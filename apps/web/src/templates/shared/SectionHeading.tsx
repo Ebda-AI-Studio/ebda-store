@@ -245,6 +245,13 @@ export function SectionHeading({
             // — they extend `flex-1` to fill but cap at max-w so they
             // never dominate. Same `bg-foreground/30` opacity as the
             // kicker hairlines for visual consistency.
+            // 2026-05-20: data-zone moved from the wrapping div to the inner
+            // <p> so the `[data-zone="sectionSubtitle"] *` CSS cascade from
+            // the typography emitter (apps/web/src/app/layout.tsx) no longer
+            // bleeds onto the flanking line <span> siblings. Was previously
+            // breaking lines when merchant set sectionSubtitle.color or
+            // backgroundColor in /typography admin. Matches the kicker
+            // pattern above (data-zone on the text element only).
             <div
               className={`self-stretch flex items-center gap-3 sm:gap-4 ${
                 subtitleAlign === 'start'
@@ -253,16 +260,6 @@ export function SectionHeading({
                     ? 'justify-end'
                     : 'justify-center'
               }`}
-              data-zone="sectionSubtitle"
-              style={{
-                fontFamily: subtitleZone?.fontFamily,
-                fontSize: responsiveFontSize(subtitleZone?.fontSize),
-                fontWeight: subtitleZone?.fontWeight,
-                color: subtitleZone?.color,
-                letterSpacing: subtitleZone?.letterSpacing,
-                lineHeight: subtitleZone?.lineHeight,
-                textTransform: subtitleZone?.textTransform as React.CSSProperties['textTransform'],
-              }}
             >
               {subtitleShowLines && (
                 <span
@@ -271,7 +268,22 @@ export function SectionHeading({
                   className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
                 />
               )}
-              <p className="text-xl text-muted-foreground max-w-2xl">{subtitleText}</p>
+              <p
+                className="text-xl text-muted-foreground max-w-2xl"
+                data-zone="sectionSubtitle"
+                style={{
+                  fontFamily: subtitleZone?.fontFamily,
+                  fontSize: responsiveFontSize(subtitleZone?.fontSize),
+                  fontWeight: subtitleZone?.fontWeight,
+                  color: subtitleZone?.color,
+                  letterSpacing: subtitleZone?.letterSpacing,
+                  lineHeight: subtitleZone?.lineHeight,
+                  textTransform:
+                    subtitleZone?.textTransform as React.CSSProperties['textTransform'],
+                }}
+              >
+                {subtitleText}
+              </p>
               {subtitleShowLines && (
                 <span
                   aria-hidden

@@ -415,6 +415,7 @@ const layoutSchema = z
             id: z.string().min(1).max(80),
             productSource: z.enum(['newest', 'best_seller', 'featured', 'category', 'manual']),
             categorySlug: z.string().max(120).optional(),
+            categoryFetchLimit: z.number().int().min(1).max(200).optional(),
             manualProductIds: z.array(z.string().max(80)).max(50).optional(),
             enabled: z.boolean().optional(),
             limit: z.number().int().min(1).max(50).optional(),

@@ -498,6 +498,12 @@ export interface ExtraCarouselSettings extends ProductCarouselSettings {
   /** When productSource === 'category', filter products by this category slug.
    *  Falls back to 'newest' if the slug doesn't match any fetched products. */
   categorySlug?: string;
+  /** When productSource === 'category', how many products to fetch from the
+   *  category before applying carousel.limit. Default 50. Bump higher (up to
+   *  200) for large categories where the carousel needs visibility into more
+   *  than the first 50 products (e.g. a sort filter applied at the carousel
+   *  layer). Each extra slot costs +1 server fetch + bigger JSON payload. */
+  categoryFetchLimit?: number;
   /** When productSource === 'manual', the list of product ids to render in
    *  the carousel. Falls back to 'newest' when the list is empty. */
   manualProductIds?: string[];

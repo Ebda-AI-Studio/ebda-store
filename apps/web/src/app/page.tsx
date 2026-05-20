@@ -133,13 +133,19 @@ async function fetchHomepageData(
   // featured, which misses products in unrelated categories or manually-
   // chosen products not in any of those lists.
   const extras = layout.extraCarousels ?? [];
-  const categoryFetches = Array.from(
-    new Set(
-      extras
-        .filter(e => e.enabled !== false && e.productSource === 'category' && e.categorySlug)
-        .map(e => e.categorySlug as string)
-    )
-  );
+  // For each unique category slug, pick the MAX requested fetch limit
+  // across all extras using that slug (default 50). One slug used by 2
+  // carousels with limits 100 + 80 → fetch 100 once, both carousels share.
+  const categoryFetchMap = new Map<string, number>();
+  for (const e of extras) {
+    if (e.enabled === false) continue;
+    if (e.productSource !== 'category') continue;
+    if (!e.categorySlug) continue;
+    const cap = Math.max(1, Math.min(200, e.categoryFetchLimit ?? 50));
+    const existing = categoryFetchMap.get(e.categorySlug) ?? 0;
+    if (cap > existing) categoryFetchMap.set(e.categorySlug, cap);
+  }
+  const categoryFetches = Array.from(categoryFetchMap.entries());
   const manualIds = Array.from(
     new Set(
       extras
@@ -148,8 +154,8 @@ async function fetchHomepageData(
     )
   );
   const extraResults = await Promise.all([
-    ...categoryFetches.map(slug =>
-      fetch(`${API_URL}/public/products?category=${encodeURIComponent(slug)}&limit=50`, {
+    ...categoryFetches.map(([slug, fetchLimit]) =>
+      fetch(`${API_URL}/public/products?category=${encodeURIComponent(slug)}&limit=${fetchLimit}`, {
         next: { revalidate: 60 },
         headers: storeHeaders,
       })

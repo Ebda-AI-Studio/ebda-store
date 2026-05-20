@@ -2379,6 +2379,13 @@ interface ProductSummary {
   images?: Array<{ url: string }>;
 }
 
+// Module-level cache for product details (id → summary). Survives across
+// renders + across ExtraCarouselCard instances within the same admin session.
+// Avoids re-fetching names for already-known products every time merchant
+// opens the page-builder or expands a different extra card. Cleared on hard
+// reload only — that's fine, fresh data after refresh is the cheap path.
+const PRODUCT_DETAIL_CACHE = new Map<string, ProductSummary>();
+
 function ManualProductPicker({
   storeId,
   value,
@@ -2390,15 +2397,38 @@ function ManualProductPicker({
 }) {
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<ProductSummary[]>([]);
-  const [selectedDetails, setSelectedDetails] = useState<Record<string, ProductSummary>>({});
+  // Seed from the module-level cache so already-known products render their
+  // names + thumbs on first paint without any fetch (eliminates the flash-of-id
+  // when the merchant opens page-builder a second time in the same session).
+  const [selectedDetails, setSelectedDetails] = useState<Record<string, ProductSummary>>(() => {
+    const seed: Record<string, ProductSummary> = {};
+    for (const id of value) {
+      const cached = PRODUCT_DETAIL_CACHE.get(id);
+      if (cached) seed[id] = cached;
+    }
+    return seed;
+  });
+  const [highlightIdx, setHighlightIdx] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [open, setOpen] = useState(false);
 
-  // Hydrate names for already-saved ids on mount + whenever the value array
-  // grows to include unknown ids.
+  // Hydrate names for IDs we don't have cached yet. Reads from PRODUCT_DETAIL_CACHE
+  // first (free); falls through to a single batched fetch for the remainder.
   useEffect(() => {
-    const missing = value.filter(id => !selectedDetails[id]);
-    if (missing.length === 0) return;
+    const missing = value.filter(id => !selectedDetails[id] && !PRODUCT_DETAIL_CACHE.has(id));
+    if (missing.length === 0) {
+      // All ids known via cache — populate state from cache if needed.
+      const next: Record<string, ProductSummary> = { ...selectedDetails };
+      let changed = false;
+      for (const id of value) {
+        if (!next[id] && PRODUCT_DETAIL_CACHE.has(id)) {
+          next[id] = PRODUCT_DETAIL_CACHE.get(id)!;
+          changed = true;
+        }
+      }
+      if (changed) setSelectedDetails(next);
+      return;
+    }
     (async () => {
       try {
         const res = await apiGet<{
@@ -2408,7 +2438,10 @@ function ManualProductPicker({
         const list =
           res.data?.products ?? (res.data as { products?: ProductSummary[] })?.products ?? [];
         const next: Record<string, ProductSummary> = { ...selectedDetails };
-        for (const p of list) next[p.id] = p;
+        for (const p of list) {
+          next[p.id] = p;
+          PRODUCT_DETAIL_CACHE.set(p.id, p);
+        }
         setSelectedDetails(next);
       } catch {
         // silent — picker stays functional with id-only display fallback
@@ -2434,7 +2467,11 @@ function ManualProductPicker({
         }>(`/api/v1/admin/stores/${storeId}/products?search=${encodeURIComponent(q)}&limit=10`);
         const list =
           res.data?.products ?? (res.data as { products?: ProductSummary[] })?.products ?? [];
+        // Cache search-result details so a later "remove + re-add" doesn't
+        // re-fetch the same product.
+        for (const p of list) PRODUCT_DETAIL_CACHE.set(p.id, p);
         setSearchResults(list);
+        setHighlightIdx(0);
       } catch {
         setSearchResults([]);
       } finally {
@@ -2541,8 +2578,27 @@ function ManualProductPicker({
           onChange={e => {
             setSearch(e.target.value);
             setOpen(true);
+            setHighlightIdx(0);
           }}
           onFocus={() => setOpen(true)}
+          onKeyDown={e => {
+            const filtered = searchResults.filter(p => !value.includes(p.id));
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setHighlightIdx(i => Math.min(i + 1, Math.max(0, filtered.length - 1)));
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setHighlightIdx(i => Math.max(i - 1, 0));
+            } else if (e.key === 'Enter') {
+              const pick = filtered[highlightIdx];
+              if (pick) {
+                e.preventDefault();
+                add(pick.id, pick);
+              }
+            } else if (e.key === 'Escape') {
+              setOpen(false);
+            }
+          }}
           placeholder={`Search products to add (${value.length}/50)…`}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
         />
@@ -2556,12 +2612,15 @@ function ManualProductPicker({
             )}
             {searchResults
               .filter(p => !value.includes(p.id))
-              .map(p => (
+              .map((p, i) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => add(p.id, p)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-start hover:bg-muted"
+                  onMouseEnter={() => setHighlightIdx(i)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-start ${
+                    i === highlightIdx ? 'bg-muted' : 'hover:bg-muted'
+                  }`}
                 >
                   {p.images?.[0]?.url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -2582,6 +2641,11 @@ function ManualProductPicker({
                 </button>
               ))}
           </div>
+        )}
+        {(search.trim() !== '' || searchResults.length > 0) && (
+          <p className="mt-1 text-[10px] text-muted-foreground/70">
+            ↑↓ to navigate · Enter to add · Esc to close
+          </p>
         )}
       </div>
     </div>
@@ -2690,16 +2754,42 @@ function ExtraCarouselCard({
             </select>
           </label>
           {extra.productSource === 'category' && (
-            <label className="flex flex-col gap-1 sm:col-span-2">
-              <span className="text-xs font-medium text-muted-foreground">Category slug</span>
-              <input
-                type="text"
-                value={extra.categorySlug ?? ''}
-                onChange={e => onPatch({ categorySlug: e.target.value || undefined })}
-                placeholder="exact slug as in /products?category=<slug>"
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
-              />
-            </label>
+            <>
+              <label className="flex flex-col gap-1 sm:col-span-2">
+                <span className="text-xs font-medium text-muted-foreground">Category slug</span>
+                <input
+                  type="text"
+                  value={extra.categorySlug ?? ''}
+                  onChange={e => onPatch({ categorySlug: e.target.value || undefined })}
+                  placeholder="exact slug as in /products?category=<slug>"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
+                />
+              </label>
+              <label className="flex flex-col gap-1 sm:col-span-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Products to fetch from this category (default 50)
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={200}
+                  value={extra.categoryFetchLimit ?? 50}
+                  onChange={e => {
+                    const v = Number(e.target.value);
+                    onPatch({
+                      categoryFetchLimit:
+                        Number.isFinite(v) && v >= 1 && v <= 200 && v !== 50 ? v : undefined,
+                    });
+                  }}
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm w-32"
+                />
+                <span className="mt-0.5 text-[11px] text-muted-foreground/80">
+                  Bump higher (max 200) for large categories — costs more per page load. Keep at 50
+                  unless your category has &gt;50 products AND the storefront needs visibility past
+                  the first 50.
+                </span>
+              </label>
+            </>
           )}
           {extra.productSource === 'manual' && (
             <div className="sm:col-span-2 flex flex-col gap-1">
