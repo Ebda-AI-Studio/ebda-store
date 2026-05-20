@@ -119,9 +119,21 @@ const nextConfig = {
             //   connect-src https://*.onesignal.com → REST + websocket
             //   worker-src 'self' blob: → /OneSignalSDKWorker.js can importScripts the OneSignal CDN
             //   manifest-src 'self' → PWA install
+            //
+            // frame-src 2026-05-20: page-builder embeds the storefront as a
+            // live-preview iframe. Without storefront origins here, Chrome
+            // blocks the iframe with "This content is blocked" — the parent's
+            // CSP frame-src controls what URLs the PARENT can frame
+            // (separate from the storefront's frame-ancestors, which controls
+            // who can frame IT). Both must permit the embed for it to render.
+            // ADMIN_PREVIEW_FRAME_SRC env var lets ops extend the allowlist
+            // when new custom-domain tenants are onboarded without a deploy.
             key: 'Content-Security-Policy',
             value:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://store-api.forcemediakw.com wss://store-api.forcemediakw.com https://*.up.railway.app wss://*.up.railway.app https://*.supabase.co https://vercel.live wss://vercel.live https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com; frame-src https://vercel.live https://onesignal.com https://*.onesignal.com; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://store-api.forcemediakw.com wss://store-api.forcemediakw.com https://*.up.railway.app wss://*.up.railway.app https://*.supabase.co https://vercel.live wss://vercel.live https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com; frame-src https://vercel.live https://onesignal.com https://*.onesignal.com " +
+              (process.env.ADMIN_PREVIEW_FRAME_SRC ??
+                'https://store.forcemediakw.com https://*.forcemediakw.com https://wadyaljuz.com https://*.vercel.app') +
+              "; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'",
           },
         ],
       },
