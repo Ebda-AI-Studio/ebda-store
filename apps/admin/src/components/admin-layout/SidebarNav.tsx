@@ -7,15 +7,28 @@ interface SidebarNavProps {
   navItems: NavItem[];
   pathname: string | null;
   onNavigate: () => void;
+  /**
+   * When provided, a nav item is considered active if its `hubKey` matches
+   * this value. This ensures the Catalog hub item stays highlighted when
+   * browsing /blog or /page-builder even though the item's href points to
+   * /products.
+   */
+  activeHubKey?: string | null;
 }
 
-export function SidebarNav({ navItems, pathname, onNavigate }: SidebarNavProps) {
+export function SidebarNav({ navItems, pathname, onNavigate, activeHubKey }: SidebarNavProps) {
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-4">
       <ul className="space-y-1">
         {navItems.map(item => {
-          const isActive =
-            pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+          // Hub-aware active detection: if the item carries a hubKey and the
+          // current hub matches, mark it active regardless of the exact URL.
+          // Falls back to the original pathname-prefix check for super-admin
+          // nav items that don't have a hubKey.
+          const isActive = item.hubKey
+            ? activeHubKey === item.hubKey
+            : pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+
           return (
             <li key={item.name}>
               <Link

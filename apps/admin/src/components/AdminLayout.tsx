@@ -13,6 +13,8 @@ import {
   type NavLabels,
   type StoreBranding,
 } from './admin-layout/buildStoreAdminNav';
+import { HubTabs } from './admin-layout/HubTabs';
+import { detectHub, type HubLabels } from './admin-layout/hubs';
 import { SidebarHeader } from './admin-layout/SidebarHeader';
 import { SidebarNav } from './admin-layout/SidebarNav';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
@@ -78,33 +80,48 @@ export function AdminLayout({
       : (explicitMode ?? (isStoreScopedPath ? 'store_admin' : 'super_admin'));
 
   const navLabels: NavLabels = {
+    // Hub names (sidebar — 8 items)
     dashboard: t('navDashboard'),
+    catalog: t('navCatalog'),
+    sales: t('navSales'),
+    stock: t('navStock'),
+    finance: t('navFinance'),
+    analytics: t('navAnalytics'),
+    marketing: t('navMarketing'),
+    settings: t('navSettings'),
+    // Super-admin only
     stores: t('navStores'),
     users: t('navUsers'),
     auditLogs: t('navAuditLogs'),
-    products: t('navProducts'),
-    orders: t('navOrders'),
-    customers: t('navCustomers'),
-    analytics: t('navAnalytics'),
-    pageBuilder: t('navPageBuilder'),
-    content: t('navContent'),
-    settings: t('navSettings'),
-    aiTools: t('navAiTools'),
-    navAccounts: t('navAccounts'),
-    navJournal: t('navJournal'),
-    // Stock group (Batch 2)
-    navStockDashboard: t('navStockDashboard'),
-    navInventory: t('navInventory'),
-    navAdjustments: t('navAdjustments'),
-    navSuppliers: t('navSuppliers'),
-    navPurchaseOrders: t('navPurchaseOrders'),
-    navReorder: t('navReorder'),
-    navBackorders: t('navBackorders'),
-    navDeadstock: t('navDeadstock'),
-    // Finance group extensions (Batch 2)
-    navFinanceDashboard: t('navFinanceDashboard'),
-    navExpenses: t('navExpenses'),
-    navReports: t('navReports'),
+  };
+
+  const hubLabels: HubLabels = {
+    // Catalog tabs
+    products: t('hubTabs.products'),
+    pageBuilder: t('hubTabs.pageBuilder'),
+    content: t('hubTabs.content'),
+    blog: t('hubTabs.blog'),
+    // Sales tabs
+    orders: t('hubTabs.orders'),
+    customers: t('hubTabs.customers'),
+    // Stock tabs
+    stockDashboard: t('hubTabs.stockDashboard'),
+    inventory: t('hubTabs.inventory'),
+    adjustments: t('hubTabs.adjustments'),
+    suppliers: t('hubTabs.suppliers'),
+    purchaseOrders: t('hubTabs.purchaseOrders'),
+    backorders: t('hubTabs.backorders'),
+    reorder: t('hubTabs.reorder'),
+    deadstock: t('hubTabs.deadstock'),
+    // Finance tabs
+    financeDashboard: t('hubTabs.financeDashboard'),
+    accounts: t('hubTabs.accounts'),
+    journal: t('hubTabs.journal'),
+    expenses: t('hubTabs.expenses'),
+    reports: t('hubTabs.reports'),
+    // Marketing tabs
+    aiTools: t('hubTabs.aiTools'),
+    whatsapp: t('hubTabs.whatsapp'),
   };
 
   // Sync dark mode with localStorage and system preference
@@ -175,6 +192,25 @@ export function AdminLayout({
     item => !item.featureKey || isFeatureEnabled(item.featureKey)
   );
 
+  // Hub detection — only applies to store-admin mode with a resolved storeId.
+  // Detects which hub the current URL belongs to, builds the tab list, and
+  // exposes the hub key so SidebarNav can highlight the correct hub item even
+  // when browsing a non-landing sub-route (e.g. /blog highlights Catalog).
+  const { activeHubKey, hubTabs } = useMemo(() => {
+    if (mode !== 'store_admin' || !navStoreId || !pathname) {
+      return { activeHubKey: null, hubTabs: [] };
+    }
+    const hub = detectHub(pathname, navStoreId);
+    if (!hub) return { activeHubKey: null, hubTabs: [] };
+    return {
+      activeHubKey: hub.key,
+      hubTabs: hub.buildTabs(navStoreId, hubLabels),
+    };
+    // hubLabels object is rebuilt on every render (from translation strings) but
+    // its values are stable strings — useMemo deps on pathname + navStoreId is sufficient.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, navStoreId, pathname]);
+
   // Auto-derive store branding for the sidebar header when the page didn't
   // pass it explicitly. The shared useCurrentStore hook already fetched the
   // store's logo + name, so we hand them straight to SidebarHeader.
@@ -203,6 +239,7 @@ export function AdminLayout({
         navItems={navItems}
         pathname={pathname}
         onNavigate={() => setIsSidebarOpen(false)}
+        activeHubKey={activeHubKey}
       />
       <SidebarFooter isDark={isDark} onToggleTheme={toggleTheme} user={user} onLogout={logout} />
     </>
@@ -278,6 +315,11 @@ export function AdminLayout({
           onBack={() => router.back()}
           viewStoreUrl={viewStoreUrl}
         />
+
+        {/* Hub tab nav — shown above page content when inside a multi-route hub
+            (Catalog, Sales, Stock, Finance, Marketing). Empty for single-page
+            hubs (Dashboard, Analytics, Settings). */}
+        {hubTabs.length > 0 && <HubTabs items={hubTabs} />}
 
         {/* Page Content. `pb-20` on mobile reserves room for the
             fixed bottom-nav so primary actions / save buttons aren't
