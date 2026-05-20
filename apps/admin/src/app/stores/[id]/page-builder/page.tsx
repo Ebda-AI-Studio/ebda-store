@@ -1190,204 +1190,214 @@ export default function StoreLayoutPage() {
                   back-compat with existing stores' saved JSON but isn't
                   surfaced in admin or read by render code. */}
 
-              {/* Section Dividers — platform-wide horizontal rules between sections.
-                  Merged from the standalone /dividers page (2026-05-19).
-                  Lives here at the same conceptual tier as Header + Footer
-                  typography — both are platform-wide visual rhythm controls.
-                  Persists via a dedicated PUT /theme call (handleSaveDividers)
-                  so it stays independent of the layout + typography saves. */}
-              <SectionCard
-                title="Section dividers (platform-wide)"
-                description="Horizontal lines between homepage sections. Tune style, thickness, width, color, and spacing."
-                alwaysOn
-                defaultExpanded={false}
-              >
-                <div className="space-y-5">
-                  {/* Group A — Master toggle */}
-                  <DividerControlGroup
-                    heading="Visibility"
-                    description="Master switch for the horizontal rule between sections. Color-shift backgrounds already separate sections visually — turning dividers off when you use a background preset keeps the page from feeling over-separated."
-                  >
-                    <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-sm font-semibold text-foreground">
-                          Show section dividers
-                        </span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
-                          When off, your homepage sections sit edge-to-edge with no horizontal line
-                          between them.
-                        </span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={dividerSettings.enabled}
-                        onChange={e =>
-                          setDividerSettings(prev => ({ ...prev, enabled: e.target.checked }))
-                        }
-                        className="h-5 w-5 cursor-pointer accent-primary"
-                      />
-                    </label>
-                  </DividerControlGroup>
+              {/* Section dividers card REMOVED 2026-05-20 — Ahmad: "i want them by
+                  each section". Per-section divider controls now live inside each
+                  SectionCard above (hero, categories, newArrivals, bestSellers,
+                  testimonials) via the SectionDividers data model (5 slots each:
+                  above / kicker / title / subtitle / belowHeading).
 
-                  {/* All other controls disabled when master off */}
-                  <fieldset
-                    disabled={!dividerSettings.enabled}
-                    className={`space-y-5 ${dividerSettings.enabled ? '' : 'opacity-50 pointer-events-none'}`}
-                  >
-                    {/* Group B — Style & thickness */}
-                    <DividerControlGroup
-                      heading="Style & thickness"
-                      description="What the line itself looks like."
-                    >
-                      <DividerRadioPicker
-                        label="Line style"
-                        hint="How the line is drawn."
-                        value={dividerSettings.style}
-                        options={[
-                          { value: 'solid', label: 'Solid' },
-                          { value: 'dashed', label: 'Dashed' },
-                          { value: 'dotted', label: 'Dotted' },
-                          { value: 'double', label: 'Double' },
-                        ]}
-                        onChange={v =>
-                          setDividerSettings(prev => ({
-                            ...prev,
-                            style: v as DividerStyle,
-                          }))
-                        }
-                      />
-                      <DividerRadioPicker
-                        label="Line thickness"
-                        hint="Pixel height of the line."
-                        value={String(dividerSettings.thickness)}
-                        options={[
-                          { value: '1', label: 'Hairline (1px)' },
-                          { value: '2', label: 'Medium (2px)' },
-                          { value: '3', label: 'Bold (3px)' },
-                        ]}
-                        onChange={v =>
-                          setDividerSettings(prev => ({
-                            ...prev,
-                            thickness: Number(v) as DividerThickness,
-                          }))
-                        }
-                      />
-                    </DividerControlGroup>
+                  Storefront `<SectionDivider>` still reads legacy `theme.dividers`
+                  as a fallback when no per-section override is set, so existing
+                  stores keep their current look until merchants opt-in per-section.
 
-                    {/* Group C — Position & size */}
+                  The save handler `handleSaveDividers` + state `dividerSettings`
+                  are now unused by this card but kept for v1 migration safety —
+                  will be removed in a follow-up commit once all stores are on
+                  per-section dividers. */}
+              {false && (
+                <SectionCard
+                  title="Section dividers (platform-wide) — DEPRECATED"
+                  description="Removed in 2026-05-20. Use per-section dividers inside each SectionCard above."
+                  alwaysOn
+                  defaultExpanded={false}
+                >
+                  <div className="space-y-5">
+                    {/* Group A — Master toggle */}
                     <DividerControlGroup
-                      heading="Position & size"
-                      description="How wide the line is and how much space it leaves around itself."
+                      heading="Visibility"
+                      description="Master switch for the horizontal rule between sections. Color-shift backgrounds already separate sections visually — turning dividers off when you use a background preset keeps the page from feeling over-separated."
                     >
-                      <DividerRadioPicker
-                        label="Line width"
-                        hint="How wide the line spans across the page."
-                        value={dividerSettings.width}
-                        options={[
-                          { value: 'full', label: 'Edge-to-edge' },
-                          { value: 'contained', label: 'Within content (recommended)' },
-                          { value: 'short', label: 'Short accent (centered)' },
-                        ]}
-                        onChange={v =>
-                          setDividerSettings(prev => ({
-                            ...prev,
-                            width: v as DividerWidth,
-                          }))
-                        }
-                      />
-                      <DividerRadioPicker
-                        label="Vertical spacing"
-                        hint="Padding above and below the line."
-                        value={dividerSettings.spacing}
-                        options={[
-                          { value: 'tight', label: 'Tight' },
-                          { value: 'normal', label: 'Normal' },
-                          { value: 'loose', label: 'Loose' },
-                        ]}
-                        onChange={v =>
-                          setDividerSettings(prev => ({
-                            ...prev,
-                            spacing: v as DividerSpacing,
-                          }))
-                        }
-                      />
-                    </DividerControlGroup>
-
-                    {/* Group D — Color */}
-                    <DividerControlGroup
-                      heading="Color"
-                      description="Pick a tone that matches your sections. Auto lets the theme decide; Accent uses your brand primary."
-                    >
-                      <DividerRadioPicker
-                        label="Line color"
-                        hint="How the line picks up your store palette."
-                        value={dividerSettings.color}
-                        options={[
-                          { value: 'auto', label: 'Auto (subtle theme color)' },
-                          { value: 'foreground', label: 'High contrast (foreground)' },
-                          { value: 'accent', label: 'Brand color' },
-                          { value: 'custom', label: 'Custom color' },
-                        ]}
-                        onChange={v =>
-                          setDividerSettings(prev => ({
-                            ...prev,
-                            color: v as DividerColorMode,
-                          }))
-                        }
-                      />
-                      {dividerSettings.color === 'custom' && (
-                        <label className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
-                          <span className="text-sm text-foreground">Pick a custom color</span>
-                          <input
-                            type="color"
-                            value={dividerSettings.customColor ?? '#cccccc'}
-                            onChange={e =>
-                              setDividerSettings(prev => ({
-                                ...prev,
-                                customColor: e.target.value,
-                              }))
-                            }
-                            className="h-10 w-16 cursor-pointer rounded border border-border"
-                          />
-                          <span className="font-mono text-sm text-muted-foreground">
-                            {dividerSettings.customColor ?? '#cccccc'}
+                      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-semibold text-foreground">
+                            Show section dividers
                           </span>
-                        </label>
-                      )}
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            When off, your homepage sections sit edge-to-edge with no horizontal
+                            line between them.
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={dividerSettings.enabled}
+                          onChange={e =>
+                            setDividerSettings(prev => ({ ...prev, enabled: e.target.checked }))
+                          }
+                          className="h-5 w-5 cursor-pointer accent-primary"
+                        />
+                      </label>
                     </DividerControlGroup>
-                  </fieldset>
 
-                  {/* Live preview */}
-                  <DividerPreviewBlock
-                    settings={dividerSettings}
-                    primaryColor={storeInfo?.theme?.primaryColor}
-                  />
+                    {/* All other controls disabled when master off */}
+                    <fieldset
+                      disabled={!dividerSettings.enabled}
+                      className={`space-y-5 ${dividerSettings.enabled ? '' : 'opacity-50 pointer-events-none'}`}
+                    >
+                      {/* Group B — Style & thickness */}
+                      <DividerControlGroup
+                        heading="Style & thickness"
+                        description="What the line itself looks like."
+                      >
+                        <DividerRadioPicker
+                          label="Line style"
+                          hint="How the line is drawn."
+                          value={dividerSettings.style}
+                          options={[
+                            { value: 'solid', label: 'Solid' },
+                            { value: 'dashed', label: 'Dashed' },
+                            { value: 'dotted', label: 'Dotted' },
+                            { value: 'double', label: 'Double' },
+                          ]}
+                          onChange={v =>
+                            setDividerSettings(prev => ({
+                              ...prev,
+                              style: v as DividerStyle,
+                            }))
+                          }
+                        />
+                        <DividerRadioPicker
+                          label="Line thickness"
+                          hint="Pixel height of the line."
+                          value={String(dividerSettings.thickness)}
+                          options={[
+                            { value: '1', label: 'Hairline (1px)' },
+                            { value: '2', label: 'Medium (2px)' },
+                            { value: '3', label: 'Bold (3px)' },
+                          ]}
+                          onChange={v =>
+                            setDividerSettings(prev => ({
+                              ...prev,
+                              thickness: Number(v) as DividerThickness,
+                            }))
+                          }
+                        />
+                      </DividerControlGroup>
 
-                  <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDividerSettings(DEFAULT_DIVIDER_SETTINGS);
-                        setDividerSaveMsg(null);
-                      }}
-                      className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
-                    >
-                      Reset to defaults
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveDividers}
-                      disabled={isSaving}
-                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors cursor-pointer"
-                    >
-                      {isSaving ? 'Saving…' : 'Save dividers'}
-                    </button>
-                    {dividerSaveMsg && (
-                      <span className="text-sm text-muted-foreground">{dividerSaveMsg}</span>
-                    )}
+                      {/* Group C — Position & size */}
+                      <DividerControlGroup
+                        heading="Position & size"
+                        description="How wide the line is and how much space it leaves around itself."
+                      >
+                        <DividerRadioPicker
+                          label="Line width"
+                          hint="How wide the line spans across the page."
+                          value={dividerSettings.width}
+                          options={[
+                            { value: 'full', label: 'Edge-to-edge' },
+                            { value: 'contained', label: 'Within content (recommended)' },
+                            { value: 'short', label: 'Short accent (centered)' },
+                          ]}
+                          onChange={v =>
+                            setDividerSettings(prev => ({
+                              ...prev,
+                              width: v as DividerWidth,
+                            }))
+                          }
+                        />
+                        <DividerRadioPicker
+                          label="Vertical spacing"
+                          hint="Padding above and below the line."
+                          value={dividerSettings.spacing}
+                          options={[
+                            { value: 'tight', label: 'Tight' },
+                            { value: 'normal', label: 'Normal' },
+                            { value: 'loose', label: 'Loose' },
+                          ]}
+                          onChange={v =>
+                            setDividerSettings(prev => ({
+                              ...prev,
+                              spacing: v as DividerSpacing,
+                            }))
+                          }
+                        />
+                      </DividerControlGroup>
+
+                      {/* Group D — Color */}
+                      <DividerControlGroup
+                        heading="Color"
+                        description="Pick a tone that matches your sections. Auto lets the theme decide; Accent uses your brand primary."
+                      >
+                        <DividerRadioPicker
+                          label="Line color"
+                          hint="How the line picks up your store palette."
+                          value={dividerSettings.color}
+                          options={[
+                            { value: 'auto', label: 'Auto (subtle theme color)' },
+                            { value: 'foreground', label: 'High contrast (foreground)' },
+                            { value: 'accent', label: 'Brand color' },
+                            { value: 'custom', label: 'Custom color' },
+                          ]}
+                          onChange={v =>
+                            setDividerSettings(prev => ({
+                              ...prev,
+                              color: v as DividerColorMode,
+                            }))
+                          }
+                        />
+                        {dividerSettings.color === 'custom' && (
+                          <label className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
+                            <span className="text-sm text-foreground">Pick a custom color</span>
+                            <input
+                              type="color"
+                              value={dividerSettings.customColor ?? '#cccccc'}
+                              onChange={e =>
+                                setDividerSettings(prev => ({
+                                  ...prev,
+                                  customColor: e.target.value,
+                                }))
+                              }
+                              className="h-10 w-16 cursor-pointer rounded border border-border"
+                            />
+                            <span className="font-mono text-sm text-muted-foreground">
+                              {dividerSettings.customColor ?? '#cccccc'}
+                            </span>
+                          </label>
+                        )}
+                      </DividerControlGroup>
+                    </fieldset>
+
+                    {/* Live preview */}
+                    <DividerPreviewBlock
+                      settings={dividerSettings}
+                      primaryColor={storeInfo?.theme?.primaryColor}
+                    />
+
+                    <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDividerSettings(DEFAULT_DIVIDER_SETTINGS);
+                          setDividerSaveMsg(null);
+                        }}
+                        className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      >
+                        Reset to defaults
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveDividers}
+                        disabled={isSaving}
+                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors cursor-pointer"
+                      >
+                        {isSaving ? 'Saving…' : 'Save dividers'}
+                      </button>
+                      {dividerSaveMsg && (
+                        <span className="text-sm text-muted-foreground">{dividerSaveMsg}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </SectionCard>
+                </SectionCard>
+              )}
 
               {/* Header + Footer typography — only truly platform-wide zones.
                   Section-specific zones (sectionTitle / sectionKicker / etc.)
@@ -2105,8 +2115,12 @@ type KickerSubtitleValues = {
   subtitleAr?: string;
   title?: string;
   titleAr?: string;
+  /** @deprecated 2026-05-20 — use `dividers.kicker.enabled`. Still read as fallback. */
   showKickerLines?: boolean;
+  /** @deprecated 2026-05-20 — use `dividers.subtitle.enabled`. Still read as fallback. */
   showSubtitleLines?: boolean;
+  /** Per-section divider slots (above / kicker / title / subtitle / belowHeading). */
+  dividers?: import('@force/shared').SectionDividers;
 };
 
 function KickerSubtitleControls({
@@ -2169,28 +2183,89 @@ function KickerSubtitleControls({
           dir="rtl"
         />
       </div>
-      <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/20 p-3">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Heading line dividers
-        </p>
-        <p className="mb-3 text-[11px] text-muted-foreground/80">
-          Two short hairline rules drawn before and after the kicker / subtitle text. Turn off for a
-          cleaner look without the surrounding lines.
-        </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <RowToggle
-            label="Show lines around kicker"
-            checked={values.showKickerLines !== false}
-            onChange={v => onPatch({ showKickerLines: v })}
-          />
-          <RowToggle
-            label="Show lines around subtitle"
-            checked={values.showSubtitleLines !== false}
-            onChange={v => onPatch({ showSubtitleLines: v })}
-          />
-        </div>
-      </div>
+      <SectionDividersBlock values={values} onPatch={onPatch} />
     </>
+  );
+}
+
+/**
+ * Per-section dividers block — 5 toggles for the 5 SectionDividers slots
+ * (above / kicker / title / subtitle / belowHeading). Each toggle writes
+ * to `dividers.<slot>.enabled` on the section. Replaces the legacy
+ * `showKickerLines` / `showSubtitleLines` boolean fields (still read for
+ * back-compat by the storefront).
+ *
+ * Ahmad 2026-05-20: "i want them by each section and per each part of it
+ * as the Heading line dividers". This v1 ships the enabled toggles only;
+ * the full DividerSettings shape (style/thickness/width/color/spacing) is
+ * stored + zod-accepted but uses defaults for rendering. v2 will add
+ * per-slot styling controls.
+ */
+function SectionDividersBlock({
+  values,
+  onPatch,
+}: {
+  values: KickerSubtitleValues;
+  onPatch: (patch: Partial<KickerSubtitleValues>) => void;
+}) {
+  const dividers = values.dividers ?? {};
+
+  // Set or unset a slot's `enabled` field. When turning ON, seed an empty
+  // object so the storefront renders with DEFAULT_DIVIDER_SETTINGS. When
+  // turning OFF, mark explicit `enabled: false` so the storefront doesn't
+  // fall back to the legacy boolean.
+  function setSlot(slot: 'above' | 'kicker' | 'title' | 'subtitle' | 'belowHeading', on: boolean) {
+    onPatch({
+      dividers: {
+        ...dividers,
+        [slot]: { ...(dividers[slot] ?? {}), enabled: on },
+      },
+    });
+  }
+
+  // Resolve current ENABLED state per slot. Kicker / subtitle fall back
+  // to the legacy showKickerLines / showSubtitleLines booleans (default
+  // true) when the new shape is unset, matching storefront behavior.
+  const aboveOn = dividers.above?.enabled === true;
+  const kickerOn = dividers.kicker?.enabled ?? values.showKickerLines !== false;
+  const titleOn = dividers.title?.enabled === true;
+  const subtitleOn = dividers.subtitle?.enabled ?? values.showSubtitleLines !== false;
+  const belowHeadingOn = dividers.belowHeading?.enabled === true;
+
+  return (
+    <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/20 p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Section dividers
+      </p>
+      <p className="mb-3 text-[11px] text-muted-foreground/80">
+        Hairline dividers around each part of this section. Each toggle is independent — turn on the
+        ones that match your visual rhythm. Default OFF except for kicker + subtitle, which inherit
+        the existing &quot;Heading line dividers&quot; behavior.
+      </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <RowToggle
+          label="Above this section"
+          checked={aboveOn}
+          onChange={v => setSlot('above', v)}
+        />
+        <RowToggle
+          label="Around kicker text"
+          checked={kickerOn}
+          onChange={v => setSlot('kicker', v)}
+        />
+        <RowToggle label="Around title" checked={titleOn} onChange={v => setSlot('title', v)} />
+        <RowToggle
+          label="Around subtitle"
+          checked={subtitleOn}
+          onChange={v => setSlot('subtitle', v)}
+        />
+        <RowToggle
+          label="Below heading (before content)"
+          checked={belowHeadingOn}
+          onChange={v => setSlot('belowHeading', v)}
+        />
+      </div>
+    </div>
   );
 }
 

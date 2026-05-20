@@ -5,6 +5,17 @@ import { DEFAULT_DIVIDER_SETTINGS, type DividerSettings } from '@force/shared';
 
 interface SectionDividerProps {
   /**
+   * Per-section divider settings (partial). When provided AND
+   * `enabled !== false`, renders the divider with these settings merged over
+   * DEFAULT_DIVIDER_SETTINGS. When `enabled === false`, renders nothing.
+   *
+   * When NOT provided (undefined), falls back to legacy `theme.dividers`
+   * (platform-wide setting) to preserve existing stores' look. Once a
+   * merchant sets per-section dividers via the new page-builder UI, the
+   * per-section value wins.
+   */
+  settings?: Partial<DividerSettings>;
+  /**
    * When true (caller indicates one or both adjacent sections have an
    * explicit per-section bgColor), hide the divider — the color shift IS
    * the separator. Same idiom as the theme.backgroundPreset mutex below.
@@ -18,33 +29,40 @@ interface SectionDividerProps {
 }
 
 /**
- * Horizontal section divider — drawn between homepage sections per
- * `store.theme.dividers`. Default-on so every store gets a visible
- * separator without merchant action; merchants tune style/color/etc.
- * via Admin → Dividers.
+ * Horizontal section divider — rendered between homepage sections OR
+ * between heading parts (kicker/title/subtitle) within a section.
+ *
+ * Per Ahmad 2026-05-20: the platform-wide admin card is removed; each
+ * section owns its dividers via `layout.<section>.dividers.{above,
+ * kicker, title, subtitle, belowHeading}`. The storefront still falls
+ * back to legacy `theme.dividers` when no per-section setting is passed,
+ * so existing stores keep their current look.
  *
  * Returns null when:
- *   - `enabled === false` (merchant turned dividers off)
- *   - `theme.backgroundPreset !== 'none'` (alternation IS the divider)
- *   - `hideForExplicitBg === true` (caller indicates adjacent per-section
- *     bgColors are set, making the color shift the separator)
+ *   - settings.enabled === false (merchant explicitly turned it off)
+ *   - no per-section settings AND no legacy `theme.dividers` either
+ *   - theme.backgroundPreset !== 'none' (alternation IS the divider)
+ *   - hideForExplicitBg === true (adjacent per-section bgColors set)
  */
-export function SectionDivider({ hideForExplicitBg }: SectionDividerProps = {}) {
+export function SectionDivider({ settings, hideForExplicitBg }: SectionDividerProps = {}) {
   const { store } = useStore();
-  const settings: DividerSettings = {
-    ...DEFAULT_DIVIDER_SETTINGS,
-    ...(store.theme?.dividers ?? {}),
-  };
-  if (!settings.enabled) return null;
+
+  // Per-section settings win when provided. Legacy theme.dividers is the
+  // fallback for the between-section `above` slot only — only HomePageContent
+  // calls without an explicit `settings` prop, and that's the legacy path.
+  const merged: DividerSettings = settings
+    ? { ...DEFAULT_DIVIDER_SETTINGS, ...settings }
+    : { ...DEFAULT_DIVIDER_SETTINGS, ...(store.theme?.dividers ?? {}) };
+
+  if (!merged.enabled) return null;
 
   // Mutual exclusion with backgroundPreset (Ahmad 2026-05-17 evening):
   // both systems separate sections visually — running them together is
-  // unpleasant double-separation. When the merchant picked a bg preset,
-  // the alternation IS the divider; render no <hr>. Dividers only paint
-  // when bg preset is `none` (or unset), so flat-bg stores still get a
-  // visible separator.
+  // unpleasant double-separation. Only applies to between-section dividers;
+  // intra-section line dividers (kicker/title/subtitle) bypass this check
+  // because they're not affected by background alternation.
   const bgPreset = store.theme?.backgroundPreset ?? 'none';
-  if (bgPreset !== 'none') return null;
+  if (bgPreset !== 'none' && hideForExplicitBg !== undefined) return null;
 
   // Per-section bgColor mutex (2026-05-19): merchants can color individual
   // sections without changing the global backgroundPreset. When either
@@ -54,14 +72,14 @@ export function SectionDivider({ hideForExplicitBg }: SectionDividerProps = {}) 
 
   // Color resolution — single source of truth so the admin live preview
   // and the storefront render stay in lockstep.
-  const colorCss = resolveDividerColor(settings, store.theme?.primaryColor);
+  const colorCss = resolveDividerColor(merged, store.theme?.primaryColor);
 
   // Vertical padding bands per spacing token. Padding sits OUTSIDE the
   // line itself so adjacent sections don't grow when dividers turn on.
   const paddingClass =
-    settings.spacing === 'tight'
+    merged.spacing === 'tight'
       ? 'py-3 sm:py-4'
-      : settings.spacing === 'loose'
+      : merged.spacing === 'loose'
         ? 'py-8 sm:py-12'
         : 'py-5 sm:py-8';
 
@@ -69,9 +87,9 @@ export function SectionDivider({ hideForExplicitBg }: SectionDividerProps = {}) 
   // short centered accent. Default 'short' = 140-200px to match the
   // SectionKicker hairlines that flank section titles (Ahmad 2026-05-17).
   const containerClass =
-    settings.width === 'full'
+    merged.width === 'full'
       ? 'w-full'
-      : settings.width === 'short'
+      : merged.width === 'short'
         ? 'mx-auto w-[140px] sm:w-[200px]'
         : 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8';
 
@@ -81,8 +99,8 @@ export function SectionDivider({ hideForExplicitBg }: SectionDividerProps = {}) 
         <hr
           className="m-0 border-0 border-t"
           style={{
-            borderTopStyle: settings.style,
-            borderTopWidth: `${settings.thickness}px`,
+            borderTopStyle: merged.style,
+            borderTopWidth: `${merged.thickness}px`,
             borderTopColor: colorCss,
           }}
         />

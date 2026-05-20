@@ -335,6 +335,10 @@ export function HomePageContent({
                 resolve to the same color and the rhythm comes from
                 padding alone; when a preset is picked, adjacent
                 sections alternate visibly. */}
+            {/* Per-section `above` divider (opt-in) — renders before categories. */}
+            {layout.categories.dividers?.above?.enabled && (
+              <SectionDivider settings={layout.categories.dividers.above} />
+            )}
             {layout.categories.enabled && templateCategories.length > 0 && (
               <section
                 data-section="categories"
@@ -356,6 +360,7 @@ export function HomePageContent({
                     subtitleAr={layout.categories.subtitleAr}
                     showKickerLines={layout.categories.showKickerLines}
                     showSubtitleLines={layout.categories.showSubtitleLines}
+                    dividers={layout.categories.dividers}
                     seeAllHref={storeUrl('/products')}
                     isRtl={isRtl}
                     pack={templateId}
@@ -388,6 +393,7 @@ export function HomePageContent({
                       subtitleAr={layout.categories.subtitleAr}
                       showKickerLines={layout.categories.showKickerLines}
                       showSubtitleLines={layout.categories.showSubtitleLines}
+                      dividers={layout.categories.dividers}
                       cardSize={layout.categories.cardSize}
                       cardAspect={layout.categories.cardAspect}
                       cardShape={layout.categories.cardShape}
@@ -416,8 +422,11 @@ export function HomePageContent({
 
             {/* Divider between categories and new-arrivals. Suppressed when
                 either flanking section has an explicit per-section bgColor —
-                the color shift already acts as the visual separator. */}
+                the color shift already acts as the visual separator. Per-section
+                `newArrivals.dividers.above` wins over the legacy theme.dividers
+                fallback when set. */}
             <SectionDivider
+              settings={layout.newArrivals.dividers?.above}
               hideForExplicitBg={!!(layout.categories.bgColor || layout.newArrivals.bgColor)}
             />
 
@@ -445,6 +454,7 @@ export function HomePageContent({
                     subtitleAr={layout.newArrivals.subtitleAr}
                     showKickerLines={layout.newArrivals.showKickerLines}
                     showSubtitleLines={layout.newArrivals.showSubtitleLines}
+                    dividers={layout.newArrivals.dividers}
                     seeAllHref={storeUrl('/products?sort=newest')}
                     isRtl={isRtl}
                     currency={store.currency}
@@ -493,8 +503,11 @@ export function HomePageContent({
               </section>
             )}
 
-            {/* Divider between new-arrivals and best-sellers. */}
+            {/* Divider between new-arrivals and best-sellers. Per-section
+                `bestSellers.dividers.above` wins over the legacy theme.dividers
+                fallback when set. */}
             <SectionDivider
+              settings={layout.bestSellers.dividers?.above}
               hideForExplicitBg={!!(layout.newArrivals.bgColor || layout.bestSellers.bgColor)}
             />
 
@@ -525,6 +538,7 @@ export function HomePageContent({
                     subtitleAr={layout.bestSellers.subtitleAr}
                     showKickerLines={layout.bestSellers.showKickerLines}
                     showSubtitleLines={layout.bestSellers.showSubtitleLines}
+                    dividers={layout.bestSellers.dividers}
                     seeAllHref={storeUrl('/products?sort=best_seller')}
                     isRtl={isRtl}
                     currency={store.currency}
@@ -604,8 +618,12 @@ export function HomePageContent({
             )}
 
             {/* Divider before testimonials. Suppressed when testimonials
-                section has an explicit per-section bgColor. */}
-            <SectionDivider hideForExplicitBg={!!layout.testimonials.bgColor} />
+                section has an explicit per-section bgColor. Per-section
+                `testimonials.dividers.above` wins over the legacy fallback. */}
+            <SectionDivider
+              settings={layout.testimonials.dividers?.above}
+              hideForExplicitBg={!!layout.testimonials.bgColor}
+            />
 
             {/* Testimonials — auto-hides when no qualifying reviews.
                 Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates
@@ -629,6 +647,7 @@ export function HomePageContent({
                   headingZone={testimonialsHeadingZone}
                   kickerZone={testimonialsKickerZone}
                   subtitleZone={testimonialsSubtitleZone}
+                  dividers={layout.testimonials.dividers}
                 />
               </section>
             )}

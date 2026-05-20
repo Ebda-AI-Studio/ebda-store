@@ -348,10 +348,15 @@ export interface ProductCarouselProps {
   /** Tagline rendered below the title. */
   subtitle?: string;
   subtitleAr?: string;
-  /** Toggle the flanking editorial hairlines around the kicker. Default true. */
+  /** Toggle the flanking editorial hairlines around the kicker. Default true.
+   *  @deprecated 2026-05-20 — use `dividers.kicker.enabled` instead. */
   showKickerLines?: boolean;
-  /** Toggle the flanking editorial hairlines around the subtitle. Default true. */
+  /** Toggle the flanking editorial hairlines around the subtitle. Default true.
+   *  @deprecated 2026-05-20 — use `dividers.subtitle.enabled` instead. */
   showSubtitleLines?: boolean;
+  /** Per-section divider settings — see SectionDividers. Wins over the
+   *  legacy showKickerLines/showSubtitleLines toggles when set. */
+  dividers?: import('@force/shared').SectionDividers;
   /** Optional href for the "See all" link. Hidden when omitted. */
   seeAllHref?: string;
   isRtl?: boolean;
@@ -405,10 +410,14 @@ export interface CategoryStripProps {
   kickerAr?: string;
   subtitle?: string;
   subtitleAr?: string;
-  /** Toggle flanking hairlines around the kicker. Default true. */
+  /** Toggle flanking hairlines around the kicker. Default true.
+   *  @deprecated 2026-05-20 — use `dividers.kicker.enabled` instead. */
   showKickerLines?: boolean;
-  /** Toggle flanking hairlines around the subtitle. Default true. */
+  /** Toggle flanking hairlines around the subtitle. Default true.
+   *  @deprecated 2026-05-20 — use `dividers.subtitle.enabled` instead. */
   showSubtitleLines?: boolean;
+  /** Per-section divider settings — see SectionDividers. */
+  dividers?: import('@force/shared').SectionDividers;
   seeAllHref?: string;
   isRtl?: boolean;
   urlPrefix?: string;
@@ -465,6 +474,8 @@ export interface TestimonialRowProps {
   headingZone?: ResolvedZone;
   kickerZone?: ResolvedZone;
   subtitleZone?: ResolvedZone;
+  /** Per-section divider settings — see SectionDividers. */
+  dividers?: import('@force/shared').SectionDividers;
 }
 
 /**
@@ -585,6 +596,8 @@ export interface CategoryGridProps {
   showKickerLines?: boolean;
   /** Toggle flanking hairlines around the subtitle. Default true. */
   showSubtitleLines?: boolean;
+  /** Per-section divider settings — see SectionDividers. */
+  dividers?: import('@force/shared').SectionDividers;
   /** Per-store card size override. */
   cardSize?: import('@force/shared').CardSize;
   /** Per-store card aspect override. */

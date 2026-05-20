@@ -58,6 +58,7 @@ export function CategoryStrip({
   subtitleZone,
   seeAllZone,
   categoryLabelZone,
+  dividers,
 }: CategoryStripProps) {
   // Hooks must be called unconditionally (before any early return).
   const { store } = useStore();
@@ -79,6 +80,7 @@ export function CategoryStrip({
           subtitleAr={subtitleAr}
           showKickerLines={showKickerLines}
           showSubtitleLines={showSubtitleLines}
+          dividers={dividers}
           isRtl={isRtl}
           seeAllHref={seeAllHref}
           pack={pack}

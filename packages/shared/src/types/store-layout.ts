@@ -15,6 +15,31 @@
 
 export type HeroMode = 'single' | 'slider';
 
+/**
+ * Per-section divider slots — each section can have its own dividers around
+ * each part of its heading + content. Replaces the platform-wide
+ * `theme.dividers` (now deprecated, still read for back-compat).
+ *
+ * All 5 slots default `undefined` on new stores ("opt in" — Ahmad 2026-05-20).
+ * Existing stores keep their current look via legacy fallback reads on
+ * `showKickerLines` / `showSubtitleLines` / `theme.dividers`.
+ *
+ * Each slot uses the full `DividerSettings` shape so merchants get the same
+ * style / thickness / width / color / spacing controls everywhere.
+ */
+export interface SectionDividers {
+  /** Horizontal divider above this section (between this and the previous). */
+  above?: import('./store-theme').DividerSettings;
+  /** Hairlines flanking the kicker text. Replaces `showKickerLines`. */
+  kicker?: import('./store-theme').DividerSettings;
+  /** Hairlines flanking the title h2. New slot (no legacy equivalent). */
+  title?: import('./store-theme').DividerSettings;
+  /** Hairlines flanking the subtitle text. Replaces `showSubtitleLines`. */
+  subtitle?: import('./store-theme').DividerSettings;
+  /** Horizontal divider between the heading block and the section content. */
+  belowHeading?: import('./store-theme').DividerSettings;
+}
+
 export interface HeroSlide {
   /**
    * Desktop image — R2 URL. Recommended 1920×800 (aspect 2.4:1) so the
@@ -128,6 +153,8 @@ export interface HeroSettings extends SectionBgOverride {
   presentation?: 'full-bleed' | 'framed';
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
+  /** Per-section divider overrides — see SectionDividers. Default undefined (off). */
+  dividers?: SectionDividers;
 }
 
 export type CategoriesLayout = 'grid' | 'horizontal';
@@ -299,6 +326,8 @@ export interface CategoriesSettings extends SectionTitleOverride, SectionBgOverr
   cardFrameColor?: string;
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
+  /** Per-section divider overrides — see SectionDividers. Default undefined (off). */
+  dividers?: SectionDividers;
 }
 
 export interface ProductCarouselSettings extends SectionTitleOverride, SectionBgOverride {
@@ -338,6 +367,8 @@ export interface ProductCarouselSettings extends SectionTitleOverride, SectionBg
   cardFrameColor?: string;
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
+  /** Per-section divider overrides — see SectionDividers. Default undefined (off). */
+  dividers?: SectionDividers;
 }
 
 export interface FilterSidebarSettings {
@@ -352,6 +383,8 @@ export interface TestimonialsSettings extends SectionTitleOverride, SectionBgOve
   verifiedOnly: boolean;
   /** Per-section typography overrides — wins over global typography zones. */
   typography?: SectionTypographyOverride;
+  /** Per-section divider overrides — see SectionDividers. Default undefined (off). */
+  dividers?: SectionDividers;
 }
 
 /**

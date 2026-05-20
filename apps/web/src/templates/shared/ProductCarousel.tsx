@@ -71,6 +71,7 @@ export function ProductCarousel({
   productNameZone,
   productPriceZone,
   productCtaZone,
+  dividers,
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
   const sizeCap = productSizeClass(cardSize);
@@ -169,6 +170,7 @@ export function ProductCarousel({
           subtitleAr={subtitleAr}
           showKickerLines={showKickerLines}
           showSubtitleLines={showSubtitleLines}
+          dividers={dividers}
           isRtl={isRtl}
           seeAllHref={seeAllHref}
           pack={pack}

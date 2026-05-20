@@ -2,10 +2,11 @@
 
 import type React from 'react';
 import Link from 'next/link';
-import type { TemplateId } from '@force/shared';
+import type { TemplateId, SectionDividers } from '@force/shared';
 import { getPackStyles } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
 import { responsiveFontSize } from './section-typography';
+import { SectionDivider } from './SectionDivider';
 
 interface SectionHeadingProps {
   title?: string;
@@ -23,13 +24,27 @@ interface SectionHeadingProps {
   /**
    * Flanking hairlines around the kicker text. Default true preserves the
    * editorial divider look; set false to keep the kicker text alone.
+   * @deprecated 2026-05-20 — use `dividers.kicker.enabled` instead. Still read
+   * as fallback when `dividers.kicker` is undefined.
    */
   showKickerLines?: boolean;
   /**
    * Flanking hairlines around the subtitle text. Default true preserves the
    * editorial divider look; set false to keep the subtitle text alone.
+   * @deprecated 2026-05-20 — use `dividers.subtitle.enabled` instead. Still read
+   * as fallback when `dividers.subtitle` is undefined.
    */
   showSubtitleLines?: boolean;
+  /**
+   * Per-section divider settings. When provided, `kicker.enabled` /
+   * `title.enabled` / `subtitle.enabled` toggle flanking hairlines around
+   * each text element. `belowHeading` (full DividerSettings) renders a
+   * horizontal line between this heading block and the section content.
+   *
+   * The `above` slot is rendered by the parent (HomePageContent) BEFORE
+   * the section, not by SectionHeading itself.
+   */
+  dividers?: SectionDividers;
   /**
    * Per-section typography overrides resolved by resolveSectionZone().
    * When provided, applied as inline styles on the heading h2, kicker span,
@@ -65,7 +80,15 @@ export function SectionHeading({
   kickerZone,
   subtitleZone,
   seeAllZone,
+  dividers,
 }: SectionHeadingProps) {
+  // Per-section dividers override the legacy showKickerLines / showSubtitleLines
+  // booleans when present. When the new `dividers.{kicker,title,subtitle}` is
+  // undefined, fall back to the deprecated boolean props so existing stores
+  // keep their current look.
+  const kickerLinesEnabled = dividers?.kicker?.enabled ?? showKickerLines !== false;
+  const titleLinesEnabled = dividers?.title?.enabled === true;
+  const subtitleLinesEnabled = dividers?.subtitle?.enabled ?? showSubtitleLines !== false;
   const text = isRtl ? (titleAr ?? title) : (title ?? titleAr);
   const kickerText = isRtl ? (kickerAr ?? kicker) : (kicker ?? kickerAr);
   const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
@@ -91,8 +114,13 @@ export function SectionHeading({
   const kickerAlign = kickerZone?.textAlign ?? 'center';
   const titleAlign = headingZone?.textAlign ?? 'center';
   const subtitleAlign = subtitleZone?.textAlign ?? 'center';
-  const kickerShowLines = showKickerLines && kickerAlign === 'center';
-  const subtitleShowLines = showSubtitleLines && subtitleAlign === 'center';
+  // Flanking hairlines only render when text alignment is center — they look
+  // disjointed flanking left/right-aligned text. Combine the resolved-toggle
+  // value (kickerLinesEnabled etc — already accounts for legacy boolean
+  // fallback) with the alignment gate.
+  const kickerShowLines = kickerLinesEnabled && kickerAlign === 'center';
+  const titleShowLines = titleLinesEnabled && titleAlign === 'center';
+  const subtitleShowLines = subtitleLinesEnabled && subtitleAlign === 'center';
   return (
     <div className="mb-8 flex flex-col gap-2 sm:mb-12 sm:gap-3">
       {/* relative row: title-block is full-width-centered, seeAll absolute-anchored
@@ -150,29 +178,64 @@ export function SectionHeading({
               )}
             </div>
           )}
-          {text && (
-            <h2
-              className={`${styles.sectionHeading} ${
-                titleAlign === 'start'
-                  ? 'text-start'
-                  : titleAlign === 'end'
-                    ? 'text-end'
-                    : 'text-center'
-              }`}
-              data-zone="sectionTitle"
-              style={{
-                fontFamily: headingZone?.fontFamily,
-                fontSize: responsiveFontSize(headingZone?.fontSize),
-                fontWeight: headingZone?.fontWeight,
-                color: headingZone?.color,
-                letterSpacing: headingZone?.letterSpacing,
-                lineHeight: headingZone?.lineHeight,
-                textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],
-              }}
-            >
-              {text}
-            </h2>
-          )}
+          {text &&
+            // Title can OPTIONALLY have flanking hairlines when
+            // `dividers.title.enabled === true`. Default OFF (new slot, no
+            // legacy equivalent). Same visual idiom as kicker/subtitle lines
+            // — hairlines flank the centered title h2. When alignment is not
+            // center the lines auto-suppress (see titleShowLines).
+            (titleShowLines ? (
+              <div className="self-stretch flex items-center justify-center gap-3 sm:gap-4">
+                <span
+                  aria-hidden
+                  data-title-divider-line
+                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                />
+                <h2
+                  className={styles.sectionHeading}
+                  data-zone="sectionTitle"
+                  style={{
+                    fontFamily: headingZone?.fontFamily,
+                    fontSize: responsiveFontSize(headingZone?.fontSize),
+                    fontWeight: headingZone?.fontWeight,
+                    color: headingZone?.color,
+                    letterSpacing: headingZone?.letterSpacing,
+                    lineHeight: headingZone?.lineHeight,
+                    textTransform:
+                      headingZone?.textTransform as React.CSSProperties['textTransform'],
+                  }}
+                >
+                  {text}
+                </h2>
+                <span
+                  aria-hidden
+                  data-title-divider-line
+                  className="h-px flex-1 max-w-[140px] sm:max-w-[200px] bg-foreground/30"
+                />
+              </div>
+            ) : (
+              <h2
+                className={`${styles.sectionHeading} ${
+                  titleAlign === 'start'
+                    ? 'text-start'
+                    : titleAlign === 'end'
+                      ? 'text-end'
+                      : 'text-center'
+                }`}
+                data-zone="sectionTitle"
+                style={{
+                  fontFamily: headingZone?.fontFamily,
+                  fontSize: responsiveFontSize(headingZone?.fontSize),
+                  fontWeight: headingZone?.fontWeight,
+                  color: headingZone?.color,
+                  letterSpacing: headingZone?.letterSpacing,
+                  lineHeight: headingZone?.lineHeight,
+                  textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],
+                }}
+              >
+                {text}
+              </h2>
+            ))}
           {subtitleText && (
             // Subtitle renders with flanking hairlines matching the
             // SectionKicker editorial-divider style (Ahmad 2026-05-17
@@ -238,6 +301,10 @@ export function SectionHeading({
           </Link>
         )}
       </div>
+      {/* belowHeading divider — between this heading block and the section
+          content (products / categories grid). Full DividerSettings shape;
+          renders as a SectionDivider <hr>. Default OFF — merchant opts in. */}
+      {dividers?.belowHeading?.enabled && <SectionDivider settings={dividers.belowHeading} />}
     </div>
   );
 }

@@ -87,6 +87,33 @@ const sectionTypographyOverride = z
   .partial()
   .optional();
 
+// DividerSettings — mirrors packages/shared/src/types/store-theme.ts.
+// Per-section divider overrides. Each slot is independently optional.
+// Keep in sync with SectionDividers in store-layout.ts.
+const dividerSettings = z
+  .object({
+    enabled: z.boolean(),
+    style: z.enum(['solid', 'dashed', 'dotted', 'double']),
+    thickness: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    width: z.enum(['full', 'contained', 'short']),
+    color: z.enum(['auto', 'foreground', 'accent', 'custom']),
+    customColor: z.string().max(20).optional(),
+    spacing: z.enum(['tight', 'normal', 'loose']),
+  })
+  .partial()
+  .optional();
+
+const sectionDividers = z
+  .object({
+    above: dividerSettings,
+    kicker: dividerSettings,
+    title: dividerSettings,
+    subtitle: dividerSettings,
+    belowHeading: dividerSettings,
+  })
+  .partial()
+  .optional();
+
 const layoutSchema = z
   .object({
     hero: z.object({
@@ -103,6 +130,8 @@ const layoutSchema = z
       bgColor: colorValue,
       // Per-section typography overrides. Must be listed or Zod silently strips.
       typography: sectionTypographyOverride,
+      // Per-section divider overrides — see sectionDividers + SectionDividers type.
+      dividers: sectionDividers,
     }),
     categories: z.object({
       enabled: z.boolean(),
@@ -167,6 +196,8 @@ const layoutSchema = z
       bgColor: colorValue,
       // Per-section typography overrides. Must be listed or Zod silently strips.
       typography: sectionTypographyOverride,
+      // Per-section divider overrides — see sectionDividers + SectionDividers type.
+      dividers: sectionDividers,
     }),
     // Product carousels — newArrivals + bestSellers. 2026-05-16: extended
     // to mirror the categories block so merchants can tune product card
@@ -214,6 +245,8 @@ const layoutSchema = z
       bgColor: colorValue,
       // Per-section typography overrides. Must be listed or Zod silently strips.
       typography: sectionTypographyOverride,
+      // Per-section divider overrides — see sectionDividers + SectionDividers type.
+      dividers: sectionDividers,
     }),
     bestSellers: z.object({
       enabled: z.boolean(),
@@ -255,6 +288,8 @@ const layoutSchema = z
       bgColor: colorValue,
       // Per-section typography overrides. Must be listed or Zod silently strips.
       typography: sectionTypographyOverride,
+      // Per-section divider overrides — see sectionDividers + SectionDividers type.
+      dividers: sectionDividers,
     }),
     filterSidebar: z.object({
       enabled: z.boolean(),
@@ -272,6 +307,8 @@ const layoutSchema = z
       bgColor: colorValue,
       // Per-section typography overrides. Must be listed or Zod silently strips.
       typography: sectionTypographyOverride,
+      // Per-section divider overrides — see sectionDividers + SectionDividers type.
+      dividers: sectionDividers,
     }),
     // sibling UGC section, added 2026-05-16. without listing here Zod
     // would silently strip it on every save — same bug class as imageMobile
