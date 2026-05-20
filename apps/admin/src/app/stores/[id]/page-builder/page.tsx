@@ -1502,6 +1502,61 @@ export default function StoreLayoutPage() {
                   }
                   theme={storeInfo?.theme}
                 />
+                {/* Card-level toggles (Ahmad 2026-05-20: moved from
+                    branding/ThemeTab → here. These flags affect every
+                    product card on the store — PLP, categories, search,
+                    homepage carousels — so they belong on the catalog-wide
+                    Product Card Defaults card alongside frame/size/typography). */}
+                <div className="mt-4 space-y-3 border-t border-border/40 pt-4">
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-foreground">
+                        Brand badge on cards
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Small store-name pill in the top corner of every product card.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={
+                        pendingThemeUpdates.showBrandBadge ??
+                        storeInfo?.theme?.showBrandBadge === true
+                      }
+                      onChange={e =>
+                        setPendingThemeUpdates(prev => ({
+                          ...prev,
+                          showBrandBadge: e.target.checked,
+                        }))
+                      }
+                      className="h-5 w-5 cursor-pointer accent-primary"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-foreground">
+                        Quick-add (+) on carousel cards
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        One-tap add-to-cart circle on homepage carousel cards. When ON, the bottom
+                        Add to cart button auto-suppresses on the same card.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={
+                        pendingThemeUpdates.showQuickAdd ?? storeInfo?.theme?.showQuickAdd === true
+                      }
+                      onChange={e =>
+                        setPendingThemeUpdates(prev => ({
+                          ...prev,
+                          showQuickAdd: e.target.checked,
+                        }))
+                      }
+                      className="h-5 w-5 cursor-pointer accent-primary"
+                    />
+                  </label>
+                </div>
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Live preview

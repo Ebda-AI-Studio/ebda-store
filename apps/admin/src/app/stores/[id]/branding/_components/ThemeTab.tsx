@@ -53,45 +53,11 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         onChange={theme => onChange({ ...branding, theme })}
       />
 
-      {/* Bucket C5 (2026-05-17) — opt-in brand pill on product cards. */}
-      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-        <span className="flex-1 min-w-0">
-          <span className="block text-sm font-semibold text-foreground">
-            {t('brandBadge.title')}
-          </span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">{t('brandBadge.hint')}</span>
-        </span>
-        <input
-          type="checkbox"
-          checked={branding.theme.showBrandBadge === true}
-          onChange={e =>
-            onChange({
-              ...branding,
-              theme: { ...branding.theme, showBrandBadge: e.target.checked },
-            })
-          }
-          className="h-5 w-5 cursor-pointer accent-primary"
-        />
-      </label>
-
-      {/* Bucket E3 (2026-05-17) — opt-in quick-add (+) on carousel cards. */}
-      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-        <span className="flex-1 min-w-0">
-          <span className="block text-sm font-semibold text-foreground">{t('quickAdd.title')}</span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">{t('quickAdd.hint')}</span>
-        </span>
-        <input
-          type="checkbox"
-          checked={branding.theme.showQuickAdd === true}
-          onChange={e =>
-            onChange({
-              ...branding,
-              theme: { ...branding.theme, showQuickAdd: e.target.checked },
-            })
-          }
-          className="h-5 w-5 cursor-pointer accent-primary"
-        />
-      </label>
+      {/* Brand badge + Quick add card-level toggles REMOVED 2026-05-20:
+          moved to Page Builder → Product Card Defaults section card.
+          They affect every product card on the store, not just the
+          theme-level visual identity, so they belong with the other
+          catalog-wide product card controls. */}
 
       {/* Bucket E1 (2026-05-17) — opt-in blog feature toggle. Sits on the
           Theme tab alongside the other store-level on/off flags so the

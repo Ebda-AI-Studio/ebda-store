@@ -31,6 +31,10 @@ import { apiPost } from '../lib/api';
 export interface ThemeUpdates {
   primaryColor?: string;
   accentColor?: string;
+  /** Card-level toggles staged from the page-builder "Product Cards" section
+   *  card (Ahmad 2026-05-20: moved from branding/ThemeTab). */
+  showBrandBadge?: boolean;
+  showQuickAdd?: boolean;
 }
 
 interface SmartPaletteModalProps {
