@@ -407,29 +407,51 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // raw value as-is — that's the merchant's explicit choice.
   type ColorFieldContext = 'text' | 'background';
   const resolveColorValue = (v: string, context: ColorFieldContext = 'background'): string => {
-    // 'token:*' is the new ColorField format (emitted since Wave 5 of
-    // the page-builder work). Handle alongside the legacy 'brand-*' format
-    // so stores with old data and stores with new data both resolve correctly.
-    if (v === 'token:primary' || v === 'brand-primary') return 'hsl(var(--primary, 220 13% 18%))';
-    if (v === 'token:secondary' || v === 'brand-secondary')
-      return 'hsl(var(--secondary, 220 14% 96%))';
-    if (v === 'token:accent' || v === 'brand-accent') return 'hsl(var(--accent, 220 14% 92%))';
+    // Generic 'token:<name>' handler — covers every entry in COLOR_TOKENS
+    // (primary/secondary/accent/card/muted/foreground/border). Fall back to
+    // the global CSS variable so the resolution works even when Store.theme
+    // doesn't carry the matching `*Color` field (e.g. card/muted/border are
+    // newer tokens not present on legacy theme rows).
+    //
+    // Verified 2026-05-20 — wadyaljuz had merchant picked `token:card` for
+    // the footer color zone, but the old switch-style handler below only
+    // knew primary/secondary/accent, so the literal string "token:card" was
+    // emitted as a CSS value and the browser silently dropped the rule.
+    if (v.startsWith('token:')) {
+      const key = v.slice('token:'.length);
+      // Bg tokens used as text → flip to readable text counterpart so the
+      // merchant doesn't accidentally make text invisible.
+      if (context === 'text' && (key === 'background' || key === 'card')) {
+        return 'hsl(var(--foreground, 220 13% 12%))';
+      }
+      if (context === 'text' && key === 'muted') {
+        return 'hsl(var(--muted-foreground, 220 9% 46%))';
+      }
+      // Text tokens used as bg → flip to bg counterpart.
+      if (context === 'background' && key === 'foreground') {
+        return 'hsl(var(--background, 0 0% 100%))';
+      }
+      // Generic — any other token name maps directly to its CSS variable.
+      // Identifier-only allowlist to keep CSS-injection surface zero.
+      if (/^[a-zA-Z][a-zA-Z0-9-]{0,32}$/.test(key)) {
+        return `hsl(var(--${key}))`;
+      }
+      return 'inherit';
+    }
+    // Legacy 'brand-*' format — kept for stores saved before the token:
+    // refactor. Falls into the same readability flips as token: above.
+    if (v === 'brand-primary') return 'hsl(var(--primary, 220 13% 18%))';
+    if (v === 'brand-secondary') return 'hsl(var(--secondary, 220 14% 96%))';
+    if (v === 'brand-accent') return 'hsl(var(--accent, 220 14% 92%))';
     if (v === 'brand-foreground') {
-      // brand-foreground IS the page text color. Using it as background
-      // creates dark-on-dark text invisibility. Flip to background.
       if (context === 'background') return 'hsl(var(--background, 0 0% 100%))';
       return 'hsl(var(--foreground, 220 13% 12%))';
     }
     if (v === 'brand-background') {
-      // brand-background IS the page bg. Using it as text creates
-      // white-on-white. Flip to foreground.
       if (context === 'text') return 'hsl(var(--foreground, 220 13% 12%))';
       return 'hsl(var(--background, 0 0% 100%))';
     }
     if (v === 'brand-muted') {
-      // brand-muted is a BACKGROUND tint (light gray surface). As text
-      // it'd be near-white on white. Substitute muted-foreground
-      // (semantically "muted text" — gray text on white) so readable.
       if (context === 'text') return 'hsl(var(--muted-foreground, 220 9% 46%))';
       return 'hsl(var(--muted, 220 14% 96%))';
     }

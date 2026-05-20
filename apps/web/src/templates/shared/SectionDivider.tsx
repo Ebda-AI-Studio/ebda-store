@@ -138,11 +138,27 @@ function resolveDividerColor(settings: DividerSettings, theme: StoreTheme | unde
     case 'custom':
       // 2026-05-20: customColor now accepts EITHER a raw hex (#RRGGBB) OR
       // a brand token reference (token:primary / token:accent / etc).
-      // resolveColor handles both transparently; hex passes through, tokens
-      // resolve via the StoreTheme.
+      // - hex / hsl() passes through unchanged
+      // - token:<name> resolves via theme[<name>Color]; if that field is
+      //   undefined on the theme (older theme rows are missing card/muted/
+      //   border etc.), fall back to the global CSS variable which exists
+      //   in globals.css for every shadcn token. Returning the literal
+      //   "token:card" string would be silently dropped by the browser
+      //   — verified FWB 2026-05-20.
       if (settings.customColor) {
-        if (!theme) return settings.customColor;
-        return resolveColor(settings.customColor, theme) ?? settings.customColor;
+        const v = settings.customColor;
+        if (v.startsWith('token:')) {
+          if (theme) {
+            const resolved = resolveColor(v, theme);
+            if (resolved) return resolved;
+          }
+          const key = v.slice('token:'.length);
+          if (/^[a-zA-Z][a-zA-Z0-9-]{0,32}$/.test(key)) {
+            return `hsl(var(--${key}))`;
+          }
+          return 'hsl(var(--border))';
+        }
+        return v;
       }
       return 'hsl(var(--border))';
     case 'auto':
