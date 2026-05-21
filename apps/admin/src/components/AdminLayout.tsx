@@ -130,6 +130,11 @@ export function AdminLayout({
     // Marketing tabs
     aiTools: t('hubTabs.aiTools'),
     whatsapp: t('hubTabs.whatsapp'),
+    marketingPixels: t('hubTabs.marketingPixels'),
+    notifications: t('hubTabs.notifications'),
+    newsletter: t('hubTabs.newsletter'),
+    affiliates: t('hubTabs.affiliates'),
+    abandonedCarts: t('hubTabs.abandonedCarts'),
   };
 
   // Sync dark mode with localStorage and system preference

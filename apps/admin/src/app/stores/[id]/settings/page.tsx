@@ -203,106 +203,22 @@ export default function StoreSettingsPage() {
         </svg>
       ),
     },
-    {
-      key: 'marketingPixels',
-      href: `/stores/${storeId}/marketing-pixels`,
-      color: 'bg-info/10 text-info dark:bg-info/30 dark:text-info',
-      featureKey: 'marketing_pixels',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'notifications',
-      href: `/stores/${storeId}/notifications`,
-      color: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'affiliates',
-      href: `/stores/${storeId}/affiliates`,
-      color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300',
-      featureKey: 'affiliate',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'abandonedCarts',
-      href: `/stores/${storeId}/abandoned-carts`,
-      color: 'bg-primary/10 text-primary',
-      featureKey: 'abandoned_cart',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'shippingCarriers',
-      href: `/stores/${storeId}/shipping-carriers`,
-      color: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300',
-      featureKey: 'shipping_carriers',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'newsletter',
-      href: `/stores/${storeId}/newsletter`,
-      color: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-          />
-        </svg>
-      ),
-    },
+    /*
+     * 5 cards REMOVED 2026-05-21 (Ahmad audit). Moved into the Marketing
+     * hub as sibling tabs alongside AI Tools + WhatsApp:
+     *   - marketingPixels  -> /stores/[id]/marketing-pixels
+     *   - notifications    -> /stores/[id]/notifications
+     *   - affiliates       -> /stores/[id]/affiliates
+     *   - abandonedCarts   -> /stores/[id]/abandoned-carts
+     *   - newsletter       -> /stores/[id]/newsletter
+     *
+     * shippingCarriers card also removed — it's a sub-concern of Shipping;
+     * the /shipping page links to /shipping-carriers from inside.
+     *
+     * Settings now houses ONLY store-level config that doesn't belong
+     * in a more-specific hub: branding, navigation, seo, domain, payment,
+     * shipping, tax, pwa, template, pages, language.
+     */
   ];
 
   return (

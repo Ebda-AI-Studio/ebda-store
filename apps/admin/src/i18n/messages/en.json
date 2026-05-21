@@ -3621,7 +3621,12 @@
         "insightsSegments": "Segments",
         "insightsProducts": "Products",
         "aiTools": "AI Tools",
-        "whatsapp": "WhatsApp"
+        "whatsapp": "WhatsApp",
+        "marketingPixels": "Pixels",
+        "notifications": "Push",
+        "newsletter": "Newsletter",
+        "affiliates": "Affiliates",
+        "abandonedCarts": "Abandoned Carts"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",
