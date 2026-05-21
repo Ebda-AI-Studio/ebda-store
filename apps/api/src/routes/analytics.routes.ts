@@ -4,6 +4,7 @@ import { requirePermission } from '../middleware/rbac';
 import { AnalyticsService } from '../services/analytics.service';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@force/database';
+import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
 
@@ -33,15 +34,33 @@ router.get(
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      const [stats, gl, stock] = await Promise.all([
+      // 2026-05-21: switched Promise.all -> Promise.allSettled so a single
+      // failing sub-query (e.g. GL queries breaking when a store has no
+      // posted journal entries) doesn't kill the whole dashboard. Each
+      // rejection is logged with which subroutine failed, so Railway logs
+      // surface the real cause without needing to bisect.
+      const [statsRes, glRes, stockRes] = await Promise.allSettled([
         AnalyticsService.getDashboardStats(storeId, dateRange),
         AnalyticsService.glRevenueWindow(storeId, monthStart, now),
         AnalyticsService.stockSnapshot(storeId),
       ]);
+      if (statsRes.status === 'rejected') {
+        logger.error({ err: statsRes.reason, storeId }, '[ANALYTICS] dashboard stats failed');
+      }
+      if (glRes.status === 'rejected') {
+        logger.error({ err: glRes.reason, storeId }, '[ANALYTICS] gl revenue window failed');
+      }
+      if (stockRes.status === 'rejected') {
+        logger.error({ err: stockRes.reason, storeId }, '[ANALYTICS] stock snapshot failed');
+      }
 
       res.json({
         success: true,
-        data: { stats, gl, stock },
+        data: {
+          stats: statsRes.status === 'fulfilled' ? statsRes.value : null,
+          gl: glRes.status === 'fulfilled' ? glRes.value : null,
+          stock: stockRes.status === 'fulfilled' ? stockRes.value : null,
+        },
       });
     } catch (error) {
       next(error);
