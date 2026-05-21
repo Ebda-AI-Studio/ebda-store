@@ -150,14 +150,10 @@ export default function ClassicFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`${
-                      s.BrandIcon
-                        ? 'overflow-hidden rounded-md'
-                        : 'text-muted-foreground hover:text-foreground'
-                    } transition-colors duration-200 cursor-pointer`}
+                    className="text-muted-foreground hover:text-foreground overflow-hidden rounded-md transition-colors duration-200 cursor-pointer"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className={s.BrandIcon ? 'w-6 h-6' : 'w-4 h-4'} />
+                    <SocialGlyph entry={s} className="w-5 h-5" />
                   </a>
                 ))}
                 {displayLogo && (

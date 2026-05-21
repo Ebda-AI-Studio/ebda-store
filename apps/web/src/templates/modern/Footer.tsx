@@ -143,17 +143,10 @@ export default function ModernFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`w-9 h-9 ${s.BrandIcon ? '' : 'bg-foreground/10 hover:bg-primary'} rounded-lg flex items-center justify-center overflow-hidden transition-colors duration-300 ease-out cursor-pointer`}
+                    className="w-9 h-9 bg-foreground/10 hover:bg-primary rounded-lg flex items-center justify-center overflow-hidden transition-colors duration-300 ease-out cursor-pointer text-foreground/75 hover:text-foreground"
                     aria-label={s.key}
                   >
-                    <SocialGlyph
-                      entry={s}
-                      className={
-                        s.BrandIcon
-                          ? 'w-full h-full'
-                          : 'w-4 h-4 text-foreground/75 hover:text-foreground'
-                      }
-                    />
+                    <SocialGlyph entry={s} className="w-5 h-5" />
                   </a>
                 ))}
                 {displayLogo && (

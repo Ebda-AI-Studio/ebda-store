@@ -342,6 +342,11 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           config={(store.settings?.floatingWidget as FloatingWidgetConfig | undefined) ?? undefined}
           theme={store.theme}
           isRtl={isRtl}
+          contact={{ whatsapp: contact.whatsapp, phone: contact.phone }}
+          socials={{
+            instagram: contact.socialLinks?.instagram,
+            whatsapp: contact.socialLinks?.whatsapp,
+          }}
         />
       )}
     </div>

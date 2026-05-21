@@ -8,12 +8,41 @@ import type {
   FloatingWidgetConfig,
   StoreTheme,
 } from '@force/shared';
-import { InstagramBrandIcon, WhatsappBrandIcon, VolumeMaxIcon, VolumeMutedIcon } from './icons';
+import { InstagramGlyphIcon, WhatsappGlyphIcon, VolumeMaxIcon, VolumeMutedIcon } from './icons';
+import type { StoreContact, StoreSocials } from '../types';
 
 interface FloatingWidgetProps {
   config: FloatingWidgetConfig | undefined;
   theme: StoreTheme | undefined;
   isRtl: boolean;
+  /** Store-level contact info — fallback source for WhatsApp button's
+   *  phone when the merchant didn't set one explicitly on the button.
+   *  Saves them re-typing data that lives in /branding > contact. */
+  contact?: Pick<StoreContact, 'whatsapp' | 'phone'>;
+  /** Store-level socials — fallback for Instagram handle extraction. */
+  socials?: Pick<StoreSocials, 'instagram' | 'whatsapp'>;
+}
+
+/** Extract an Instagram handle from a URL or @handle string. Returns null
+ *  when no handle can be recovered. Accepts "@wadyaljuz", "wadyaljuz",
+ *  "https://instagram.com/wadyaljuz", "https://www.instagram.com/wadyaljuz/". */
+function instagramHandleFromUrl(input: string | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  // Already a bare handle (no slash, no protocol)
+  if (!/^https?:|\//.test(trimmed)) return trimmed.replace(/^@/, '');
+  const match = trimmed.match(/instagram\.com\/([^/?#]+)/i);
+  return match ? match[1] : null;
+}
+
+/** Extract digits-only phone from a wa.me URL or raw phone string. */
+function whatsappDigitsFromAny(input: string | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const digits = trimmed.replace(/\D/g, '');
+  return digits.length >= 6 ? digits : null;
 }
 
 const POSITION_CLASSES: Record<NonNullable<FloatingWidgetConfig['position']>, string> = {
@@ -45,18 +74,41 @@ const KIND_DEFAULTS: Record<
   custom: { bg: '#6B7280', icon: '#ffffff', label: 'Link', labelAr: 'رابط' },
 };
 
-function resolveButtonHref(b: FloatingButton): string | null {
+function resolveButtonHref(
+  b: FloatingButton,
+  fallback: {
+    contact?: Pick<StoreContact, 'whatsapp' | 'phone'>;
+    socials?: Pick<StoreSocials, 'instagram' | 'whatsapp'>;
+  }
+): string | null {
   switch (b.kind) {
-    case 'whatsapp':
-      if (!b.whatsappPhone) return null;
+    case 'whatsapp': {
+      // Inherit from store contact when the button doesn't carry its own
+      // phone — most merchants already typed it in /branding > contact;
+      // re-typing here would just rot. Order: button override → store
+      // contact.whatsapp → store socials.whatsapp URL → null.
+      const phone =
+        whatsappDigitsFromAny(b.whatsappPhone) ??
+        whatsappDigitsFromAny(fallback.contact?.whatsapp) ??
+        whatsappDigitsFromAny(fallback.socials?.whatsapp);
+      if (!phone) return null;
       return b.whatsappMessage
-        ? `https://wa.me/${encodeURIComponent(b.whatsappPhone)}?text=${encodeURIComponent(b.whatsappMessage)}`
-        : `https://wa.me/${encodeURIComponent(b.whatsappPhone)}`;
-    case 'instagram':
-      if (!b.instagramHandle) return null;
-      return `https://instagram.com/${encodeURIComponent(b.instagramHandle.replace(/^@/, ''))}`;
+        ? `https://wa.me/${phone}?text=${encodeURIComponent(b.whatsappMessage)}`
+        : `https://wa.me/${phone}`;
+    }
+    case 'instagram': {
+      const handle =
+        instagramHandleFromUrl(b.instagramHandle) ??
+        instagramHandleFromUrl(fallback.socials?.instagram);
+      if (!handle) return null;
+      return `https://instagram.com/${encodeURIComponent(handle)}`;
+    }
     case 'phone':
-      return b.phoneNumber ? `tel:${b.phoneNumber}` : null;
+      return b.phoneNumber
+        ? `tel:${b.phoneNumber}`
+        : fallback.contact?.phone
+          ? `tel:${fallback.contact.phone}`
+          : null;
     case 'email':
       if (!b.emailAddress) return null;
       return b.emailSubject
@@ -69,40 +121,60 @@ function resolveButtonHref(b: FloatingButton): string | null {
   }
 }
 
-// Whatsapp + Instagram are handled separately at the button-render level —
-// they render full-bleed brand SVGs that include their own background.
-// KindIcon below handles only the kinds that share the "circle bg +
-// centered glyph" pattern: phone / email / music / custom.
+// Every kind renders its icon at the same physical size (`h-7 w-7` = 28px)
+// inside the 48px-circle button. Ahmad 2026-05-21: "all icons same size".
+// Brand kinds use the white glyph (no embedded bg) over a brand-color
+// button bg; themed kinds use a stroke icon over the merchant's bg color.
+const ICON_BOX_CLASS = 'h-7 w-7';
+
 function KindIcon({
   kind,
   color,
   isPlaying,
 }: {
-  kind: Exclude<FloatingButtonKind, 'whatsapp' | 'instagram'>;
+  kind: FloatingButtonKind;
   color: string;
   isPlaying?: boolean;
 }) {
-  const common = { width: 22, height: 22, fill: 'none', stroke: color, strokeWidth: 2 };
   switch (kind) {
+    case 'whatsapp':
+      return <WhatsappGlyphIcon className={ICON_BOX_CLASS} />;
+    case 'instagram':
+      return <InstagramGlyphIcon className={ICON_BOX_CLASS} />;
     case 'phone':
       return (
-        <svg viewBox="0 0 24 24" {...common} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className={ICON_BOX_CLASS}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.37 1.78.7 2.6a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.48-1.48a2 2 0 0 1 2.11-.45c.83.33 1.7.57 2.6.7A2 2 0 0 1 22 16.92z" />
         </svg>
       );
     case 'email':
       return (
-        <svg viewBox="0 0 24 24" {...common} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className={ICON_BOX_CLASS}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
           <polyline points="22,6 12,13 2,6" />
         </svg>
       );
     case 'music':
-      // Two states: max (currently playing) / muted (paused or idle). Both
-      // SVGs use `stroke="currentColor"` so the merchant's iconColor flows
-      // through via the wrapper's color CSS. Ahmad's request 2026-05-21.
+      // Two states: max (currently playing) / muted (paused or idle).
+      // currentColor lets the merchant's iconColor flow through.
       return (
-        <span className="block h-[22px] w-[22px]" style={{ color }}>
+        <span className={`block ${ICON_BOX_CLASS}`} style={{ color }}>
           {isPlaying ? (
             <VolumeMaxIcon className="h-full w-full" />
           ) : (
@@ -112,7 +184,15 @@ function KindIcon({
       );
     case 'custom':
       return (
-        <svg viewBox="0 0 24 24" {...common} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          className={ICON_BOX_CLASS}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
@@ -126,23 +206,25 @@ function ButtonRender({
   isRtl,
   onMusicToggle,
   musicPlaying,
+  contact,
+  socials,
 }: {
   button: FloatingButton;
   theme: StoreTheme | undefined;
   isRtl: boolean;
   onMusicToggle: (b: FloatingButton) => void;
   musicPlaying: string | null;
+  contact?: Pick<StoreContact, 'whatsapp' | 'phone'>;
+  socials?: Pick<StoreSocials, 'instagram' | 'whatsapp'>;
 }) {
   const defaults = KIND_DEFAULTS[button.kind];
-  const isBrandKind = button.kind === 'whatsapp' || button.kind === 'instagram';
-  // Brand kinds embed their own gradient/color background — we paint the
-  // button transparent and let the SVG fill the circle. Merchant bgColor
-  // override is intentionally ignored here (brand color IS the icon).
-  const bg = isBrandKind
-    ? 'transparent'
-    : button.bgColor
-      ? (resolveColor(button.bgColor, theme as StoreTheme) ?? button.bgColor)
-      : defaults.bg;
+  // Every kind uses merchant pick OR the kind's default color. For brand
+  // kinds (whatsapp/instagram), the default IS the brand color so the
+  // button reads as the brand without the SVG needing to embed its bg.
+  // Same glyph size across kinds — Ahmad 2026-05-21 "all icons same size".
+  const bg = button.bgColor
+    ? (resolveColor(button.bgColor, theme as StoreTheme) ?? button.bgColor)
+    : defaults.bg;
   const iconColor = button.iconColor
     ? (resolveColor(button.iconColor, theme as StoreTheme) ?? button.iconColor)
     : defaults.icon;
@@ -161,18 +243,10 @@ function ButtonRender({
     title: label,
   };
 
-  // Merchant-supplied `iconUrl` always wins for any kind — they uploaded
-  // their own icon, render it. Otherwise: brand kinds get the full-bleed
-  // SVG (gradient + glyph), other kinds get a small centered KindIcon
-  // over the button's bg color.
   const inner = (
     <>
       {button.iconUrl ? (
-        <img src={button.iconUrl} alt="" className="h-6 w-6 object-contain" />
-      ) : button.kind === 'whatsapp' ? (
-        <WhatsappBrandIcon className="h-full w-full" />
-      ) : button.kind === 'instagram' ? (
-        <InstagramBrandIcon className="h-full w-full" />
+        <img src={button.iconUrl} alt="" className="h-7 w-7 object-contain" />
       ) : (
         <KindIcon kind={button.kind} color={iconColor} isPlaying={isActive} />
       )}
@@ -193,7 +267,7 @@ function ButtonRender({
     );
   }
 
-  const href = resolveButtonHref(button);
+  const href = resolveButtonHref(button, { contact, socials });
   if (!href) return null;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" {...sharedProps}>
@@ -202,7 +276,7 @@ function ButtonRender({
   );
 }
 
-export function FloatingWidget({ config, theme, isRtl }: FloatingWidgetProps) {
+export function FloatingWidget({ config, theme, isRtl, contact, socials }: FloatingWidgetProps) {
   const [expanded, setExpanded] = useState(false);
   const [musicPlayingId, setMusicPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -289,6 +363,8 @@ export function FloatingWidget({ config, theme, isRtl }: FloatingWidgetProps) {
               isRtl={isRtl}
               onMusicToggle={onMusicToggle}
               musicPlaying={musicPlayingId}
+              contact={contact}
+              socials={socials}
             />
           ))}
         </div>

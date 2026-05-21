@@ -302,17 +302,10 @@ export default function ElegantFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`w-8 h-8 flex items-center justify-center overflow-hidden ${
-                      s.BrandIcon
-                        ? ''
-                        : 'border border-border text-foreground/40 hover:text-foreground hover:border-foreground'
-                    } transition-all duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+                    className="w-8 h-8 flex items-center justify-center overflow-hidden border border-border text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
-                    <SocialGlyph
-                      entry={s}
-                      className={s.BrandIcon ? 'w-full h-full' : 'w-3.5 h-3.5'}
-                    />
+                    <SocialGlyph entry={s} className="w-5 h-5" />
                   </a>
                 ))}
                 {displayLogo && (

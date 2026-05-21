@@ -105,15 +105,10 @@ export default function BoldFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`w-10 h-10 flex items-center justify-center overflow-hidden ${
-                      s.BrandIcon ? '' : 'bg-foreground/10 hover:bg-primary'
-                    } rounded-none transition-colors duration-200 cursor-pointer`}
+                    className="w-10 h-10 flex items-center justify-center overflow-hidden bg-foreground/10 hover:bg-primary rounded-none transition-colors duration-200 cursor-pointer text-foreground"
                     aria-label={s.key}
                   >
-                    <SocialGlyph
-                      entry={s}
-                      className={s.BrandIcon ? 'w-full h-full' : 'w-4 h-4 text-foreground'}
-                    />
+                    <SocialGlyph entry={s} className="w-5 h-5" />
                   </a>
                 ))}
                 {displayLogo && (
