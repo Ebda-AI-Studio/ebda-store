@@ -9,14 +9,17 @@ import type {
   LowStockProduct,
   Period,
   RecentOrder,
+  ResolvedDateRange,
   SalesData,
   StockSnapshot,
   TopProduct,
 } from '../_components/types';
+import { resolveDateRange } from '../_components/types';
 
 interface UseAnalyticsArgs {
   storeId: string;
   period: Period;
+  customRange?: ResolvedDateRange;
 }
 
 interface DashboardResponseData {
@@ -30,7 +33,7 @@ interface DashboardResponseData {
  * state. Dashboard now returns gl + stock alongside operational stats.
  * Cashflow is fetched separately (last 30 days, independent of period selector).
  */
-export function useAnalytics({ storeId, period }: UseAnalyticsArgs) {
+export function useAnalytics({ storeId, period, customRange }: UseAnalyticsArgs) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [gl, setGl] = useState<GlWindow | null>(null);
   const [stockSnapshot, setStockSnapshot] = useState<StockSnapshot | null>(null);
@@ -47,6 +50,11 @@ export function useAnalytics({ storeId, period }: UseAnalyticsArgs) {
 
     try {
       const basePath = `/api/v1/stores/${storeId}/analytics`;
+      // Resolve the period preset to concrete startDate/endDate so the
+      // backend gets explicit timestamps. Custom range overrides via
+      // ResolvedDateRange passed from the picker.
+      const range = period === 'custom' && customRange ? customRange : resolveDateRange(period);
+      const rangeQs = `startDate=${range.startDate.toISOString()}&endDate=${range.endDate.toISOString()}`;
 
       const [
         dashboardResult,
@@ -56,12 +64,12 @@ export function useAnalytics({ storeId, period }: UseAnalyticsArgs) {
         stockResult,
         cashflowResult,
       ] = await Promise.all([
-        apiGet<DashboardResponseData>(`${basePath}/dashboard`),
-        apiGet<{ sales: SalesData[] }>(`${basePath}/sales?period=${period}`),
-        apiGet<{ products: TopProduct[] }>(`${basePath}/top-products?limit=5`),
+        apiGet<DashboardResponseData>(`${basePath}/dashboard?${rangeQs}`),
+        apiGet<{ sales: SalesData[] }>(`${basePath}/sales?period=${period}&${rangeQs}`),
+        apiGet<{ products: TopProduct[] }>(`${basePath}/top-products?limit=5&${rangeQs}`),
         apiGet<{ orders: RecentOrder[] }>(`${basePath}/recent-orders?limit=5`),
         apiGet<{ products: LowStockProduct[] }>(`${basePath}/low-stock?threshold=10`),
-        apiGet<{ trend: Array<{ day: string; net: number }> }>(`${basePath}/cashflow`),
+        apiGet<{ trend: Array<{ day: string; net: number }> }>(`${basePath}/cashflow?${rangeQs}`),
       ]);
 
       if (dashboardResult.data) {
@@ -89,7 +97,7 @@ export function useAnalytics({ storeId, period }: UseAnalyticsArgs) {
     } finally {
       setIsLoading(false);
     }
-  }, [storeId, period]);
+  }, [storeId, period, customRange?.startDate.getTime(), customRange?.endDate.getTime()]);
 
   useEffect(() => {
     fetchAnalytics();

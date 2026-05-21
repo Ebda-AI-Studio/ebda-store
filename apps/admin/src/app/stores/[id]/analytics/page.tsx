@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { AnalyticsDateRange } from './_components/AnalyticsDateRange';
+import { DateRangePicker } from '../../../../components/DateRangePicker';
 import { AnalyticsSkeleton } from './_components/AnalyticsSkeleton';
 import { AnalyticsStatsGrid } from './_components/AnalyticsStatsGrid';
 import { CashflowChart } from './_components/CashflowChart';
@@ -14,7 +14,7 @@ import { LowStockAlertsCard } from './_components/LowStockAlertsCard';
 import { RecentOrdersCard } from './_components/RecentOrdersCard';
 import { RevenueChart } from './_components/RevenueChart';
 import { TopProductsTable } from './_components/TopProductsTable';
-import type { ChartType, Period } from './_components/types';
+import type { ChartType, Period, ResolvedDateRange } from './_components/types';
 import { useAnalytics } from './_hooks/useAnalytics';
 
 export default function AnalyticsPage() {
@@ -22,7 +22,8 @@ export default function AnalyticsPage() {
   const storeId = params?.id as string;
   const tPage = useT('analytics.page');
 
-  const [period, setPeriod] = useState<Period>('month');
+  const [period, setPeriod] = useState<Period>('this_month');
+  const [customRange, setCustomRange] = useState<ResolvedDateRange | undefined>(undefined);
   const [chartType, setChartType] = useState<ChartType>('revenue');
 
   const {
@@ -35,11 +36,18 @@ export default function AnalyticsPage() {
     recentOrders,
     lowStockProducts,
     isLoading,
-  } = useAnalytics({ storeId, period });
+  } = useAnalytics({ storeId, period, customRange });
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
-      <AnalyticsDateRange period={period} onPeriodChange={setPeriod} />
+      <DateRangePicker
+        period={period}
+        custom={customRange}
+        onChange={(p, c) => {
+          setPeriod(p);
+          if (c) setCustomRange(c);
+        }}
+      />
 
       {isLoading ? (
         <AnalyticsSkeleton />

@@ -1217,8 +1217,8 @@
         "description": "Choose and customize the storefront design template"
       },
       "pages": {
-        "title": "Footer & Pages",
-        "description": "Manage footer links, support pages and company pages"
+        "title": "Footer Links",
+        "description": "Choose which links appear in the footer + pre-header bar (page content is edited under Pages)"
       },
       "language": {
         "title": "Language",
@@ -2593,9 +2593,9 @@
   },
   "pages": {
     "page": {
-      "title": "Footer & Pages",
-      "subtitle": "Manage the links shown in your store's footer",
-      "loadingSubtitle": "Manage footer links and store pages",
+      "title": "Footer Links",
+      "subtitle": "Choose which links appear in your storefront footer and pre-header bar. Edit the actual page content (About, Privacy, etc.) under Pages.",
+      "loadingSubtitle": "Manage footer + utility bar links",
       "backToSettings": "Back to Settings",
       "saveChanges": "Save Changes",
       "saving": "Saving...",
@@ -3596,7 +3596,7 @@
       "hubTabs": {
         "products": "Products",
         "pageBuilder": "Page Builder",
-        "content": "Content",
+        "content": "Pages",
         "blog": "Blog",
         "floatingWidget": "Floating Widget",
         "orders": "Orders",
