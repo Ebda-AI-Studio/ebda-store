@@ -317,7 +317,14 @@ export class StoreService {
     const store = await this.getById(storeId);
 
     await prisma.$transaction(async tx => {
-      // Returns reference orders with no cascade — clear them first.
+      // Reviews reference Order with onDelete: Restrict, so they must be
+      // deleted BEFORE orders. Review.store is Cascade but Review.order
+      // is Restrict — without this, tx.order.deleteMany throws an FK
+      // violation as soon as any review is tied to a store order.
+      // Ahmad 2026-05-21 — 500 on store delete trace: this was the
+      // unhandled second restrict.
+      await tx.review.deleteMany({ where: { storeId } });
+      // Returns reference orders with no cascade — clear them next.
       await tx.return.deleteMany({ where: { storeId } });
       // Orders are Restrict-on-delete from Store; remove them explicitly.
       // OrderItem / Payment / Shipment cascade from Order.
