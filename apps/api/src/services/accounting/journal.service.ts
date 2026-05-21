@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import type { JournalEntry, JournalEntrySource, Prisma } from '@prisma/client';
 import { Prisma as PrismaNs } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
@@ -44,6 +44,19 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
   }
   if (input.lines.length === 0) {
     throw new Error('Journal entry requires at least one line');
+  }
+
+  // RLS escape hatch 2026-05-21: when no caller-provided tx exists, Inngest
+  // jobs and other background workers call postEntry directly via the
+  // proxy, which falls through to basePrisma with no app.current_store_id
+  // GUC set. The journal_entries RLS policy then filters every INSERT /
+  // SELECT to invisible — silent no-op, no error. Wrap in withRlsBypass
+  // when standalone so the GUC is set inside our own transaction.
+  // Caller-provided tx is assumed to have either app.current_store_id
+  // set (from request middleware) OR bypass_rls (from store-delete style
+  // ops).
+  if (!input.tx) {
+    return withRlsBypass(tx => postEntry({ ...input, tx }));
   }
 
   // Fast-path idempotency check (skipped if no sourceId — manual entries are

@@ -201,3 +201,38 @@ export async function withTenantContext<T>(
     return fn(tx);
   });
 }
+
+/**
+ * Execute a callback within a transaction that BYPASSES Row-Level Security.
+ *
+ * Use this for super-admin, cron, Inngest, and other cross-tenant operations
+ * that need to touch RLS-protected tables (journal_entries, accounts,
+ * orders, products, etc.) without being filtered to the current tenant.
+ *
+ * RLS policies on FWB are written with an explicit bypass clause:
+ *   USING (
+ *     store_id::text = current_setting('app.current_store_id', true)
+ *     OR current_setting('app.bypass_rls', true) = 'true'
+ *   )
+ *
+ * Setting the bypass GUC via SET LOCAL means the override dies on
+ * commit/rollback (transaction-scoped, no leak to other connections).
+ *
+ * Trap this helper protects against: opening a fresh prisma.$transaction
+ * for cross-tenant work, then watching DELETEs / UPDATEs silently match
+ * zero rows because RLS filtered them out. See
+ * feedback-postgres-rls-silent-filter-trap.md for the FWB incident
+ * 2026-05-21.
+ *
+ * @example
+ *   // Inngest job archiving cross-tenant audit logs
+ *   await withRlsBypass(async tx => {
+ *     await tx.$executeRaw`DELETE FROM public.audit_logs WHERE created_at < ${cutoff}`;
+ *   });
+ */
+export async function withRlsBypass<T>(fn: (tx: TenantTx) => Promise<T>): Promise<T> {
+  return basePrisma.$transaction(async tx => {
+    await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
+    return fn(tx);
+  });
+}
