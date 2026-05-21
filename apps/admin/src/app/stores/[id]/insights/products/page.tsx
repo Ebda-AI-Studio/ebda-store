@@ -28,8 +28,16 @@ interface ProductsData {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function kwd(fils: number): string {
+function kwd(fils: number | null | undefined): string {
+  if (typeof fils !== 'number' || !Number.isFinite(fils)) return '0.000';
   return (fils / 1000).toFixed(3);
+}
+
+// 2026-05-21: same defensive helper as insights/dashboard. row.velocityPerDay
+// is null for SKUs with no rollup yet → array .map crashes the page.
+function num(v: number | null | undefined, digits = 2): string {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return (0).toFixed(digits);
+  return v.toFixed(digits);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -137,7 +145,7 @@ export default function InsightsProductsPage() {
                       <td className="px-3 py-2 text-end font-mono">{row.unitsSold7d}</td>
                       <td className="px-3 py-2 text-end font-mono">{row.unitsSold30d}</td>
                       <td className="px-3 py-2 text-end font-mono text-xs">
-                        {row.velocityPerDay.toFixed(2)}{' '}
+                        {num(row.velocityPerDay, 2)}{' '}
                         <span className="text-muted-foreground">{t('velocityUnit')}</span>
                       </td>
                       <td className="px-3 py-2 text-end font-mono">

@@ -317,18 +317,27 @@ export class StoreService {
     const store = await this.getById(storeId);
 
     await prisma.$transaction(async tx => {
+      // Diagnostic logging 2026-05-21 — repeated 500s on store delete
+      // despite explicit deletes. Surface row counts at each step so
+      // Railway logs reveal which deletion path is silently missing
+      // rows. Remove after the FK chain is fully validated in prod.
+      logger.info({ storeId }, '[STORE_DELETE] start');
+
       // Reviews reference Order with onDelete: Restrict, so they must be
       // deleted BEFORE orders. Review.store is Cascade but Review.order
       // is Restrict — without this, tx.order.deleteMany throws an FK
       // violation as soon as any review is tied to a store order.
       // Ahmad 2026-05-21 — 500 on store delete trace: this was the
       // unhandled second restrict.
-      await tx.review.deleteMany({ where: { storeId } });
+      const reviewsDel = await tx.review.deleteMany({ where: { storeId } });
+      logger.info({ storeId, count: reviewsDel.count }, '[STORE_DELETE] reviews');
       // Returns reference orders with no cascade — clear them next.
-      await tx.return.deleteMany({ where: { storeId } });
+      const returnsDel = await tx.return.deleteMany({ where: { storeId } });
+      logger.info({ storeId, count: returnsDel.count }, '[STORE_DELETE] returns');
       // Orders are Restrict-on-delete from Store; remove them explicitly.
       // OrderItem / Payment / Shipment cascade from Order.
-      await tx.order.deleteMany({ where: { storeId } });
+      const ordersDel = await tx.order.deleteMany({ where: { storeId } });
+      logger.info({ storeId, count: ordersDel.count }, '[STORE_DELETE] orders');
 
       // Accounting + Stock models added 2026-05-19/20 (Batches 1-3) all
       // have onDelete: Restrict on their Store FK. Without explicit
@@ -337,10 +346,14 @@ export class StoreService {
       // returned 500 on a test store. Order matters: Expense + StockAdj
       // reference Account; Account cascades from Store; JournalLine
       // cascades from JournalEntry. So delete the parent rows first.
-      await tx.expense.deleteMany({ where: { storeId } });
-      await tx.stockAdjustment.deleteMany({ where: { storeId } });
-      await tx.purchaseOrder.deleteMany({ where: { storeId } });
-      await tx.journalEntry.deleteMany({ where: { storeId } });
+      const expensesDel = await tx.expense.deleteMany({ where: { storeId } });
+      logger.info({ storeId, count: expensesDel.count }, '[STORE_DELETE] expenses');
+      const stockAdjDel = await tx.stockAdjustment.deleteMany({ where: { storeId } });
+      logger.info({ storeId, count: stockAdjDel.count }, '[STORE_DELETE] stockAdjustments');
+      const posDel = await tx.purchaseOrder.deleteMany({ where: { storeId } });
+      logger.info({ storeId, count: posDel.count }, '[STORE_DELETE] purchaseOrders');
+      const journalDel = await tx.journalEntry.deleteMany({ where: { storeId } });
+      logger.info({ storeId, count: journalDel.count }, '[STORE_DELETE] journalEntries');
 
       // BackorderLine has Product FK with default NoAction (not Cascade).
       // BackorderLines normally cascade via Order→OrderItem→BackorderLine
@@ -349,7 +362,8 @@ export class StoreService {
       // in which case Product cascade from Store cannot proceed because
       // the BackorderLine.productId FK blocks it. Delete them explicitly.
       // Ahmad 2026-05-21 — backorder-test-* stores hit this.
-      await tx.backorderLine.deleteMany({ where: { storeId } });
+      const backorderDel = await tx.backorderLine.deleteMany({ where: { storeId } });
+      logger.info({ storeId, count: backorderDel.count }, '[STORE_DELETE] backorderLines');
 
       // Preserve historical audit logs by detaching them from the store.
       await tx.auditLog.updateMany({ where: { storeId }, data: { storeId: null } });
