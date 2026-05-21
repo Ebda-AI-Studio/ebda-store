@@ -336,7 +336,22 @@ export class StoreService {
       //   StockAdjustment(Restrict), PurchaseOrder(Restrict),
       //   JournalEntry(Restrict), BackorderLine.product(NoAction),
       //   AuditLog.store(NoAction nullable).
-      logger.info({ storeId }, '[STORE_DELETE] start (raw sql)');
+      // ROOT CAUSE 2026-05-21 — RLS was silently filtering every delete
+      // to zero rows. The accounting tables (journal_entries, expenses,
+      // stock_adjustments, accounts, sequences) have row-level-security
+      // policies that require either app.current_store_id GUC to match
+      // OR app.bypass_rls = 'true'. Inside this transaction neither
+      // was set, so DELETE matched 0 rows even though rows existed.
+      // The FK violation at store.delete then fired because the
+      // journal_entries rows were never actually touched.
+      //
+      // Set the bypass GUC for the duration of THIS transaction only —
+      // SET LOCAL scoping means it dies on commit/rollback. This is a
+      // super-admin-only code path (route gates with super_admin role
+      // check) so bypass is appropriate here.
+      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
+
+      logger.info({ storeId }, '[STORE_DELETE] start (raw sql, rls bypassed)');
 
       const reviewCount =
         await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
