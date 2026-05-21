@@ -378,9 +378,14 @@ export function SocialGlyph({
   entry: SocialLinkEntry;
   className?: string;
 }) {
-  if (entry.BrandIcon) {
-    return <entry.BrandIcon className={className} />;
-  }
+  // 2026-05-21 — every footer icon renders as the single-path monochrome
+  // glyph from Simple Icons. Previously WhatsApp + Instagram used their
+  // branded SVG components (gradient + glyph on a rounded square bg),
+  // which read as a "white frame" around them since the other socials
+  // (Facebook / TikTok / etc) are just paths with no bg. Ahmad's directive:
+  // "social logos in footer must have same size without the white frame".
+  // Brand identity is preserved in the FloatingWidget context (different
+  // code path via KindIcon) — only the footer surface goes monochrome.
   return (
     <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path d={entry.icon} />
