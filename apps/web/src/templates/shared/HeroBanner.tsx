@@ -38,17 +38,18 @@ export function HeroBanner({
   // Mobile-specific source falls back to the desktop image when not set.
   const dedicatedMobileSrc = (isRtl && imageMobileAr) || imageMobile;
   const mobileSrc = dedicatedMobileSrc || desktopSrc;
-  // Mobile hero is always LANDSCAPE — Ahmad 2026-05-18 directive
-  // "the mobile hero banner i want it horizontal not vertical or
-  // portrait". Container aspect matches the desktop image (1920:700)
-  // so the same landscape banner renders edge-to-edge with no side
-  // crop on either breakpoint. The dedicated mobile image upload is
-  // still honored as a source override (different content / higher-res
-  // close-up) — but it's rendered in the same landscape container.
-  // Merchants should now upload mobile-specific images in landscape
-  // crops, not portrait. Old portrait crops (if any merchant uploaded
-  // one) will get letterboxed top + bottom on mobile.
-  const mobileAspectClass = 'aspect-[1920/700]';
+  // Mobile hero aspect: 4:3 LANDSCAPE — Ahmad 2026-05-21 directive
+  // "we need a size better than this, mobile hero banner is very small".
+  // Previous 1920/700 (2.74:1) rendered at ~142px on a 390px phone (18%
+  // viewport) — billboard-shaped, too short to read as a proper hero.
+  // 4:3 lands at ~292px (37% viewport) which matches the 50-70vh hero-
+  // section comfort zone industry sources recommend. Still horizontal
+  // (honors the 2026-05-18 "no portrait" directive); just taller.
+  // Merchant sources at the legacy 1920/700 aspect get a blurred
+  // letterbox extension server-side (scripts/rescale-hero-to-4-3.mjs)
+  // so existing content shows uncropped centered with blurred bands
+  // top + bottom filling the new container height.
+  const mobileAspectClass = 'aspect-[4/3]';
   const text = isRtl ? (headlineAr ?? headline) : (headline ?? headlineAr);
   const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
   const cta = isRtl ? (ctaTextAr ?? ctaText) : (ctaText ?? ctaTextAr);
