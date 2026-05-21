@@ -1342,11 +1342,17 @@ export default function StoreLayoutPage() {
 
               {/* Footer — bg, dividers, padding + typography zones
                   (footer / afterFooter). Folded the platform-wide typography
-                  zones in here 2026-05-20. */}
+                  zones in here 2026-05-20.
+
+                  Footer link sections (Shop / Support / Company) are managed
+                  on the standalone /pages route ("Footer Links" in Settings).
+                  Cross-link from the section card so merchants discover both
+                  surfaces without a 666-line component absorb (Ahmad audit
+                  2026-05-21). */}
               <ExtraSectionCard
                 kind="footer"
                 label="Footer"
-                description="Footer chrome — background, dividers, spacing, typography."
+                description="Footer chrome — background, dividers, spacing, typography. Manage the actual footer LINKS (shop/support/company/utility bar) on the Footer Links page."
                 settings={layout.footer}
                 legacyEnabled={true}
                 onPatch={patch =>
@@ -1371,6 +1377,12 @@ export default function StoreLayoutPage() {
                   })
                 }
               />
+              <a
+                href={`/stores/${storeId}/pages`}
+                className="-mt-3 inline-flex items-center gap-2 self-start rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+              >
+                ↗ Edit footer links (Shop / Support / Company + Utility bar + Bottom bar)
+              </a>
 
               {/* Extra duplicated product carousels (section duplication 2026-05-20).
                   Renders one card per entry + a "+ add carousel" button at the

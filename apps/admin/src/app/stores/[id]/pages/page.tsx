@@ -440,6 +440,18 @@ export default function StorePagesPage() {
           </p>
         </div>
 
+        {/* Cross-link to page-builder Footer chrome card. Ahmad audit
+            2026-05-21 — these two surfaces work together: this page owns
+            footer LINKS, page-builder Footer card owns footer CHROME
+            (bg/dividers/typography). Mutual cross-links make the
+            relationship discoverable without merging the editors. */}
+        <Link
+          href={`/stores/${storeId}/page-builder`}
+          className="inline-flex items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+        >
+          ↗ Footer chrome (background, dividers, typography) is in Page Builder
+        </Link>
+
         {/* Top utility bar — pre-header strip rendered above the main
             header on packs that support it (Elegant + Classic). The
             other packs (Modern, Minimal, Bold) ignore this setting
