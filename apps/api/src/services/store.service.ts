@@ -338,46 +338,51 @@ export class StoreService {
       //   AuditLog.store(NoAction nullable).
       logger.info({ storeId }, '[STORE_DELETE] start (raw sql)');
 
-      const reviewCount = await tx.$executeRaw`DELETE FROM reviews WHERE store_id = ${storeId}`;
+      const reviewCount =
+        await tx.$executeRaw`DELETE FROM public.reviews WHERE store_id = ${storeId}`;
       logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
 
-      const returnCount = await tx.$executeRaw`DELETE FROM returns WHERE store_id = ${storeId}`;
+      const returnCount =
+        await tx.$executeRaw`DELETE FROM public.returns WHERE store_id = ${storeId}`;
       logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
 
-      const orderCount = await tx.$executeRaw`DELETE FROM orders WHERE store_id = ${storeId}`;
+      const orderCount =
+        await tx.$executeRaw`DELETE FROM public.orders WHERE store_id = ${storeId}`;
       logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
 
-      const expenseCount = await tx.$executeRaw`DELETE FROM expenses WHERE store_id = ${storeId}`;
+      const expenseCount =
+        await tx.$executeRaw`DELETE FROM public.expenses WHERE store_id = ${storeId}`;
       logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
 
       const stockAdjCount =
-        await tx.$executeRaw`DELETE FROM stock_adjustments WHERE store_id = ${storeId}`;
+        await tx.$executeRaw`DELETE FROM public.stock_adjustments WHERE store_id = ${storeId}`;
       logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
 
-      const poCount = await tx.$executeRaw`DELETE FROM purchase_orders WHERE store_id = ${storeId}`;
+      const poCount =
+        await tx.$executeRaw`DELETE FROM public.purchase_orders WHERE store_id = ${storeId}`;
       logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
 
       const journalCount =
-        await tx.$executeRaw`DELETE FROM journal_entries WHERE store_id = ${storeId}`;
+        await tx.$executeRaw`DELETE FROM public.journal_entries WHERE store_id = ${storeId}`;
       logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
 
       const backorderCount =
-        await tx.$executeRaw`DELETE FROM backorder_lines WHERE store_id = ${storeId}`;
+        await tx.$executeRaw`DELETE FROM public.backorder_lines WHERE store_id = ${storeId}`;
       logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
 
       // Detach historical audit logs by nulling their storeId (preserves trail).
       const auditCount =
-        await tx.$executeRaw`UPDATE audit_logs SET store_id = NULL WHERE store_id = ${storeId}`;
+        await tx.$executeRaw`UPDATE public.audit_logs SET store_id = NULL WHERE store_id = ${storeId}`;
       logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
 
       // Verification: count any rows that would still block the store delete.
       // If any of these come back > 0, we know exactly which table.
       const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
-        SELECT 'orders' AS table_name, COUNT(*)::bigint AS cnt FROM orders WHERE store_id = ${storeId}
-        UNION ALL SELECT 'journal_entries', COUNT(*)::bigint FROM journal_entries WHERE store_id = ${storeId}
-        UNION ALL SELECT 'expenses', COUNT(*)::bigint FROM expenses WHERE store_id = ${storeId}
-        UNION ALL SELECT 'stock_adjustments', COUNT(*)::bigint FROM stock_adjustments WHERE store_id = ${storeId}
-        UNION ALL SELECT 'purchase_orders', COUNT(*)::bigint FROM purchase_orders WHERE store_id = ${storeId}
+        SELECT 'orders' AS table_name, COUNT(*)::bigint AS cnt FROM public.orders WHERE store_id = ${storeId}
+        UNION ALL SELECT 'journal_entries', COUNT(*)::bigint FROM public.journal_entries WHERE store_id = ${storeId}
+        UNION ALL SELECT 'expenses', COUNT(*)::bigint FROM public.expenses WHERE store_id = ${storeId}
+        UNION ALL SELECT 'stock_adjustments', COUNT(*)::bigint FROM public.stock_adjustments WHERE store_id = ${storeId}
+        UNION ALL SELECT 'purchase_orders', COUNT(*)::bigint FROM public.purchase_orders WHERE store_id = ${storeId}
       `;
       const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
       if (stillBlocking.length > 0) {
@@ -386,7 +391,7 @@ export class StoreService {
 
       // Final delete — cascades products, categories, customers, pages,
       // carts, coupons, accounts, suppliers, backorders, etc.
-      await tx.$executeRaw`DELETE FROM stores WHERE id = ${storeId}`;
+      await tx.$executeRaw`DELETE FROM public.stores WHERE id = ${storeId}`;
       logger.info({ storeId }, '[STORE_DELETE] store deleted');
 
       // If the owner was a store_admin and this was their only store,
