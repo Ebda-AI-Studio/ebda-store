@@ -42,7 +42,8 @@ interface ProfitAnomaly {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function kwd(fils: number): string {
+function kwd(fils: number | null | undefined): string {
+  if (typeof fils !== 'number' || !Number.isFinite(fils)) return '0.000';
   return (fils / 1000).toFixed(3);
 }
 
@@ -74,18 +75,20 @@ export default function FinanceDashboardPage() {
       })
       .catch(() => setError('Failed to load finance dashboard'));
 
-    // Recent unacknowledged anomalies (top 3)
-    apiGet<{ data: ProfitAnomaly[]; meta: { total: number } }>(
+    // Recent unacknowledged anomalies (top 3) — defensive against missing
+    // `data` field on the API response (e.g. anomalies feature not yet
+    // enabled for this store, error responses, partial shape).
+    apiGet<{ data?: ProfitAnomaly[]; meta?: { total: number } }>(
       `/api/v1/stores/${storeId}/finance/anomalies?acknowledged=false&perPage=3&page=1`
     ).then(({ data: ad }) => {
-      if (ad) setRecentAnomalies(ad.data);
+      if (ad?.data && Array.isArray(ad.data)) setRecentAnomalies(ad.data);
     });
 
-    // Pending OCR drafts count
-    apiGet<{ meta: { total: number } }>(
+    // Pending OCR drafts count — defensive against missing `meta` field.
+    apiGet<{ meta?: { total: number } }>(
       `/api/v1/stores/${storeId}/expenses?status=draft&hasOcr=true&perPage=1&page=1`
     ).then(({ data: ed }) => {
-      if (ed) setPendingOcrCount(ed.meta.total);
+      if (ed?.meta?.total !== undefined) setPendingOcrCount(ed.meta.total);
     });
   }, [storeId]);
 
@@ -105,7 +108,14 @@ export default function FinanceDashboardPage() {
     );
   }
 
-  const { thisMonth, cash, stockValue, balanceSheet } = data;
+  // Defensive destructure — API can return partial shape for stores with
+  // incomplete accounting setup (no COA seeded, no journal entries yet,
+  // backorder-test stores etc.). Defaults keep the page renderable
+  // instead of crashing on `cash.length` or `thisMonth.net`.
+  const thisMonth = data.thisMonth ?? { revenue: 0, expenses: 0, net: 0 };
+  const cash = Array.isArray(data.cash) ? data.cash : [];
+  const stockValue = typeof data.stockValue === 'number' ? data.stockValue : 0;
+  const balanceSheet = data.balanceSheet ?? { totalAssets: 0, totalLiabilities: 0, totalEquity: 0 };
   const netPositive = thisMonth.net >= 0;
 
   return (
