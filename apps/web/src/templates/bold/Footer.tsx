@@ -108,7 +108,7 @@ export default function BoldFooter({
                     className="w-10 h-10 flex items-center justify-center overflow-hidden bg-foreground/10 hover:bg-primary rounded-none transition-colors duration-200 cursor-pointer text-foreground"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-7 h-7" />
+                    <SocialGlyph entry={s} className="w-full h-full" />
                   </a>
                 ))}
                 {displayLogo && (

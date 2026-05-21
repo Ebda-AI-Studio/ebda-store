@@ -146,7 +146,7 @@ export default function ModernFooter({
                     className="w-9 h-9 bg-foreground/10 hover:bg-primary rounded-lg flex items-center justify-center overflow-hidden transition-colors duration-300 ease-out cursor-pointer text-foreground/75 hover:text-foreground"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-7 h-7" />
+                    <SocialGlyph entry={s} className="w-full h-full" />
                   </a>
                 ))}
                 {displayLogo && (

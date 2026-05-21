@@ -319,7 +319,7 @@ export default function ElegantFooter({
                     className="w-9 h-9 flex items-center justify-center overflow-hidden border border-border text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-7 h-7" />
+                    <SocialGlyph entry={s} className="w-full h-full" />
                   </a>
                 ))}
               </div>
