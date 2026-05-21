@@ -675,6 +675,31 @@ export class StoreService {
     return updatedStore;
   }
 
+  // Dedicated writer for the floating-widget config so the admin doesn't
+  // round-trip the whole `settings` JSON. The generic PUT /stores/:id
+  // route accepts settings but routing the floating widget through there
+  // means clients have to GET-merge-PUT — and any stale local copy of
+  // `store.settings` clobbers concurrent writes from other admin tabs
+  // (or wipes fields the page hasn't loaded). Merging in here keeps
+  // floatingWidget surgical: read existing settings JSON, splice the
+  // new sub-key in, write back. Same posture as the announcement-bar
+  // writer above, but folded into the `settings` JSON column instead
+  // of a dedicated column.
+  static async updateFloatingWidget(storeId: string, floatingWidget: Record<string, unknown>) {
+    const store = await this.getById(storeId);
+    const existingSettings = (store.settings as Record<string, unknown>) || {};
+    const mergedSettings = { ...existingSettings, floatingWidget };
+
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: { settings: mergedSettings as Prisma.InputJsonValue },
+    });
+
+    await StoreService.invalidateCache(store);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    return updatedStore;
+  }
+
   static async updateSeo(
     storeId: string,
     seo: {

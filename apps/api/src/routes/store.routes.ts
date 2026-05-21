@@ -177,6 +177,49 @@ const announcementSchema = z
 
 const marketingPixelsSchema = z.record(z.string(), z.unknown());
 
+// Floating widget — sticky button group on the storefront. Schema mirrors
+// the FloatingWidgetConfig type in @force/shared. The buttons array can
+// hold any FloatingButton shape; we use z.record for the per-button object
+// so adding a new optional field on the client (e.g. a new social kind)
+// doesn't immediately require a backend redeploy. Length caps prevent
+// runaway payloads — a merchant should not be configuring 200 buttons.
+const floatingButtonSchema = z
+  .object({
+    id: z.string().max(64),
+    kind: z.enum(['whatsapp', 'instagram', 'phone', 'email', 'music', 'custom']),
+    label: optionalStr(200),
+    labelAr: optionalStr(200),
+    bgColor: optionalStr(50),
+    iconColor: optionalStr(50),
+    iconUrl: optionalStr(500),
+    whatsappPhone: optionalStr(50),
+    whatsappMessage: optionalStr(500),
+    instagramHandle: optionalStr(100),
+    phoneNumber: optionalStr(50),
+    emailAddress: optionalStr(255),
+    emailSubject: optionalStr(200),
+    musicUrl: optionalStr(500),
+    musicLoop: z.boolean().optional(),
+    customHref: optionalStr(500),
+  })
+  .strip();
+
+const floatingWidgetSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    position: z.enum(['br', 'bl', 'tr', 'tl']).optional(),
+    expandDirection: z.enum(['up', 'down', 'left', 'right']).optional(),
+    toggleBgColor: optionalStr(50),
+    toggleIconUrl: optionalStr(500),
+    toggleLabel: optionalStr(200),
+    toggleLabelAr: optionalStr(200),
+    startExpanded: z.boolean().optional(),
+    hideOnMobile: z.boolean().optional(),
+    hideOnDesktop: z.boolean().optional(),
+    buttons: z.array(floatingButtonSchema).max(50).optional(),
+  })
+  .strip();
+
 /**
  * @swagger
  * /stores:
@@ -603,6 +646,37 @@ router.put(
       const announcementBar = announcementSchema.parse(req.body);
 
       const store = await StoreService.updateAnnouncementBar(id, announcementBar);
+
+      res.json({
+        success: true,
+        data: { store },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:id/floating-widget — dedicated writer for the storefront's
+// floating action-button widget. Lives on Store.settings.floatingWidget;
+// the merge happens server-side in StoreService.updateFloatingWidget so
+// the admin only ships the widget config, not the whole settings blob
+// (which is fragile across tabs and silently drops fields if the admin
+// holds a stale copy).
+router.put(
+  '/:id/floating-widget',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const floatingWidget = floatingWidgetSchema.parse(req.body);
+
+      const store = await StoreService.updateFloatingWidget(
+        id,
+        floatingWidget as Record<string, unknown>
+      );
 
       res.json({
         success: true,
