@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -40,16 +40,21 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
       );
 
       const gl = await step.run(`gl-${store.id}`, async () => {
-        const rows = await prisma.$queryRaw<{ total: bigint }[]>`
-          SELECT COALESCE(SUM(l.credit), 0) AS total
-          FROM public.journal_lines l
-          JOIN public.journal_entries e ON e.id = l.entry_id
-          JOIN public.accounts a       ON a.id = l.account_id
-          WHERE e.store_id = ${store.id}
-            AND e.status = 'posted'
-            AND e.posted_at >= ${since}
-            AND a.code IN ('4000', '4010', '2100')
-        `;
+        // Cross-tenant cron — no tenant context; RLS would filter these
+        // accounting reads to 0 rows. withRlsBypass sets the GUC inside
+        // a transaction so the raw SQL sees actual posted journal lines.
+        const rows = await withRlsBypass(
+          tx => tx.$queryRaw<{ total: bigint }[]>`
+            SELECT COALESCE(SUM(l.credit), 0) AS total
+            FROM public.journal_lines l
+            JOIN public.journal_entries e ON e.id = l.entry_id
+            JOIN public.accounts a       ON a.id = l.account_id
+            WHERE e.store_id = ${store.id}
+              AND e.status = 'posted'
+              AND e.posted_at >= ${since}
+              AND a.code IN ('4000', '4010', '2100')
+          `
+        );
         return Number(rows[0].total);
       });
 

@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import type { AccountType, Prisma } from '@prisma/client';
 import { COA_TEMPLATE } from './coa-template';
 import { postEntry } from './journal.service';
@@ -42,7 +42,12 @@ export async function seedCoaForStore(
     await postOpeningBalanceIfNeeded(storeId, client);
   };
   if (tx) return run(tx);
-  return prisma.$transaction(run);
+  // No caller tx → wrap in withRlsBypass. seedCoaForStore is called by
+  // StoreService.create (super-admin) and by the accounting-enable
+  // toggle path; neither sets app.current_store_id in their outer
+  // transaction. Without bypass, accounts.findMany returns empty (RLS
+  // filter), createMany throws WITH CHECK violation.
+  return withRlsBypass(run);
 }
 
 /**
@@ -137,12 +142,21 @@ async function postOpeningBalanceIfNeeded(
 export async function getSystemAccountIdByCode(
   storeId: string,
   code: string,
-  tx: Prisma.TransactionClient | typeof prisma = prisma
+  tx?: Prisma.TransactionClient
 ): Promise<string> {
-  const acct = await tx.account.findUnique({
-    where: { storeId_code: { storeId, code } },
-    select: { id: true },
-  });
+  // 2026-05-21: when no tx is passed, the proxy prisma falls through to
+  // basePrisma which has no app.current_store_id GUC. accounts RLS
+  // policy (accounting_foundations migration) requires either the GUC
+  // OR app.bypass_rls = 'true', so without the wrap account.findUnique
+  // silently returns null → throws "seed COA first" even though the COA
+  // exists. Wrap in withRlsBypass when standalone; tx callers are
+  // assumed to have set up the GUC already.
+  const findIt = (client: Prisma.TransactionClient | typeof prisma) =>
+    client.account.findUnique({
+      where: { storeId_code: { storeId, code } },
+      select: { id: true },
+    });
+  const acct = tx ? await findIt(tx) : await withRlsBypass(findIt);
   if (!acct) {
     throw new Error(`System account ${code} not found for store ${storeId} — seed COA first`);
   }

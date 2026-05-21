@@ -198,7 +198,12 @@ export async function reverseEntry(
 
     return reversal;
   };
-  const reversal = await (tx ? run(tx) : prisma.$transaction(run));
+  // When no caller-provided tx, wrap in withRlsBypass — Inngest reversal
+  // paths (refund posting, profit-anomaly remediation) run without tenant
+  // context, so RLS on journal_entries would silently filter every read
+  // and the create would fail WITH CHECK. See journal.service.postEntry
+  // for the same pattern + feedback-postgres-rls-silent-filter-trap.md.
+  const reversal = await (tx ? run(tx) : withRlsBypass(run));
 
   // Non-blocking UI refresh signal — best-effort, never throws
   broadcastToStore(reversal.storeId, {
