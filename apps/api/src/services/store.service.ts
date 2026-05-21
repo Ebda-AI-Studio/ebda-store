@@ -365,11 +365,24 @@ export class StoreService {
   }
 
   static async getStoreStats(storeId: string) {
+    // Revenue = orders that are EITHER confirmed-and-beyond by fulfillment
+    // status OR paid by payment status. Captures the case where an order
+    // sits in 'pending' fulfillment but the customer's card was already
+    // charged (Tap/MyFatoorah webhook landed the payment but a fulfillment
+    // worker hasn't moved the order forward yet). Without the paymentStatus
+    // arm, dashboards showed Revenue=0 even when KWDs had been collected.
+    // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, KWD 0.000 revenue.
     const [productCount, orderCount, totalRevenue, recentOrders] = await Promise.all([
       prisma.product.count({ where: { storeId, status: 'active' } }),
       prisma.order.count({ where: { storeId } }),
       prisma.order.aggregate({
-        where: { storeId, status: { in: ['confirmed', 'processing', 'shipped', 'delivered'] } },
+        where: {
+          storeId,
+          OR: [
+            { status: { in: ['confirmed', 'processing', 'shipped', 'delivered'] } },
+            { paymentStatus: 'paid' },
+          ],
+        },
         _sum: { total: true },
       }),
       prisma.order.findMany({

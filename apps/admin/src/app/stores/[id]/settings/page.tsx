@@ -55,36 +55,16 @@ export default function StoreSettingsPage() {
         </svg>
       ),
     },
-    {
-      key: 'hero',
-      href: `/stores/${storeId}/hero`,
-      color: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'categories',
-      href: `/stores/${storeId}/categories`,
-      color: 'bg-lime-100 text-lime-600',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-          />
-        </svg>
-      ),
-    },
+    /*
+     * Hero / Categories / Announcement cards REMOVED 2026-05-21 (Ahmad
+     * audit). Page Builder under Catalog now owns hero slides, category
+     * tile config, and announcement bar visibility + content. The
+     * standalone /hero, /categories, /announcement pages still work by
+     * URL but are no longer discoverable from Settings — they're linked
+     * from inside the matching Page Builder section card. SEO stays in
+     * Settings since it's meta-tags + structured data, distinct from
+     * page-builder's typography zones.
+     */
     {
       key: 'seo',
       href: `/stores/${storeId}/seo`,
@@ -97,21 +77,6 @@ export default function StoreSettingsPage() {
             strokeLinejoin="round"
             strokeWidth={2}
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'announcement',
-      href: `/stores/${storeId}/announcement`,
-      color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"
           />
         </svg>
       ),
