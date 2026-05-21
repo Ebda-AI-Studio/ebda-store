@@ -286,28 +286,16 @@ export default function ElegantFooter({
             </div>
           )}
 
-          {/* Social — hidden when there are no social links configured.
-              On mobile, the logo renders BESIDE the social icons (Ahmad
-              2026-05-21 layout adjustment). Desktop keeps the original
-              Brand-column logo. */}
+          {/* Social — heading row carries the mobile logo so it aligns with
+              the Contact column's heading in the neighboring grid cell
+              (Ahmad 2026-05-21: "logo same row as تواصل"). Logo sits on
+              the inline-end via ms-auto: right in LTR, left in RTL. */}
           {socialLinks.length > 0 && (
             <div>
-              <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground mb-6 font-serif">
-                {isRtl ? 'تابعنا' : 'Follow'}
-              </h4>
-              <div className="flex flex-wrap items-center gap-3">
-                {socialLinks.map(s => (
-                  <a
-                    key={s.key}
-                    href={s.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-8 h-8 flex items-center justify-center overflow-hidden border border-border text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                    aria-label={s.key}
-                  >
-                    <SocialGlyph entry={s} className="w-5 h-5" />
-                  </a>
-                ))}
+              <div className="flex items-center mb-6">
+                <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground font-serif">
+                  {isRtl ? 'تابعنا' : 'Follow'}
+                </h4>
                 {displayLogo && (
                   <img
                     src={displayLogo}
@@ -320,6 +308,20 @@ export default function ElegantFooter({
                     }
                   />
                 )}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {socialLinks.map(s => (
+                  <a
+                    key={s.key}
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-9 h-9 flex items-center justify-center overflow-hidden border border-border text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    aria-label={s.key}
+                  >
+                    <SocialGlyph entry={s} className="w-7 h-7" />
+                  </a>
+                ))}
               </div>
             </div>
           )}
