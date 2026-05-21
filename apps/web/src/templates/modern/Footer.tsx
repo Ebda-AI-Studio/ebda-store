@@ -11,7 +11,6 @@ import {
   getDisplayText,
   isNewsletterEnabled,
   resolveAddressHref,
-  resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
@@ -22,12 +21,11 @@ export default function ModernFooter({
   socials,
   navigation = [],
   footerLinks,
-  disabledCmsSlugs,
   isRtl: isRtlProp,
-  urlPrefix = '',
   bgColor,
   footerLogo,
   footerLogoInvert,
+  hideFooterLogoMobile,
 }: FooterProps) {
   const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -52,7 +50,6 @@ export default function ModernFooter({
   // an empty config we fall back to the navigation-driven default below.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const showNewsletter = isNewsletterEnabled(footerLinks);
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
   const addressMapHref = resolveAddressHref(
     displayAddress,
     contact.addressUrl,
@@ -136,20 +133,20 @@ export default function ModernFooter({
                 of this row (ms-auto). Ahmad 2026-05-21: bigger + on the
                 other side from "follow us" cluster. */}
             {socialLinks.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-3">
                 {socialLinks.map(s => (
                   <a
                     key={s.key}
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-9 h-9 bg-foreground/10 hover:bg-primary rounded-lg flex items-center justify-center overflow-hidden transition-colors duration-300 ease-out cursor-pointer text-foreground/75 hover:text-foreground"
+                    className="text-foreground/75 hover:text-foreground transition-colors duration-300 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-full h-full" />
+                    <SocialGlyph entry={s} className="w-8 h-8" />
                   </a>
                 ))}
-                {displayLogo && (
+                {displayLogo && !hideFooterLogoMobile && (
                   <img
                     src={footerLogo || displayLogo}
                     alt={displayName}
@@ -365,39 +362,7 @@ export default function ModernFooter({
           )}
         </div>
 
-        {/* Bottom Bar — copyright string + per-store-toggleable legal links.
-            The whole bar can be hidden via `footerLinks.bottomBar.enabled`. */}
-        {bottomBar.enabled && (
-          <div className="mt-12 pt-6 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-foreground/55">{bottomBar.copyright}</p>
-            <div className="flex items-center gap-5">
-              {bottomBar.privacyEnabled && (
-                <Link
-                  href={`${urlPrefix}/privacy`}
-                  className="text-xs text-foreground/55 hover:text-foreground/75 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
-                </Link>
-              )}
-              {bottomBar.termsEnabled && (
-                <Link
-                  href={`${urlPrefix}/terms`}
-                  className="text-xs text-foreground/55 hover:text-foreground/75 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
-                </Link>
-              )}
-              {bottomBar.shippingEnabled && (
-                <Link
-                  href={`${urlPrefix}/shipping`}
-                  className="text-xs text-foreground/55 hover:text-foreground/75 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  {isRtl ? 'الشحن' : 'Shipping'}
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PoweredByForce />

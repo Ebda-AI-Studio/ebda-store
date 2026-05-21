@@ -1,10 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { resolveBottomBar, resolveFooterSections } from '../shared/display-helpers';
+import { resolveFooterSections } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
 
 export default function MinimalFooter({
@@ -13,12 +12,11 @@ export default function MinimalFooter({
   socials,
   navigation = [],
   footerLinks,
-  disabledCmsSlugs,
   isRtl: isRtlProp,
-  urlPrefix = '',
   bgColor,
   footerLogo,
   footerLogoInvert,
+  hideFooterLogoMobile,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -47,8 +45,6 @@ export default function MinimalFooter({
   // social URL is set, so the merchant's contact phone doubles as a chat
   // link without manual configuration.
   const socialLinks = getSocialLinks(socials, contact);
-
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
 
   return (
     <footer
@@ -111,10 +107,10 @@ export default function MinimalFooter({
                   className="text-muted-foreground hover:text-foreground overflow-hidden rounded-md transition-colors duration-200 cursor-pointer"
                   aria-label={s.key}
                 >
-                  <SocialGlyph entry={s} className="w-7 h-7" />
+                  <SocialGlyph entry={s} className="w-8 h-8" />
                 </a>
               ))}
-              {displayLogo && (
+              {displayLogo && !hideFooterLogoMobile && (
                 <img
                   src={displayLogo}
                   alt={displayName}
@@ -130,43 +126,7 @@ export default function MinimalFooter({
           )}
         </div>
 
-        {/* Bottom bar — copyright + per-store-toggleable legal links. The
-            entire bar can be hidden via `footerLinks.bottomBar.enabled`. */}
-        {bottomBar.enabled && (
-          <div
-            className={`mt-10 pt-6 border-t border-border/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground ${
-              isRtl ? 'flex-row-reverse' : ''
-            }`}
-          >
-            <p>{bottomBar.copyright}</p>
-            <div className={`flex items-center gap-5 ${isRtl ? 'flex-row-reverse' : ''}`}>
-              {bottomBar.privacyEnabled && (
-                <Link
-                  href={`${urlPrefix}/privacy`}
-                  className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  {isRtl ? 'الخصوصية' : 'Privacy'}
-                </Link>
-              )}
-              {bottomBar.termsEnabled && (
-                <Link
-                  href={`${urlPrefix}/terms`}
-                  className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  {isRtl ? 'الشروط' : 'Terms'}
-                </Link>
-              )}
-              {bottomBar.shippingEnabled && (
-                <Link
-                  href={`${urlPrefix}/shipping`}
-                  className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  {isRtl ? 'الشحن' : 'Shipping'}
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PoweredByForce />

@@ -318,6 +318,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           }
           footerLogo={store.theme?.footerLogo ?? undefined}
           footerLogoInvert={store.theme?.footerLogoInvert === true}
+          hideFooterLogoMobile={store.theme?.hideFooterLogoMobile === true}
         />
       </div>
       {/* afterFooter — empty placeholder so any merchant-injected text

@@ -255,6 +255,11 @@ export interface FooterProps {
    * upload. Ignored when `footerLogo` is set (the custom upload wins).
    */
   footerLogoInvert?: boolean;
+  /**
+   * When true, the mobile-only footer logo doesn't render. The logo
+   * still shows on desktop. Wired from `theme.hideFooterLogoMobile`.
+   */
+  hideFooterLogoMobile?: boolean;
 }
 
 /**

@@ -193,6 +193,14 @@ export interface StoreTheme {
    * wins when both are set.
    */
   footerLogoInvert?: boolean;
+  /**
+   * When true, the mobile-only footer logo (the one that appears beside
+   * the social icons on phones) doesn't render. Useful for stores where
+   * the header logo is already big and the merchant wants the mobile
+   * footer to be text-only. Desktop footer logo is unaffected.
+   * Ahmad 2026-05-21. Default false (logo visible on mobile).
+   */
+  hideFooterLogoMobile?: boolean;
 
   // Custom CSS (for advanced users)
   customCss?: string;

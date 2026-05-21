@@ -132,6 +132,23 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             above.
           </span>
         </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={branding.theme.hideFooterLogoMobile === true}
+            onChange={e =>
+              onChange({
+                ...branding,
+                theme: { ...branding.theme, hideFooterLogoMobile: e.target.checked },
+              })
+            }
+            className="h-4 w-4 cursor-pointer accent-primary"
+          />
+          <span className="text-xs text-foreground">
+            Hide footer logo on mobile (desktop footer logo stays visible). Useful when the header
+            logo on mobile is already large and the footer reads better as text-only.
+          </span>
+        </label>
       </div>
 
       <BrandPreview theme={branding.theme} />

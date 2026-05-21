@@ -46,6 +46,9 @@ export interface StoreTheme {
   /** Apply CSS `filter: brightness(0) invert(1)` to the main logo in the
    *  footer (renders it white). Ignored when footerLogo is set. */
   footerLogoInvert?: boolean;
+  /** Hide the mobile-only footer logo when true. Desktop footer logo
+   *  unaffected. Ahmad 2026-05-21. */
+  hideFooterLogoMobile?: boolean;
 }
 
 export interface StoreBranding {

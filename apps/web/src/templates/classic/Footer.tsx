@@ -8,7 +8,6 @@ import {
   getDisplayBranding,
   getDisplayText,
   resolveAddressHref,
-  resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
@@ -19,12 +18,11 @@ export default function ClassicFooter({
   socials,
   navigation = [],
   footerLinks,
-  disabledCmsSlugs,
   isRtl: isRtlProp,
-  urlPrefix = '',
   bgColor,
   footerLogo,
   footerLogoInvert,
+  hideFooterLogoMobile,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -44,7 +42,6 @@ export default function ClassicFooter({
   // navigation into up to 3 columns when no footerLinks have been saved so
   // long-standing tenants keep their existing layout.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
   const addressMapHref = resolveAddressHref(
     displayAddress,
     contact.addressUrl,
@@ -153,10 +150,10 @@ export default function ClassicFooter({
                     className="text-muted-foreground hover:text-foreground overflow-hidden rounded-md transition-colors duration-200 cursor-pointer"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-7 h-7" />
+                    <SocialGlyph entry={s} className="w-8 h-8" />
                   </a>
                 ))}
-                {displayLogo && (
+                {displayLogo && !hideFooterLogoMobile && (
                   <img
                     src={footerLogo || displayLogo}
                     alt={displayName}
@@ -229,48 +226,7 @@ export default function ClassicFooter({
               ))}
         </div>
 
-        {/* Bottom bar — copyright + per-store-toggleable legal links. The
-            entire bar can be hidden via `footerLinks.bottomBar.enabled`. */}
-        {bottomBar.enabled && (
-          <>
-            <div className="h-px bg-border mb-6" />
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-              <p>{bottomBar.copyright}</p>
-              <div className="flex items-center gap-5">
-                {bottomBar.privacyEnabled && (
-                  <Link
-                    href={`${urlPrefix}/privacy`}
-                    className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
-                  </Link>
-                )}
-                {bottomBar.privacyEnabled && bottomBar.termsEnabled && (
-                  <span aria-hidden="true">·</span>
-                )}
-                {bottomBar.termsEnabled && (
-                  <Link
-                    href={`${urlPrefix}/terms`}
-                    className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    {isRtl ? 'الشروط والأحكام' : 'Terms & Conditions'}
-                  </Link>
-                )}
-                {bottomBar.termsEnabled && bottomBar.shippingEnabled && (
-                  <span aria-hidden="true">·</span>
-                )}
-                {bottomBar.shippingEnabled && (
-                  <Link
-                    href={`${urlPrefix}/shipping`}
-                    className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    {isRtl ? 'الشحن' : 'Shipping'}
-                  </Link>
-                )}
-              </div>
-            </div>
-          </>
-        )}
+        {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PoweredByForce />

@@ -4,11 +4,7 @@ import Link from 'next/link';
 import { PoweredByForce } from '../shared/PoweredByForce';
 import type { FooterProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import {
-  resolveAddressHref,
-  resolveBottomBar,
-  resolveFooterSections,
-} from '../shared/display-helpers';
+import { resolveAddressHref, resolveFooterSections } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
 
 export default function BoldFooter({
@@ -17,12 +13,11 @@ export default function BoldFooter({
   socials,
   navigation = [],
   footerLinks,
-  disabledCmsSlugs,
   isRtl: isRtlProp,
-  urlPrefix = '',
   bgColor,
   footerLogo,
   footerLogoInvert,
+  hideFooterLogoMobile,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -40,7 +35,6 @@ export default function BoldFooter({
   // configured we keep the navigation-driven default below. Bold has no
   // newsletter form so newsletterEnabled does not apply here.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
   const addressMapHref = resolveAddressHref(
     displayAddress,
     contact.addressUrl,
@@ -105,13 +99,13 @@ export default function BoldFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-10 h-10 flex items-center justify-center overflow-hidden bg-foreground/10 hover:bg-primary rounded-none transition-colors duration-200 cursor-pointer text-foreground"
+                    className="text-foreground hover:text-primary transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-full h-full" />
+                    <SocialGlyph entry={s} className="w-8 h-8" />
                   </a>
                 ))}
-                {displayLogo && (
+                {displayLogo && !hideFooterLogoMobile && (
                   <img
                     src={displayLogo}
                     alt={displayName}
@@ -221,39 +215,7 @@ export default function BoldFooter({
           )}
         </div>
 
-        {/* Bottom bar — copyright + per-store-toggleable legal links. The
-            entire bar can be hidden via `footerLinks.bottomBar.enabled`. */}
-        {bottomBar.enabled && (
-          <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-foreground/60 font-medium">{bottomBar.copyright}</p>
-            <div className="flex gap-6">
-              {bottomBar.privacyEnabled && (
-                <Link
-                  href={`${urlPrefix}/privacy`}
-                  className="text-xs text-foreground/60 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  {isRtl ? 'الخصوصية' : 'Privacy'}
-                </Link>
-              )}
-              {bottomBar.termsEnabled && (
-                <Link
-                  href={`${urlPrefix}/terms`}
-                  className="text-xs text-foreground/60 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  {isRtl ? 'الشروط' : 'Terms'}
-                </Link>
-              )}
-              {bottomBar.shippingEnabled && (
-                <Link
-                  href={`${urlPrefix}/shipping`}
-                  className="text-xs text-foreground/60 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  {isRtl ? 'الشحن' : 'Shipping'}
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Bottom bar removed 2026-05-21 — redundant with Company Links. */}
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PoweredByForce />

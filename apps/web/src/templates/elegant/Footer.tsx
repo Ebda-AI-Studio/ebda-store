@@ -9,7 +9,6 @@ import { api } from '../../lib/api';
 import {
   isNewsletterEnabled,
   resolveAddressHref,
-  resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
 import { getSocialLinks, SocialGlyph } from '../shared/icons';
@@ -20,12 +19,11 @@ export default function ElegantFooter({
   socials,
   navigation = [],
   footerLinks,
-  disabledCmsSlugs,
   isRtl: isRtlProp,
-  urlPrefix = '',
   bgColor,
   footerLogo,
   footerLogoInvert,
+  hideFooterLogoMobile,
 }: FooterProps) {
   const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -75,7 +73,6 @@ export default function ElegantFooter({
   // the pack's classic Explore / Contact / Follow trio.
   const footerSections = resolveFooterSections(footerLinks, isRtl);
   const showNewsletter = isNewsletterEnabled(footerLinks);
-  const bottomBar = resolveBottomBar(footerLinks?.bottomBar, displayName, isRtl, disabledCmsSlugs);
   const addressMapHref = resolveAddressHref(
     displayAddress,
     contact.addressUrl,
@@ -296,7 +293,7 @@ export default function ElegantFooter({
                 <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground font-serif">
                   {isRtl ? 'تابعنا' : 'Follow'}
                 </h4>
-                {displayLogo && (
+                {displayLogo && !hideFooterLogoMobile && (
                   <img
                     src={displayLogo}
                     alt={displayName}
@@ -309,17 +306,17 @@ export default function ElegantFooter({
                   />
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-4">
                 {socialLinks.map(s => (
                   <a
                     key={s.key}
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-9 h-9 flex items-center justify-center overflow-hidden border border-border text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    className="text-foreground/60 hover:text-foreground transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-full h-full" />
+                    <SocialGlyph entry={s} className="w-8 h-8" />
                   </a>
                 ))}
               </div>
@@ -328,43 +325,10 @@ export default function ElegantFooter({
         </div>
       </div>
 
-      {/* Bottom bar — copyright + per-store-toggleable legal links. The
-          entire bar can be hidden via `footerLinks.bottomBar.enabled`. */}
-      {bottomBar.enabled && (
-        <div className="border-t border-border/50">
-          <div className="container mx-auto px-4 py-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs tracking-wide text-muted-foreground/70">
-              <p>{bottomBar.copyright}</p>
-              <div className="flex gap-6">
-                {bottomBar.privacyEnabled && (
-                  <Link
-                    href={`${urlPrefix}/privacy`}
-                    className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    {isRtl ? 'الخصوصية' : 'Privacy'}
-                  </Link>
-                )}
-                {bottomBar.termsEnabled && (
-                  <Link
-                    href={`${urlPrefix}/terms`}
-                    className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    {isRtl ? 'الشروط' : 'Terms'}
-                  </Link>
-                )}
-                {bottomBar.shippingEnabled && (
-                  <Link
-                    href={`${urlPrefix}/shipping`}
-                    className="hover:text-foreground transition-colors duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    {isRtl ? 'الشحن' : 'Shipping'}
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Bottom bar removed 2026-05-21 — was redundant with the Company
+          Links footer section (merchants put Privacy/Terms/Shipping there
+          if they want them). PoweredByForce attribution + the per-section
+          copyright option are kept. */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PoweredByForce />
       </div>

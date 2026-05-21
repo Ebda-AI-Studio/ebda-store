@@ -35,38 +35,20 @@ interface UtilityBarSettings {
   links?: UtilityBarLink[];
 }
 
-interface BottomBarSettings {
-  enabled?: boolean;
-  copyrightOverride?: string;
-  copyrightOverrideAr?: string;
-  privacyEnabled?: boolean;
-  termsEnabled?: boolean;
-  shippingEnabled?: boolean;
-}
-
 interface StoreSettings {
   footerLinks?: {
     shop?: FooterLink[];
     support: FooterLink[];
     company: FooterLink[];
     newsletterEnabled?: boolean;
-    bottomBar?: BottomBarSettings;
+    /** @deprecated removed 2026-05-21 — storefront no longer renders.
+     *  Field stays in shape so existing data on rows that pre-date the
+     *  removal is preserved (just ignored by the storefront). */
+    bottomBar?: unknown;
   };
   utilityBar?: UtilityBarSettings;
   [key: string]: unknown;
 }
-
-const DEFAULT_BOTTOM_BAR: Required<
-  Pick<BottomBarSettings, 'enabled' | 'privacyEnabled' | 'termsEnabled' | 'shippingEnabled'>
-> &
-  Pick<BottomBarSettings, 'copyrightOverride' | 'copyrightOverrideAr'> = {
-  enabled: true,
-  privacyEnabled: true,
-  termsEnabled: true,
-  shippingEnabled: true,
-  copyrightOverride: '',
-  copyrightOverrideAr: '',
-};
 
 const DEFAULT_SHOP_LINKS: FooterLink[] = [
   { name: 'All Products', nameAr: 'كل المنتجات', href: '/products', enabled: true },
@@ -112,7 +94,6 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
   const [supportLinks, setSupportLinks] = useState<FooterLink[]>(DEFAULT_SUPPORT_LINKS);
   const [companyLinks, setCompanyLinks] = useState<FooterLink[]>(DEFAULT_COMPANY_LINKS);
   const [newsletterEnabled, setNewsletterEnabled] = useState(true);
-  const [bottomBar, setBottomBar] = useState<typeof DEFAULT_BOTTOM_BAR>(DEFAULT_BOTTOM_BAR);
   const [utilityBarEnabled, setUtilityBarEnabled] = useState(true);
   const [utilityLinks, setUtilityLinks] = useState<UtilityBarLink[]>(DEFAULT_UTILITY_LINKS);
 
@@ -133,24 +114,7 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
             if (typeof settings.footerLinks.newsletterEnabled === 'boolean') {
               setNewsletterEnabled(settings.footerLinks.newsletterEnabled);
             }
-            if (settings.footerLinks.bottomBar) {
-              const bb = settings.footerLinks.bottomBar;
-              setBottomBar(prev => ({
-                enabled: typeof bb.enabled === 'boolean' ? bb.enabled : prev.enabled,
-                privacyEnabled:
-                  typeof bb.privacyEnabled === 'boolean' ? bb.privacyEnabled : prev.privacyEnabled,
-                termsEnabled:
-                  typeof bb.termsEnabled === 'boolean' ? bb.termsEnabled : prev.termsEnabled,
-                shippingEnabled:
-                  typeof bb.shippingEnabled === 'boolean'
-                    ? bb.shippingEnabled
-                    : prev.shippingEnabled,
-                copyrightOverride:
-                  typeof bb.copyrightOverride === 'string' ? bb.copyrightOverride : '',
-                copyrightOverrideAr:
-                  typeof bb.copyrightOverrideAr === 'string' ? bb.copyrightOverrideAr : '',
-              }));
-            }
+            // bottomBar field deprecated 2026-05-21 — no longer loaded/saved.
           }
           if (settings.utilityBar) {
             const ub = settings.utilityBar;
@@ -200,14 +164,8 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
           support: supportLinks,
           company: companyLinks,
           newsletterEnabled,
-          bottomBar: {
-            enabled: bottomBar.enabled,
-            privacyEnabled: bottomBar.privacyEnabled,
-            termsEnabled: bottomBar.termsEnabled,
-            shippingEnabled: bottomBar.shippingEnabled,
-            copyrightOverride: (bottomBar.copyrightOverride || '').trim() || undefined,
-            copyrightOverrideAr: (bottomBar.copyrightOverrideAr || '').trim() || undefined,
-          },
+          // bottomBar removed 2026-05-21 — redundant with Company Links.
+          // Existing rows keep their stale field; new saves omit it.
         },
         utilityBar: {
           enabled: utilityBarEnabled,
@@ -496,85 +454,9 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
         </div>
       </div>
 
-      {/* Bottom bar */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">{t('bottomBar')}</h2>
-            <p className="text-sm text-muted-foreground mt-1">{t('bottomBarHint')}</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={bottomBar.enabled}
-              onChange={e => setBottomBar(prev => ({ ...prev, enabled: e.target.checked }))}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
-          </label>
-        </div>
-        {bottomBar.enabled && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  {t('copyrightOverride')}
-                </label>
-                <input
-                  type="text"
-                  value={bottomBar.copyrightOverride || ''}
-                  onChange={e =>
-                    setBottomBar(prev => ({ ...prev, copyrightOverride: e.target.value }))
-                  }
-                  placeholder={t('copyrightOverridePlaceholder')}
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  {t('copyrightOverrideAr')}
-                </label>
-                <input
-                  type="text"
-                  value={bottomBar.copyrightOverrideAr || ''}
-                  onChange={e =>
-                    setBottomBar(prev => ({ ...prev, copyrightOverrideAr: e.target.value }))
-                  }
-                  placeholder={t('copyrightOverrideArPlaceholder')}
-                  lang="ar"
-                  dir="rtl"
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-            </div>
-            <div className="space-y-2 pt-2 border-t">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                {t('legalLinks')}
-              </p>
-              {(
-                [
-                  ['privacyEnabled', 'privacyToggle'],
-                  ['termsEnabled', 'termsToggle'],
-                  ['shippingEnabled', 'shippingToggle'],
-                ] as const
-              ).map(([field, labelKey]) => (
-                <label
-                  key={field}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <span className="text-sm text-foreground">{t(labelKey)}</span>
-                  <input
-                    type="checkbox"
-                    checked={bottomBar[field]}
-                    onChange={e => setBottomBar(prev => ({ ...prev, [field]: e.target.checked }))}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Bottom bar section removed 2026-05-21 — was redundant with the
+          Company Links section above. Merchants put Privacy / Terms /
+          Shipping into Company Links if they want them in the footer. */}
 
       {/* Save button. Embedded variant in page-builder shows this too —
           editor is fully self-contained, no coupling to outer Save flows. */}
