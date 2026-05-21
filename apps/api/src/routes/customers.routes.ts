@@ -425,7 +425,7 @@ router.get(
           shipping_address->>'email'     AS email,
           shipping_address->>'phone'     AS phone,
           id::text AS order_id
-        FROM orders
+        FROM public.orders
         WHERE store_id = ${storeId}::uuid
           AND customer_id IS NULL
           AND deleted_at IS NULL

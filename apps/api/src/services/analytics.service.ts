@@ -234,8 +234,8 @@ export class AnalyticsService {
       // to avoid loading every line item into Node memory.
       prisma.$queryRaw<Array<{ profit: bigint | null }>>`
         SELECT COALESCE(SUM((oi.price - COALESCE(oi.cost_price, 0)) * oi.quantity), 0)::bigint AS profit
-        FROM order_items oi
-        JOIN orders o ON o.id = oi.order_id
+        FROM public.order_items oi
+        JOIN public.orders o ON o.id = oi.order_id
         WHERE o.store_id = ${storeId}
           AND o.created_at >= ${startDate}
           AND o.created_at <= ${endDate}
@@ -301,7 +301,7 @@ export class AnalyticsService {
         date_trunc(${truncUnit}, "created_at") AS period,
         COALESCE(SUM(total), 0) AS revenue,
         COUNT(*)::bigint AS orders
-      FROM orders
+      FROM public.orders
       WHERE store_id = ${storeId}
         AND created_at >= ${startDate}
         AND created_at <= ${endDate}

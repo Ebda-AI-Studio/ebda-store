@@ -57,7 +57,7 @@ export class InventoryService {
       // Prisma aggregate cannot express; use raw SQL for accuracy.
       prisma.$queryRaw<[{ total_value: bigint | null }]>`
         SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total_value
-        FROM products
+        FROM public.products
         WHERE store_id = ${storeId}
           AND deleted_at IS NULL
           AND track_inventory = true
@@ -68,7 +68,7 @@ export class InventoryService {
     // which Prisma does not support; use raw SQL.
     const [{ low_stock_count }] = await prisma.$queryRaw<[{ low_stock_count: bigint }]>`
       SELECT COUNT(*)::bigint AS low_stock_count
-      FROM products
+      FROM public.products
       WHERE store_id = ${storeId}
         AND deleted_at IS NULL
         AND track_inventory = true
@@ -237,7 +237,7 @@ export class InventoryService {
     >`
       SELECT id, name, name_ar, sku, inventory, low_stock_threshold,
              track_inventory, cost_price, status
-      FROM products
+      FROM public.products
       WHERE store_id = ${storeId}
         AND deleted_at IS NULL
         AND track_inventory = true
@@ -263,7 +263,7 @@ export class InventoryService {
     >`
       SELECT id, name, name_ar, sku, inventory, low_stock_threshold,
              track_inventory, cost_price, status
-      FROM products
+      FROM public.products
       WHERE store_id = ${storeId}
         AND deleted_at IS NULL
         AND track_inventory = true

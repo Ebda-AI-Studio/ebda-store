@@ -98,8 +98,8 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
       let total = 0;
       while (true) {
         const result = await prisma.$executeRawUnsafe<number>(
-          `DELETE FROM "audit_logs" WHERE id IN (
-             SELECT id FROM "audit_logs" WHERE "created_at" < $1 LIMIT ${DELETE_BATCH}
+          `DELETE FROM public.audit_logs WHERE id IN (
+             SELECT id FROM public.audit_logs WHERE created_at < $1 LIMIT ${DELETE_BATCH}
            )`,
           cutoff
         );

@@ -269,7 +269,7 @@ export class OrderService {
             const [lockedVariant] = await tx.$queryRaw<
               Array<{ inventory: number; allow_backorder: boolean }>
             >`
-              SELECT inventory, allow_backorder FROM "product_variants"
+              SELECT inventory, allow_backorder FROM public.product_variants
               WHERE id = ${(item as { variantId: string }).variantId}
               FOR UPDATE
             `;
@@ -293,7 +293,7 @@ export class OrderService {
             const [lockedProduct] = await tx.$queryRaw<
               Array<{ inventory: number; allow_backorder: boolean }>
             >`
-              SELECT inventory, allow_backorder FROM "products"
+              SELECT inventory, allow_backorder FROM public.products
               WHERE id = ${item.productId}
               FOR UPDATE
             `;
@@ -920,7 +920,7 @@ export class OrderService {
           const [lockedProduct] = await tx.$queryRaw<
             Array<{ id: string; inventory: number; track_inventory: boolean }>
           >`
-            SELECT id, inventory, track_inventory FROM "products"
+            SELECT id, inventory, track_inventory FROM public.products
             WHERE id = ${item.productId}
             FOR UPDATE
           `;
