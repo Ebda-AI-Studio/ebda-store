@@ -342,6 +342,15 @@ export class StoreService {
       await tx.purchaseOrder.deleteMany({ where: { storeId } });
       await tx.journalEntry.deleteMany({ where: { storeId } });
 
+      // BackorderLine has Product FK with default NoAction (not Cascade).
+      // BackorderLines normally cascade via Order→OrderItem→BackorderLine
+      // when we delete orders above. But test stores can have orphan
+      // BackorderLines (created without a parent order via E2E flows),
+      // in which case Product cascade from Store cannot proceed because
+      // the BackorderLine.productId FK blocks it. Delete them explicitly.
+      // Ahmad 2026-05-21 — backorder-test-* stores hit this.
+      await tx.backorderLine.deleteMany({ where: { storeId } });
+
       // Preserve historical audit logs by detaching them from the store.
       await tx.auditLog.updateMany({ where: { storeId }, data: { storeId: null } });
       // Now the store delete cascades through everything else
