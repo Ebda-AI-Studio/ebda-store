@@ -322,10 +322,24 @@ export class StoreService {
       // Orders are Restrict-on-delete from Store; remove them explicitly.
       // OrderItem / Payment / Shipment cascade from Order.
       await tx.order.deleteMany({ where: { storeId } });
+
+      // Accounting + Stock models added 2026-05-19/20 (Batches 1-3) all
+      // have onDelete: Restrict on their Store FK. Without explicit
+      // deletes here, store.delete() returns 500 with a foreign-key
+      // constraint violation. Ahmad 2026-05-21 — DELETE /stores/<id>
+      // returned 500 on a test store. Order matters: Expense + StockAdj
+      // reference Account; Account cascades from Store; JournalLine
+      // cascades from JournalEntry. So delete the parent rows first.
+      await tx.expense.deleteMany({ where: { storeId } });
+      await tx.stockAdjustment.deleteMany({ where: { storeId } });
+      await tx.purchaseOrder.deleteMany({ where: { storeId } });
+      await tx.journalEntry.deleteMany({ where: { storeId } });
+
       // Preserve historical audit logs by detaching them from the store.
       await tx.auditLog.updateMany({ where: { storeId }, data: { storeId: null } });
       // Now the store delete cascades through everything else
-      // (products, categories, customers, pages, carts, coupons, etc.).
+      // (products, categories, customers, pages, carts, coupons,
+      // accounts, suppliers, backorders, etc.).
       await tx.store.delete({ where: { id: storeId } });
 
       // If the owner was a store_admin and this was their only store,
