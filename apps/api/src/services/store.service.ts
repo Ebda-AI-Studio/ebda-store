@@ -317,60 +317,77 @@ export class StoreService {
     const store = await this.getById(storeId);
 
     await prisma.$transaction(async tx => {
-      // Diagnostic logging 2026-05-21 — repeated 500s on store delete
-      // despite explicit deletes. Surface row counts at each step so
-      // Railway logs reveal which deletion path is silently missing
-      // rows. Remove after the FK chain is fully validated in prod.
-      logger.info({ storeId }, '[STORE_DELETE] start');
+      // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE
+      // statements because the Prisma-typed approach kept hitting
+      // P2003 (journal_entries_store_id_fkey) even with explicit
+      // tx.journalEntry.deleteMany() in the chain. Raw SQL is:
+      //   1. unambiguous about which table + column the delete targets
+      //      (no Prisma client cache / schema drift)
+      //   2. easier to debug — each step logs storeId + affected row
+      //      count via $executeRaw's number return value
+      //   3. order-explicit — Postgres processes statements sequentially
+      //      so any FK cascade chain is committed before the next step
+      //
+      // Order matters. Each step listed below corresponds to a Store FK
+      // that's either Restrict OR a child whose own FK to Product is
+      // NoAction. Cascade-from-Store relations clean themselves up via
+      // store.delete() at the end. Schema audit done 2026-05-21:
+      //   Order(Restrict), Review.order(Restrict), Expense(Restrict),
+      //   StockAdjustment(Restrict), PurchaseOrder(Restrict),
+      //   JournalEntry(Restrict), BackorderLine.product(NoAction),
+      //   AuditLog.store(NoAction nullable).
+      logger.info({ storeId }, '[STORE_DELETE] start (raw sql)');
 
-      // Reviews reference Order with onDelete: Restrict, so they must be
-      // deleted BEFORE orders. Review.store is Cascade but Review.order
-      // is Restrict — without this, tx.order.deleteMany throws an FK
-      // violation as soon as any review is tied to a store order.
-      // Ahmad 2026-05-21 — 500 on store delete trace: this was the
-      // unhandled second restrict.
-      const reviewsDel = await tx.review.deleteMany({ where: { storeId } });
-      logger.info({ storeId, count: reviewsDel.count }, '[STORE_DELETE] reviews');
-      // Returns reference orders with no cascade — clear them next.
-      const returnsDel = await tx.return.deleteMany({ where: { storeId } });
-      logger.info({ storeId, count: returnsDel.count }, '[STORE_DELETE] returns');
-      // Orders are Restrict-on-delete from Store; remove them explicitly.
-      // OrderItem / Payment / Shipment cascade from Order.
-      const ordersDel = await tx.order.deleteMany({ where: { storeId } });
-      logger.info({ storeId, count: ordersDel.count }, '[STORE_DELETE] orders');
+      const reviewCount = await tx.$executeRaw`DELETE FROM reviews WHERE store_id = ${storeId}`;
+      logger.info({ storeId, count: reviewCount }, '[STORE_DELETE] reviews');
 
-      // Accounting + Stock models added 2026-05-19/20 (Batches 1-3) all
-      // have onDelete: Restrict on their Store FK. Without explicit
-      // deletes here, store.delete() returns 500 with a foreign-key
-      // constraint violation. Ahmad 2026-05-21 — DELETE /stores/<id>
-      // returned 500 on a test store. Order matters: Expense + StockAdj
-      // reference Account; Account cascades from Store; JournalLine
-      // cascades from JournalEntry. So delete the parent rows first.
-      const expensesDel = await tx.expense.deleteMany({ where: { storeId } });
-      logger.info({ storeId, count: expensesDel.count }, '[STORE_DELETE] expenses');
-      const stockAdjDel = await tx.stockAdjustment.deleteMany({ where: { storeId } });
-      logger.info({ storeId, count: stockAdjDel.count }, '[STORE_DELETE] stockAdjustments');
-      const posDel = await tx.purchaseOrder.deleteMany({ where: { storeId } });
-      logger.info({ storeId, count: posDel.count }, '[STORE_DELETE] purchaseOrders');
-      const journalDel = await tx.journalEntry.deleteMany({ where: { storeId } });
-      logger.info({ storeId, count: journalDel.count }, '[STORE_DELETE] journalEntries');
+      const returnCount = await tx.$executeRaw`DELETE FROM returns WHERE store_id = ${storeId}`;
+      logger.info({ storeId, count: returnCount }, '[STORE_DELETE] returns');
 
-      // BackorderLine has Product FK with default NoAction (not Cascade).
-      // BackorderLines normally cascade via Order→OrderItem→BackorderLine
-      // when we delete orders above. But test stores can have orphan
-      // BackorderLines (created without a parent order via E2E flows),
-      // in which case Product cascade from Store cannot proceed because
-      // the BackorderLine.productId FK blocks it. Delete them explicitly.
-      // Ahmad 2026-05-21 — backorder-test-* stores hit this.
-      const backorderDel = await tx.backorderLine.deleteMany({ where: { storeId } });
-      logger.info({ storeId, count: backorderDel.count }, '[STORE_DELETE] backorderLines');
+      const orderCount = await tx.$executeRaw`DELETE FROM orders WHERE store_id = ${storeId}`;
+      logger.info({ storeId, count: orderCount }, '[STORE_DELETE] orders');
 
-      // Preserve historical audit logs by detaching them from the store.
-      await tx.auditLog.updateMany({ where: { storeId }, data: { storeId: null } });
-      // Now the store delete cascades through everything else
-      // (products, categories, customers, pages, carts, coupons,
-      // accounts, suppliers, backorders, etc.).
-      await tx.store.delete({ where: { id: storeId } });
+      const expenseCount = await tx.$executeRaw`DELETE FROM expenses WHERE store_id = ${storeId}`;
+      logger.info({ storeId, count: expenseCount }, '[STORE_DELETE] expenses');
+
+      const stockAdjCount =
+        await tx.$executeRaw`DELETE FROM stock_adjustments WHERE store_id = ${storeId}`;
+      logger.info({ storeId, count: stockAdjCount }, '[STORE_DELETE] stockAdjustments');
+
+      const poCount = await tx.$executeRaw`DELETE FROM purchase_orders WHERE store_id = ${storeId}`;
+      logger.info({ storeId, count: poCount }, '[STORE_DELETE] purchaseOrders');
+
+      const journalCount =
+        await tx.$executeRaw`DELETE FROM journal_entries WHERE store_id = ${storeId}`;
+      logger.info({ storeId, count: journalCount }, '[STORE_DELETE] journalEntries');
+
+      const backorderCount =
+        await tx.$executeRaw`DELETE FROM backorder_lines WHERE store_id = ${storeId}`;
+      logger.info({ storeId, count: backorderCount }, '[STORE_DELETE] backorderLines');
+
+      // Detach historical audit logs by nulling their storeId (preserves trail).
+      const auditCount =
+        await tx.$executeRaw`UPDATE audit_logs SET store_id = NULL WHERE store_id = ${storeId}`;
+      logger.info({ storeId, count: auditCount }, '[STORE_DELETE] auditLogs (detached)');
+
+      // Verification: count any rows that would still block the store delete.
+      // If any of these come back > 0, we know exactly which table.
+      const blocking = await tx.$queryRaw<Array<{ table_name: string; cnt: bigint }>>`
+        SELECT 'orders' AS table_name, COUNT(*)::bigint AS cnt FROM orders WHERE store_id = ${storeId}
+        UNION ALL SELECT 'journal_entries', COUNT(*)::bigint FROM journal_entries WHERE store_id = ${storeId}
+        UNION ALL SELECT 'expenses', COUNT(*)::bigint FROM expenses WHERE store_id = ${storeId}
+        UNION ALL SELECT 'stock_adjustments', COUNT(*)::bigint FROM stock_adjustments WHERE store_id = ${storeId}
+        UNION ALL SELECT 'purchase_orders', COUNT(*)::bigint FROM purchase_orders WHERE store_id = ${storeId}
+      `;
+      const stillBlocking = blocking.filter(b => Number(b.cnt) > 0);
+      if (stillBlocking.length > 0) {
+        logger.error({ storeId, stillBlocking }, '[STORE_DELETE] BLOCKING rows still exist');
+      }
+
+      // Final delete — cascades products, categories, customers, pages,
+      // carts, coupons, accounts, suppliers, backorders, etc.
+      await tx.$executeRaw`DELETE FROM stores WHERE id = ${storeId}`;
+      logger.info({ storeId }, '[STORE_DELETE] store deleted');
 
       // If the owner was a store_admin and this was their only store,
       // delete the user too. Otherwise they remain in the system as a
