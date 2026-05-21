@@ -89,29 +89,35 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       name: labels.sales,
       href: `/stores/${storeId}/orders`,
       hubKey: 'sales',
-      // Clipboard / orders icon
-      icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
+      // Price tag (Heroicons v2 `tag`) — the classic commerce/sales glyph.
+      // Replaces the old clipboard icon that read as "notes" not "sales".
+      icon: 'M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z M6 6h.008v.008H6V6z',
     },
     {
       name: labels.stock,
       href: `/stores/${storeId}/stock/dashboard`,
       hubKey: 'stock',
-      // Chart bars icon
-      icon: 'M3 12h2v9H3zm4-4h2v13H7zm4-4h2v17h-2zm4 8h2v9h-2zm4-12h2v21h-2z',
+      // Archive box with lid (Heroicons v2 `archive-box`) — a literal box
+      // says "inventory" instantly. Replaces the bar-chart icon which read
+      // as analytics and conflicted visually with the analytics hub.
+      icon: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5 M10 11.25h4 M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z',
     },
     {
       name: labels.finance,
       href: `/stores/${storeId}/finance/dashboard`,
       hubKey: 'finance',
-      // Dollar-sign circle icon
-      icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1L15 8m-3-2v8m4-4a8 8 0 11-16 0 8 8 0 0116 0z',
+      // Calculator (Heroicons v2 `calculator`) — reads as accounting, not
+      // just "money/revenue" like the old dollar-circle.
+      icon: 'M15.75 15.75V18 M8.25 6h7.5v2.25h-7.5V6z M12 2.25c-1.892 0-3.758.11-5.593.322C5.307 2.7 4.5 3.65 4.5 4.757V19.5a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25V4.757c0-1.108-.806-2.057-1.907-2.185A48.507 48.507 0 0012 2.25z M8.25 11.25h.008v.008H8.25v-.008z M8.25 13.5h.008v.008H8.25V13.5z M8.25 15.75h.008v.008H8.25v-.008z M8.25 18h.008v.008H8.25V18z M10.748 11.25h.008v.008h-.008v-.008z M10.748 13.5h.008v.008h-.008V13.5z M10.748 15.75h.008v.008h-.008v-.008z M10.748 18h.008v.008h-.008V18z M13.252 11.25h.008v.008h-.008v-.008z M13.252 13.5h.008v.008h-.008V13.5z M13.252 15.75h.008v.008h-.008v-.008z M13.252 18h.008v.008h-.008V18z M15.75 11.25h.008v.008h-.008v-.008z M15.75 13.5h.008v.008h-.008V13.5z',
     },
     {
       name: labels.analytics,
       href: `/stores/${storeId}/analytics`,
       hubKey: 'analytics',
-      // Bar chart icon
-      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+      // Trending-up arrow (Heroicons v2 `arrow-trending-up`) — a rising
+      // line reads as growth/analytics; visually distinct from the new
+      // archive-box on Stock so the two hubs no longer look alike.
+      icon: 'M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22 M16.106 8.818l5.94 2.281 M22.046 11.099l-2.28 5.941',
     },
     {
       name: labels.marketing,

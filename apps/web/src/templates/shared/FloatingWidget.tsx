@@ -8,6 +8,7 @@ import type {
   FloatingWidgetConfig,
   StoreTheme,
 } from '@force/shared';
+import { InstagramBrandIcon, WhatsappBrandIcon, VolumeMaxIcon, VolumeMutedIcon } from './icons';
 
 interface FloatingWidgetProps {
   config: FloatingWidgetConfig | undefined;
@@ -68,23 +69,21 @@ function resolveButtonHref(b: FloatingButton): string | null {
   }
 }
 
-function KindIcon({ kind, color }: { kind: FloatingButtonKind; color: string }) {
+// Whatsapp + Instagram are handled separately at the button-render level —
+// they render full-bleed brand SVGs that include their own background.
+// KindIcon below handles only the kinds that share the "circle bg +
+// centered glyph" pattern: phone / email / music / custom.
+function KindIcon({
+  kind,
+  color,
+  isPlaying,
+}: {
+  kind: Exclude<FloatingButtonKind, 'whatsapp' | 'instagram'>;
+  color: string;
+  isPlaying?: boolean;
+}) {
   const common = { width: 22, height: 22, fill: 'none', stroke: color, strokeWidth: 2 };
   switch (kind) {
-    case 'whatsapp':
-      return (
-        <svg viewBox="0 0 24 24" width={common.width} height={common.height} fill={color}>
-          <path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.4-.1-.6.1-.2.3-.7.9-.8 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.4-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5C10.4 9 9.8 7.6 9.6 7.1c-.2-.5-.5-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2 0 1.3.9 2.6 1.1 2.8.1.2 1.8 2.8 4.5 3.9.6.3 1.1.4 1.5.5.6.2 1.2.2 1.7.1.5-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.1-.3-.2-.6-.4zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.6 1.4 5.1L2 22l5-1.4c1.4.8 3.1 1.2 4.9 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2zm6 14c-.6 1-1.7 1.7-3 1.9-.3.1-.8.2-1.6 0-.4-.1-1-.3-1.7-.6-3.2-1.4-5.3-4.7-5.5-4.9-.2-.2-1.3-1.8-1.3-3.4 0-1.7.8-2.4 1.2-2.7.3-.3.6-.4.9-.4h.5c.2 0 .4 0 .6.5.2.5.7 1.8.8 2 .1.2.1.4 0 .5-.1.2-.2.3-.3.5-.1.1-.3.3-.4.4-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.1.9 2 1.2 2.3 1.4.3.1.5.1.6-.1.2-.2.7-.8.9-1.1.2-.3.4-.2.6-.1.2.1 1.5.7 1.7.8.3.1.5.2.5.3.1.2.1.9-.2 1.4z" />
-        </svg>
-      );
-    case 'instagram':
-      return (
-        <svg viewBox="0 0 24 24" {...common} strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="2" width="20" height="20" rx="5" />
-          <circle cx="12" cy="12" r="4" />
-          <circle cx="17.5" cy="6.5" r="1" fill={color} stroke="none" />
-        </svg>
-      );
     case 'phone':
       return (
         <svg viewBox="0 0 24 24" {...common} strokeLinecap="round" strokeLinejoin="round">
@@ -99,12 +98,17 @@ function KindIcon({ kind, color }: { kind: FloatingButtonKind; color: string }) 
         </svg>
       );
     case 'music':
+      // Two states: max (currently playing) / muted (paused or idle). Both
+      // SVGs use `stroke="currentColor"` so the merchant's iconColor flows
+      // through via the wrapper's color CSS. Ahmad's request 2026-05-21.
       return (
-        <svg viewBox="0 0 24 24" {...common} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 18V5l12-2v13" />
-          <circle cx="6" cy="18" r="3" />
-          <circle cx="18" cy="16" r="3" />
-        </svg>
+        <span className="block h-[22px] w-[22px]" style={{ color }}>
+          {isPlaying ? (
+            <VolumeMaxIcon className="h-full w-full" />
+          ) : (
+            <VolumeMutedIcon className="h-full w-full" />
+          )}
+        </span>
       );
     case 'custom':
       return (
@@ -130,9 +134,15 @@ function ButtonRender({
   musicPlaying: string | null;
 }) {
   const defaults = KIND_DEFAULTS[button.kind];
-  const bg = button.bgColor
-    ? (resolveColor(button.bgColor, theme as StoreTheme) ?? button.bgColor)
-    : defaults.bg;
+  const isBrandKind = button.kind === 'whatsapp' || button.kind === 'instagram';
+  // Brand kinds embed their own gradient/color background — we paint the
+  // button transparent and let the SVG fill the circle. Merchant bgColor
+  // override is intentionally ignored here (brand color IS the icon).
+  const bg = isBrandKind
+    ? 'transparent'
+    : button.bgColor
+      ? (resolveColor(button.bgColor, theme as StoreTheme) ?? button.bgColor)
+      : defaults.bg;
   const iconColor = button.iconColor
     ? (resolveColor(button.iconColor, theme as StoreTheme) ?? button.iconColor)
     : defaults.icon;
@@ -142,7 +152,7 @@ function ButtonRender({
   const isActive = button.kind === 'music' && musicPlaying === button.id;
 
   const baseClass =
-    'group relative flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all duration-200 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-primary';
+    'group relative flex h-12 w-12 items-center justify-center rounded-full shadow-lg overflow-hidden transition-all duration-200 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-primary';
 
   const sharedProps = {
     className: baseClass,
@@ -151,13 +161,20 @@ function ButtonRender({
     title: label,
   };
 
+  // Merchant-supplied `iconUrl` always wins for any kind — they uploaded
+  // their own icon, render it. Otherwise: brand kinds get the full-bleed
+  // SVG (gradient + glyph), other kinds get a small centered KindIcon
+  // over the button's bg color.
   const inner = (
     <>
       {button.iconUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img src={button.iconUrl} alt="" className="h-6 w-6 object-contain" />
+      ) : button.kind === 'whatsapp' ? (
+        <WhatsappBrandIcon className="h-full w-full" />
+      ) : button.kind === 'instagram' ? (
+        <InstagramBrandIcon className="h-full w-full" />
       ) : (
-        <KindIcon kind={button.kind} color={iconColor} />
+        <KindIcon kind={button.kind} color={iconColor} isPlaying={isActive} />
       )}
       {isActive && (
         <span
@@ -290,7 +307,6 @@ export function FloatingWidget({ config, theme, isRtl }: FloatingWidgetProps) {
         style={{ backgroundColor: toggleBg }}
       >
         {config.toggleIconUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img src={config.toggleIconUrl} alt="" className="h-7 w-7 object-contain" />
         ) : (
           <svg

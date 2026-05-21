@@ -11,7 +11,7 @@ import {
   resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
-import { getSocialLinks } from '../shared/icons';
+import { getSocialLinks, SocialGlyph } from '../shared/icons';
 
 export default function ClassicFooter({
   branding,
@@ -140,15 +140,31 @@ export default function ClassicFooter({
               </ul>
             )}
 
-            {/* Social icons — logo renders BESIDE on mobile (md:hidden). */}
+            {/* Social icons — on mobile, the logo lands at the OPPOSITE end
+                of this row via ms-auto. Ahmad 2026-05-21. */}
             {socialLinks.length > 0 && (
               <div className="flex flex-wrap items-center gap-3 pt-1">
+                {socialLinks.map(s => (
+                  <a
+                    key={s.key}
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${
+                      s.BrandIcon
+                        ? 'overflow-hidden rounded-md'
+                        : 'text-muted-foreground hover:text-foreground'
+                    } transition-colors duration-200 cursor-pointer`}
+                    aria-label={s.key}
+                  >
+                    <SocialGlyph entry={s} className={s.BrandIcon ? 'w-6 h-6' : 'w-4 h-4'} />
+                  </a>
+                ))}
                 {displayLogo && (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={footerLogo || displayLogo}
                     alt={displayName}
-                    className="md:hidden h-10 w-auto object-contain me-2"
+                    className="md:hidden ms-auto h-16 w-auto object-contain"
                     style={
                       !footerLogo && footerLogoInvert
                         ? { filter: 'brightness(0) invert(1)' }
@@ -156,25 +172,6 @@ export default function ClassicFooter({
                     }
                   />
                 )}
-                {socialLinks.map(({ key, icon, url }) => (
-                  <a
-                    key={key}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
-                    aria-label={key}
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path d={icon} />
-                    </svg>
-                  </a>
-                ))}
               </div>
             )}
           </div>

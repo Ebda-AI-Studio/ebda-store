@@ -14,7 +14,7 @@ import {
   resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
-import { getSocialLinks } from '../shared/icons';
+import { getSocialLinks, SocialGlyph } from '../shared/icons';
 
 export default function ModernFooter({
   branding,
@@ -132,15 +132,35 @@ export default function ModernFooter({
               <p className="text-foreground/60 text-sm leading-relaxed">{displayDescription}</p>
             )}
 
-            {/* Social Icons — logo renders BESIDE on mobile (md:hidden). */}
+            {/* Social Icons — on mobile, the logo lands at the OPPOSITE end
+                of this row (ms-auto). Ahmad 2026-05-21: bigger + on the
+                other side from "follow us" cluster. */}
             {socialLinks.length > 0 && (
               <div className="flex flex-wrap items-center gap-2.5">
+                {socialLinks.map(s => (
+                  <a
+                    key={s.key}
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`w-9 h-9 ${s.BrandIcon ? '' : 'bg-foreground/10 hover:bg-primary'} rounded-lg flex items-center justify-center overflow-hidden transition-colors duration-300 ease-out cursor-pointer`}
+                    aria-label={s.key}
+                  >
+                    <SocialGlyph
+                      entry={s}
+                      className={
+                        s.BrandIcon
+                          ? 'w-full h-full'
+                          : 'w-4 h-4 text-foreground/75 hover:text-foreground'
+                      }
+                    />
+                  </a>
+                ))}
                 {displayLogo && (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={footerLogo || displayLogo}
                     alt={displayName}
-                    className="md:hidden h-10 w-auto object-contain me-2"
+                    className="md:hidden ms-auto h-16 w-auto object-contain"
                     style={
                       !footerLogo && footerLogoInvert
                         ? { filter: 'brightness(0) invert(1)' }
@@ -148,25 +168,6 @@ export default function ModernFooter({
                     }
                   />
                 )}
-                {socialLinks.map(({ key, icon, url }) => (
-                  <a
-                    key={key}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-9 h-9 bg-foreground/10 hover:bg-primary rounded-lg flex items-center justify-center transition-colors duration-300 ease-out cursor-pointer"
-                    aria-label={key}
-                  >
-                    <svg
-                      className="w-4 h-4 text-foreground/75 hover:text-foreground"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path d={icon} />
-                    </svg>
-                  </a>
-                ))}
               </div>
             )}
           </div>

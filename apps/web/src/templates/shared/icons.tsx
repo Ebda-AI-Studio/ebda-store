@@ -1,3 +1,4 @@
+import type React from 'react';
 import type { StoreContact, StoreSocials } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -142,6 +143,165 @@ export const TELEGRAM_PATH =
   'M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z';
 
 // ---------------------------------------------------------------------------
+// Brand-color SVG components (used by footer + floating widget)
+// ---------------------------------------------------------------------------
+
+// These icons are reused in two places: the storefront footer (`w-4 h-4`
+// tile) and the floating widget (full-bleed inside `h-12 w-12` buttons).
+// Both contexts want the official brand colors — Instagram gradient, WhatsApp
+// green — so the SVGs embed their own bg + glyph fill. `currentColor` is
+// NOT honored for these (the brand colors ARE the icon's identity); the
+// floating widget therefore renders them edge-to-edge and suppresses the
+// per-button bgColor merchant override for whatsapp/instagram kinds.
+
+export function InstagramBrandIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <rect x="2" y="2" width="28" height="28" rx="6" fill="url(#ig_paint0)" />
+      <rect x="2" y="2" width="28" height="28" rx="6" fill="url(#ig_paint1)" />
+      <rect x="2" y="2" width="28" height="28" rx="6" fill="url(#ig_paint2)" />
+      <path
+        d="M23 10.5C23 11.3284 22.3284 12 21.5 12C20.6716 12 20 11.3284 20 10.5C20 9.67157 20.6716 9 21.5 9C22.3284 9 23 9.67157 23 10.5Z"
+        fill="white"
+      />
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M16 21C18.7614 21 21 18.7614 21 16C21 13.2386 18.7614 11 16 11C13.2386 11 11 13.2386 11 16C11 18.7614 13.2386 21 16 21ZM16 19C17.6569 19 19 17.6569 19 16C19 14.3431 17.6569 13 16 13C14.3431 13 13 14.3431 13 16C13 17.6569 14.3431 19 16 19Z"
+        fill="white"
+      />
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M6 15.6C6 12.2397 6 10.5595 6.65396 9.27606C7.2292 8.14708 8.14708 7.2292 9.27606 6.65396C10.5595 6 12.2397 6 15.6 6H16.4C19.7603 6 21.4405 6 22.7239 6.65396C23.8529 7.2292 24.7708 8.14708 25.346 9.27606C26 10.5595 26 12.2397 26 15.6V16.4C26 19.7603 26 21.4405 25.346 22.7239C24.7708 23.8529 23.8529 24.7708 22.7239 25.346C21.4405 26 19.7603 26 16.4 26H15.6C12.2397 26 10.5595 26 9.27606 25.346C8.14708 24.7708 7.2292 23.8529 6.65396 22.7239C6 21.4405 6 19.7603 6 16.4V15.6ZM15.6 8H16.4C18.1132 8 19.2777 8.00156 20.1779 8.0751C21.0548 8.14674 21.5032 8.27659 21.816 8.43597C22.5686 8.81947 23.1805 9.43139 23.564 10.184C23.7234 10.4968 23.8533 10.9452 23.9249 11.8221C23.9984 12.7223 24 13.8868 24 15.6V16.4C24 18.1132 23.9984 19.2777 23.9249 20.1779C23.8533 21.0548 23.7234 21.5032 23.564 21.816C23.1805 22.5686 22.5686 23.1805 21.816 23.564C21.5032 23.7234 21.0548 23.8533 20.1779 23.9249C19.2777 23.9984 18.1132 24 16.4 24H15.6C13.8868 24 12.7223 23.9984 11.8221 23.9249C10.9452 23.8533 10.4968 23.7234 10.184 23.564C9.43139 23.1805 8.81947 22.5686 8.43597 21.816C8.27659 21.5032 8.14674 21.0548 8.0751 20.1779C8.00156 19.2777 8 18.1132 8 16.4V15.6C8 13.8868 8.00156 12.7223 8.0751 11.8221C8.14674 10.9452 8.27659 10.4968 8.43597 10.184C8.81947 9.43139 9.43139 8.81947 10.184 8.43597C10.4968 8.27659 10.9452 8.14674 11.8221 8.0751C12.7223 8.00156 13.8868 8 15.6 8Z"
+        fill="white"
+      />
+      <defs>
+        <radialGradient
+          id="ig_paint0"
+          cx="0"
+          cy="0"
+          r="1"
+          gradientUnits="userSpaceOnUse"
+          gradientTransform="translate(12 23) rotate(-55.3758) scale(25.5196)"
+        >
+          <stop stopColor="#B13589" />
+          <stop offset="0.79309" stopColor="#C62F94" />
+          <stop offset="1" stopColor="#8A3AC8" />
+        </radialGradient>
+        <radialGradient
+          id="ig_paint1"
+          cx="0"
+          cy="0"
+          r="1"
+          gradientUnits="userSpaceOnUse"
+          gradientTransform="translate(11 31) rotate(-65.1363) scale(22.5942)"
+        >
+          <stop stopColor="#E0E8B7" />
+          <stop offset="0.444662" stopColor="#FB8A2E" />
+          <stop offset="0.71474" stopColor="#E2425C" />
+          <stop offset="1" stopColor="#E2425C" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient
+          id="ig_paint2"
+          cx="0"
+          cy="0"
+          r="1"
+          gradientUnits="userSpaceOnUse"
+          gradientTransform="translate(0.500002 3) rotate(-8.1301) scale(38.8909 8.31836)"
+        >
+          <stop offset="0.156701" stopColor="#406ADC" />
+          <stop offset="0.467799" stopColor="#6A45BE" />
+          <stop offset="1" stopColor="#6A45BE" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
+
+export function WhatsappBrandIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 1024 1024"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient
+          id="wa_bg"
+          gradientUnits="userSpaceOnUse"
+          x1="512.001"
+          y1=".978"
+          x2="512.001"
+          y2="1025.023"
+        >
+          <stop offset="0" stopColor="#61fd7d" />
+          <stop offset="1" stopColor="#2bb826" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M1023.941 765.153c0 5.606-.171 17.766-.508 27.159-.824 22.982-2.646 52.639-5.401 66.151-4.141 20.306-10.392 39.472-18.542 55.425-9.643 18.871-21.943 35.775-36.559 50.364-14.584 14.56-31.472 26.812-50.315 36.416-16.036 8.172-35.322 14.426-55.744 18.549-13.378 2.701-42.812 4.488-65.648 5.3-9.402.336-21.564.505-27.15.505l-504.226-.081c-5.607 0-17.765-.172-27.158-.509-22.983-.824-52.639-2.646-66.152-5.4-20.306-4.142-39.473-10.392-55.425-18.542-18.872-9.644-35.775-21.944-50.364-36.56-14.56-14.584-26.812-31.471-36.415-50.314-8.174-16.037-14.428-35.323-18.551-55.744-2.7-13.378-4.487-42.812-5.3-65.649-.334-9.401-.503-21.563-.503-27.148l.08-504.228c0-5.607.171-17.766.508-27.159.825-22.983 2.646-52.639 5.401-66.151 4.141-20.306 10.391-39.473 18.542-55.426C34.154 93.24 46.455 76.336 61.07 61.747c14.584-14.559 31.472-26.812 50.315-36.416 16.037-8.172 35.324-14.426 55.745-18.549 13.377-2.701 42.812-4.488 65.648-5.3 9.402-.335 21.565-.504 27.149-.504l504.227.081c5.608 0 17.766.171 27.159.508 22.983.825 52.638 2.646 66.152 5.401 20.305 4.141 39.472 10.391 55.425 18.542 18.871 9.643 35.774 21.944 50.363 36.559 14.559 14.584 26.812 31.471 36.415 50.315 8.174 16.037 14.428 35.323 18.551 55.744 2.7 13.378 4.486 42.812 5.3 65.649.335 9.402.504 21.564.504 27.15l-.082 504.226z"
+        fill="url(#wa_bg)"
+      />
+      <path
+        fill="#FFF"
+        d="M783.302 243.246c-69.329-69.387-161.529-107.619-259.763-107.658-202.402 0-367.133 164.668-367.214 367.072-.026 64.699 16.883 127.854 49.017 183.522l-52.096 190.229 194.665-51.047c53.636 29.244 114.022 44.656 175.482 44.682h.151c202.382 0 367.128-164.688 367.21-367.094.039-98.087-38.121-190.319-107.452-259.706zM523.544 808.047h-.125c-54.767-.021-108.483-14.729-155.344-42.529l-11.146-6.612-115.517 30.293 30.834-112.592-7.259-11.544c-30.552-48.579-46.688-104.729-46.664-162.379.066-168.229 136.985-305.096 305.339-305.096 81.521.031 158.154 31.811 215.779 89.482s89.342 134.332 89.312 215.859c-.066 168.243-136.984 305.118-305.209 305.118zm167.415-228.515c-9.177-4.591-54.286-26.782-62.697-29.843-8.41-3.062-14.526-4.592-20.645 4.592-6.115 9.182-23.699 29.843-29.053 35.964-5.352 6.122-10.704 6.888-19.879 2.296-9.176-4.591-38.74-14.277-73.786-45.526-27.275-24.319-45.691-54.359-51.043-63.543-5.352-9.183-.569-14.146 4.024-18.72 4.127-4.109 9.175-10.713 13.763-16.069 4.587-5.355 6.117-9.183 9.175-15.304 3.059-6.122 1.529-11.479-.765-16.07-2.293-4.591-20.644-49.739-28.29-68.104-7.447-17.886-15.013-15.466-20.645-15.747-5.346-.266-11.469-.322-17.585-.322s-16.057 2.295-24.467 11.478-32.113 31.374-32.113 76.521c0 45.147 32.877 88.764 37.465 94.885 4.588 6.122 64.699 98.771 156.741 138.502 21.892 9.45 38.982 15.094 52.308 19.322 21.98 6.979 41.982 5.995 57.793 3.634 17.628-2.633 54.284-22.189 61.932-43.615 7.646-21.427 7.646-39.791 5.352-43.617-2.294-3.826-8.41-6.122-17.585-10.714z"
+      />
+    </svg>
+  );
+}
+
+// Volume icons — used by the FloatingWidget music kind. Stroke is
+// `currentColor` so the merchant's iconColor flows through. Two states:
+// max = currently playing, muted = paused/idle.
+export function VolumeMaxIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M16.0004 9.00009C16.6281 9.83575 17 10.8745 17 12.0001C17 13.1257 16.6281 14.1644 16.0004 15.0001M18 5.29177C19.8412 6.93973 21 9.33459 21 12.0001C21 14.6656 19.8412 17.0604 18 18.7084M4.6 9.00009H5.5012C6.05213 9.00009 6.32759 9.00009 6.58285 8.93141C6.80903 8.87056 7.02275 8.77046 7.21429 8.63566C7.43047 8.48353 7.60681 8.27191 7.95951 7.84868L10.5854 4.69758C11.0211 4.17476 11.2389 3.91335 11.4292 3.88614C11.594 3.86258 11.7597 3.92258 11.8712 4.04617C12 4.18889 12 4.52917 12 5.20973V18.7904C12 19.471 12 19.8113 11.8712 19.954C11.7597 20.0776 11.594 20.1376 11.4292 20.114C11.239 20.0868 11.0211 19.8254 10.5854 19.3026L7.95951 16.1515C7.60681 15.7283 7.43047 15.5166 7.21429 15.3645C7.02275 15.2297 6.80903 15.1296 6.58285 15.0688C6.32759 15.0001 6.05213 15.0001 5.5012 15.0001H4.6C4.03995 15.0001 3.75992 15.0001 3.54601 14.8911C3.35785 14.7952 3.20487 14.6422 3.10899 14.4541C3 14.2402 3 13.9601 3 13.4001V10.6001C3 10.04 3 9.76001 3.10899 9.54609C3.20487 9.35793 3.35785 9.20495 3.54601 9.10908C3.75992 9.00009 4.03995 9.00009 4.6 9.00009Z"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function VolumeMutedIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M16 9.50009L21 14.5001M21 9.50009L16 14.5001M4.6 9.00009H5.5012C6.05213 9.00009 6.32759 9.00009 6.58285 8.93141C6.80903 8.87056 7.02275 8.77046 7.21429 8.63566C7.43047 8.48353 7.60681 8.27191 7.95951 7.84868L10.5854 4.69758C11.0211 4.17476 11.2389 3.91335 11.4292 3.88614C11.594 3.86258 11.7597 3.92258 11.8712 4.04617C12 4.18889 12 4.52917 12 5.20973V18.7904C12 19.471 12 19.8113 11.8712 19.954C11.7597 20.0776 11.594 20.1376 11.4292 20.114C11.239 20.0868 11.0211 19.8254 10.5854 19.3026L7.95951 16.1515C7.60681 15.7283 7.43047 15.5166 7.21429 15.3645C7.02275 15.2297 6.80903 15.1296 6.58285 15.0688C6.32759 15.0001 6.05213 15.0001 5.5012 15.0001H4.6C4.03995 15.0001 3.75992 15.0001 3.54601 14.8911C3.35785 14.7952 3.20487 14.6422 3.10899 14.4541C3 14.2402 3 13.9601 3 13.4001V10.6001C3 10.04 3 9.76001 3.10899 9.54609C3.20487 9.35793 3.35785 9.20495 3.54601 9.10908C3.75992 9.00009 4.03995 9.00009 4.6 9.00009Z"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Social links builder
 // ---------------------------------------------------------------------------
 
@@ -150,6 +310,38 @@ export interface SocialLinkEntry {
   key: string;
   icon: string;
   url: string;
+  /**
+   * When set, renders this branded SVG component INSTEAD of the path-style
+   * icon. Used for whatsapp + instagram so the storefront footer shows the
+   * official brand colors (green WhatsApp tile / Instagram gradient) instead
+   * of a monochrome glyph. Footer renderers must check this field first.
+   */
+  BrandIcon?: React.ComponentType<{ className?: string }>;
+}
+
+/**
+ * Render a social link's icon — branded SVG (instagram/whatsapp) or the
+ * default monochrome path glyph. Each footer theme uses this so the brand
+ * colors land consistently without duplicating the if/else across themes.
+ *
+ * `className` controls size on the path-glyph branch; the brand-icon branch
+ * uses the same class so all glyphs render at one size in the row.
+ */
+export function SocialGlyph({
+  entry,
+  className = 'w-4 h-4',
+}: {
+  entry: SocialLinkEntry;
+  className?: string;
+}) {
+  if (entry.BrandIcon) {
+    return <entry.BrandIcon className={className} />;
+  }
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path d={entry.icon} />
+    </svg>
+  );
 }
 
 /**
@@ -169,16 +361,27 @@ export function getSocialLinks(
   const whatsappUrl =
     socials.whatsapp ||
     (contactWhatsapp ? `https://wa.me/${contactWhatsapp.replace(/\D/g, '')}` : undefined);
-  return [
-    { key: 'instagram', icon: INSTAGRAM_PATH, url: socials.instagram },
+  const candidates: Array<{
+    key: string;
+    icon: string;
+    url: string | undefined;
+    BrandIcon?: React.ComponentType<{ className?: string }>;
+  }> = [
+    {
+      key: 'instagram',
+      icon: INSTAGRAM_PATH,
+      url: socials.instagram,
+      BrandIcon: InstagramBrandIcon,
+    },
     { key: 'facebook', icon: FACEBOOK_PATH, url: socials.facebook },
     { key: 'twitter', icon: TWITTER_PATH, url: socials.twitter },
     { key: 'tiktok', icon: TIKTOK_PATH, url: socials.tiktok },
     { key: 'youtube', icon: YOUTUBE_PATH, url: socials.youtube },
     { key: 'snapchat', icon: SNAPCHAT_PATH, url: socials.snapchat },
-    { key: 'whatsapp', icon: WHATSAPP_PATH, url: whatsappUrl },
+    { key: 'whatsapp', icon: WHATSAPP_PATH, url: whatsappUrl, BrandIcon: WhatsappBrandIcon },
     { key: 'linkedin', icon: LINKEDIN_PATH, url: socials.linkedin },
     { key: 'pinterest', icon: PINTEREST_PATH, url: socials.pinterest },
     { key: 'telegram', icon: TELEGRAM_PATH, url: socials.telegram },
-  ].filter((s): s is SocialLinkEntry => !!s.url);
+  ];
+  return candidates.filter((s): s is SocialLinkEntry => !!s.url);
 }

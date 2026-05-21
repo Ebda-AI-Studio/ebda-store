@@ -12,7 +12,7 @@ import {
   resolveBottomBar,
   resolveFooterSections,
 } from '../shared/display-helpers';
-import { getSocialLinks } from '../shared/icons';
+import { getSocialLinks, SocialGlyph } from '../shared/icons';
 
 export default function ElegantFooter({
   branding,
@@ -296,12 +296,30 @@ export default function ElegantFooter({
                 {isRtl ? 'تابعنا' : 'Follow'}
               </h4>
               <div className="flex flex-wrap items-center gap-3">
+                {socialLinks.map(s => (
+                  <a
+                    key={s.key}
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`w-8 h-8 flex items-center justify-center overflow-hidden ${
+                      s.BrandIcon
+                        ? ''
+                        : 'border border-border text-foreground/40 hover:text-foreground hover:border-foreground'
+                    } transition-all duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+                    aria-label={s.key}
+                  >
+                    <SocialGlyph
+                      entry={s}
+                      className={s.BrandIcon ? 'w-full h-full' : 'w-3.5 h-3.5'}
+                    />
+                  </a>
+                ))}
                 {displayLogo && (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={displayLogo}
                     alt={displayName}
-                    className="md:hidden h-10 w-auto object-contain me-2"
+                    className="md:hidden ms-auto h-16 w-auto object-contain"
                     style={
                       !footerLogo && footerLogoInvert
                         ? { filter: 'brightness(0) invert(1)' }
@@ -309,25 +327,6 @@ export default function ElegantFooter({
                     }
                   />
                 )}
-                {socialLinks.map(({ key, icon, url }) => (
-                  <a
-                    key={key}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-8 h-8 border border-border flex items-center justify-center text-foreground/40 hover:text-foreground hover:border-foreground transition-all duration-700 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                    aria-label={key}
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path d={icon} />
-                    </svg>
-                  </a>
-                ))}
               </div>
             </div>
           )}
