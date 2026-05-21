@@ -42,12 +42,24 @@ interface InsightsDashboard {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function kwd(fils: number): string {
+function kwd(fils: number | null | undefined): string {
+  if (typeof fils !== 'number' || !Number.isFinite(fils)) return '0.000';
   return (fils / 1000).toFixed(3);
 }
 
-function pct(val: number): string {
+function pct(val: number | null | undefined): string {
+  if (typeof val !== 'number' || !Number.isFinite(val)) return '0.0%';
   return (val * 100).toFixed(1) + '%';
+}
+
+// 2026-05-21: number formatter helper for table cells. `sku.velocity` and
+// similar numeric API fields can be null when an SKU has no rollup data
+// yet (new product, no orders in window) — crashing the whole page with
+// "Cannot read properties of undefined" is wrong. Default to 0 + the
+// `digits` decimal places. Used wherever an API number could be missing.
+function num(v: number | null | undefined, digits = 2): string {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return (0).toFixed(digits);
+  return v.toFixed(digits);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -87,10 +99,9 @@ export default function InsightsDashboardPage() {
     );
   }
 
-  const aovChange =
-    data.aov.lastPeriodFils > 0
-      ? ((data.aov.thisPeriodFils - data.aov.lastPeriodFils) / data.aov.lastPeriodFils) * 100
-      : 0;
+  const aovThis = data.aov?.thisPeriodFils ?? 0;
+  const aovLast = data.aov?.lastPeriodFils ?? 0;
+  const aovChange = aovLast > 0 ? ((aovThis - aovLast) / aovLast) * 100 : 0;
 
   return (
     <AdminLayout title={t('title')}>
@@ -115,7 +126,7 @@ export default function InsightsDashboardPage() {
           {/* AOV */}
           <div className="rounded-xl border border-border p-4 space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('aov')}</p>
-            <p className="text-2xl font-semibold font-mono">{kwd(data.aov.thisPeriodFils)}</p>
+            <p className="text-2xl font-semibold font-mono">{kwd(aovThis)}</p>
             <p className="text-xs text-muted-foreground">
               KWD
               {aovChange !== 0 && (
@@ -123,7 +134,7 @@ export default function InsightsDashboardPage() {
                   className={`ms-2 font-medium ${aovChange >= 0 ? 'text-green-700' : 'text-red-600'}`}
                 >
                   {aovChange >= 0 ? '+' : ''}
-                  {aovChange.toFixed(1)}%
+                  {num(aovChange, 1)}%
                 </span>
               )}
             </p>
@@ -225,7 +236,7 @@ export default function InsightsDashboardPage() {
                       <td className="px-3 py-2">{sku.name}</td>
                       <td className="px-3 py-2 text-end font-mono">{sku.unitsSold7d}</td>
                       <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
-                        {sku.velocity.toFixed(2)}/day
+                        {num(sku.velocity, 2)}/day
                       </td>
                     </tr>
                   ))}
