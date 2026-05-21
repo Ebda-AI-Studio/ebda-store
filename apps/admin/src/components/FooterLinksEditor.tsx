@@ -1,19 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useToast } from '@force/ui';
 import { apiGet, apiPut } from '../lib/api';
 import { useT } from '@/i18n/useT';
 
 /**
- * Reusable footer links + utility bar + bottom bar editor. Extracted
- * from /stores/[id]/pages 2026-05-21 (Ahmad audit: "do it then update
- * memory") so the SAME editor can be rendered:
+ * Reusable footer links + utility bar editor. Extracted from
+ * /stores/[id]/pages 2026-05-21 (Ahmad audit: "do it then update memory")
+ * so the SAME editor can be rendered:
  *   - standalone at /pages (its own AdminLayout wrapper)
  *   - embedded inside the page-builder Footer ExtraSectionCard
  *
  * The component owns its own state, load, save, and Save button. Both
  * surfaces share one source of truth.
+ *
+ * Visual rebuild 2026-05-21 night: replaced the 5 box-soup cards with
+ * a SectionShell helper that renders a consistent numbered heading,
+ * subtitle, "where this shows" hint, optional enable toggle, and body.
+ * Link rows use grid layout so each input gets equal share; on narrow
+ * widths the AR + EN names share a row and the href drops to its own
+ * row instead of competing for horizontal space. Save bar is sticky at
+ * the bottom of the editor's scroll region. Bottom Bar section removed
+ * (redundant with Company Links).
  */
 
 interface FooterLink {
@@ -84,9 +93,198 @@ interface FooterLinksEditorProps {
   variant?: 'standalone' | 'embedded';
 }
 
+/* ── SectionShell ──────────────────────────────────────────────────────
+ * One consistent visual frame per editor section. Header carries an
+ * ordinal step number, title, subtitle, and an optional enable toggle.
+ * `whereShows` is a small footnote-style hint right under the subtitle
+ * so merchants know exactly where on the storefront this section paints.
+ * Body is the slot for whatever the section configures (link list,
+ * etc.). Sticks to the standing admin grouping pattern (`feedback-admin-
+ * mirrors-storefront-flow.md`).
+ */
+function SectionShell({
+  step,
+  title,
+  subtitle,
+  whereShows,
+  enabled,
+  onToggle,
+  collapsedWhenDisabled = false,
+  embedded = false,
+  children,
+}: {
+  step: number;
+  title: string;
+  subtitle?: string;
+  whereShows?: string;
+  enabled?: boolean;
+  onToggle?: (value: boolean) => void;
+  /** When true + enabled is false, the body doesn't render. */
+  collapsedWhenDisabled?: boolean;
+  embedded?: boolean;
+  children?: ReactNode;
+}) {
+  const showBody = !collapsedWhenDisabled || enabled !== false;
+  return (
+    <section
+      className={`rounded-xl border ${
+        embedded ? 'border-border/60 bg-background' : 'border-border bg-card shadow-sm'
+      } overflow-hidden`}
+    >
+      <header className="flex items-start gap-4 p-5">
+        <span
+          aria-hidden
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+        >
+          {step}
+        </span>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base font-semibold text-foreground leading-tight">{title}</h3>
+          {subtitle && (
+            <p className="mt-1 text-sm text-muted-foreground leading-snug">{subtitle}</p>
+          )}
+          {whereShows && (
+            <p className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground/70">
+              {whereShows}
+            </p>
+          )}
+        </div>
+        {typeof enabled === 'boolean' && onToggle && (
+          <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={e => onToggle(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+          </label>
+        )}
+      </header>
+      {showBody && children && (
+        <div className="border-t border-border/60 bg-muted/20 p-5">{children}</div>
+      )}
+    </section>
+  );
+}
+
+/* ── LinkRow ───────────────────────────────────────────────────────────
+ * One editable footer-link row. Responsive grid: 2 columns (name EN /
+ * name AR) on narrow widths with the path on a second row; 4 columns
+ * inline on md+. Enable checkbox + delete button anchor the start +
+ * end. Used by every link list (shop / support / company / utility).
+ */
+function LinkRow({
+  enabled,
+  primaryLabel,
+  primaryValue,
+  primaryPlaceholder,
+  arabicValue,
+  arabicPlaceholder,
+  pathValue,
+  pathPlaceholder,
+  onToggle,
+  onPrimaryChange,
+  onArabicChange,
+  onPathChange,
+  onRemove,
+  removeTitle,
+}: {
+  enabled: boolean;
+  primaryLabel: string;
+  primaryValue: string;
+  primaryPlaceholder: string;
+  arabicValue: string;
+  arabicPlaceholder: string;
+  pathValue: string;
+  pathPlaceholder: string;
+  onToggle: (v: boolean) => void;
+  onPrimaryChange: (v: string) => void;
+  onArabicChange: (v: string) => void;
+  onPathChange: (v: string) => void;
+  onRemove: () => void;
+  removeTitle: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 transition-colors hover:border-border/80">
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => onToggle(e.target.checked)}
+          className="mt-2.5 h-4 w-4 shrink-0 rounded border-border text-primary focus:ring-primary"
+          aria-label={primaryLabel}
+        />
+        <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input
+            type="text"
+            value={primaryValue}
+            onChange={e => onPrimaryChange(e.target.value)}
+            placeholder={primaryPlaceholder}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <input
+            type="text"
+            value={arabicValue}
+            onChange={e => onArabicChange(e.target.value)}
+            placeholder={arabicPlaceholder}
+            lang="ar"
+            dir="rtl"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <input
+            type="text"
+            value={pathValue}
+            onChange={e => onPathChange(e.target.value)}
+            placeholder={pathPlaceholder}
+            className="sm:col-span-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-muted-foreground focus:border-primary focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"
+          title={removeTitle}
+          aria-label={removeTitle}
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── AddLinkButton ────────────────────────────────────────────────────
+ * Full-width "+ Add link" affordance at the bottom of every list.
+ * Dashed border ghost button — friendlier and more discoverable than
+ * the cramped + icon previously crammed into each section heading.
+ */
+function AddLinkButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+    >
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+      </svg>
+      {label}
+    </button>
+  );
+}
+
 export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLinksEditorProps) {
   const t = useT('pages.page');
   const { success, error: showError } = useToast();
+  const isEmbedded = variant === 'embedded';
 
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -139,12 +337,12 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
           }
         }
       } catch {
-        // use defaults
+        // Silent — defaults remain in state.
       } finally {
         if (!cancelled) setIsLoading(false);
       }
     }
-    loadSettings();
+    void loadSettings();
     return () => {
       cancelled = true;
     };
@@ -165,7 +363,6 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
           company: companyLinks,
           newsletterEnabled,
           // bottomBar removed 2026-05-21 — redundant with Company Links.
-          // Existing rows keep their stale field; new saves omit it.
         },
         utilityBar: {
           enabled: utilityBarEnabled,
@@ -227,85 +424,33 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
     setUtilityLinks(prev => prev.filter((_, i) => i !== index));
   }
 
-  function renderLinkEditor(
-    title: string,
-    section: 'shop' | 'support' | 'company',
-    links: FooterLink[]
-  ) {
+  function renderLinkList(section: 'shop' | 'support' | 'company', links: FooterLink[]): ReactNode {
     return (
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-          <button
-            type="button"
-            onClick={() => addLink(section)}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            {t('addLink')}
-          </button>
-        </div>
+      <div className="space-y-3">
         {links.length === 0 ? (
-          <p className="text-muted-foreground text-sm py-4 text-center">{t('emptyLinks')}</p>
+          <p className="text-muted-foreground text-sm py-2 text-center">{t('emptyLinks')}</p>
         ) : (
-          <div className="space-y-3">
-            {links.map((link, index) => (
-              <div key={index} className="flex items-center gap-3 rounded-lg border p-3">
-                <input
-                  type="checkbox"
-                  checked={link.enabled}
-                  onChange={e => updateLink(section, index, 'enabled', e.target.checked)}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                />
-                <input
-                  type="text"
-                  value={link.name}
-                  onChange={e => updateLink(section, index, 'name', e.target.value)}
-                  placeholder={t('linkNamePlaceholder')}
-                  className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <input
-                  type="text"
-                  value={link.nameAr || ''}
-                  onChange={e => updateLink(section, index, 'nameAr', e.target.value)}
-                  placeholder={t('linkNameArPlaceholder')}
-                  lang="ar"
-                  dir="rtl"
-                  className="w-40 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <input
-                  type="text"
-                  value={link.href}
-                  onChange={e => updateLink(section, index, 'href', e.target.value)}
-                  placeholder={t('linkPathPlaceholder')}
-                  className="w-40 rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeLink(section, index)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"
-                  title={t('removeLink')}
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
-              </div>
-            ))}
-          </div>
+          links.map((link, index) => (
+            <LinkRow
+              key={index}
+              enabled={link.enabled}
+              primaryLabel={t('linkNamePlaceholder')}
+              primaryValue={link.name}
+              primaryPlaceholder={t('linkNamePlaceholder')}
+              arabicValue={link.nameAr || ''}
+              arabicPlaceholder={t('linkNameArPlaceholder')}
+              pathValue={link.href}
+              pathPlaceholder={t('linkPathPlaceholder')}
+              onToggle={v => updateLink(section, index, 'enabled', v)}
+              onPrimaryChange={v => updateLink(section, index, 'name', v)}
+              onArabicChange={v => updateLink(section, index, 'nameAr', v)}
+              onPathChange={v => updateLink(section, index, 'href', v)}
+              onRemove={() => removeLink(section, index)}
+              removeTitle={t('removeLink')}
+            />
+          ))
         )}
+        <AddLinkButton label={t('addLink')} onClick={() => addLink(section)} />
       </div>
     );
   }
@@ -319,156 +464,109 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
   }
 
   return (
-    <div className="space-y-6">
-      {variant === 'standalone' && (
-        <div className="rounded-xl border border-info/30 bg-info/5 p-4">
-          <p className="text-sm text-info">
-            {t('help')} <code className="bg-info/10 px-1 rounded">{t('helpCode')}</code>
-            {t('helpClose')}
-          </p>
+    <div className="space-y-5">
+      {/* Section 1 — Utility Bar (top of every page) */}
+      <SectionShell
+        step={1}
+        title={t('utilityBar')}
+        subtitle={t('utilityBarHint')}
+        whereShows={isEmbedded ? undefined : t('utilityBarWhere')}
+        enabled={utilityBarEnabled}
+        onToggle={setUtilityBarEnabled}
+        collapsedWhenDisabled
+        embedded={isEmbedded}
+      >
+        <div className="space-y-3">
+          {utilityLinks.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-2 text-center">{t('emptyLinks')}</p>
+          ) : (
+            utilityLinks.map((link, index) => (
+              <LinkRow
+                key={index}
+                enabled={link.enabled}
+                primaryLabel={t('utilityBarLabelPlaceholder')}
+                primaryValue={link.label}
+                primaryPlaceholder={t('utilityBarLabelPlaceholder')}
+                arabicValue={link.labelAr || ''}
+                arabicPlaceholder={t('utilityBarLabelArPlaceholder')}
+                pathValue={link.href}
+                pathPlaceholder={t('linkPathPlaceholder')}
+                onToggle={v => updateUtilityLink(index, 'enabled', v)}
+                onPrimaryChange={v => updateUtilityLink(index, 'label', v)}
+                onArabicChange={v => updateUtilityLink(index, 'labelAr', v)}
+                onPathChange={v => updateUtilityLink(index, 'href', v)}
+                onRemove={() => removeUtilityLink(index)}
+                removeTitle={t('removeLink')}
+              />
+            ))
+          )}
+          <AddLinkButton label={t('addLink')} onClick={addUtilityLink} />
         </div>
-      )}
+      </SectionShell>
 
-      {/* Utility bar (pre-header) */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">{t('utilityBar')}</h2>
-            <p className="text-sm text-muted-foreground mt-1">{t('utilityBarHint')}</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={utilityBarEnabled}
-              onChange={e => setUtilityBarEnabled(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
-          </label>
-        </div>
-        {utilityBarEnabled && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                {t('utilityBarLinks')}
-              </p>
-              <button
-                type="button"
-                onClick={addUtilityLink}
-                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                {t('addLink')}
-              </button>
-            </div>
-            {utilityLinks.length === 0 ? (
-              <p className="text-muted-foreground text-sm py-4 text-center">{t('emptyLinks')}</p>
-            ) : (
-              <div className="space-y-3">
-                {utilityLinks.map((link, index) => (
-                  <div key={index} className="flex items-center gap-3 rounded-lg border p-3">
-                    <input
-                      type="checkbox"
-                      checked={link.enabled}
-                      onChange={e => updateUtilityLink(index, 'enabled', e.target.checked)}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                    />
-                    <input
-                      type="text"
-                      value={link.label}
-                      onChange={e => updateUtilityLink(index, 'label', e.target.value)}
-                      placeholder={t('utilityBarLabelPlaceholder')}
-                      className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                    <input
-                      type="text"
-                      value={link.labelAr || ''}
-                      onChange={e => updateUtilityLink(index, 'labelAr', e.target.value)}
-                      placeholder={t('utilityBarLabelArPlaceholder')}
-                      lang="ar"
-                      dir="rtl"
-                      className="w-40 rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                    <input
-                      type="text"
-                      value={link.href}
-                      onChange={e => updateUtilityLink(index, 'href', e.target.value)}
-                      placeholder={t('linkPathPlaceholder')}
-                      className="w-40 rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeUtilityLink(index)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors"
-                      title={t('removeLink')}
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Section 2 — Shop links (first footer column) */}
+      <SectionShell
+        step={2}
+        title={t('shopLinks')}
+        subtitle={t('shopLinksHint')}
+        whereShows={isEmbedded ? undefined : t('shopLinksWhere')}
+        embedded={isEmbedded}
+      >
+        {renderLinkList('shop', shopLinks)}
+      </SectionShell>
 
-      {renderLinkEditor(t('shopLinks'), 'shop', shopLinks)}
-      {renderLinkEditor(t('supportLinks'), 'support', supportLinks)}
-      {renderLinkEditor(t('companyLinks'), 'company', companyLinks)}
+      {/* Section 3 — Support links (second footer column) */}
+      <SectionShell
+        step={3}
+        title={t('supportLinks')}
+        subtitle={t('supportLinksHint')}
+        whereShows={isEmbedded ? undefined : t('supportLinksWhere')}
+        embedded={isEmbedded}
+      >
+        {renderLinkList('support', supportLinks)}
+      </SectionShell>
 
-      {/* Newsletter */}
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">{t('newsletter')}</h2>
-            <p className="text-sm text-muted-foreground mt-1">{t('newsletterHint')}</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={newsletterEnabled}
-              onChange={e => setNewsletterEnabled(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
-          </label>
-        </div>
-      </div>
+      {/* Section 4 — Company links (third footer column) */}
+      <SectionShell
+        step={4}
+        title={t('companyLinks')}
+        subtitle={t('companyLinksHint')}
+        whereShows={isEmbedded ? undefined : t('companyLinksWhere')}
+        embedded={isEmbedded}
+      >
+        {renderLinkList('company', companyLinks)}
+      </SectionShell>
 
-      {/* Bottom bar section removed 2026-05-21 — was redundant with the
-          Company Links section above. Merchants put Privacy / Terms /
-          Shipping into Company Links if they want them in the footer. */}
+      {/* Section 5 — Newsletter (subscribe form below footer columns) */}
+      <SectionShell
+        step={5}
+        title={t('newsletter')}
+        subtitle={t('newsletterHint')}
+        whereShows={isEmbedded ? undefined : t('newsletterWhere')}
+        enabled={newsletterEnabled}
+        onToggle={setNewsletterEnabled}
+        embedded={isEmbedded}
+      />
 
-      {/* Save button. Embedded variant in page-builder shows this too —
-          editor is fully self-contained, no coupling to outer Save flows. */}
-      <div className="flex justify-end">
+      {/* Bottom bar section removed 2026-05-21 — redundant with Company Links. */}
+
+      {/* Sticky save bar — anchored at the bottom of the editor's flow
+          (not the viewport) so it doesn't fight the page-builder's own
+          sticky chrome when embedded. Pinned position inside the
+          standalone /pages variant comes from the page-level sticky
+          footer there, not from this component. */}
+      <div className="sticky bottom-0 -mx-1 mt-2 flex items-center justify-end gap-3 rounded-xl border border-border/60 bg-card/95 px-4 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
+        <p className="text-xs text-muted-foreground hidden sm:block">
+          {t('saveHintEmpty') || 'Changes apply after Save.'}
+        </p>
         <button
           type="button"
           onClick={handleSave}
           disabled={isSaving}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
         >
           {isSaving && (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
           )}
           {isSaving ? t('saving') : t('saveChanges')}
         </button>

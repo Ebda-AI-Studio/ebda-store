@@ -1379,24 +1379,22 @@ export default function StoreLayoutPage() {
                 }
               />
               {/* Embedded footer links editor — same FooterLinksEditor
-                  component that renders at /pages. Merchants edit shop/
-                  support/company link sections + utility bar + bottom
-                  bar inline with the rest of page-builder. Component
-                  owns its own state + Save (independent of page-builder
-                  Save). Ahmad audit 2026-05-21: real absorb of /pages
-                  into the Footer card. */}
-              <div className="rounded-2xl border border-border bg-card p-6">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold text-foreground">Footer links</h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Shop / Support / Company sections + Utility bar + Bottom bar. Independent of
-                      the footer chrome above.
+                  component that renders at /pages. Editor owns its own
+                  state + Save (independent of page-builder Save). Card
+                  chrome stays subtle so it doesn't double-frame the
+                  numbered sections inside. */}
+              <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+                <div className="mb-5 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold text-foreground">Footer & utility</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Utility bar above the header + the three footer link columns + newsletter
+                      signup, all in one place.
                     </p>
                   </div>
                   <a
                     href={`/stores/${storeId}/pages`}
-                    className="text-xs text-primary hover:underline"
+                    className="shrink-0 text-xs font-medium text-primary hover:underline"
                   >
                     Open standalone ↗
                   </a>
@@ -2966,7 +2964,6 @@ function ManualProductPicker({
                 className="flex items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5"
               >
                 {detail?.images?.[0]?.url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={detail.images[0].url}
                     alt=""
@@ -3068,7 +3065,6 @@ function ManualProductPicker({
                   }`}
                 >
                   {p.images?.[0]?.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={p.images[0].url}
                       alt=""
