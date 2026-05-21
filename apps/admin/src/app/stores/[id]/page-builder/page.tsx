@@ -64,6 +64,7 @@ import { SectionPreview } from '../../../../components/SectionPreview';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
 import { ImageUpload } from '../../../../components/ImageUpload';
+import { FooterLinksEditor } from '../../../../components/FooterLinksEditor';
 import { apiGet, apiPost, apiPut, apiFetch } from '../../../../lib/api';
 import { getStoreHref } from '../../../../lib/store-url';
 
@@ -1377,12 +1378,31 @@ export default function StoreLayoutPage() {
                   })
                 }
               />
-              <a
-                href={`/stores/${storeId}/pages`}
-                className="-mt-3 inline-flex items-center gap-2 self-start rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
-              >
-                ↗ Edit footer links (Shop / Support / Company + Utility bar + Bottom bar)
-              </a>
+              {/* Embedded footer links editor — same FooterLinksEditor
+                  component that renders at /pages. Merchants edit shop/
+                  support/company link sections + utility bar + bottom
+                  bar inline with the rest of page-builder. Component
+                  owns its own state + Save (independent of page-builder
+                  Save). Ahmad audit 2026-05-21: real absorb of /pages
+                  into the Footer card. */}
+              <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-semibold text-foreground">Footer links</h2>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Shop / Support / Company sections + Utility bar + Bottom bar. Independent of
+                      the footer chrome above.
+                    </p>
+                  </div>
+                  <a
+                    href={`/stores/${storeId}/pages`}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Open standalone ↗
+                  </a>
+                </div>
+                <FooterLinksEditor storeId={storeId} variant="embedded" />
+              </div>
 
               {/* Extra duplicated product carousels (section duplication 2026-05-20).
                   Renders one card per entry + a "+ add carousel" button at the
