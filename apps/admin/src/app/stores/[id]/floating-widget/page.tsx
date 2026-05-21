@@ -6,6 +6,7 @@ import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { ColorField } from '../../../../components/ColorField';
+import { useFeatures } from '../../../../hooks/useFeatures';
 import type {
   FloatingButton,
   FloatingButtonKind,
@@ -55,6 +56,13 @@ export default function FloatingWidgetPage() {
   const params = useParams();
   const storeId = params.id as string;
   const { success: toastSuccess, error: toastError } = useToast();
+  // useFeatures hooks into the AdminFeatureProvider which fetches the
+  // canonical /api/v1/admin/stores/:id/features endpoint. The admin
+  // store endpoint doesn't include enabledFeatures, so checking
+  // store.enabledFeatures directly was always falsy. Verified
+  // 2026-05-21 — ahmad enabled floating_widget but the page kept
+  // showing 'Feature not enabled' until this hook was used.
+  const { isEnabled, isLoading: featuresLoading } = useFeatures();
 
   const [store, setStore] = useState<StoreInfo | null>(null);
   const [config, setConfig] = useState<FloatingWidgetConfig>(DEFAULT_FLOATING_WIDGET_CONFIG);
@@ -76,7 +84,7 @@ export default function FloatingWidgetPage() {
       .finally(() => setLoading(false));
   }, [storeId]);
 
-  const featureEnabled = store?.enabledFeatures?.includes('floating_widget') ?? false;
+  const featureEnabled = isEnabled('floating_widget');
 
   const handleSave = useCallback(async () => {
     if (!store) return;
@@ -125,7 +133,7 @@ export default function FloatingWidgetPage() {
     });
   };
 
-  if (loading) {
+  if (loading || featuresLoading) {
     return (
       <AdminLayout title="Floating widget" subtitle="Loading…">
         <div className="text-sm text-muted-foreground">Loading…</div>

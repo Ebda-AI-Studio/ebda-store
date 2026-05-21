@@ -199,7 +199,19 @@ app.use(
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    // 2026-05-21 redesign — global limiter now ONLY counts mutations
+    // (POST/PUT/PATCH/DELETE), not safe-method reads (GET/HEAD/OPTIONS).
+    // Reason: legit clients (merchants on admin, customers browsing
+    // storefront) easily issue 100+ GET requests per 15min via normal
+    // page navigation. The previous 100-cap-per-IP false-positived on
+    // every busy session. Mutations are the abuse vector — scraping,
+    // brute-force, mass-create attacks — keep those rate-limited.
+    //
+    // Reads still have per-endpoint targeted limits where appropriate
+    // (publicLimiter, etc.) plus auth chains that gate sensitive data.
+    // 200 mutations per IP per 15min is comfortable for normal use
+    // and still blocks scripted abuse.
+    max: 200,
     message: {
       success: false,
       error: { code: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
@@ -233,11 +245,14 @@ app.use(
         const provided = req.header('x-load-test-token');
         if (provided && provided === expected) return true;
       }
-      // Bypass 2: admin bulk-AI status polling
-      if (
-        req.method === 'GET' &&
-        /^\/api\/v1\/stores\/[^/]+\/ai\/bulk(\/[^/]+)?\/?$/.test(req.path)
-      ) {
+      // Bypass 2: safe-method reads. Legitimate clients (admin merchant
+      // sessions, storefront customers) issue many GETs per page load;
+      // 100+/15min is normal for normal use. Per-endpoint limiters
+      // (publicLimiter etc.) still cover targeted hotspots. Mutations
+      // (POST/PUT/PATCH/DELETE) below the bypass remain limited at 200/
+      // 15min — that's the abuse-blocking surface.
+      const method = req.method.toUpperCase();
+      if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
         return true;
       }
       return false;
