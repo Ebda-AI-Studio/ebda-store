@@ -111,13 +111,14 @@ export default function ModernFooter({
     >
       <div className="container mx-auto px-4 py-16 lg:py-20">
         <div className={`grid grid-cols-1 md:grid-cols-2 ${lgColsClass} gap-10 lg:gap-12`}>
-          {/* Brand Column */}
+          {/* Brand Column — logo desktop-only at top; on mobile it
+              moves beside the social icons below (Ahmad 2026-05-21). */}
           <div className="lg:col-span-1 space-y-5">
             {displayLogo ? (
               <img
                 src={footerLogo || displayLogo}
                 alt={displayName}
-                className="h-16 sm:h-20 w-auto object-contain"
+                className="hidden md:block h-16 sm:h-20 w-auto object-contain"
                 style={
                   !footerLogo && footerLogoInvert
                     ? { filter: 'brightness(0) invert(1)' }
@@ -125,15 +126,28 @@ export default function ModernFooter({
                 }
               />
             ) : (
-              <h3 className="text-xl font-bold text-foreground">{displayName}</h3>
+              <h3 className="hidden md:block text-xl font-bold text-foreground">{displayName}</h3>
             )}
             {displayDescription && (
               <p className="text-foreground/60 text-sm leading-relaxed">{displayDescription}</p>
             )}
 
-            {/* Social Icons */}
+            {/* Social Icons — logo renders BESIDE on mobile (md:hidden). */}
             {socialLinks.length > 0 && (
-              <div className="flex flex-wrap gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {displayLogo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={footerLogo || displayLogo}
+                    alt={displayName}
+                    className="md:hidden h-10 w-auto object-contain me-2"
+                    style={
+                      !footerLogo && footerLogoInvert
+                        ? { filter: 'brightness(0) invert(1)' }
+                        : undefined
+                    }
+                  />
+                )}
                 {socialLinks.map(({ key, icon, url }) => (
                   <a
                     key={key}

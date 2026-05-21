@@ -60,8 +60,9 @@ export default function MinimalFooter({
       <div className="container mx-auto px-6">
         {/* Single-row layout: logo · links · copyright */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-          {/* Brand */}
-          <div className="flex-shrink-0">
+          {/* Brand — desktop only; on mobile the logo moves beside the
+              social icons further down (Ahmad 2026-05-21). */}
+          <div className="hidden md:block flex-shrink-0">
             {displayLogo ? (
               <img
                 src={displayLogo}
@@ -101,6 +102,19 @@ export default function MinimalFooter({
               footer doesn't read as half-finished placeholder copy. */}
           {socialLinks.length > 0 && (
             <div className={`flex items-center gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+              {displayLogo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={displayLogo}
+                  alt={displayName}
+                  className="md:hidden h-10 w-auto object-contain me-2"
+                  style={
+                    !footerLogo && footerLogoInvert
+                      ? { filter: 'brightness(0) invert(1)' }
+                      : undefined
+                  }
+                />
+              )}
               {socialLinks.map(({ key, icon, url }) => (
                 <a
                   key={key}

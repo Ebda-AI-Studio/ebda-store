@@ -93,7 +93,13 @@ export default function FloatingWidgetPage() {
       ...(store.settings ?? {}),
       floatingWidget: config,
     };
-    const res = await apiPut(`/api/v1/admin/stores/${storeId}`, { settings: nextSettings });
+    // 2026-05-21 — switched from /admin/stores/:id (which only persists
+    // name/slug/plan/status and silently drops settings) to /stores/:id
+    // which is the settings-aware update route. Ahmad reported floating
+    // widget toggled on + WhatsApp configured but storefront showed
+    // nothing — settings.floatingWidget never reached the DB because the
+    // admin endpoint's updateStoreAdminSchema doesn't include settings.
+    const res = await apiPut(`/api/v1/stores/${storeId}`, { settings: nextSettings });
     setSaving(false);
     if (res.error) {
       toastError(res.error.message || 'Save failed');

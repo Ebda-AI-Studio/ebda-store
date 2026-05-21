@@ -70,13 +70,14 @@ export default function BoldFooter({
         <div
           className={`grid md:grid-cols-2 ${lgColsClass} gap-8 sm:gap-10 md:gap-12 mb-10 sm:mb-12 md:mb-16`}
         >
-          {/* Brand */}
+          {/* Brand — logo desktop-only at top; on mobile it moves beside
+              the social icons below (Ahmad 2026-05-21). */}
           <div className="lg:col-span-2">
             {displayLogo ? (
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-16 sm:h-20 w-auto object-contain mb-6"
+                className="hidden md:block h-16 sm:h-20 w-auto object-contain mb-6"
                 style={
                   !footerLogo && footerLogoInvert
                     ? { filter: 'brightness(0) invert(1)' }
@@ -84,7 +85,7 @@ export default function BoldFooter({
                 }
               />
             ) : (
-              <h3 className="text-3xl font-black uppercase tracking-wider mb-6 text-foreground">
+              <h3 className="hidden md:block text-3xl font-black uppercase tracking-wider mb-6 text-foreground">
                 {displayName}
               </h3>
             )}
@@ -94,9 +95,22 @@ export default function BoldFooter({
               </p>
             )}
 
-            {/* Social icons — bright accent on hover */}
+            {/* Social icons — logo renders BESIDE on mobile (md:hidden). */}
             {socialLinks.length > 0 && (
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                {displayLogo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={displayLogo}
+                    alt={displayName}
+                    className="md:hidden h-10 w-auto object-contain me-2"
+                    style={
+                      !footerLogo && footerLogoInvert
+                        ? { filter: 'brightness(0) invert(1)' }
+                        : undefined
+                    }
+                  />
+                )}
                 {socialLinks.map(({ key, icon, url }) => (
                   <a
                     key={key}

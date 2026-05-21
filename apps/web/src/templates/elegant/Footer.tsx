@@ -167,13 +167,14 @@ export default function ElegantFooter({
                 : 'md:grid-cols-4'
           } md:gap-12`}
         >
-          {/* Brand */}
+          {/* Brand — desktop only. Logo moves into Follow col on mobile
+              (Ahmad 2026-05-21). Description stays here on both. */}
           <div className="col-span-2 md:col-span-1">
             {displayLogo ? (
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-16 sm:h-20 w-auto object-contain mb-6"
+                className="hidden md:block h-16 sm:h-20 w-auto object-contain mb-6"
                 style={
                   !footerLogo && footerLogoInvert
                     ? { filter: 'brightness(0) invert(1)' }
@@ -181,7 +182,7 @@ export default function ElegantFooter({
                 }
               />
             ) : (
-              <h3 className="text-base font-medium tracking-[0.2em] text-foreground mb-6 font-serif">
+              <h3 className="hidden md:block text-base font-medium tracking-[0.2em] text-foreground mb-6 font-serif">
                 {displayName}
               </h3>
             )}
@@ -285,13 +286,29 @@ export default function ElegantFooter({
             </div>
           )}
 
-          {/* Social — hidden when there are no social links configured. */}
+          {/* Social — hidden when there are no social links configured.
+              On mobile, the logo renders BESIDE the social icons (Ahmad
+              2026-05-21 layout adjustment). Desktop keeps the original
+              Brand-column logo. */}
           {socialLinks.length > 0 && (
             <div>
               <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground mb-6 font-serif">
                 {isRtl ? 'تابعنا' : 'Follow'}
               </h4>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                {displayLogo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={displayLogo}
+                    alt={displayName}
+                    className="md:hidden h-10 w-auto object-contain me-2"
+                    style={
+                      !footerLogo && footerLogoInvert
+                        ? { filter: 'brightness(0) invert(1)' }
+                        : undefined
+                    }
+                  />
+                )}
                 {socialLinks.map(({ key, icon, url }) => (
                   <a
                     key={key}
