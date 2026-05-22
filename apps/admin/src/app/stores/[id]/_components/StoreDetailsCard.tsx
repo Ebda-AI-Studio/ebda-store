@@ -35,12 +35,9 @@ export function StoreDetailsCard({
     inactive: t('statusInactive'),
     suspended: t('statusSuspended'),
   }[store.status];
-  const planLabel = {
-    free: t('planFree'),
-    starter: t('planStarter'),
-    professional: t('planProfessional'),
-    enterprise: t('planEnterprise'),
-  }[store.plan];
+  // Plan UI removed 2026-05-22 (Ahmad): no public tier list, agency model.
+  // Store.plan enum stays in DB as internal tracking but doesn't appear in
+  // any merchant-visible or super-admin UI.
 
   return (
     <div className="lg:col-span-2 rounded-xl border bg-card shadow-sm">
@@ -107,23 +104,6 @@ export function StoreDetailsCard({
               </p>
             </div>
             <div>
-              <Label htmlFor="plan">{t('plan')}</Label>
-              <select
-                id="plan"
-                value={editForm.plan}
-                onChange={e => {
-                  const value = e.target.value;
-                  onChangeForm(prev => ({ ...prev, plan: value }));
-                }}
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="free">{t('planFree')}</option>
-                <option value="starter">{t('planStarter')}</option>
-                <option value="professional">{t('planProfessional')}</option>
-                <option value="enterprise">{t('planEnterprise')}</option>
-              </select>
-            </div>
-            <div>
               <Label htmlFor="status">{t('status')}</Label>
               <select
                 id="status"
@@ -155,10 +135,6 @@ export function StoreDetailsCard({
               <Badge variant={statusColors[store.status]} className="mt-1">
                 {statusLabel}
               </Badge>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">{t('plan')}</p>
-              <p className="font-medium text-foreground">{planLabel}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('created')}</p>

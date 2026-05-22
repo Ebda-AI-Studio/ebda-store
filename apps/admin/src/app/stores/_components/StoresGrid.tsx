@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { getStoreDisplayUrl } from '@/lib/store-url';
-import { formatDate, planConfig, statusConfig, type Store } from './types';
+import { formatDate, statusConfig, type Store } from './types';
 
 interface StoresGridProps {
   stores: Store[];
@@ -16,7 +16,6 @@ export function StoresGrid({ stores }: StoresGridProps) {
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 stagger-animation">
       {stores.map((store, index) => {
         const status = statusConfig[store.status];
-        const plan = planConfig[store.plan];
         return (
           <Link
             key={store.id}
@@ -65,26 +64,18 @@ export function StoresGrid({ stores }: StoresGridProps) {
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            {/* Stats — 2 columns since plan badge was removed. Plan UI stripped
+                2026-05-22 (Ahmad): no public tier list, agency model. The
+                Store.plan enum stays in DB as internal tracking but doesn't
+                appear in any UI. */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="text-center">
                 <p className="text-lg font-bold text-foreground">{store._count?.products || 0}</p>
                 <p className="text-xs text-muted-foreground">{t('products')}</p>
               </div>
-              <div className="text-center border-x border-border/50">
+              <div className="text-center border-s border-border/50">
                 <p className="text-lg font-bold text-foreground">{store._count?.orders || 0}</p>
                 <p className="text-xs text-muted-foreground">{t('orders')}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-foreground">
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs ${plan.bg} ${plan.text}`}
-                  >
-                    <span>{plan.icon}</span>
-                    <span className="capitalize">{store.plan}</span>
-                  </span>
-                </p>
-                <p className="text-xs text-muted-foreground">{t('plan')}</p>
               </div>
             </div>
 

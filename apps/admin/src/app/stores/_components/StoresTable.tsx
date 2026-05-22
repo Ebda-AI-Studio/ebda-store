@@ -5,7 +5,7 @@ import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { getStoreDisplayUrl } from '@/lib/store-url';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
-import { formatDate, planConfig, statusConfig, type Store } from './types';
+import { formatDate, statusConfig, type Store } from './types';
 
 interface StoresTableProps {
   stores: Store[];
@@ -52,20 +52,6 @@ export function StoresTable({ stores }: StoresTableProps) {
           >
             <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
             {t(`status.${store.status}`)}
-          </span>
-        );
-      },
-    },
-    {
-      header: t('colPlan'),
-      cell: store => {
-        const plan = planConfig[store.plan];
-        return (
-          <span
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium ${plan.bg} ${plan.text}`}
-          >
-            <span>{plan.icon}</span>
-            <span className="capitalize">{store.plan}</span>
           </span>
         );
       },
