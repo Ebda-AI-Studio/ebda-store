@@ -114,8 +114,11 @@ We're not VC-backed. We don't have a 50-person team. We ship every day, and ever
 
 ## Get started
 
+Force Store is sold as a **managed e-commerce service** — every client gets a custom proposal based on the features they need, not a self-serve subscription. To start:
+
 - **See it live:** [wadyaljuz.com](https://wadyaljuz.com) (our flagship Kuwait merchant — 235 products, 8 categories, full bilingual)
-- **Admin demo:** [app.forcemediakw.com](https://app.forcemediakw.com)
-- **Pricing:** see [04-pricing-tiers.md](04-pricing-tiers.md)
-- **Compare:** see [03-competitive-positioning.md](03-competitive-positioning.md) for Shopify / Salla / Wix Kuwait comparison
-- **Talk to us:** [forcemediakw.com/contact](https://forcemediakw.com/contact)
+- **Talk to us:** [forcemediakw.com/contact](https://forcemediakw.com/contact) — we'll schedule a 30-minute call to understand your needs and send you a written proposal within 2-3 business days
+- **Compare:** see [03-competitive-positioning.md](03-competitive-positioning.md) for honest comparison vs Shopify / Salla / Wix Kuwait
+- **Feature catalog:** [02-feature-catalog.md](02-feature-catalog.md) — the full list of what's available before we talk
+
+Typical onboarding from contract signing to live store: **2-4 weeks** depending on catalog size and brand readiness.

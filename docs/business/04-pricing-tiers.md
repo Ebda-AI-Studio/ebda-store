@@ -1,16 +1,44 @@
-# Force Store — Pricing Decision Framework
+# Force Store — Proposal Pricing Framework
 
 **Internal document. Last updated: 2026-05-22. Owner: Ahmad Sharaf / Force AI.**
 
-> Pricing tiers + onboarding flow are Ahmad's call to design. This doc holds the **inputs** — cost floors, competitor benchmarks, FEATURE_REGISTRY tier annotations, payment-provider economics, market context — so the synthesis step is grounded in data, not hunch.
+> **There is no public tier list.** Force Store is sold as a **managed e-commerce platform** by Force AI / Force Media. Every client gets a **custom proposal** based on the features they need. Pricing is per-client, not per-tier. This doc holds the inputs you need to write good proposals — cost floors, feature value bands, competitor benchmarks.
 
 ---
 
-## 1. Inputs for pricing decisions
+## 1. How Force Store actually sells
 
-### 1a. Cost-floor math (from the 2026-05-22 audit)
+Per Ahmad's standing 2026-05-22 description:
 
-From `docs/audits/_slices/06-cost-forecast.md`:
+1. **Client comes to Force AI** (usually through Force Media agency relationships, referrals, or inbound contact)
+2. **Sees the contract** — full list of features Force Store offers
+3. **You write a proposal** — pick the features the client needs, set a price, send the contract
+4. **Client pays** — typically upfront or 50/50 split (deposit + on-completion)
+5. **Onboarding begins** — you ask for:
+   - Brand assets (logo, colors, fonts, hero images)
+   - Excel file with categories, product names + AR translations, descriptions + AR translations, prices, images
+   - Domain (or you provision via Vercel)
+   - Payment provider setup (Tap/MyFatoorah/Hesabe/UPayments account creation if needed)
+6. **You enable features via super_admin** — flip the per-store flags in `StoreFeature` for whatever the client signed and paid for
+7. **Store goes live**
+
+There's no self-serve signup. There's no monthly tier list on a public pricing page. Every deal is a custom contract.
+
+**Why this model fits Force AI today:**
+
+- **No CBK licensing risk** — you're not aggregating payments, each merchant has their own provider account
+- **No race-to-the-bottom pricing** — Salla/Shopify can publish a $39/mo Basic, you don't compete on that axis
+- **Custom feature bundles** — clients pay for what they need, not for a marketing-driven tier
+- **Premium positioning** — agency-led delivery commands agency-level fees
+- **Less product engineering** — no signup flow, no billing dashboard, no Tap Subscriptions integration needed
+
+---
+
+## 2. Inputs for writing a proposal
+
+### 2a. Cost-floor math (from the 2026-05-22 audit)
+
+What it costs YOU per merchant per month on infrastructure:
 
 | Scale                      | Infra cost/mo | Per-merchant cost | Cost floor (3× loaded) | Cost floor (5× loaded) |
 | -------------------------- | ------------- | ----------------- | ---------------------- | ---------------------- |
@@ -18,223 +46,220 @@ From `docs/audits/_slices/06-cost-forecast.md`:
 | 10k MAU / 100 merchants    | ~$171         | **$1.71**         | $5.13                  | $8.55                  |
 | 100k MAU / 1,000 merchants | ~$1,100       | **$1.10**         | $3.30                  | $5.50                  |
 
-**What this means:** the loaded floor (3-5× infra cost) gives you the minimum sustainable per-merchant pricing at scale. Anything above this is gross margin. Below this and merchant churn cross-subsidies become structural debt.
+**Use this to:** never quote a monthly maintenance fee below the loaded cost floor. Today, anything under ~$40/mo is unprofitable. At 100 merchants, $9/mo is the floor.
 
-**Most expensive cost line at scale:** Resend email overage (~$515/mo at 100k MAU if every merchant sends 600 emails/day). Architectural fix before 500 active merchants: per-merchant SMTP provider (each store routes its own transactional email through their own Resend/Mailgun account).
+**One-off vs recurring split in proposals:**
 
-### 1b. Competitor benchmarks (Kuwait/GCC market, 2026)
+- **Setup fee** (one-off) — your time onboarding the client (data import, branding setup, theme configuration, training). Recommended: 200-1000 KWD depending on complexity.
+- **Monthly platform fee** — covers infra + ongoing support + AI quotas + new features as they ship. Recommended: above the loaded cost floor + your margin.
 
-| Competitor                          | Equivalent tier | Monthly price         | KNET?                     | Bilingual?                                         | AI?                                  |
-| ----------------------------------- | --------------- | --------------------- | ------------------------- | -------------------------------------------------- | ------------------------------------ |
-| **Shopify Basic** (Kuwait)          | Entry           | $39 USD + 2% GMV      | Via 3rd-party plugin only | Translate & Adapt app (now free, 100k char/yr cap) | Shopify Magic, EN-only on paid plans |
-| **Shopify Advanced** (Kuwait)       | Mid             | $299 USD + 0.5% GMV   | Same plugin route         | Same                                               | Same                                 |
-| **Shopify Plus**                    | Top             | $2,300 USD/mo base    | Same                      | Same                                               | Same                                 |
-| **Salla Starter** (Saudi-first)     | Entry           | ~$22 USD (SAR 79)     | Mada native, KNET weak    | Arabic-first                                       | None                                 |
-| **Salla Pro**                       | Mid             | ~$130 USD (SAR 479)   | Same                      | Same                                               | None                                 |
-| **Wix eCommerce Standard**          | Entry           | $27 USD               | Via 3rd-party             | EN-first, AR via plugin                            | None                                 |
-| **Wix eCommerce Premium**           | Mid             | $59 USD               | Same                      | Same                                               | None                                 |
-| **WooCommerce + hosting + plugins** | Self-managed    | $30-100 USD effective | Plugin (WooCommerce KNET) | Plugin (WPML $99/yr)                               | None                                 |
+### 2b. Competitor benchmarks (what client says they're comparing against)
 
-**Source URLs:** Shopify pricing page, Salla pricing page, Wix Kuwait pricing, WooCommerce hosting estimates — all captured 2026-05-22 by the competitive-positioning subagent. Confirm before any pricing announcement.
+| Competitor              | Equivalent monthly fee                                     | Notes                       |
+| ----------------------- | ---------------------------------------------------------- | --------------------------- |
+| Shopify Basic Kuwait    | $39 USD + 2% GMV + ~$20 translation app + ~$10 KNET plugin | Real all-in ~$80/mo USD     |
+| Shopify Advanced Kuwait | $299 USD + 0.5% GMV + apps                                 | Real all-in $350-450/mo USD |
+| Salla Starter           | ~$22 USD (SAR 79)                                          | Saudi-first, no KNET native |
+| Salla Pro               | ~$130 USD (SAR 479)                                        | Same, no built-in AI        |
+| Wix eCommerce           | $27-59 USD                                                 | Limited Arabic support      |
+| WooCommerce + agency    | $5-15k upfront + $200-500/mo maintenance                   | Self-managed risk           |
 
-**Pricing white space (where Force Store can land profitably):**
+**Use this to:** anchor against the competitor the client cites. Most Kuwait merchants compare against Shopify or are evaluating "do I just hire a developer for WooCommerce?" — the agency-managed Force Store sells against both.
 
-- **Below $30/mo** — possible but compresses margin to ~3× at 10k MAU. Worth it only as a deliberate land-grab strategy with Series A funding behind it. Not recommended at current scale.
-- **$30-100/mo** — the sweet spot. Comparable to Shopify Basic + translation app + KNET plugin total cost, undercut Salla Pro, beat WooCommerce TCO when factoring developer maintenance.
-- **$100-300/mo** — Professional tier zone. Anchor against Shopify Advanced ($299 + 0.5% GMV) which is what your Kuwait merchant prospects compare you to most.
-- **Above $300/mo** — Enterprise / custom contracts. White-label, multi-store, dedicated support territory.
+### 2c. Feature value bands (what to charge for each feature group in a proposal)
 
-### 1c. FEATURE_REGISTRY tier annotations
+The 22-feature `FEATURE_REGISTRY` in `packages/shared/src/features.ts` falls into 4 value bands when building a custom proposal:
 
-From `packages/shared/src/features.ts` (22 features as of 2026-05-21):
+#### Band 1 — Always included (always on, no upcharge)
 
-| Feature key           | Tier         | Category   | Status                | Notes                                            |
-| --------------------- | ------------ | ---------- | --------------------- | ------------------------------------------------ |
-| `coupons`             | core         | commerce   | Live                  | Should be in every paid tier                     |
-| `loyalty`             | **addon**    | commerce   | Live                  | Natural upsell — Professional+                   |
-| `returns`             | core         | commerce   | Live                  | Every paid tier                                  |
-| `reviews`             | core         | commerce   | Live                  | Every paid tier (Free OK too)                    |
-| `inventory`           | core         | commerce   | Live                  | Every paid tier                                  |
-| `tax`                 | core         | commerce   | Live                  | Every paid tier                                  |
-| `bulk_operations`     | core         | operations | Live                  | Starter+                                         |
-| `customer_wallet`     | experimental | commerce   | Hidden                | Don't price yet                                  |
-| `upsell_crosssell`    | **addon**    | commerce   | Live                  | Natural upsell — Professional+                   |
-| `whatsapp`            | **addon**    | marketing  | Live (via WBS)        | Premium — Professional+                          |
-| `sms`                 | **addon**    | marketing  | Live                  | Premium — Professional+                          |
-| `push_notifications`  | **addon**    | marketing  | Live                  | Mid — Starter+ or Pro+ depending on positioning  |
-| `email_campaigns`     | experimental | marketing  | Hidden                | Don't price yet                                  |
-| `abandoned_cart`      | core         | marketing  | Live                  | Starter+                                         |
-| `affiliate`           | **addon**    | marketing  | Live                  | Premium — Professional+                          |
-| `marketing_pixels`    | core         | marketing  | Live                  | Starter+                                         |
-| `shipping_carriers`   | core         | operations | Live                  | Starter+                                         |
-| `staff_accounts`      | experimental | operations | Hidden                | Don't price yet                                  |
-| `pwa`                 | core         | storefront | Live                  | Free+                                            |
-| `seo`                 | core         | storefront | Live (platform-level) | Always on                                        |
-| `search_autocomplete` | core         | storefront | Live (platform-level) | Always on                                        |
-| `floating_widget`     | **addon**    | engagement | Live (2026-05-21)     | Differentiator — could lead with this in Starter |
+- `coupons`, `returns`, `reviews`, `inventory`, `tax`, `pwa`, `seo`, `search_autocomplete`, `marketing_pixels`, `shipping_carriers`, `bulk_operations`, `abandoned_cart`
 
-**6 addon-tier features** are your tier-gate decision points: `loyalty`, `upsell_crosssell`, `whatsapp`, `sms`, `affiliate`, `floating_widget`. Each one merits a tier-mapping decision.
+These are platform-default. Every Force Store client gets them. Don't bother itemizing in a proposal — they're table stakes.
 
-### 1d. Payment processing economics
+#### Band 2 — Premium add-ons (charge separately)
 
-**Payment processing model is Ahmad's call** (per 2026-05-22 standing instruction). Two viable models:
+| Feature              | Value framing                                                | Recommended proposal price band                         |
+| -------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
+| `loyalty`            | "Customer loyalty program — points, tiers, rewards"          | Setup: 100-300 KWD + Monthly: 5-15 KWD                  |
+| `affiliate`          | "Run an affiliate program — let influencers earn % per sale" | Setup: 100-200 KWD + Monthly: 5-10 KWD                  |
+| `whatsapp`           | "Order notifications via WhatsApp (4 templates)"             | Setup: 50-150 KWD + Monthly: 3-10 KWD                   |
+| `sms`                | "Order updates via SMS (Kuwait carriers)"                    | Setup: 50-150 KWD + Monthly: 3-10 KWD + SMS-per-message |
+| `push_notifications` | "Web push to opt-in customers"                               | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
+| `upsell_crosssell`   | "AI-driven product recommendations + bundles"                | Setup: 50-100 KWD + Monthly: 3-10 KWD                   |
+| `floating_widget`    | "Sticky WhatsApp/Instagram/music button"                     | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
 
-- **Managed-setup model** — Force Media negotiates payment provider accounts (Tap, MyFatoorah, Hesabe, UPayments) on each merchant's behalf. Credentials configured in the merchant's Force Store admin. Money flows direct: customer → merchant's own provider account → merchant's bank. Force Store collects subscription only; no GMV cut. No CBK licensing required.
-- **Aggregator model** — Force AI uses one master payment provider account. Customer pays Force AI → Force AI holds funds → periodic payout to merchant minus subscription + GMV cut. Requires CBK financial services licensing, AML/KYC compliance, reserve obligations against chargebacks. Codebase changes: refactor per-store credentials to platform-level + add payout/balance/reserve modules.
+These are the **upgrade levers** during a proposal conversation. A merchant wanting WhatsApp + Loyalty + Affiliate adds ~250-500 KWD setup + ~13-35 KWD/month to the base.
 
-Decision affects:
+#### Band 3 — White-glove services (your time, billed at agency rates)
 
-- Pricing model (subscription-only vs subscription + GMV cut)
-- Regulatory exposure (none vs CBK-licensed financial services entity)
-- Codebase changes (none vs significant refactor)
-- Sales pitch ("you keep 100% of every sale" vs "we handle everything")
+| Service                                                          | Recommended price band             |
+| ---------------------------------------------------------------- | ---------------------------------- |
+| Catalog import (per 100 products)                                | 50-100 KWD                         |
+| Bilingual translation review (per 100 products with AI-pre-fill) | 30-60 KWD                          |
+| Custom theme tweaks                                              | 200-500 KWD per round              |
+| Brand identity work (if Force Media does it)                     | 500-2000 KWD                       |
+| Photoshoot / product photography                                 | varies, refer to Force Media rates |
+| Marketing campaign setup (Meta/Google ads)                       | varies, refer to Force Media rates |
 
-Standard 2026 KNET/card rates (provider direct, applies to both models):
+#### Band 4 — Custom dev (escalation, rarely)
 
-| Provider   | KNET  | Visa/MC domestic | International |
-| ---------- | ----- | ---------------- | ------------- |
-| MyFatoorah | 2.0%  | 3.5%             | 3.5%+         |
-| Tap        | 2.75% | 2.75%            | 3.25% + FX    |
-| Hesabe     | ~2.5% | ~3.5%            | —             |
-| UPayments  | ~2.5% | ~3.0%            | —             |
+| Custom request                                               | Pricing posture                                        |
+| ------------------------------------------------------------ | ------------------------------------------------------ |
+| Custom payment provider integration (beyond the 4 supported) | Custom quote — 1500+ KWD setup                         |
+| Custom storefront design (outside the 5 themes)              | Custom quote — usually decline or refer to Force Media |
+| API access for client's external systems                     | Custom quote — 500+ KWD setup + monthly access fee     |
+| Multi-store under one account                                | Custom quote — pre-codebase support, 2000+ KWD setup   |
 
-### 1e. Kuwait market context
+Custom dev requests are where Force AI margin is highest BUT also where scope creep risk is highest. Have a fixed-scope contract before starting.
 
-- Kuwait psychological pricing: round KWD numbers (5, 10, 15, 20, 50, 100) read as "thought through"; numbers like KWD 13 or KWD 47 suggest discount framing.
-- USD pricing matters for the international/expat merchant segment + future GCC expansion.
-- Annual prepay discount is standard in Kuwait B2B SaaS — typically 2 months free (effectively ~17% off).
-- Switching-discount offers ("migrate from Shopify, get 50% off 3 months") are a documented Kuwait merchant acquisition tool.
+### 2d. Payment processing economics (no GMV cut from you)
 
-### 1f. Onboarding-driven tier-design notes
+Per Ahmad's standing 2026-05-22 instruction — **payments are handled by Ahmad/Force Media** as part of the onboarding service:
 
-Ahmad will design onboarding himself. For pricing-tier design context only:
+- You help the client get a Tap, MyFatoorah, Hesabe, or UPayments account if they don't have one
+- The merchant's payment provider credentials are configured in their Force Store admin
+- Money flows direct from customer → merchant's payment provider account → merchant's bank
+- Force Store doesn't touch the funds
+- No CBK licensing required
 
-- **Free tier conversion event** — the moment a merchant connects a payment provider OR attaches a custom domain. Both are "I'm taking real money" signals. Free tier must NOT include these unless conversion strategy demands it.
-- **Free tier anti-abuse** — dormant stores (no orders 60+ days) flagged as inactive after 7-day warning email. Prevents parked-domain inflation of infra costs.
-- **14-day Pro trial vs 14-day Starter trial** — Pro trial is a more compelling conversion tool because it lets merchants experience the addon features (loyalty, affiliate, WhatsApp) they'd be paying extra for. Starter trial converts at a lower rate but is more honest about what most merchants need long-term.
+What Force Store charges the merchant:
 
----
+- One-off setup fee (your time onboarding)
+- Monthly platform fee (recurring)
+- Optional add-ons (paid per feature unlocked)
 
-## 2. The tier-structure decision (Ahmad's call)
+The merchant pays payment provider fees (2-3.5% per transaction) directly to Tap/MyFatoorah/etc. You don't take a cut of those.
 
-### Recommended structure (Ahmad to fill in pricing + final feature mapping)
+This is the **managed-setup payment model** documented earlier — it stays clean from a regulatory standpoint and the merchant keeps 100% of every sale (minus what their gateway charges them).
 
-| Tier             | Price (KWD/USD) | Target merchant                       | Key feature unlock                                    | Hard limits    |
-| ---------------- | --------------- | ------------------------------------- | ----------------------------------------------------- | -------------- |
-| **Free**         | 0               | Hobbyist, pre-launch                  | All core features, no live payments                   | [TBD by Ahmad] |
-| **Starter**      | [TBD]           | Real selling, single store            | Custom domain + KNET + all themes                     | [TBD by Ahmad] |
-| **Professional** | [TBD]           | Established + team + marketing        | + WhatsApp / Loyalty / Affiliate / Upsell-Crosssell   | [TBD by Ahmad] |
-| **Enterprise**   | [TBD]           | High-volume, multi-store, white-label | + Multi-store, dedicated support, custom integrations | Unlimited      |
+### 2e. Kuwait market context for proposal-writing
 
-### Decision inputs Ahmad should consult
-
-1. **Cost floor** — keep all tiers above the 5× loaded cost line from §1a (Starter ≥ $8.55/mo at 10k MAU, Pro/Enterprise above proportionally).
-2. **Competitor anchor** — Professional tier is the **most important price** because that's where Kuwait merchants compare you against Shopify Advanced ($299/mo). Beat that price by a clear margin and the value differential (KNET + AI + Arabic) closes the sale.
-3. **Addon tier feature mapping** — 6 addon features in FEATURE_REGISTRY. Decide whether each unlocks at Starter, Pro, or Enterprise. The decision drives upgrade pressure.
-4. **Annual prepay discount** — standard is 2 months free. Worth offering at launch as a cash-flow + churn-reduction mechanism.
-5. **Migration discount** — Shopify/Wix/Salla switchers are a real Kuwait acquisition channel. 50% off 3 months is a documented industry move.
+- **Kuwait merchants negotiate.** Expect 10-30% pushback on first quote. Build that into your initial number.
+- **Round numbers anchor better** (50, 100, 250, 500, 1000 KWD) than precise ones (47, 113, 287)
+- **Annual prepay discount is expected** — typical 10-20% off if they prepay 12 months
+- **Q4 / Ramadan** (peak shopping seasons) — merchants are more price-sensitive at quote time but less likely to churn after launch
+- **Bilingual proposals** — if the client speaks Arabic, send the proposal in both languages. Force Media has a template you can adapt.
 
 ---
 
-## 3. Add-on pricing (separate from tier subscription)
+## 3. Sample proposal structures (illustrative — your actual numbers may vary)
 
-Features merchants might want individually without upgrading tier:
+### Basic merchant (single store, 50-200 products, no addons)
 
-| Add-on                                           | Recommended price band | Rationale                                                                         |
-| ------------------------------------------------ | ---------------------- | --------------------------------------------------------------------------------- |
-| Extra custom domain                              | KWD 2-5/mo per domain  | Vercel auto-provision cost = ~$0; price for value                                 |
-| AI quota bump (10× daily cap)                    | KWD 5-15/mo            | Gemini paid is $0.10/1M input + $0.40/1M output — even heavy use is $5-15/mo cost |
-| Dedicated support (4hr response SLA)             | KWD 10-30/mo           | Manual support time cost                                                          |
-| White-label storefront (no Force Store branding) | KWD 20-50/mo           | Brand equity loss premium                                                         |
-| API access (for custom integrations)             | KWD 10-30/mo           | API stability commitment + support burden                                         |
+```
+Setup fee: 500 KWD (one-off)
+  - Brand setup (logo, colors, hero images)
+  - Catalog import (up to 200 products, bilingual)
+  - Theme configuration
+  - Payment provider setup
+  - Custom domain provisioning
+  - 1-hour live training session
 
-Final add-on prices: Ahmad's call.
+Monthly platform fee: 50 KWD/mo
+  - Hosting, bandwidth, SSL
+  - All Band 1 (core) features
+  - Bilingual AI translation (within quota)
+  - Email order confirmations
+  - Standard support (email, 24hr response)
+  - Updates + new features as we ship them
+  - 3 staff accounts
 
----
+Annual prepay discount: 2 months free (effectively 17% off)
+Annual total: 1100 KWD (500 setup + 600 / 12 mo @ 50)
+```
 
-## 4. Annual billing + discount structure
+### Mid-market merchant (single store, 500+ products, addons)
 
-**Standard recommendation:**
+```
+Setup fee: 1000 KWD (one-off)
+  - Everything in Basic
+  - + Loyalty program configuration
+  - + WhatsApp templates (4 events) — incl. WBS bridge setup
+  - + Affiliate program setup
+  - + 2-hour live training session
 
-- Monthly billing: tier price × 12
-- Annual prepay: tier price × 10 (i.e. 2 months free, ~17% discount)
-- Quarterly billing: tier price × 12 (no discount — billed in advance)
+Monthly platform fee: 100 KWD/mo
+  - Everything in Basic
+  - + WhatsApp order notifications
+  - + Loyalty program
+  - + Affiliate tracking
+  - + Push notifications
+  - + Upsell/cross-sell recommendations
+  - Priority support (email + WhatsApp, 4hr response)
+  - 10 staff accounts
 
-**Why annual matters:**
+Annual prepay discount: 2 months free
+Annual total: 2200 KWD (1000 setup + 1200 / 12 mo @ 100)
+```
 
-- Cash flow buffer for Force AI in pre-Series A stage
-- Lower churn (merchant has prepaid; not re-evaluating monthly)
-- Standard Kuwait B2B SaaS expectation
+### Enterprise / high-volume (custom)
 
----
+Each enterprise prospect gets a fully custom contract. Typical contract value:
 
-## 5. Free trial + money-back
+- Setup: 2000-5000+ KWD (white-label, custom integrations, dedicated infrastructure setup)
+- Monthly: 250-500+ KWD (multi-store, dedicated support, SLA, white-label)
 
-**Recommended (Ahmad's call):**
-
-- 14-day trial of Professional tier (NOT Starter) — sells the addon features that are the upgrade pressure
-- No credit card required to start trial
-- At end of trial: merchant chooses Starter/Pro/Enterprise OR drops to Free (data preserved 30 days)
-- Money-back: 30-day full refund on any tier if merchant cancels in first 30 days (rare in B2B SaaS but reduces switching friction from Shopify)
-
-**Anti-abuse:**
-
-- One trial per merchant identity (verify via email + phone + payment provider check on activation)
-- Trial cannot include extra add-ons
-- Trial does not include white-label or API access (Enterprise-only add-ons)
-
----
-
-## 6. Migration / switcher discounts
-
-**Recommended:**
-
-- 50% off Professional tier for first 3 months, for verified switchers from Shopify, Wix, Salla, Zid, or WooCommerce
-- Proof: screenshot of prior platform billing within last 90 days
-- Funnel: drives Kuwait merchants in the Force Media network who already use Shopify → Force Store
-
-**Why migration discount is worth it:**
-
-- Acquisition cost in Kuwait via paid social is ~$50-200 per active merchant
-- A 50%-off-3-months discount on a $50-100 Pro tier is $75-150 forgone — comparable acquisition cost with much higher intent (merchant is actively switching, not browsing)
+**Do not publish enterprise pricing.** Negotiate based on the client's specific needs + alternatives.
 
 ---
 
-## 7. Revenue projection (illustrative — final numbers depend on Ahmad's pricing)
+## 4. Common objections + responses
 
-Assuming a moderate pricing curve at the 3-4× loaded cost floor:
-
-| Stage  | Merchants    | Avg ARPU | MRR   | ARR   | Infra cost | Gross margin |
-| ------ | ------------ | -------- | ----- | ----- | ---------- | ------------ |
-| Today  | 2            | [n/a]    | [n/a] | [n/a] | $26/mo     | n/a          |
-| Year 1 | 100          | [TBD]    | [TBD] | [TBD] | $170/mo    | [TBD]        |
-| Year 3 | 1,000        | [TBD]    | [TBD] | [TBD] | $1,100/mo  | [TBD]        |
-| Year 5 | 10,000 (GCC) | [TBD]    | [TBD] | [TBD] | $11,000/mo | [TBD]        |
-
-Use this template to model revenue at Ahmad's chosen price points. At any pricing above the 3× loaded cost floor, gross margin stays >70% at scale.
+| Objection                                              | Response                                                                                                                                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Shopify is only $39/mo"                               | "Shopify is $39 + a $20 translation app + a 3rd-party KNET plugin + you still need someone to set it up. The all-in cost is $80-150/mo for what you'd get from us in one bill, fully managed."                                        |
+| "Salla is cheaper at SAR 99"                           | "Salla is built for Saudi Arabia. KNET works but is not the primary integration. AR is the only storefront language. If you sell to Kuwait specifically and want English-speaking customers too, Force Store is built for that case." |
+| "Can I do month-to-month?"                             | "Yes, but we offer 2 months free on annual prepay — most clients pick that. Month-to-month is fine for the first 3 months while you decide."                                                                                          |
+| "What if I want to leave?"                             | "Your data is yours. We export everything as CSV/Excel. Your custom domain transfers back to your registrar. We give you 30 days of read-only access after cancellation to download anything you need."                               |
+| "What about my customer reviews / orders / customers?" | "All exportable. We use standard formats — you can import them into Shopify, Wix, or anywhere else."                                                                                                                                  |
+| "Why do I need an annual contract?"                    | "You don't — we offer monthly too. The annual contract saves you 2 months of fees and locks in your current pricing if our rates change."                                                                                             |
 
 ---
 
-## 8. Pricing announcement checklist (when Ahmad commits)
+## 5. Proposal-writing checklist
 
-When you finalize prices, update these files in the same commit:
+Before sending a proposal:
 
-- [ ] `04-pricing-tiers.md` (this doc) — replace every `[TBD]` with the final number + rationale paragraph
-- [ ] `05-pitch-deck-outline.md` slide 8 + slide 9 — replace `[TBD]` placeholders
-- [ ] `06-faq.md` — replace `[TBD]` in the "How much does it cost?" answer
-- [ ] `01-overview.md` — verify no specific dollar amount needs updating (currently links to this doc for pricing)
-- [ ] Public-facing landing page (when it exists) — copy the announced prices
-- [ ] Billing flow + admin signup wizard — wire `StorePlan` enum to billing provider (Tap Subscriptions or MyFatoorah recurring)
-- [ ] Sales scripts / call playbooks — update talking points
-
-The bundle stays consistent only if all 7 surfaces get the new numbers in one push.
+- [ ] Confirm the merchant's product count (drives catalog import cost)
+- [ ] Confirm bilingual needs (EN-only, AR-only, or both)
+- [ ] Confirm payment provider (Tap / MyFatoorah / Hesabe / UPayments) — set up account if they don't have one
+- [ ] Confirm custom domain availability (or provision a Force Store subdomain)
+- [ ] Identify which Band 2 add-ons they want (Loyalty / Affiliate / WhatsApp / etc.)
+- [ ] Identify any Band 3 white-glove services they need (catalog import, photoshoot, branding)
+- [ ] Identify any Band 4 custom dev — if yes, fixed-scope contract addendum
+- [ ] Setup fee = ABOVE your time cost + reasonable margin
+- [ ] Monthly fee = ABOVE the loaded cost floor (currently ~$40 USD / 12 KWD at small scale)
+- [ ] Annual prepay discount included (2 months free)
+- [ ] Contract terms: deposit %, completion %, cancellation policy, data export commitment
+- [ ] Bilingual proposal if client speaks Arabic
 
 ---
 
-## 9. Companion documents
+## 6. Operational discipline (what you do after the client pays)
 
-- [`02-feature-catalog.md`](02-feature-catalog.md) — full feature inventory (informs which features land in which tier)
-- [`03-competitive-positioning.md`](03-competitive-positioning.md) — TCO comparison vs Shopify/Salla/Wix (drives competitor anchoring)
-- [`05-pitch-deck-outline.md`](05-pitch-deck-outline.md) — sales pitch (must match pricing decisions)
-- [`docs/audits/_slices/06-cost-forecast.md`](../audits/_slices/06-cost-forecast.md) — full per-service cost forecast at scale
+1. **Generate the store** — use the super_admin store-creation flow
+2. **Enable features** — flip `StoreFeature` rows for everything the client paid for
+3. **Set tier internally** — set `Store.plan` enum to whichever value tracks this client best (you control the meaning of `free` / `starter` / `professional` / `enterprise` internally; clients never see this)
+4. **Configure payment provider** — set up Tap/MyFatoorah/Hesabe/UPayments credentials per the client's account
+5. **Onboard the client** — branding, catalog import (Excel → Force Store), theme config, training session
+6. **Verify it works** — place a test order, verify webhooks fire, verify order confirmation email arrives
+7. **Hand over** — give the client admin credentials, schedule the training session, schedule a 2-week check-in
+
+---
+
+## 7. What this doc is NOT
+
+- **Not a public pricing page.** No version of this is published. Clients get a custom proposal, not a tier list.
+- **Not a feature paywall enforcement reference.** That logic is in `StoreFeature` table + per-route `feature-gate.ts` middleware.
+- **Not a contract template.** Use Force Media's existing legal templates for the actual contract; this doc informs the dollar amounts in the contract.
+- **Not exposed to the codebase.** Future engineers don't need to read this — pricing decisions live in your head + the proposals you send, not in code.
+
+---
+
+## 8. Companion documents
+
+- [`02-feature-catalog.md`](02-feature-catalog.md) — feature inventory (informs what's available in a proposal)
+- [`03-competitive-positioning.md`](03-competitive-positioning.md) — competitor comparison (informs objection-handling)
+- [`05-pitch-deck-outline.md`](05-pitch-deck-outline.md) — sales pitch (for first conversations, before proposal)
+- [`docs/audits/_slices/06-cost-forecast.md`](../audits/_slices/06-cost-forecast.md) — full infra cost forecast (sets your cost floor)
 - [`packages/shared/src/features.ts`](../../packages/shared/src/features.ts) — FEATURE_REGISTRY source of truth

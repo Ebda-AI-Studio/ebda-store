@@ -90,7 +90,7 @@ Provider fees are paid by you to your provider (not to Force Store). Typical 202
 | Hesabe     | ~2.5% | ~3.5%            | —             |
 | UPayments  | ~2.5% | ~3.0%            | —             |
 
-Whether Force Store takes a cut of GMV is a launch-time decision pending — see [04-pricing-tiers.md §1d](04-pricing-tiers.md). Subscription is the primary revenue model regardless.
+**Force Store does not take a cut of your sales.** Your contract is a fixed setup fee + monthly platform fee. Payment provider fees (2-3.5% per transaction) go directly from your customer to your payment gateway — not through us.
 
 ### Can I use Stripe?
 
@@ -106,45 +106,56 @@ Yes — toggle COD on per store. We track it as a payment method and your delive
 
 ### How much does it cost?
 
-See [04-pricing-tiers.md](04-pricing-tiers.md) for the full breakdown. Quick summary:
+**Force Store is sold as a managed service with a custom proposal per client** — not a self-serve subscription with a public price list. Pricing depends on:
 
-- **Free** — for testing (1 store, 10 products)
-- **Starter** — [TBD] — single-merchant, custom domain, KNET, all 5 themes
-- **Professional** — [TBD] — adds AI bulk sweeps, WhatsApp orders, loyalty, affiliates
-- **Enterprise** — [TBD] — multi-store, white-label, dedicated support, custom integrations
+- How many products you have (catalog size affects onboarding cost)
+- Whether you need bilingual translation (EN/AR — usually yes for Kuwait)
+- Which add-on features you want (Loyalty / Affiliate / WhatsApp orders / Push / etc.)
+- Whether Force Media also handles branding / photography / marketing for you
+- Your sales volume expectations (drives feature recommendations)
 
-Final prices announced at launch — contact us for current pricing.
+**How to get a real quote:** [contact us](mailto:hello@forcemediakw.com) with a short description of your business. We'll send a custom proposal within 2-3 business days. Most Kuwait SMBs land in the **[setup fee 500-1,000 KWD] + [monthly 50-150 KWD]** range, but every contract is custom.
 
-Annual prepay gets 2 months free.
+**No hidden fees:** the proposal you sign is the price you pay. Payment provider fees (Tap/MyFatoorah/Hesabe/UPayments charge 2-3.5% per transaction) go directly to your gateway — Force Store doesn't take a cut.
+
+Annual prepay typically saves 2 months of fees.
 
 ### Are there any hidden fees?
 
-No. The subscription covers:
+No. Your signed proposal is the price you pay. Each proposal covers:
 
 - Hosting + bandwidth
-- All AI features (within generous monthly quotas)
+- All AI features included in your contract (within agreed quotas)
 - Custom domain (auto-provisioned)
 - SSL certificate
 - Email sending (transactional — order confirmations, password resets)
 - Updates + new features as we ship them
+- Support per the SLA in your contract
 
 You pay separately for:
 
-- Your KNET payment provider (Tap/MyFatoorah/etc.) — their fees, paid to them
+- Your KNET payment provider (Tap/MyFatoorah/Hesabe/UPayments) — their fees, paid to them directly
 - Your domain registration (e.g. $12/yr at GoDaddy for yourshop.com)
 
 That's it.
 
-### Can I switch plans later?
+### Can I add features later?
 
-Yes. Upgrade any time. Downgrade at the end of your current billing period (we pro-rate annual plans). No long-term contracts.
+Yes — features can be added to your contract at any time. Common upgrades after launch:
+
+- Loyalty program — when you're ready to add a customer-rewards motion
+- Affiliate program — when you have influencers / partners
+- WhatsApp order notifications — typically requested in month 2-3
+- Multiple stores — when expanding to a second brand or location
+
+We'll send an updated proposal for the additions; the change applies the same billing cycle.
 
 ### Do you offer discounts?
 
-- **Annual prepay:** 2 months free (effectively ~17% discount)
-- **Migration discount:** 50% off first 3 months if you migrate from Shopify, Wix, Salla, or WooCommerce (we ask for the prior platform's billing screenshot as proof)
-- **Multiple stores:** progressive discount on Enterprise tier for 2+ stores
-- **Non-profit / educational:** contact us for case-by-case pricing
+- **Annual prepay:** typically save ~2 months of monthly fees if you prepay 12 months
+- **Migration discount:** if you're migrating from Shopify, Wix, Salla, or WooCommerce — ask us for the switcher discount during your proposal call
+- **Multiple stores:** discounts for clients running 2+ stores under one account
+- **Non-profit / educational:** case-by-case — ask
 
 ---
 

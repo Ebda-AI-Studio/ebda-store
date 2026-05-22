@@ -101,22 +101,33 @@ Visual: 2 merchant logos + 4 KPI bubbles.
 
 ## Slide 8 — Business model
 
-**Subscription SaaS.** Payment processing model TBD by Ahmad — see [04-pricing-tiers.md §1d](04-pricing-tiers.md).
+**Managed e-commerce platform delivered as an agency service.** Custom proposal per client — no public tier list.
 
-- **Free tier** — 1 store, 10 products, Force Store branding — for merchants testing the waters
-- **Starter** — [KWD/USD TBD] — 1 store, 500 products, custom domain, KNET, all 5 themes
-- **Professional** — [KWD/USD TBD] — 1 store, unlimited products, AI bulk sweeps, WhatsApp orders, loyalty, affiliates (target: undercut Shopify Advanced with KNET + AI included — the sales anchor)
-- **Enterprise** — [KWD/USD TBD] — multi-store, white-label, dedicated support, custom integrations
+How it works:
 
-Payment processing model is Ahmad's call (managed-setup vs aggregator). Details in [04-pricing-tiers.md §1d](04-pricing-tiers.md).
+1. Client comes to Force AI / Force Media
+2. Sees the feature catalog, picks what they need
+3. Force AI sends a custom proposal (setup fee + monthly platform fee + addon features)
+4. Client signs + pays
+5. Force AI does the onboarding personally — brand setup, catalog import, theme config, training session
+6. Client's store goes live, fully configured
 
-Per-merchant infra cost: $1.71/mo at 10k MAU. Gross margin posture: see [04-pricing-tiers.md](04-pricing-tiers.md) for the cost-floor math and Ahmad's final pricing decisions.
+**Why this model fits Kuwait:**
 
-Annual prepay: 2 months free.
+- Premium positioning matches Force Media's existing agency relationships
+- Custom contracts = no race-to-the-bottom against Salla/Shopify
+- High-touch onboarding builds merchant loyalty + reduces churn
+- Each merchant uses their own payment provider account (no CBK licensing concerns)
 
-Visual: 4-column pricing table with "Most Popular" callout on Professional.
+**Unit economics (per the 2026-05-22 audit):**
 
-(See [04-pricing-tiers.md](04-pricing-tiers.md) for the full breakdown including KWD prices.)
+- Per-merchant infra cost: ~$13/mo today, dropping to ~$1.71/mo at 10k MAU
+- Gross margin >90% on any reasonable per-client contract
+- Setup fees recoup onboarding labor + buffer for first-year margin
+
+**Pricing details:** see [04-pricing-tiers.md](04-pricing-tiers.md) — proposal pricing framework with feature value bands, cost floors, sample proposal structures (basic / mid-market / enterprise).
+
+Visual: a single-frame "how it works" diagram showing the 6-step client journey from inquiry to launch.
 
 ---
 
@@ -131,11 +142,11 @@ Visual: 4-column pricing table with "Most Popular" callout on Professional.
 
 **Realistic SOM (Force Store at maturity):**
 
-- Year 1: 100 merchants × [avg ARPU TBD, Starter-weighted] (Kuwait early-adopter target)
-- Year 3: 1,000 merchants × [avg ARPU TBD, Pro-weighted]
-- Year 5 (GCC expansion): 10,000 merchants × [avg ARPU TBD]
+- Year 1: 25-50 hand-onboarded Kuwait merchants × custom proposal ARPU
+- Year 3: 200-500 merchants × custom proposal ARPU + 1-2 additional onboarding staff
+- Year 5 (GCC expansion): scale via partner agencies in Saudi / UAE / Bahrain referring clients
 
-Per-merchant infra cost ceiling: $1.10/mo at 100k MAU. Whatever pricing Ahmad lands on, gross margin stays >90% on every tier.
+Agency model trades raw merchant count for higher per-client revenue + lower churn. Per-merchant infra cost ceiling: $1.10/mo at 100k MAU — gross margin stays >90% on every contract.
 
 GCC expansion path: add Mada (Saudi) + Benefit (Bahrain) + UAE payment rails → 10× TAM.
 
