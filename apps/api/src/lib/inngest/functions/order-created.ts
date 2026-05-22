@@ -74,11 +74,13 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       orderNumber: order.orderNumber,
       customerName,
       customerEmail: order.customer?.email || guestEmail,
-      items: order.items.map(item => ({
-        name: item.productName,
-        quantity: item.quantity,
-        price: item.price,
-      })),
+      items: (order.items as Array<{ productName: string; quantity: number; price: number }>).map(
+        item => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+        })
+      ),
       subtotal: order.subtotal,
       tax: order.tax,
       shipping: order.shipping,

@@ -471,7 +471,7 @@ export class OrderService {
           logger.info(`Abandoned cart ${abandonedCart.id} recovered by order ${newOrder.id}`);
         }
       } catch (err) {
-        logger.error('Abandoned cart recovery detection failed:', err);
+        logger.error({ err }, 'Abandoned cart recovery detection failed');
         // Never fail order creation
       }
 

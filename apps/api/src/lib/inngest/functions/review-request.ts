@@ -136,7 +136,11 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
       : `https://store.forcemediakw.com/${store.slug}`;
 
     // ── Build per-item review links ────────────────────────────────────────
-    const items = order.items.map(it => {
+    type OrderItemForReview = {
+      productId: string;
+      product: { id: string; name: string; nameAr: string | null; images: unknown };
+    };
+    const items = (order.items as OrderItemForReview[]).map(it => {
       const images = it.product.images;
       const firstImage =
         Array.isArray(images) && images.length > 0
