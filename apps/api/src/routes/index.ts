@@ -39,6 +39,7 @@ import publicStoreLayoutRoutes from './public-store-layout.routes';
 import pagesRoutes from './pages.routes';
 import typographyRoutes from './typography.routes';
 import wbsIntegrationRoutes from './wbs-integration.routes';
+import waTemplatesRoutes from './wa-templates.routes';
 import financeRoutes from './finance.routes';
 import smartLayerRoutes from './smart-layer.routes';
 import insightsRoutes from './insights.routes';
@@ -142,6 +143,9 @@ router.use('/stores', tenantContext, newsletterRoutes);
 
 // WBS integration routes (Force Store ↔ WBS bridge config)
 router.use('/stores', tenantContext, wbsIntegrationRoutes);
+
+// Phase 7: WhatsApp templates admin (generate / sync / status)
+router.use('/stores/:id/wa-templates', tenantContext, waTemplatesRoutes);
 
 // Finance routes (COA tree + general ledger journal)
 router.use('/stores', tenantContext, financeRoutes);

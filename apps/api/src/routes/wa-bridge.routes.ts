@@ -409,4 +409,105 @@ router.post('/cart/redeem', async (req: Request, res: Response) => {
   }
 });
 
+// ─── POST /templates/status ──────────────────────────────────────────────────
+// Phase 7 FWB-driven template sync: WBS calls back here when Meta's
+// message_template_status_update webhook arrives for a template that
+// originated from an FWB-driven submission. Idempotent — same status
+// arriving twice (Meta sometimes redelivers) just refreshes the row.
+
+const templateStatusSchema = z.object({
+  fwbStoreId: z.string().min(1),
+  sourceKey: z.string().nullable().optional(),
+  templateName: z.string().min(1),
+  language: z.string().min(1),
+  status: z.enum(['draft', 'pending', 'approved', 'rejected', 'paused', 'disabled']),
+  rejectionReason: z.string().nullable().optional(),
+  metaTemplateId: z.string().nullable().optional(),
+});
+
+router.post('/templates/status', async (req: Request, res: Response) => {
+  try {
+    const parsed = templateStatusSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ success: false, error: 'INVALID_BODY' });
+      return;
+    }
+    const {
+      fwbStoreId,
+      sourceKey,
+      language,
+      status,
+      rejectionReason,
+      metaTemplateId,
+      templateName,
+    } = parsed.data;
+
+    // Bridge-store auth contract: the X-WBS-API-KEY middleware already mapped
+    // the caller to a store. Refuse if the body's fwbStoreId disagrees —
+    // that would indicate a forged callback from a different merchant's WBS
+    // integration trying to mutate this merchant's templates.
+    if (req.bridgeStore!.id !== fwbStoreId) {
+      logger.warn(
+        { authStoreId: req.bridgeStore!.id, bodyStoreId: fwbStoreId, templateName },
+        '[wa-bridge] templates/status: store mismatch — refusing'
+      );
+      res.status(403).json({ success: false, error: 'STORE_MISMATCH' });
+      return;
+    }
+
+    // sourceKey is mandatory for the upsert path; if WBS didn't include it
+    // we can't route to a specific row.
+    if (!sourceKey) {
+      logger.info(
+        { templateName, language, status },
+        '[wa-bridge] templates/status: no sourceKey — recording but skipping upsert'
+      );
+      res.json({ success: true, recorded: false });
+      return;
+    }
+
+    const existing = await prisma.whatsAppTemplate.findUnique({
+      where: {
+        storeId_sourceKey_language: {
+          storeId: fwbStoreId,
+          sourceKey,
+          language,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      // Status arrived for a template we don't have a local row for — log
+      // and continue. Could be a template submitted directly via the WBS
+      // admin (not FWB-driven) or a stale callback from a deleted store.
+      logger.info(
+        { fwbStoreId, sourceKey, language, status },
+        '[wa-bridge] templates/status: no matching local row — ignored'
+      );
+      res.json({ success: true, recorded: false });
+      return;
+    }
+
+    await prisma.whatsAppTemplate.update({
+      where: { id: existing.id },
+      data: {
+        status,
+        rejectionReason: status === 'rejected' ? rejectionReason || null : null,
+        metaTemplateId: metaTemplateId || undefined,
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    logger.info(
+      { fwbStoreId, sourceKey, language, status },
+      '[wa-bridge] templates/status: row updated'
+    );
+    res.json({ success: true, recorded: true });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, '[wa-bridge] templates/status failed');
+    res.status(500).json({ success: false, error: 'STATUS_CALLBACK_FAILED' });
+  }
+});
+
 export default router;
