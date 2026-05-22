@@ -101,16 +101,16 @@ Visual: 2 merchant logos + 4 KPI bubbles.
 
 ## Slide 8 — Business model
 
-**Subscription SaaS, no GMV cut.**
+**Subscription SaaS.** Payment processing model TBD by Ahmad — see [04-pricing-tiers.md §1d](04-pricing-tiers.md).
 
 - **Free tier** — 1 store, 10 products, Force Store branding — for merchants testing the waters
-- **Starter** — $49/mo (15 KWD) — 1 store, 500 products, custom domain, KNET, all 5 themes
-- **Professional** — $115/mo (35 KWD) — 1 store, unlimited products, AI bulk sweeps, WhatsApp orders, loyalty, affiliates (62% cheaper than Shopify Advanced with KNET included — the sales anchor)
-- **Enterprise** — $325/mo (99 KWD) — multi-store, white-label, dedicated support, custom integrations
+- **Starter** — [KWD/USD TBD] — 1 store, 500 products, custom domain, KNET, all 5 themes
+- **Professional** — [KWD/USD TBD] — 1 store, unlimited products, AI bulk sweeps, WhatsApp orders, loyalty, affiliates (target: undercut Shopify Advanced with KNET + AI included — the sales anchor)
+- **Enterprise** — [KWD/USD TBD] — multi-store, white-label, dedicated support, custom integrations
 
-Payment processing fees pass through to merchant via Tap/MyFatoorah/etc — FWB doesn't take a cut of GMV (CBK licensing risk + sales pitch integrity).
+Payment processing model is Ahmad's call (managed-setup vs aggregator). Details in [04-pricing-tiers.md §1d](04-pricing-tiers.md).
 
-Per-merchant infra cost: $1.71/mo at 10k MAU. Gross margin at Starter $49/mo: ~96%.
+Per-merchant infra cost: $1.71/mo at 10k MAU. Gross margin posture: see [04-pricing-tiers.md](04-pricing-tiers.md) for the cost-floor math and Ahmad's final pricing decisions.
 
 Annual prepay: 2 months free.
 
@@ -131,9 +131,11 @@ Visual: 4-column pricing table with "Most Popular" callout on Professional.
 
 **Realistic SOM (Force Store at maturity):**
 
-- Year 1: 100 merchants × $60 avg (Starter-weighted) = $72K ARR (Kuwait early-adopter target)
-- Year 3: 1,000 merchants × $90 avg (Pro-weighted) = $1.08M ARR
-- Year 5 (GCC expansion): 10,000 merchants × $115 avg = $13.8M ARR
+- Year 1: 100 merchants × [avg ARPU TBD, Starter-weighted] (Kuwait early-adopter target)
+- Year 3: 1,000 merchants × [avg ARPU TBD, Pro-weighted]
+- Year 5 (GCC expansion): 10,000 merchants × [avg ARPU TBD]
+
+Per-merchant infra cost ceiling: $1.10/mo at 100k MAU. Whatever pricing Ahmad lands on, gross margin stays >90% on every tier.
 
 GCC expansion path: add Mada (Saudi) + Benefit (Bahrain) + UAE payment rails → 10× TAM.
 

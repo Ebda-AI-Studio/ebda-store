@@ -90,7 +90,7 @@ Provider fees are paid by you to your provider (not to Force Store). Typical 202
 | Hesabe     | ~2.5% | ~3.5%            | —             |
 | UPayments  | ~2.5% | ~3.0%            | —             |
 
-**Force Store does not take a cut of your sales.** You pay our subscription, that's it.
+Whether Force Store takes a cut of GMV is a launch-time decision pending — see [04-pricing-tiers.md §1d](04-pricing-tiers.md). Subscription is the primary revenue model regardless.
 
 ### Can I use Stripe?
 
@@ -106,12 +106,14 @@ Yes — toggle COD on per store. We track it as a payment method and your delive
 
 ### How much does it cost?
 
-See [04-pricing-tiers.md](04-pricing-tiers.md). Quick summary:
+See [04-pricing-tiers.md](04-pricing-tiers.md) for the full breakdown. Quick summary:
 
-- **Free** — $0/mo — for testing (1 store, 10 products)
-- **Starter** — 15 KWD/mo (~$49/mo)
-- **Professional** — 35 KWD/mo (~$115/mo)
-- **Enterprise** — 99 KWD/mo (~$325/mo)
+- **Free** — for testing (1 store, 10 products)
+- **Starter** — [TBD] — single-merchant, custom domain, KNET, all 5 themes
+- **Professional** — [TBD] — adds AI bulk sweeps, WhatsApp orders, loyalty, affiliates
+- **Enterprise** — [TBD] — multi-store, white-label, dedicated support, custom integrations
+
+Final prices announced at launch — contact us for current pricing.
 
 Annual prepay gets 2 months free.
 
