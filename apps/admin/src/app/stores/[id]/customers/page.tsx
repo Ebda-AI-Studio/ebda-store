@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiFetch } from '../../../../lib/api';
+import { apiGet, apiFetch, unwrapList } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 interface OrderCustomer {
@@ -247,7 +247,7 @@ export default function StoreCustomersPage() {
       )
         .then(({ data }) => {
           if (!data) return;
-          const rows = Array.isArray(data) ? data : ((data as any).data ?? []);
+          const rows = unwrapList<{ customerId: string; segment: string }>(data);
           setRfmMap(
             new Map(
               rows.map((r: { customerId: string; segment: string }) => [r.customerId, r.segment])

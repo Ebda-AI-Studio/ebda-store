@@ -18,6 +18,17 @@ const addToCartSchema = z.object({
   quantity: z.number().int().min(1).default(1),
 });
 
+const bulkSyncSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        quantity: z.number().int().min(1),
+      })
+    )
+    .max(100),
+});
+
 const updateCartItemSchema = z.object({
   quantity: z.number().int().min(0),
 });
@@ -66,6 +77,27 @@ router.post('/items', async (req: Request, res: Response, next: NextFunction) =>
     );
 
     res.status(201).json({
+      success: true,
+      data: { cart },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /stores/:storeId/cart/sync — bulk merge guest cart into server cart
+// post-login. Replaces the N-request `Promise.allSettled(addToCart)` loop with
+// one round-trip + one transaction. Max 100 items per request.
+router.post('/sync', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const sessionId = getSessionId(req);
+    const customerId = customerUserId(req);
+    const data = bulkSyncSchema.parse(req.body);
+
+    const cart = await CartService.addItems(storeId, sessionId, data.items, customerId);
+
+    res.status(200).json({
       success: true,
       data: { cart },
     });

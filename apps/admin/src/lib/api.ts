@@ -29,6 +29,36 @@ export interface ApiResponse<T = unknown> {
   };
 }
 
+/**
+ * Some legacy endpoints return list payloads as `T[]` directly while others
+ * wrap them as `{ data: T[] }`. `unwrapList` accepts either shape and returns
+ * the array (or `[]` if neither matches). Use this instead of casting through
+ * `as any` when the caller can't be certain which variant the endpoint emits.
+ */
+export function unwrapList<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === 'object' && 'data' in value) {
+    const inner = (value as { data: unknown }).data;
+    if (Array.isArray(inner)) return inner as T[];
+  }
+  return [];
+}
+
+/**
+ * Symmetrical helper for object payloads that may be wrapped as `{ data: T }`
+ * or returned bare. Returns `null` when no usable object is present.
+ */
+export function unwrapObject<T extends object>(value: unknown): T | null {
+  if (value && typeof value === 'object') {
+    if ('data' in value) {
+      const inner = (value as { data: unknown }).data;
+      if (inner && typeof inner === 'object') return inner as T;
+    }
+    return value as T;
+  }
+  return null;
+}
+
 export interface ApiError {
   code: string;
   message: string;

@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut, apiDelete, unwrapList, unwrapObject } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
 interface SeoSettings {
@@ -225,16 +225,18 @@ export default function StoreSeoPage() {
       }
 
       if (faqsRes.data) {
-        setFaqs(Array.isArray(faqsRes.data) ? faqsRes.data : ((faqsRes.data as any).data ?? []));
+        setFaqs(unwrapList<StoreFaq>(faqsRes.data));
       }
       if (howtosRes.data) {
-        setHowtos(
-          Array.isArray(howtosRes.data) ? howtosRes.data : ((howtosRes.data as any).data ?? [])
-        );
+        setHowtos(unwrapList<StoreHowto>(howtosRes.data));
       }
 
-      const rawSocial =
-        (storeRes.data as any)?.store?.socialLinks ?? (storeRes.data as any)?.socialLinks ?? {};
+      const storeBody = unwrapObject<{
+        store?: { socialLinks?: Record<string, string> };
+        socialLinks?: Record<string, string>;
+      }>(storeRes.data);
+      const rawSocial: Record<string, string> =
+        storeBody?.store?.socialLinks ?? storeBody?.socialLinks ?? {};
       setSocialLinks({
         wikidata: rawSocial.wikidata || '',
         wikipedia: rawSocial.wikipedia || '',
@@ -260,7 +262,7 @@ export default function StoreSeoPage() {
       if (editingFaqId === 'new') {
         const { data, error } = await apiPost<StoreFaq>(`/api/v1/stores/${storeId}/faqs`, faqDraft);
         if (error) throw new Error(error.message);
-        const created = (data as any)?.data ?? data;
+        const created = unwrapObject<StoreFaq>(data);
         if (created) setFaqs(prev => [...prev, created]);
       } else if (editingFaqId) {
         const { data, error } = await apiPut<StoreFaq>(
@@ -268,9 +270,8 @@ export default function StoreSeoPage() {
           faqDraft
         );
         if (error) throw new Error(error.message);
-        const updated = (data as any)?.data ?? data;
-        if (updated)
-          setFaqs(prev => prev.map(f => (f.id === editingFaqId ? (updated as StoreFaq) : f)));
+        const updated = unwrapObject<StoreFaq>(data);
+        if (updated) setFaqs(prev => prev.map(f => (f.id === editingFaqId ? updated : f)));
       }
       setEditingFaqId(null);
       setFaqDraft(EMPTY_FAQ);
@@ -299,8 +300,8 @@ export default function StoreSeoPage() {
         isActive: !faq.isActive,
       });
       if (error) throw new Error(error.message);
-      const updated = (data as any)?.data ?? data;
-      if (updated) setFaqs(prev => prev.map(f => (f.id === faq.id ? (updated as StoreFaq) : f)));
+      const updated = unwrapObject<StoreFaq>(data);
+      if (updated) setFaqs(prev => prev.map(f => (f.id === faq.id ? updated : f)));
     } catch {
       setMessage({ type: 'error', text: t('faqSaveError') });
     }
@@ -334,7 +335,7 @@ export default function StoreSeoPage() {
           howtoDraft
         );
         if (error) throw new Error(error.message);
-        const created = (data as any)?.data ?? data;
+        const created = unwrapObject<StoreHowto>(data);
         if (created) setHowtos(prev => [...prev, created]);
       } else if (editingHowtoId) {
         const { data, error } = await apiPut<StoreHowto>(
@@ -342,9 +343,8 @@ export default function StoreSeoPage() {
           howtoDraft
         );
         if (error) throw new Error(error.message);
-        const updated = (data as any)?.data ?? data;
-        if (updated)
-          setHowtos(prev => prev.map(h => (h.id === editingHowtoId ? (updated as StoreHowto) : h)));
+        const updated = unwrapObject<StoreHowto>(data);
+        if (updated) setHowtos(prev => prev.map(h => (h.id === editingHowtoId ? updated : h)));
       }
       setEditingHowtoId(null);
       setHowtoDraft(EMPTY_HOWTO);
@@ -374,9 +374,8 @@ export default function StoreSeoPage() {
         { isActive: !howto.isActive }
       );
       if (error) throw new Error(error.message);
-      const updated = (data as any)?.data ?? data;
-      if (updated)
-        setHowtos(prev => prev.map(h => (h.id === howto.id ? (updated as StoreHowto) : h)));
+      const updated = unwrapObject<StoreHowto>(data);
+      if (updated) setHowtos(prev => prev.map(h => (h.id === howto.id ? updated : h)));
     } catch {
       setMessage({ type: 'error', text: t('howtoSaveError') });
     }

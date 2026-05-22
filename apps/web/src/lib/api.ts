@@ -421,18 +421,20 @@ class ApiClient {
   }
 
   async login(email: string, password: string, storeId?: string) {
-    const result = await this.request<{ user: User; accessToken: string; refreshToken: string }>(
-      '/auth/login',
-      { method: 'POST', body: JSON.stringify({ email, password, storeId }) }
-    );
+    const result = await this.request<{
+      user: User;
+      accessToken: string;
+      refreshToken: string;
+      csrfToken?: string;
+    }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password, storeId }) });
 
     if (result.success && result.data) {
       // The access token is set as an HTTP-only cookie by the API response.
       // Only store the refresh token in localStorage.
       if (typeof window !== 'undefined') {
         localStorage.setItem('refreshToken', result.data.refreshToken);
-        if ((result.data as any).csrfToken) {
-          localStorage.setItem('csrfToken', (result.data as any).csrfToken);
+        if (result.data.csrfToken) {
+          localStorage.setItem('csrfToken', result.data.csrfToken);
         }
       }
     }
@@ -583,6 +585,13 @@ class ApiClient {
     return this.request<{ cart: Cart }>('/public/cart/items', {
       method: 'POST',
       body: JSON.stringify({ productId, quantity }),
+    });
+  }
+
+  async syncCart(items: Array<{ productId: string; quantity: number }>) {
+    return this.request<{ cart: Cart }>('/public/cart/sync', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
     });
   }
 

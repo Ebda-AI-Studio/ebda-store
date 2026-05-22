@@ -137,6 +137,74 @@ export class CartService {
     return this.getOrCreate(storeId, sessionId, customerId);
   }
 
+  static async addItems(
+    storeId: string,
+    sessionId: string,
+    items: Array<{ productId: string; quantity: number }>,
+    customerId?: string
+  ) {
+    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+
+    if (items.length === 0) {
+      return cart;
+    }
+
+    const productIds = items.map(i => i.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, storeId, status: 'active' },
+      select: { id: true, inventory: true, trackInventory: true, allowBackorder: true },
+    });
+    const productById = new Map(products.map(p => [p.id, p]));
+
+    await prisma.$transaction(
+      async tx => {
+        const existingItems = await tx.cartItem.findMany({
+          where: { cartId: cart.id, productId: { in: productIds } },
+        });
+        const existingByProduct = new Map(existingItems.map(i => [i.productId, i]));
+
+        for (const item of items) {
+          const product = productById.get(item.productId);
+          if (!product) continue;
+
+          const existing = existingByProduct.get(item.productId);
+          const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
+
+          if (
+            product.trackInventory &&
+            product.inventory < targetQuantity &&
+            !product.allowBackorder
+          ) {
+            throw new AppError(
+              400,
+              'INSUFFICIENT_INVENTORY',
+              `Not enough inventory for product ${item.productId}`
+            );
+          }
+
+          if (existing) {
+            await tx.cartItem.update({
+              where: { id: existing.id },
+              data: { quantity: targetQuantity },
+            });
+          } else {
+            await tx.cartItem.create({
+              data: { cartId: cart.id, productId: item.productId, quantity: item.quantity },
+            });
+          }
+        }
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+
+    await prisma.cart.update({
+      where: { id: cart.id, storeId },
+      data: { lastActivityAt: new Date() },
+    });
+
+    return this.getOrCreate(storeId, sessionId, customerId);
+  }
+
   static async updateItem(
     storeId: string,
     sessionId: string,

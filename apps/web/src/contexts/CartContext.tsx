@@ -131,9 +131,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
         if (!hasServerItems && localItems.length > 0 && !migratedRef.current) {
           migratedRef.current = true;
-          await Promise.allSettled(
-            localItems.map(i => api.addToCart(i.productId || i.id, i.quantity))
-          );
+          const syncPayload = localItems
+            .filter(i => (i.productId || i.id) && i.quantity > 0)
+            .map(i => ({
+              productId: (i.productId || i.id) as string,
+              quantity: i.quantity,
+            }));
+          if (syncPayload.length > 0) {
+            await api.syncCart(syncPayload);
+          }
           if (cancelled) return;
           await refetchCart();
         } else {

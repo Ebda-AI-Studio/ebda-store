@@ -34,7 +34,7 @@ export default [
       "react/react-in-jsx-scope": "off",
       "@next/next/no-img-element": "off",
       "react/no-unescaped-entities": "off",
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": "warn",
       // Flag hardcoded Tailwind semantic colors so admin pages honor the
       // design tokens (bg-primary / bg-destructive / bg-muted / …). Orange
