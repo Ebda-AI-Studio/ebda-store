@@ -215,10 +215,62 @@ export default function StoreSettingsPage() {
      * shippingCarriers card also removed — it's a sub-concern of Shipping;
      * the /shipping page links to /shipping-carriers from inside.
      *
-     * Settings now houses ONLY store-level config that doesn't belong
-     * in a more-specific hub: branding, navigation, seo, domain, payment,
-     * shipping, tax, pwa, template, pages, language.
+     * 2026-05-22 (Ahmad audit pt.2): WhatsApp surfaces moved BACK to
+     * Settings — they're integration config + administrative actions,
+     * not customer-engagement campaigns. Marketing hub keeps the
+     * non-integration cards (notifications, newsletter, etc).
      */
+    {
+      key: 'whatsappBridge',
+      href: `/stores/${storeId}/integrations/wbs`,
+      color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M3 12c0-4.97 4.03-9 9-9s9 4.03 9 9-4.03 9-9 9c-1.46 0-2.84-.35-4.06-.97L3 21l1.03-4.94A8.96 8.96 0 013 12z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8 11.5c.5 1.5 2 3 3.5 3.5"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: 'whatsappTemplates',
+      href: `/stores/${storeId}/wa-templates`,
+      color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: 'whatsappPaymentLink',
+      href: `/stores/${storeId}/payment-link`,
+      color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+          />
+        </svg>
+      ),
+    },
   ];
 
   return (

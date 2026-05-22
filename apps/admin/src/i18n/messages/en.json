@@ -1247,6 +1247,18 @@
       "newsletter": {
         "title": "Newsletter Subscribers",
         "description": "View and export the email list captured from your storefront"
+      },
+      "whatsappBridge": {
+        "title": "WhatsApp Business",
+        "description": "Connect Force Store to Force WhatsApp Business Platform — paste your API key + configure templates"
+      },
+      "whatsappTemplates": {
+        "title": "WhatsApp Templates",
+        "description": "Generate + sync the 12 canonical message templates to Meta for approval (order paid, shipped, delivered, payment link, ...)"
+      },
+      "whatsappPaymentLink": {
+        "title": "WhatsApp Payment Link",
+        "description": "Send a customer a one-tap payment link via WhatsApp — Kuwait alternative to WhatsApp Pay"
       }
     }
   },
@@ -1335,9 +1347,18 @@
           "label": "Warm sand",
           "hint": "Premium grocery + heritage brands. #FAF7F2 / #F0EAE0."
         },
-        "coolGrey": { "label": "Cool grey", "hint": "Tech + modern brands. #F8F8F8 / #EEEEEE." },
-        "pureWhite": { "label": "Pure white", "hint": "Minimal — alternation barely visible." },
-        "brandColor": { "label": "Brand color tint", "hint": "Derived from your primary color." }
+        "coolGrey": {
+          "label": "Cool grey",
+          "hint": "Tech + modern brands. #F8F8F8 / #EEEEEE."
+        },
+        "pureWhite": {
+          "label": "Pure white",
+          "hint": "Minimal — alternation barely visible."
+        },
+        "brandColor": {
+          "label": "Brand color tint",
+          "hint": "Derived from your primary color."
+        }
       },
       "brandBadge": {
         "title": "Show brand name on product cards",
