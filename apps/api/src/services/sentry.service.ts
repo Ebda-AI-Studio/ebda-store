@@ -48,15 +48,25 @@ export class SentryService {
 
   /**
    * Express error handler middleware
+   *
+   * SECURITY: Authorization + Cookie headers are stripped before sending to
+   * Sentry. Pino's redact list does NOT protect Sentry's `extra` payload;
+   * without this scrub every 5xx error pipes live JWTs / session cookies to
+   * a third-party SaaS. 2026-05-22 audit P0-3.
    */
   static errorHandler() {
     return (err: Error & { status?: number }, req: Request, _res: Response, next: NextFunction) => {
       if (this.isInitialized && (!err.status || err.status >= 500)) {
+        const { authorization, cookie, 'x-csrf-token': csrfToken, ...safeHeaders } = req.headers;
+        // suppress unused-var warning — these are intentionally dropped
+        void authorization;
+        void cookie;
+        void csrfToken;
         Sentry.captureException(err, {
           extra: {
             url: req.url,
             method: req.method,
-            headers: req.headers,
+            headers: safeHeaders,
           },
         });
       }
@@ -80,8 +90,11 @@ export class SentryService {
       return '';
     }
 
+    // SECURITY: drop email from Sentry user context (GDPR/KW Law 13/2023 —
+    // customer email shouldn't reach a US SaaS without explicit consent for
+    // error-tracking). 2026-05-22 audit P2.
     return Sentry.captureException(error, {
-      user: context?.user ? { id: context.user.id, email: context.user.email } : undefined,
+      user: context?.user ? { id: context.user.id } : undefined,
       tags: context?.tags,
       extra: context?.extra,
     });
@@ -111,11 +124,13 @@ export class SentryService {
   }
 
   /**
-   * Set user context for the current scope
+   * Set user context for the current scope. Email is intentionally dropped
+   * from the payload — Sentry only sees the user ID and role, never PII.
+   * 2026-05-22 audit P2.
    */
   static setUser(user: { id: string; email?: string; role?: string }): void {
     if (!this.isInitialized) return;
-    Sentry.setUser(user);
+    Sentry.setUser({ id: user.id, role: user.role });
   }
 
   /**
@@ -145,14 +160,14 @@ export class SentryService {
   }
 
   /**
-   * Middleware to add user context from request
+   * Middleware to add user context from request. Email NOT forwarded —
+   * Sentry only sees userId + role. 2026-05-22 audit P2.
    */
   static userContextMiddleware() {
     return (req: Request, _res: Response, next: NextFunction) => {
       if (req.user) {
         SentryService.setUser({
           id: req.user.userId,
-          email: req.user.email,
           role: req.user.role,
         });
       }

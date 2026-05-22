@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
@@ -32,7 +32,7 @@ setInterval(
 ); // Every 5 minutes
 
 export async function generateCsrfToken(sessionId: string): Promise<string> {
-  const token = uuidv4();
+  const token = randomUUID();
   const ttlSeconds = 3600; // 1 hour
 
   // Try Redis first
@@ -610,7 +610,7 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
 export function requestId(req: Request, res: Response, next: NextFunction) {
   const clientId = req.headers['x-request-id'] as string;
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const id = clientId && uuidRegex.test(clientId) ? clientId : uuidv4();
+  const id = clientId && uuidRegex.test(clientId) ? clientId : randomUUID();
   req.headers['x-request-id'] = id;
   res.setHeader('X-Request-Id', id);
   next();

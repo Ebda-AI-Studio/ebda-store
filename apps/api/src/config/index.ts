@@ -46,6 +46,12 @@ export const config = {
 
   // Database
   databaseUrl: getRequiredSecret('DATABASE_URL', 'Database URL'),
+  // DIRECT_URL is the non-pooled Neon connection used for migrations
+  // (prisma migrate deploy / interactive transactions). Without it, the
+  // Railway preDeployCommand silently runs the pooled URL which doesn't
+  // support DDL on Neon serverless — migrations vanish. Surfaced by the
+  // 2026-05-22 audit (P1-6).
+  directUrl: getRequiredSecret('DIRECT_URL', 'Direct (non-pooled) Database URL'),
 
   // Redis
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',

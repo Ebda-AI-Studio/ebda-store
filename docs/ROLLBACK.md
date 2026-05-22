@@ -10,12 +10,12 @@ Use when one Vercel app is broken but the other apps + API + DB are fine.
 
 For admin:
 
-1. https://vercel.com/ahmad-sharafs-projects/force-admin-seven/deployments
+1. https://vercel.com/ahmad-sharafs-projects/force-admin/deployments
 2. Three-dot menu on the previous successful prod deployment → **Promote to Production**
 
 For storefront:
 
-1. https://vercel.com/ahmad-sharafs-projects/force-web-sigma/deployments
+1. https://vercel.com/ahmad-sharafs-projects/force-web/deployments
 2. Same flow.
 
 ⚠️ The admin and storefront often need to be in lock-step (shared API contracts via `@force/shared`). Promoting one without the other can break SSR fetches. Prefer path B unless you're sure.

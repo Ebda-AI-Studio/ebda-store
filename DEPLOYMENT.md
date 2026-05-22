@@ -1,38 +1,41 @@
 # Force Website Builder - Production Deployment Guide
 
+> **2026-05-22 update:** prior versions of this doc described a Cloudflare Pages + Supabase topology that was never the production state. The canonical production stack is below. The old doc misled incident responders during the 2026-05-22 audit (P1-7).
+
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    CLOUDFLARE (Free)                        │
-│  ┌─────────────────────┐  ┌─────────────────────┐          │
-│  │   Pages: Web App    │  │  Pages: Admin App   │          │
-│  │   store.domain.com  │  │  admin.domain.com   │          │
-│  └─────────────────────┘  └─────────────────────┘          │
-│  ┌─────────────────────┐                                   │
-│  │   R2: File Storage  │  cdn.domain.com                   │
-│  └─────────────────────┘                                   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    RAILWAY (~$50/mo)                        │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              Express.js API                          │   │
-│  │              api.domain.com                          │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    SUPABASE (~$75/mo)                       │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              PostgreSQL Database                     │   │
-│  │              Pro Plan + Medium Compute               │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                       VERCEL Pro ($20/mo)                        │
+│  ┌──────────────────────────┐  ┌──────────────────────────┐      │
+│  │  force-admin (Next 16)   │  │  force-web (Next 16)     │      │
+│  │  app.forcemediakw.com    │  │  store.forcemediakw.com  │      │
+│  │                          │  │  + per-tenant domains    │      │
+│  └──────────────────────────┘  │  (wadyaljuz.com, ...)    │      │
+│                                └──────────────────────────┘      │
+└──────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼ HTTPS, credentials:include
+┌──────────────────────────────────────────────────────────────────┐
+│                      RAILWAY (~$10-20/mo)                        │
+│  ┌──────────────────────────────────────────────────────────┐    │
+│  │  Express.js API (Dockerfile, Railpack runner)             │    │
+│  │  store-api.forcemediakw.com                              │    │
+│  │  + Redis (railway internal :6379)                        │    │
+│  └──────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────┘
+                     │                  │                  │
+                     ▼                  ▼                  ▼
+┌──────────────────────────┐  ┌─────────────────┐  ┌──────────────┐
+│ NEON Launch (~$17-150/mo) │  │ CLOUDFLARE R2   │  │ INNGEST CLOUD│
+│ PostgreSQL serverless     │  │ (per-tenant     │  │ 30 functions │
+│ 79 models, RLS-backed     │  │  media storage) │  │              │
+│ per-commit snapshot brs   │  │  *.r2.dev       │  │              │
+└──────────────────────────┘  └─────────────────┘  └──────────────┘
 
-Estimated Monthly Cost: $125-150
+Estimated Monthly Cost (current scale): ~$26/mo
+   See docs/audits/2026-05-22-comprehensive-saas-audit.md §6 for the
+   full per-service forecast at 10k MAU ($170/mo) and 100k MAU ($1,100/mo).
 ```
 
 ---
@@ -114,6 +117,8 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 ---
 
 ## Step 2: Cloudflare Pages Setup (Web & Admin)
+
+> ⚠️ **STALE — see top of doc.** Production storefront + admin run on **Vercel Pro**, not Cloudflare Pages. Project names: `force-admin` (app.forcemediakw.com) and `force-web` (store.forcemediakw.com + per-tenant custom domains). Vercel domain provisioning is automated via `apps/api/src/services/vercel-domain.service.ts`. The instructions below predate the 2026-05-17 Vercel migration and should not be followed.
 
 ### 2.1 Create Cloudflare Account
 
@@ -214,6 +219,8 @@ Add CORS rules:
 ---
 
 ## Step 4: Supabase Configuration
+
+> ⚠️ **STALE — see top of doc.** Production DB is **Neon Postgres** (serverless, per-commit snapshot branches via `.github/workflows/neon-snapshot.yml`), not Supabase. RLS is implemented via `runInTenantContext` AsyncLocalStorage + 52 ENABLE ROW LEVEL SECURITY tables. Migration was completed pre-2026-05-01. Do not follow the Supabase setup steps below.
 
 ### 4.1 Upgrade to Pro Plan
 
@@ -364,21 +371,25 @@ Estimated effort: ~4h focused session.
 
 ## Cost Summary
 
-| Service          | Plan          | Monthly Cost     |
-| ---------------- | ------------- | ---------------- |
-| Railway          | Pro           | $20 + ~$30 usage |
-| Supabase         | Pro + Medium  | $75              |
-| Cloudflare Pages | Free          | $0               |
-| Cloudflare R2    | Pay-as-you-go | ~$5-10           |
-| **Total**        |               | **~$130-140**    |
+See `docs/audits/2026-05-22-comprehensive-saas-audit.md` §6 for the authoritative per-service forecast (idle / 10k MAU / 100k MAU scenarios). Snapshot of current scale:
+
+| Service                                     | Plan         | Monthly Cost   |
+| ------------------------------------------- | ------------ | -------------- |
+| Vercel (admin + web)                        | Pro (1 seat) | $20            |
+| Railway (API + Redis)                       | Hobby        | ~$6-16         |
+| Neon Postgres                               | Launch       | $0-17 (today)  |
+| Cloudflare R2                               | Free tier    | $0             |
+| Inngest, OneSignal, Sentry, R2, Gemini, etc | Free tiers   | $0             |
+| **Total at current scale**                  |              | **~$26-36/mo** |
 
 ---
 
 ## Support Contacts
 
+- Vercel: support@vercel.com
 - Railway: support@railway.app
+- Neon: support@neon.tech
 - Cloudflare: Enterprise support or community forums
-- Supabase: support@supabase.io
 
 ---
 

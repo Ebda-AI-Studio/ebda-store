@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import { orderCreated } from './order-created';
 import { orderRefunded } from './order-refunded';
 import { bulkImportProducts } from './bulk-import';
+import { bulkImportOrphanCleanup } from './bulk-import-orphan-cleanup';
 import { invoiceEmail } from './invoice-email';
 import { heartbeat } from './heartbeat';
 import { auditLogArchive } from './audit-log-archive';
@@ -43,6 +44,7 @@ export const inngestFunctions: InngestFunction.Any[] = [
   orderCreated,
   orderRefunded,
   bulkImportProducts,
+  bulkImportOrphanCleanup,
   invoiceEmail,
   heartbeat,
   auditLogArchive,

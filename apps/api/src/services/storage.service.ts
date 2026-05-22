@@ -5,7 +5,7 @@ import {
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import path from 'path';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
@@ -307,7 +307,7 @@ export class StorageService {
   }): string {
     const { folder, storeId, filename, originalFilename, ext } = args;
     const safeFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '');
-    const id = filename || uuidv4();
+    const id = filename || randomUUID();
     const safeName = sanitizeFilename(path.basename(originalFilename, ext));
 
     if (storeId) {
