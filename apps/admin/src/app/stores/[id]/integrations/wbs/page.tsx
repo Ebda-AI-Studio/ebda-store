@@ -120,7 +120,11 @@ export default function WbsIntegrationPage() {
     if (!apiKeyInput.trim()) return;
     setConnecting(true);
     try {
-      const { error } = await apiPut(`/api/v1/stores/${storeId}/integrations/wbs`, {
+      const { data, error } = await apiPut<{
+        templatesAutoSeeded?: number;
+        templatesAutoSubmitted?: number;
+        templatesAutoError?: string;
+      }>(`/api/v1/stores/${storeId}/integrations/wbs`, {
         wbsApiKey: apiKeyInput.trim(),
       });
       if (error) {
@@ -130,7 +134,27 @@ export default function WbsIntegrationPage() {
           toastError('Connection failed', error.message || 'Could not connect to Force WhatsApp');
         }
       } else {
-        toastSuccess('Connected', 'Force WhatsApp Business Platform connected');
+        // Phase 7 atomic: surface what the auto-generate step did. Three
+        // possible outcomes:
+        //   - happy path: seeded N + submitted M templates → cheer
+        //   - templates already existed: seeded=0 → confirm + offer review
+        //   - submit error: show as warning so the merchant knows to retry
+        const seeded = data?.templatesAutoSeeded;
+        const submitted = data?.templatesAutoSubmitted;
+        const autoErr = data?.templatesAutoError;
+        if (autoErr) {
+          toastSuccess(
+            'Connected',
+            `Force WhatsApp connected — but template auto-submit failed: ${autoErr}. Visit WhatsApp Templates to retry.`
+          );
+        } else if (seeded && seeded > 0) {
+          toastSuccess(
+            'Connected + templates submitted',
+            `${seeded} template${seeded === 1 ? '' : 's'} seeded, ${submitted ?? 0} pending Meta approval (~10min–24h).`
+          );
+        } else {
+          toastSuccess('Connected', 'Force WhatsApp Business Platform connected');
+        }
         setApiKeyInput('');
         await fetchConfig();
       }

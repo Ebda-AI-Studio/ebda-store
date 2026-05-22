@@ -158,6 +158,7 @@ export const HUBS: HubDefinition[] = [
       '/settings',
       '/integrations',
       '/wa-templates',
+      '/wa-order-updates',
       '/payment-link',
       '/branding',
       '/navigation',

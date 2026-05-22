@@ -18,6 +18,8 @@ import { authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { encryption } from '../services/encryption.service';
 import { wbsBridgeService, WbsUnauthorizedError } from '../services/wbs-bridge.service';
+import { config } from '../config';
+import { buildTemplatesForStore } from '../lib/wa-templates/buildForStore';
 import { auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import logger from '../lib/logger';
@@ -279,12 +281,135 @@ router.put(
         where: { id: storeId },
         data: updateData,
         select: {
+          slug: true,
+          name: true,
+          nameAr: true,
           wbsEnabled: true,
           wbsClientId: true,
           wbsApiKey: true,
           wbsTemplates: true,
         },
       });
+
+      // ── Phase 7 atomic Connect+Generate ───────────────────────────────────
+      // On first-connect (new API key just validated above), seed the
+      // per-store WhatsAppTemplate rows AND submit them to Meta in one shot.
+      // Existing rows aren't touched (skipDuplicates). Errors here don't
+      // fail the save — the merchant can retry generation manually via the
+      // wa-templates page if either step trips.
+      let templatesAutoSeeded: number | undefined;
+      let templatesAutoSubmitted: number | undefined;
+      let templatesAutoError: string | undefined;
+      if (isNewApiKey && input.wbsApiKey) {
+        try {
+          const built = buildTemplatesForStore({
+            slug: updated.slug,
+            name: updated.name,
+            nameAr: updated.nameAr,
+          });
+
+          const existing = await prisma.whatsAppTemplate.findMany({
+            where: { storeId },
+            select: { sourceKey: true, language: true },
+          });
+          const have = new Set(existing.map(r => `${r.sourceKey}:${r.language}`));
+          const toCreate = built.filter(t => !have.has(`${t.sourceKey}:${t.language}`));
+
+          if (toCreate.length > 0) {
+            await prisma.whatsAppTemplate.createMany({
+              data: toCreate.map(t => {
+                const bodyComp = t.components.find(c => c.type === 'BODY');
+                return {
+                  storeId,
+                  sourceKey: t.sourceKey,
+                  language: t.language,
+                  metaName: t.name,
+                  category: t.category,
+                  body: bodyComp?.text || '',
+                  status: 'draft',
+                };
+              }),
+              skipDuplicates: true,
+            });
+            templatesAutoSeeded = toCreate.length;
+          } else {
+            templatesAutoSeeded = 0;
+          }
+
+          // Submit all drafts (including any pre-existing ones from a partial
+          // earlier attempt) to WBS → Meta.
+          const drafts = await prisma.whatsAppTemplate.findMany({
+            where: { storeId, status: 'draft' },
+          });
+          if (drafts.length > 0) {
+            const definitions = drafts
+              .map(row => {
+                const tmpl = built.find(
+                  t => t.sourceKey === row.sourceKey && t.language === row.language
+                );
+                if (!tmpl) return null;
+                return {
+                  sourceKey: row.sourceKey,
+                  name: tmpl.name,
+                  language: tmpl.metaLanguage,
+                  category: tmpl.category,
+                  components: tmpl.components,
+                };
+              })
+              .filter(Boolean);
+
+            const submitResp = await fetch(
+              `${config.wbsBaseUrl}/api/v1/external/templates/submit`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-wbs-api-key': input.wbsApiKey,
+                },
+                body: JSON.stringify({ fwbStoreId: storeId, definitions }),
+                signal: AbortSignal.timeout(30_000),
+              }
+            );
+            const submitBody = (await submitResp.json().catch(() => ({}))) as {
+              success?: boolean;
+              results?: Array<{
+                sourceKey: string;
+                name: string;
+                language: string;
+                status: string;
+                metaTemplateId?: string | null;
+                error?: string;
+              }>;
+            };
+            if (submitResp.ok && submitBody.success && Array.isArray(submitBody.results)) {
+              let submittedOk = 0;
+              for (const r of submitBody.results) {
+                await prisma.whatsAppTemplate.updateMany({
+                  where: { storeId, sourceKey: r.sourceKey, language: r.language },
+                  data: {
+                    status: r.status === 'pending' ? 'pending' : r.status,
+                    metaTemplateId: r.metaTemplateId || undefined,
+                    rejectionReason: r.error || null,
+                    lastSyncedAt: new Date(),
+                  },
+                });
+                if (r.status === 'pending') submittedOk += 1;
+              }
+              templatesAutoSubmitted = submittedOk;
+            } else {
+              templatesAutoError = 'WBS rejected the batch submit';
+            }
+          } else {
+            templatesAutoSubmitted = 0;
+          }
+        } catch (err) {
+          templatesAutoError = (err as Error).message;
+          logger.warn(
+            { storeId, err: templatesAutoError },
+            '[WBS-INTEGRATION] auto generate+submit failed (save still succeeded)'
+          );
+        }
+      }
 
       await auditLog({
         action: 'store.wbs_integration_updated',
@@ -309,6 +434,13 @@ router.put(
           wbsApiKeyMasked: maskApiKey(updated.wbsApiKey),
           hasApiKey: Boolean(updated.wbsApiKey),
           wbsTemplates: updated.wbsTemplates,
+          // Phase 7 atomic: surface what happened to the auto-generated
+          // templates so the UI can show "Connected + 12 templates pending"
+          ...(templatesAutoSeeded !== undefined && {
+            templatesAutoSeeded,
+            templatesAutoSubmitted,
+            templatesAutoError,
+          }),
         },
       });
     } catch (err) {

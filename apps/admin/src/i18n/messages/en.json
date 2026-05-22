@@ -1259,6 +1259,10 @@
       "whatsappPaymentLink": {
         "title": "WhatsApp Payment Link",
         "description": "Send a customer a one-tap payment link via WhatsApp — Kuwait alternative to WhatsApp Pay"
+      },
+      "whatsappOrderUpdates": {
+        "title": "Order Updates",
+        "description": "Toggle automatic WhatsApp messages to customers on each step of their order (paid, shipped, delivered)"
       }
     }
   },

@@ -25,6 +25,7 @@ import {
   TEMPLATE_SOURCE_KEYS,
   type TemplateSourceKey,
 } from '../lib/wa-templates/definitions';
+import { buildTemplatesForStore } from '../lib/wa-templates/buildForStore';
 
 const router = Router({ mergeParams: true });
 
@@ -96,13 +97,31 @@ router.post(
   async (req: Request, res: Response) => {
     const storeId = req.params.id;
     try {
+      // Phase 7 smart generation: load the store's branding (slug + name)
+      // so the templates get per-store names + per-store example body_text
+      // values instead of the canonical Force-AI defaults.
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { slug: true, name: true, nameAr: true },
+      });
+      if (!store) {
+        res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
+        return;
+      }
+
+      const templates = buildTemplatesForStore({
+        slug: store.slug,
+        name: store.name,
+        nameAr: store.nameAr,
+      });
+
       const existing = await prisma.whatsAppTemplate.findMany({
         where: { storeId },
         select: { sourceKey: true, language: true },
       });
       const have = new Set(existing.map(r => `${r.sourceKey}:${r.language}`));
 
-      const toCreate = TEMPLATES.filter(t => !have.has(`${t.sourceKey}:${t.language}`));
+      const toCreate = templates.filter(t => !have.has(`${t.sourceKey}:${t.language}`));
       if (toCreate.length === 0) {
         res.json({ success: true, data: { created: 0, message: 'All templates already seeded.' } });
         return;
@@ -199,22 +218,35 @@ router.post(
         return;
       }
 
-      // Build the WBS submit payload. Need full component arrays from the
-      // canonical library, not just the persisted body (the DB stores body
-      // for display; submission needs the full component structure with
-      // examples for Meta's quality review).
+      // Build the WBS submit payload. Use the per-store builder so the
+      // template name + example body_text reflect the merchant's branding,
+      // not the Force-AI default. The DB stores body for display; submission
+      // needs the full component structure with examples for Meta review.
+      const storeForBranding = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { slug: true, name: true, nameAr: true },
+      });
+      if (!storeForBranding) {
+        res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
+        return;
+      }
+      const storeTemplates = buildTemplatesForStore({
+        slug: storeForBranding.slug,
+        name: storeForBranding.name,
+        nameAr: storeForBranding.nameAr,
+      });
       const definitions = drafts
         .map(row => {
-          const canonical = TEMPLATES.find(
+          const built = storeTemplates.find(
             t => t.sourceKey === row.sourceKey && t.language === row.language
           );
-          if (!canonical) return null;
+          if (!built) return null;
           return {
             sourceKey: row.sourceKey,
-            name: canonical.name,
-            language: canonical.metaLanguage,
-            category: canonical.category,
-            components: canonical.components,
+            name: built.name,
+            language: built.metaLanguage,
+            category: built.category,
+            components: built.components,
           };
         })
         .filter(Boolean);
