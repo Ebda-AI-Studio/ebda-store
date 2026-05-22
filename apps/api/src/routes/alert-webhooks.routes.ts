@@ -105,6 +105,60 @@ router.post('/posthog', async (req, res) => {
   res.json({ ok: true });
 });
 
+router.post('/railway', async (req, res) => {
+  if (!requireToken(req, res)) return;
+  // Railway webhook payload (per docs.railway.com/guides/webhooks):
+  //   { type, timestamp, project: { id, name }, environment: { id, name },
+  //     deployment: { id, creator, meta, status } }
+  // Relevant `type` values for build-failure visibility:
+  //   DEPLOY_FAILED, DEPLOY_CRASHED, DEPLOY_REMOVED, DEPLOY_BUILDING (info)
+  // Silent build failures (P1-8 in 2026-05-22 audit) become loud Telegram
+  // pings — the old container keeps serving the previous deploy while
+  // routes added in the failed commit 404 silently otherwise.
+  const body = (req.body ?? {}) as {
+    type?: string;
+    timestamp?: string;
+    project?: { id?: string; name?: string };
+    environment?: { id?: string; name?: string };
+    deployment?: {
+      id?: string;
+      status?: string;
+      creator?: { name?: string };
+      meta?: { commitMessage?: string; commitAuthor?: string };
+    };
+  };
+  const type = body.type ?? 'unknown';
+  // P0 for crashes + failures, info for everything else (started / building /
+  // succeeded). Filter at Railway's side too — only subscribe to FAILED +
+  // CRASHED in the project's webhook config to avoid info noise.
+  const level: 'p0' | 'p1' | 'info' =
+    type === 'DEPLOY_FAILED' || type === 'DEPLOY_CRASHED'
+      ? 'p0'
+      : type === 'DEPLOY_REMOVED'
+        ? 'p1'
+        : 'info';
+  const projectName = body.project?.name ?? 'force-api';
+  const envName = body.environment?.name ?? 'production';
+  const commitMsg = body.deployment?.meta?.commitMessage?.slice(0, 120) ?? '';
+  const commitAuthor = body.deployment?.meta?.commitAuthor ?? '';
+  await sendAlert({
+    level,
+    scope: 'platform',
+    source: 'railway',
+    title: `railway ${type.toLowerCase().replace('deploy_', '')}: ${projectName}/${envName}`,
+    body: commitMsg
+      ? `${commitMsg}${commitAuthor ? ` (${commitAuthor})` : ''}`
+      : `deployment ${body.deployment?.id ?? '?'}`,
+    context: {
+      type,
+      projectId: body.project?.id,
+      deploymentId: body.deployment?.id,
+      status: body.deployment?.status,
+    },
+  });
+  res.json({ ok: true });
+});
+
 router.post('/generic', async (req, res) => {
   if (!requireToken(req, res)) return;
   const body = (req.body ?? {}) as {
