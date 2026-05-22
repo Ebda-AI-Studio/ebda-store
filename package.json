@@ -43,6 +43,9 @@
     "test:coverage": "vitest run --coverage",
     "test:ci": "vitest run --reporter=junit --outputFile=test-results.xml",
     "test:ui": "vitest --ui",
+    "test:smoke": "playwright test",
+    "test:smoke:install": "playwright install --with-deps chromium",
+    "test:smoke:report": "playwright show-report",
     "typecheck": "tsc --noEmit",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
     "db:generate": "npm run generate -w packages/database",
@@ -62,6 +65,7 @@
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
+    "@playwright/test": "1.60.0",
     "@secretlint/secretlint-rule-preset-recommend": "^12.0.0",
     "@types/node": "^20.10.0",
     "@types/supertest": "^7.2.0",
