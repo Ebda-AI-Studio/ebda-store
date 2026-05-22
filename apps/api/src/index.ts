@@ -273,6 +273,13 @@ app.use(express.urlencoded({ extended: true }));
 // Protected by ALERTS_WEBHOOK_TOKEN env var (querystring or header).
 app.use('/api/v1/alerts/webhooks', alertWebhookRoutes);
 
+// Phase 6 (Option C) — WBS WhatsApp customer-DM ordering bridge inbound.
+// Mounted BEFORE CSRF because the caller is WBS (a server, not a
+// browser), authenticated via X-WBS-API-KEY header against the store's
+// encrypted wbsApiKey. See apps/api/src/middleware/wa-bridge-auth.ts.
+const waBridgeRoutes = require('./routes/wa-bridge.routes').default;
+app.use('/api/v1/wa-bridge', express.json({ limit: '256kb' }), waBridgeRoutes);
+
 // Inngest serve handler. Mounted before auth/CSRF because Inngest's
 // platform calls this endpoint with its own request signature
 // (verified inside the SDK using INNGEST_SIGNING_KEY) — it must not
