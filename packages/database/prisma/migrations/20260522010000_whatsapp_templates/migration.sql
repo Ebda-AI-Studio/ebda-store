@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS "whatsapp_templates" (
   "created_at"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updated_at"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "whatsapp_templates_store_id_fkey"
-    FOREIGN KEY ("store_id") REFERENCES "Store"("id")
+    FOREIGN KEY ("store_id") REFERENCES "stores"("id")
     ON DELETE CASCADE ON UPDATE CASCADE
 );
 
