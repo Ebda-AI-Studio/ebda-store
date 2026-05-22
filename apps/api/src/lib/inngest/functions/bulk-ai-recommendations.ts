@@ -78,13 +78,29 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
     retries: 2,
     triggers: [{ event: 'bulk-ai/recommendations-requested' }],
   },
-  async ({ event }) => {
+  async ({ event, step }) => {
     const { jobId, storeId } = event.data as { jobId: string; storeId: string };
 
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/recommendations-requested fired without ids');
       return;
     }
+
+    // Flip the job to 'running' as the very first step BEFORE any heavy
+    // load. Two reasons: (a) the queue-depth watcher can distinguish
+    // "Inngest never delivered the event" (status stays 'queued' for
+    // >30min → alert) from "delivered but stuck on Gemini" (status
+    // 'running' >30min → different alert path); (b) the UI shows
+    // immediate feedback so the merchant doesn't think nothing's
+    // happening while products + categories load. Wrapped in step.run
+    // so Inngest persists the transition independently from subsequent
+    // failures — a Gemini error doesn't roll back this update.
+    await step.run('mark-running', () =>
+      prisma.bulkAiJob.update({
+        where: { id: jobId },
+        data: { status: 'running', startedAt: new Date() },
+      })
+    );
 
     const errors: Array<{
       entityKind: string;
@@ -119,7 +135,7 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
 
       await prisma.bulkAiJob.update({
         where: { id: jobId },
-        data: { status: 'running', startedAt: new Date(), total: products.length },
+        data: { total: products.length },
       });
 
       if (products.length < 2) {
