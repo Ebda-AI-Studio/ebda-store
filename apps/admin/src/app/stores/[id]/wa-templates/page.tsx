@@ -245,7 +245,7 @@ export default function WhatsAppTemplatesPage() {
     setLoading(true);
     try {
       const { data: payload, error } = await apiGet<ListResponse>(
-        `/stores/${storeId}/wa-templates`
+        `/api/v1/stores/${storeId}/wa-templates`
       );
       if (error) throw new Error(error.message || 'Failed to load');
       if (payload) setData(payload);

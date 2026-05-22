@@ -318,9 +318,35 @@ router.get(
         String(req.query.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       );
       const to = new Date(String(req.query.to ?? new Date().toISOString()));
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const raw = await runInTenantContext(req.params.storeId, () =>
         profitAndLoss(req.params.storeId, from, to)
       );
+      // Reshape service output ({ revenue: row[], expenses: row[], totalRevenue, ... })
+      // into the { revenue: {accounts, total}, expenses: {accounts, total}, netIncome }
+      // shape the frontend renders. Account-level fields renamed code/nameEn/balance
+      // for UI clarity (service returns full TrialBalanceRow which carries other fields
+      // the frontend doesn't need).
+      const data = {
+        from: raw.from,
+        to: raw.to,
+        revenue: {
+          accounts: raw.revenue.map(r => ({
+            code: r.code,
+            nameEn: r.nameEn,
+            balance: r.creditTotal - r.debitTotal,
+          })),
+          total: raw.totalRevenue,
+        },
+        expenses: {
+          accounts: raw.expenses.map(r => ({
+            code: r.code,
+            nameEn: r.nameEn,
+            balance: r.debitTotal - r.creditTotal,
+          })),
+          total: raw.totalExpenses,
+        },
+        netIncome: raw.netIncome,
+      };
       res.json({ data });
     } catch (err) {
       next(err);
@@ -342,9 +368,31 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : new Date();
-      const data = await runInTenantContext(req.params.storeId, () =>
+      const raw = await runInTenantContext(req.params.storeId, () =>
         balanceSheet(req.params.storeId, asOf)
       );
+      // Reshape service output ({ assets: row[], liabilities: row[], equity: row[], total* })
+      // into the { assets: {accounts, total}, ... } shape the frontend renders.
+      // Liability + equity balances are credit-natural — negate to display natural sign.
+      const data = {
+        asOf: raw.asOf,
+        assets: {
+          accounts: raw.assets.map(r => ({ code: r.code, nameEn: r.nameEn, balance: r.balance })),
+          total: raw.totalAssets,
+        },
+        liabilities: {
+          accounts: raw.liabilities.map(r => ({
+            code: r.code,
+            nameEn: r.nameEn,
+            balance: -r.balance,
+          })),
+          total: raw.totalLiabilities,
+        },
+        equity: {
+          accounts: raw.equity.map(r => ({ code: r.code, nameEn: r.nameEn, balance: -r.balance })),
+          total: raw.totalEquity,
+        },
+      };
       res.json({ data });
     } catch (err) {
       next(err);

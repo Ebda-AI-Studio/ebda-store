@@ -97,7 +97,7 @@ export default function PaymentLinkPage() {
     try {
       const amountFils = Math.round(Number(amountKwd) * 1000);
       const { data: payload, error } = await apiPost<PaymentLinkResponse>(
-        `/stores/${storeId}/payment-links`,
+        `/api/v1/stores/${storeId}/payment-links`,
         {
           customerPhone: customerPhone.trim(),
           customerName: customerName.trim() || undefined,

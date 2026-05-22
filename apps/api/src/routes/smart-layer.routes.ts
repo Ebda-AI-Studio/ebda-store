@@ -77,7 +77,7 @@ router.get(
         ])
       );
 
-      res.json({ data: items, meta: pageMeta(page, perPage, total) });
+      res.json({ success: true, data: { data: items, meta: pageMeta(page, perPage, total) } });
     } catch (err) {
       next(err);
     }
@@ -166,7 +166,7 @@ router.get(
         ])
       );
 
-      res.json({ data: items, meta: pageMeta(page, perPage, total) });
+      res.json({ success: true, data: { data: items, meta: pageMeta(page, perPage, total) } });
     } catch (err) {
       next(err);
     }
@@ -255,7 +255,7 @@ router.get(
         ])
       );
 
-      res.json({ data: items, meta: pageMeta(page, perPage, total) });
+      res.json({ success: true, data: { data: items, meta: pageMeta(page, perPage, total) } });
     } catch (err) {
       next(err);
     }
