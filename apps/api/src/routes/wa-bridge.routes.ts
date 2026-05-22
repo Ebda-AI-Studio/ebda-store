@@ -19,6 +19,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
@@ -27,6 +28,27 @@ import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import logger from '../lib/logger';
 
 const router = Router();
+
+// Per-API-key rate limit. 120 req/min headroom — a single store running
+// a customer-DM ordering flow has natural rhythm (browse → choose → cart),
+// so even an aggressive customer can't reasonably exceed 120/min. Real
+// purpose: contain a buggy WBS state-machine retry loop from overwhelming
+// FWB. Falls back to IP when the key is missing (still gets the same cap).
+const bridgeRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator: req =>
+    (req.headers['x-wbs-api-key'] as string | undefined) || req.ip || 'anonymous',
+  message: {
+    success: false,
+    error: 'rate_limit_exceeded',
+    message: 'Too many requests from this WBS integration. Please slow down.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.use(bridgeRateLimit);
 router.use(waBridgeAuth);
 
 const PAGE_SIZE = 10; // Meta interactive list cap
