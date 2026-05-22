@@ -130,7 +130,7 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'Hi {{1}}, your order {{2}} from {{4}} is on the way! Tracking number: {{5}}.',
+        text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} is on the way! Tracking number: {{5}}.',
         example: {
           body_text: [['Ahmad', 'ORD-1042', '5.500 KWD', 'Wady Aljuz', 'KW123456789']],
         },
@@ -149,7 +149,7 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا {{1}}، طلبك {{2}} من {{4}} في الطريق! رقم التتبع: {{5}}.',
+        text: 'مرحبًا {{1}}، طلبك {{2}} بقيمة {{3}} من {{4}} في الطريق! رقم التتبع: {{5}}.',
         example: {
           body_text: [['أحمد', 'ORD-1042', '5.500 د.ك', 'وادي الجوز', 'KW123456789']],
         },
@@ -170,7 +170,7 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'Hi {{1}}, your order {{2}} has been delivered. Thanks for shopping with {{4}}!',
+        text: 'Hi {{1}}, your order {{2}} for {{3}} has been delivered. Thanks for shopping with {{4}}!',
         example: {
           body_text: [['Ahmad', 'ORD-1042', '5.500 KWD', 'Wady Aljuz']],
         },
@@ -193,7 +193,7 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا {{1}}، تم تسليم طلبك {{2}}. شكرًا لاختيارك {{4}}!',
+        text: 'مرحبًا {{1}}، تم تسليم طلبك {{2}} بقيمة {{3}}. شكرًا لاختيارك {{4}}!',
         example: {
           body_text: [['أحمد', 'ORD-1042', '5.500 د.ك', 'وادي الجوز']],
         },
