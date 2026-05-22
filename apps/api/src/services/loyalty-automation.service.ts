@@ -19,6 +19,7 @@ import logger from '../lib/logger';
 
 const DEFAULT_BIRTHDAY_BONUS = 500;
 const DEFAULT_EXPIRATION_MONTHS = 12;
+const SCAN_BATCH_SIZE = 500;
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -108,32 +109,64 @@ class LoyaltyAutomationService {
 
         if (birthdayBonus <= 0) continue;
 
-        // Find loyalty members in this store whose birthday is today
-        const loyaltyMembers = await prisma.loyaltyPoints.findMany({
-          where: { storeId: store.id },
-          select: {
-            id: true,
-            customerId: true,
-            points: true,
-            totalEarned: true,
-            tier: true,
-            customer: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                dateOfBirth: true,
+        // Find loyalty members in this store whose birthday is today.
+        // Cursor-batch through the table in pages of SCAN_BATCH_SIZE to
+        // avoid a single multi-MB memory spike on stores with 10k+ members.
+        // Birthday-today filtering happens per page in JS; Postgres-side
+        // EXTRACT predicate would be cleaner but isn't reachable from
+        // Prisma's typed API without raw SQL — cursor batching is the
+        // policy-compliant middle ground (see scaling-cliff rule).
+        type LoyaltyMember = {
+          id: string;
+          customerId: string;
+          points: number;
+          totalEarned: number;
+          tier: string;
+          customer: {
+            id: string;
+            firstName: string | null;
+            lastName: string | null;
+            dateOfBirth: Date | null;
+          };
+        };
+        const birthdayMembers: LoyaltyMember[] = [];
+        let cursor: string | undefined;
+        while (true) {
+          const batch: LoyaltyMember[] = await prisma.loyaltyPoints.findMany({
+            where: { storeId: store.id },
+            select: {
+              id: true,
+              customerId: true,
+              points: true,
+              totalEarned: true,
+              tier: true,
+              customer: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  dateOfBirth: true,
+                },
               },
             },
-          },
-        });
+            take: SCAN_BATCH_SIZE,
+            orderBy: { id: 'asc' },
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+          });
 
-        // Filter to customers whose birthday is today
-        const birthdayMembers = loyaltyMembers.filter(m => {
-          const dob = m.customer.dateOfBirth;
-          if (!dob) return false;
-          return dob.getMonth() + 1 === todayMonth && dob.getDate() === todayDay;
-        });
+          if (batch.length === 0) break;
+
+          for (const m of batch) {
+            const dob = m.customer.dateOfBirth;
+            if (!dob) continue;
+            if (dob.getMonth() + 1 === todayMonth && dob.getDate() === todayDay) {
+              birthdayMembers.push(m);
+            }
+          }
+
+          if (batch.length < SCAN_BATCH_SIZE) break;
+          cursor = batch[batch.length - 1].id;
+        }
 
         // Bulk lookup of customers who already received this year's
         // birthday bonus. Previously the per-member findFirst loop ran
@@ -234,30 +267,51 @@ class LoyaltyAutomationService {
       // To keep this simple and safe, we group by storeId+customerId:
       // aggregate total expired points per member then create a single deduction.
 
-      // Get all expired positive transactions (earn types) not yet expired
-      const expiredTxns = await prisma.loyaltyTransaction.findMany({
-        where: {
-          expiresAt: { lt: now },
-          points: { gt: 0 }, // Only earn transactions can expire
-          type: {
-            in: [
-              'earn_purchase',
-              'earn_signup',
-              'earn_referral',
-              'earn_review',
-              'earn_birthday',
-              'earn_manual',
-            ],
+      // Get all expired positive transactions (earn types) not yet expired.
+      // Cursor-batch in pages of SCAN_BATCH_SIZE so an annual sweep across
+      // every store doesn't load the whole table into one container.
+      type ExpiredTxn = {
+        id: string;
+        storeId: string;
+        customerId: string;
+        points: number;
+        expiresAt: Date | null;
+      };
+      const expiredTxns: ExpiredTxn[] = [];
+      let txnCursor: string | undefined;
+      while (true) {
+        const batch: ExpiredTxn[] = await prisma.loyaltyTransaction.findMany({
+          where: {
+            expiresAt: { lt: now },
+            points: { gt: 0 },
+            type: {
+              in: [
+                'earn_purchase',
+                'earn_signup',
+                'earn_referral',
+                'earn_review',
+                'earn_birthday',
+                'earn_manual',
+              ],
+            },
           },
-        },
-        select: {
-          id: true,
-          storeId: true,
-          customerId: true,
-          points: true,
-          expiresAt: true,
-        },
-      });
+          select: {
+            id: true,
+            storeId: true,
+            customerId: true,
+            points: true,
+            expiresAt: true,
+          },
+          take: SCAN_BATCH_SIZE,
+          orderBy: { id: 'asc' },
+          ...(txnCursor ? { cursor: { id: txnCursor }, skip: 1 } : {}),
+        });
+
+        if (batch.length === 0) break;
+        expiredTxns.push(...batch);
+        if (batch.length < SCAN_BATCH_SIZE) break;
+        txnCursor = batch[batch.length - 1].id;
+      }
 
       if (expiredTxns.length === 0) {
         logger.debug('[LoyaltyAutomation] No expired transactions found');
