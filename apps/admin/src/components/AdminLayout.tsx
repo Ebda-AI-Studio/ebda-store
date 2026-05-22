@@ -130,6 +130,8 @@ export function AdminLayout({
     // Marketing tabs
     aiTools: t('hubTabs.aiTools'),
     whatsapp: t('hubTabs.whatsapp'),
+    whatsappTemplates: 'WhatsApp Templates',
+    whatsappPaymentLink: 'WhatsApp Payment Link',
     marketingPixels: t('hubTabs.marketingPixels'),
     notifications: t('hubTabs.notifications'),
     newsletter: t('hubTabs.newsletter'),

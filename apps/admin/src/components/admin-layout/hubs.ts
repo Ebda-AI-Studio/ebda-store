@@ -54,6 +54,8 @@ export type HubLabels = {
   // Marketing tabs
   aiTools: string;
   whatsapp: string;
+  whatsappTemplates: string;
+  whatsappPaymentLink: string;
   marketingPixels: string;
   notifications: string;
   newsletter: string;
@@ -141,10 +143,14 @@ export const HUBS: HubDefinition[] = [
       '/newsletter',
       '/affiliates',
       '/abandoned-carts',
+      '/wa-templates',
+      '/payment-link',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.aiTools, href: `/stores/${storeId}/ai-tools` },
       { label: labels.whatsapp, href: `/stores/${storeId}/integrations/wbs` },
+      { label: labels.whatsappTemplates, href: `/stores/${storeId}/wa-templates` },
+      { label: labels.whatsappPaymentLink, href: `/stores/${storeId}/payment-link` },
       { label: labels.notifications, href: `/stores/${storeId}/notifications` },
       { label: labels.newsletter, href: `/stores/${storeId}/newsletter` },
       { label: labels.abandonedCarts, href: `/stores/${storeId}/abandoned-carts` },
