@@ -48,14 +48,18 @@ const bridgeRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
+// Rate limit applies to every wa-bridge call (including the
+// customer-facing /cart/redeem). The auth middleware is mounted
+// per-route below so /cart/redeem can be reached by storefront browsers
+// that don't have a WBS API key — that endpoint's auth IS the signed
+// JWT carrying the cart payload.
 router.use(bridgeRateLimit);
-router.use(waBridgeAuth);
 
 const PAGE_SIZE = 10; // Meta interactive list cap
 const CHECKOUT_TOKEN_TTL_SECONDS = 30 * 60; // 30 minutes
 
 // ─── GET /health ─────────────────────────────────────────────────────────────
-router.get('/health', (req, res) => {
+router.get('/health', waBridgeAuth, (req, res) => {
   res.json({
     success: true,
     data: { storeId: req.bridgeStore?.id, storeName: req.bridgeStore?.name },
@@ -63,7 +67,7 @@ router.get('/health', (req, res) => {
 });
 
 // ─── GET /categories ─────────────────────────────────────────────────────────
-router.get('/categories', async (req: Request, res: Response) => {
+router.get('/categories', waBridgeAuth, async (req: Request, res: Response) => {
   try {
     const storeId = req.bridgeStore!.id;
     const categories = await prisma.category.findMany({
@@ -99,7 +103,7 @@ router.get('/categories', async (req: Request, res: Response) => {
 const searchSchema = z.object({
   q: z.string().min(1).max(80),
 });
-router.get('/products/search', async (req: Request, res: Response) => {
+router.get('/products/search', waBridgeAuth, async (req: Request, res: Response) => {
   try {
     const parse = searchSchema.safeParse(req.query);
     if (!parse.success) {
@@ -164,7 +168,7 @@ const byCategorySchema = z.object({
   categoryId: z.string().uuid(),
   page: z.coerce.number().int().min(1).max(50).default(1),
 });
-router.get('/products/by-category', async (req: Request, res: Response) => {
+router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Response) => {
   try {
     const parse = byCategorySchema.safeParse(req.query);
     if (!parse.success) {
@@ -240,7 +244,7 @@ const cartFromWaSchema = z.object({
   locale: z.enum(['ar', 'en']).optional(),
   waConversationId: z.string().min(1).max(120).optional(),
 });
-router.post('/cart/from-wa', async (req: Request, res: Response) => {
+router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) => {
   try {
     const parse = cartFromWaSchema.safeParse(req.body);
     if (!parse.success) {
@@ -425,7 +429,7 @@ const templateStatusSchema = z.object({
   metaTemplateId: z.string().nullable().optional(),
 });
 
-router.post('/templates/status', async (req: Request, res: Response) => {
+router.post('/templates/status', waBridgeAuth, async (req: Request, res: Response) => {
   try {
     const parsed = templateStatusSchema.safeParse(req.body);
     if (!parsed.success) {
