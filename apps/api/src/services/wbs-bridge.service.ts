@@ -57,6 +57,12 @@ export interface WbsSendParams {
   /** Positional string variables matching the template's {{n}} placeholders */
   variables: string[];
   idempotencyKey: string;
+  /**
+   * Phase 6 final-loop. Optional: when this template send corresponds to a
+   * Force Store order, pass the order id so WBS can stamp wa_carts.fwb_order_id
+   * during the auto-completion side-effect. Closes the analytics join.
+   */
+  fwbOrderId?: string;
 }
 
 export interface WbsSendResult {
@@ -103,6 +109,7 @@ export class WbsBridgeService {
       languageCode,
       variables,
       idempotencyKey,
+      fwbOrderId,
     } = params;
 
     // Decrypt the API key before sending
@@ -129,6 +136,7 @@ export class WbsBridgeService {
           languageCode,
           variables,
           idempotencyKey,
+          ...(fwbOrderId ? { fwbOrderId } : {}),
         }),
         // 15s timeout — generous for a synchronous template send
         signal: AbortSignal.timeout(15_000),

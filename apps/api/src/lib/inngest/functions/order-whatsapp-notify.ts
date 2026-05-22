@@ -212,6 +212,9 @@ export async function handleOrderWhatsAppNotify(
         languageCode: templateConfig.languageCode || 'en',
         variables,
         idempotencyKey,
+        // Phase 6 final-loop: pass the order id so WBS can stamp
+        // wa_carts.fwb_order_id when auto-completing the cart on this send.
+        fwbOrderId: orderId,
       });
     } catch (err) {
       if (err instanceof WbsUnauthorizedError) {
