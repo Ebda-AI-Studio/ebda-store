@@ -29,6 +29,14 @@ export interface StoreBrandingForTemplates {
   slug: string;
   name: string;
   nameAr: string | null;
+  /**
+   * Opt-in: when set, every template gets a HEADER IMAGE component
+   * pinned to this handle. The handle comes from Meta's resumable
+   * upload protocol (uploaded via WBS /external/templates/upload-header-handle).
+   * When unset, templates have no header (text BODY only) — the existing
+   * default since Phase 7 shipped.
+   */
+  headerHandle?: string | null;
 }
 
 /**
@@ -81,10 +89,26 @@ export function buildTemplatesForStore(store: StoreBrandingForTemplates): Templa
       return { ...c, example: { ...c.example, body_text: bodyText } };
     });
 
+    // Phase 7 opt-in: prepend a HEADER IMAGE component when the store has
+    // a logo handle. example.header_handle tells Meta which image to use
+    // during template approval review; at send time the existing flow
+    // can pass a fresh `image.link` header parameter to swap the actual
+    // image per-send.
+    const components = store.headerHandle
+      ? [
+          {
+            type: 'HEADER' as const,
+            format: 'IMAGE' as const,
+            example: { header_handle: [store.headerHandle] },
+          } as (typeof tmpl.components)[number],
+          ...rewrittenComponents,
+        ]
+      : rewrittenComponents;
+
     return {
       ...tmpl,
       name: newName,
-      components: rewrittenComponents,
+      components,
     };
   });
 }

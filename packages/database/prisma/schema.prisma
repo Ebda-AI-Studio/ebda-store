@@ -261,6 +261,12 @@ model Store {
   wbsClientId  String?  @map("wbs_client_id")
   wbsApiKey    String?  @map("wbs_api_key")
   wbsTemplates Json?    @map("wbs_templates")
+  /// Phase 7 opt-in (2026-05-22): when true, generate templates with a
+  /// HEADER IMAGE component pinned to Store.logo. Customer sees the store
+  /// logo at the top of every order-update WhatsApp message. Defaults
+  /// false because uploading + maintaining the Meta header_handle adds
+  /// complexity per template re-submission.
+  wbsTemplateUseLogoHeader Boolean @default(false) @map("wbs_template_use_logo_header")
 
   // Accounting Settings (Batch 1)
   accountingEnabled    Boolean @default(true) @map("accounting_enabled")

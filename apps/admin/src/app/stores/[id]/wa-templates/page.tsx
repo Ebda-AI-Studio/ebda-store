@@ -17,7 +17,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, apiPost } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 
 // Inline tiny SVG icons — admin app doesn't import lucide-react in this scope
 const Icon = {
@@ -232,29 +232,64 @@ function StatusBadge({ status }: { status: TemplateRow['status'] }) {
   );
 }
 
+interface WbsConfigForToggle {
+  wbsTemplateUseLogoHeader: boolean;
+  storeHasLogo: boolean;
+}
+
 export default function WhatsAppTemplatesPage() {
   const params = useParams();
   const storeId = params.id as string;
   const { success: toastSuccess, error: toastError } = useToast();
   const [data, setData] = useState<ListResponse | null>(null);
+  const [wbsConfig, setWbsConfig] = useState<WbsConfigForToggle | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [savingLogoToggle, setSavingLogoToggle] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: payload, error } = await apiGet<ListResponse>(
-        `/api/v1/stores/${storeId}/wa-templates`
-      );
-      if (error) throw new Error(error.message || 'Failed to load');
-      if (payload) setData(payload);
+      const [tmplResp, cfgResp] = await Promise.all([
+        apiGet<ListResponse>(`/api/v1/stores/${storeId}/wa-templates`),
+        apiGet<WbsConfigForToggle>(`/api/v1/stores/${storeId}/integrations/wbs`),
+      ]);
+      if (tmplResp.error) throw new Error(tmplResp.error.message || 'Failed to load');
+      if (tmplResp.data) setData(tmplResp.data);
+      if (cfgResp.data) {
+        setWbsConfig({
+          wbsTemplateUseLogoHeader: Boolean(cfgResp.data.wbsTemplateUseLogoHeader),
+          storeHasLogo: Boolean(cfgResp.data.storeHasLogo),
+        });
+      }
     } catch (err) {
       toastError('Failed to load templates', err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
   }, [storeId, toastError]);
+
+  const toggleLogoHeader = async (next: boolean) => {
+    setSavingLogoToggle(true);
+    try {
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/integrations/wbs`, {
+        wbsTemplateUseLogoHeader: next,
+      });
+      if (error) throw new Error(error.message || 'Save failed');
+      setWbsConfig(c => (c ? { ...c, wbsTemplateUseLogoHeader: next } : c));
+      toastSuccess(
+        next ? 'Logo header enabled' : 'Logo header disabled',
+        next
+          ? 'Next template generation/sync will include your store logo as the message header image.'
+          : 'Future templates will be generated without a header image.'
+      );
+    } catch (err) {
+      toastError('Save failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingLogoToggle(false);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -370,6 +405,49 @@ export default function WhatsAppTemplatesPage() {
             Refresh
           </Button>
         </div>
+
+        {/* Logo-as-header opt-in */}
+        {wbsConfig && (
+          <div
+            className={`rounded-lg border p-4 ${
+              wbsConfig.storeHasLogo
+                ? 'bg-white border-gray-200'
+                : 'bg-gray-50 border-gray-200 opacity-75'
+            }`}
+          >
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={wbsConfig.wbsTemplateUseLogoHeader}
+                disabled={!wbsConfig.storeHasLogo || savingLogoToggle}
+                onChange={e => toggleLogoHeader(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 peer-disabled:opacity-40 peer-disabled:cursor-not-allowed mt-0.5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-sm text-gray-900">
+                  Use my store logo as the WhatsApp message header
+                </div>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Customers see your store logo at the top of every order-update message. Applied
+                  when you next generate or sync templates. Meta has to re-approve the new templates
+                  with the header (~10min–24h).
+                </p>
+                {!wbsConfig.storeHasLogo && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    ⚠️ Set a store logo first under Branding before enabling this.
+                  </p>
+                )}
+                {wbsConfig.wbsTemplateUseLogoHeader && wbsConfig.storeHasLogo && (
+                  <p className="text-xs text-emerald-700 mt-1">
+                    ✅ On. Next sync will upload your logo to Meta and submit templates with image
+                    headers.
+                  </p>
+                )}
+              </div>
+            </label>
+          </div>
+        )}
 
         {/* Template list */}
         {loading && !data ? (

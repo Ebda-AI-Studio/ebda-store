@@ -18,9 +18,16 @@ export type TemplateCategory = 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
 
 export interface TemplateComponent {
   type: 'BODY' | 'FOOTER' | 'HEADER' | 'BUTTONS';
+  /** Only used for HEADER (when format='IMAGE'/'VIDEO'/'DOCUMENT' the
+   *  format field is required). */
+  format?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
   text?: string;
   example?: {
     body_text?: string[][];
+    /** Meta media handle from the resumable-upload protocol — required
+     *  for IMAGE/VIDEO/DOCUMENT header templates during approval. Per
+     *  Meta docs this is an array even though it always has one entry. */
+    header_handle?: string[];
   };
 }
 

@@ -26,6 +26,7 @@ import {
   type TemplateSourceKey,
 } from '../lib/wa-templates/definitions';
 import { buildTemplatesForStore } from '../lib/wa-templates/buildForStore';
+import { resolveHeaderHandle } from '../lib/wa-templates/resolveHeaderHandle';
 
 const router = Router({ mergeParams: true });
 
@@ -224,16 +225,33 @@ router.post(
       // needs the full component structure with examples for Meta review.
       const storeForBranding = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { slug: true, name: true, nameAr: true },
+        select: {
+          slug: true,
+          name: true,
+          nameAr: true,
+          logo: true,
+          wbsTemplateUseLogoHeader: true,
+        },
       });
       if (!storeForBranding) {
         res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
         return;
       }
+      // Phase 7 opt-in: upload the store logo to Meta + get a header_handle
+      // so each template carries an IMAGE HEADER. Skipped when opt-in is
+      // off or the upload fails — templates still submit (header-less),
+      // merchant can retry from the toggle.
+      const headerHandle = await resolveHeaderHandle({
+        wbsApiKey: apiKey,
+        logoUrl: storeForBranding.logo,
+        optedIn: storeForBranding.wbsTemplateUseLogoHeader,
+        wbsBaseUrl: config.wbsBaseUrl,
+      });
       const storeTemplates = buildTemplatesForStore({
         slug: storeForBranding.slug,
         name: storeForBranding.name,
         nameAr: storeForBranding.nameAr,
+        headerHandle,
       });
       const definitions = drafts
         .map(row => {

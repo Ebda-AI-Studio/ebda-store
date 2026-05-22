@@ -20,6 +20,7 @@ import { encryption } from '../services/encryption.service';
 import { wbsBridgeService, WbsUnauthorizedError } from '../services/wbs-bridge.service';
 import { config } from '../config';
 import { buildTemplatesForStore } from '../lib/wa-templates/buildForStore';
+import { resolveHeaderHandle } from '../lib/wa-templates/resolveHeaderHandle';
 import { auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import logger from '../lib/logger';
@@ -47,6 +48,8 @@ const wbsIntegrationSchema = z.object({
     })
     .nullable()
     .optional(),
+  /** Phase 7 opt-in for store-logo HEADER images on templates. */
+  wbsTemplateUseLogoHeader: z.boolean().optional(),
 });
 
 type WbsIntegrationInput = z.infer<typeof wbsIntegrationSchema>;
@@ -87,6 +90,8 @@ router.get(
           wbsClientId: true,
           wbsApiKey: true,
           wbsTemplates: true,
+          wbsTemplateUseLogoHeader: true,
+          logo: true,
         },
       });
 
@@ -140,6 +145,8 @@ router.get(
           wbsApiKeyMasked: maskApiKey(store.wbsApiKey),
           hasApiKey: Boolean(store.wbsApiKey),
           wbsTemplates: store.wbsTemplates,
+          wbsTemplateUseLogoHeader: store.wbsTemplateUseLogoHeader,
+          storeHasLogo: Boolean(store.logo),
           connectedTenant,
           ...(connectedTenantError ? { connectedTenantError } : {}),
         },
@@ -261,6 +268,10 @@ router.put(
         updateData.wbsTemplates = input.wbsTemplates;
       }
 
+      if (input.wbsTemplateUseLogoHeader !== undefined) {
+        updateData.wbsTemplateUseLogoHeader = input.wbsTemplateUseLogoHeader;
+      }
+
       // API key handling
       if (isNewApiKey && input.wbsApiKey) {
         updateData.wbsApiKey = encryption.encrypt(input.wbsApiKey);
@@ -284,10 +295,12 @@ router.put(
           slug: true,
           name: true,
           nameAr: true,
+          logo: true,
           wbsEnabled: true,
           wbsClientId: true,
           wbsApiKey: true,
           wbsTemplates: true,
+          wbsTemplateUseLogoHeader: true,
         },
       });
 
@@ -302,10 +315,20 @@ router.put(
       let templatesAutoError: string | undefined;
       if (isNewApiKey && input.wbsApiKey) {
         try {
+          // Phase 7 opt-in: when wbsTemplateUseLogoHeader is true, upload
+          // the store logo to Meta + get a header_handle. Skipped silently
+          // when the merchant hasn't opted in or has no logo set.
+          const headerHandle = await resolveHeaderHandle({
+            wbsApiKey: input.wbsApiKey,
+            logoUrl: updated.logo,
+            optedIn: updated.wbsTemplateUseLogoHeader,
+            wbsBaseUrl: config.wbsBaseUrl,
+          });
           const built = buildTemplatesForStore({
             slug: updated.slug,
             name: updated.name,
             nameAr: updated.nameAr,
+            headerHandle,
           });
 
           const existing = await prisma.whatsAppTemplate.findMany({
