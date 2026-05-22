@@ -40,6 +40,7 @@ import pagesRoutes from './pages.routes';
 import typographyRoutes from './typography.routes';
 import wbsIntegrationRoutes from './wbs-integration.routes';
 import waTemplatesRoutes from './wa-templates.routes';
+import paymentLinksRoutes from './payment-links.routes';
 import financeRoutes from './finance.routes';
 import smartLayerRoutes from './smart-layer.routes';
 import insightsRoutes from './insights.routes';
@@ -146,6 +147,9 @@ router.use('/stores', tenantContext, wbsIntegrationRoutes);
 
 // Phase 7: WhatsApp templates admin (generate / sync / status)
 router.use('/stores/:id/wa-templates', tenantContext, waTemplatesRoutes);
+
+// Phase 7: merchant-initiated payment links via WhatsApp
+router.use('/stores/:id/payment-links', tenantContext, paymentLinksRoutes);
 
 // Finance routes (COA tree + general ledger journal)
 router.use('/stores', tenantContext, financeRoutes);
