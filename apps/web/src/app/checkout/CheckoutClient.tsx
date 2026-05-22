@@ -205,6 +205,32 @@ export default function CheckoutClient() {
     }
   }, [formData, checkoutStorageKey]);
 
+  // Phase 6 (Option C): WaTokenHydrator stashes the customer's WhatsApp phone
+  // under `fwb.wa-customer-phone` when a customer arrives via the WhatsApp
+  // ordering flow. Pre-fill the shipping phone with that value when the form
+  // is otherwise blank — never overwrite a value the customer already typed.
+  // The marker is removed once consumed so a later session-storage hit can't
+  // clobber a deliberate edit on a return visit.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (formData.phone.trim() !== '') return;
+    let waPhone: string | null = null;
+    try {
+      waPhone = window.sessionStorage.getItem('fwb.wa-customer-phone');
+    } catch {
+      return;
+    }
+    if (!waPhone) return;
+    const normalized = waPhone.trim();
+    if (!normalized) return;
+    setFormData(prev => (prev.phone.trim() === '' ? { ...prev, phone: normalized } : prev));
+    try {
+      window.sessionStorage.removeItem('fwb.wa-customer-phone');
+    } catch {
+      // Non-fatal.
+    }
+  }, [formData.phone]);
+
   // Form validation errors
   const [formErrors, setFormErrors] = useState<{
     email?: string;
