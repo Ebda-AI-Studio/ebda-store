@@ -228,3 +228,54 @@ and route to a "check your email" page.
 - `apps/api/src/routes/auth.routes.ts` — register handler, audit log
 - `apps/api/src/services/email.service.ts` — `sendDuplicateRegistrationNotice`
 - `apps/web/src/app/auth/check-email/` — the post-register landing
+
+---
+
+## Cross-service tenant isolation: Force Store ↔ WBS bridge
+
+The Force WhatsApp Business Platform (WBS) calls Force Store's `/api/v1/wa-bridge/*`
+endpoints to read catalog data, enumerate abandoned carts, toggle DM ordering,
+and proxy bot analytics. Every one of these endpoints must be scoped to a single
+Force Store tenant. This section documents how that scoping is enforced.
+
+### The contract
+
+1. **Authentication is API-key based, not JWT-based.** WBS passes a per-store key
+   in the `x-wbs-api-key` request header. The bridge middleware resolves the key
+   to a `storeId` by looking it up in `wa_ordering_settings.encryptedFwbApiKey`.
+   This is the ONLY mechanism for establishing tenant scope on bridge endpoints.
+
+2. **Tenant scope is never passed as a query parameter or request body field.**
+   Even though some bridge endpoints accept a `storeId` in the request body (e.g.
+   abandoned-cart enumeration passes `clientId`), the Force Store endpoint does
+   NOT trust that value for scoping. The `storeId` is always derived from the
+   resolved API key. A WBS caller that passes a different `storeId` in the body
+   gets back data for the store the key belongs to, not the spoofed one.
+
+3. **WBS enforces symmetric scoping.** Every `/external/*` endpoint in WBS
+   also resolves the calling client from the `x-wbs-api-key` before touching
+   any data. The `CLIENT_SAFE_SELECT` projection ensures the response never
+   includes credentials or another client's data regardless of what the API
+   key resolves to.
+
+4. **No trust across service boundaries for query params.** Neither service
+   trusts `storeId` / `clientId` values in query strings on cross-service calls.
+   The binding is always key → tenant, enforced at the middleware layer.
+
+### Why this matters
+
+WBS is a multi-tenant platform. Each WBS client has one business WhatsApp number
+and may be connected to one Force Store. If tenant scoping were based on a
+caller-supplied `storeId`, a WBS client who knew another merchant's Force Store
+UUID could enumerate their products, read their abandoned carts, or toggle their
+DM ordering feature. The API-key → storeId resolution prevents this at the entry
+point before any handler code runs.
+
+### Where this lives
+
+- `apps/api/src/routes/wa-bridge.routes.ts` — bridge routes + key resolution
+  middleware (`requireWbsApiKey`, which resolves `storeId` from `x-wbs-api-key`)
+- `apps/api/src/services/wbs-bridge.service.ts` — bridge service calls
+- `backend/src/routes/external.js` in WBS — `CLIENT_SAFE_SELECT` + key lookup
+- `backend/src/middleware/clientScope.js` in WBS — client-scope middleware used
+  on all `/external/*` and `/api/v1/*` routes
