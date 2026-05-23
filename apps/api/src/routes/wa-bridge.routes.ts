@@ -102,9 +102,16 @@ router.get('/categories', waBridgeAuth, async (req: Request, res: Response) => {
   }
 });
 
-// ─── GET /products/search?q= ─────────────────────────────────────────────────
+// ─── GET /products/search?q=&page= ───────────────────────────────────────────
+// Bilingual: matches name OR nameAr (both case-insensitive).
+// Paginated: page param (default 1) with PAGE_SIZE per page so WBS can
+// implement "Show more…" rows the same way as /products/by-category.
+// limit param allows WBS to request a different page size (default PAGE_SIZE,
+// max 50) — WBS uses 9 products/page so it can reserve one row for "Show more".
 const searchSchema = z.object({
   q: z.string().min(1).max(80),
+  page: z.coerce.number().int().min(1).max(50).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(PAGE_SIZE),
 });
 router.get('/products/search', waBridgeAuth, async (req: Request, res: Response) => {
   try {
@@ -113,10 +120,11 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
       res.status(400).json({ success: false, error: 'INVALID_QUERY' });
       return;
     }
-    const { q } = parse.data;
+    const { q, page, limit } = parse.data;
     const storeId = req.bridgeStore!.id;
 
-    // Case-insensitive contains on name + nameAr. Returns top-10.
+    // Case-insensitive contains on name + nameAr, plus exact SKU match.
+    // Fetch limit+1 to cheaply determine hasMore without a COUNT query.
     const products = await prisma.product.findMany({
       where: {
         storeId,
@@ -143,12 +151,17 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
           take: 1,
         },
       },
-      take: PAGE_SIZE,
+      orderBy: { name: 'asc' },
+      take: limit + 1, // +1 probe for hasMore
+      skip: (page - 1) * limit,
     });
+
+    const hasMore = products.length > limit;
+    const pageProducts = hasMore ? products.slice(0, limit) : products;
 
     res.json({
       success: true,
-      data: products.map(p => ({
+      data: pageProducts.map(p => ({
         id: p.id,
         name: p.name,
         nameAr: p.nameAr,
@@ -159,6 +172,7 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
         inventory: p.trackInventory ? p.inventory : null,
         imageUrl: p.images[0]?.url || null,
       })),
+      pagination: { page, perPage: limit, hasMore },
     });
   } catch (err) {
     logger.error({ err: (err as Error).message }, '[wa-bridge] product search failed');
