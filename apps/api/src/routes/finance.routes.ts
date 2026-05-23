@@ -403,8 +403,10 @@ router.get(
 // ─── GET /:storeId/finance/dashboard ─────────────────────────────────────────
 
 /**
- * Merchant-facing finance dashboard — this-month P&L, cash account balances,
+ * Merchant-facing finance dashboard — windowed P&L, cash account balances,
  * stock value, and balance-sheet totals.
+ * Accepts optional `from` and `to` ISO date query params to set the P&L
+ * window. Defaults to the current calendar month when omitted.
  * Cash accounts are those whose code starts with '10' (asset accounts in the
  * 1000-1099 range per Kuwait COA — bank + petty cash).
  */
@@ -418,10 +420,16 @@ router.get(
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+      // Allow caller to override the P&L window via from/to query params.
+      // Both are expected as YYYY-MM-DD strings (date-only, local midnight).
+      // When omitted, the endpoint falls back to current-month behaviour.
+      const from = req.query.from ? new Date(String(req.query.from) + 'T00:00:00') : monthStart;
+      const to = req.query.to ? new Date(String(req.query.to) + 'T23:59:59') : now;
+
       const data = await runInTenantContext(req.params.storeId, async () => {
         const [pnl, bs, stockValueRows] = await Promise.all([
-          profitAndLoss(req.params.storeId, monthStart, now),
-          balanceSheet(req.params.storeId, now),
+          profitAndLoss(req.params.storeId, from, to),
+          balanceSheet(req.params.storeId, to),
           prisma.$queryRawUnsafe<{ total: bigint }[]>(
             `SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total
              FROM public.products

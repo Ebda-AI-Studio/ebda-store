@@ -80,7 +80,7 @@ const getSessionId = (req: Request): string => {
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const { page, limit, status } = req.query;
+    const { page, limit, status, from, to } = req.query;
     const role = req.user?.role;
     const isAdmin = role === 'store_admin' || role === 'super_admin';
 
@@ -99,6 +99,8 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
       limit: limit ? parseInt(limit as string) : undefined,
       status: status as string,
       customerId: isAdmin ? undefined : req.user?.userId,
+      from: from ? new Date(String(from) + 'T00:00:00') : undefined,
+      to: to ? new Date(String(to) + 'T23:59:59') : undefined,
     });
 
     res.json({

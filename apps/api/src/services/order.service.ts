@@ -58,9 +58,11 @@ export class OrderService {
       limit?: number;
       status?: string;
       customerId?: string;
+      from?: Date;
+      to?: Date;
     } = {}
   ) {
-    const { status, customerId } = options;
+    const { status, customerId, from, to } = options;
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
@@ -73,6 +75,11 @@ export class OrderService {
     const where: Prisma.OrderWhereInput = { storeId, deletedAt: null };
     if (status) where.status = status as OrderStatus;
     if (customerId) where.customerId = customerId;
+    if (from || to) {
+      where.createdAt = {};
+      if (from) (where.createdAt as any).gte = from;
+      if (to) (where.createdAt as any).lte = to;
+    }
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
