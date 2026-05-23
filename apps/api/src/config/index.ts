@@ -168,12 +168,6 @@ export const config = {
   vercelProjectId: process.env.VERCEL_PROJECT_ID || '',
   vercelTeamId: process.env.VERCEL_TEAM_ID || '',
 
-  // Backup
-  backupEnabled: process.env.BACKUP_ENABLED === 'true',
-  backupSchedule: process.env.BACKUP_SCHEDULE || '0 3 * * *', // Daily at 3 AM
-  backupRetentionDays: parseInt(process.env.BACKUP_RETENTION_DAYS || '30', 10),
-  backupS3Bucket: process.env.BACKUP_S3_BUCKET || '',
-
   // AI features — Force Store AI assistant uses Google Gemini 2.0 Flash
   // for translation, SEO meta generation, and category suggestions.
   // Free tier covers 15 req/min and ~1500 req/day per project, which
