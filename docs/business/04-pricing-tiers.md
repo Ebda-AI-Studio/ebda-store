@@ -78,15 +78,17 @@ These are platform-default. Every Force Store client gets them. Don't bother ite
 
 #### Band 2 — Premium add-ons (charge separately)
 
-| Feature              | Value framing                                                | Recommended proposal price band                         |
-| -------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
-| `loyalty`            | "Customer loyalty program — points, tiers, rewards"          | Setup: 100-300 KWD + Monthly: 5-15 KWD                  |
-| `affiliate`          | "Run an affiliate program — let influencers earn % per sale" | Setup: 100-200 KWD + Monthly: 5-10 KWD                  |
-| `whatsapp`           | "Order notifications via WhatsApp (4 templates)"             | Setup: 50-150 KWD + Monthly: 3-10 KWD                   |
-| `sms`                | "Order updates via SMS (Kuwait carriers)"                    | Setup: 50-150 KWD + Monthly: 3-10 KWD + SMS-per-message |
-| `push_notifications` | "Web push to opt-in customers"                               | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
-| `upsell_crosssell`   | "AI-driven product recommendations + bundles"                | Setup: 50-100 KWD + Monthly: 3-10 KWD                   |
-| `floating_widget`    | "Sticky WhatsApp/Instagram/music button"                     | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
+| Feature              | Value framing                                                                                                        | Recommended proposal price band                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `loyalty`            | "Customer loyalty program — points, tiers, rewards"                                                                  | Setup: 100-300 KWD + Monthly: 5-15 KWD                  |
+| `affiliate`          | "Run an affiliate program — let influencers earn % per sale"                                                         | Setup: 100-200 KWD + Monthly: 5-10 KWD                  |
+| `whatsapp`           | "WhatsApp integration: order notifications (4 templates) + customer DM ordering bot + bot analytics + payment links" | Setup: 150-300 KWD + Monthly: 10-25 KWD                 |
+| `sms`                | "Order updates via SMS (Kuwait carriers)"                                                                            | Setup: 50-150 KWD + Monthly: 3-10 KWD + SMS-per-message |
+| `push_notifications` | "Web push to opt-in customers"                                                                                       | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
+| `upsell_crosssell`   | "AI-driven product recommendations + bundles"                                                                        | Setup: 50-100 KWD + Monthly: 3-10 KWD                   |
+| `floating_widget`    | "Sticky WhatsApp/Instagram/music button"                                                                             | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
+
+> **Bot intelligence is included in the `whatsapp` feature at no extra charge.** The natural-language AI (intent classification, voice transcription, product photo matching, returning-customer personalization) runs on the Google Gemini free tier — there is no per-conversation or per-LLM-call cost passed to merchants. Same holds for all other AI features (translation, SEO, category suggestion): the platform absorbs the Gemini free-tier cost.
 
 These are the **upgrade levers** during a proposal conversation. A merchant wanting WhatsApp + Loyalty + Affiliate adds ~250-500 KWD setup + ~13-35 KWD/month to the base.
 
@@ -174,7 +176,7 @@ Annual total: 1100 KWD (500 setup + 600 / 12 mo @ 50)
 Setup fee: 1000 KWD (one-off)
   - Everything in Basic
   - + Loyalty program configuration
-  - + WhatsApp templates (4 events) — incl. WBS bridge setup
+  - + WhatsApp integration (4 order templates + customer DM ordering bot + payment links) — incl. WBS bridge setup
   - + Affiliate program setup
   - + 2-hour live training session
 

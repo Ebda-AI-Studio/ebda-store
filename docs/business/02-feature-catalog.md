@@ -232,13 +232,106 @@ When the platform ships a new feature or design improvement, all stores receive 
 
 ---
 
-## 6. Integrations (الاتصالات والتكاملات)
+## 6. WhatsApp Customer Ordering — واتساب التسوّق المباشر (Phase 6 + Phase 8)
 
-### WhatsApp Order Notifications (إشعارات الطلبات على واتساب)
+Force Store connects to the **Force WhatsApp Business Platform** to turn every customer DM into a complete order — without any human agent typing it out.
 
-Connect your store to the Force WhatsApp Business Platform (a separate Force AI product). Once connected with a single API key, your customers automatically receive WhatsApp messages for four order events: order placed, order confirmed, order shipped, and order delivered. Messages are sent through Meta-approved templates so they reach customers even if they haven't chatted with your business number before.
+### How it works for the customer
 
-> 📸 Screenshot: WhatsApp notification setup page showing the connect-by-key flow and four event templates
+1. Customer DMs your business WhatsApp number — even "hi" is enough.
+2. Within 1 second they receive a category list (interactive tap-menu, not plain text).
+3. Tap a category → product list. Tap a product → quantity picker. Tap quantity → cart summary.
+4. Tap **Checkout** → receives a checkout link valid for 30 minutes.
+5. Tap the link → lands on your Force Store checkout with their cart and phone number already filled in.
+6. Pays via KNET, Tap, MyFatoorah, or their preferred gateway — the same checkout your website customers use.
+7. Receives a WhatsApp thank-you message automatically after successful payment.
+
+Bilingual from end-to-end: Arabic-speaking customers get the full Arabic flow; English customers get English. Language is detected automatically from their first message — no setup required.
+
+### Bot intelligence — الذكاء الاصطناعي في المحادثة
+
+The bot is not a rigid keyword-matching system. It understands natural language:
+
+| Customer types             | Bot understands                                                   |
+| -------------------------- | ----------------------------------------------------------------- |
+| "بغيت أطلب قهوة بدون سكر"  | Finds coffee products, asks for quantity                          |
+| "شو عندكم من حلويات؟"      | Shows the Sweets category                                         |
+| "same as last time please" | Recognizes returning customer, offers to re-order their last cart |
+| Sends a voice note         | Transcribes it, processes as text                                 |
+| Sends a product photo      | Matches it against your catalog, suggests the closest product     |
+
+**How it works:** powered by Google Gemini AI running inside the Force WhatsApp Business Platform. All AI cost is absorbed by the platform — there is no per-message or per-AI-call charge to merchants. No API key required on your side.
+
+**Returning-customer greeting:** for any customer who has completed an order before, the bot opens with a personalized message offering to repeat their last order. This alone increases conversion for repeat buyers.
+
+### Bot Copy — تخصيص رسائل البوت
+
+Your bot's messages use your brand voice. From Force Store admin → Settings → WhatsApp Integration → Bot Copy, you can edit:
+
+- The welcome greeting (Arabic + English)
+- Category and product prompts
+- Cart summary phrasing
+- Checkout confirmation message
+
+Changes apply immediately — no code deployment needed.
+
+### Bot Analytics — تحليلات البوت
+
+A dedicated analytics dashboard (Admin → WhatsApp Integration → Bot Analytics) shows:
+
+- **Funnel**: how many conversations reached each stage (welcome → category → product → cart → checkout → paid)
+- **Intent breakdown**: what customers asked for (ordering, browsing, support, unknown)
+- **LLM stats**: how often Gemini classified intent vs. fell back to keyword mode
+- **Input breakdown**: text vs. voice vs. image inputs over any date range
+
+---
+
+## 7. Order Notifications — إشعارات الطلبات
+
+### Per-event, per-channel notification toggles
+
+For every order lifecycle event, you choose whether the notification fires by email, WhatsApp, or both. Configure from Admin → Settings → WhatsApp Integration → Order Updates.
+
+| Event               | What triggers it             | Channels available |
+| ------------------- | ---------------------------- | ------------------ |
+| **Order Placed**    | Customer completes checkout  | Email, WhatsApp    |
+| **Order Confirmed** | You mark the order confirmed | Email, WhatsApp    |
+| **Order Shipped**   | You add a tracking number    | Email, WhatsApp    |
+| **Order Delivered** | You mark delivered           | Email, WhatsApp    |
+
+**Origin-aware delivery:** orders placed on your website send via the configured channels (email + WhatsApp). Orders placed through WhatsApp DM send WhatsApp-only — no synthetic email in the customer's inbox.
+
+### Abandoned cart recovery — استرداد السلات المتروكة
+
+Customers who leave items in their cart without completing checkout receive automated recovery reminders. As of Phase 8, the recovery sweep covers **both** website carts and WhatsApp DM carts — if a customer started ordering via WhatsApp but didn't tap Checkout, they receive a recovery reminder on WhatsApp too.
+
+---
+
+## 8. Smart Payment Links — روابط الدفع الذكية
+
+Merchants can generate a payment link from any order in **Admin → Orders** and send it directly to a customer on WhatsApp. The feature:
+
+- **Typeahead product picker** — search your catalog by name and add products directly to the link without leaving the admin
+- **Custom amount** — set any amount for a payment link not tied to a specific product (service fees, deposits, etc.)
+- **Multi-provider** — the link uses your store's configured payment gateway (Tap, MyFatoorah, Hesabe, or UPayments). No hardcoded provider.
+- **Re-use existing URL** — if a payment link was already minted for an order, the Copy + Open buttons surface it inline without generating a new one.
+
+This replaces the need to call customers back to re-do checkout. Send a link, customer pays in one tap.
+
+---
+
+## 9. Integrations (الاتصالات والتكاملات)
+
+### WhatsApp Integration — التكامل مع واتساب
+
+The WhatsApp integration is a single consolidated page in your admin: **Settings → WhatsApp Integration**. It covers six areas via tabs:
+
+1. **Connection** — connect your Force WhatsApp Business Platform account with one API key. The card shows live status: "Connected / Not connected" + "DM ordering: ON/OFF" at a glance.
+2. **Templates** — view all your Meta-approved templates. If Meta rejects a template, use the **Reset to Draft** button to rename it and resubmit. Dropdowns across the admin always resolve to the current approved version automatically.
+3. **Order Updates** — per-event, per-channel toggles + language picker (see Section 7 above).
+4. **Payment Link** — generate and send payment links from any order (see Section 8 above).
+5. **Bot Copy** — edit your bot's greeting and flow messages in Arabic and English.
+6. **Bot Analytics** — funnel + intent + LLM stats (see Section 6 above).
 
 ### Transactional Email (البريد الإلكتروني)
 
@@ -254,11 +347,23 @@ Connect Meta (Facebook/Instagram), Google, and TikTok tracking pixels to your st
 
 ### Analytics (التحليلات السلوكية)
 
-Visitor behavior tracking is built in to power the Analytics hub's conversion funnel, cohort, and segment reports.
+Visitor behavior tracking is built in to power the Analytics hub's conversion funnel, cohort, and segment reports. Date range pickers appear across Finance, Orders, Stock, Bot Analytics, and the Analytics Overview — every report can be filtered to any custom time period.
 
 ---
 
-## 7. Premium Add-Ons (الميزات الإضافية)
+## 10. Marketing Tools — أدوات التسويق
+
+### Newsletter Broadcast (إرسال النشرات)
+
+Send promotional email campaigns to your subscriber list directly from **Admin → Marketing → Newsletter**. Draft, preview, and send to all opted-in customers. Export your subscriber list as Excel (.xlsx) or CSV for use in external tools.
+
+### Affiliate Program (برنامج التسويق بالعمولة)
+
+The affiliate program is available as a premium add-on. Affiliates, influencers, or loyal customers each get a unique referral link. Every completed order through their link earns the affiliate their configured commission. Invite new affiliates directly from the admin with the **Invite** button — sends a branded onboarding email automatically.
+
+---
+
+## 11. Premium Add-Ons (الميزات الإضافية)
 
 The following features are available as opt-in additions for stores that want extra capabilities. They require separate activation — ask your Force AI account manager.
 
@@ -290,7 +395,7 @@ Let influencers, partners, or loyal customers earn a commission for every order 
 
 ### WhatsApp Notifications (إشعارات واتساب)
 
-The WhatsApp order notification integration described in Section 6 is an add-on. It requires an active Force WhatsApp Business Platform account and a connected Meta-approved WABA.
+The full WhatsApp integration described in Section 9 is an add-on. It requires an active Force WhatsApp Business Platform account and a connected Meta-approved WABA. The bot intelligence features (natural language ordering, voice, photo matching) are included in the WhatsApp add-on at no extra charge — they run on the free Google Gemini tier.
 
 ### SMS Notifications (الرسائل القصيرة)
 

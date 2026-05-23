@@ -27,7 +27,9 @@ Every manual content task that drains merchant time has an AI auto-fill button:
 - **Detect spam reviews** automatically
 - **Draft owner-responses** to customer reviews in either language
 
-All powered by Google Gemini Flash Lite. **Included free** in your subscription up to generous monthly quotas. Compare to Shopify charging $20/month for Arabic translation alone.
+Beyond content, AI powers the **WhatsApp DM ordering bot**: customers message your business number in natural Arabic or English, the bot understands what they want, walks them through your catalog, and hands them a checkout link — all without an agent. Voice notes are transcribed. Product photos are matched against your catalog. Returning customers are greeted by name and offered their last order. All powered by Google Gemini, **included free** in the WhatsApp integration at no per-message or per-AI-call cost.
+
+Compare to Shopify charging $20/month for Arabic translation alone — and offering no WhatsApp ordering bot at any price.
 
 ### 2. Arabic-first locality
 
@@ -76,6 +78,7 @@ Most platforms give you a theme picker and call it customization. Force Store gi
 - Needs to sell to both Arabic-speaking and English-speaking customers
 - Wants KNET as a primary payment method (not buried behind a plugin)
 - Doesn't have a developer on staff and doesn't want to hire one
+- Wants to take orders via WhatsApp DM (not just notifications — actual orders from customers DMing the business number)
 - Cares about WhatsApp order updates because that's how their customers communicate
 - Values built-in inventory, suppliers, purchase orders, basic accounting
 
