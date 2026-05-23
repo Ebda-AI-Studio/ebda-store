@@ -157,6 +157,7 @@ export const HUBS: HubDefinition[] = [
     urlPrefixes: [
       '/settings',
       '/integrations',
+      '/whatsapp',
       '/wa-templates',
       '/wa-order-updates',
       '/payment-link',

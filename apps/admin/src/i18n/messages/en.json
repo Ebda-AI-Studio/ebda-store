@@ -1248,6 +1248,10 @@
         "title": "Newsletter Subscribers",
         "description": "View and export the email list captured from your storefront"
       },
+      "whatsapp": {
+        "title": "WhatsApp Integration",
+        "description": "Force Business Platform · templates · order updates · payment links"
+      },
       "whatsappBridge": {
         "title": "WhatsApp Business",
         "description": "Connect Force Store to Force WhatsApp Business Platform — paste your API key + configure templates"
