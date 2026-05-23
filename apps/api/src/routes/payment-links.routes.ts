@@ -40,23 +40,36 @@ import type { Currency } from '../services/payment-providers/types';
 
 const router = Router({ mergeParams: true });
 
-const bodySchema = z.object({
-  // Customer's phone in E.164 format
-  customerPhone: z.string().regex(/^\+[1-9]\d{6,14}$/, 'Phone must be E.164 (e.g. +96512345678)'),
-  customerName: z.string().min(1).max(100).optional(),
-  // Items (existing products) — required because OrderItem.productId is non-nullable
-  items: z
-    .array(
-      z.object({
-        productId: z.string().min(1),
-        quantity: z.number().int().min(1).max(99),
-      })
-    )
-    .min(1, 'At least one item is required')
-    .max(50),
-  // Override paymentLink template language for this send (default = en)
-  language: z.enum(['en', 'ar']).optional(),
-});
+const bodySchema = z
+  .object({
+    // Customer's phone in E.164 format
+    customerPhone: z.string().regex(/^\+[1-9]\d{6,14}$/, 'Phone must be E.164 (e.g. +96512345678)'),
+    customerName: z.string().min(1).max(100).optional(),
+    // Items from the catalogue (productId references). Optional when an
+    // extraAmount is provided — a payment link can be ALL custom charge
+    // (e.g. service deposit, custom quote) with no catalogued items.
+    items: z
+      .array(
+        z.object({
+          productId: z.string().min(1),
+          quantity: z.number().int().min(1).max(99),
+        })
+      )
+      .max(50)
+      .optional(),
+    // Out-of-catalogue charge in fils. Baked into Order.total + persisted
+    // as Order.extraAmount. Use for custom quotes, deposits, service fees
+    // that don't map to a Product. Either items OR extraAmount (or both)
+    // must be provided.
+    extraAmountFils: z.number().int().min(0).max(100_000_000).optional(),
+    extraAmountNote: z.string().max(200).optional(),
+    // Override paymentLink template language (default = en)
+    language: z.enum(['en', 'ar']).optional(),
+  })
+  .refine(
+    d => (d.items && d.items.length > 0) || (d.extraAmountFils && d.extraAmountFils > 0),
+    'Provide at least one item OR a non-zero extra amount.'
+  );
 
 router.post(
   '/',
@@ -78,7 +91,16 @@ router.post(
         });
         return;
       }
-      const { customerPhone, customerName, items, language } = parsed.data;
+      const {
+        customerPhone,
+        customerName,
+        items: itemsRaw,
+        extraAmountFils,
+        extraAmountNote,
+        language,
+      } = parsed.data;
+      const items = itemsRaw ?? [];
+      const extraFils = extraAmountFils ?? 0;
       const user = getAuthUser(req);
 
       // ── Load store ──────────────────────────────────────────────────────────
@@ -138,19 +160,21 @@ router.post(
 
       // ── Validate items + compute total ─────────────────────────────────────
       const productIds = items.map(i => i.productId);
-      const products = await prisma.product.findMany({
-        where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          inventory: true,
-          trackInventory: true,
-          allowBackorder: true,
-          sku: true,
-          costPrice: true,
-        },
-      });
+      const products = productIds.length
+        ? await prisma.product.findMany({
+            where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
+            select: {
+              id: true,
+              name: true,
+              price: true,
+              inventory: true,
+              trackInventory: true,
+              allowBackorder: true,
+              sku: true,
+              costPrice: true,
+            },
+          })
+        : [];
       const byId = new Map(products.map(p => [p.id, p]));
       for (const it of items) {
         const p = byId.get(it.productId);
@@ -171,10 +195,11 @@ router.post(
           return;
         }
       }
-      const totalFils = items.reduce((sum, it) => {
+      const itemsSubtotal = items.reduce((sum, it) => {
         const p = byId.get(it.productId);
         return sum + (p ? p.price * it.quantity : 0);
       }, 0);
+      const totalFils = itemsSubtotal + extraFils;
 
       // ── Find or create Customer ────────────────────────────────────────────
       // The User model is the customer record (role='customer', scoped to storeId).
@@ -216,11 +241,13 @@ router.post(
           orderNumber,
           status: 'pending',
           paymentStatus: 'unpaid',
-          subtotal: totalFils,
+          subtotal: itemsSubtotal,
           tax: 0,
           shipping: 0,
           discount: 0,
           total: totalFils,
+          extraAmount: extraFils,
+          extraAmountNote: extraAmountNote || null,
           currency: store.currency || 'KWD',
           shippingAddress: {
             phone: customerPhone,

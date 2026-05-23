@@ -86,11 +86,14 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
   const fetchConfig = useCallback(async () => {
     if (!storeId) return;
     setLoading(true);
-    const { data } = await apiGet<{ data: WbsConfig }>(
-      `/api/v1/stores/${storeId}/integrations/wbs`
-    );
-    if (data?.data) {
-      const cfg = data.data;
+    // apiRequest auto-unwraps the API's `data` envelope — the value
+    // it returns IS the WbsConfig payload. Don't double-unwrap with
+    // `data.data` (the bug this tab carried since the extraction
+    // from the old /integrations/wbs page — caused config to never
+    // populate, so isConnected was permanently false and the Connect
+    // form rendered even after a successful save).
+    const { data: cfg } = await apiGet<WbsConfig>(`/api/v1/stores/${storeId}/integrations/wbs`);
+    if (cfg) {
       setConfig(cfg);
       setEnableToggle(cfg.wbsEnabled);
       setSelectedTemplates(cfg.wbsTemplates || {});

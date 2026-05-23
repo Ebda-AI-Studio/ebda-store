@@ -836,6 +836,13 @@ model Order {
   shipping        Int                @default(0)
   discount        Int                @default(0)
   total           Int
+  // Extra out-of-catalog amount used by merchant-initiated payment
+  // links — a custom service fee, deposit, or quote that doesn't map
+  // to a Product. Baked into `total` at order creation; rendered as
+  // a synthetic line in admin order detail. extraAmountNote captures
+  // what the charge is for ("Photography deposit", "Rush fee", etc.).
+  extraAmount       Int                @default(0) @map("extra_amount")
+  extraAmountNote   String?            @map("extra_amount_note")
   currency        String             @default("KWD")
   couponCode      String?            @map("coupon_code")
   couponDiscount  Int                @default(0) @map("coupon_discount")
