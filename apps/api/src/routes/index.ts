@@ -49,6 +49,7 @@ import purchaseOrdersRoutes from './purchase-orders.routes';
 import stockAdjustmentsRoutes from './stock-adjustments.routes';
 import expensesRoutes from './expenses.routes';
 import backordersRoutes from './backorders.routes';
+import botAnalyticsRoutes from './bot-analytics.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -174,6 +175,9 @@ router.use('/stores', tenantContext, expensesRoutes);
 
 // Backorder list + cancel (Batch 2 accounting)
 router.use('/stores', tenantContext, backordersRoutes);
+
+// Phase 5 bot intelligence: proxy bot analytics from WBS to admin frontend
+router.use('/stores', tenantContext, botAnalyticsRoutes);
 
 // Wishlist routes (user-scoped, no store context)
 router.use('/wishlist', wishlistRoutes);
