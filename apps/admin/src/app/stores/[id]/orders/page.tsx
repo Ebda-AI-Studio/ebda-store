@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { DateRangePicker } from '../../../../components/DateRangePicker';
 import { apiGet, apiPut, apiPost, apiFetch } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 import { OrdersFilters } from './_components/OrdersFilters';
@@ -13,6 +14,8 @@ import { OrdersTable } from './_components/OrdersTable';
 import { OrdersPagination } from './_components/OrdersPagination';
 import type { Order, Pagination, StatusFilter } from './_components/types';
 import { ConfirmActionModal } from '../../../../components/ConfirmActionModal';
+import type { Period, ResolvedDateRange } from '../analytics/_components/types';
+import { resolveDateRange } from '../analytics/_components/types';
 
 type ConfirmType = 'markPaid' | 'bulkMarkPaid';
 
@@ -40,6 +43,9 @@ export default function StoreOrdersPage() {
     return [10, 25, 50, 100].includes(parsed) ? parsed : 25;
   })();
 
+  const [period, setPeriod] = useState<Period>('last_30');
+  const [customRange, setCustomRange] = useState<ResolvedDateRange | undefined>(undefined);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -60,14 +66,24 @@ export default function StoreOrdersPage() {
   });
   const { success: toastSuccess, error: showError } = useToast();
 
+  function toDateStr(d: Date): string {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
   const fetchOrders = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
     setError(null);
     try {
+      const resolved = resolveDateRange(period, customRange);
       const qs = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
+        from: toDateStr(resolved.startDate),
+        to: toDateStr(resolved.endDate),
       });
       if (statusFilter !== 'all') qs.set('status', statusFilter);
 
@@ -89,7 +105,7 @@ export default function StoreOrdersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [storeId, pagination.page, pagination.limit, statusFilter, t]);
+  }, [storeId, pagination.page, pagination.limit, statusFilter, period, customRange, t]);
 
   useEffect(() => {
     fetchOrders();
@@ -307,6 +323,16 @@ export default function StoreOrdersPage() {
         </div>
       }
     >
+      <DateRangePicker
+        period={period}
+        custom={customRange}
+        onChange={(p, c) => {
+          setPeriod(p);
+          if (c) setCustomRange(c);
+          setPagination(prev => ({ ...prev, page: 1 }));
+        }}
+      />
+
       <OrdersFilters
         statusFilter={statusFilter}
         onStatusFilterChange={status => {
