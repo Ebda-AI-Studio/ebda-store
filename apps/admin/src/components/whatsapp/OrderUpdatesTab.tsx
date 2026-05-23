@@ -77,6 +77,7 @@ interface WbsTemplates {
   orderPaid?: TemplateEntry;
   orderShipped?: TemplateEntry;
   orderDelivered?: TemplateEntry;
+  cartAbandoned?: TemplateEntry;
 }
 
 interface WbsConfig {
@@ -89,7 +90,7 @@ interface WbsConfig {
   } | null;
 }
 
-type EventKey = 'orderPaid' | 'orderShipped' | 'orderDelivered';
+type EventKey = 'orderPaid' | 'orderShipped' | 'orderDelivered' | 'cartAbandoned';
 
 interface EventDef {
   key: EventKey;
@@ -120,6 +121,13 @@ const EVENTS: EventDef[] = [
     label: 'Order delivered',
     description: 'Send when the order is marked as delivered.',
     templateBase: 'order_delivered',
+  },
+  {
+    key: 'cartAbandoned',
+    label: 'Cart abandoned',
+    description:
+      'Send a reminder when a customer leaves items in their cart without checking out. Up to 3 steps: 1 h, 4 h, 24 h after abandonment.',
+    templateBase: 'cart_abandoned',
   },
 ];
 
@@ -178,12 +186,14 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
     orderPaid: false,
     orderShipped: false,
     orderDelivered: false,
+    cartAbandoned: false,
   });
   /** Per-event channel toggles. Both default to true when not present in saved config. */
   const [channels, setChannels] = useState<Record<EventKey, TemplateChannels>>({
     orderPaid: { ...DEFAULT_CHANNELS },
     orderShipped: { ...DEFAULT_CHANNELS },
     orderDelivered: { ...DEFAULT_CHANNELS },
+    cartAbandoned: { ...DEFAULT_CHANNELS },
   });
 
   const load = useCallback(async () => {
@@ -198,6 +208,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
           orderPaid: Boolean(t.orderPaid?.name),
           orderShipped: Boolean(t.orderShipped?.name),
           orderDelivered: Boolean(t.orderDelivered?.name),
+          cartAbandoned: Boolean(t.cartAbandoned?.name),
         });
         if (t.orderPaid?.languageCode === 'ar') setLanguage('ar');
         // Restore saved channel state; default both ON when absent
@@ -205,6 +216,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
           orderPaid: t.orderPaid?.channels ?? { ...DEFAULT_CHANNELS },
           orderShipped: t.orderShipped?.channels ?? { ...DEFAULT_CHANNELS },
           orderDelivered: t.orderDelivered?.channels ?? { ...DEFAULT_CHANNELS },
+          cartAbandoned: t.cartAbandoned?.channels ?? { ...DEFAULT_CHANNELS },
         });
       }
     } catch (e) {

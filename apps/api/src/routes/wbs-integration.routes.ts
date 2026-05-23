@@ -55,6 +55,7 @@ const wbsIntegrationSchema = z.object({
       orderPaid: templateEntryWithChannelsSchema.optional(),
       orderShipped: templateEntryWithChannelsSchema.optional(),
       orderDelivered: templateEntryWithChannelsSchema.optional(),
+      cartAbandoned: templateEntryWithChannelsSchema.optional(),
     })
     .nullable()
     .optional(),
