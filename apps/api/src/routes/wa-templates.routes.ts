@@ -152,6 +152,88 @@ router.post(
   }
 );
 
+// ─── POST /stores/:id/wa-templates/reset-rejected ────────────────────────────
+//
+// For each WhatsAppTemplate row currently in status='rejected', refresh its
+// `body` from the latest canonical definitions.ts via buildTemplatesForStore
+// AND flip status='draft' + clear rejectionReason. This lets the merchant
+// hit "Sync" next and have the rejected templates re-submitted to Meta with
+// the corrected body text (typical case: an early-generation row carries a
+// historical body that had a placeholder gap / wrong wording, the definitions
+// have since been fixed, but the row's `body` and `status` are stale).
+//
+// Meta tracks rejection cooldowns per name+language. If we resubmit with the
+// SAME name within 24h of a rejection, Meta still rejects with the same code.
+// Callers can check rejectionReason age + wait if needed; this endpoint
+// doesn't rename templates.
+router.post(
+  '/reset-rejected',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response) => {
+    const storeId = req.params.id;
+    try {
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { slug: true, name: true, nameAr: true },
+      });
+      if (!store) {
+        res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
+        return;
+      }
+
+      const rejected = await prisma.whatsAppTemplate.findMany({
+        where: { storeId, status: 'rejected' },
+        select: { id: true, sourceKey: true, language: true, metaName: true },
+      });
+      if (rejected.length === 0) {
+        res.json({
+          success: true,
+          data: { reset: 0, message: 'No rejected templates to reset.' },
+        });
+        return;
+      }
+
+      const canonical = buildTemplatesForStore({
+        slug: store.slug,
+        name: store.name,
+        nameAr: store.nameAr,
+      });
+
+      let reset = 0;
+      for (const row of rejected) {
+        const built = canonical.find(
+          c => c.sourceKey === row.sourceKey && c.language === row.language
+        );
+        if (!built) continue;
+        const bodyComp = built.components.find(c => c.type === 'BODY');
+        await prisma.whatsAppTemplate.update({
+          where: { id: row.id },
+          data: {
+            body: bodyComp?.text || '',
+            status: 'draft',
+            rejectionReason: null,
+            lastSyncedAt: null,
+          },
+        });
+        reset++;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          reset,
+          message: `Reset ${reset} rejected template${reset === 1 ? '' : 's'} to draft with the latest canonical body. Click Sync to resubmit to Meta.`,
+        },
+      });
+    } catch (err) {
+      logger.error({ err: (err as Error).message }, '[wa-templates] reset-rejected failed');
+      res.status(500).json({ success: false, error: 'RESET_FAILED' });
+    }
+  }
+);
+
 // ─── POST /stores/:id/wa-templates/sync ──────────────────────────────────────
 //
 // Submits every 'draft' row to WBS, which forwards to Meta. Rows transition

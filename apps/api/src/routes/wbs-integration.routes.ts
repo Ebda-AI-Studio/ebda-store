@@ -86,6 +86,7 @@ router.get(
       const store = await prisma.store.findUnique({
         where: { id: storeId },
         select: {
+          name: true,
           wbsEnabled: true,
           wbsClientId: true,
           wbsApiKey: true,
@@ -134,6 +135,43 @@ router.get(
             '[WBS-INTEGRATION] Could not fetch metadata during GET'
           );
         }
+      }
+
+      // Augment with FWB's OWN approved templates. WBS metadata reflects
+      // its templates table which can lag (Meta callbacks missed,
+      // templates approved via Meta UI directly, etc.). FWB's
+      // WhatsAppTemplate rows are the more authoritative "approved for
+      // THIS store" set because the bridge updates them via
+      // /wa-bridge/templates/status webhooks. Union + dedupe by
+      // name+language. If FWB has own-approved rows we also clear the
+      // wbs_unavailable error since the connection is functionally
+      // healthy (the merchant still has approved templates to choose).
+      const ownApproved = await prisma.whatsAppTemplate.findMany({
+        where: { storeId, status: 'approved' },
+        select: { metaName: true, language: true, category: true },
+      });
+      if (ownApproved.length > 0) {
+        const tenantNow = connectedTenant ?? {
+          businessName: store.name,
+          phoneNumber: null,
+          availableTemplates: [],
+        };
+        const seen = new Set(tenantNow.availableTemplates.map(t => `${t.name}:::${t.language}`));
+        const merged = [...tenantNow.availableTemplates];
+        for (const t of ownApproved) {
+          const key = `${t.metaName}:::${t.language}`;
+          if (seen.has(key)) continue;
+          merged.push({
+            name: t.metaName,
+            language: t.language,
+            status: 'APPROVED',
+            category: t.category || 'UTILITY',
+            variableCount: 0,
+          });
+          seen.add(key);
+        }
+        connectedTenant = { ...tenantNow, availableTemplates: merged };
+        if (connectedTenantError === 'wbs_unavailable') connectedTenantError = null;
       }
 
       res.json({

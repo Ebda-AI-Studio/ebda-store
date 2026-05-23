@@ -478,6 +478,22 @@ export class PaymentService {
   }
 
   /**
+   * Resolve the merchant's default payment provider for the given store.
+   * Honors per-store PaymentProviderConfig.isEnabled + falls back to env
+   * defaults via the same logic as `createPayment(undefined, storeId)`.
+   * Returns null when no provider is configured (caller surfaces a
+   * "configure a provider in Settings → Payments" error).
+   *
+   * Used by merchant-initiated flows (WhatsApp payment links, manual
+   * refunds, etc.) that need to know the provider name BEFORE calling
+   * createPayment — typically to build the provider-specific webhook URL.
+   */
+  static async getDefaultProvider(storeId?: string | null): Promise<PaymentProvider | null> {
+    const cached = await factory.getProviders(storeId);
+    return cached.defaultProvider ?? null;
+  }
+
+  /**
    * Get payment methods for a specific provider
    */
   static async getPaymentMethods(

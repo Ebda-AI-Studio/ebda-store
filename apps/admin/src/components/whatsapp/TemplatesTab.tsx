@@ -327,6 +327,31 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
     }
   };
 
+  const [resetting, setResetting] = useState(false);
+  const resetRejected = async () => {
+    setResetting(true);
+    try {
+      const { data: payload, error } = await apiPost<{ reset: number; message?: string }>(
+        `/api/v1/stores/${storeId}/wa-templates/reset-rejected`,
+        {}
+      );
+      if (error) throw new Error(error.message || 'Reset failed');
+      const reset = payload?.reset ?? 0;
+      toastSuccess(
+        reset > 0 ? `Reset ${reset} rejected templates` : 'No rejected templates',
+        payload?.message ||
+          (reset > 0
+            ? 'Templates flipped to draft with the latest canonical body. Click Sync to resubmit.'
+            : 'There are no rejected templates to reset.')
+      );
+      await load();
+    } catch (err) {
+      toastError('Reset failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const groupedRows = (data?.rows || []).reduce<Record<string, TemplateRow[]>>((acc, row) => {
     (acc[row.sourceKey] ||= []).push(row);
     return acc;
@@ -335,6 +360,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
   const sourceKeys = data?.sourceKeys || [];
   const hasAnyRows = (data?.rows || []).length > 0;
   const draftCount = (data?.rows || []).filter(r => r.status === 'draft').length;
+  const rejectedCount = (data?.rows || []).filter(r => r.status === 'rejected').length;
 
   return (
     <div className="space-y-6">
@@ -360,6 +386,17 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
               ? `Sync ${draftCount} to Meta`
               : 'Nothing to sync'}
         </Button>
+        {rejectedCount > 0 && (
+          <Button
+            onClick={resetRejected}
+            disabled={resetting || loading}
+            variant="outline"
+            title="Refresh rejected templates from the latest canonical body, then click Sync to resubmit"
+          >
+            <Icon.Refresh className={`me-2 h-4 w-4 ${resetting ? 'animate-spin' : ''}`} />
+            {resetting ? 'Resetting…' : `Reset ${rejectedCount} rejected to draft`}
+          </Button>
+        )}
         <Button onClick={load} disabled={loading} variant="outline">
           <Icon.Refresh className={`me-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh

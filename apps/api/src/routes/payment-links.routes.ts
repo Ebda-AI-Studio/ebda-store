@@ -290,6 +290,25 @@ router.post(
       const customerDisplayName =
         `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || 'Customer';
 
+      // Resolve the store's configured payment provider FIRST so we can
+      // build the provider-specific webhook URL. Each provider posts
+      // back to /api/v1/webhooks/payment/<provider-name>; hardcoding
+      // /myfatoorah would break Tap / Hesabe / UPayments merchants
+      // because the matching handler verifies provider-specific
+      // signatures.
+      const providerName = await PaymentService.getDefaultProvider(storeId);
+      if (!providerName) {
+        // Don't leave the draft Order orphaned — clean it up.
+        await prisma.order.delete({ where: { id: draftOrder.id } }).catch(() => null);
+        res.status(400).json({
+          success: false,
+          error: 'PAYMENT_NOT_CONFIGURED',
+          message:
+            'Configure a payment provider in Store Settings → Payments before sending payment links.',
+        });
+        return;
+      }
+
       const result = await PaymentService.createPayment(
         {
           orderId: draftOrder.id,
@@ -310,10 +329,10 @@ router.post(
           })),
           callbackUrl: `${storefrontBaseUrl}/checkout/success`,
           errorUrl: `${storefrontBaseUrl}/checkout/error`,
-          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/myfatoorah`,
+          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${providerName}`,
           notifyVia: 'link',
         },
-        'myfatoorah',
+        providerName,
         storeId
       );
 
