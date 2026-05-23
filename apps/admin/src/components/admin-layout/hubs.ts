@@ -167,6 +167,7 @@ export const HUBS: HubDefinition[] = [
       '/domain',
       '/payment-settings',
       '/shipping',
+      '/shipping-carriers',
       '/tax',
       '/pwa',
       '/language',
