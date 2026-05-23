@@ -541,3 +541,35 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 | Axiom                  | (Ahmad's account)        | free tier (500GB/30d) — dataset `force-api-railway`   |
 | Resend                 | platform-wide            | one account; per-merchant domains added under it      |
 | @ForceAI1_bot Telegram | personal DM to Ahmad     | chat_id `1943728711`                                  |
+
+---
+
+## Service Worker: pre-registration pattern (commit `91d735cf`)
+
+Chromium 133+ emits a deprecation warning when a service worker script adds
+event listeners (`message`, `push`, `notificationclick`, `pushsubscriptionchange`)
+**after** an async `importScripts()` call. The warning eventually becomes an
+error, which would break push notifications silently.
+
+**Fix applied to `apps/web/public/OneSignalSDKWorker.js`:**
+
+Pre-register **no-op handlers** for all four events synchronously, before the
+`importScripts` that loads the real OneSignal SDK:
+
+```javascript
+// pre-register before importScripts so Chromium 133+ doesn't warn
+self.addEventListener('message', () => {});
+self.addEventListener('push', () => {});
+self.addEventListener('notificationclick', () => {});
+self.addEventListener('pushsubscriptionchange', () => {});
+
+importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
+```
+
+The real handlers from `importScripts` override the no-ops. The pre-registration
+is invisible to the SDK — it only prevents the browser from seeing the first
+async event handler registration as a post-import listener.
+
+**When adding a new service worker or updating `OneSignalSDKWorker.js`:**
+preserve this pre-registration block. Removing it restores the deprecation
+warning on Chromium 133+.
