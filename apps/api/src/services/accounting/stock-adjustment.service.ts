@@ -196,10 +196,20 @@ export async function postAdjustment(
 
 /**
  * List last 100 adjustments for a store with items + product names.
+ * Accepts optional from/to Date values to filter by createdAt.
  */
-export async function listAdjustments(storeId: string): Promise<AdjustmentWithItems[]> {
+export async function listAdjustments(
+  storeId: string,
+  opts: { from?: Date; to?: Date } = {}
+): Promise<AdjustmentWithItems[]> {
+  const where: any = { storeId };
+  if (opts.from || opts.to) {
+    where.createdAt = {};
+    if (opts.from) where.createdAt.gte = opts.from;
+    if (opts.to) where.createdAt.lte = opts.to;
+  }
   return prisma.stockAdjustment.findMany({
-    where: { storeId },
+    where,
     orderBy: { createdAt: 'desc' },
     take: 100,
     include: {

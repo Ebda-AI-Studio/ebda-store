@@ -41,8 +41,10 @@ router.get(
   requireStoreAccess,
   async (req, res, next) => {
     try {
+      const from = req.query.from ? new Date(String(req.query.from) + 'T00:00:00') : undefined;
+      const to = req.query.to ? new Date(String(req.query.to) + 'T23:59:59') : undefined;
       const data = await runInTenantContext(req.params.storeId, () =>
-        listAdjustments(req.params.storeId)
+        listAdjustments(req.params.storeId, { from, to })
       );
       res.json({ data });
     } catch (err) {
