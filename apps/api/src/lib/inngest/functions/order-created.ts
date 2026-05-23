@@ -91,7 +91,12 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     };
 
     const store = await step.run('load-store', () =>
-      prisma.store.findUnique({ where: { id: storeId }, select: { name: true } }).catch(() => null)
+      prisma.store
+        .findUnique({
+          where: { id: storeId },
+          select: { name: true, wbsTemplates: true },
+        })
+        .catch(() => null)
     );
 
     // Origin-aware notification routing: orders that originated on
@@ -108,11 +113,28 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     // WhatsApp-origin flows (customer DM, BWA bot) should stamp the
     // same marker so the email skip applies uniformly.
     const orderSource = (order.shippingAddress as { _source?: string } | null)?._source;
-    const skipEmail = orderSource === 'wa_payment_link' || orderSource === 'wa_dm_order';
-    if (skipEmail) {
+    const skipEmailByOrigin = orderSource === 'wa_payment_link' || orderSource === 'wa_dm_order';
+    if (skipEmailByOrigin) {
       logger.info(
         { orderId: order.id, source: orderSource },
         '[order-created] skipping customer email — WhatsApp-origin order, customer notified via template'
+      );
+    }
+
+    // Merchant-level channel toggle: check wbsTemplates.orderPaid.channels.email.
+    // When explicitly set to false, the merchant wants this event silent on email
+    // (e.g. they rely solely on WhatsApp for paid confirmation). Absent channels
+    // object = both on (backward-compatible default).
+    type TemplateChannels = { whatsapp?: boolean; email?: boolean };
+    type TemplateEntry = { name?: string; languageCode?: string; channels?: TemplateChannels };
+    type WbsTemplatesShape = { orderPaid?: TemplateEntry };
+    const wbsTemplates = store?.wbsTemplates as WbsTemplatesShape | null;
+    const emailChannelEnabled = wbsTemplates?.orderPaid?.channels?.email !== false;
+    const skipEmail = skipEmailByOrigin || !emailChannelEnabled;
+    if (!emailChannelEnabled && !skipEmailByOrigin) {
+      logger.info(
+        { orderId: order.id, storeId },
+        '[order-created] skipping customer email — merchant disabled email channel for orderPaid'
       );
     }
 

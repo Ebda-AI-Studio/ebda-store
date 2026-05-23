@@ -41,9 +41,16 @@ type EventName = 'order/created' | 'order/shipped' | 'order/delivered';
 
 type TemplateKey = 'orderPaid' | 'orderShipped' | 'orderDelivered';
 
+interface TemplateChannels {
+  whatsapp?: boolean;
+  email?: boolean;
+}
+
 interface TemplateConfig {
   name: string;
   languageCode: string;
+  /** Per-event channel toggles. Absent = both on (backward-compatible). */
+  channels?: TemplateChannels;
 }
 
 interface WbsTemplates {
@@ -132,6 +139,17 @@ export async function handleOrderWhatsAppNotify(
       '[WBS-NOTIFY] No template configured for this event — skipping'
     );
     return { skipped: 'template-not-configured' };
+  }
+
+  // Merchant-level channel toggle: check channels.whatsapp.
+  // When explicitly set to false, skip the WhatsApp send for this event.
+  // Absent channels object = WhatsApp on (backward-compatible default).
+  if (templateConfig.channels?.whatsapp === false) {
+    logger.info(
+      { storeId, eventName, templateKey },
+      '[WBS-NOTIFY] WhatsApp channel disabled by merchant for this event — skipping'
+    );
+    return { skipped: 'whatsapp-channel-disabled' };
   }
 
   // ── Step 3: Load order + customer phone ───────────────────────────────

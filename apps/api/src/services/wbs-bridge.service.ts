@@ -255,6 +255,66 @@ export class WbsBridgeService {
       templates: (body.templates as WbsTemplateInfo[]) || [],
     };
   }
+
+  /**
+   * Sync the per-store WA customer-DM ordering flag to WBS.
+   *
+   * Called when a merchant toggles "Customer ordering via WhatsApp DM" in the
+   * FWB Connection tab. WBS uses `wa_ordering_enabled` on the client row to
+   * decide whether to activate the ordering state machine for inbound DMs.
+   *
+   * Throws:
+   *   WbsUnauthorizedError — 401 (bad/revoked key)
+   *   WbsServerError       — 5xx or network failure
+   */
+  async syncWaOrdering(
+    plaintextApiKey: string,
+    enabled: boolean
+  ): Promise<{ wa_ordering_enabled: boolean }> {
+    const url = `${this.baseUrl}/api/v1/external/wa-ordering`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-wbs-api-key': plaintextApiKey,
+        },
+        body: JSON.stringify({ enabled }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (err) {
+      logger.error(
+        { err: (err as Error).message, url },
+        '[WBS-BRIDGE] Network error syncing wa-ordering'
+      );
+      throw new WbsServerError(`WBS wa-ordering unreachable: ${(err as Error).message}`);
+    }
+
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await response.json()) as Record<string, unknown>;
+    } catch {
+      // Ignore parse failure
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new WbsUnauthorizedError((body.message as string) || `WBS returned ${response.status}`);
+    }
+
+    if (response.status >= 500) {
+      throw new WbsServerError(`WBS wa-ordering returned ${response.status}`);
+    }
+
+    if (!response.ok) {
+      throw new WbsServerError(`WBS wa-ordering returned unexpected status ${response.status}`);
+    }
+
+    logger.info({ enabled }, '[WBS-BRIDGE] wa_ordering_enabled synced to WBS');
+
+    return { wa_ordering_enabled: (body.wa_ordering_enabled as boolean) ?? enabled };
+  }
 }
 
 export const wbsBridgeService = new WbsBridgeService();

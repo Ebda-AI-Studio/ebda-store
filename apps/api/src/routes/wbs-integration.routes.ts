@@ -34,6 +34,16 @@ const templateEntrySchema = z.object({
   languageCode: z.string().default('en'),
 });
 
+const templateEntryWithChannelsSchema = templateEntrySchema.extend({
+  /** Per-event channel toggles. Absent = both on (backward-compatible). */
+  channels: z
+    .object({
+      whatsapp: z.boolean().default(true),
+      email: z.boolean().default(true),
+    })
+    .optional(),
+});
+
 const wbsIntegrationSchema = z.object({
   // wbsEnabled: optional on first-connect PUT (only wbsApiKey may be sent)
   wbsEnabled: z.boolean().optional(),
@@ -42,14 +52,20 @@ const wbsIntegrationSchema = z.object({
   wbsApiKey: z.string().nullable().optional(),
   wbsTemplates: z
     .object({
-      orderPaid: templateEntrySchema.optional(),
-      orderShipped: templateEntrySchema.optional(),
-      orderDelivered: templateEntrySchema.optional(),
+      orderPaid: templateEntryWithChannelsSchema.optional(),
+      orderShipped: templateEntryWithChannelsSchema.optional(),
+      orderDelivered: templateEntryWithChannelsSchema.optional(),
     })
     .nullable()
     .optional(),
   /** Phase 7 opt-in for store-logo HEADER images on templates. */
   wbsTemplateUseLogoHeader: z.boolean().optional(),
+  /**
+   * Customer-DM ordering via WhatsApp — when set, FWB stores the value and
+   * syncs it to WBS via PUT /api/v1/external/wa-ordering.
+   * Default OFF (false) — merchant opts in explicitly from the Connection tab.
+   */
+  waCustomerOrderingEnabled: z.boolean().optional(),
 });
 
 type WbsIntegrationInput = z.infer<typeof wbsIntegrationSchema>;
@@ -92,6 +108,7 @@ router.get(
           wbsApiKey: true,
           wbsTemplates: true,
           wbsTemplateUseLogoHeader: true,
+          waCustomerOrderingEnabled: true,
           logo: true,
         },
       });
@@ -184,6 +201,7 @@ router.get(
           hasApiKey: Boolean(store.wbsApiKey),
           wbsTemplates: store.wbsTemplates,
           wbsTemplateUseLogoHeader: store.wbsTemplateUseLogoHeader,
+          waCustomerOrderingEnabled: store.waCustomerOrderingEnabled,
           storeHasLogo: Boolean(store.logo),
           connectedTenant,
           ...(connectedTenantError ? { connectedTenantError } : {}),
@@ -310,6 +328,10 @@ router.put(
         updateData.wbsTemplateUseLogoHeader = input.wbsTemplateUseLogoHeader;
       }
 
+      if (input.waCustomerOrderingEnabled !== undefined) {
+        updateData.waCustomerOrderingEnabled = input.waCustomerOrderingEnabled;
+      }
+
       // API key handling
       if (isNewApiKey && input.wbsApiKey) {
         updateData.wbsApiKey = encryption.encrypt(input.wbsApiKey);
@@ -339,8 +361,31 @@ router.put(
           wbsApiKey: true,
           wbsTemplates: true,
           wbsTemplateUseLogoHeader: true,
+          waCustomerOrderingEnabled: true,
         },
       });
+
+      // ── Sync waCustomerOrderingEnabled to WBS ─────────────────────────────
+      // Non-blocking: any error here MUST NOT fail the save — the FWB Store
+      // record is the source of truth; WBS sync is best-effort and can be
+      // retried by the next save. Log the error for observability.
+      if (input.waCustomerOrderingEnabled !== undefined && updated.wbsApiKey) {
+        (async () => {
+          try {
+            const plaintextKey = encryption.decrypt(updated.wbsApiKey!);
+            await wbsBridgeService.syncWaOrdering(plaintextKey, updated.waCustomerOrderingEnabled);
+            logger.info(
+              { storeId, waCustomerOrderingEnabled: updated.waCustomerOrderingEnabled },
+              '[WBS-INTEGRATION] wa_ordering_enabled synced to WBS'
+            );
+          } catch (err) {
+            logger.warn(
+              { storeId, err: (err as Error).message },
+              '[WBS-INTEGRATION] waCustomerOrderingEnabled sync to WBS failed (store saved; WBS will be out-of-sync until next save)'
+            );
+          }
+        })();
+      }
 
       // ── Phase 7 atomic Connect+Generate ───────────────────────────────────
       // On first-connect (new API key just validated above), seed the
@@ -495,6 +540,7 @@ router.put(
           wbsApiKeyMasked: maskApiKey(updated.wbsApiKey),
           hasApiKey: Boolean(updated.wbsApiKey),
           wbsTemplates: updated.wbsTemplates,
+          waCustomerOrderingEnabled: updated.waCustomerOrderingEnabled,
           // Phase 7 atomic: surface what happened to the auto-generated
           // templates so the UI can show "Connected + 12 templates pending"
           ...(templatesAutoSeeded !== undefined && {
