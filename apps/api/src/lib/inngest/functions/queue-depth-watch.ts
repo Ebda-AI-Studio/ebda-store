@@ -88,14 +88,39 @@ export const queueDepthWatch: InngestFunction.Any = inngest.createFunction(
     for (const job of stuckRunning) {
       const ageMin = Math.floor((now - (job.startedAt?.getTime() ?? now)) / 60_000);
       const progress = job.total > 0 ? `${job.processed}/${job.total}` : 'unknown';
+      // Auto-reap: a stuck-running row > 60min almost always means the
+      // worker died mid-execution (Railway redeploy window, Inngest
+      // disconnect, an exception that escaped the try/catch).
+      // Marking failed here clears the dashboard confusion + lets the
+      // merchant retry from the UI without needing manual SQL.
+      try {
+        await prisma.bulkAiJob.update({
+          where: { id: job.id },
+          data: {
+            status: 'failed',
+            errorMessage: `auto-reaped by queue-depth-watch: stuck running ${ageMin}m at progress ${progress}. likely cause: worker died mid-execution (deploy window / crash / inngest disconnect). retry from UI.`,
+            completedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        logger.error(
+          { jobId: job.id, err: (err as Error).message },
+          'queue-depth-watch: auto-reap failed'
+        );
+      }
       await sendAlert({
         level: 'p1',
         scope: 'store',
         store: { id: job.storeId, name: job.store?.name ?? job.storeId, slug: job.store?.slug },
         source: 'inngest.queue-depth',
-        title: `bulk-ai-job stuck in running (${job.kind}) — ${ageMin}m, ${progress}`,
-        body: `Job ${job.id} for store "${job.store?.name ?? job.storeId}" has been running for ${ageMin} minutes (progress ${progress}). Most likely cause: worker crashed without writing status=failed. Mark the row failed manually or wait for the next AI sweep.`,
-        context: { jobId: job.id, kind: job.kind, ageMinutes: ageMin, type: 'stuck_running' },
+        title: `bulk-ai-job auto-reaped after ${ageMin}m stuck running (${job.kind}, ${progress})`,
+        body: `Job ${job.id} for store "${job.store?.name ?? job.storeId}" was running ${ageMin} min at progress ${progress} without updates — auto-marked failed. Common cause: a Railway redeploy window killed the Inngest invocation. Merchant can retry from the UI; partial progress is lost.`,
+        context: {
+          jobId: job.id,
+          kind: job.kind,
+          ageMinutes: ageMin,
+          type: 'stuck_running_auto_reaped',
+        },
       });
     }
 
