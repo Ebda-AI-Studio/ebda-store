@@ -26,6 +26,41 @@ const ERROR_CAP = 50;
 const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Retry a single Gemini call on transient errors (503, 429-rate-limit,
+ * network resets). Exponential backoff: 2s → 4s → 8s (+up to 500ms
+ * jitter, capped at 15s). Max 3 attempts (1 initial + 2 retries).
+ *
+ * Does NOT retry quota-cap errors (those have .code and are re-thrown
+ * by isAiQuotaCapError). Does NOT retry 401/403/400.
+ */
+async function callWithRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status =
+        (err as { status?: number; response?: { status?: number } })?.status ??
+        (err as { response?: { status?: number } })?.response?.status;
+      const msg = (err instanceof Error ? err.message : String(err)) ?? '';
+      const transient =
+        status === 503 ||
+        (status === 429 && !isAiQuotaCapError(err)) ||
+        /timeout|ECONNRESET|ETIMEDOUT/i.test(msg);
+
+      if (!transient || attempt === maxAttempts) throw err;
+
+      const delayMs = Math.min(2000 * 2 ** (attempt - 1), 15000) + Math.floor(Math.random() * 500);
+      logger.warn(
+        { label, attempt, maxAttempts, status, err: msg },
+        '[bulk-ai] transient gemini failure, retrying'
+      );
+      await sleep(delayMs);
+    }
+  }
+  throw new Error('callWithRetry: exhausted attempts');
+}
+
 interface BulkError {
   entityKind: 'product' | 'category' | 'store';
   entityId: string;
@@ -123,13 +158,17 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
 
           if (shouldFill(p.name, p.nameAr)) {
             try {
-              const r = await AIService.translate({
-                storeId,
-                text: sourceText(p.name, p.nameAr),
-                from: fillTo === 'ar' ? 'en' : 'ar',
-                to: fillTo,
-                kind: 'product-name',
-              });
+              const r = await callWithRetry(
+                () =>
+                  AIService.translate({
+                    storeId,
+                    text: sourceText(p.name, p.nameAr),
+                    from: fillTo === 'ar' ? 'en' : 'ar',
+                    to: fillTo,
+                    kind: 'product-name',
+                  }),
+                `translate:product:${p.id}:name`
+              );
               updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
               filled++;
               await sleep(THROTTLE_MS);
@@ -150,13 +189,17 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
 
           if (shouldFill(p.description, p.descriptionAr)) {
             try {
-              const r = await AIService.translate({
-                storeId,
-                text: sourceText(p.description, p.descriptionAr),
-                from: fillTo === 'ar' ? 'en' : 'ar',
-                to: fillTo,
-                kind: 'product-description',
-              });
+              const r = await callWithRetry(
+                () =>
+                  AIService.translate({
+                    storeId,
+                    text: sourceText(p.description, p.descriptionAr),
+                    from: fillTo === 'ar' ? 'en' : 'ar',
+                    to: fillTo,
+                    kind: 'product-description',
+                  }),
+                `translate:product:${p.id}:description`
+              );
               updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
               filled++;
               await sleep(THROTTLE_MS);
@@ -211,13 +254,17 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
         const updates: Record<string, string> = {};
         if (shouldFill(c.name, c.nameAr)) {
           try {
-            const r = await AIService.translate({
-              storeId,
-              text: sourceText(c.name, c.nameAr),
-              from: fillTo === 'ar' ? 'en' : 'ar',
-              to: fillTo,
-              kind: 'category-name',
-            });
+            const r = await callWithRetry(
+              () =>
+                AIService.translate({
+                  storeId,
+                  text: sourceText(c.name, c.nameAr),
+                  from: fillTo === 'ar' ? 'en' : 'ar',
+                  to: fillTo,
+                  kind: 'category-name',
+                }),
+              `translate:category:${c.id}:name`
+            );
             updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
             filled++;
             await sleep(THROTTLE_MS);
@@ -236,13 +283,17 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
 
         if (shouldFill(c.description, c.descriptionAr)) {
           try {
-            const r = await AIService.translate({
-              storeId,
-              text: sourceText(c.description, c.descriptionAr),
-              from: fillTo === 'ar' ? 'en' : 'ar',
-              to: fillTo,
-              kind: 'category-description',
-            });
+            const r = await callWithRetry(
+              () =>
+                AIService.translate({
+                  storeId,
+                  text: sourceText(c.description, c.descriptionAr),
+                  from: fillTo === 'ar' ? 'en' : 'ar',
+                  to: fillTo,
+                  kind: 'category-description',
+                }),
+              `translate:category:${c.id}:description`
+            );
             updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
             filled++;
             await sleep(THROTTLE_MS);
@@ -284,13 +335,17 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
         const updates: Record<string, string> = {};
         if (shouldFill(store.name, store.nameAr)) {
           try {
-            const r = await AIService.translate({
-              storeId,
-              text: sourceText(store.name, store.nameAr),
-              from: fillTo === 'ar' ? 'en' : 'ar',
-              to: fillTo,
-              kind: 'store-name',
-            });
+            const r = await callWithRetry(
+              () =>
+                AIService.translate({
+                  storeId,
+                  text: sourceText(store.name, store.nameAr),
+                  from: fillTo === 'ar' ? 'en' : 'ar',
+                  to: fillTo,
+                  kind: 'store-name',
+                }),
+              `translate:store:${storeId}:name`
+            );
             updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
             filled++;
             await sleep(THROTTLE_MS);
@@ -309,13 +364,17 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
 
         if (shouldFill(store.description, store.descriptionAr)) {
           try {
-            const r = await AIService.translate({
-              storeId,
-              text: sourceText(store.description, store.descriptionAr),
-              from: fillTo === 'ar' ? 'en' : 'ar',
-              to: fillTo,
-              kind: 'store-description',
-            });
+            const r = await callWithRetry(
+              () =>
+                AIService.translate({
+                  storeId,
+                  text: sourceText(store.description, store.descriptionAr),
+                  from: fillTo === 'ar' ? 'en' : 'ar',
+                  to: fillTo,
+                  kind: 'store-description',
+                }),
+              `translate:store:${storeId}:description`
+            );
             updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
             filled++;
             await sleep(THROTTLE_MS);

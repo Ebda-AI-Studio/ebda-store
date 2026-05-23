@@ -137,9 +137,85 @@ Healthy state: no rows with `status = 'running'` older than 30 minutes.
 
 ---
 
+---
+
+### 4. Per-product transient retry for Gemini 503/429 (2026-05-23)
+
+Gemini free-tier spikes occasionally return HTTP 503 "Service Unavailable" or
+rate-limit 429 mid-sweep. Without retry, a single overload burst permanently
+marks affected products as failed for that run.
+
+**Fix:** `callWithRetry<T>(fn, label, maxAttempts=3)` wrapper in every bulk-AI
+function. Placed per entity, NOT per sweep — completed products are never re-run.
+
+**Backoff:** 2s → 4s → 8s + up to 500ms jitter, capped at 15s.
+Gemini demand spikes typically resolve in under 30s, so 3 attempts cover the
+common case while adding at most ~14s of latency per affected product.
+
+**What is retried (transient):**
+
+- HTTP 503 (model high demand)
+- HTTP 429 where `.code` is NOT a quota-cap error (rate-limit only)
+- Network errors: `timeout`, `ECONNRESET`, `ETIMEDOUT`
+
+**What is NOT retried:**
+
+- Quota-cap errors (`AI_QUOTA_DAILY_EXCEEDED` / `AI_QUOTA_MONTHLY_EXCEEDED`)
+- Auth errors (401/403)
+- Bad-input errors (400)
+- The `ERROR_CAP = 50` whole-sweep bail still applies after all retries exhaust
+
+**Pattern to use in any new bulk-AI function:**
+
+```typescript
+// Add this helper near the top of the file (alongside sleep / THROTTLE_MS)
+async function callWithRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      const msg = (err instanceof Error ? err.message : String(err)) ?? '';
+      const transient =
+        status === 503 ||
+        (status === 429 && !isAiQuotaCapError(err)) ||
+        /timeout|ECONNRESET|ETIMEDOUT/i.test(msg);
+      if (!transient || attempt === maxAttempts) throw err;
+      const delayMs = Math.min(2000 * 2 ** (attempt - 1), 15000) + Math.floor(Math.random() * 500);
+      logger.warn(
+        { label, attempt, maxAttempts, status, err: msg },
+        '[bulk-ai] transient gemini failure, retrying'
+      );
+      await sleep(delayMs);
+    }
+  }
+  throw new Error('callWithRetry: exhausted attempts');
+}
+
+// Then wrap each per-entity Gemini call:
+const result = await callWithRetry(() => model.generateContent(prompt), `sweep-name:entity-id`);
+```
+
+**Railway log on retry:** `[bulk-ai] transient gemini failure, retrying` at WARN
+level with `{ label, attempt, maxAttempts, status, err }`.
+
+**Quota note:** each retry counts against `assertAiQuota()`. The quota check runs
+before the call. If quota is exhausted mid-retry, `isAiQuotaCapError` re-throws
+and bypasses the retry loop — no double-counting.
+
+**Files with this pattern as of 2026-05-23:**
+
+- `bulk-ai-recommendations.ts` — wraps `model.generateContent(prompt)`
+- `bulk-ai-seo.ts` — wraps 3× `AIService.suggestSeo()`
+- `bulk-ai-translate.ts` — wraps 6× `AIService.translate()`
+- `bulk-ai-aeo.ts` — wraps 4× `model.generateContent()` (FAQ, HowTo, meta-store, meta-product)
+
+---
+
 ## Related
 
 - **Stuck job alert**: Telegram `@ForceAI1_bot` P1 level — see DEPLOYMENT.md §4
 - **Inngest dashboard**: https://app.inngest.com — function execution history + retry audit
 - **Auto-reaper source**: `apps/api/src/lib/inngest/functions/queue-depth-watch.ts`
 - **mark-running-first source**: `apps/api/src/lib/inngest/functions/bulk-ai-recommendations.ts`
+- **Transient retry memory**: `~/.claude/projects/-Users-ahmadsharaf-Desktop-projects-force-website-builder/memory/feedback-fwb-bulk-ai-transient-retry-per-product.md`

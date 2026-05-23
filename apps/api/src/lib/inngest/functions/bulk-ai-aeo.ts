@@ -37,6 +37,41 @@ const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Retry a single Gemini call on transient errors (503, 429-rate-limit,
+ * network resets). Exponential backoff: 2s → 4s → 8s (+up to 500ms
+ * jitter, capped at 15s). Max 3 attempts (1 initial + 2 retries).
+ *
+ * Does NOT retry quota-cap errors (those have .code and are re-thrown
+ * by isAiQuotaCapError). Does NOT retry 401/403/400.
+ */
+async function callWithRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status =
+        (err as { status?: number; response?: { status?: number } })?.status ??
+        (err as { response?: { status?: number } })?.response?.status;
+      const msg = (err instanceof Error ? err.message : String(err)) ?? '';
+      const transient =
+        status === 503 ||
+        (status === 429 && !isAiQuotaCapError(err)) ||
+        /timeout|ECONNRESET|ETIMEDOUT/i.test(msg);
+
+      if (!transient || attempt === maxAttempts) throw err;
+
+      const delayMs = Math.min(2000 * 2 ** (attempt - 1), 15000) + Math.floor(Math.random() * 500);
+      logger.warn(
+        { label, attempt, maxAttempts, status, err: msg },
+        '[bulk-ai] transient gemini failure, retrying'
+      );
+      await sleep(delayMs);
+    }
+  }
+  throw new Error('callWithRetry: exhausted attempts');
+}
+
 function getGenAI(): GoogleGenerativeAI {
   if (!config.googleAiKey) {
     throw new Error('AI_NOT_CONFIGURED: GOOGLE_GENERATIVE_AI_KEY missing');
@@ -329,7 +364,10 @@ No other text, no markdown code fences — pure JSON only.`;
 
       let drafted: DraftedFaq[] = [];
       try {
-        const result = await model.generateContent(prompt);
+        const result = await callWithRetry(
+          () => model.generateContent(prompt),
+          `faq-aeo:${storeId}`
+        );
         const raw = stripFences(result.response.text());
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
@@ -554,7 +592,10 @@ No markdown, no code fences — pure JSON only.`;
 
       let drafted: DraftedHowTo[] = [];
       try {
-        const result = await model.generateContent(prompt);
+        const result = await callWithRetry(
+          () => model.generateContent(prompt),
+          `howto-aeo:${storeId}`
+        );
         const raw = stripFences(result.response.text());
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
@@ -765,7 +806,10 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
           });
 
           const prompt = buildMetaPrompt('store', store.name, store.description ?? '');
-          const result = await model.generateContent(prompt);
+          const result = await callWithRetry(
+            () => model.generateContent(prompt),
+            `meta-aeo:store:${storeId}`
+          );
           const raw = stripFences(result.response.text());
           const parsed = JSON.parse(raw) as { en: string; ar: string };
 
@@ -850,7 +894,10 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
             });
 
             const prompt = buildMetaPrompt('product', p.name, p.description ?? '', store.name);
-            const result = await model.generateContent(prompt);
+            const result = await callWithRetry(
+              () => model.generateContent(prompt),
+              `meta-aeo:product:${p.id}`
+            );
             const raw = stripFences(result.response.text());
             const parsed = JSON.parse(raw) as { en: string; ar: string };
 

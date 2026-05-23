@@ -21,6 +21,41 @@ const ERROR_CAP = 50;
 const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Retry a single Gemini call on transient errors (503, 429-rate-limit,
+ * network resets). Exponential backoff: 2s → 4s → 8s (+up to 500ms
+ * jitter, capped at 15s). Max 3 attempts (1 initial + 2 retries).
+ *
+ * Does NOT retry quota-cap errors (those have .code and are re-thrown
+ * by isAiQuotaCapError). Does NOT retry 401/403/400.
+ */
+async function callWithRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status =
+        (err as { status?: number; response?: { status?: number } })?.status ??
+        (err as { response?: { status?: number } })?.response?.status;
+      const msg = (err instanceof Error ? err.message : String(err)) ?? '';
+      const transient =
+        status === 503 ||
+        (status === 429 && !isAiQuotaCapError(err)) ||
+        /timeout|ECONNRESET|ETIMEDOUT/i.test(msg);
+
+      if (!transient || attempt === maxAttempts) throw err;
+
+      const delayMs = Math.min(2000 * 2 ** (attempt - 1), 15000) + Math.floor(Math.random() * 500);
+      logger.warn(
+        { label, attempt, maxAttempts, status, err: msg },
+        '[bulk-ai] transient gemini failure, retrying'
+      );
+      await sleep(delayMs);
+    }
+  }
+  throw new Error('callWithRetry: exhausted attempts');
+}
+
 interface BulkError {
   entityKind: 'product' | 'category' | 'store';
   entityId: string;
@@ -115,16 +150,20 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
       // Store-level SEO
       if (needsSeo(store)) {
         try {
-          const r = await AIService.suggestSeo({
-            storeId,
-            kind: 'store',
-            storeName: store.name,
-            storeNameAr: store.nameAr,
-            entityName: store.name,
-            entityNameAr: store.nameAr,
-            entityDescription: store.description,
-            entityDescriptionAr: store.descriptionAr,
-          });
+          const r = await callWithRetry(
+            () =>
+              AIService.suggestSeo({
+                storeId,
+                kind: 'store',
+                storeName: store.name,
+                storeNameAr: store.nameAr,
+                entityName: store.name,
+                entityNameAr: store.nameAr,
+                entityDescription: store.description,
+                entityDescriptionAr: store.descriptionAr,
+              }),
+            `seo:store:${storeId}`
+          );
           await prisma.store.update({
             where: { id: storeId },
             data: {
@@ -175,16 +214,20 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
           skipped++;
         } else {
           try {
-            const r = await AIService.suggestSeo({
-              storeId,
-              kind: 'category',
-              storeName: store.name,
-              storeNameAr: store.nameAr,
-              entityName: c.name,
-              entityNameAr: c.nameAr,
-              entityDescription: c.description,
-              entityDescriptionAr: c.descriptionAr,
-            });
+            const r = await callWithRetry(
+              () =>
+                AIService.suggestSeo({
+                  storeId,
+                  kind: 'category',
+                  storeName: store.name,
+                  storeNameAr: store.nameAr,
+                  entityName: c.name,
+                  entityNameAr: c.nameAr,
+                  entityDescription: c.description,
+                  entityDescriptionAr: c.descriptionAr,
+                }),
+              `seo:category:${c.id}`
+            );
             await prisma.category.update({
               where: { id: c.id },
               data: {
@@ -254,17 +297,21 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
             skipped++;
           } else {
             try {
-              const r = await AIService.suggestSeo({
-                storeId,
-                kind: 'product',
-                storeName: store.name,
-                storeNameAr: store.nameAr,
-                entityName: p.name,
-                entityNameAr: p.nameAr,
-                entityDescription: p.description,
-                entityDescriptionAr: p.descriptionAr,
-                categoryNames: p.categories.map(pc => pc.category.name),
-              });
+              const r = await callWithRetry(
+                () =>
+                  AIService.suggestSeo({
+                    storeId,
+                    kind: 'product',
+                    storeName: store.name,
+                    storeNameAr: store.nameAr,
+                    entityName: p.name,
+                    entityNameAr: p.nameAr,
+                    entityDescription: p.description,
+                    entityDescriptionAr: p.descriptionAr,
+                    categoryNames: p.categories.map(pc => pc.category.name),
+                  }),
+                `seo:product:${p.id}`
+              );
               await prisma.product.update({
                 where: { id: p.id },
                 data: {
