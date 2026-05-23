@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiFetch } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,6 +72,20 @@ function downloadCsv(filename: string, rows: string[][]): void {
   URL.revokeObjectURL(url);
 }
 
+async function downloadXlsx(endpoint: string, filename: string): Promise<void> {
+  const response = await apiFetch(endpoint);
+  if (!response.ok) return;
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ─── Sub-views ───────────────────────────────────────────────────────────────
 
 function TrialBalanceTab({ storeId }: { storeId: string }) {
@@ -81,6 +95,7 @@ function TrialBalanceTab({ storeId }: { storeId: string }) {
   const [rows, setRows] = useState<TrialBalanceRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
 
   const fetch = useCallback(() => {
     setLoading(true);
@@ -150,11 +165,21 @@ function TrialBalanceTab({ storeId }: { storeId: string }) {
           </button>
           <button
             type="button"
-            disabled
-            title={t('exportXlsxComing')}
-            className="px-3 py-2 border border-border rounded text-sm opacity-40 cursor-not-allowed"
+            disabled={!rows || rows.length === 0 || exportingXlsx}
+            onClick={async () => {
+              setExportingXlsx(true);
+              try {
+                await downloadXlsx(
+                  `/api/v1/stores/${storeId}/finance/reports/trial-balance.xlsx?asOf=${asOf}`,
+                  `trial-balance-${asOf}.xlsx`
+                );
+              } finally {
+                setExportingXlsx(false);
+              }
+            }}
+            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
           >
-            {t('exportXlsx')}
+            {exportingXlsx ? t('exporting') : t('exportXlsx')}
           </button>
         </div>
       </div>
@@ -235,6 +260,7 @@ function PnlTab({ storeId }: { storeId: string }) {
   const [data, setData] = useState<PnlData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
 
   const fetch = useCallback(() => {
     setLoading(true);
@@ -299,11 +325,21 @@ function PnlTab({ storeId }: { storeId: string }) {
           </button>
           <button
             type="button"
-            disabled
-            title={t('exportXlsxComing')}
-            className="px-3 py-2 border border-border rounded text-sm opacity-40 cursor-not-allowed"
+            disabled={!data || exportingXlsx}
+            onClick={async () => {
+              setExportingXlsx(true);
+              try {
+                await downloadXlsx(
+                  `/api/v1/stores/${storeId}/finance/reports/pnl.xlsx?from=${from}&to=${to}`,
+                  `pnl-${from}-to-${to}.xlsx`
+                );
+              } finally {
+                setExportingXlsx(false);
+              }
+            }}
+            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
           >
-            {t('exportXlsx')}
+            {exportingXlsx ? t('exporting') : t('exportXlsx')}
           </button>
         </div>
       </div>
@@ -396,6 +432,7 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
   const [data, setData] = useState<BalanceSheetData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
 
   const fetch = useCallback(() => {
     setLoading(true);
@@ -489,11 +526,21 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
           </button>
           <button
             type="button"
-            disabled
-            title={t('exportXlsxComing')}
-            className="px-3 py-2 border border-border rounded text-sm opacity-40 cursor-not-allowed"
+            disabled={!data || exportingXlsx}
+            onClick={async () => {
+              setExportingXlsx(true);
+              try {
+                await downloadXlsx(
+                  `/api/v1/stores/${storeId}/finance/reports/balance-sheet.xlsx?asOf=${asOf}`,
+                  `balance-sheet-${asOf}.xlsx`
+                );
+              } finally {
+                setExportingXlsx(false);
+              }
+            }}
+            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
           >
-            {t('exportXlsx')}
+            {exportingXlsx ? t('exporting') : t('exportXlsx')}
           </button>
         </div>
       </div>

@@ -24,6 +24,7 @@ import {
 } from '../services/accounting/account.service';
 import { postEntry } from '../services/accounting/journal.service';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
+import { streamXlsxResponse } from '../lib/exports/xlsx';
 
 const router = Router({ mergeParams: true });
 
@@ -457,6 +458,169 @@ router.get(
       });
 
       res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── XLSX exports for finance reports ────────────────────────────────────────
+// Each mirrors the JSON endpoint above — same auth chain, same data, streamed
+// as a formatted Excel workbook (bold header, KWD three-decimal numFmt).
+
+// GET /:storeId/finance/reports/trial-balance.xlsx
+router.get(
+  '/:storeId/finance/reports/trial-balance.xlsx',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : undefined;
+      const rows = await runInTenantContext(req.params.storeId, () =>
+        trialBalance(req.params.storeId, asOf)
+      );
+      const date = (asOf ?? new Date()).toISOString().slice(0, 10);
+      await streamXlsxResponse(res, {
+        filename: `trial-balance-${date}.xlsx`,
+        sheetName: 'Trial Balance',
+        columns: [
+          { header: 'Account Code', key: 'code', width: 16 },
+          { header: 'Account Name (EN)', key: 'nameEn', width: 34 },
+          { header: 'Account Name (AR)', key: 'nameAr', width: 34 },
+          { header: 'Debit (KWD)', key: 'debit', width: 16, numFmt: '#,##0.000' },
+          { header: 'Credit (KWD)', key: 'credit', width: 16, numFmt: '#,##0.000' },
+          { header: 'Balance (KWD)', key: 'balance', width: 16, numFmt: '#,##0.000' },
+        ],
+        rows: rows.map(r => ({
+          code: r.code,
+          nameEn: r.nameEn,
+          nameAr: r.nameAr ?? '',
+          debit: r.debitTotal / 1000,
+          credit: r.creditTotal / 1000,
+          balance: r.balance / 1000,
+        })),
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /:storeId/finance/reports/pnl.xlsx
+router.get(
+  '/:storeId/finance/reports/pnl.xlsx',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const from = new Date(
+        String(req.query.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      );
+      const to = new Date(String(req.query.to ?? new Date().toISOString()));
+      const raw = await runInTenantContext(req.params.storeId, () =>
+        profitAndLoss(req.params.storeId, from, to)
+      );
+
+      // Flatten into a sheet: revenue rows, total revenue, blank, expense rows,
+      // total expenses, blank, net income.
+      type XlsxRow = { type: string; code: string; name: string; amount: number | string };
+      const rows: XlsxRow[] = [
+        { type: 'Section', code: '', name: 'Revenue', amount: '' },
+        ...raw.revenue.map(r => ({
+          type: 'Account',
+          code: r.code,
+          name: r.nameEn,
+          amount: (r.creditTotal - r.debitTotal) / 1000,
+        })),
+        { type: 'Total', code: '', name: 'Total Revenue', amount: raw.totalRevenue / 1000 },
+        { type: '', code: '', name: '', amount: '' },
+        { type: 'Section', code: '', name: 'Expenses', amount: '' },
+        ...raw.expenses.map(r => ({
+          type: 'Account',
+          code: r.code,
+          name: r.nameEn,
+          amount: (r.debitTotal - r.creditTotal) / 1000,
+        })),
+        { type: 'Total', code: '', name: 'Total Expenses', amount: raw.totalExpenses / 1000 },
+        { type: '', code: '', name: '', amount: '' },
+        { type: 'Net', code: '', name: 'Net Income', amount: raw.netIncome / 1000 },
+      ];
+
+      const fromStr = from.toISOString().slice(0, 10);
+      const toStr = to.toISOString().slice(0, 10);
+      await streamXlsxResponse(res, {
+        filename: `pnl-${fromStr}-to-${toStr}.xlsx`,
+        sheetName: 'P&L',
+        columns: [
+          { header: 'Type', key: 'type', width: 12 },
+          { header: 'Account Code', key: 'code', width: 16 },
+          { header: 'Account Name', key: 'name', width: 34 },
+          { header: 'Amount (KWD)', key: 'amount', width: 18, numFmt: '#,##0.000' },
+        ],
+        rows,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /:storeId/finance/reports/balance-sheet.xlsx
+router.get(
+  '/:storeId/finance/reports/balance-sheet.xlsx',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : new Date();
+      const raw = await runInTenantContext(req.params.storeId, () =>
+        balanceSheet(req.params.storeId, asOf)
+      );
+
+      type XlsxRow = { section: string; code: string; name: string; amount: number | string };
+      const buildSection = (
+        label: string,
+        totalLabel: string,
+        accounts: { code: string; nameEn: string; balance: number }[],
+        sign: number
+      ): XlsxRow[] => [
+        { section: label, code: '', name: label, amount: '' },
+        ...accounts.map(r => ({
+          section: label,
+          code: r.code,
+          name: r.nameEn,
+          amount: (r.balance * sign) / 1000,
+        })),
+        {
+          section: 'Total',
+          code: '',
+          name: totalLabel,
+          amount: accounts.reduce((s, r) => s + r.balance * sign, 0) / 1000,
+        },
+        { section: '', code: '', name: '', amount: '' },
+      ];
+
+      const rows: XlsxRow[] = [
+        ...buildSection('Assets', 'Total Assets', raw.assets, 1),
+        ...buildSection('Liabilities', 'Total Liabilities', raw.liabilities, -1),
+        ...buildSection('Equity', 'Total Equity', raw.equity, -1),
+      ];
+
+      const date = asOf.toISOString().slice(0, 10);
+      await streamXlsxResponse(res, {
+        filename: `balance-sheet-${date}.xlsx`,
+        sheetName: 'Balance Sheet',
+        columns: [
+          { header: 'Section', key: 'section', width: 14 },
+          { header: 'Account Code', key: 'code', width: 16 },
+          { header: 'Account Name', key: 'name', width: 34 },
+          { header: 'Amount (KWD)', key: 'amount', width: 18, numFmt: '#,##0.000' },
+        ],
+        rows,
+      });
     } catch (err) {
       next(err);
     }

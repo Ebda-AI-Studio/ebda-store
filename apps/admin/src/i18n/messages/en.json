@@ -3856,6 +3856,7 @@
       "from": "From",
       "to": "To",
       "exportCsv": "Export CSV",
+      "exporting": "Exporting…",
       "exportXlsx": "Export XLSX",
       "exportXlsxComing": "XLSX export coming soon",
       "trialBalance": {

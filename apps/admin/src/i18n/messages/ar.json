@@ -3856,6 +3856,7 @@
       "from": "من",
       "to": "إلى",
       "exportCsv": "تصدير CSV",
+      "exporting": "جارٍ التصدير…",
       "exportXlsx": "تصدير XLSX",
       "exportXlsxComing": "تصدير XLSX قادم قريباً",
       "trialBalance": {
