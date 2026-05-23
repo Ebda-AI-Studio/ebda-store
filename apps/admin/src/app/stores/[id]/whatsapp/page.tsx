@@ -18,16 +18,18 @@ import { ConnectionTab } from '../../../../components/whatsapp/ConnectionTab';
 import { TemplatesTab } from '../../../../components/whatsapp/TemplatesTab';
 import { OrderUpdatesTab } from '../../../../components/whatsapp/OrderUpdatesTab';
 import { PaymentLinkTab } from '../../../../components/whatsapp/PaymentLinkTab';
+import { BotCopyTab } from '../../../../components/whatsapp/BotCopyTab';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
-type TabKey = 'connection' | 'templates' | 'order-updates' | 'payment-link';
+type TabKey = 'connection' | 'templates' | 'order-updates' | 'payment-link' | 'bot-copy';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'connection', label: 'Connection' },
   { key: 'templates', label: 'Templates' },
   { key: 'order-updates', label: 'Order Updates' },
   { key: 'payment-link', label: 'Payment Link' },
+  { key: 'bot-copy', label: 'Bot Copy' },
 ];
 
 function isValidTab(value: string | null): value is TabKey {
@@ -35,7 +37,8 @@ function isValidTab(value: string | null): value is TabKey {
     value === 'connection' ||
     value === 'templates' ||
     value === 'order-updates' ||
-    value === 'payment-link'
+    value === 'payment-link' ||
+    value === 'bot-copy'
   );
 }
 
@@ -85,6 +88,7 @@ export default function WhatsAppMasterPage() {
       {activeTab === 'templates' && <TemplatesTab storeId={storeId} />}
       {activeTab === 'order-updates' && <OrderUpdatesTab storeId={storeId} />}
       {activeTab === 'payment-link' && <PaymentLinkTab storeId={storeId} />}
+      {activeTab === 'bot-copy' && <BotCopyTab storeId={storeId} />}
     </AdminLayout>
   );
 }
