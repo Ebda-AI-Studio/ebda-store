@@ -8,6 +8,7 @@ import { xlsxBufferToImportCsv } from '../services/xlsx-import';
 import { prisma, ProductStatus } from '@force/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { inngest } from '../lib/inngest/client';
+import { streamXlsxResponse } from '../lib/exports/xlsx';
 
 const router = Router();
 
@@ -82,6 +83,125 @@ router.get(
         `attachment; filename=products_${storeId}_${Date.now()}.csv`
       );
       res.send(csv);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /stores/:storeId/bulk/export.xlsx - Export products to XLSX
+// Sibling to the CSV export above — same query, same column set, formatted
+// as an Excel workbook. Shape matches the CSV columns 1:1 so either file
+// can be re-imported (for the columns that support re-import).
+router.get(
+  '/:storeId/bulk/export.xlsx',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { status, search, includeDeleted } = req.query;
+
+      // Build the same where clause as BulkService.exportProducts
+      const where: Record<string, unknown> = { storeId };
+      if (status) where.status = status as ProductStatus;
+      if (includeDeleted !== 'true') where.deletedAt = null;
+      if (search) {
+        where.OR = [
+          { name: { contains: search as string, mode: 'insensitive' } },
+          { nameAr: { contains: search as string, mode: 'insensitive' } },
+          { sku: { contains: search as string, mode: 'insensitive' } },
+        ];
+      }
+
+      const products = await prisma.product.findMany({
+        where,
+        include: {
+          images: { orderBy: { position: 'asc' } },
+          categories: { include: { category: true } },
+          tags: { include: { tag: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10000,
+      });
+
+      const rows = products.map(p => ({
+        id: p.id,
+        name: p.name,
+        nameAr: p.nameAr ?? '',
+        slug: p.slug,
+        description: p.description ?? '',
+        descriptionAr: p.descriptionAr ?? '',
+        price: p.price / 1000,
+        compareAtPrice: p.compareAtPrice != null ? p.compareAtPrice / 1000 : '',
+        costPrice: p.costPrice != null ? p.costPrice / 1000 : '',
+        sku: p.sku ?? '',
+        barcode: p.barcode ?? '',
+        inventory: p.inventory,
+        lowStockThreshold: p.lowStockThreshold,
+        trackInventory: p.trackInventory,
+        weight: p.weight ?? '',
+        status: p.status,
+        featured: p.featured,
+        isNew: p.isNew,
+        categories: p.categories.map(c => c.category.name).join(', '),
+        tags: p.tags.map(t => t.tag.name).join(', '),
+        images: p.images.map(i => i.url).join(', '),
+        metaTitle: p.metaTitle ?? '',
+        metaTitleAr: p.metaTitleAr ?? '',
+        metaDescription: p.metaDescription ?? '',
+        metaDescriptionAr: p.metaDescriptionAr ?? '',
+      }));
+
+      await auditLog({
+        action: 'bulk.export',
+        userId: req.user!.userId,
+        resourceType: 'product',
+        resourceId: storeId,
+        details: { type: 'products_xlsx' },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      const date = new Date().toISOString().slice(0, 10);
+      await streamXlsxResponse(res, {
+        filename: `products-${storeId}-${date}.xlsx`,
+        sheetName: 'Products',
+        columns: [
+          { header: 'ID', key: 'id', width: 38 },
+          { header: 'Name', key: 'name', width: 30 },
+          { header: 'Name (AR)', key: 'nameAr', width: 30 },
+          { header: 'Slug', key: 'slug', width: 24 },
+          { header: 'Description', key: 'description', width: 40 },
+          { header: 'Description (AR)', key: 'descriptionAr', width: 40 },
+          { header: 'Price (KWD)', key: 'price', width: 14, numFmt: '#,##0.000' },
+          {
+            header: 'Compare At Price (KWD)',
+            key: 'compareAtPrice',
+            width: 22,
+            numFmt: '#,##0.000',
+          },
+          { header: 'Cost Price (KWD)', key: 'costPrice', width: 18, numFmt: '#,##0.000' },
+          { header: 'SKU', key: 'sku', width: 16 },
+          { header: 'Barcode', key: 'barcode', width: 16 },
+          { header: 'Inventory', key: 'inventory', width: 12 },
+          { header: 'Low Stock Threshold', key: 'lowStockThreshold', width: 20 },
+          { header: 'Track Inventory', key: 'trackInventory', width: 16 },
+          { header: 'Weight', key: 'weight', width: 10 },
+          { header: 'Status', key: 'status', width: 12 },
+          { header: 'Featured', key: 'featured', width: 10 },
+          { header: 'Is New', key: 'isNew', width: 10 },
+          { header: 'Categories', key: 'categories', width: 30 },
+          { header: 'Tags', key: 'tags', width: 30 },
+          { header: 'Images', key: 'images', width: 60 },
+          { header: 'Meta Title', key: 'metaTitle', width: 30 },
+          { header: 'Meta Title (AR)', key: 'metaTitleAr', width: 30 },
+          { header: 'Meta Description', key: 'metaDescription', width: 40 },
+          { header: 'Meta Description (AR)', key: 'metaDescriptionAr', width: 40 },
+        ],
+        rows,
+      });
     } catch (error) {
       next(error);
     }

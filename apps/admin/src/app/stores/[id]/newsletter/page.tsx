@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, getApiUrl } from '../../../../lib/api';
+import { apiGet, getApiUrl, apiFetch } from '../../../../lib/api';
 
 /**
  * Minimal admin viewer for newsletter subscribers.
@@ -67,13 +67,33 @@ export default function NewsletterPage() {
     if (storeId) fetchSubs();
   }, [storeId, fetchSubs]);
 
-  // CSV export hits a separate API endpoint that already streams the file
-  // with the right Content-Type / Content-Disposition headers — we just
-  // need to navigate the browser to that URL with credentials so the
-  // auth cookie is sent.
-  const handleExport = () => {
+  // CSV export — navigates to the endpoint so the browser downloads directly.
+  // The auth cookie is sent because we open the URL in the same session.
+  const handleExportCsv = () => {
     const url = `${getApiUrl()}/api/v1/stores/${storeId}/newsletter/subscribers/export`;
     window.open(url, '_blank');
+  };
+
+  // XLSX export — fetches with credentials then triggers a blob download so
+  // the auth cookie is included (window.open won't send cookies cross-origin).
+  const handleExportXlsx = async () => {
+    try {
+      const response = await apiFetch(
+        `/api/v1/stores/${storeId}/newsletter/subscribers/export.xlsx`
+      );
+      if (!response.ok) return;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `newsletter-${storeId}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently ignore — user can retry
+    }
   };
 
   return (
@@ -81,9 +101,26 @@ export default function NewsletterPage() {
       title={tPage('title')}
       subtitle={tPage('subtitle')}
       actions={
-        <Button type="button" onClick={handleExport} disabled={subs.length === 0}>
-          {tPage('exportCsv')}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportCsv}
+            disabled={subs.length === 0}
+          >
+            {tPage('exportCsv')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportXlsx}
+            disabled={subs.length === 0}
+          >
+            {tPage('exportXlsx')}
+          </Button>
+        </div>
       }
     >
       <div className="space-y-4">

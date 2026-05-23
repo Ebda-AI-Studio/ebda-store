@@ -2228,6 +2228,8 @@
       "includeDeleted": "Include deleted products",
       "exporting": "Exporting...",
       "exportButton": "Export to CSV",
+      "exportXlsx": "Export to XLSX",
+      "exportingXlsx": "Exporting…",
       "infoTitle": "Export Information",
       "info": {
         "allFields": "All product fields are included in the export",
@@ -2246,6 +2248,7 @@
       "title": "Newsletter Subscribers",
       "subtitle": "People who signed up via your storefront footer",
       "exportCsv": "Export CSV",
+      "exportXlsx": "Export XLSX",
       "totalCount": "{count} subscribers",
       "emptyTitle": "No subscribers yet",
       "emptyDescription": "When customers submit the newsletter form on your storefront, they appear here."

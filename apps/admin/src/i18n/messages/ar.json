@@ -2228,6 +2228,8 @@
       "includeDeleted": "تضمين المنتجات المحذوفة",
       "exporting": "جارٍ التصدير...",
       "exportButton": "تصدير إلى CSV",
+      "exportXlsx": "تصدير إلى XLSX",
+      "exportingXlsx": "جارٍ التصدير…",
       "infoTitle": "معلومات التصدير",
       "info": {
         "allFields": "جميع حقول المنتج مضمنة في التصدير",
@@ -2246,6 +2248,7 @@
       "title": "مشتركو النشرة الإخبارية",
       "subtitle": "العملاء الذين اشتركوا عبر تذييل واجهة المتجر",
       "exportCsv": "تصدير CSV",
+      "exportXlsx": "تصدير XLSX",
       "totalCount": "{count} مشترك",
       "emptyTitle": "لا يوجد مشتركون بعد",
       "emptyDescription": "عندما يسجل العملاء في النشرة الإخبارية من واجهة المتجر، ستظهر بياناتهم هنا."
