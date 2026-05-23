@@ -94,9 +94,33 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       prisma.store.findUnique({ where: { id: storeId }, select: { name: true } }).catch(() => null)
     );
 
+    // Origin-aware notification routing: orders that originated on
+    // WhatsApp (merchant-initiated payment link, customer DM ordering,
+    // etc.) should NOT receive an email — the customer didn't give us
+    // a real email address (the User row carries a synthetic
+    // wa-<digits>@placeholder.forcestore.kw placeholder), the WhatsApp
+    // template already confirms the order via the orderPaid template
+    // (handled by the parallel orderWhatsappNotify Inngest fn), and
+    // sending email to the placeholder address would either bounce or
+    // (worse) deliver to whoever owns the placeholder domain. We detect
+    // the origin via shippingAddress._source — set when the
+    // payment-links.routes.ts flow creates the draft order. Any future
+    // WhatsApp-origin flows (customer DM, BWA bot) should stamp the
+    // same marker so the email skip applies uniformly.
+    const orderSource = (order.shippingAddress as { _source?: string } | null)?._source;
+    const skipEmail = orderSource === 'wa_payment_link' || orderSource === 'wa_dm_order';
+    if (skipEmail) {
+      logger.info(
+        { orderId: order.id, source: orderSource },
+        '[order-created] skipping customer email — WhatsApp-origin order, customer notified via template'
+      );
+    }
+
     await Promise.allSettled([
       step.run('send-customer-confirmation', () =>
-        EmailService.sendOrderConfirmation(storeId, emailData, emailLocale)
+        skipEmail
+          ? Promise.resolve()
+          : EmailService.sendOrderConfirmation(storeId, emailData, emailLocale)
       ),
       step.run('send-admin-new-order', () => EmailService.sendAdminNewOrder(emailData)),
       step.run('dispatch-notification-channels', async () => {

@@ -10,6 +10,15 @@ interface PaymentLinkButtonProps {
   orderNumber: string;
   /** Disable when the order is already paid — backend rejects with 400. */
   disabled?: boolean;
+  /**
+   * Existing payment URL from a prior `PaymentService.createPayment`
+   * call on this order. When present (typical for WhatsApp-origin
+   * orders that minted a MyFatoorah link at creation), the button
+   * surfaces the existing link first with a Copy/Open action AND
+   * exposes a smaller "Issue a new link" option. Without this prop
+   * the original modal flow runs unchanged.
+   */
+  existingPaymentUrl?: string | null;
 }
 
 interface PaymentLinkResult {
@@ -34,11 +43,25 @@ export function PaymentLinkButton({
   orderId,
   orderNumber,
   disabled = false,
+  existingPaymentUrl,
 }: PaymentLinkButtonProps) {
   const [open, setOpen] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
   const [result, setResult] = useState<PaymentLinkResult | null>(null);
+  const [copiedExisting, setCopiedExisting] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
+
+  const copyExistingLink = async () => {
+    if (!existingPaymentUrl) return;
+    try {
+      await navigator.clipboard.writeText(existingPaymentUrl);
+      setCopiedExisting(true);
+      toastSuccess('Link copied to clipboard');
+      setTimeout(() => setCopiedExisting(false), 2000);
+    } catch {
+      toastError('Could not access clipboard — copy the link manually');
+    }
+  };
 
   const issue = async (notifyVia: 'link' | 'email') => {
     setIsIssuing(true);
@@ -80,22 +103,110 @@ export function PaymentLinkButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        disabled={disabled || isIssuing}
-        className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-info bg-info/5 px-4 py-2.5 text-sm font-semibold text-info hover:bg-info/10 disabled:opacity-60 transition-colors cursor-pointer"
-      >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-2.828 2.828a4 4 0 01-5.656 0L11 18.828m-1.828-7.656a4 4 0 00-5.656 0L1.69 12.586a4 4 0 000 5.656l2.828 2.828a4 4 0 005.656 0L11.828 19.5"
-          />
-        </svg>
-        Payment Link
-      </button>
+      {existingPaymentUrl ? (
+        // The order already has a Payment.paymentUrl (typical for
+        // WhatsApp-origin orders that minted the link at creation time).
+        // Surface the URL directly with Copy + Open actions; the small
+        // "Issue a new link" caption still opens the original modal
+        // for the rare case where the merchant needs a fresh URL.
+        <div className="flex-1 min-w-[10rem] inline-flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5 rounded-xl border-2 border-info bg-info/5 px-3 py-2">
+            <svg
+              className="h-4 w-4 text-info flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-2.828 2.828a4 4 0 01-5.656 0L11 18.828m-1.828-7.656a4 4 0 00-5.656 0L1.69 12.586a4 4 0 000 5.656l2.828 2.828a4 4 0 005.656 0L11.828 19.5"
+              />
+            </svg>
+            <span className="text-xs font-mono text-info truncate flex-1" dir="ltr">
+              {existingPaymentUrl}
+            </span>
+            <button
+              type="button"
+              onClick={copyExistingLink}
+              disabled={disabled}
+              className="text-info hover:bg-info/10 rounded-md p-1.5 flex-shrink-0 cursor-pointer"
+              aria-label="Copy payment link"
+              title="Copy payment link"
+            >
+              {copiedExisting ? (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+              )}
+            </button>
+            <a
+              href={existingPaymentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-info hover:bg-info/10 rounded-md p-1.5 flex-shrink-0"
+              aria-label="Open payment link"
+              title="Open payment link"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+            </a>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            disabled={disabled || isIssuing}
+            className="text-[11px] text-muted-foreground hover:text-foreground underline self-start"
+          >
+            Issue a new link
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          disabled={disabled || isIssuing}
+          className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-info bg-info/5 px-4 py-2.5 text-sm font-semibold text-info hover:bg-info/10 disabled:opacity-60 transition-colors cursor-pointer"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-2.828 2.828a4 4 0 01-5.656 0L11 18.828m-1.828-7.656a4 4 0 00-5.656 0L1.69 12.586a4 4 0 000 5.656l2.828 2.828a4 4 0 005.656 0L11.828 19.5"
+            />
+          </svg>
+          Payment Link
+        </button>
+      )}
 
       {open && (
         <div

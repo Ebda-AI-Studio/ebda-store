@@ -44,6 +44,11 @@ export interface OrderPaymentDetail {
   amount: number;
   /** Provider-side transaction id, useful for reconciliation. */
   transactionId?: string | null;
+  /** Provider's hosted-checkout URL (MyFatoorah / Tap / Hesabe / UPayments).
+   *  Set by PaymentService.createPayment + persisted on the Payment row
+   *  via the Prisma `payment_url` column. */
+  paymentUrl?: string | null;
+  /** Legacy alias for paymentUrl kept for backwards compatibility. */
   paymentLink?: string | null;
   createdAt: string;
 }

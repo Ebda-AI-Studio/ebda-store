@@ -17,7 +17,13 @@ export function CustomerCard({ order }: CustomerCardProps) {
   if (!customer) return null;
 
   const phone = customer.phone || order.shippingAddress?.phone || '';
-  const email = customer.email || order.shippingAddress?.email || '';
+  // Hide the synthetic placeholder email created for WhatsApp-initiated
+  // customers (User.email is non-nullable in the schema, so the
+  // payment-link flow mints `wa-<digits>@placeholder.forcestore.kw`).
+  // Showing the placeholder in the UI confuses merchants — it isn't a
+  // real address and there's nothing to send to.
+  const rawEmail = customer.email || order.shippingAddress?.email || '';
+  const email = rawEmail.endsWith('@placeholder.forcestore.kw') ? '' : rawEmail;
   const name = `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim();
 
   if (!phone && !email && !name) return null;

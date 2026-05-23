@@ -113,13 +113,25 @@ export function ActionFooter({
             )}
           </button>
         )}
-        {/* Payment Link — issue MyFatoorah pay-by-link for unpaid orders. */}
+        {/* Payment Link — surface existing MyFatoorah/Tap URL when the
+            order already has one (WhatsApp-origin orders mint a link
+            at creation), otherwise open the issue-new modal. Picks the
+            most recent non-paid Payment row with a usable URL. */}
         {showMarkPaid && (
           <PaymentLinkButton
             storeId={storeId}
             orderId={order.id}
             orderNumber={order.orderNumber}
             disabled={isUpdating}
+            existingPaymentUrl={
+              [...(order.payments ?? [])]
+                .filter(p => p.status !== 'paid' && (p.paymentUrl || p.paymentLink))
+                .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0]?.paymentUrl ??
+              [...(order.payments ?? [])]
+                .filter(p => p.status !== 'paid' && (p.paymentUrl || p.paymentLink))
+                .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0]?.paymentLink ??
+              null
+            }
           />
         )}
         {/* Refresh payment — diagnostic. Re-check provider status when
