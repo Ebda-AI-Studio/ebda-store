@@ -5,18 +5,23 @@
  *
  * When the checkout URL carries ?waToken=<jwt>, redeem it via the
  * /api/v1/wa-bridge/cart/redeem endpoint to recover the cart payload
- * that WBS handed off. Append every item to the customer's cart, then
- * strip the token from the URL so a refresh doesn't double-add.
+ * that WBS handed off. Hydrate the server cart via individual
+ * api.addToCart calls, then refetchCart so the UI reflects the server
+ * truth. Strips the token from the URL to prevent double-hydration on
+ * refresh.
  *
- * Idempotent: tracks redemption in sessionStorage so a HMR / strict-
- * mode double-mount doesn't double-add either. Errors logged + the
- * hydrator silently falls back (the customer sees an empty cart they
- * can re-build manually, rather than a stuck error state).
+ * Race condition fix (Issue 4): we wait for CartContext.isReady before
+ * running so CartContext.hydrate() has already settled. This prevents
+ * the hydrate() useEffect from overwriting our items with an empty cart.
+ *
+ * Idempotent: sessionStorage marker prevents re-running on HMR /
+ * strict-mode double-mount.
  */
 
 import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
+import { api } from '../../lib/api';
 
 interface WaCartItem {
   productId: string;
@@ -41,10 +46,13 @@ const SESSION_KEY = 'fwb.wa-cart-redeemed';
 export default function WaTokenHydrator() {
   const router = useRouter();
   const params = useSearchParams();
-  const { addItem } = useCart();
+  const { isReady, refetchCart } = useCart();
   const ranRef = useRef(false);
 
   useEffect(() => {
+    // Issue 4: wait until CartContext.hydrate() has settled so we don't race
+    // with its setItems(serverItems) call overwriting our additions.
+    if (!isReady) return;
     if (ranRef.current) return;
     const token = params.get('waToken');
     if (!token) return;
@@ -81,19 +89,28 @@ export default function WaTokenHydrator() {
         }
         const json = await res.json();
         const data: WaCartPayload | undefined = json?.data;
-        if (!data || !Array.isArray(data.items)) return;
+        if (!data || !Array.isArray(data.items) || data.items.length === 0) return;
 
-        // Add every item. addItem accepts a single product at a time;
-        // sequential to preserve order. CartContext owns the DB sync.
+        // Issue 4: call api.addToCart directly (bypassing the addItem
+        // optimistic update + toast) and refetch once at the end so the UI
+        // reflects the server-authoritative cart state. Sequential to preserve
+        // order and avoid duplicate-detection races.
+        let anyAdded = false;
         for (const item of data.items) {
-          await addItem(
-            {
-              id: item.productId,
-              name: item.name || 'Product',
-              price: item.priceFils ?? 0,
-            } as Parameters<typeof addItem>[0],
-            item.quantity
-          );
+          if (!item.productId || !item.quantity || item.quantity < 1) continue;
+          const addRes = await api.addToCart(item.productId, item.quantity);
+          if (addRes.success) {
+            anyAdded = true;
+          } else {
+            // eslint-disable-next-line no-console
+            console.warn('[wa-token-hydrator] addToCart failed for', item.productId, addRes.error);
+          }
+        }
+
+        if (anyAdded) {
+          // Refetch to get the authoritative server cart state (prices,
+          // stock status, slugs) rather than relying on the JWT snapshot.
+          await refetchCart().catch(() => {});
         }
 
         // Stash customer phone for the shipping-step pre-fill.
@@ -114,7 +131,7 @@ export default function WaTokenHydrator() {
         console.warn('[wa-token-hydrator] failed', (err as Error).message);
       }
     })();
-  }, [params, addItem, router]);
+  }, [isReady, params, refetchCart, router]);
 
   return null;
 }

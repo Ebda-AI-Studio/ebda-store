@@ -205,6 +205,12 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
         inventory: true,
         trackInventory: true,
         allowBackorder: true,
+        // Issue 3: include imageUrl so WBS can send product images before the list
+        images: {
+          select: { url: true },
+          orderBy: { position: 'asc' },
+          take: 1,
+        },
       },
       orderBy: { name: 'asc' },
       take: PAGE_SIZE,
@@ -220,6 +226,7 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
         priceFils: p.price,
         currency: req.bridgeStore!.currency,
         inStock: !p.trackInventory || p.inventory > 0 || p.allowBackorder,
+        imageUrl: p.images[0]?.url ?? null,
       })),
       pagination: { page, perPage: PAGE_SIZE, hasMore: products.length === PAGE_SIZE },
     });

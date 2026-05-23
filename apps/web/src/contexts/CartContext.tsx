@@ -46,6 +46,8 @@ interface CartContextType {
   updateQuantity: (id: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
   syncCartToBackend: () => Promise<void>;
+  /** Refetch the server cart and update local state. Used by WaTokenHydrator. */
+  refetchCart: () => Promise<void>;
   itemCount: number;
   total: number;
 }
@@ -299,6 +301,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         updateQuantity,
         clearCart,
         syncCartToBackend,
+        refetchCart,
         itemCount,
         total,
       }}
