@@ -52,6 +52,22 @@ export function ActionFooter({
   // merchant on this page from a "mark paid" deep link, so the action
   // must be one tap away, not buried behind a kebab.
   const showMarkPaid = order.paymentStatus !== 'paid';
+  // The MANUAL "Mark as Paid" button — separately gated. Only show when
+  // the order has NO provider-payment row. For orders with a payment-
+  // provider URL (MyFatoorah/Tap/Hesabe/UPayments — both website checkout
+  // AND merchant-initiated WhatsApp payment links), the paid status MUST
+  // come from the provider's webhook. Letting the merchant flip it
+  // manually would mark an order paid when the customer never actually
+  // paid — financial data integrity break. COD orders (and edge-case
+  // orders with no Payment row at all) keep the manual toggle because
+  // there's no provider to authoritatively confirm. PaymentLinkButton +
+  // RefreshPaymentButton still respect `showMarkPaid` — they're the
+  // affordances merchants USE on provider-payment orders to share the
+  // link or re-check status.
+  const hasProviderPayment = order.payments?.some(
+    p => p.provider !== 'cod' && (p.paymentUrl || p.paymentLink || p.transactionId)
+  );
+  const showManualMarkPaid = showMarkPaid && !hasProviderPayment;
   // Refund-via-provider is only meaningful when:
   //   - the order is paid (provider has money to give back)
   //   - we have a completed online payment row with a transactionId
@@ -176,7 +192,7 @@ export function ActionFooter({
             onRefreshed={onPaymentRefreshed}
           />
         )}
-        {showMarkPaid && (
+        {showManualMarkPaid && (
           <button
             type="button"
             onClick={onMarkPaid}
