@@ -480,12 +480,18 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
           </h3>
           <div className="text-xs text-emerald-800 space-y-1.5">
             <p>
-              Link expires at:{' '}
-              <span className="font-mono">{new Date(result.expiresAt).toLocaleString()}</span>
+              Customer receives the WhatsApp message immediately. The MyFatoorah checkout link stays
+              valid until the order is paid or canceled.
             </p>
-            <p className="text-[10px] text-emerald-600 font-mono">
-              Order: {result.orderNumber}
-              {result.invoiceId && <> · Invoice: {result.invoiceId}</>}
+            <p className="flex items-center gap-2 flex-wrap text-[11px] text-emerald-700">
+              <span className="font-mono">Order #{result.orderNumber}</span>
+              {result.invoiceId && <span className="font-mono">· Invoice {result.invoiceId}</span>}
+              <a
+                href={`/stores/${storeId}/orders/${result.orderId}`}
+                className="ms-auto inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-emerald-700 hover:bg-emerald-100 font-medium"
+              >
+                View order →
+              </a>
             </p>
             <div className="flex items-center gap-2 mt-2">
               <input

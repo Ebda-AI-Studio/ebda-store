@@ -208,9 +208,17 @@ router.post(
         );
         if (!built) continue;
         const bodyComp = built.components.find(c => c.type === 'BODY');
+        // ALSO refresh metaName from canonical. When the canonical name
+        // bumps versions (e.g. force_order_shipped_v1 → _v2 after a
+        // policy-related rewording) the row needs to track the new
+        // name so /sync submits under it AND Meta cooldown on the OLD
+        // name+language pair doesn't block us. The body refresh + name
+        // refresh travel together — they're both part of "regenerate
+        // from canonical".
         await prisma.whatsAppTemplate.update({
           where: { id: row.id },
           data: {
+            metaName: built.name,
             body: bodyComp?.text || '',
             status: 'draft',
             rejectionReason: null,

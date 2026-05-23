@@ -121,7 +121,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── orderShipped ─────
   {
     sourceKey: 'orderShipped',
-    name: 'force_order_shipped_v1',
+    name: 'force_order_shipped_v2',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -137,16 +137,22 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} is on the way! Tracking number: {{5}}.',
+        // Meta rejected v1 with code 100/2388299. Root causes: (a) body
+        // ended with "{{5}}." which Meta now treats as "body ends with
+        // a variable" (disallowed), and (b) the example tracking value
+        // "KW123456789" looked enough like a phone number to trigger
+        // Meta's E.164 heuristic. v2 ends with substantive text after
+        // {{5}} and uses a TRK- prefixed example.
+        text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} is on the way. Track it with reference {{5}} — we will message you when it arrives.',
         example: {
-          body_text: [['Ahmad', 'ORD-1042', '5.500 KWD', 'Wady Aljuz', 'KW123456789']],
+          body_text: [['Ahmad', 'ORD-1042', '5.500 KWD', 'Wady Aljuz', 'TRK-12345']],
         },
       },
     ],
   },
   {
     sourceKey: 'orderShipped',
-    name: 'force_order_shipped_v1',
+    name: 'force_order_shipped_v2',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
@@ -156,9 +162,9 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا {{1}}، طلبك {{2}} بقيمة {{3}} من {{4}} في الطريق! رقم التتبع: {{5}}.',
+        text: 'مرحبًا {{1}}، طلبك {{2}} بقيمة {{3}} من {{4}} في الطريق. تتبّعه برقم {{5}} وسنُعلمك فور الوصول.',
         example: {
-          body_text: [['أحمد', 'ORD-1042', '5.500 د.ك', 'وادي الجوز', 'KW123456789']],
+          body_text: [['أحمد', 'ORD-1042', '5.500 د.ك', 'وادي الجوز', 'TRK-12345']],
         },
       },
     ],
@@ -167,7 +173,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   // ───── orderDelivered ─────
   {
     sourceKey: 'orderDelivered',
-    name: 'force_order_delivered_v1',
+    name: 'force_order_delivered_v2',
     language: 'en',
     metaLanguage: 'en',
     category: 'UTILITY',
@@ -177,7 +183,10 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'Hi {{1}}, your order {{2}} for {{3}} has been delivered. Thanks for shopping with {{4}}!',
+        // v1 ended with "{{4}}!" — Meta rejected (100/2388299) because
+        // body cannot end with a variable. v2 moves the store name
+        // earlier and ends with substantive thanks text.
+        text: 'Hi {{1}}, your order {{2}} for {{3}} from {{4}} has been delivered. Thanks for shopping with us, we hope you love it.',
         example: {
           body_text: [['Ahmad', 'ORD-1042', '5.500 KWD', 'Wady Aljuz']],
         },
@@ -190,7 +199,7 @@ export const TEMPLATES: TemplateDefinition[] = [
   },
   {
     sourceKey: 'orderDelivered',
-    name: 'force_order_delivered_v1',
+    name: 'force_order_delivered_v2',
     language: 'ar',
     metaLanguage: 'ar',
     category: 'UTILITY',
@@ -200,7 +209,7 @@ export const TEMPLATES: TemplateDefinition[] = [
     components: [
       {
         type: 'BODY',
-        text: 'مرحبًا {{1}}، تم تسليم طلبك {{2}} بقيمة {{3}}. شكرًا لاختيارك {{4}}!',
+        text: 'مرحبًا {{1}}، تم تسليم طلبك {{2}} بقيمة {{3}} من {{4}}. شكرًا لتسوقك معنا، ونأمل أن يعجبك.',
         example: {
           body_text: [['أحمد', 'ORD-1042', '5.500 د.ك', 'وادي الجوز']],
         },
