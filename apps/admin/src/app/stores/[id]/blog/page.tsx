@@ -68,7 +68,10 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
   const { publishedCount, draftCount } = useMemo(() => {
     let p = 0;
     let d = 0;
-    for (const post of posts) post.isPublished ? p++ : d++;
+    for (const post of posts) {
+      if (post.isPublished) p++;
+      else d++;
+    }
     return { publishedCount: p, draftCount: d };
   }, [posts]);
 

@@ -209,7 +209,7 @@ export function OrdersTable({
       columns={columns}
       rows={orders}
       rowKey={o => o.id}
-      onRowClick={(order, _i) => {
+      onRowClick={(order, _) => {
         // The desktop table cells already capture clicks on interactive
         // children; on mobile cards, swallow taps that started on a
         // button/select/etc the same way before navigating.

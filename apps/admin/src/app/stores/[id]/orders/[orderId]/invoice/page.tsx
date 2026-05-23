@@ -30,7 +30,7 @@ export default function OrderInvoicePage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
         if (!cancelled) setHtml(text);
-      } catch (e) {
+      } catch {
         if (!cancelled) setError(t('errors.loadFailed'));
       }
     })();

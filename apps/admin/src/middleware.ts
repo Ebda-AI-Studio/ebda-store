@@ -23,6 +23,7 @@ import type { NextRequest } from 'next/server';
  * stay logged in across iOS WebKit's storage purges.
  */
 export function middleware(_request: NextRequest) {
+  // eslint-disable-line @typescript-eslint/no-unused-vars
   return NextResponse.next();
 }
 
