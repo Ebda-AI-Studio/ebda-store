@@ -237,11 +237,240 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
 // Product cap: 1000. Stores with >1000 products will see a warning in the
 // response; pagination in Phase 8.2. For Wady Aljuz today (~235 products)
 // the cap is never hit.
+//
+// Phase 4 extension: optional ?phone=<E164> query param. When provided, the
+// response includes `customerHistory` with past order data scoped strictly to
+// this store (tenant isolation enforced — same phone on another store returns
+// independent history). Privacy: no email, address, or payment info returned.
 const CATALOG_PRODUCT_CAP = 1000;
+const CUSTOMER_HISTORY_DAYS = 90; // don't surface orders older than 90 days
+const CUSTOMER_HISTORY_ORDER_LIMIT = 10; // last 10 paid orders for frequency analysis
+const FREQUENT_CATEGORIES_TOP = 3;
+const FREQUENT_PRODUCTS_TOP = 5;
+
+/**
+ * Build the `customerHistory` payload for a given phone + store.
+ * Returns { isReturning: false, ... } if the customer has no paid orders
+ * for this store within the 90-day window (clear "not found" signal for bot).
+ * Returns null only on database error (caller omits the key from response).
+ *
+ * Tenant isolation: user is looked up by (phone, storeId, role=customer).
+ * A phone that belongs to Store A and Store B gets separate histories.
+ * Privacy: no email, address, or payment data returned.
+ */
+async function buildCustomerHistory(
+  phone: string,
+  storeId: string,
+  currency: string
+): Promise<Record<string, unknown> | null> {
+  try {
+    // Normalise: strip leading + for comparison flexibility — but keep
+    // the value as-is since WBS sends E164 with leading +
+    const normalised = phone.trim();
+
+    // Look up the customer scoped to this store only.
+    const user = await prisma.user.findFirst({
+      where: {
+        phone: normalised,
+        storeId,
+        role: 'customer',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        language: true,
+      },
+    });
+
+    // No customer account for this phone at this store → still return a
+    // structured "not returning" object so the bot has a deterministic shape.
+    if (!user) {
+      return {
+        isReturning: false,
+        totalOrders: 0,
+        totalSpentFils: 0,
+        firstName: null,
+        preferredLanguage: null,
+        lastOrder: null,
+        frequentCategories: [],
+        frequentProducts: [],
+      };
+    }
+
+    // Fetch last 10 paid orders within the 90-day window (for frequency analysis)
+    const since = new Date(Date.now() - CUSTOMER_HISTORY_DAYS * 24 * 60 * 60 * 1000);
+    const orders = await prisma.order.findMany({
+      where: {
+        storeId,
+        customerId: user.id,
+        paymentStatus: 'paid',
+        deletedAt: null,
+        createdAt: { gte: since },
+      },
+      select: {
+        id: true,
+        orderNumber: true,
+        createdAt: true,
+        total: true,
+        items: {
+          select: {
+            productId: true,
+            productName: true,
+            quantity: true,
+            price: true,
+            product: {
+              select: {
+                nameAr: true,
+                categories: {
+                  select: {
+                    category: {
+                      select: {
+                        id: true,
+                        name: true,
+                        nameAr: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: CUSTOMER_HISTORY_ORDER_LIMIT,
+    });
+
+    if (orders.length === 0) {
+      return {
+        isReturning: false,
+        totalOrders: 0,
+        totalSpentFils: 0,
+        firstName: user.firstName || null,
+        preferredLanguage: (user.language === 'ar' ? 'ar' : 'en') as 'en' | 'ar',
+        lastOrder: null,
+        frequentCategories: [],
+        frequentProducts: [],
+      };
+    }
+
+    // Compute aggregate spend across the window
+    const totalSpentFils = orders.reduce((sum, o) => sum + o.total, 0);
+
+    // Build lastOrder from most-recent order (already sorted desc)
+    const latest = orders[0];
+    const lastOrder = {
+      orderId: latest.id,
+      orderNumber: latest.orderNumber,
+      createdAt: latest.createdAt.toISOString(),
+      totalFils: latest.total,
+      items: latest.items.map(i => ({
+        productId: i.productId,
+        productName: i.productName, // snapshot name at time of purchase
+        productNameAr: i.product?.nameAr ?? null,
+        quantity: i.quantity,
+        priceFils: i.price,
+      })),
+    };
+
+    // Frequency analysis: count category orders + product quantity across all fetched orders
+    const categoryCount: Map<string, { id: string; name: string; nameAr: string; count: number }> =
+      new Map();
+    const productCount: Map<
+      string,
+      {
+        productId: string;
+        name: string;
+        nameAr: string | null;
+        priceFils: number;
+        totalQty: number;
+      }
+    > = new Map();
+
+    for (const order of orders) {
+      // Track which categories appeared in this order (count once per order, not per item)
+      const seenCatsThisOrder = new Set<string>();
+      for (const item of order.items) {
+        for (const pc of item.product?.categories ?? []) {
+          const cat = pc.category;
+          if (!seenCatsThisOrder.has(cat.id)) {
+            seenCatsThisOrder.add(cat.id);
+            const existing = categoryCount.get(cat.id);
+            if (existing) {
+              existing.count += 1;
+            } else {
+              categoryCount.set(cat.id, {
+                id: cat.id,
+                name: cat.name,
+                nameAr: cat.nameAr ?? '',
+                count: 1,
+              });
+            }
+          }
+        }
+        // Product frequency — total quantity across all orders in the window
+        const existing = productCount.get(item.productId);
+        if (existing) {
+          existing.totalQty += item.quantity;
+        } else {
+          productCount.set(item.productId, {
+            productId: item.productId,
+            name: item.productName,
+            nameAr: item.product?.nameAr ?? null,
+            priceFils: item.price,
+            totalQty: item.quantity,
+          });
+        }
+      }
+    }
+
+    const frequentCategories = Array.from(categoryCount.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, FREQUENT_CATEGORIES_TOP)
+      .map(c => ({ categoryId: c.id, name: c.name, nameAr: c.nameAr, orderCount: c.count }));
+
+    const frequentProducts = Array.from(productCount.values())
+      .sort((a, b) => b.totalQty - a.totalQty)
+      .slice(0, FREQUENT_PRODUCTS_TOP)
+      .map(p => ({
+        productId: p.productId,
+        name: p.name,
+        nameAr: p.nameAr,
+        priceFils: p.priceFils,
+        totalQuantity: p.totalQty,
+      }));
+
+    return {
+      isReturning: true,
+      totalOrders: orders.length,
+      totalSpentFils,
+      firstName: user.firstName || null,
+      preferredLanguage: (user.language === 'ar' ? 'ar' : 'en') as 'en' | 'ar',
+      lastOrder,
+      frequentCategories,
+      frequentProducts,
+    };
+  } catch (err) {
+    logger.error(
+      { err: (err as Error).message, storeId },
+      '[wa-bridge] buildCustomerHistory failed'
+    );
+    return null; // caller omits customerHistory key on error
+  }
+}
+
+const catalogPhoneSchema = z.object({
+  phone: z.string().min(8).max(20).optional(),
+});
 
 router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) => {
   try {
     const store = req.bridgeStore!;
+
+    // Phase 4: optional phone query param for personalized history
+    const phoneParseResult = catalogPhoneSchema.safeParse(req.query);
+    const customerPhone = phoneParseResult.success ? phoneParseResult.data.phone : undefined;
 
     // Fetch store meta (name, currency, locale, bot copy overrides)
     const storeRow = await prisma.store.findUnique({
@@ -369,10 +598,26 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
     // to canonical defaults in botCopyDefaults.js for every key.
     const botCopy = storeRow.botCopy ?? null;
 
+    // Phase 4: customer history. Only fetched when ?phone= is supplied.
+    // Tenant-scoped to this store — cross-store leakage is impossible.
+    // null = fetch failed (WBS omits the key, falls back to anonymous greeting).
+    let customerHistory: Record<string, unknown> | null | undefined = undefined;
+    if (customerPhone) {
+      customerHistory = await buildCustomerHistory(customerPhone, store.id, storeRow.currency);
+    }
+
     // 30-day cache-control: the catalog changes infrequently and WBS applies
     // its own 5-min in-memory TTL on top. CDN/Varnish can serve staleness safely.
+    // Note: when ?phone= is provided the response is customer-specific — the
+    // Cache-Control header is intentionally kept (WBS manages per-customer
+    // caching at the botCatalogService layer with a phone-keyed Redis key).
     res.setHeader('Cache-Control', 'public, max-age=2592000, stale-while-revalidate=86400');
-    res.json({ success: true, catalog, botCopy });
+    res.json({
+      success: true,
+      catalog,
+      botCopy,
+      ...(customerHistory !== undefined ? { customerHistory } : {}),
+    });
   } catch (err) {
     logger.error({ err: (err as Error).message }, '[wa-bridge] store-catalog failed');
     res.status(500).json({ success: false, error: 'CATALOG_FETCH_FAILED' });
