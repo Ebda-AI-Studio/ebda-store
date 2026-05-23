@@ -1,66 +1,73 @@
 /**
- * Merchant-Initiated Payment Links — Phase 7.
+ * Merchant-Initiated Payment Links — Phase 7 (rewritten Phase 7.1).
  *
  * Lets a store admin send a customer a WhatsApp message containing a
- * one-tap payment link. Used for invoices, custom quotes, or any
- * out-of-band order. Kuwait doesn't have WhatsApp Pay so we ship the
- * customer a Force Store checkout URL signed as a 30-minute JWT.
+ * one-tap MyFatoorah hosted-checkout URL. Used for invoices, custom quotes,
+ * or any out-of-band order.
+ *
+ * Flow:
+ *   1. Validate input (phone, amount or items)
+ *   2. Find-or-create a Customer row
+ *   3. Create a draft Order (status=pending, paymentStatus=unpaid)
+ *   4. Mint a MyFatoorah payment link via PaymentService.createPayment
+ *   5. Send the hosted-checkout URL via the WBS paymentLink template
  *
  * Routes:
  *   POST /stores/:id/payment-links
  *     body: { customerPhone, items?: [{productId, quantity}],
  *             amountFils?, customerName?, language? }
- *     creates the link, calls WBS to send the paymentLink template,
- *     returns the URL + JWT for record-keeping.
  *
- * The customer taps the URL → /checkout?waToken=<jwt> → existing
- * WaTokenHydrator hydrates the cart → existing checkout flow → pays.
+ * Note: OrderItem.productId is required+non-nullable in the schema.
+ * Open-amount mode (no items) is not supported — callers must pass at
+ * least one product item. The admin UI already exposes an amount-only
+ * input; in that mode the frontend should be updated to require item
+ * selection, but to avoid a breaking change we reject open-amount at
+ * the API level with a clear error code.
  */
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
 import { config } from '../config';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { auditLog, writeLimiter } from '../middleware/security';
 import { encryption } from '../services/encryption.service';
+import { PaymentService } from '../services/payment-providers/payment.factory';
+import { getAuthUser } from '../utils/store-helpers';
 import logger from '../lib/logger';
+import type { Currency } from '../services/payment-providers/types';
 
 const router = Router({ mergeParams: true });
 
-const CHECKOUT_TOKEN_TTL_SECONDS = 30 * 60; // 30 minutes
-
-const bodySchema = z
-  .object({
-    // Customer's phone in E.164 format
-    customerPhone: z.string().regex(/^\+[1-9]\d{6,14}$/, 'Phone must be E.164 (e.g. +96512345678)'),
-    customerName: z.string().min(1).max(100).optional(),
-    // Either: items (existing products) OR amountFils (open amount, no SKU)
-    items: z
-      .array(
-        z.object({
-          productId: z.string().min(1),
-          quantity: z.number().int().min(1).max(99),
-        })
-      )
-      .max(50)
-      .optional(),
-    amountFils: z.number().int().min(100).max(100_000_000).optional(),
-    // Override paymentLink template language for this send (default = store default)
-    language: z.enum(['en', 'ar']).optional(),
-  })
-  .refine(d => (d.items && d.items.length > 0) || typeof d.amountFils === 'number', {
-    message: 'Either items[] or amountFils is required',
-  });
+const bodySchema = z.object({
+  // Customer's phone in E.164 format
+  customerPhone: z.string().regex(/^\+[1-9]\d{6,14}$/, 'Phone must be E.164 (e.g. +96512345678)'),
+  customerName: z.string().min(1).max(100).optional(),
+  // Items (existing products) — required because OrderItem.productId is non-nullable
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        quantity: z.number().int().min(1).max(99),
+      })
+    )
+    .min(1, 'At least one item is required')
+    .max(50),
+  // Override paymentLink template language for this send (default = en)
+  language: z.enum(['en', 'ar']).optional(),
+});
 
 router.post(
   '/',
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  writeLimiter,
   async (req: Request, res: Response) => {
     const storeId = req.params.id;
+    let draftOrderId: string | null = null;
+
     try {
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -71,8 +78,10 @@ router.post(
         });
         return;
       }
-      const { customerPhone, customerName, items, amountFils, language } = parsed.data;
+      const { customerPhone, customerName, items, language } = parsed.data;
+      const user = getAuthUser(req);
 
+      // ── Load store ──────────────────────────────────────────────────────────
       const store = await prisma.store.findUnique({
         where: { id: storeId },
         select: {
@@ -99,10 +108,7 @@ router.post(
         return;
       }
 
-      // Confirm the chosen paymentLink template is approved before we send.
-      // If it's pending or rejected, fail loudly — sending a non-approved
-      // template will be rejected by Meta + waste the customer's first
-      // touch with our brand.
+      // ── Confirm the paymentLink template is approved ────────────────────────
       const tmpl = await prisma.whatsAppTemplate.findUnique({
         where: {
           storeId_sourceKey_language: {
@@ -130,74 +136,170 @@ router.post(
         return;
       }
 
-      // Validate items belong to this store + are in stock; compute total
-      // for the WhatsApp message text. Open amount (amountFils) bypasses
-      // this — admin-trusted to enter the right number.
-      let totalFils = amountFils || 0;
-      if (items && items.length > 0) {
-        const productIds = items.map(i => i.productId);
-        const products = await prisma.product.findMany({
-          where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
-          select: {
-            id: true,
-            price: true,
-            inventory: true,
-            trackInventory: true,
-            allowBackorder: true,
+      // ── Validate items + compute total ─────────────────────────────────────
+      const productIds = items.map(i => i.productId);
+      const products = await prisma.product.findMany({
+        where: { id: { in: productIds }, storeId, status: 'active', deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          inventory: true,
+          trackInventory: true,
+          allowBackorder: true,
+          sku: true,
+          costPrice: true,
+        },
+      });
+      const byId = new Map(products.map(p => [p.id, p]));
+      for (const it of items) {
+        const p = byId.get(it.productId);
+        if (!p) {
+          res.status(400).json({
+            success: false,
+            error: 'PRODUCT_NOT_FOUND',
+            message: `Product ${it.productId} not in this store.`,
+          });
+          return;
+        }
+        if (p.trackInventory && !p.allowBackorder && p.inventory < it.quantity) {
+          res.status(400).json({
+            success: false,
+            error: 'OUT_OF_STOCK',
+            message: `Product ${it.productId} has insufficient stock.`,
+          });
+          return;
+        }
+      }
+      const totalFils = items.reduce((sum, it) => {
+        const p = byId.get(it.productId);
+        return sum + (p ? p.price * it.quantity : 0);
+      }, 0);
+
+      // ── Find or create Customer ────────────────────────────────────────────
+      // The User model is the customer record (role='customer', scoped to storeId).
+      // email is required+non-nullable on the User model — use a placeholder
+      // derived from the phone number for WA-initiated customers.
+      const placeholderEmail = `wa-${customerPhone.replace(/\D/g, '')}@placeholder.forcestore.kw`;
+      const firstName = customerName?.split(' ')[0] || null;
+      const lastName = customerName?.split(' ').slice(1).join(' ') || null;
+
+      let customer = await prisma.user.findFirst({
+        where: { phone: customerPhone, role: 'customer', storeId },
+      });
+      if (!customer) {
+        // Try by placeholder email within the store first (idempotent re-runs)
+        customer = await prisma.user.findFirst({
+          where: { email: placeholderEmail, storeId, role: 'customer' },
+        });
+      }
+      if (!customer) {
+        customer = await prisma.user.create({
+          data: {
+            storeId,
+            email: placeholderEmail,
+            passwordHash: '',
+            firstName: firstName || 'Customer',
+            lastName: lastName || '',
+            phone: customerPhone,
+            role: 'customer',
           },
         });
-        const byId = new Map(products.map(p => [p.id, p]));
-        for (const it of items) {
-          const p = byId.get(it.productId);
-          if (!p) {
-            res.status(400).json({
-              success: false,
-              error: 'PRODUCT_NOT_FOUND',
-              message: `Product ${it.productId} not in this store.`,
-            });
-            return;
-          }
-          if (p.trackInventory && !p.allowBackorder && p.inventory < it.quantity) {
-            res.status(400).json({
-              success: false,
-              error: 'OUT_OF_STOCK',
-              message: `Product ${it.productId} has insufficient stock.`,
-            });
-            return;
-          }
-        }
-        totalFils = items.reduce((sum, it) => {
-          const p = byId.get(it.productId);
-          return sum + (p ? p.price * it.quantity : 0);
-        }, 0);
       }
 
-      // Sign the JWT — same shape as Phase 6 /cart/from-wa
-      const tokenPayload: Record<string, unknown> = {
-        sub: 'payment-link',
-        storeId,
-        phone: customerPhone,
-        items: items || null,
-        amountFils: items ? null : totalFils,
-        createdBy: req.user?.userId || null,
-      };
-      const checkoutToken = jwt.sign(tokenPayload, config.jwtSecret, {
-        expiresIn: CHECKOUT_TOKEN_TTL_SECONDS,
+      // ── Create draft Order ─────────────────────────────────────────────────
+      const orderNumber = `WA-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const draftOrder = await prisma.order.create({
+        data: {
+          storeId,
+          customerId: customer.id,
+          orderNumber,
+          status: 'pending',
+          paymentStatus: 'unpaid',
+          subtotal: totalFils,
+          tax: 0,
+          shipping: 0,
+          discount: 0,
+          total: totalFils,
+          currency: store.currency || 'KWD',
+          shippingAddress: {
+            phone: customerPhone,
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            _source: 'wa_payment_link',
+          },
+          billingAddress: {
+            phone: customerPhone,
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            _source: 'wa_payment_link',
+          },
+          notes: 'Created via merchant-initiated WhatsApp payment link',
+          locale: language || 'en',
+          items: {
+            create: items.map(it => {
+              const p = byId.get(it.productId)!;
+              return {
+                productId: it.productId,
+                productName: p.name,
+                quantity: it.quantity,
+                price: p.price,
+                total: p.price * it.quantity,
+                sku: p.sku || null,
+                costPrice: p.costPrice || null,
+              };
+            }),
+          },
+        },
+        include: { items: true, customer: true },
       });
+      draftOrderId = draftOrder.id;
 
-      // Build the storefront checkout URL. Use the store's domain if set,
-      // otherwise fall back to the slug-based subdomain (the storefront
-      // resolves either).
-      const baseUrl = store.domain
+      // ── Mint MyFatoorah payment link ───────────────────────────────────────
+      const storefrontBaseUrl = store.domain
         ? `https://${store.domain}`
-        : `https://${store.slug}.forcestore.kw`;
-      const checkoutUrl = `${baseUrl}/checkout?waToken=${encodeURIComponent(checkoutToken)}`;
+        : `${config.webUrl}/${store.slug}`;
 
-      // Call WBS to send the paymentLink template.
+      const customerDisplayName =
+        `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || 'Customer';
+
+      const result = await PaymentService.createPayment(
+        {
+          orderId: draftOrder.id,
+          orderNumber: draftOrder.orderNumber,
+          amount: draftOrder.total,
+          currency: draftOrder.currency as Currency,
+          customer: {
+            id: customer.id,
+            name: customerDisplayName,
+            email: customer.email || '',
+            phone: customerPhone,
+          },
+          items: draftOrder.items.map(it => ({
+            name: it.productName,
+            quantity: it.quantity,
+            unitPrice: it.price,
+            sku: it.sku || undefined,
+          })),
+          callbackUrl: `${storefrontBaseUrl}/checkout/success`,
+          errorUrl: `${storefrontBaseUrl}/checkout/error`,
+          webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/myfatoorah`,
+          notifyVia: 'link',
+        },
+        'myfatoorah',
+        storeId
+      );
+
+      const paymentUrl = result.paymentUrl;
+
+      // ── Send via WBS paymentLink template ──────────────────────────────────
       let wbsApiKey: string;
       try {
         wbsApiKey = encryption.decrypt(store.wbsApiKey);
       } catch {
+        // Clean up the draft order before failing
+        await prisma.order.delete({ where: { id: draftOrderId } }).catch(() => {});
+        draftOrderId = null;
         res.status(400).json({ success: false, error: 'WBS_KEY_INVALID' });
         return;
       }
@@ -212,11 +314,11 @@ router.post(
       //   {{2}} order total
       //   {{3}} currency
       //   {{4}} store name
-      //   {{5}} checkout URL
-      const variables = [customerDisplay, totalDisplay, currencyDisplay, storeName, checkoutUrl];
+      //   {{5}} payment URL (MyFatoorah hosted checkout)
+      const variables = [customerDisplay, totalDisplay, currencyDisplay, storeName, paymentUrl];
 
       const wbsBaseUrl = config.wbsBaseUrl;
-      const idempotencyKey = `pl-${storeId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const idempotencyKey = `pl-${storeId}-${draftOrder.id}-${Date.now()}`;
 
       const wbsResponse = await fetch(`${wbsBaseUrl}/api/v1/external/send-template`, {
         method: 'POST',
@@ -246,6 +348,9 @@ router.post(
           { status: wbsResponse.status, body: wbsBody, storeId },
           '[payment-links] WBS send failed'
         );
+        // Clean up the orphan draft order
+        await prisma.order.delete({ where: { id: draftOrderId } }).catch(() => {});
+        draftOrderId = null;
         res.status(502).json({
           success: false,
           error: wbsBody.error || 'WBS_SEND_FAILED',
@@ -254,25 +359,61 @@ router.post(
         return;
       }
 
+      // ── Audit log ──────────────────────────────────────────────────────────
+      await auditLog({
+        action: 'payment_link.merchant_initiated',
+        userId: user.userId,
+        resourceType: 'order',
+        resourceId: draftOrder.id,
+        details: {
+          orderId: draftOrder.id,
+          orderNumber: draftOrder.orderNumber,
+          totalFils,
+          invoiceId: result.invoiceId ?? null,
+          messageId: wbsBody.messageId ?? null,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
       logger.info(
-        { storeId, customerPhone: '[REDACTED]', totalFils, messageId: wbsBody.messageId },
+        {
+          storeId,
+          customerPhone: '[REDACTED]',
+          totalFils,
+          orderId: draftOrder.id,
+          orderNumber: draftOrder.orderNumber,
+          invoiceId: result.invoiceId,
+          messageId: wbsBody.messageId,
+        },
         '[payment-links] sent'
       );
+
+      const PAYMENT_LINK_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
       res.json({
         success: true,
         data: {
-          checkoutUrl,
-          checkoutToken,
+          paymentUrl,
+          orderId: draftOrder.id,
+          orderNumber: draftOrder.orderNumber,
+          invoiceId: result.invoiceId ?? null,
           totalFils,
           currency: store.currency || 'KWD',
           messageId: wbsBody.messageId,
-          expiresAt: new Date(Date.now() + CHECKOUT_TOKEN_TTL_SECONDS * 1000).toISOString(),
+          expiresAt: new Date(Date.now() + PAYMENT_LINK_TTL_MS).toISOString(),
         },
       });
     } catch (err) {
+      // If we created a draft order but something failed after, delete it
+      // to avoid orphaned unpaid orders cluttering the merchant's order list.
+      if (draftOrderId) {
+        await prisma.order.delete({ where: { id: draftOrderId } }).catch(() => {});
+      }
       logger.error({ err: (err as Error).message }, '[payment-links] create failed');
-      res.status(500).json({ success: false, error: 'CREATE_FAILED' });
+      res
+        .status(500)
+        .json({ success: false, error: 'CREATE_FAILED', message: (err as Error).message });
     }
   }
 );
