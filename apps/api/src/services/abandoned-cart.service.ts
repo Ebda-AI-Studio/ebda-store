@@ -32,11 +32,23 @@ const ABANDONMENT_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 // Shorter than website carts (1h) because DM sessions go cold faster.
 const WA_ABANDONMENT_MINUTES = 30;
 
-// Redis sentinel key TTL for WA cart step-1 dedup.
-// Set to 25h so a re-abandoned cart (recovered then abandoned again) can
-// receive a new reminder after 25h rather than being silently skipped forever.
-// Must be > sweep interval (15 min) to prevent double-sends in back-to-back runs.
-const WA_CART_SENTINEL_TTL_SECONDS = 25 * 60 * 60; // 25 hours
+// Multi-step WA cart abandoned reminder cadence.
+// Mirrors the website abandoned-cart default config (step1=60min, step2=240min, step3=1440min)
+// except the WBS inactivity trigger already implies 30 min has passed before step 1 fires.
+//   step1: fires when cart is detected as abandoned (≥30min inactivity).
+//   step2: fires 4h (240min) after step1 sentinel is written.
+//   step3: fires 24h (1440min) after step2 sentinel is written.
+const WA_CART_STEP1_DELAY_SECONDS = 0; // immediate on detection
+const WA_CART_STEP2_DELAY_SECONDS = 240 * 60; // 4 hours after step1
+const WA_CART_STEP3_DELAY_SECONDS = 1440 * 60; // 24 hours after step2
+
+// Redis sentinel TTL for each step.
+// Step-N sentinel lives long enough for step N+1 to check it exists, plus headroom.
+// Step3 sentinel = 25h so a re-abandoned cart can get a fresh sequence after that window.
+const WA_CART_STEP1_SENTINEL_TTL =
+  WA_CART_STEP2_DELAY_SECONDS + WA_CART_STEP3_DELAY_SECONDS + 2 * 60 * 60; // ~30h
+const WA_CART_STEP2_SENTINEL_TTL = WA_CART_STEP3_DELAY_SECONDS + 2 * 60 * 60; // ~26h
+const WA_CART_STEP3_SENTINEL_TTL = 25 * 60 * 60; // 25h
 
 interface AbandonedCartConfigDefaults {
   step1Enabled: boolean;
@@ -426,6 +438,28 @@ class AbandonedCartService {
     }
   }
 
+  /**
+   * Multi-step WA cart abandoned reminder sequence.
+   *
+   * Cadence (mirrors website AbandonedCartConfig defaults):
+   *   step1 — fires immediately when the cart is detected as abandoned (≥30min inactivity)
+   *   step2 — fires 4h after step1 sentinel was written
+   *   step3 — fires 24h after step2 sentinel was written
+   *
+   * Each step is deduped via a Redis sentinel key keyed by waCartId + step number.
+   * Sentinel value = Unix timestamp (ms) of when it was written — used by the
+   * next step to check if enough time has elapsed.
+   *
+   * Step N fires only when:
+   *   (a) step N sentinel does NOT yet exist (not already sent)
+   *   (b) for N>1: step N-1 sentinel EXISTS and its stored timestamp is ≥ step-N delay ago
+   *
+   * All 3 steps use the same Meta-approved template (force_cart_abandoned_v1).
+   * Variables are identical across steps; messaging variation is a future enhancement.
+   *
+   * Sentinel expiry ensures re-abandoned carts (recovered then abandoned again) get
+   * a fresh reminder sequence after the TTL window.
+   */
   private async sendWaCartAbandonedReminder(
     store: { id: string; name: string; wbsApiKey: string | null },
     cart: AbandonedWaCart,
@@ -434,20 +468,64 @@ class AbandonedCartService {
   ): Promise<void> {
     if (!store.wbsApiKey) return;
 
-    // Redis sentinel: prevents double-sends within the 25h dedup window
-    const sentinelKey = `wa-cart-abandoned:${cart.waCartId}:step1`;
-    const alreadySent = await redis.exists(sentinelKey);
-    if (alreadySent) {
+    // Pre-validate the encrypted key decrypts before attempting any send.
+    try {
+      encryption.decrypt(store.wbsApiKey);
+    } catch {
+      logger.warn({ storeId: store.id }, '[AbandonedCart:WA] decrypt failed — skipping cart');
+      return;
+    }
+
+    const step1Key = `wa-cart-abandoned:${cart.waCartId}:step1`;
+    const step2Key = `wa-cart-abandoned:${cart.waCartId}:step2`;
+    const step3Key = `wa-cart-abandoned:${cart.waCartId}:step3`;
+
+    // Read all sentinel values (stored as ms timestamps, or null if not yet fired)
+    const [step1Val, step2Val, step3Val] = await Promise.all([
+      redis.get<string>(step1Key),
+      redis.get<string>(step2Key),
+      redis.get<string>(step3Key),
+    ]);
+
+    const now = Date.now();
+
+    // Determine which step to fire.
+    // At most one step fires per cart per sweep; the next sweep advances further.
+    let stepToFire: 1 | 2 | 3 | null = null;
+
+    if (!step1Val) {
+      // Step 1: fire immediately — cart is newly detected as abandoned
+      stepToFire = 1;
+    } else if (!step2Val) {
+      // Step 2: fires ≥4h after step1
+      const step1SentAt = parseInt(step1Val, 10);
+      if (now - step1SentAt >= WA_CART_STEP2_DELAY_SECONDS * 1000) {
+        stepToFire = 2;
+      }
+    } else if (!step3Val) {
+      // Step 3: fires ≥24h after step2
+      const step2SentAt = parseInt(step2Val, 10);
+      if (now - step2SentAt >= WA_CART_STEP3_DELAY_SECONDS * 1000) {
+        stepToFire = 3;
+      }
+    }
+
+    if (stepToFire === null) {
       logger.debug(
-        { waCartId: cart.waCartId },
-        '[AbandonedCart:WA] Already sent reminder within dedup window — skipping'
+        {
+          waCartId: cart.waCartId,
+          step1: Boolean(step1Val),
+          step2: Boolean(step2Val),
+          step3: Boolean(step3Val),
+        },
+        '[AbandonedCart:WA] All applicable steps already sent or not yet due — skipping'
       );
       return;
     }
 
     const templateName = template.name!;
     const languageCode = template.languageCode || (cart.language === 'ar' ? 'ar' : 'en');
-    const idempotencyKey = `wa-cart-${cart.waCartId}-step1`;
+    const idempotencyKey = `wa-cart-${cart.waCartId}-step${stepToFire}`;
 
     // Build variables for force_cart_abandoned_v1:
     //   {{1}} customer name, {{2}} cart total, {{3}} store name
@@ -456,16 +534,6 @@ class AbandonedCartService {
     const customerName = cart.customerName || 'Customer';
 
     const variables = [customerName, totalDisplay, store.name];
-
-    // Pre-validate the encrypted key decrypts before attempting the send.
-    // sendOrderNotification also decrypts internally, but catching here gives a
-    // cleaner log context (waCartId present).
-    try {
-      encryption.decrypt(store.wbsApiKey);
-    } catch {
-      logger.warn({ storeId: store.id }, '[AbandonedCart:WA] decrypt failed — skipping cart');
-      return;
-    }
 
     try {
       const result = await wbsBridgeService.sendOrderNotification({
@@ -477,11 +545,24 @@ class AbandonedCartService {
         idempotencyKey,
       });
 
-      // Mark as sent in Redis to prevent re-send in next sweep cycle
-      await redis.set(sentinelKey, '1', WA_CART_SENTINEL_TTL_SECONDS);
+      // Write sentinel: value = ms timestamp so the next step can measure elapsed time
+      const sentinelKey = stepToFire === 1 ? step1Key : stepToFire === 2 ? step2Key : step3Key;
+      const sentinelTtl =
+        stepToFire === 1
+          ? WA_CART_STEP1_SENTINEL_TTL
+          : stepToFire === 2
+            ? WA_CART_STEP2_SENTINEL_TTL
+            : WA_CART_STEP3_SENTINEL_TTL;
+      await redis.set(sentinelKey, String(now), sentinelTtl);
 
       logger.info(
-        { correlationId, storeId: store.id, waCartId: cart.waCartId, messageId: result.messageId },
+        {
+          correlationId,
+          storeId: store.id,
+          waCartId: cart.waCartId,
+          step: stepToFire,
+          messageId: result.messageId,
+        },
         '[AbandonedCart:WA] WhatsApp reminder sent'
       );
     } catch (err) {
