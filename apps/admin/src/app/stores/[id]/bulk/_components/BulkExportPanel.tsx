@@ -8,6 +8,7 @@ import type { ExportFilters } from './types';
 interface BulkExportPanelProps {
   isExporting: boolean;
   onExport: (filters: ExportFilters) => Promise<void> | void;
+  onExportXlsx: (filters: ExportFilters) => Promise<void> | void;
 }
 
 const INFO_KEYS = ['allFields', 'commaSeparated', 'reImport', 'pricesInFils'] as const;
@@ -17,7 +18,7 @@ const INFO_KEYS = ['allFields', 'commaSeparated', 'reImport', 'pricesInFils'] as
  * export button, and the static informational panel that explains the
  * output format.
  */
-export function BulkExportPanel({ isExporting, onExport }: BulkExportPanelProps) {
+export function BulkExportPanel({ isExporting, onExport, onExportXlsx }: BulkExportPanelProps) {
   const t = useT('bulk.export');
 
   const [filters, setFilters] = useState<ExportFilters>({
@@ -75,7 +76,7 @@ export function BulkExportPanel({ isExporting, onExport }: BulkExportPanelProps)
           </div>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-6 flex gap-2">
           <Button onClick={() => onExport(filters)} disabled={isExporting}>
             {isExporting ? (
               <span className="inline-flex items-center gap-2">
@@ -107,6 +108,40 @@ export function BulkExportPanel({ isExporting, onExport }: BulkExportPanelProps)
                   />
                 </svg>
                 {t('exportButton')}
+              </span>
+            )}
+          </Button>
+          <Button variant="outline" onClick={() => onExportXlsx(filters)} disabled={isExporting}>
+            {isExporting ? (
+              <span className="inline-flex items-center gap-2">
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                {t('exportingXlsx')}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                {t('exportXlsx')}
               </span>
             )}
           </Button>

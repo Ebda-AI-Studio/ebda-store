@@ -34,6 +34,7 @@ export default function BulkOperationsPage() {
     downloadTemplate,
     importFile,
     exportProducts,
+    exportProductsXlsx,
     clearImportResult,
   } = useBulkOperations({
     storeId,
@@ -76,7 +77,11 @@ export default function BulkOperationsPage() {
       )}
 
       {activeTab === 'export' && (
-        <BulkExportPanel isExporting={isExporting} onExport={exportProducts} />
+        <BulkExportPanel
+          isExporting={isExporting}
+          onExport={exportProducts}
+          onExportXlsx={exportProductsXlsx}
+        />
       )}
     </AdminLayout>
   );

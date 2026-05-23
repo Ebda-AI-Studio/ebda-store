@@ -180,6 +180,40 @@ export function useBulkOperations({
     [storeId]
   );
 
+  const exportProductsXlsx = useCallback(
+    async (filters: ExportFilters) => {
+      setIsExporting(true);
+
+      try {
+        const queryParams = new URLSearchParams();
+        if (filters.status) queryParams.append('status', filters.status);
+        if (filters.search) queryParams.append('search', filters.search);
+        if (filters.includeDeleted) queryParams.append('includeDeleted', 'true');
+
+        const response = await apiFetch(
+          `/api/v1/stores/${storeId}/bulk/export.xlsx?${queryParams}`
+        );
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `products-${storeId}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        }
+      } catch (error) {
+        console.error('Failed to export products as xlsx:', error);
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [storeId]
+  );
+
   const clearImportResult = useCallback(() => {
     setImportResult(null);
     setImportProgress(null);
@@ -193,6 +227,7 @@ export function useBulkOperations({
     downloadTemplate,
     importFile,
     exportProducts,
+    exportProductsXlsx,
     clearImportResult,
   };
 }
