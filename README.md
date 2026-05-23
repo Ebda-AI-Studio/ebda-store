@@ -9,6 +9,28 @@ Multi-tenant SaaS e-commerce platform by Force Media. Provision and manage multi
 > redistributed, hosted, or used to build derivative or competing works
 > without the prior written permission of Force Media.
 
+## What shipped in the 2026-05-22/23 session
+
+Major capabilities added across this session (commit SHAs for reference):
+
+| Capability                                                                           | Key commits                                 |
+| ------------------------------------------------------------------------------------ | ------------------------------------------- |
+| Phase 6 WhatsApp customer DM ordering bridge                                         | (phase 6 base)                              |
+| Phase 7 template sync + FWB-driven template management                               | `3fee59a` (WBS)                             |
+| Phase 7.1 master WhatsApp tab — 4 cards → 1 consolidated page                        | `f100656e`                                  |
+| Bot intelligence Phase 1–5 (intent, catalog cache, voice, image, history, analytics) | `0434afc1` `dafeb3bf` `a81e86dd` `bf4881d5` |
+| Multi-provider payment links (Tap / MyFatoorah / Hesabe / UPayments)                 | `fe129e8b`                                  |
+| Cart abandoned unification — website carts + WA DM carts in one sweep                | `9cdd4062`                                  |
+| Date window pickers across Finance, Orders, Stock, Bot Analytics                     | `fe8b0731` `8491a91e` `07be5ebd`            |
+| XLSX exports — finance reports, newsletter, bulk products                            | `5d720e44` `bb9074fb`                       |
+| Newsletter broadcast + Affiliate invite button                                       | `b1e2e0dd`                                  |
+| Settings discoverability chips (connected/DM-ordering state on card)                 | `917a268a`                                  |
+| Origin-aware order email skip (WhatsApp-origin → WA-only, no placeholder email)      | `115e76a7`                                  |
+| Version-agnostic template lookup (strip `_v2` suffix, auto-recover after reject)     | `1507ef67`                                  |
+| Inngest mark-running-first (unambiguous job state)                                   | `46269715`                                  |
+| Inngest auto-reaper for stuck-running jobs (queue-depth-watch 15-min cron)           | `8c229e2b`                                  |
+| Service worker pre-registration (Chromium 133+ deprecation fix)                      | `91d735cf`                                  |
+
 ## Architecture
 
 ```
