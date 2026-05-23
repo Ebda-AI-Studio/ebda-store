@@ -67,6 +67,16 @@ const wbsIntegrationSchema = z.object({
    * Default OFF (false) — merchant opts in explicitly from the Connection tab.
    */
   waCustomerOrderingEnabled: z.boolean().optional(),
+  /**
+   * Phase 2 bot intelligence: per-store bot copy overrides.
+   * Shape: Record<string, { en?: string; ar?: string }> — keys match
+   * botCopyDefaults.js in WBS. Absent keys fall back to canonical defaults.
+   * null = clear all overrides (revert to defaults).
+   */
+  botCopy: z
+    .record(z.object({ en: z.string().optional(), ar: z.string().optional() }))
+    .nullable()
+    .optional(),
 });
 
 type WbsIntegrationInput = z.infer<typeof wbsIntegrationSchema>;
@@ -110,6 +120,7 @@ router.get(
           wbsTemplates: true,
           wbsTemplateUseLogoHeader: true,
           waCustomerOrderingEnabled: true,
+          botCopy: true,
           logo: true,
         },
       });
@@ -203,6 +214,7 @@ router.get(
           wbsTemplates: store.wbsTemplates,
           wbsTemplateUseLogoHeader: store.wbsTemplateUseLogoHeader,
           waCustomerOrderingEnabled: store.waCustomerOrderingEnabled,
+          botCopy: store.botCopy ?? null,
           storeHasLogo: Boolean(store.logo),
           connectedTenant,
           ...(connectedTenantError ? { connectedTenantError } : {}),
@@ -333,6 +345,13 @@ router.put(
         updateData.waCustomerOrderingEnabled = input.waCustomerOrderingEnabled;
       }
 
+      // botCopy: null = clear overrides (revert to WBS canonical defaults);
+      // object = merge/replace the whole overrides map. Partial key updates
+      // are handled client-side (admin loads current, edits, saves whole map).
+      if (input.botCopy !== undefined) {
+        updateData.botCopy = input.botCopy;
+      }
+
       // API key handling
       if (isNewApiKey && input.wbsApiKey) {
         updateData.wbsApiKey = encryption.encrypt(input.wbsApiKey);
@@ -363,6 +382,7 @@ router.put(
           wbsTemplates: true,
           wbsTemplateUseLogoHeader: true,
           waCustomerOrderingEnabled: true,
+          botCopy: true,
         },
       });
 
@@ -542,6 +562,7 @@ router.put(
           hasApiKey: Boolean(updated.wbsApiKey),
           wbsTemplates: updated.wbsTemplates,
           waCustomerOrderingEnabled: updated.waCustomerOrderingEnabled,
+          botCopy: updated.botCopy ?? null,
           // Phase 7 atomic: surface what happened to the auto-generated
           // templates so the UI can show "Connected + 12 templates pending"
           ...(templatesAutoSeeded !== undefined && {

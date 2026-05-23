@@ -243,7 +243,7 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
   try {
     const store = req.bridgeStore!;
 
-    // Fetch store meta (name, currency, locale)
+    // Fetch store meta (name, currency, locale, bot copy overrides)
     const storeRow = await prisma.store.findUnique({
       where: { id: store.id },
       select: {
@@ -252,6 +252,7 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
         nameAr: true,
         currency: true,
         settings: true,
+        botCopy: true,
       },
     });
 
@@ -362,10 +363,16 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
       ...(truncated ? { truncated: true, totalProducts: products.length } : {}),
     };
 
+    // botCopy: per-store merchant overrides for bot wording (Phase 2).
+    // WBS reads this alongside the catalog on every 5-min cache refresh.
+    // null = merchant hasn't configured any overrides → WBS falls back
+    // to canonical defaults in botCopyDefaults.js for every key.
+    const botCopy = storeRow.botCopy ?? null;
+
     // 30-day cache-control: the catalog changes infrequently and WBS applies
     // its own 5-min in-memory TTL on top. CDN/Varnish can serve staleness safely.
     res.setHeader('Cache-Control', 'public, max-age=2592000, stale-while-revalidate=86400');
-    res.json({ success: true, catalog });
+    res.json({ success: true, catalog, botCopy });
   } catch (err) {
     logger.error({ err: (err as Error).message }, '[wa-bridge] store-catalog failed');
     res.status(500).json({ success: false, error: 'CATALOG_FETCH_FAILED' });
