@@ -78,6 +78,7 @@ router.get('/categories', waBridgeAuth, async (req: Request, res: Response) => {
         name: true,
         nameAr: true,
         slug: true,
+        image: true,
         _count: { select: { products: true } },
       },
       orderBy: { position: 'asc' },
@@ -92,6 +93,7 @@ router.get('/categories', waBridgeAuth, async (req: Request, res: Response) => {
         nameAr: c.nameAr,
         slug: c.slug,
         productCount: c._count.products,
+        imageUrl: c.image ?? null,
       })),
     });
   } catch (err) {
