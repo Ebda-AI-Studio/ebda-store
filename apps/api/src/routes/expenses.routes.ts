@@ -61,8 +61,10 @@ router.get(
       const status = typeof req.query.status === 'string' ? req.query.status : undefined;
       const page = Number(req.query.page ?? 1);
       const perPage = Number(req.query.perPage ?? 50);
+      const from = req.query.from ? new Date(String(req.query.from) + 'T00:00:00') : undefined;
+      const to = req.query.to ? new Date(String(req.query.to) + 'T23:59:59') : undefined;
       const result = await runInTenantContext(req.params.storeId, () =>
-        listExpenses(req.params.storeId, { status, page, perPage })
+        listExpenses(req.params.storeId, { status, page, perPage, from, to })
       );
       res.json({
         data: result.items,

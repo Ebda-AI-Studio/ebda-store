@@ -163,10 +163,12 @@ export interface ListExpensesOptions {
   status?: string;
   page?: number;
   perPage?: number;
+  from?: Date;
+  to?: Date;
 }
 
 /**
- * Paginated list of expenses for a store with optional status filter.
+ * Paginated list of expenses for a store with optional status + date filters.
  */
 export async function listExpenses(
   storeId: string,
@@ -176,10 +178,16 @@ export async function listExpenses(
   const perPage = Math.min(100, Math.max(1, opts.perPage ?? 50));
   const skip = (page - 1) * perPage;
 
-  const where = {
+  const where: any = {
     storeId,
     ...(opts.status ? { status: opts.status as any } : {}),
   };
+
+  if (opts.from || opts.to) {
+    where.expenseDate = {};
+    if (opts.from) where.expenseDate.gte = opts.from;
+    if (opts.to) where.expenseDate.lte = opts.to;
+  }
 
   const include = {
     supplier: { select: { id: true, name: true, nameAr: true } },
