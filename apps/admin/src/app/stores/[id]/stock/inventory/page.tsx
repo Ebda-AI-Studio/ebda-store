@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
+import { Button, useToast } from '@force/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,48 @@ export default function StockInventoryPage() {
   const [suggestedSet, setSuggestedSet] = useState<Set<string>>(new Set());
   const [deadSet, setDeadSet] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const { success: toastSuccess, error: toastError } = useToast();
+
+  // Whether every loaded product already allows backorder. Drives the
+  // toggle button's label between "Enable all" and "Disable all".
+  const allBackorderEnabled = Boolean(
+    products && products.length > 0 && products.every(p => p.allowBackorder)
+  );
+
+  const handleBulkSetBackorder = async (enabled: boolean) => {
+    const verb = enabled ? 'enable' : 'disable';
+    if (!products || products.length === 0) return;
+    const confirmed = window.confirm(
+      enabled
+        ? `Enable backorder on all ${products.length} active products? Customers will be able to order items even when out of stock.`
+        : `Disable backorder on all ${products.length} active products? Out-of-stock items will become unorderable.`
+    );
+    if (!confirmed) return;
+    setBulkBusy(true);
+    try {
+      const { data, error: apiError } = await apiPost<{ updated: number; enabled: boolean }>(
+        `/api/v1/stores/${storeId}/products/bulk-set-backorder`,
+        { enabled }
+      );
+      if (apiError) {
+        toastError(`Could not ${verb} backorder`, apiError.message || '');
+        return;
+      }
+      const updated = data?.updated ?? 0;
+      toastSuccess(
+        enabled
+          ? `Backorder enabled on ${updated} products`
+          : `Backorder disabled on ${updated} products`
+      );
+      // Optimistic UI update — no need to re-fetch the whole list
+      setProducts(prev => (prev ? prev.map(p => ({ ...p, allowBackorder: enabled })) : prev));
+    } catch (err) {
+      toastError(`Could not ${verb} backorder`, err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!storeId) return;
@@ -95,8 +138,29 @@ export default function StockInventoryPage() {
     );
   }
 
+  const bulkBackorderButton =
+    products && products.length > 0 ? (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={bulkBusy}
+        onClick={() => handleBulkSetBackorder(!allBackorderEnabled)}
+        title={
+          allBackorderEnabled
+            ? 'Turn off backorder for every active product'
+            : 'Allow customers to order every product even when out of stock'
+        }
+      >
+        {bulkBusy
+          ? '…'
+          : allBackorderEnabled
+            ? 'Disable backorder on all products'
+            : 'Enable backorder on all products'}
+      </Button>
+    ) : null;
+
   return (
-    <AdminLayout title={t('title')} subtitle={t('description')}>
+    <AdminLayout title={t('title')} subtitle={t('description')} actions={bulkBackorderButton}>
       <div className="max-w-5xl">
         {products.length === 0 ? (
           <p className="text-muted-foreground text-sm">{tc('noResults')}</p>

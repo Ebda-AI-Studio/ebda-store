@@ -291,6 +291,55 @@ router.get(
   }
 );
 
+// POST /stores/:storeId/products/bulk-set-backorder
+//
+// Flip Product.allowBackorder for EVERY active product in the store in one
+// shot. Saves merchants from clicking through 200+ products individually.
+// Used by the inventory page's "Enable backorder on all products" button.
+//
+// Body: { enabled: boolean }
+//   true  → every active product gets allowBackorder=true
+//   false → every active product gets allowBackorder=false
+//
+// Only touches status='active' + deletedAt=null products. Archived / draft /
+// soft-deleted products are skipped so a future restore doesn't surprise the
+// merchant by inheriting the bulk-flip.
+router.post(
+  '/bulk-set-backorder',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { enabled } = req.body as { enabled?: unknown };
+      if (typeof enabled !== 'boolean') {
+        throw new AppError(400, 'INVALID_BODY', 'enabled must be true or false');
+      }
+      const result = await prisma.product.updateMany({
+        where: { storeId, status: 'active', deletedAt: null },
+        data: { allowBackorder: enabled },
+      });
+      await auditLog({
+        action: 'product.bulk_backorder',
+        userId: req.user!.userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        details: { enabled, productCount: result.count },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({
+        success: true,
+        data: { updated: result.count, enabled },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /stores/:storeId/products - Create product
 router.post(
   '/',
