@@ -9,6 +9,7 @@
  *   GET  /categories                              category list
  *   GET  /products/search?q=                      text search top-10
  *   GET  /products/by-category?categoryId=&page=  paginated 10/page
+ *   GET  /store-catalog                           full catalog for bot intent classifier (Phase 8)
  *   POST /cart/from-wa                            create cart + signed JWT
  *   POST /cart/redeem                             single-use JWT redemption
  *   GET  /health                                  bridge ping
@@ -225,6 +226,149 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
   } catch (err) {
     logger.error({ err: (err as Error).message }, '[wa-bridge] by-category failed');
     res.status(500).json({ success: false, error: 'BY_CATEGORY_FAILED' });
+  }
+});
+
+// ─── GET /store-catalog (Phase 8 — bot intent classifier) ───────────────────
+// Returns all active categories + products in a single response sized for
+// the Gemini intent-classification prompt. WBS caches this at 5-min TTL;
+// FWB adds a 30-day Cache-Control so CDN/Varnish can edge-cache if needed.
+//
+// Product cap: 1000. Stores with >1000 products will see a warning in the
+// response; pagination in Phase 8.2. For Wady Aljuz today (~235 products)
+// the cap is never hit.
+const CATALOG_PRODUCT_CAP = 1000;
+
+router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) => {
+  try {
+    const store = req.bridgeStore!;
+
+    // Fetch store meta (name, currency, locale)
+    const storeRow = await prisma.store.findUnique({
+      where: { id: store.id },
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        currency: true,
+        settings: true,
+      },
+    });
+
+    if (!storeRow) {
+      res.status(404).json({ success: false, error: 'STORE_NOT_FOUND' });
+      return;
+    }
+
+    // Fetch all active categories
+    const categories = await prisma.category.findMany({
+      where: { storeId: store.id, deletedAt: null, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        slug: true,
+        position: true,
+      },
+      orderBy: { position: 'asc' },
+    });
+
+    // Fetch active products (cap at CATALOG_PRODUCT_CAP)
+    const products = await prisma.product.findMany({
+      where: {
+        storeId: store.id,
+        status: 'active',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        descriptionAr: true,
+        slug: true,
+        price: true,
+        compareAtPrice: true,
+        sku: true,
+        inventory: true,
+        trackInventory: true,
+        allowBackorder: true,
+        images: {
+          select: { url: true },
+          orderBy: { position: 'asc' },
+          take: 1,
+        },
+        categories: {
+          select: { categoryId: true },
+        },
+        variants: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            inventory: true,
+            allowBackorder: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: CATALOG_PRODUCT_CAP + 1, // +1 to detect overflow
+    });
+
+    const truncated = products.length > CATALOG_PRODUCT_CAP;
+    const productSlice = truncated ? products.slice(0, CATALOG_PRODUCT_CAP) : products;
+
+    if (truncated) {
+      logger.warn(
+        { storeId: store.id, count: products.length },
+        '[wa-bridge] store-catalog hit product cap — returning first 1000; paginate in Phase 8.2'
+      );
+    }
+
+    const catalog = {
+      storeId: storeRow.id,
+      storeName: storeRow.name,
+      storeNameAr: storeRow.nameAr ?? '',
+      currency: storeRow.currency,
+      locale: (storeRow.settings as Record<string, unknown>)?.locale ?? 'en',
+      categories: categories.map(c => ({
+        id: c.id,
+        name: c.name,
+        nameAr: c.nameAr ?? '',
+        slug: c.slug,
+        position: c.position,
+      })),
+      products: productSlice.map(p => ({
+        id: p.id,
+        name: p.name,
+        nameAr: p.nameAr ?? '',
+        descriptionAr: p.descriptionAr ?? '',
+        slug: p.slug,
+        price: p.price,
+        compareAtPrice: p.compareAtPrice ?? undefined,
+        currency: storeRow.currency,
+        categoryIds: p.categories.map(pc => pc.categoryId),
+        inStock: !p.trackInventory || p.inventory > 0 || p.allowBackorder,
+        sku: p.sku ?? undefined,
+        imageUrl: p.images[0]?.url ?? undefined,
+        variants: p.variants.map(v => ({
+          id: v.id,
+          name: v.title,
+          price: v.price ?? p.price,
+          inStock: v.inventory > 0 || v.allowBackorder,
+        })),
+      })),
+      cachedAt: new Date().toISOString(),
+      ...(truncated ? { truncated: true, totalProducts: products.length } : {}),
+    };
+
+    // 30-day cache-control: the catalog changes infrequently and WBS applies
+    // its own 5-min in-memory TTL on top. CDN/Varnish can serve staleness safely.
+    res.setHeader('Cache-Control', 'public, max-age=2592000, stale-while-revalidate=86400');
+    res.json({ success: true, catalog });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, '[wa-bridge] store-catalog failed');
+    res.status(500).json({ success: false, error: 'CATALOG_FETCH_FAILED' });
   }
 });
 
