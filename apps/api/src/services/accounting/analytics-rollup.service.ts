@@ -73,12 +73,6 @@ function monthStart(ym: string): Date {
   return new Date(Date.UTC(y, m - 1, 1, 0, 0, 0) - KW_OFFSET_MS);
 }
 
-/** Returns the start of the next month. */
-function nextMonthStart(ym: string): Date {
-  const [y, m] = ym.split('-').map(Number);
-  return new Date(Date.UTC(y, m, 1, 0, 0, 0) - KW_OFFSET_MS); // m (not m-1) = next month
-}
-
 /** Generates a sequence of 'YYYY-MM' strings from start to end (inclusive). */
 function monthRange(startYm: string, endYm: string): string[] {
   const months: string[] = [];

@@ -128,7 +128,6 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   // ---- 4. Cost spike: compare average recent inventory moves ----
   // We compare the average unit cost from InventoryHistory in the 7d window
   // vs the prior 21d window (making up the full 28d).
-  const window21dStart = new Date(now.getTime() - 21 * 24 * 60 * 60 * 1000);
   const [invHistory7d, invHistory21d] = await Promise.all([
     prisma.inventoryHistory.findMany({
       where: { storeId, createdAt: { gte: window7dStart } },
@@ -265,20 +264,8 @@ Return STRICT JSON: { "explanationEn": "...", "explanationAr": "...", "likelyCau
     // ---- 10. P0 alert — deduplicated per (storeId, metric) in last 24h ----
     if (anomaly.severity === 'p0') {
       const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const recentP0 = await prisma.profitAnomaly.findFirst({
-        where: {
-          storeId,
-          metric: anomaly.metric,
-          severity: 'p0',
-          detectedAt: { gte: since24h },
-          // Exclude the row we just inserted by checking detectedAt < now minus a small buffer
-          // (our just-inserted row has detectedAt = DB default now(), but we only need
-          //  to check for OTHER rows — checking count > 1 avoids self-match)
-        },
-        orderBy: { detectedAt: 'desc' },
-      });
-
-      // recentP0 will be our own just-inserted row. Check if there's more than one.
+      // Count p0 anomalies for this (storeId, metric) in last 24h.
+      // Our just-inserted row counts as 1 — if count > 1 a duplicate already fired.
       const p0Count24h = await prisma.profitAnomaly.count({
         where: {
           storeId,

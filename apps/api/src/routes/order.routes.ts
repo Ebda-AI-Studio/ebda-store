@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
-import { requirePermission, requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { prisma } from '@force/database';

@@ -1,6 +1,5 @@
 import { prisma } from '@force/database';
 import { config } from '../config';
-import logger from '../lib/logger';
 import { ResendService } from './resend.service';
 import { welcomeTemplate } from './email-templates/welcome';
 import { passwordResetTemplate } from './email-templates/password-reset';

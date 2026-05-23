@@ -1,7 +1,5 @@
 import { randomBytes } from 'crypto';
 import { prisma, Prisma } from '@force/database';
-import { redis } from './redis.service';
-import { featureService } from './feature.service';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 

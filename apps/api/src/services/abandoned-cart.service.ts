@@ -12,7 +12,6 @@
 
 import { prisma } from '@force/database';
 import { redis } from './redis.service';
-import { featureService } from './feature.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import logger from '../lib/logger';
 import crypto from 'crypto';

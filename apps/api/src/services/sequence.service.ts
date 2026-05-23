@@ -1,4 +1,4 @@
-import { prisma, withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@force/database';
 
 const PREFIX = {
   journal: 'JE',

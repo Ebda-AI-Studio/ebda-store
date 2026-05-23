@@ -6,19 +6,12 @@
 import { prisma } from '@force/database';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
-import { featureService } from './feature.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import logger from '../lib/logger';
-import { config } from '../config';
 
 import { iCarryCarrier } from './carriers/icarry.carrier';
 import { aramexCarrier } from './carriers/aramex.carrier';
-import {
-  ShippingCarrierProvider,
-  CarrierCode,
-  CARRIER_CODES,
-  ShipmentAddress,
-} from './carriers/types';
+import { ShippingCarrierProvider, CarrierCode, ShipmentAddress } from './carriers/types';
 
 const CARRIER_REGISTRY: Record<CarrierCode, ShippingCarrierProvider> = {
   icarry: iCarryCarrier,

@@ -105,7 +105,7 @@ async function recordUsage(
 // Public types
 // ---------------------------------------------------------------------------
 
-export interface CallGeminiOpts<_T> {
+export interface CallGeminiOpts {
   /** Full prompt text (system + user combined, or just user if you prefer). */
   prompt: string;
   /** Feature label written to AiUsage. e.g. 'reorder-scan' | 'deadstock-scan' | 'expense-ocr' */
@@ -118,7 +118,7 @@ export interface CallGeminiOpts<_T> {
   imageMimeType?: string;
 }
 
-export interface CallGeminiBatchOpts<TItem, TResult> {
+export interface CallGeminiBatchOpts<TItem> {
   /** Array of items to process. */
   items: TItem[];
   /**
@@ -155,7 +155,7 @@ export interface CallGeminiBatchOpts<TItem, TResult> {
  *
  * @throws AppError on missing API key, quota exceeded, API error, or malformed JSON.
  */
-export async function callGemini<T>(opts: CallGeminiOpts<T>): Promise<T> {
+export async function callGemini<T>(opts: CallGeminiOpts): Promise<T> {
   await assertAiQuota();
 
   const model = getClient().getGenerativeModel({
@@ -221,7 +221,7 @@ export async function callGemini<T>(opts: CallGeminiOpts<T>): Promise<T> {
  * @param opts.throttleMs — milliseconds to sleep between calls (default 2500)
  */
 export async function callGeminiBatch<TItem, TResult>(
-  opts: CallGeminiBatchOpts<TItem, TResult>
+  opts: CallGeminiBatchOpts<TItem>
 ): Promise<Array<TResult | null>> {
   const throttleMs = opts.throttleMs ?? 2500;
   const results: Array<TResult | null> = [];

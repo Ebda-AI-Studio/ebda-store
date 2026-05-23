@@ -72,70 +72,69 @@ router.get(
     try {
       const storeId = req.params.storeId;
 
-      const [orderStats, segmentCounts, topSegmentRaw, yesterdayFunnel, topSkus, narration] =
-        await Promise.all([
-          // AOV + MRR-equiv (last 30d)
-          runInTenantContext(storeId, () =>
-            prisma.order.aggregate({
-              where: {
+      const [orderStats, , topSegmentRaw, yesterdayFunnel, topSkus, narration] = await Promise.all([
+        // AOV + MRR-equiv (last 30d)
+        runInTenantContext(storeId, () =>
+          prisma.order.aggregate({
+            where: {
+              storeId,
+              paymentStatus: 'paid',
+              createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+            },
+            _avg: { total: true },
+            _sum: { total: true },
+            _count: true,
+          })
+        ),
+
+        // Segment counts
+        runInTenantContext(storeId, () =>
+          prisma.customerRfmSnapshot.groupBy({
+            by: ['segment'],
+            where: { storeId },
+            _count: { id: true },
+          })
+        ),
+
+        // Top segment by count
+        runInTenantContext(storeId, () =>
+          prisma.customerRfmSnapshot.groupBy({
+            by: ['segment'],
+            where: { storeId },
+            _count: { id: true },
+            orderBy: { _count: { id: 'desc' } },
+            take: 1,
+          })
+        ),
+
+        // Yesterday funnel snapshot
+        runInTenantContext(storeId, () =>
+          prisma.funnelSnapshot.findFirst({
+            where: { storeId },
+            orderBy: { periodDate: 'desc' },
+          })
+        ),
+
+        // Top 5 SKUs by revenue (last 7d)
+        runInTenantContext(storeId, () =>
+          prisma.orderItem.groupBy({
+            by: ['productId'],
+            where: {
+              order: {
                 storeId,
                 paymentStatus: 'paid',
-                createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+                createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
               },
-              _avg: { total: true },
-              _sum: { total: true },
-              _count: true,
-            })
-          ),
+            },
+            _sum: { total: true, quantity: true },
+            orderBy: { _sum: { total: 'desc' } },
+            take: 5,
+          })
+        ),
 
-          // Segment counts
-          runInTenantContext(storeId, () =>
-            prisma.customerRfmSnapshot.groupBy({
-              by: ['segment'],
-              where: { storeId },
-              _count: { id: true },
-            })
-          ),
-
-          // Top segment by count
-          runInTenantContext(storeId, () =>
-            prisma.customerRfmSnapshot.groupBy({
-              by: ['segment'],
-              where: { storeId },
-              _count: { id: true },
-              orderBy: { _count: { id: 'desc' } },
-              take: 1,
-            })
-          ),
-
-          // Yesterday funnel snapshot
-          runInTenantContext(storeId, () =>
-            prisma.funnelSnapshot.findFirst({
-              where: { storeId },
-              orderBy: { periodDate: 'desc' },
-            })
-          ),
-
-          // Top 5 SKUs by revenue (last 7d)
-          runInTenantContext(storeId, () =>
-            prisma.orderItem.groupBy({
-              by: ['productId'],
-              where: {
-                order: {
-                  storeId,
-                  paymentStatus: 'paid',
-                  createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-                },
-              },
-              _sum: { total: true, quantity: true },
-              orderBy: { _sum: { total: 'desc' } },
-              take: 5,
-            })
-          ),
-
-          // AI narration (graceful null on failure)
-          generateInsightNarration(storeId, 'segment'),
-        ]);
+        // AI narration (graceful null on failure)
+        generateInsightNarration(storeId, 'segment'),
+      ]);
 
       // Enrich top SKUs with product info
       const productIds = topSkus.map(s => s.productId);
