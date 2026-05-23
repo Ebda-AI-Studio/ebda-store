@@ -97,6 +97,58 @@ Force Store enforces strict validation. The error message tells you which field 
 
 ---
 
+## WhatsApp integration issues — مشاكل تكامل واتساب
+
+### Connected to WBS but seeing 0 approved templates — متصل لكن لا توجد قوالب معتمدة
+
+1. Open the WhatsApp Business Platform admin dashboard (ws.forcemediakw.com)
+2. Go to your template list — check the status column on Meta for each template
+3. Templates may have been rejected by Meta. Use the **Reset to Draft** button on any rejected template to automatically rename it (e.g., `order_paid_v2`) and resubmit for approval
+4. After approval, template dropdowns in Force Store admin resolve the new version automatically — you do not need to re-select them
+
+تحقّق من حالة القوالب في لوحة WBS وMeta. القوالب المرفوضة يمكن إعادة تقديمها بزر «Reset to Draft» — القوائم المنسدلة في المتجر تتعرّف على الإصدار الجديد تلقائيًا.
+
+### Bot says "tap a product please" to customers instead of understanding natural language — البوت لا يفهم الطلبات الطبيعية
+
+This means the Gemini AI classifier is not running — the bot is in legacy keyword mode.
+
+**Root cause:** `GEMINI_API_KEY` is missing from the WBS Railway environment.
+
+**Fix (admin-only, contact Force AI):**
+
+1. Log into Railway → `whatsapp-broadcaster` service → Variables
+2. Confirm `GEMINI_API_KEY` is set to a valid Google AI Studio key
+3. Redeploy the service
+4. Test by DMing a natural-language phrase like "أريد أطلب قهوة" — bot should now classify and respond intelligently
+
+بدون `GEMINI_API_KEY` في Railway، البوت يرجع لوضع الكلمات المفتاحية. تواصل مع فريق Force AI لإضافة المفتاح.
+
+### Customer DM ordering toggle not showing in admin — زر تفعيل الطلبات لا يظهر
+
+The toggle only appears after a successful WBS connection. Check the **Settings card status chip**:
+
+- If it shows "Not connected" → complete the WBS connection first (see Quickstart step 9)
+- If it shows "Connected" but the toggle still doesn't appear → hard-refresh the admin (Cmd+Shift+R) or WhatsApp Force AI support with your store slug
+
+### Payment link returns 400 error — رابط الدفع يرجع خطأ 400
+
+Two common causes:
+
+1. **No payment provider configured** — check **Admin → Settings → Payment Settings** and confirm at least one provider is enabled and has valid credentials
+2. **`paymentLink` template not approved** — the payment link sends a WhatsApp template to the customer after link generation. Confirm the `paymentLink` template is approved in your WBS template list. If rejected, use **Reset to Draft** and resubmit.
+
+### Templates rejected by Meta — Meta رفضت القوالب
+
+1. Go to **Admin → Settings → WhatsApp Integration → Templates**
+2. Find the rejected template (shown with a red status badge)
+3. Click **Reset to Draft** — this renames the template (e.g., `order_paid` → `order_paid_v2`) and sets it back to draft for resubmission
+4. Meta typically reviews templates within 1–24 hours
+5. Once approved, all admin dropdowns that use this template auto-update to the new version — no manual re-selection needed
+
+If the same template gets rejected repeatedly, review Meta's [Message Template Guidelines](https://business.facebook.com/business/help/2055875911147364) for the specific rejection reason shown in Meta Business Manager.
+
+---
+
 ## DNS / domain issues
 
 ### Custom domain verification stuck at "verifying" — التحقّق علق على verifying

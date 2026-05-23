@@ -117,7 +117,42 @@ By default your store is at `store.forcemediakw.com/<your-slug>`. To use `yourst
 
 افتراضيًا متجرك على `store.forcemediakw.com/<slug>`. لربط `yourstore.com` بدلًا، راجع [custom-domain.md](./custom-domain.md) — 10 دقائق من إعدادات DNS وSSL تلقائي.
 
-## 9. Test a real order before going live
+## 9. Connect Force WhatsApp Business Platform (optional but recommended)
+
+If you want WhatsApp order notifications or the customer DM ordering bot:
+
+**Admin → Settings → WhatsApp Integration → Connection**
+
+1. Ask your Force AI contact for the Force WhatsApp Business Platform setup — you'll need an active WBS account.
+2. In Force Store admin, click **Generate API Key** under the WhatsApp Integration card.
+3. Copy the key and paste it into the WBS admin under your store's settings.
+4. Once connected, the status chip on the Settings card shows **Connected** in green.
+
+أرسل لفريق Force AI أنك تريد تفعيل واتساب. بعد إنشاء حسابك على منصة WBS، ارجع لـ Admin ← Settings ← WhatsApp Integration وانقر «Generate API Key» ثم الصقها في إعدادات WBS.
+
+### Enable Customer DM Ordering
+
+Once connected:
+
+- **Admin → Settings → WhatsApp Integration → Connection → Customer DM Ordering toggle** → turn ON
+- Customers who DM your business WhatsApp number will be guided through your catalog automatically
+- The bot speaks Arabic or English — auto-detected from the customer's first message
+
+### Edit Bot Copy
+
+- **Admin → Settings → WhatsApp Integration → Bot Copy**
+- Edit the welcome greeting, prompts, and checkout message in Arabic and English
+- Changes apply immediately
+
+### View Bot Analytics
+
+- **Admin → Settings → WhatsApp Integration → Bot Analytics**
+- Shows the funnel (how many DMs reached checkout vs. paid), intent breakdown, and date ranges
+- Use this to see which hours/days get the most bot orders
+
+---
+
+## 10. Test a real order before going live
 
 1. Open your storefront as a visitor (incognito browser tab)
 2. Add a product to cart
@@ -129,7 +164,7 @@ By default your store is at `store.forcemediakw.com/<your-slug>`. To use `yourst
 
 اطلب طلب اختبار من الواجهة كزائر (تبويب خاص) قبل الإطلاق الرسمي. تأكد أن الطلب يظهر في لوحة الإدارة + وصلك إيميل الإشعار.
 
-## 10. Go live
+## 11. Go live
 
 Switch your payment providers from **test mode** to **live mode** in **Admin → Settings → Payment Settings**. Real customer payments will now go to your bank account.
 

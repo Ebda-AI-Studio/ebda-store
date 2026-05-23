@@ -150,6 +150,24 @@ If you enable multiple providers, your customer sees them as separate options at
 
 ---
 
+## WhatsApp payment links
+
+Merchant-initiated payment links (sent to customers via WhatsApp) use **the same provider configuration** as your storefront checkout. There is no separate payment link gateway — the link generates a checkout URL through whichever provider you have active.
+
+To generate a payment link from the admin:
+
+1. **Admin → Orders → [any order] → Payment Link** (or create a new manual order)
+2. Use the **typeahead product picker** to search your catalog and add products, OR enter a **custom amount** for a deposit or service fee
+3. Click **Generate Link** → copy and paste into WhatsApp
+4. The customer taps the link → lands on your Force Store checkout with the cart pre-filled
+5. Pays via their preferred method (KNET, Apple Pay, cards — whatever your gateway supports)
+
+If a payment link was already generated for an order, the **Copy** and **Open** buttons appear inline — you do not need to generate a new one.
+
+لإنشاء رابط دفع من لوحة الطلبات: افتح الطلب ← Payment Link ← ابحث عن المنتج بالكتابة أو أدخل مبلغًا مخصصًا ← انسخ الرابط وأرسله للعميل على واتساب. البوابة المُستخدمة هي نفس بوابة متجرك المفعّلة.
+
+---
+
 ## Multi-tenant safety (technical)
 
 You may wonder: "if every store uses the same webhook URL, can other merchants see my payment events?"
