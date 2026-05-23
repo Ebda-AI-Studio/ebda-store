@@ -44,6 +44,8 @@ interface WbsConfig {
   wbsTemplates: WbsTemplates | null;
   connectedTenant: ConnectedTenant | null;
   connectedTenantError?: string | null;
+  /** Whether the WA customer-DM ordering state machine is active for this store. Default false. */
+  waCustomerOrderingEnabled: boolean;
 }
 
 const DEFAULT_CONFIG: WbsConfig = {
@@ -53,6 +55,7 @@ const DEFAULT_CONFIG: WbsConfig = {
   hasApiKey: false,
   wbsTemplates: null,
   connectedTenant: null,
+  waCustomerOrderingEnabled: false,
 };
 
 function templateLabel(t: AvailableTemplate): string {
@@ -82,6 +85,8 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
   const [connecting, setConnecting] = useState(false);
   const [selectedTemplates, setSelectedTemplates] = useState<WbsTemplates>({});
   const [enableToggle, setEnableToggle] = useState(false);
+  const [waOrderingEnabled, setWaOrderingEnabled] = useState(false);
+  const [savingWaOrdering, setSavingWaOrdering] = useState(false);
 
   const fetchConfig = useCallback(async () => {
     if (!storeId) return;
@@ -97,6 +102,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
       setConfig(cfg);
       setEnableToggle(cfg.wbsEnabled);
       setSelectedTemplates(cfg.wbsTemplates || {});
+      setWaOrderingEnabled(cfg.waCustomerOrderingEnabled ?? false);
     }
     setLoading(false);
   }, [storeId]);
@@ -195,6 +201,33 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
       toastError('Save failed', 'An unexpected error occurred');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveWaOrdering = async (newValue: boolean) => {
+    setSavingWaOrdering(true);
+    try {
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/integrations/wbs`, {
+        waCustomerOrderingEnabled: newValue,
+      });
+      if (error) {
+        toastError('Save failed', error.message || 'Could not update WA ordering setting');
+        // Revert optimistic update
+        setWaOrderingEnabled(!newValue);
+      } else {
+        toastSuccess(
+          newValue ? 'WA ordering enabled' : 'WA ordering disabled',
+          newValue
+            ? 'Customers can now order directly via WhatsApp DM.'
+            : 'WhatsApp DM ordering has been turned off.'
+        );
+        await fetchConfig();
+      }
+    } catch {
+      toastError('Save failed', 'An unexpected error occurred');
+      setWaOrderingEnabled(!newValue);
+    } finally {
+      setSavingWaOrdering(false);
     }
   };
 
@@ -443,6 +476,43 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
             <Button onClick={handleSaveTemplates} disabled={saving}>
               {saving ? 'Saving...' : 'Save Settings'}
             </Button>
+          </div>
+
+          {/* Customer ordering via WhatsApp DM */}
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="font-medium text-foreground">Customer ordering via WhatsApp DM</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  When enabled, customers who DM the store&apos;s WhatsApp number can browse + order
+                  directly. The bot will guide them through delivery + payment, then a draft order
+                  lands here ready to fulfill.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1.5 italic">
+                  Default off — opt in when you&apos;re ready to handle bot-guided orders.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={waOrderingEnabled}
+                disabled={savingWaOrdering}
+                onClick={() => {
+                  const newValue = !waOrderingEnabled;
+                  setWaOrderingEnabled(newValue);
+                  handleSaveWaOrdering(newValue);
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ${
+                  waOrderingEnabled ? 'bg-primary' : 'bg-muted'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    waOrderingEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </>
       )}

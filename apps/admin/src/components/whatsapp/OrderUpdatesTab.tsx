@@ -61,9 +61,16 @@ interface AvailableTemplate {
   variableCount: number;
 }
 
+interface TemplateChannels {
+  whatsapp: boolean;
+  email: boolean;
+}
+
 interface TemplateEntry {
   name: string;
   languageCode: string;
+  /** Per-event channel toggles. Absent = both on (backward-compatible). */
+  channels?: TemplateChannels;
 }
 
 interface WbsTemplates {
@@ -112,6 +119,9 @@ const EVENTS: EventDef[] = [
   },
 ];
 
+/** Default channel state: both on when not previously saved. */
+const DEFAULT_CHANNELS: TemplateChannels = { whatsapp: true, email: true };
+
 function findApprovedTemplate(
   available: AvailableTemplate[],
   baseName: string,
@@ -142,7 +152,7 @@ function findAnyTemplate(
 }
 
 export function OrderUpdatesTab({ storeId }: { storeId: string }) {
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
   const [config, setConfig] = useState<WbsConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -151,6 +161,12 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
     orderPaid: false,
     orderShipped: false,
     orderDelivered: false,
+  });
+  /** Per-event channel toggles. Both default to true when not present in saved config. */
+  const [channels, setChannels] = useState<Record<EventKey, TemplateChannels>>({
+    orderPaid: { ...DEFAULT_CHANNELS },
+    orderShipped: { ...DEFAULT_CHANNELS },
+    orderDelivered: { ...DEFAULT_CHANNELS },
   });
 
   const load = useCallback(async () => {
@@ -167,6 +183,12 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
           orderDelivered: Boolean(t.orderDelivered?.name),
         });
         if (t.orderPaid?.languageCode === 'ar') setLanguage('ar');
+        // Restore saved channel state; default both ON when absent
+        setChannels({
+          orderPaid: t.orderPaid?.channels ?? { ...DEFAULT_CHANNELS },
+          orderShipped: t.orderShipped?.channels ?? { ...DEFAULT_CHANNELS },
+          orderDelivered: t.orderDelivered?.channels ?? { ...DEFAULT_CHANNELS },
+        });
       }
     } catch (e) {
       toastError('Failed to load', e instanceof Error ? e.message : String(e));
@@ -190,7 +212,19 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
         const approved = findApprovedTemplate(available, evt.templateBase, language);
         const any = approved || findAnyTemplate(available, evt.templateBase, language);
         if (any) {
-          nextTemplates[evt.key] = { name: any.name, languageCode: language };
+          const evtChannels = channels[evt.key];
+          // Warn when both channels are off — the event becomes silent
+          if (!evtChannels.whatsapp && !evtChannels.email) {
+            toastWarning?.(
+              'Silent event',
+              `${EVENTS.find(e => e.key === evt.key)?.label} has both channels off — no notification will be sent.`
+            );
+          }
+          nextTemplates[evt.key] = {
+            name: any.name,
+            languageCode: language,
+            channels: evtChannels,
+          };
         }
       }
       const { error } = await apiPut(`/api/v1/stores/${storeId}/integrations/wbs`, {
@@ -262,6 +296,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                     ? (any.status.toLowerCase() as 'pending' | 'rejected' | 'paused' | 'disabled')
                     : 'missing';
                 const enabledForEvent = enabled[evt.key];
+                const evtChannels = channels[evt.key];
                 return (
                   <div key={evt.key} className="rounded-lg border bg-white p-4">
                     <div className="flex items-start justify-between gap-4">
@@ -294,6 +329,48 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                             Generate templates first from the <strong>Templates</strong> tab.
                           </p>
                         )}
+
+                        {/* Channel toggles — only shown when event is enabled */}
+                        {enabledForEvent && status !== 'missing' && (
+                          <div className="mt-3 flex flex-wrap items-center gap-4">
+                            <span className="text-xs font-medium text-gray-500">Send via:</span>
+                            {/* WhatsApp channel toggle */}
+                            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={evtChannels.whatsapp}
+                                onChange={e =>
+                                  setChannels(prev => ({
+                                    ...prev,
+                                    [evt.key]: { ...prev[evt.key], whatsapp: e.target.checked },
+                                  }))
+                                }
+                                className="h-3.5 w-3.5 rounded border-gray-300 accent-green-500"
+                              />
+                              <span className="text-xs text-gray-700">WhatsApp</span>
+                            </label>
+                            {/* Email channel toggle */}
+                            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={evtChannels.email}
+                                onChange={e =>
+                                  setChannels(prev => ({
+                                    ...prev,
+                                    [evt.key]: { ...prev[evt.key], email: e.target.checked },
+                                  }))
+                                }
+                                className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-500"
+                              />
+                              <span className="text-xs text-gray-700">Email</span>
+                            </label>
+                            {!evtChannels.whatsapp && !evtChannels.email && (
+                              <span className="text-xs text-amber-600 font-medium">
+                                Both off — event will be silent
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <label className="inline-flex items-center cursor-pointer shrink-0">
                         <input
@@ -324,7 +401,8 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
             <div className="rounded-md border bg-blue-50/50 border-blue-200 p-3 text-xs text-blue-800">
               <strong>How it works:</strong> when a customer&apos;s order transitions to one of
               these states, the FWB API fires the corresponding WhatsApp template via your Force
-              WhatsApp Business Platform integration.
+              WhatsApp Business Platform integration. Use the channel checkboxes to control which
+              notification methods are active per event.
             </div>
           </>
         )
