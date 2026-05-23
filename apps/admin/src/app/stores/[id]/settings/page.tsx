@@ -2,11 +2,79 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { WhatsAppIcon } from '../../../../components/icons/WhatsAppIcon';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { useT } from '@/i18n/useT';
+import { apiGet } from '../../../../lib/api';
+
+/**
+ * Fetches the WBS integration status for the current store and surfaces
+ * two status chips directly on the Settings page WhatsApp card:
+ *   • Connected / Not connected
+ *   • DM ordering: ON / OFF (only shown when connected)
+ *
+ * This makes the critical waCustomerOrderingEnabled toggle discoverable
+ * without requiring a click-through to Settings → WhatsApp → Connection tab.
+ */
+function WhatsAppStatusInline({ storeId }: { storeId: string }) {
+  const [status, setStatus] = useState<{
+    connected: boolean;
+    waOrdering: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!storeId) return;
+    apiGet<{
+      hasApiKey: boolean;
+      wbsEnabled: boolean;
+      waCustomerOrderingEnabled: boolean;
+    }>(`/api/v1/stores/${storeId}/integrations/wbs`)
+      .then(({ data }) => {
+        if (data) {
+          setStatus({
+            connected: Boolean(data.hasApiKey && data.wbsEnabled),
+            waOrdering: Boolean(data.waCustomerOrderingEnabled),
+          });
+        }
+      })
+      .catch(() => {
+        // Silent — badge simply won't render on error
+      });
+  }, [storeId]);
+
+  if (!status) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      <span
+        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+          status.connected
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
+            : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+        }`}
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${status.connected ? 'bg-emerald-500' : 'bg-gray-400'}`}
+        />
+        {status.connected ? 'Connected' : 'Not connected'}
+      </span>
+      {status.connected && (
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+            status.waOrdering
+              ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800'
+              : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+          }`}
+        >
+          DM ordering: {status.waOrdering ? 'ON' : 'OFF'}
+        </span>
+      )}
+    </div>
+  );
+}
 
 interface SettingsCard {
   /** Translation key under `settings.cards` (e.g. `branding`). */
@@ -275,6 +343,7 @@ export default function StoreSettingsPage() {
                     <p className="mt-1 text-sm text-muted-foreground leading-snug">
                       {tCards(`${card.key}.description`)}
                     </p>
+                    {card.key === 'whatsapp' && <WhatsAppStatusInline storeId={storeId} />}
                   </div>
                 </Link>
               ))}
