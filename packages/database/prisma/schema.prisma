@@ -274,6 +274,12 @@ model Store {
   /// can gate the feature per-store and push the flag to WBS.
   /// Default OFF — merchant must opt in explicitly.
   waCustomerOrderingEnabled Boolean @default(false) @map("wa_customer_ordering_enabled")
+  /// Phase 2 bot intelligence (2026-05-24): per-store WhatsApp bot copy overrides.
+  /// Shape: Record<string, { en?: string; ar?: string }> keyed by state/purpose.
+  /// e.g. { greeting: { en: "Hi!", ar: "مرحبا!" }, ask_category: { ar: "أي فئة؟" } }
+  /// Absent keys fall back to canonical defaults in WBS botCopyDefaults.js.
+  /// Supports {storeName}, {customerName}, {items}, {total}, {currency} placeholder vars.
+  botCopy                   Json?   @map("bot_copy")
 
   // Accounting Settings (Batch 1)
   accountingEnabled    Boolean @default(true) @map("accounting_enabled")
