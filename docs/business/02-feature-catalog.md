@@ -299,7 +299,9 @@ For every order lifecycle event, you choose whether the notification fires by em
 | **Order Shipped**   | You add a tracking number    | Email, WhatsApp    |
 | **Order Delivered** | You mark delivered           | Email, WhatsApp    |
 
-**Origin-aware delivery:** orders placed on your website send via the configured channels (email + WhatsApp). Orders placed through WhatsApp DM send WhatsApp-only — no synthetic email in the customer's inbox.
+Turning off either toggle for an event means notifications for that event are completely silent on that channel. For example: turning off WhatsApp for "Order Shipped" still sends the email shipping confirmation.
+
+**Origin-aware delivery:** orders placed on your website send via the configured channels (email + WhatsApp). Orders placed through WhatsApp DM ordering send **WhatsApp-only** — no synthetic placeholder email goes to the customer's inbox, because WhatsApp customers never registered an email address.
 
 ### Abandoned cart recovery — استرداد السلات المتروكة
 
@@ -326,8 +328,8 @@ This replaces the need to call customers back to re-do checkout. Send a link, cu
 
 The WhatsApp integration is a single consolidated page in your admin: **Settings → WhatsApp Integration**. It covers six areas via tabs:
 
-1. **Connection** — connect your Force WhatsApp Business Platform account with one API key. The card shows live status: "Connected / Not connected" + "DM ordering: ON/OFF" at a glance.
-2. **Templates** — view all your Meta-approved templates. If Meta rejects a template, use the **Reset to Draft** button to rename it and resubmit. Dropdowns across the admin always resolve to the current approved version automatically.
+1. **Connection** — connect your Force WhatsApp Business Platform account with one API key. The card shows live status: "Connected / Not connected" + "DM ordering: ON/OFF" at a glance — you can see both states without clicking into the tab.
+2. **Templates** — view all your Meta-approved templates. If Meta rejects a template, use the **Reset to Draft** button to rename it (e.g. `order_paid` → `order_paid_v2`) and resubmit. **Version-agnostic lookup:** dropdowns across the admin always resolve to the latest approved version automatically — you never need to re-select a template after a rename. This means a rejection auto-recovers once the new version is approved.
 3. **Order Updates** — per-event, per-channel toggles + language picker (see Section 7 above).
 4. **Payment Link** — generate and send payment links from any order (see Section 8 above).
 5. **Bot Copy** — edit your bot's greeting and flow messages in Arabic and English.
