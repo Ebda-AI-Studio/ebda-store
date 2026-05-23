@@ -153,48 +153,48 @@ enum VerificationTokenType {
 // ==========================================
 
 model Store {
-  id               String      @id @default(uuid())
-  name             String
-  nameAr           String?     @map("name_ar")
-  slug             String      @unique
-  domain           String?     @unique
+  id                    String      @id @default(uuid())
+  name                  String
+  nameAr                String?     @map("name_ar")
+  slug                  String      @unique
+  domain                String?     @unique
   // Resend email-sender state (platform-managed under a single Resend account)
-  emailSenderLocalPart  String    @default("noreply") @map("email_sender_local_part")
-  emailDomainId         String?   @map("email_domain_id")
-  emailDomainStatus     String?   @map("email_domain_status")
-  emailDomainVerifiedAt DateTime? @map("email_domain_verified_at")
-  ownerId          String      @map("owner_id")
-  status           StoreStatus @default(active)
-  plan             StorePlan   @default(starter)
-  logo             String?
-  logoAr           String?     @map("logo_ar")
-  favicon          String?
+  emailSenderLocalPart  String      @default("noreply") @map("email_sender_local_part")
+  emailDomainId         String?     @map("email_domain_id")
+  emailDomainStatus     String?     @map("email_domain_status")
+  emailDomainVerifiedAt DateTime?   @map("email_domain_verified_at")
+  ownerId               String      @map("owner_id")
+  status                StoreStatus @default(active)
+  plan                  StorePlan   @default(starter)
+  logo                  String?
+  logoAr                String?     @map("logo_ar")
+  favicon               String?
   // Hero customization
-  heroTitle        String?     @map("hero_title")
-  heroTitleAr      String?     @map("hero_title_ar")
-  heroSubtitle     String?     @map("hero_subtitle")
-  heroSubtitleAr   String?     @map("hero_subtitle_ar")
-  heroCtaText      String?     @map("hero_cta_text")
-  heroCtaTextAr    String?     @map("hero_cta_text_ar")
-  heroCtaLink      String?     @map("hero_cta_link")
-  heroImage        String?     @map("hero_image")
+  heroTitle             String?     @map("hero_title")
+  heroTitleAr           String?     @map("hero_title_ar")
+  heroSubtitle          String?     @map("hero_subtitle")
+  heroSubtitleAr        String?     @map("hero_subtitle_ar")
+  heroCtaText           String?     @map("hero_cta_text")
+  heroCtaTextAr         String?     @map("hero_cta_text_ar")
+  heroCtaLink           String?     @map("hero_cta_link")
+  heroImage             String?     @map("hero_image")
   // Cover image shown on the storefront's Best Sellers virtual
   // category tile. Optional — when null the storefront falls back to
   // the text-only treatment.
-  bestSellersImage String?     @map("best_sellers_image")
+  bestSellersImage      String?     @map("best_sellers_image")
   // Per-store typography overrides — see TypographySettings type in
   // @force/shared. JSON because the shape will keep evolving (more
   // zones, line-height/letter-spacing, etc.) and we don't want a
   // column-add migration each time.
-  typography       Json?       @map("typography")
-  description      String?
-  descriptionAr    String?     @map("description_ar")
-  currency         String      @default("KWD")
-  timezone         String      @default("Asia/Kuwait")
-  settings         Json        @default("{}")
-  createdAt        DateTime    @default(now()) @map("created_at")
-  updatedAt        DateTime    @updatedAt @map("updated_at")
-  deletedAt        DateTime?   @map("deleted_at") // Soft delete support
+  typography            Json?       @map("typography")
+  description           String?
+  descriptionAr         String?     @map("description_ar")
+  currency              String      @default("KWD")
+  timezone              String      @default("Asia/Kuwait")
+  settings              Json        @default("{}")
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+  deletedAt             DateTime?   @map("deleted_at") // Soft delete support
 
   // Template & Theme
   template       StoreTemplate @default(modern)
@@ -256,29 +256,36 @@ model Store {
   // Force WhatsApp Business Platform integration (opt-in per store)
   // wbsApiKey is encrypted via AES-GCM using apps/api/src/services/encryption.service.ts
   // wbsTemplates shape: { orderPaid?, orderShipped?, orderDelivered? }
-  //   each entry: { name: string, languageCode: string }
-  wbsEnabled   Boolean  @default(false) @map("wbs_enabled")
-  wbsClientId  String?  @map("wbs_client_id")
-  wbsApiKey    String?  @map("wbs_api_key")
-  wbsTemplates Json?    @map("wbs_templates")
+  //   each entry: { name: string, languageCode: string, channels?: { whatsapp: boolean, email: boolean } }
+  //   channels defaults: { whatsapp: true, email: true } when absent (backward-compatible)
+  wbsEnabled                Boolean @default(false) @map("wbs_enabled")
+  wbsClientId               String? @map("wbs_client_id")
+  wbsApiKey                 String? @map("wbs_api_key")
+  wbsTemplates              Json?   @map("wbs_templates")
   /// Phase 7 opt-in (2026-05-22): when true, generate templates with a
   /// HEADER IMAGE component pinned to Store.logo. Customer sees the store
   /// logo at the top of every order-update WhatsApp message. Defaults
   /// false because uploading + maintaining the Meta header_handle adds
   /// complexity per template re-submission.
-  wbsTemplateUseLogoHeader Boolean @default(false) @map("wbs_template_use_logo_header")
+  wbsTemplateUseLogoHeader  Boolean @default(false) @map("wbs_template_use_logo_header")
+  /// Customer-DM ordering via WhatsApp (2026-05-23): when true, WBS
+  /// state machine is enabled for this store — customers who DM the
+  /// store's WhatsApp number can order directly. Stored here so FWB
+  /// can gate the feature per-store and push the flag to WBS.
+  /// Default OFF — merchant must opt in explicitly.
+  waCustomerOrderingEnabled Boolean @default(false) @map("wa_customer_ordering_enabled")
 
   // Accounting Settings (Batch 1)
   accountingEnabled    Boolean @default(true) @map("accounting_enabled")
-  defaultTaxRateBps    Int     @default(0)    @map("default_tax_rate_bps")
-  fiscalYearStartMonth Int     @default(1)    @map("fiscal_year_start_month")
+  defaultTaxRateBps    Int     @default(0) @map("default_tax_rate_bps")
+  fiscalYearStartMonth Int     @default(1) @map("fiscal_year_start_month")
 
   // Accounting Settings (Batch 2)
   expenseTwoStepApproval Boolean @default(false) @map("expense_two_step_approval")
 
   // Accounting Settings (Batch 3)
-  aiFeaturesEnabled  Boolean @default(true) @map("ai_features_enabled")
-  aiBulkThrottleMs   Int     @default(2500)  @map("ai_bulk_throttle_ms")
+  aiFeaturesEnabled Boolean @default(true) @map("ai_features_enabled")
+  aiBulkThrottleMs  Int     @default(2500) @map("ai_bulk_throttle_ms")
 
   // Accounting Settings (Batch 4 — Insights)
   aiNarrationEnabled Boolean @default(true) @map("ai_narration_enabled")
@@ -825,43 +832,43 @@ model CartItem {
 // ==========================================
 
 model Order {
-  id              String             @id @default(uuid())
-  storeId         String             @map("store_id")
-  customerId      String?            @map("customer_id")
-  orderNumber     String             @unique @map("order_number")
-  status          OrderStatus        @default(pending)
-  paymentStatus   OrderPaymentStatus @default(unpaid) @map("payment_status")
-  subtotal        Int
-  tax             Int                @default(0)
-  shipping        Int                @default(0)
-  discount        Int                @default(0)
-  total           Int
+  id                  String             @id @default(uuid())
+  storeId             String             @map("store_id")
+  customerId          String?            @map("customer_id")
+  orderNumber         String             @unique @map("order_number")
+  status              OrderStatus        @default(pending)
+  paymentStatus       OrderPaymentStatus @default(unpaid) @map("payment_status")
+  subtotal            Int
+  tax                 Int                @default(0)
+  shipping            Int                @default(0)
+  discount            Int                @default(0)
+  total               Int
   // Extra out-of-catalog amount used by merchant-initiated payment
   // links — a custom service fee, deposit, or quote that doesn't map
   // to a Product. Baked into `total` at order creation; rendered as
   // a synthetic line in admin order detail. extraAmountNote captures
   // what the charge is for ("Photography deposit", "Rush fee", etc.).
-  extraAmount       Int                @default(0) @map("extra_amount")
-  extraAmountNote   String?            @map("extra_amount_note")
-  currency        String             @default("KWD")
-  couponCode      String?            @map("coupon_code")
-  couponDiscount  Int                @default(0) @map("coupon_discount")
-  notes           String?
-  customerNotes   String?            @map("customer_notes")
-  shippingAddress Json               @map("shipping_address")
-  billingAddress  Json               @map("billing_address")
-  shippedAt       DateTime?          @map("shipped_at")
-  deliveredAt          DateTime?          @map("delivered_at")
-  reviewRequestSentAt  DateTime?          @map("review_request_sent_at")
-  createdAt            DateTime           @default(now()) @map("created_at")
-  updatedAt            DateTime           @updatedAt @map("updated_at")
-  deletedAt            DateTime?          @map("deleted_at") // Soft delete support
+  extraAmount         Int                @default(0) @map("extra_amount")
+  extraAmountNote     String?            @map("extra_amount_note")
+  currency            String             @default("KWD")
+  couponCode          String?            @map("coupon_code")
+  couponDiscount      Int                @default(0) @map("coupon_discount")
+  notes               String?
+  customerNotes       String?            @map("customer_notes")
+  shippingAddress     Json               @map("shipping_address")
+  billingAddress      Json               @map("billing_address")
+  shippedAt           DateTime?          @map("shipped_at")
+  deliveredAt         DateTime?          @map("delivered_at")
+  reviewRequestSentAt DateTime?          @map("review_request_sent_at")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  deletedAt           DateTime?          @map("deleted_at") // Soft delete support
 
   // Buyer's UI locale at checkout time ('en' | 'ar'). Used to send
   // transactional emails in the customer's language regardless of the
   // store's defaultLanguage setting. NULL for pre-feature orders —
   // email service falls back to store.settings.defaultLanguage.
-  locale             String?
+  locale String?
 
   // Webhook idempotency - prevents duplicate processing
   idempotencyKey     String?   @unique @map("idempotency_key")
@@ -910,15 +917,15 @@ enum OrderStatus {
 }
 
 model OrderItem {
-  id          String  @id @default(uuid())
-  orderId     String  @map("order_id")
-  productId   String  @map("product_id")
-  variantId   String? @map("variant_id")
-  productName String  @map("product_name")
-  variantName String? @map("variant_name") // e.g., "Large / Red"
-  sku         String?
-  quantity    Int
-  price       Int
+  id                String  @id @default(uuid())
+  orderId           String  @map("order_id")
+  productId         String  @map("product_id")
+  variantId         String? @map("variant_id")
+  productName       String  @map("product_name")
+  variantName       String? @map("variant_name") // e.g., "Large / Red"
+  sku               String?
+  quantity          Int
+  price             Int
   // Cost-of-goods snapshot at sale time. Stored in fils, same scale as
   // `price`. Snapshotted because the product's cost may change later but
   // the order's profit must reflect what it cost on the day it shipped.
@@ -1847,23 +1854,23 @@ model Review {
   customer   User?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   // The review content itself
-  rating           Int      // 1-5
+  rating           Int // 1-5
   title            String?
-  body             String   @db.Text
-  language         String   @default("en") // 'en' | 'ar'
-  bodyTranslated   String?  @db.Text @map("body_translated") // AI translation of body
+  body             String    @db.Text
+  language         String    @default("en") // 'en' | 'ar'
+  bodyTranslated   String?   @map("body_translated") @db.Text // AI translation of body
   bodyTranslatedAt DateTime? @map("body_translated_at")
 
   // Verification + moderation
   verifiedPurchase Boolean @default(true) @map("verified_purchase") // always true via this flow
-  status          String  @default("pending") // 'pending' | 'published' | 'rejected' | 'spam'
-  rejectionReason String? @map("rejection_reason")
-  spamScore       Float?  @map("spam_score") // 0-1, AI-flagged
-  spamReasons     Json?   @map("spam_reasons")
+  status           String  @default("pending") // 'pending' | 'published' | 'rejected' | 'spam'
+  rejectionReason  String? @map("rejection_reason")
+  spamScore        Float?  @map("spam_score") // 0-1, AI-flagged
+  spamReasons      Json?   @map("spam_reasons")
 
   // Merchant response (optional)
-  ownerResponse   String?   @db.Text @map("owner_response")
-  ownerResponseAr String?   @db.Text @map("owner_response_ar")
+  ownerResponse   String?   @map("owner_response") @db.Text
+  ownerResponseAr String?   @map("owner_response_ar") @db.Text
   ownerResponseAt DateTime? @map("owner_response_at")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -2006,8 +2013,8 @@ model StoreFaq {
   store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   question       String   @map("question")
   questionAr     String?  @map("question_ar")
-  answer         String   @db.Text @map("answer")
-  answerAr       String?  @db.Text @map("answer_ar")
+  answer         String   @map("answer") @db.Text
+  answerAr       String?  @map("answer_ar") @db.Text
   // AI-draft state — smart-skip in the Gemini bulk sweep never overwrites
   // a manually-edited entry.
   aiDrafted      Boolean  @default(false) @map("ai_drafted")
@@ -2027,8 +2034,8 @@ model StoreHowto {
   store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   title          String   @map("title")
   titleAr        String?  @map("title_ar")
-  description    String   @db.Text @map("description")
-  descriptionAr  String?  @db.Text @map("description_ar")
+  description    String   @map("description") @db.Text
+  descriptionAr  String?  @map("description_ar") @db.Text
   // HowTo.step is an array of HowToStep — stored as JSON.
   // Format: [{ name, text, image? }, ...]
   steps          Json     @map("steps")
@@ -2054,7 +2061,7 @@ model ProductFaq {
   question       String
   questionAr     String?  @map("question_ar")
   answer         String   @db.Text
-  answerAr       String?  @db.Text @map("answer_ar")
+  answerAr       String?  @map("answer_ar") @db.Text
   aiDrafted      Boolean  @default(false) @map("ai_drafted")
   manuallyEdited Boolean  @default(false) @map("manually_edited")
   createdAt      DateTime @default(now()) @map("created_at")
@@ -2095,9 +2102,9 @@ enum JournalEntryStatus {
 model Sequence {
   // Per-store, per-kind monotonically-increasing counter. Used for entryNumber,
   // poNumber, adjustmentNumber, expenseNumber. Atomic increment via FOR UPDATE.
-  storeId String @map("store_id")
-  kind    String // 'journal' | 'po' | 'adjustment' | 'expense'
-  next    Int    @default(1)
+  storeId   String   @map("store_id")
+  kind      String // 'journal' | 'po' | 'adjustment' | 'expense'
+  next      Int      @default(1)
   updatedAt DateTime @updatedAt @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -2115,16 +2122,16 @@ model Account {
   type      AccountType
   parentId  String?     @map("parent_id")
   isSystem  Boolean     @default(false) @map("is_system")
-  isActive  Boolean     @default(true)  @map("is_active")
+  isActive  Boolean     @default(true) @map("is_active")
   createdAt DateTime    @default(now()) @map("created_at")
-  updatedAt DateTime    @updatedAt      @map("updated_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
 
-  store              Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  parent             Account?      @relation("AccountTree", fields: [parentId], references: [id])
-  children           Account[]     @relation("AccountTree")
+  store              Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent             Account?        @relation("AccountTree", fields: [parentId], references: [id])
+  children           Account[]       @relation("AccountTree")
   lines              JournalLine[]
-  expensesByCategory Expense[]     @relation("ExpenseCategoryAccount")
-  expensesPaidFrom   Expense[]     @relation("ExpensePaidFromAccount")
+  expensesByCategory Expense[]       @relation("ExpenseCategoryAccount")
+  expensesPaidFrom   Expense[]       @relation("ExpensePaidFromAccount")
   purchaseOrders     PurchaseOrder[] @relation("PoApAccount")
 
   @@unique([storeId, code])
@@ -2148,8 +2155,8 @@ model JournalEntry {
 
   store      Store         @relation(fields: [storeId], references: [id], onDelete: Restrict)
   lines      JournalLine[]
-  reversedBy JournalEntry?  @relation("Reversal", fields: [reversedById], references: [id])
-  reverses   JournalEntry?  @relation("Reversal")
+  reversedBy JournalEntry? @relation("Reversal", fields: [reversedById], references: [id])
+  reverses   JournalEntry? @relation("Reversal")
 
   @@unique([storeId, entryNumber])
   @@index([storeId, postedAt(sort: Desc)])
@@ -2300,9 +2307,9 @@ model PurchaseOrderItem {
   notes       String?
   createdAt   DateTime @default(now()) @map("created_at")
 
-  po                  PurchaseOrder    @relation(fields: [poId], references: [id], onDelete: Cascade)
-  product             Product          @relation(fields: [productId], references: [id])
-  variant             ProductVariant?  @relation(fields: [variantId], references: [id])
+  po                  PurchaseOrder   @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product             Product         @relation(fields: [productId], references: [id])
+  variant             ProductVariant? @relation(fields: [variantId], references: [id])
   backordersFulfilled BackorderLine[]
 
   @@index([poId])
@@ -2327,7 +2334,7 @@ model StockAdjustment {
   createdAt        DateTime              @default(now()) @map("created_at")
   updatedAt        DateTime              @updatedAt @map("updated_at")
 
-  store Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  store Store                 @relation(fields: [storeId], references: [id], onDelete: Restrict)
   items StockAdjustmentItem[]
 
   @@unique([storeId, adjustmentNumber])
@@ -2482,25 +2489,25 @@ enum AnomalySeverity {
 }
 
 model ReorderSuggestion {
-  id           String  @id @default(uuid())
-  storeId      String  @map("store_id")
-  productId    String  @map("product_id")
-  variantId    String? @map("variant_id")
-  suggestedQty Int     @map("suggested_qty")
-  velocity7d   Float   @map("velocity_7d")
-  velocity28d  Float   @map("velocity_28d")
-  onHand       Int     @map("on_hand")
-  onOrder      Int     @map("on_order")
-  openBacklog  Int     @map("open_backlog")
-  urgencyDays  Int     @map("urgency_days")
-  supplierId   String? @map("supplier_id")
-  reasoningEn  String  @map("reasoning_en")
-  reasoningAr  String? @map("reasoning_ar")
+  id           String                  @id @default(uuid())
+  storeId      String                  @map("store_id")
+  productId    String                  @map("product_id")
+  variantId    String?                 @map("variant_id")
+  suggestedQty Int                     @map("suggested_qty")
+  velocity7d   Float                   @map("velocity_7d")
+  velocity28d  Float                   @map("velocity_28d")
+  onHand       Int                     @map("on_hand")
+  onOrder      Int                     @map("on_order")
+  openBacklog  Int                     @map("open_backlog")
+  urgencyDays  Int                     @map("urgency_days")
+  supplierId   String?                 @map("supplier_id")
+  reasoningEn  String                  @map("reasoning_en")
+  reasoningAr  String?                 @map("reasoning_ar")
   status       ReorderSuggestionStatus @default(open)
-  dismissedBy  String?   @map("dismissed_by")
-  dismissedAt  DateTime? @map("dismissed_at")
-  poId         String?   @map("po_id")
-  scannedAt    DateTime  @default(now()) @map("scanned_at")
+  dismissedBy  String?                 @map("dismissed_by")
+  dismissedAt  DateTime?               @map("dismissed_at")
+  poId         String?                 @map("po_id")
+  scannedAt    DateTime                @default(now()) @map("scanned_at")
 
   store    Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product  Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -2513,21 +2520,21 @@ model ReorderSuggestion {
 }
 
 model DeadStockFlag {
-  id                   String   @id @default(uuid())
-  storeId              String   @map("store_id")
-  productId            String   @map("product_id")
-  variantId            String?  @map("variant_id")
-  daysSinceSale        Int      @map("days_since_sale")
-  stockOnHand          Int      @map("stock_on_hand")
-  stockValueFils       Int      @map("stock_value_fils")
-  suggestedDiscountBps Int      @map("suggested_discount_bps")
-  clearanceCopyEn      String   @map("clearance_copy_en")
-  clearanceCopyAr      String?  @map("clearance_copy_ar")
+  id                   String              @id @default(uuid())
+  storeId              String              @map("store_id")
+  productId            String              @map("product_id")
+  variantId            String?             @map("variant_id")
+  daysSinceSale        Int                 @map("days_since_sale")
+  stockOnHand          Int                 @map("stock_on_hand")
+  stockValueFils       Int                 @map("stock_value_fils")
+  suggestedDiscountBps Int                 @map("suggested_discount_bps")
+  clearanceCopyEn      String              @map("clearance_copy_en")
+  clearanceCopyAr      String?             @map("clearance_copy_ar")
   status               DeadStockFlagStatus @default(open)
-  couponCode           String?   @map("coupon_code")
-  dismissedBy          String?   @map("dismissed_by")
-  dismissedAt          DateTime? @map("dismissed_at")
-  scannedAt            DateTime  @default(now()) @map("scanned_at")
+  couponCode           String?             @map("coupon_code")
+  dismissedBy          String?             @map("dismissed_by")
+  dismissedAt          DateTime?           @map("dismissed_at")
+  scannedAt            DateTime            @default(now()) @map("scanned_at")
 
   store   Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -2583,15 +2590,15 @@ enum RfmSegment {
 }
 
 model CustomerCohortSnapshot {
-  id               String   @id @default(uuid())
-  storeId          String   @map("store_id")
-  cohortMonth      String   @map("cohort_month")    // 'YYYY-MM'
-  periodOffset     Int      @map("period_offset")
-  customersTotal   Int      @map("customers_total")
-  customersActive  Int      @map("customers_active")
-  ordersInPeriod   Int      @map("orders_in_period")
-  revenueInPeriod  Int      @map("revenue_in_period")
-  computedAt       DateTime @default(now()) @map("computed_at")
+  id              String   @id @default(uuid())
+  storeId         String   @map("store_id")
+  cohortMonth     String   @map("cohort_month") // 'YYYY-MM'
+  periodOffset    Int      @map("period_offset")
+  customersTotal  Int      @map("customers_total")
+  customersActive Int      @map("customers_active")
+  ordersInPeriod  Int      @map("orders_in_period")
+  revenueInPeriod Int      @map("revenue_in_period")
+  computedAt      DateTime @default(now()) @map("computed_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -2601,17 +2608,17 @@ model CustomerCohortSnapshot {
 }
 
 model FunnelSnapshot {
-  id                 String   @id @default(uuid())
-  storeId            String   @map("store_id")
-  periodDate         DateTime @map("period_date")
-  productViews       Int      @map("product_views")
-  cartsCreated       Int      @map("carts_created")
-  cartItemsAdded     Int      @map("cart_items_added")
-  checkoutsStarted   Int      @map("checkouts_started")
-  ordersCompleted    Int      @map("orders_completed")
-  ordersAbandoned    Int      @map("orders_abandoned")
-  revenueFils        Int      @map("revenue_fils")
-  computedAt         DateTime @default(now()) @map("computed_at")
+  id               String   @id @default(uuid())
+  storeId          String   @map("store_id")
+  periodDate       DateTime @map("period_date")
+  productViews     Int      @map("product_views")
+  cartsCreated     Int      @map("carts_created")
+  cartItemsAdded   Int      @map("cart_items_added")
+  checkoutsStarted Int      @map("checkouts_started")
+  ordersCompleted  Int      @map("orders_completed")
+  ordersAbandoned  Int      @map("orders_abandoned")
+  revenueFils      Int      @map("revenue_fils")
+  computedAt       DateTime @default(now()) @map("computed_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -2647,19 +2654,19 @@ model CustomerRfmSnapshot {
 /// The 6 canonical sourceKeys are defined in apps/api/src/lib/wa-templates/definitions.ts;
 /// new sourceKeys can be added without a schema change.
 model WhatsAppTemplate {
-  id              String   @id @default(uuid())
-  storeId         String   @map("store_id")
-  sourceKey       String   @map("source_key") @db.VarChar(64)
-  language        String   @db.VarChar(8)
-  metaName        String   @map("meta_name") @db.VarChar(255)
-  category        String   @db.VarChar(32)
-  body            String   @db.Text
-  status          String   @default("draft") @db.VarChar(32)
-  rejectionReason String?  @map("rejection_reason") @db.Text
-  metaTemplateId  String?  @map("meta_template_id") @db.VarChar(255)
+  id              String    @id @default(uuid())
+  storeId         String    @map("store_id")
+  sourceKey       String    @map("source_key") @db.VarChar(64)
+  language        String    @db.VarChar(8)
+  metaName        String    @map("meta_name") @db.VarChar(255)
+  category        String    @db.VarChar(32)
+  body            String    @db.Text
+  status          String    @default("draft") @db.VarChar(32)
+  rejectionReason String?   @map("rejection_reason") @db.Text
+  metaTemplateId  String?   @map("meta_template_id") @db.VarChar(255)
   lastSyncedAt    DateTime? @map("last_synced_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
