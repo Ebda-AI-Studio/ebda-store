@@ -2039,7 +2039,22 @@
   "affiliates": {
     "page": {
       "title": "Affiliate Program",
-      "subtitle": "Manage influencer referrals and commissions"
+      "subtitle": "Manage influencer referrals and commissions",
+      "inviteButton": "Invite Affiliate",
+      "inviteTitle": "Invite Affiliate",
+      "inviteSubtitle": "Create an approved affiliate directly — they can start sharing their referral link immediately.",
+      "inviteNameLabel": "Full Name",
+      "inviteNamePlaceholder": "Jane Doe",
+      "inviteEmailLabel": "Email",
+      "inviteEmailPlaceholder": "jane@example.com",
+      "invitePhoneLabel": "Phone (optional)",
+      "inviteInstagramLabel": "Instagram (optional)",
+      "inviteTiktokLabel": "TikTok (optional)",
+      "inviteNotesLabel": "Internal Notes (optional)",
+      "inviteNotesPlaceholder": "e.g. Kuwait fashion micro-influencer, 50K followers",
+      "inviteSubmit": "Add Affiliate",
+      "inviting": "Adding…",
+      "inviteCancel": "Cancel"
     },
     "tabs": {
       "affiliates": "Affiliates",
@@ -2166,6 +2181,13 @@
       "invalidAmount": {
         "title": "Invalid Amount",
         "message": "Enter a valid payout amount."
+      },
+      "inviteCreated": {
+        "title": "Affiliate Added",
+        "message": "Affiliate created and approved. They can start sharing their referral link."
+      },
+      "inviteError": {
+        "message": "Failed to add affiliate. The email may already be registered."
       }
     }
   },
@@ -2249,9 +2271,23 @@
       "subtitle": "People who signed up via your storefront footer",
       "exportCsv": "Export CSV",
       "exportXlsx": "Export XLSX",
+      "sendBroadcast": "Send Newsletter",
       "totalCount": "{count} subscribers",
       "emptyTitle": "No subscribers yet",
-      "emptyDescription": "When customers submit the newsletter form on your storefront, they appear here."
+      "emptyDescription": "When customers submit the newsletter form on your storefront, they appear here.",
+      "broadcastTitle": "Send Newsletter Broadcast",
+      "broadcastSubtitle": "Will be sent to {count} active subscriber(s)",
+      "broadcastSubjectLabel": "Subject line",
+      "broadcastSubjectPlaceholder": "Your newsletter subject…",
+      "broadcastBodyLabel": "Body (HTML)",
+      "broadcastBodyHint": "Enter valid HTML. It will be wrapped in your store's branded email template automatically.",
+      "broadcastBodyPlaceholder": "<p>Hello!</p>\n<p>Your newsletter content here…</p>",
+      "broadcastSend": "Send to all subscribers",
+      "broadcastSending": "Sending…",
+      "broadcastCancel": "Cancel",
+      "broadcastSent": "Broadcast sent!",
+      "broadcastSentCount": "Sent to {sent} of {total} subscriber(s).",
+      "broadcastClose": "Close"
     },
     "table": {
       "email": "Email",

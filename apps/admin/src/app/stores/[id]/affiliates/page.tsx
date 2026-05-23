@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
@@ -69,6 +69,17 @@ export default function AffiliatesPage() {
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutMethod, setPayoutMethod] = useState('bank_transfer');
   const [payoutNotes, setPayoutNotes] = useState('');
+
+  // Invite affiliate modal state
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteName, setInviteName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePhone, setInvitePhone] = useState('');
+  const [inviteInstagram, setInviteInstagram] = useState('');
+  const [inviteTiktok, setInviteTiktok] = useState('');
+  const [inviteNotes, setInviteNotes] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const inviteNameRef = useRef<HTMLInputElement>(null);
 
   // ---- Data Fetching ----
 
@@ -202,8 +213,70 @@ export default function AffiliatesPage() {
     }
   };
 
+  // ---- Invite Affiliate ----
+
+  const openInviteModal = () => {
+    setInviteName('');
+    setInviteEmail('');
+    setInvitePhone('');
+    setInviteInstagram('');
+    setInviteTiktok('');
+    setInviteNotes('');
+    setShowInviteModal(true);
+    setTimeout(() => inviteNameRef.current?.focus(), 50);
+  };
+
+  const closeInviteModal = () => {
+    setShowInviteModal(false);
+  };
+
+  const handleInviteAffiliate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteName.trim() || !inviteEmail.trim()) return;
+
+    setInviting(true);
+    try {
+      const { error } = await apiPost(`/api/v1/stores/${storeId}/affiliates`, {
+        name: inviteName.trim(),
+        email: inviteEmail.trim(),
+        phone: invitePhone.trim() || undefined,
+        instagram: inviteInstagram.trim() || undefined,
+        tiktok: inviteTiktok.trim() || undefined,
+        notes: inviteNotes.trim() || undefined,
+      });
+
+      if (!error) {
+        toastSuccess(tToasts('inviteCreated.title'), tToasts('inviteCreated.message'));
+        closeInviteModal();
+        fetchAffiliates();
+        fetchStats();
+      } else {
+        showError(tToasts('error.title'), error.message || tToasts('inviteError.message'));
+      }
+    } catch {
+      showError(tToasts('error.title'), tToasts('inviteError.message'));
+    } finally {
+      setInviting(false);
+    }
+  };
+
   return (
-    <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
+    <AdminLayout
+      title={tPage('title')}
+      subtitle={tPage('subtitle')}
+      actions={
+        <button
+          type="button"
+          onClick={openInviteModal}
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm font-medium"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          {tPage('inviteButton')}
+        </button>
+      }
+    >
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -278,6 +351,141 @@ export default function AffiliatesPage() {
           onClose={closePayoutModal}
           onSubmit={handlePayout}
         />
+      )}
+
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-background shadow-xl border border-border">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-lg font-semibold">{tPage('inviteTitle')}</h2>
+                <p className="text-sm text-muted-foreground">{tPage('inviteSubtitle')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeInviteModal}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleInviteAffiliate} className="px-6 py-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-sm font-medium mb-1.5">
+                    {tPage('inviteNameLabel')} *
+                  </label>
+                  <input
+                    ref={inviteNameRef}
+                    type="text"
+                    value={inviteName}
+                    onChange={e => setInviteName(e.target.value)}
+                    required
+                    maxLength={100}
+                    placeholder={tPage('inviteNamePlaceholder')}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-sm font-medium mb-1.5">
+                    {tPage('inviteEmailLabel')} *
+                  </label>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    required
+                    placeholder={tPage('inviteEmailPlaceholder')}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-sm font-medium mb-1.5">
+                    {tPage('invitePhoneLabel')}
+                  </label>
+                  <input
+                    type="tel"
+                    value={invitePhone}
+                    onChange={e => setInvitePhone(e.target.value)}
+                    maxLength={30}
+                    placeholder="+965 XXXX XXXX"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-sm font-medium mb-1.5">
+                    {tPage('inviteInstagramLabel')}
+                  </label>
+                  <input
+                    type="text"
+                    value={inviteInstagram}
+                    onChange={e => setInviteInstagram(e.target.value)}
+                    maxLength={100}
+                    placeholder="@username"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-sm font-medium mb-1.5">
+                    {tPage('inviteTiktokLabel')}
+                  </label>
+                  <input
+                    type="text"
+                    value={inviteTiktok}
+                    onChange={e => setInviteTiktok(e.target.value)}
+                    maxLength={100}
+                    placeholder="@username"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-1.5">
+                    {tPage('inviteNotesLabel')}
+                  </label>
+                  <textarea
+                    value={inviteNotes}
+                    onChange={e => setInviteNotes(e.target.value)}
+                    maxLength={1000}
+                    rows={3}
+                    placeholder={tPage('inviteNotesPlaceholder')}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={closeInviteModal}
+                  disabled={inviting}
+                  className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+                >
+                  {tPage('inviteCancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={inviting || !inviteName.trim() || !inviteEmail.trim()}
+                  className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {inviting ? tPage('inviting') : tPage('inviteSubmit')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </AdminLayout>
   );

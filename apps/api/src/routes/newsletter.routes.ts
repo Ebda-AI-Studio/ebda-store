@@ -1,8 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
+import { ResendService } from '../services/resend.service';
+import { renderBrandedShell } from '../services/email.service';
+import logger from '../lib/logger';
 
 /**
  * Admin newsletter routes — list + CSV export of subscribers for a store.
@@ -168,6 +172,135 @@ router.get(
           isActive: r.isActive ? 'true' : 'false',
           subscribedAt: r.subscribedAt.toISOString(),
         })),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// Newsletter broadcast
+// ==========================================
+
+const broadcastSchema = z.object({
+  subject: z.string().min(1).max(300),
+  html: z.string().min(1),
+  text: z.string().optional(),
+  /** Optional: only send to this language segment (e.g. 'ar', 'en'). */
+  language: z.string().max(10).optional(),
+});
+
+// POST /stores/:storeId/newsletter/broadcast
+//
+// Sends a newsletter email to all active subscribers of the store.
+// The body HTML is rendered inside the store's branded email shell so
+// the message has the store's header/footer.
+//
+// Rate / scale note: for very large lists (>1000) this should move to an
+// Inngest job for fan-out.  For current tenant sizes a single Resend batch
+// call is fine — Resend allows up to 100 recipients per API call, so we
+// chunk automatically below.
+router.post(
+  '/:storeId/newsletter/broadcast',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const body = broadcastSchema.parse(req.body);
+
+      // Fetch the store context for the branded shell.
+      // `defaultLanguage` lives inside the `settings` JSON column, not a
+      // first-class column, so we read `settings` and extract it manually.
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          name: true,
+          nameAr: true,
+          logo: true,
+          email: true,
+          phone: true,
+          address: true,
+          settings: true,
+          theme: true,
+          emailSenderLocalPart: true,
+          emailDomainStatus: true,
+          domain: true,
+        },
+      });
+
+      if (!store) {
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Store not found' } });
+        return;
+      }
+
+      // Fetch all active subscribers (optionally filtered by language)
+      const where: Record<string, unknown> = { storeId, isActive: true };
+      if (body.language) where.language = body.language;
+
+      const subscribers = await prisma.newsletterSubscriber.findMany({
+        where,
+        select: { email: true },
+      });
+
+      if (subscribers.length === 0) {
+        res.json({ success: true, data: { sent: 0, message: 'No active subscribers to send to' } });
+        return;
+      }
+
+      const emails = subscribers.map(s => s.email);
+
+      const settingsJson = store.settings as Record<string, unknown> | null;
+      const defaultLanguage: 'en' | 'ar' = settingsJson?.defaultLanguage === 'ar' ? 'ar' : 'en';
+
+      // Wrap the provided HTML in the branded shell
+      const storeContext = {
+        name: store.name,
+        nameAr: store.nameAr,
+        logo: store.logo,
+        email: store.email,
+        phone: store.phone,
+        address: store.address,
+        defaultLanguage,
+        theme: store.theme as { primaryColor?: string | null; primary?: string | null } | null,
+      };
+      const wrappedHtml = renderBrandedShell(body.html, storeContext);
+
+      // Send in chunks of 50 (well within Resend's per-call limit)
+      const CHUNK = 50;
+      let sent = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < emails.length; i += CHUNK) {
+        const chunk = emails.slice(i, i + CHUNK);
+        try {
+          await ResendService.sendBrandedEmail(storeId, {
+            to: chunk,
+            subject: body.subject,
+            html: wrappedHtml,
+            text: body.text,
+          });
+          sent += chunk.length;
+        } catch (err: any) {
+          const msg = err?.message ?? 'send failed';
+          logger.error({ err, storeId, chunk: i / CHUNK }, '[Newsletter] Chunk send error');
+          errors.push(msg);
+        }
+      }
+
+      logger.info({ storeId, sent, errors: errors.length }, '[Newsletter] Broadcast complete');
+
+      res.json({
+        success: true,
+        data: {
+          sent,
+          total: emails.length,
+          errors: errors.length > 0 ? errors : undefined,
+        },
       });
     } catch (error) {
       next(error);

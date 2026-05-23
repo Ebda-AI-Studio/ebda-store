@@ -1,20 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
-import { apiGet, getApiUrl, apiFetch } from '../../../../lib/api';
+import { apiGet, getApiUrl, apiFetch, apiPost } from '../../../../lib/api';
 
 /**
- * Minimal admin viewer for newsletter subscribers.
+ * Admin newsletter page.
  *
- * Lists subscribers captured by the storefront's footer signup form and
- * exposes a CSV export so admins can paste the list into their email
- * marketing tool of choice. Intentionally simple — no edit/delete/segment
- * UI — because the audit's main ask was "wire the customer-side form to
- * something the merchant can actually see."
+ * Lists subscribers and exposes CSV/XLSX exports so admins can feed their
+ * email marketing tool. Also includes a simple broadcast composer so
+ * admins can send a one-off newsletter directly from the platform via the
+ * store's configured Resend sender.
  */
 
 interface Subscriber {
@@ -37,6 +36,12 @@ interface SubscribersResponse {
   };
 }
 
+interface BroadcastResult {
+  sent: number;
+  total: number;
+  errors?: string[];
+}
+
 export default function NewsletterPage() {
   const params = useParams();
   const storeId = params?.id as string;
@@ -47,6 +52,15 @@ export default function NewsletterPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Broadcast form state
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [subject, setSubject] = useState('');
+  const [html, setHtml] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<BroadcastResult | null>(null);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
 
   const fetchSubs = useCallback(async () => {
     setLoading(true);
@@ -68,14 +82,12 @@ export default function NewsletterPage() {
   }, [storeId, fetchSubs]);
 
   // CSV export — navigates to the endpoint so the browser downloads directly.
-  // The auth cookie is sent because we open the URL in the same session.
   const handleExportCsv = () => {
     const url = `${getApiUrl()}/api/v1/stores/${storeId}/newsletter/subscribers/export`;
     window.open(url, '_blank');
   };
 
-  // XLSX export — fetches with credentials then triggers a blob download so
-  // the auth cookie is included (window.open won't send cookies cross-origin).
+  // XLSX export — fetches with credentials then triggers a blob download.
   const handleExportXlsx = async () => {
     try {
       const response = await apiFetch(
@@ -93,6 +105,43 @@ export default function NewsletterPage() {
       URL.revokeObjectURL(url);
     } catch {
       // silently ignore — user can retry
+    }
+  };
+
+  const openBroadcast = () => {
+    setShowBroadcast(true);
+    setBroadcastResult(null);
+    setBroadcastError(null);
+    setTimeout(() => subjectRef.current?.focus(), 50);
+  };
+
+  const closeBroadcast = () => {
+    setShowBroadcast(false);
+    setSubject('');
+    setHtml('');
+    setBroadcastResult(null);
+    setBroadcastError(null);
+  };
+
+  const handleSendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subject.trim() || !html.trim()) return;
+
+    setBroadcastSending(true);
+    setBroadcastError(null);
+    setBroadcastResult(null);
+
+    const { data, error: err } = await apiPost<BroadcastResult>(
+      `/api/v1/stores/${storeId}/newsletter/broadcast`,
+      { subject: subject.trim(), html: html.trim() }
+    );
+
+    setBroadcastSending(false);
+
+    if (err) {
+      setBroadcastError(err.message || 'Failed to send broadcast');
+    } else if (data) {
+      setBroadcastResult(data);
     }
   };
 
@@ -119,6 +168,9 @@ export default function NewsletterPage() {
             disabled={subs.length === 0}
           >
             {tPage('exportXlsx')}
+          </Button>
+          <Button type="button" size="sm" onClick={openBroadcast} disabled={subs.length === 0}>
+            {tPage('sendBroadcast')}
           </Button>
         </div>
       }
@@ -182,6 +234,127 @@ export default function NewsletterPage() {
           </div>
         )}
       </div>
+
+      {/* Broadcast Modal */}
+      {showBroadcast && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-background shadow-xl border border-border">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-lg font-semibold">{tPage('broadcastTitle')}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {tPage('broadcastSubtitle', { count: subs.filter(s => s.isActive).length })}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeBroadcast}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {broadcastResult ? (
+              <div className="px-6 py-8 text-center">
+                <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg
+                    className="w-7 h-7 text-emerald-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold mb-1">{tPage('broadcastSent')}</h3>
+                <p className="text-muted-foreground text-sm">
+                  {tPage('broadcastSentCount', {
+                    sent: broadcastResult.sent,
+                    total: broadcastResult.total,
+                  })}
+                </p>
+                {broadcastResult.errors && broadcastResult.errors.length > 0 && (
+                  <p className="mt-2 text-xs text-destructive">
+                    {broadcastResult.errors.length} chunk(s) failed — check server logs
+                  </p>
+                )}
+                <Button type="button" variant="outline" onClick={closeBroadcast} className="mt-6">
+                  {tPage('broadcastClose')}
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleSendBroadcast} className="px-6 py-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    {tPage('broadcastSubjectLabel')}
+                  </label>
+                  <input
+                    ref={subjectRef}
+                    type="text"
+                    value={subject}
+                    onChange={e => setSubject(e.target.value)}
+                    required
+                    maxLength={300}
+                    placeholder={tPage('broadcastSubjectPlaceholder')}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    {tPage('broadcastBodyLabel')}
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">{tPage('broadcastBodyHint')}</p>
+                  <textarea
+                    value={html}
+                    onChange={e => setHtml(e.target.value)}
+                    required
+                    rows={10}
+                    placeholder={tPage('broadcastBodyPlaceholder')}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+                  />
+                </div>
+
+                {broadcastError && (
+                  <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                    {broadcastError}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeBroadcast}
+                    disabled={broadcastSending}
+                  >
+                    {tPage('broadcastCancel')}
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={broadcastSending || !subject.trim() || !html.trim()}
+                  >
+                    {broadcastSending ? tPage('broadcastSending') : tPage('broadcastSend')}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

@@ -2039,7 +2039,22 @@
   "affiliates": {
     "page": {
       "title": "برنامج التسويق بالعمولة",
-      "subtitle": "إدارة إحالات المسوّقين والعمولات"
+      "subtitle": "إدارة إحالات المسوّقين والعمولات",
+      "inviteButton": "إضافة مسوّق",
+      "inviteTitle": "إضافة مسوّق",
+      "inviteSubtitle": "أضف مسوّقاً مباشرةً — سيتمكن فوراً من مشاركة رابط الإحالة الخاص به.",
+      "inviteNameLabel": "الاسم الكامل",
+      "inviteNamePlaceholder": "أحمد محمد",
+      "inviteEmailLabel": "البريد الإلكتروني",
+      "inviteEmailPlaceholder": "ahmed@example.com",
+      "invitePhoneLabel": "الهاتف (اختياري)",
+      "inviteInstagramLabel": "إنستغرام (اختياري)",
+      "inviteTiktokLabel": "تيك توك (اختياري)",
+      "inviteNotesLabel": "ملاحظات داخلية (اختياري)",
+      "inviteNotesPlaceholder": "مثال: مؤثر موضة كويتي، 50 ألف متابع",
+      "inviteSubmit": "إضافة المسوّق",
+      "inviting": "جارٍ الإضافة…",
+      "inviteCancel": "إلغاء"
     },
     "tabs": {
       "affiliates": "المسوّقون",
@@ -2166,6 +2181,13 @@
       "invalidAmount": {
         "title": "مبلغ غير صالح",
         "message": "أدخل مبلغ دفعة صالح."
+      },
+      "inviteCreated": {
+        "title": "تمت إضافة المسوّق",
+        "message": "تمت إضافة المسوّق وتفعيله. يمكنه الآن مشاركة رابط الإحالة الخاص به."
+      },
+      "inviteError": {
+        "message": "تعذّر إضافة المسوّق. ربما يكون البريد الإلكتروني مسجّلاً بالفعل."
       }
     }
   },
@@ -2249,9 +2271,23 @@
       "subtitle": "العملاء الذين اشتركوا عبر تذييل واجهة المتجر",
       "exportCsv": "تصدير CSV",
       "exportXlsx": "تصدير XLSX",
+      "sendBroadcast": "إرسال النشرة",
       "totalCount": "{count} مشترك",
       "emptyTitle": "لا يوجد مشتركون بعد",
-      "emptyDescription": "عندما يسجل العملاء في النشرة الإخبارية من واجهة المتجر، ستظهر بياناتهم هنا."
+      "emptyDescription": "عندما يسجل العملاء في النشرة الإخبارية من واجهة المتجر، ستظهر بياناتهم هنا.",
+      "broadcastTitle": "إرسال نشرة جماعية",
+      "broadcastSubtitle": "سيتم الإرسال إلى {count} مشترك نشط",
+      "broadcastSubjectLabel": "سطر الموضوع",
+      "broadcastSubjectPlaceholder": "موضوع النشرة الإخبارية...",
+      "broadcastBodyLabel": "المحتوى (HTML)",
+      "broadcastBodyHint": "أدخل HTML صالحاً. سيتم تضمينه تلقائياً في قالب البريد الإلكتروني الخاص بمتجرك.",
+      "broadcastBodyPlaceholder": "<p>مرحباً!</p>\n<p>محتوى نشرتك هنا…</p>",
+      "broadcastSend": "إرسال إلى جميع المشتركين",
+      "broadcastSending": "جارٍ الإرسال…",
+      "broadcastCancel": "إلغاء",
+      "broadcastSent": "تم الإرسال!",
+      "broadcastSentCount": "تم الإرسال إلى {sent} من أصل {total} مشترك.",
+      "broadcastClose": "إغلاق"
     },
     "table": {
       "email": "البريد الإلكتروني",
