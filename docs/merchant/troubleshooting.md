@@ -99,14 +99,58 @@ Force Store enforces strict validation. The error message tells you which field 
 
 ## WhatsApp integration issues — مشاكل تكامل واتساب
 
+### Customer email shows as `wa-...@placeholder.forcestore.kw` — البريد يظهر كعنوان وهمي
+
+This is expected behavior for orders placed via WhatsApp DM ordering. When a customer
+orders through WhatsApp, the platform creates a customer account using a synthetic
+placeholder email (`wa-<phone>@placeholder.forcestore.kw`) because the customer
+never provided a real email address.
+
+- The placeholder email is **hidden** on the order detail page in Admin — you won't
+  see it there.
+- It will appear if you export orders as XLSX or query the customer list.
+- No action needed. The customer receives all order updates via WhatsApp, not email.
+
+البريد الوهمي يظهر فقط في تصدير الطلبات أو قائمة العملاء. الإشعارات تصل للعميل عبر واتساب تلقائيًا.
+
+### Order list shows wrong payment link or re-issues a new link — الطلب يعرض رابط دفع خاطئ
+
+For **WhatsApp-origin orders** (placed via the ordering bot), if a payment link
+was already generated for the order, the order detail **action bar** now shows
+the existing MyFatoorah URL inline with **Copy** and **Open** buttons — no new
+link is generated.
+
+If you see a new link being generated instead:
+
+1. Check that the order's `externalPaymentUrl` field is populated (visible in the
+   API response or payment logs tab on the order detail page)
+2. If the field is empty, the existing-link surface won't trigger — the modal
+   falls back to generating a fresh one, which is the correct behavior for orders
+   that never had a link
+
+للطلبات القادمة من واتساب: إن وُجد رابط دفع مسبق، يظهر مباشرة بأزرار «نسخ» و«فتح». إن لم يكن الحقل `externalPaymentUrl` محدودًا، يُنشأ رابط جديد تلقائيًا.
+
+### Cart abandoned WhatsApp reminders not firing — تذكيرات السلة المتروكة لا ترسل
+
+Check all of the following:
+
+1. **WBS connected** — go to Settings → WhatsApp Integration → Connection and confirm status shows "Connected"
+2. **`cartAbandoned` template approved** — in Settings → WhatsApp Integration → Templates, find `cart_abandoned` (or its current version if reset), confirm Meta status is "Approved"
+3. **Abandoned cart feature enabled** — Settings → Feature Toggles → Abandoned Cart Recovery should be ON
+4. **3-step cadence timing** — reminders fire at 1h, 4h, and 24h after the cart was last updated. If the cart was created less than 1h ago, no reminder has fired yet
+5. **WhatsApp-origin carts included** — as of Phase 8, both website carts AND WhatsApp DM carts are swept. If a customer started via WhatsApp DM, their cart is also eligible for the reminder cadence
+
+تحقّق: اتصال WBS فعّال، قالب `cart_abandoned` معتمد، ميزة استرداد السلة مفعّلة في الإعدادات، التوقيت (1h/4h/24h من آخر تحديث للسلة).
+
 ### Connected to WBS but seeing 0 approved templates — متصل لكن لا توجد قوالب معتمدة
 
 1. Open the WhatsApp Business Platform admin dashboard (ws.forcemediakw.com)
 2. Go to your template list — check the status column on Meta for each template
 3. Templates may have been rejected by Meta. Use the **Reset to Draft** button on any rejected template to automatically rename it (e.g., `order_paid_v2`) and resubmit for approval
 4. After approval, template dropdowns in Force Store admin resolve the new version automatically — you do not need to re-select them
+5. If the template list is **still empty** after your templates are approved: disconnect then reconnect the WBS integration (Settings → WhatsApp Integration → Connection → Disconnect, then reconnect with the same API key). This triggers a fresh metadata fetch from WBS which unions the FWB-side approved templates with the live list.
 
-تحقّق من حالة القوالب في لوحة WBS وMeta. القوالب المرفوضة يمكن إعادة تقديمها بزر «Reset to Draft» — القوائم المنسدلة في المتجر تتعرّف على الإصدار الجديد تلقائيًا.
+تحقّق من حالة القوالب في لوحة WBS وMeta. القوالب المرفوضة يمكن إعادة تقديمها بزر «Reset to Draft» — القوائم المنسدلة في المتجر تتعرّف على الإصدار الجديد تلقائيًا. إن استمرت القائمة فارغة بعد الاعتماد، افصل ثم أعد الاتصال لإجراء تحديث للبيانات الوصفية.
 
 ### Bot says "tap a product please" to customers instead of understanding natural language — البوت لا يفهم الطلبات الطبيعية
 
