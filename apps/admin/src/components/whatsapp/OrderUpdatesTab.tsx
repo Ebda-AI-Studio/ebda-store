@@ -103,38 +103,56 @@ const EVENTS: EventDef[] = [
     key: 'orderPaid',
     label: 'Order paid',
     description: 'Send automatically the moment a customer completes payment.',
-    templateBase: 'order_paid_v1',
+    // Version-agnostic base (no _v1/_v2 suffix). The matcher accepts
+    // any version of the same purpose so v2 templates resolve after
+    // a policy-driven rewording without stranding the merchant on
+    // "Template not found".
+    templateBase: 'order_paid',
   },
   {
     key: 'orderShipped',
     label: 'Order shipped',
     description: 'Send when the order is marked as shipped (includes tracking number variable).',
-    templateBase: 'order_shipped_v1',
+    templateBase: 'order_shipped',
   },
   {
     key: 'orderDelivered',
     label: 'Order delivered',
     description: 'Send when the order is marked as delivered.',
-    templateBase: 'order_delivered_v1',
+    templateBase: 'order_delivered',
   },
 ];
 
 /** Default channel state: both on when not previously saved. */
 const DEFAULT_CHANNELS: TemplateChannels = { whatsapp: true, email: true };
 
+/**
+ * Returns the highest-version template whose name matches the base
+ * pattern, optionally filtered by APPROVED status. Matching rules:
+ *   - Exact: `force_<base>` OR `<storeSlug>_<base>` (legacy v1 without suffix)
+ *   - Versioned: `force_<base>_v<N>` OR `<storeSlug>_<base>_v<N>` (any N)
+ * When multiple matches exist (e.g. v1 approved + v2 approved), we pick
+ * the highest N. v1 with no suffix ranks at 1 for comparison.
+ */
+function extractVersion(name: string, base: string): number | null {
+  // Try exact match (legacy v1 without suffix)
+  if (name === `force_${base}` || name.endsWith(`_${base}`)) return 1;
+  // Try versioned match: <prefix>_<base>_v<N>
+  const m = name.match(new RegExp(`^(?:force|.+?)_${base}_v(\\d+)$`));
+  return m ? parseInt(m[1], 10) : null;
+}
+
 function findApprovedTemplate(
   available: AvailableTemplate[],
   baseName: string,
   language: string
 ): AvailableTemplate | null {
-  return (
-    available.find(
-      t =>
-        t.language === language &&
-        (t.name === `force_${baseName}` || t.name.endsWith(`_${baseName}`)) &&
-        t.status.toUpperCase() === 'APPROVED'
-    ) || null
-  );
+  const candidates = available
+    .filter(t => t.language === language && t.status.toUpperCase() === 'APPROVED')
+    .map(t => ({ t, v: extractVersion(t.name, baseName) }))
+    .filter((x): x is { t: AvailableTemplate; v: number } => x.v !== null)
+    .sort((a, b) => b.v - a.v);
+  return candidates[0]?.t ?? null;
 }
 
 function findAnyTemplate(
@@ -142,13 +160,12 @@ function findAnyTemplate(
   baseName: string,
   language: string
 ): AvailableTemplate | null {
-  return (
-    available.find(
-      t =>
-        t.language === language &&
-        (t.name === `force_${baseName}` || t.name.endsWith(`_${baseName}`))
-    ) || null
-  );
+  const candidates = available
+    .filter(t => t.language === language)
+    .map(t => ({ t, v: extractVersion(t.name, baseName) }))
+    .filter((x): x is { t: AvailableTemplate; v: number } => x.v !== null)
+    .sort((a, b) => b.v - a.v);
+  return candidates[0]?.t ?? null;
 }
 
 export function OrderUpdatesTab({ storeId }: { storeId: string }) {

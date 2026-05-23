@@ -58,20 +58,10 @@ const DEFAULT_CONFIG: WbsConfig = {
   waCustomerOrderingEnabled: false,
 };
 
-function templateLabel(t: AvailableTemplate): string {
-  return `${t.name} (${t.language}) — ${t.category}`;
-}
-
-function templateValue(t: { name: string; language?: string; languageCode?: string }): string {
-  const lang = t.language ?? t.languageCode ?? '';
-  return `${t.name}:::${lang}`;
-}
-
-function parseTemplateValue(value: string): TemplateEntry | null {
-  const [name, languageCode] = value.split(':::');
-  if (!name || !languageCode) return null;
-  return { name, languageCode };
-}
+// Template-picker helpers (templateLabel / templateValue /
+// parseTemplateValue / selectTemplate) were removed when the duplicate
+// "Message Templates" picker in this tab was deleted. Per-event
+// template selection now lives exclusively in the Order Updates tab.
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -83,7 +73,6 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
   const [config, setConfig] = useState<WbsConfig>(DEFAULT_CONFIG);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [connecting, setConnecting] = useState(false);
-  const [selectedTemplates, setSelectedTemplates] = useState<WbsTemplates>({});
   const [enableToggle, setEnableToggle] = useState(false);
   const [waOrderingEnabled, setWaOrderingEnabled] = useState(false);
   const [savingWaOrdering, setSavingWaOrdering] = useState(false);
@@ -101,7 +90,6 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
     if (cfg) {
       setConfig(cfg);
       setEnableToggle(cfg.wbsEnabled);
-      setSelectedTemplates(cfg.wbsTemplates || {});
       setWaOrderingEnabled(cfg.waCustomerOrderingEnabled ?? false);
     }
     setLoading(false);
@@ -174,17 +162,16 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
     }
   };
 
-  const allTemplatesPicked = Boolean(
-    selectedTemplates.orderPaid?.name &&
-    selectedTemplates.orderShipped?.name &&
-    selectedTemplates.orderDelivered?.name
-  );
-
   const handleSaveTemplates = async () => {
     setSaving(true);
     try {
+      // ONLY send wbsEnabled from this tab. wbsTemplates is owned by
+      // the Order Updates tab — including it here would wipe the
+      // per-event picks (which load into local state empty until the
+      // user touches them) every time the merchant clicks Save in
+      // Connection. Order Updates tab handles wbsTemplates writes
+      // entirely.
       const { error } = await apiPut(`/api/v1/stores/${storeId}/integrations/wbs`, {
-        wbsTemplates: selectedTemplates,
         wbsEnabled: enableToggle,
       });
       if (error) {
@@ -229,17 +216,6 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
     } finally {
       setSavingWaOrdering(false);
     }
-  };
-
-  const selectTemplate = (
-    event: 'orderPaid' | 'orderShipped' | 'orderDelivered',
-    value: string
-  ) => {
-    const entry = parseTemplateValue(value);
-    setSelectedTemplates(prev => ({
-      ...prev,
-      [event]: entry || undefined,
-    }));
   };
 
   // Derived state: treat hasApiKey+wbsEnabled as connected, even if connectedTenant is null
@@ -371,71 +347,11 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
             </div>
           </div>
 
-          {/* Template selection */}
-          {tenantDetailsAvailable && (
-            <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
-              <div>
-                <h3 className="font-medium text-foreground">Message Templates</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Select the approved WhatsApp template for each order event.
-                </p>
-              </div>
-              {templates.length === 0 ? (
-                <div className="rounded-md border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30 p-4 text-sm text-amber-800 dark:text-amber-300">
-                  No approved templates found. Approve templates in your Meta WABA dashboard, then
-                  click Retry above.
-                </div>
-              ) : (
-                <>
-                  {(
-                    [
-                      {
-                        key: 'orderPaid' as const,
-                        label: 'Order Paid',
-                        description: 'Sent when a customer completes payment',
-                      },
-                      {
-                        key: 'orderShipped' as const,
-                        label: 'Order Shipped',
-                        description: 'Sent when the order status changes to Shipped',
-                      },
-                      {
-                        key: 'orderDelivered' as const,
-                        label: 'Order Delivered',
-                        description: 'Sent when the order status changes to Delivered',
-                      },
-                    ] as const
-                  ).map(({ key, label, description }) => {
-                    const current = selectedTemplates[key];
-                    const currentValue = current ? templateValue(current) : '';
-                    return (
-                      <div
-                        key={key}
-                        className="border-t border-border/50 pt-4 first:border-0 first:pt-0"
-                      >
-                        <div className="mb-2">
-                          <span className="text-sm font-medium text-foreground">{label}</span>
-                          <p className="text-xs text-muted-foreground">{description}</p>
-                        </div>
-                        <select
-                          value={currentValue}
-                          onChange={e => selectTemplate(key, e.target.value)}
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                          <option value="">— Select template —</option>
-                          {templates.map(t => (
-                            <option key={templateValue(t)} value={templateValue(t)}>
-                              {templateLabel(t)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          )}
+          {/* Per-event template picking lives in the Order Updates tab —
+              removed from here to eliminate the duplicate UI Ahmad
+              flagged. Template-name → lifecycle event mapping
+              (orderPaid / orderShipped / orderDelivered + per-event
+              channel toggles + Meta status) is all there now. */}
 
           {/* Enable toggle */}
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -443,22 +359,16 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
               <div>
                 <h3 className="font-medium text-foreground">Enable WhatsApp Notifications</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {tenantDetailsAvailable
-                    ? allTemplatesPicked
-                      ? 'Ready to enable — all 3 templates selected.'
-                      : 'Select all 3 templates above before enabling.'
-                    : 'WhatsApp notifications are enabled. Template selection requires a live WBS connection.'}
+                  Master switch for outbound WhatsApp messages. Per-event templates and channel
+                  choices live in the Order Updates tab.
                 </p>
               </div>
               <button
                 type="button"
                 role="switch"
                 aria-checked={enableToggle}
-                disabled={tenantDetailsAvailable && !allTemplatesPicked}
-                onClick={() =>
-                  (!tenantDetailsAvailable || allTemplatesPicked) && setEnableToggle(prev => !prev)
-                }
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ${
+                onClick={() => setEnableToggle(prev => !prev)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   enableToggle ? 'bg-primary' : 'bg-muted'
                 }`}
               >
