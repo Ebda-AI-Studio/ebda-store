@@ -86,6 +86,37 @@ export interface WbsMetadataResponse {
   templates: WbsTemplateInfo[];
 }
 
+/**
+ * Shape of one abandoned WhatsApp DM cart returned by
+ * GET /api/v1/external/abandoned-carts.
+ */
+export interface AbandonedWaCartItem {
+  productName: string;
+  quantity: number;
+  price?: number;
+  currency?: string;
+}
+
+export interface AbandonedWaCart {
+  waCartId: string;
+  fwbStoreId: string | null;
+  customerPhone: string; // E.164 (e.g. +96512345678)
+  customerName: string | null;
+  items: AbandonedWaCartItem[];
+  totalFils: number;
+  currency: string;
+  language: 'en' | 'ar';
+  abandonedAt: string; // ISO 8601
+  state: string;
+}
+
+export interface FetchAbandonedWaCartsOpts {
+  /** Minutes of inactivity that qualify as abandoned (default 30, max 1440). */
+  minutes?: number;
+  /** ISO cursor — only carts created after this timestamp (default 24h ago). */
+  since?: string;
+}
+
 // ─── Service ────────────────────────────────────────────────────────────────
 
 export class WbsBridgeService {
@@ -254,6 +285,79 @@ export class WbsBridgeService {
       wabaId: (body.wabaId as string | null) || null,
       templates: (body.templates as WbsTemplateInfo[]) || [],
     };
+  }
+
+  /**
+   * Fetch abandoned WhatsApp DM carts from WBS for a given store's API key.
+   *
+   * Used by FWB's abandoned-cart sweep to merge WBS DM carts with website carts.
+   * wa_carts remains the single source of truth in WBS — no duplication.
+   *
+   * Degraded-mode contract: returns [] on any error (401, 5xx, network) so the
+   * sweep keeps running for website carts even when WBS is unreachable.
+   *
+   * @param plaintextApiKey  — Decrypted WBS API key (decrypt before calling).
+   * @param opts             — minutes and since cursor (both optional).
+   */
+  async fetchAbandonedWaCarts(
+    plaintextApiKey: string,
+    opts: FetchAbandonedWaCartsOpts = {}
+  ): Promise<AbandonedWaCart[]> {
+    const params = new URLSearchParams();
+    if (opts.minutes !== undefined) params.set('minutes', String(opts.minutes));
+    if (opts.since !== undefined) params.set('since', opts.since);
+
+    const url = `${this.baseUrl}/api/v1/external/abandoned-carts${params.size > 0 ? `?${params}` : ''}`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: { 'x-wbs-api-key': plaintextApiKey },
+        // 15s timeout — generous for a background sweep call
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (err) {
+      logger.error(
+        { err: (err as Error).message, url },
+        '[WBS-BRIDGE] Network error fetching abandoned WA carts — returning empty (degraded mode)'
+      );
+      return [];
+    }
+
+    if (response.status === 401) {
+      logger.warn('[WBS-BRIDGE] WBS rejected API key on abandoned-carts fetch — returning empty');
+      throw new WbsUnauthorizedError('WBS returned 401 on abandoned-carts');
+    }
+
+    if (response.status >= 500) {
+      logger.warn(
+        { statusCode: response.status },
+        '[WBS-BRIDGE] WBS server error on abandoned-carts — returning empty (degraded mode)'
+      );
+      return [];
+    }
+
+    if (!response.ok) {
+      logger.warn(
+        { statusCode: response.status },
+        '[WBS-BRIDGE] Unexpected status on abandoned-carts — returning empty'
+      );
+      return [];
+    }
+
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await response.json()) as Record<string, unknown>;
+    } catch {
+      logger.warn('[WBS-BRIDGE] Failed to parse abandoned-carts JSON — returning empty');
+      return [];
+    }
+
+    const carts = (body.carts as AbandonedWaCart[] | undefined) ?? [];
+    logger.info({ count: carts.length }, '[WBS-BRIDGE] Abandoned WA carts fetched');
+
+    return carts;
   }
 
   /**

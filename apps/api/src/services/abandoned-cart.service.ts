@@ -13,6 +13,8 @@
 import { prisma } from '@force/database';
 import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
+import { wbsBridgeService, WbsUnauthorizedError, type AbandonedWaCart } from './wbs-bridge.service';
+import { encryption } from './encryption.service';
 import logger from '../lib/logger';
 import crypto from 'crypto';
 import { config } from '../config';
@@ -25,6 +27,16 @@ import type { NotificationData, NotificationEvent } from '@force/shared';
 const LOCK_KEY = 'abandoned-cart:processing';
 const LOCK_TTL_SECONDS = 60;
 const ABANDONMENT_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
+
+// WA cart abandonment: 30-minute inactivity threshold for DM-origin carts.
+// Shorter than website carts (1h) because DM sessions go cold faster.
+const WA_ABANDONMENT_MINUTES = 30;
+
+// Redis sentinel key TTL for WA cart step-1 dedup.
+// Set to 25h so a re-abandoned cart (recovered then abandoned again) can
+// receive a new reminder after 25h rather than being silently skipped forever.
+// Must be > sweep interval (15 min) to prevent double-sends in back-to-back runs.
+const WA_CART_SENTINEL_TTL_SECONDS = 25 * 60 * 60; // 25 hours
 
 interface AbandonedCartConfigDefaults {
   step1Enabled: boolean;
@@ -112,7 +124,13 @@ class AbandonedCartService {
     try {
       logger.info({ correlationId }, '[AbandonedCart] Processing started');
 
-      await this.detectNewAbandonments(correlationId);
+      // Run website-cart detection + WA-cart notification in parallel.
+      // Both are independent; a WBS failure must not block website reminders.
+      await Promise.all([
+        this.detectNewAbandonments(correlationId),
+        this.detectAndNotifyAbandonedWaCarts(correlationId),
+      ]);
+
       await this.processReminders(correlationId);
 
       logger.info({ correlationId }, '[AbandonedCart] Processing completed');
@@ -236,6 +254,242 @@ class AbandonedCartService {
             '[AbandonedCart] Failed to create abandoned cart record — skipping'
           );
         }
+      }
+    }
+  }
+
+  // ──────────────────────────────────────────
+  // WA Cart Detection + WhatsApp Notification
+  // ──────────────────────────────────────────
+
+  /**
+   * Fetch abandoned WhatsApp DM carts from WBS and fire the cartAbandoned
+   * WhatsApp template for each one.
+   *
+   * Architecture decision: we do NOT create AbandonedCart records for WA-origin
+   * carts (the model requires a foreign-key to a FWB Cart row which doesn't
+   * exist for DM carts). Instead we send a single step-1 WhatsApp reminder
+   * directly via the WBS bridge and use a Redis sentinel key for dedup across
+   * sweep cycles.
+   *
+   * Per-store conditions to run:
+   *   1. Store.wbsEnabled = true
+   *   2. Store.wbsApiKey is set
+   *   3. wbsTemplates.cartAbandoned template is configured
+   *   4. abandoned_cart feature enabled for the store
+   *
+   * Source → channel mapping:
+   *   WA-origin cart → WhatsApp template only (email not applicable)
+   */
+  async detectAndNotifyAbandonedWaCarts(correlationId?: string): Promise<void> {
+    // Find all stores with both abandoned_cart + whatsapp features enabled
+    const [storeFeatures, waFeatures] = await Promise.all([
+      prisma.storeFeature.findMany({
+        where: { featureKey: 'abandoned_cart', enabled: true },
+        select: { storeId: true },
+      }),
+      prisma.storeFeature.findMany({
+        where: { featureKey: 'whatsapp', enabled: true },
+        select: { storeId: true },
+      }),
+    ]);
+
+    const abandonedCartStoreIds = new Set(storeFeatures.map(sf => sf.storeId));
+    const waStoreIds = new Set(waFeatures.map(sf => sf.storeId));
+
+    // Only stores that have BOTH features enabled
+    const eligibleStoreIds = [...abandonedCartStoreIds].filter(id => waStoreIds.has(id));
+
+    if (eligibleStoreIds.length === 0) {
+      logger.debug(
+        { correlationId },
+        '[AbandonedCart:WA] No stores with both abandoned_cart + whatsapp features'
+      );
+      return;
+    }
+
+    // Load store WBS config for eligible stores
+    const stores = await prisma.store.findMany({
+      where: {
+        id: { in: eligibleStoreIds },
+        wbsEnabled: true,
+        wbsApiKey: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        wbsApiKey: true,
+        wbsTemplates: true,
+      },
+    });
+
+    logger.info(
+      { correlationId, storeCount: stores.length },
+      '[AbandonedCart:WA] Scanning WBS clients for abandoned DM carts'
+    );
+
+    for (const store of stores) {
+      try {
+        await this.processWaAbandonedCartsForStore(store, correlationId);
+      } catch (err) {
+        logger.error(
+          { err, correlationId, storeId: store.id },
+          '[AbandonedCart:WA] Failed for store — skipping (non-fatal)'
+        );
+      }
+    }
+  }
+
+  private async processWaAbandonedCartsForStore(
+    store: { id: string; name: string; wbsApiKey: string | null; wbsTemplates: unknown },
+    correlationId?: string
+  ): Promise<void> {
+    if (!store.wbsApiKey) return;
+
+    // Resolve cartAbandoned template from wbsTemplates JSON.
+    // Shape: { cartAbandoned?: { name: string, languageCode: string, channels?: { whatsapp?: boolean, email?: boolean } } }
+    type TemplateEntry = {
+      name?: string;
+      languageCode?: string;
+      channels?: { whatsapp?: boolean; email?: boolean };
+    };
+    type WbsTemplatesShape = { cartAbandoned?: TemplateEntry };
+    const templates = store.wbsTemplates as WbsTemplatesShape | null;
+    const cartAbandonedTemplate = templates?.cartAbandoned;
+
+    if (!cartAbandonedTemplate?.name) {
+      logger.debug(
+        { storeId: store.id },
+        '[AbandonedCart:WA] No cartAbandoned template configured — skipping store'
+      );
+      return;
+    }
+
+    // Respect explicit channel disable (default ON when absent)
+    if (cartAbandonedTemplate.channels?.whatsapp === false) {
+      logger.debug(
+        { storeId: store.id },
+        '[AbandonedCart:WA] WhatsApp channel disabled for cartAbandoned — skipping store'
+      );
+      return;
+    }
+
+    // Decrypt the WBS API key
+    let plaintextKey: string;
+    try {
+      plaintextKey = encryption.decrypt(store.wbsApiKey);
+    } catch {
+      logger.warn(
+        { storeId: store.id },
+        '[AbandonedCart:WA] Failed to decrypt WBS API key — skipping'
+      );
+      return;
+    }
+
+    // Fetch abandoned WA carts from WBS (degraded mode: throws on 401, returns [] on 5xx)
+    let waCarts: AbandonedWaCart[];
+    try {
+      waCarts = await wbsBridgeService.fetchAbandonedWaCarts(plaintextKey, {
+        minutes: WA_ABANDONMENT_MINUTES,
+      });
+    } catch (err) {
+      if (err instanceof WbsUnauthorizedError) {
+        logger.warn({ storeId: store.id }, '[AbandonedCart:WA] WBS 401 — skipping store');
+      } else {
+        logger.error(
+          { err, storeId: store.id },
+          '[AbandonedCart:WA] Failed to fetch WA carts — skipping store'
+        );
+      }
+      return;
+    }
+
+    // Filter to carts that belong to this store (fwb_store_id match or null as fallback)
+    const relevantCarts = waCarts.filter(
+      cart => cart.fwbStoreId === store.id || cart.fwbStoreId === null
+    );
+
+    logger.info(
+      { correlationId, storeId: store.id, total: waCarts.length, relevant: relevantCarts.length },
+      '[AbandonedCart:WA] Processing abandoned WA carts for store'
+    );
+
+    for (const cart of relevantCarts) {
+      try {
+        await this.sendWaCartAbandonedReminder(store, cart, cartAbandonedTemplate, correlationId);
+      } catch (err) {
+        logger.error(
+          { err, correlationId, storeId: store.id, waCartId: cart.waCartId },
+          '[AbandonedCart:WA] Failed to send reminder for cart — skipping'
+        );
+      }
+    }
+  }
+
+  private async sendWaCartAbandonedReminder(
+    store: { id: string; name: string; wbsApiKey: string | null },
+    cart: AbandonedWaCart,
+    template: { name?: string; languageCode?: string },
+    correlationId?: string
+  ): Promise<void> {
+    if (!store.wbsApiKey) return;
+
+    // Redis sentinel: prevents double-sends within the 25h dedup window
+    const sentinelKey = `wa-cart-abandoned:${cart.waCartId}:step1`;
+    const alreadySent = await redis.exists(sentinelKey);
+    if (alreadySent) {
+      logger.debug(
+        { waCartId: cart.waCartId },
+        '[AbandonedCart:WA] Already sent reminder within dedup window — skipping'
+      );
+      return;
+    }
+
+    const templateName = template.name!;
+    const languageCode = template.languageCode || (cart.language === 'ar' ? 'ar' : 'en');
+    const idempotencyKey = `wa-cart-${cart.waCartId}-step1`;
+
+    // Build variables for force_cart_abandoned_v1:
+    //   {{1}} customer name, {{2}} cart total, {{3}} store name
+    const cartTotalKwd = (cart.totalFils / 1000).toFixed(3);
+    const totalDisplay = `${cartTotalKwd} ${cart.currency}`;
+    const customerName = cart.customerName || 'Customer';
+
+    const variables = [customerName, totalDisplay, store.name];
+
+    // Pre-validate the encrypted key decrypts before attempting the send.
+    // sendOrderNotification also decrypts internally, but catching here gives a
+    // cleaner log context (waCartId present).
+    try {
+      encryption.decrypt(store.wbsApiKey);
+    } catch {
+      logger.warn({ storeId: store.id }, '[AbandonedCart:WA] decrypt failed — skipping cart');
+      return;
+    }
+
+    try {
+      const result = await wbsBridgeService.sendOrderNotification({
+        encryptedApiKey: store.wbsApiKey, // sendOrderNotification decrypts internally
+        recipientPhone: cart.customerPhone,
+        templateName,
+        languageCode,
+        variables,
+        idempotencyKey,
+      });
+
+      // Mark as sent in Redis to prevent re-send in next sweep cycle
+      await redis.set(sentinelKey, '1', WA_CART_SENTINEL_TTL_SECONDS);
+
+      logger.info(
+        { correlationId, storeId: store.id, waCartId: cart.waCartId, messageId: result.messageId },
+        '[AbandonedCart:WA] WhatsApp reminder sent'
+      );
+    } catch (err) {
+      if (err instanceof WbsUnauthorizedError) {
+        logger.error({ storeId: store.id }, '[AbandonedCart:WA] WBS 401 on send — skipping');
+      } else {
+        // Re-throw so the caller can log + skip to the next cart
+        throw err;
       }
     }
   }
