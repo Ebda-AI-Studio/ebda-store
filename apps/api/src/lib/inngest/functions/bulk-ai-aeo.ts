@@ -726,9 +726,12 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
     let quotaReached = false;
 
     try {
-      // Count to set total for progress bar
-      const [productCount] = await Promise.all([
-        prisma.product.count({ where: { storeId, deletedAt: null, metaDescription: null } }),
+      // Count to set total for progress bar — we now write to the AEO
+      // columns specifically, so the "needs work" predicate is
+      // `metaDescriptionAeo is null`, not `metaDescription is null`.
+      const [productCount, categoryCount] = await Promise.all([
+        prisma.product.count({ where: { storeId, deletedAt: null, metaDescriptionAeo: null } }),
+        prisma.category.count({ where: { storeId, deletedAt: null, metaDescriptionAeo: null } }),
       ]);
 
       await prisma.bulkAiJob.update({
@@ -736,7 +739,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
         data: {
           status: 'running',
           startedAt: new Date(),
-          total: productCount + 1, // +1 for the store row
+          total: productCount + categoryCount + 1, // +1 for the store row
         },
       });
 
@@ -746,8 +749,8 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
           name: true,
           nameAr: true,
           description: true,
-          metaDescription: true,
-          metaDescriptionAr: true,
+          metaDescriptionAeo: true,
+          metaDescriptionAeoAr: true,
         },
       });
 
@@ -762,7 +765,12 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
       const genAI = getGenAI();
 
       // ---- Store-level meta ----
-      if (!store.metaDescription?.trim()) {
+      // Writes to metaDescriptionAeo / metaDescriptionAeoAr (NOT the SEO
+      // columns). Skip only if the dedicated AEO field is already
+      // populated — so running the SEO sweep first no longer locks AEO
+      // out of every row. Merchant clears the AEO column from admin if
+      // they want a re-run.
+      if (!store.metaDescriptionAeo?.trim()) {
         try {
           await assertAiQuota();
 
@@ -783,9 +791,9 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
             await prisma.store.update({
               where: { id: storeId },
               data: {
-                metaDescription: parsed.en.trim().slice(0, 160),
-                metaDescriptionAr:
-                  parsed.ar?.trim().slice(0, 160) || store.metaDescriptionAr || null,
+                metaDescriptionAeo: parsed.en.trim().slice(0, 160),
+                metaDescriptionAeoAr:
+                  parsed.ar?.trim().slice(0, 160) || store.metaDescriptionAeoAr || null,
               },
             });
             filled++;
@@ -825,8 +833,8 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
           name: string;
           nameAr: string | null;
           description: string | null;
-          metaDescription: string | null;
-          metaDescriptionAr: string | null;
+          metaDescriptionAeo: string | null;
+          metaDescriptionAeoAr: string | null;
         }> = await prisma.product.findMany({
           where: { storeId, deletedAt: null },
           orderBy: { id: 'asc' },
@@ -837,15 +845,16 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
             name: true,
             nameAr: true,
             description: true,
-            metaDescription: true,
-            metaDescriptionAr: true,
+            metaDescriptionAeo: true,
+            metaDescriptionAeoAr: true,
           },
         });
         if (products.length === 0) break;
 
         for (const p of products) {
-          // Smart-skip: only fill if metaDescription is empty
-          if (p.metaDescription?.trim()) {
+          // Smart-skip: only fill if AEO column is empty. SEO content
+          // in metaDescription is irrelevant — AEO is a separate field.
+          if (p.metaDescriptionAeo?.trim()) {
             skipped++;
             processed++;
             continue;
@@ -871,8 +880,9 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
               await prisma.product.update({
                 where: { id: p.id },
                 data: {
-                  metaDescription: parsed.en.trim().slice(0, 160),
-                  metaDescriptionAr: parsed.ar?.trim().slice(0, 160) || p.metaDescriptionAr || null,
+                  metaDescriptionAeo: parsed.en.trim().slice(0, 160),
+                  metaDescriptionAeoAr:
+                    parsed.ar?.trim().slice(0, 160) || p.metaDescriptionAeoAr || null,
                 },
               });
               filled++;
@@ -903,6 +913,94 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
         });
 
         if (products.length < PAGE) break;
+      }
+
+      // ---- Categories — page through with same pattern as products ----
+      let catCursor: string | null = null;
+      while (true) {
+        const cats: Array<{
+          id: string;
+          name: string;
+          nameAr: string | null;
+          description: string | null;
+          metaDescriptionAeo: string | null;
+          metaDescriptionAeoAr: string | null;
+        }> = await prisma.category.findMany({
+          where: { storeId, deletedAt: null },
+          orderBy: { id: 'asc' },
+          take: PAGE,
+          ...(catCursor ? { skip: 1, cursor: { id: catCursor } } : {}),
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            description: true,
+            metaDescriptionAeo: true,
+            metaDescriptionAeoAr: true,
+          },
+        });
+        if (cats.length === 0) break;
+
+        for (const c of cats) {
+          if (c.metaDescriptionAeo?.trim()) {
+            skipped++;
+            processed++;
+            continue;
+          }
+
+          try {
+            await assertAiQuota();
+
+            const model = genAI.getGenerativeModel({
+              model: MODEL,
+              generationConfig: { responseMimeType: 'application/json' },
+            });
+
+            const prompt = buildMetaPrompt('category', c.name, c.description ?? '', store.name);
+            const result = await callWithRetry(
+              () => model.generateContent(prompt),
+              `meta-aeo:category:${c.id}`
+            );
+            const raw = stripFences(result.response.text());
+            const parsed = JSON.parse(raw) as { en: string; ar: string };
+
+            if (typeof parsed.en === 'string' && parsed.en.trim()) {
+              await prisma.category.update({
+                where: { id: c.id },
+                data: {
+                  metaDescriptionAeo: parsed.en.trim().slice(0, 160),
+                  metaDescriptionAeoAr:
+                    parsed.ar?.trim().slice(0, 160) || c.metaDescriptionAeoAr || null,
+                },
+              });
+              filled++;
+            } else {
+              skipped++;
+            }
+            await sleep(THROTTLE_MS);
+          } catch (err) {
+            if (isAiQuotaCapError(err)) throw err;
+            const msg = err instanceof Error ? err.message : 'Gemini call failed';
+            if (errors.length < ERROR_CAP)
+              errors.push({
+                entityKind: 'category',
+                entityId: c.id,
+                entityName: c.name,
+                error: msg,
+              });
+            failed++;
+          }
+          processed++;
+        }
+
+        catCursor = cats[cats.length - 1].id;
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { processed, filled, skipped, failed, errors: errors as object },
+        });
+
+        if (cats.length < PAGE) break;
       }
     } catch (err) {
       if (!isAiQuotaCapError(err)) throw err;
@@ -942,7 +1040,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
 // -----------------------------------------------------------------------
 
 function buildMetaPrompt(
-  kind: 'store' | 'product',
+  kind: 'store' | 'product' | 'category',
   name: string,
   description: string,
   storeName?: string
@@ -950,7 +1048,16 @@ function buildMetaPrompt(
   const context =
     kind === 'store'
       ? `Store name: "${name}"\nStore description: ${description || 'Not provided.'}`
-      : `Product: "${name}"\nFrom store: "${storeName ?? ''}"\nProduct description: ${description || 'Not provided.'}`;
+      : kind === 'category'
+        ? `Category: "${name}"\nFrom store: "${storeName ?? ''}"\nCategory description: ${description || 'Not provided.'}`
+        : `Product: "${name}"\nFrom store: "${storeName ?? ''}"\nProduct description: ${description || 'Not provided.'}`;
+
+  const naturalInclude =
+    kind === 'store'
+      ? 'the store name and its main product category'
+      : kind === 'category'
+        ? `the category name and the kinds of products it contains at ${storeName ?? 'the store'}`
+        : 'the product name and what it does or is for';
 
   return `You are an AEO (Answer Engine Optimisation) expert writing meta descriptions for a Kuwait-based e-commerce ${kind}.
 
@@ -960,7 +1067,7 @@ Write a meta description that directly answers the question a user might ask an 
 - Conversational, first-answer style — like the opening sentence of a Wikipedia article
 - Factual and specific, no marketing fluff or keyword stuffing
 - Between 130-160 characters (English)
-- Naturally include the ${kind === 'store' ? 'store name and its main product category' : 'product name and what it does or is for'}
+- Naturally include ${naturalInclude}
 - Both English and Arabic (formal MSA)
 
 Return ONLY a JSON object with keys "en" and "ar". No markdown, no code fences — pure JSON only.

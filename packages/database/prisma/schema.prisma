@@ -220,6 +220,10 @@ model Store {
   metaTitleAr            String? @map("meta_title_ar")
   metaDescription        String? @map("meta_description")
   metaDescriptionAr      String? @map("meta_description_ar")
+  // AEO — conversational answer-engine copy. Written by bulk-ai-meta-aeo
+  // sweep. Storefront coalesces at render time: AEO > SEO > null.
+  metaDescriptionAeo     String? @map("meta_description_aeo")
+  metaDescriptionAeoAr   String? @map("meta_description_aeo_ar")
   ogImage                String? @map("og_image")
   twitterHandle          String? @map("twitter_handle")
   googleSiteVerification String? @map("google_site_verification")
@@ -507,6 +511,10 @@ model Category {
   metaTitleAr       String?   @map("meta_title_ar")
   metaDescription   String?   @map("meta_description")
   metaDescriptionAr String?   @map("meta_description_ar")
+  // AEO — conversational answer-engine copy. Written by bulk-ai-meta-aeo
+  // sweep. Storefront coalesces at render time: AEO > SEO > null.
+  metaDescriptionAeo   String? @map("meta_description_aeo")
+  metaDescriptionAeoAr String? @map("meta_description_aeo_ar")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   deletedAt         DateTime? @map("deleted_at") // Soft delete support
@@ -554,6 +562,10 @@ model Product {
   metaTitleAr       String?       @map("meta_title_ar")
   metaDescription   String?       @map("meta_description")
   metaDescriptionAr String?       @map("meta_description_ar")
+  // AEO — conversational answer-engine copy. Written by bulk-ai-meta-aeo
+  // sweep. Storefront coalesces at render time: AEO > SEO > null.
+  metaDescriptionAeo   String?    @map("meta_description_aeo")
+  metaDescriptionAeoAr String?    @map("meta_description_aeo_ar")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
   deletedAt         DateTime?     @map("deleted_at") // Soft delete support
