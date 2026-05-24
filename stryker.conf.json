@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.stryker.config.ts"
+  },
+  "reporters": ["html", "clear-text", "progress"],
+  "mutate": [
+    "apps/api/src/services/auth.service.ts",
+    "apps/api/src/services/payment.service.ts",
+    "apps/api/src/services/recommendation.service.ts",
+    "apps/api/src/lib/ai-quota.ts"
+  ],
+  "thresholds": { "high": 80, "low": 60, "break": null },
+  "tempDirName": "stryker-tmp",
+  "concurrency": 2,
+  "timeoutMS": 60000,
+  "disableTypeChecks": true,
+  "ignoreStatic": true,
+  "ignorePatterns": [".claude/**", "graphify-out/**", "stryker-tmp/**", "skills/**", ".agents/**"]
+}
