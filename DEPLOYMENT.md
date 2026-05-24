@@ -2,6 +2,23 @@
 
 > **2026-05-22 update:** prior versions of this doc described a Cloudflare Pages + Supabase topology that was never the production state. The canonical production stack is below. The old doc misled incident responders during the 2026-05-22 audit (P1-7).
 
+## Local CI gate (active while GitHub Actions billing is suspended)
+
+GitHub Actions is currently blocked by a billing issue. Until billing resumes, this project uses a **local pre-push gate** instead:
+
+- `.husky/pre-push` runs lint + 3x typecheck (api/admin/web) + unit tests (497 tests) on every `git push`
+- Failures BLOCK the push — the gate exits non-zero and git aborts
+- Successful pushes still trigger Railway auto-deploy (Railway's GitHub integration runs independently of GitHub Actions)
+- `TEST_DATABASE_URL` is set to a safe placeholder in the hook so `vitest setup-e2e.ts` prod-guard passes cleanly; unit tests mock Prisma and make no real DB calls
+
+**Test gate scope:** lint + 3x typecheck + 497 unit tests (~4s)
+
+To run the full gate manually: `bash scripts/safe-deploy.sh`
+
+When GitHub Actions billing is restored, the existing `.github/workflows/ci.yml` will run server-side gates again. The pre-push hook stays as a fast local-first gate.
+
+---
+
 ## Architecture Overview
 
 ```
