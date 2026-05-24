@@ -82,6 +82,7 @@ jobs:
         run: |
           k6 run \
             --out json=loadtests/results/storefront-browse-$(date +%Y%m%dT%H%M%S).json \
+            --summary-export=loadtests/results/summary-storefront-browse-$(date +%Y%m%dT%H%M%S).json \
             loadtests/scenarios/storefront-browse.js
 
       - name: Run api-bursts
@@ -98,6 +99,7 @@ jobs:
         run: |
           k6 run \
             --out json=loadtests/results/api-bursts-$(date +%Y%m%dT%H%M%S).json \
+            --summary-export=loadtests/results/summary-api-bursts-$(date +%Y%m%dT%H%M%S).json \
             loadtests/scenarios/api-bursts.js
 
       - name: Run checkout-flow (manual only)
@@ -115,7 +117,16 @@ jobs:
         run: |
           k6 run \
             --out json=loadtests/results/checkout-flow-$(date +%Y%m%dT%H%M%S).json \
+            --summary-export=loadtests/results/summary-checkout-flow-$(date +%Y%m%dT%H%M%S).json \
             loadtests/scenarios/checkout-flow.js
+
+      - name: Push metrics to Axiom
+        # Runs even when k6 exits non-zero (threshold breach) so we always record the data point.
+        if: steps.secrets-check.outputs.skip == 'false' && always()
+        env:
+          AXIOM_INGEST_TOKEN: ${{ secrets.AXIOM_INGEST_TOKEN }}
+        run: |
+          bash loadtests/push-metrics.sh
 
       - name: Upload k6 results
         if: steps.secrets-check.outputs.skip == 'false' && always()
