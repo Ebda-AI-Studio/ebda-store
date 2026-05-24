@@ -14,6 +14,7 @@ import { requireRole } from './middleware/rbac';
 import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
 import alertWebhookRoutes from './routes/alert-webhooks.routes';
+import waBridgeRoutes from './routes/wa-bridge.routes';
 import { socketService } from './services/socket.service';
 import { setupSwagger } from './docs/swagger';
 import { prisma } from '@force/database';
@@ -277,7 +278,6 @@ app.use('/api/v1/alerts/webhooks', alertWebhookRoutes);
 // Mounted BEFORE CSRF because the caller is WBS (a server, not a
 // browser), authenticated via X-WBS-API-KEY header against the store's
 // encrypted wbsApiKey. See apps/api/src/middleware/wa-bridge-auth.ts.
-const waBridgeRoutes = require('./routes/wa-bridge.routes').default;
 app.use('/api/v1/wa-bridge', express.json({ limit: '256kb' }), waBridgeRoutes);
 
 // Inngest serve handler. Mounted before auth/CSRF because Inngest's

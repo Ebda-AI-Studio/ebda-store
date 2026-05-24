@@ -3,6 +3,21 @@ import { notFound } from 'next/navigation';
 import { ReviewForm } from './ReviewForm';
 import { ReviewErrorView } from './ReviewErrorView';
 
+interface ReviewProduct {
+  id: string;
+  name: string;
+  nameAr?: string | null;
+  images?: string[] | null;
+  storeId: string;
+}
+
+interface ReviewStore {
+  name: string;
+  nameAr?: string | null;
+  slug: string;
+  logo?: string | null;
+}
+
 export const metadata: Metadata = {
   title: 'Submit Review',
   robots: { index: false, follow: false },
@@ -20,7 +35,7 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
   if (!token) notFound();
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://store-api.forcemediakw.com';
-  let canSubmitData: { product: any; store: any } | null = null;
+  let canSubmitData: { product: ReviewProduct; store: ReviewStore } | null = null;
   let errorCode: string | null = null;
 
   try {

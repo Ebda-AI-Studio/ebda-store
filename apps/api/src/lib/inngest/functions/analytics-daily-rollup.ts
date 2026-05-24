@@ -44,7 +44,7 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
       })
     );
 
-    let totals = { cohortRows: 0, funnelDays: 0, rfmCustomers: 0 };
+    const totals = { cohortRows: 0, funnelDays: 0, rfmCustomers: 0 };
 
     for (const store of stores) {
       const result = await step.run(`rollup-${store.id}`, () => runDailyRollup(store.id));
