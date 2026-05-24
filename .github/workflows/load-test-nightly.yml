@@ -1,0 +1,126 @@
+name: Load Test (Nightly)
+
+# Runs nightly against the preview / staging Railway env (NOT production).
+# Manual trigger also available for pre-release validation.
+#
+# Required GitHub repository secrets:
+#   K6_BYPASS_TOKEN  — matches LOAD_TEST_BYPASS_TOKEN on the Railway preview API
+#   K6_STORE_ID      — UUID of a live test store on the staging env
+#   K6_PRODUCT_SLUG  — slug of an in-stock product (for checkout-flow scenario)
+#   K6_BASE_URL      — staging API base, e.g. https://api-preview.up.railway.app/api/v1
+#
+# If these secrets are not yet set, the workflow will be skipped gracefully.
+# Set them in: GitHub → Settings → Secrets and variables → Actions → Repository secrets
+#
+# NOTE: checkout-flow.js creates real orders in the staging store. It is
+# intentionally gated to manual workflow_dispatch only (not the nightly cron).
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Which scenario to run (all | storefront-browse | api-bursts | checkout-flow)'
+        required: false
+        default: 'all'
+
+jobs:
+  load-test:
+    name: k6 Load Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets
+        id: secrets-check
+        env:
+          BYPASS_TOKEN: ${{ secrets.K6_BYPASS_TOKEN }}
+          STORE_ID: ${{ secrets.K6_STORE_ID }}
+          BASE_URL: ${{ secrets.K6_BASE_URL }}
+        run: |
+          missing=""
+          [ -z "$BYPASS_TOKEN" ] && missing="$missing K6_BYPASS_TOKEN"
+          [ -z "$STORE_ID" ]     && missing="$missing K6_STORE_ID"
+          [ -z "$BASE_URL" ]     && missing="$missing K6_BASE_URL"
+          if [ -n "$missing" ]; then
+            echo "::warning::Load test skipped — missing required secrets:$missing"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install k6
+        if: steps.secrets-check.outputs.skip == 'false'
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring \
+            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Create results directory
+        if: steps.secrets-check.outputs.skip == 'false'
+        run: mkdir -p loadtests/results
+
+      - name: Run storefront-browse
+        id: run-browse
+        if: >
+          steps.secrets-check.outputs.skip == 'false' &&
+          (github.event_name == 'schedule' ||
+           github.event.inputs.scenario == 'all' ||
+           github.event.inputs.scenario == 'storefront-browse')
+        env:
+          BASE_URL: ${{ secrets.K6_BASE_URL }}
+          STORE_ID: ${{ secrets.K6_STORE_ID }}
+          LOAD_TEST_TOKEN: ${{ secrets.K6_BYPASS_TOKEN }}
+        run: |
+          k6 run \
+            --out json=loadtests/results/storefront-browse-$(date +%Y%m%dT%H%M%S).json \
+            loadtests/scenarios/storefront-browse.js
+
+      - name: Run api-bursts
+        id: run-bursts
+        if: >
+          steps.secrets-check.outputs.skip == 'false' &&
+          (github.event_name == 'schedule' ||
+           github.event.inputs.scenario == 'all' ||
+           github.event.inputs.scenario == 'api-bursts')
+        env:
+          BASE_URL: ${{ secrets.K6_BASE_URL }}
+          STORE_ID: ${{ secrets.K6_STORE_ID }}
+          LOAD_TEST_TOKEN: ${{ secrets.K6_BYPASS_TOKEN }}
+        run: |
+          k6 run \
+            --out json=loadtests/results/api-bursts-$(date +%Y%m%dT%H%M%S).json \
+            loadtests/scenarios/api-bursts.js
+
+      - name: Run checkout-flow (manual only)
+        # checkout-flow writes real orders — only available on explicit manual
+        # workflow_dispatch targeting this scenario. Never runs on the nightly cron.
+        if: >
+          steps.secrets-check.outputs.skip == 'false' &&
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.scenario == 'checkout-flow'
+        env:
+          BASE_URL: ${{ secrets.K6_BASE_URL }}
+          STORE_ID: ${{ secrets.K6_STORE_ID }}
+          PRODUCT_SLUG: ${{ secrets.K6_PRODUCT_SLUG }}
+          LOAD_TEST_TOKEN: ${{ secrets.K6_BYPASS_TOKEN }}
+        run: |
+          k6 run \
+            --out json=loadtests/results/checkout-flow-$(date +%Y%m%dT%H%M%S).json \
+            loadtests/scenarios/checkout-flow.js
+
+      - name: Upload k6 results
+        if: steps.secrets-check.outputs.skip == 'false' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results-${{ github.run_id }}
+          path: loadtests/results/
+          retention-days: 30
