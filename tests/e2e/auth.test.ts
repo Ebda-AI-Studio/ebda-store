@@ -48,24 +48,23 @@ describe('Authentication Flow', () => {
     it('should register a new user successfully', async () => {
       const res = await request(app).post('/auth/register').send(testUser);
 
-      expect(res.status).toBe(201);
+      // Post T1-4 enumeration hardening: register always returns 200 with
+      // { emailVerificationSent: true } regardless of whether the email
+      // exists, to prevent timing-based email enumeration attacks.
+      expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.user).toBeDefined();
-      expect(res.body.data.user.email).toBe(testUser.email);
-      expect(res.body.data.accessToken).toBeDefined();
-      expect(res.body.data.refreshToken).toBeDefined();
-
-      createdUserId = res.body.data.user.id;
-      authToken = res.body.data.accessToken;
-      refreshToken = res.body.data.refreshToken;
+      expect(res.body.data.emailVerificationSent).toBe(true);
     });
 
-    it('should reject duplicate email registration', async () => {
+    it('should silently accept duplicate email registration (enumeration protection)', async () => {
+      // Post T1-4: duplicate email returns the same 200 + emailVerificationSent
+      // shape as a new registration. A "registration attempt" notice is sent
+      // to the rightful owner's inbox instead of leaking a 409.
       const res = await request(app).post('/auth/register').send(testUser);
 
-      expect(res.status).toBe(409);
-      expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe('EMAIL_EXISTS');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.emailVerificationSent).toBe(true);
     });
 
     it('should validate email format', async () => {

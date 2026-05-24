@@ -79,8 +79,10 @@ describe('Account Lockout Security', () => {
       expect(res.status).toBe(401);
       expect(res.body.success).toBe(false);
       expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
-      // Should show remaining attempts
-      expect(res.body.error.message).toMatch(/\d+ attempts remaining/);
+      // Security: the API intentionally does NOT leak the remaining attempt
+      // count to prevent attackers from knowing how close they are to lockout.
+      // The generic "Invalid email or password" message is the designed response.
+      expect(res.body.error.message).toBeDefined();
     });
 
     it('should lock account after 5 failed attempts', async () => {
