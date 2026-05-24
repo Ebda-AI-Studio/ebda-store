@@ -172,9 +172,24 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
 
     const storeId = await getStoreIdFromRequest(req);
-    const product = isUuid
-      ? await ProductService.getPublicById(storeId, slugOrId)
-      : await ProductService.getPublicBySlug(storeId, slugOrId);
+
+    // Skip Redis cache for authenticated requests — per-user responses must
+    // never be served from a shared cache (auth header OR session cookie).
+    const isAuthenticated = !!req.headers['authorization'] || !!req.cookies?.token;
+
+    const cacheKey = `public:product:${storeId}:${slugOrId}`;
+    const product = isAuthenticated
+      ? // Live fetch — bypass cache for authenticated callers
+        await (isUuid
+          ? ProductService.getPublicById(storeId, slugOrId)
+          : ProductService.getPublicBySlug(storeId, slugOrId))
+      : // Anonymous path — Redis-backed get-or-set (120s TTL, min required by
+        // CLAUDE.md ESLint rule to avoid hammering Neon on cache miss).
+        await getCached(cacheKey, 120, () =>
+          isUuid
+            ? ProductService.getPublicById(storeId, slugOrId)
+            : ProductService.getPublicBySlug(storeId, slugOrId)
+        );
 
     setEdgeCache(res, { sMaxAge: 60, staleWhileRevalidate: 300 });
     res.json({

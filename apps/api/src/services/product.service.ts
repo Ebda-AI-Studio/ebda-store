@@ -264,6 +264,9 @@ export class ProductService {
     // outlive the Redis row.
     invalidateCachedPrefix(`public:products:${storeId}:`);
     invalidateCachedPrefix(`public:suggest:${storeId}:`);
+    // Invalidate per-product detail cache entries (keyed by storeId prefix).
+    // Redis keys expire naturally on their TTL; in-memory entries are swept here.
+    invalidateCachedPrefix(`public:product:${storeId}:`);
     await invalidateCached(`public:categories:${storeId}`);
   }
 
