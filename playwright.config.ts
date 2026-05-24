@@ -22,6 +22,7 @@ export default defineConfig({
     ignoreHTTPSErrors: false,
   },
   projects: [
+    // Chromium (Desktop Chrome)
     {
       name: 'storefront',
       testMatch: /storefront.*\.smoke\.spec\.ts$/,
@@ -31,6 +32,34 @@ export default defineConfig({
       name: 'admin',
       testMatch: /admin.*\.smoke\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'], baseURL: ADMIN_BASE_URL },
+    },
+    // Firefox
+    {
+      name: 'storefront-firefox',
+      testMatch: /storefront.*\.smoke\.spec\.ts$/,
+      use: { ...devices['Desktop Firefox'], baseURL: STOREFRONT_BASE_URL },
+    },
+    {
+      name: 'admin-firefox',
+      testMatch: /admin.*\.smoke\.spec\.ts$/,
+      use: { ...devices['Desktop Firefox'], baseURL: ADMIN_BASE_URL },
+    },
+    // WebKit (Desktop Safari)
+    {
+      name: 'storefront-webkit',
+      testMatch: /storefront.*\.smoke\.spec\.ts$/,
+      use: { ...devices['Desktop Safari'], baseURL: STOREFRONT_BASE_URL },
+    },
+    {
+      name: 'admin-webkit',
+      testMatch: /admin.*\.smoke\.spec\.ts$/,
+      use: { ...devices['Desktop Safari'], baseURL: ADMIN_BASE_URL },
+    },
+    // Mobile Safari (iPhone 14 — primary Kuwait market browser)
+    {
+      name: 'storefront-mobile-safari',
+      testMatch: /storefront.*\.smoke\.spec\.ts$/,
+      use: { ...devices['iPhone 14'], baseURL: STOREFRONT_BASE_URL },
     },
   ],
 });
