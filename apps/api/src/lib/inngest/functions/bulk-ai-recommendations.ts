@@ -167,6 +167,29 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
         category: p.categories[0]?.category.name ?? null,
       }));
 
+      // Smart-skip — pre-fetch the set of product IDs that already have AI
+      // recommendations in this store. Re-running the sweep should be
+      // incremental: products with existing recs are left alone (saves
+      // Gemini quota + preserves prior recs verbatim). Products without
+      // any recs get processed. A merchant who wants to fully regenerate
+      // can clear ai_recommendation rows for the store and re-run.
+      const existingRecRows = await prisma.aiRecommendation.findMany({
+        where: { storeId },
+        select: { sourceProductId: true },
+        distinct: ['sourceProductId'],
+      });
+      const productsWithRecs = new Set(existingRecRows.map(r => r.sourceProductId));
+      logger.info(
+        {
+          jobId,
+          storeId,
+          totalProducts: products.length,
+          alreadyHaveRecs: productsWithRecs.size,
+          toProcess: products.length - productsWithRecs.size,
+        },
+        'bulk-ai-recommendations: pre-sweep state'
+      );
+
       const genAI = getGenAI();
       const model = genAI.getGenerativeModel({
         model: MODEL,
@@ -176,6 +199,22 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
       let processed = 0;
 
       for (const product of products) {
+        // Skip products that already have AI recs from a prior sweep.
+        // Counts toward `skipped` in the job summary, NOT `failed`, so
+        // re-runs report cleanly: e.g. "230 skipped, 1 filled" when the
+        // merchant fixes the one product that failed last time.
+        if (productsWithRecs.has(product.id)) {
+          skipped++;
+          processed++;
+          if (processed % 25 === 0 || processed === products.length) {
+            await prisma.bulkAiJob.update({
+              where: { id: jobId },
+              data: { processed, filled, skipped, failed, errors: errors as object },
+            });
+          }
+          continue;
+        }
+
         try {
           await assertAiQuota();
 
