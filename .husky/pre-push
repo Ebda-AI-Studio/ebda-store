@@ -23,6 +23,10 @@ fi
 
 echo "-> FWB pre-push CI gate: lint + typecheck + unit tests"
 
+# Catch lockfile drift before Railway hits the same trap on `npm ci`.
+# Standing emnapi trap — see feedback-emnapi-lockfile-desync-after-add.md.
+npm ci --dry-run 2>&1 | grep -E "^npm error" && exit 1 || true
+
 npm run lint
 
 echo "-> typechecking apps..."
