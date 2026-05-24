@@ -12,6 +12,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { writeLimiter } from '../middleware/security';
 import { AIService } from '../services/ai.service';
+import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
 import { prisma } from '@force/database';
 
@@ -337,16 +338,22 @@ router.post(
 router.post('/bulk/seo', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
+    const force = req.body?.force === true;
 
     const job = await prisma.bulkAiJob.create({
-      data: { storeId, userId: req.user!.userId, kind: 'seo' },
+      data: {
+        storeId,
+        userId: req.user!.userId,
+        kind: 'seo',
+        ...(force ? { errors: { force: true } as object } : {}),
+      },
       select: { id: true, status: true, kind: true, createdAt: true },
     });
 
     try {
       await inngest.send({
         name: 'bulk-ai/seo-requested',
-        data: { jobId: job.id, storeId },
+        data: { jobId: job.id, storeId, force },
       });
     } catch (err) {
       await markJobFailedIfEnqueueFailed(job.id, err);
@@ -441,16 +448,22 @@ router.post(
     try {
       const { storeId } = req.params;
       const count = Math.min(parseInt(String(req.body?.count ?? '8'), 10) || 8, 20);
+      const force = req.body?.force === true;
 
       const job = await prisma.bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'faq_aeo' },
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'faq_aeo',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
       try {
         await inngest.send({
           name: 'bulk-ai/faq-aeo-requested',
-          data: { jobId: job.id, storeId, count },
+          data: { jobId: job.id, storeId, count, force },
         });
       } catch (err) {
         await markJobFailedIfEnqueueFailed(job.id, err);
@@ -478,16 +491,22 @@ router.post(
     try {
       const { storeId } = req.params;
       const count = Math.min(parseInt(String(req.body?.count ?? '3'), 10) || 3, 10);
+      const force = req.body?.force === true;
 
       const job = await prisma.bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'howto_aeo' },
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'howto_aeo',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
       try {
         await inngest.send({
           name: 'bulk-ai/howto-aeo-requested',
-          data: { jobId: job.id, storeId, count },
+          data: { jobId: job.id, storeId, count, force },
         });
       } catch (err) {
         await markJobFailedIfEnqueueFailed(job.id, err);
@@ -514,16 +533,22 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const force = req.body?.force === true;
 
       const job = await prisma.bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'meta_aeo' },
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'meta_aeo',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
       try {
         await inngest.send({
           name: 'bulk-ai/meta-aeo-requested',
-          data: { jobId: job.id, storeId },
+          data: { jobId: job.id, storeId, force },
         });
       } catch (err) {
         await markJobFailedIfEnqueueFailed(job.id, err);
@@ -558,16 +583,22 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const force = req.body?.force === true;
 
       const job = await prisma.bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'recommendations' },
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'recommendations',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
       try {
         await inngest.send({
           name: 'bulk-ai/recommendations-requested',
-          data: { jobId: job.id, storeId },
+          data: { jobId: job.id, storeId, force },
         });
       } catch (err) {
         await markJobFailedIfEnqueueFailed(job.id, err);
@@ -603,6 +634,8 @@ router.post(
       const { storeId } = req.params;
       const masterRunId = crypto.randomUUID();
 
+      const aeoForce = req.body?.force === true;
+
       // Create all three jobs in parallel
       const [faqJob, howtoJob, metaJob] = await Promise.all([
         prisma.bulkAiJob.create({
@@ -610,7 +643,7 @@ router.post(
             storeId,
             userId: req.user!.userId,
             kind: 'faq_aeo',
-            errors: { master_run_id: masterRunId } as object,
+            errors: { master_run_id: masterRunId, ...(aeoForce ? { force: true } : {}) } as object,
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
@@ -619,7 +652,7 @@ router.post(
             storeId,
             userId: req.user!.userId,
             kind: 'howto_aeo',
-            errors: { master_run_id: masterRunId } as object,
+            errors: { master_run_id: masterRunId, ...(aeoForce ? { force: true } : {}) } as object,
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
@@ -628,7 +661,7 @@ router.post(
             storeId,
             userId: req.user!.userId,
             kind: 'meta_aeo',
-            errors: { master_run_id: masterRunId } as object,
+            errors: { master_run_id: masterRunId, ...(aeoForce ? { force: true } : {}) } as object,
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
@@ -636,18 +669,25 @@ router.post(
 
       // Fire all three Inngest events, handling failures per-job
       const count = Math.min(parseInt(String(req.body?.count ?? '8'), 10) || 8, 20);
+      const force = aeoForce;
       const enqueueResults = await Promise.allSettled([
         inngest
-          .send({ name: 'bulk-ai/faq-aeo-requested', data: { jobId: faqJob.id, storeId, count } })
+          .send({
+            name: 'bulk-ai/faq-aeo-requested',
+            data: { jobId: faqJob.id, storeId, count, force },
+          })
           .catch(err => markJobFailedIfEnqueueFailed(faqJob.id, err)),
         inngest
           .send({
             name: 'bulk-ai/howto-aeo-requested',
-            data: { jobId: howtoJob.id, storeId, count: 3 },
+            data: { jobId: howtoJob.id, storeId, count: 3, force },
           })
           .catch(err => markJobFailedIfEnqueueFailed(howtoJob.id, err)),
         inngest
-          .send({ name: 'bulk-ai/meta-aeo-requested', data: { jobId: metaJob.id, storeId } })
+          .send({
+            name: 'bulk-ai/meta-aeo-requested',
+            data: { jobId: metaJob.id, storeId, force },
+          })
           .catch(err => markJobFailedIfEnqueueFailed(metaJob.id, err)),
       ]);
 
@@ -690,16 +730,22 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const force = req.body?.force === true;
 
       const job = await prisma.bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'llms_txt' },
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'llms_txt',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
       try {
         await inngest.send({
           name: 'bulk-ai/llms-txt-requested',
-          data: { jobId: job.id, storeId },
+          data: { jobId: job.id, storeId, force },
         });
       } catch (err) {
         await markJobFailedIfEnqueueFailed(job.id, err);
@@ -726,16 +772,22 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const force = req.body?.force === true;
 
       const job = await prisma.bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'citation_copy' },
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'citation_copy',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
       try {
         await inngest.send({
           name: 'bulk-ai/citation-copy-requested',
-          data: { jobId: job.id, storeId },
+          data: { jobId: job.id, storeId, force },
         });
       } catch (err) {
         await markJobFailedIfEnqueueFailed(job.id, err);
@@ -762,16 +814,22 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
+      const force = req.body?.force === true;
 
       const job = await prisma.bulkAiJob.create({
-        data: { storeId, userId: req.user!.userId, kind: 'brand_facts' },
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'brand_facts',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
         select: { id: true, status: true, kind: true, createdAt: true },
       });
 
       try {
         await inngest.send({
           name: 'bulk-ai/brand-facts-requested',
-          data: { jobId: job.id, storeId },
+          data: { jobId: job.id, storeId, force },
         });
       } catch (err) {
         await markJobFailedIfEnqueueFailed(job.id, err);
@@ -800,13 +858,18 @@ router.post(
       const { storeId } = req.params;
       const masterRunId = crypto.randomUUID();
 
+      const geoSweepForce = req.body?.force === true;
+
       const [llmsJob, citationJob, factsJob] = await Promise.all([
         prisma.bulkAiJob.create({
           data: {
             storeId,
             userId: req.user!.userId,
             kind: 'llms_txt',
-            errors: { master_run_id: masterRunId } as object,
+            errors: {
+              master_run_id: masterRunId,
+              ...(geoSweepForce ? { force: true } : {}),
+            } as object,
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
@@ -815,7 +878,10 @@ router.post(
             storeId,
             userId: req.user!.userId,
             kind: 'citation_copy',
-            errors: { master_run_id: masterRunId } as object,
+            errors: {
+              master_run_id: masterRunId,
+              ...(geoSweepForce ? { force: true } : {}),
+            } as object,
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
@@ -824,24 +890,34 @@ router.post(
             storeId,
             userId: req.user!.userId,
             kind: 'brand_facts',
-            errors: { master_run_id: masterRunId } as object,
+            errors: {
+              master_run_id: masterRunId,
+              ...(geoSweepForce ? { force: true } : {}),
+            } as object,
           },
           select: { id: true, status: true, kind: true, createdAt: true },
         }),
       ]);
 
+      const geoForce = geoSweepForce; // alias used in enqueue data below
       const enqueueResults = await Promise.allSettled([
         inngest
-          .send({ name: 'bulk-ai/llms-txt-requested', data: { jobId: llmsJob.id, storeId } })
+          .send({
+            name: 'bulk-ai/llms-txt-requested',
+            data: { jobId: llmsJob.id, storeId, force: geoForce },
+          })
           .catch(err => markJobFailedIfEnqueueFailed(llmsJob.id, err)),
         inngest
           .send({
             name: 'bulk-ai/citation-copy-requested',
-            data: { jobId: citationJob.id, storeId },
+            data: { jobId: citationJob.id, storeId, force: geoForce },
           })
           .catch(err => markJobFailedIfEnqueueFailed(citationJob.id, err)),
         inngest
-          .send({ name: 'bulk-ai/brand-facts-requested', data: { jobId: factsJob.id, storeId } })
+          .send({
+            name: 'bulk-ai/brand-facts-requested',
+            data: { jobId: factsJob.id, storeId, force: geoForce },
+          })
           .catch(err => markJobFailedIfEnqueueFailed(factsJob.id, err)),
       ]);
 
@@ -866,6 +942,33 @@ router.post(
       });
     } catch (error) {
       next(error);
+    }
+  }
+);
+
+// =====================================================================
+// Cancel a running or queued bulk AI job.
+// POST /stores/:storeId/ai/jobs/:jobId/cancel
+// Cooperative cancellation: sets status=cancelled in DB; the Inngest
+// function checks this flag every 5 iterations and breaks out cleanly.
+// =====================================================================
+
+router.post(
+  '/jobs/:jobId/cancel',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, jobId } = req.params;
+      const updated = await prisma.bulkAiJob.updateMany({
+        where: { id: jobId, storeId, status: { in: ['queued', 'running'] } },
+        data: { status: 'cancelled', completedAt: new Date() },
+      });
+      if (updated.count === 0) {
+        throw new AppError(404, 'JOB_NOT_CANCELLABLE', 'Job not found or already finished');
+      }
+      res.json({ success: true, data: { cancelled: true } });
+    } catch (e) {
+      next(e);
     }
   }
 );

@@ -62,7 +62,15 @@ export const bulkAiLlmsTxt: InngestFunction.Any = inngest.createFunction(
     triggers: [{ event: 'bulk-ai/llms-txt-requested' }],
   },
   async ({ event }) => {
-    const { jobId, storeId } = event.data as { jobId: string; storeId: string };
+    const {
+      jobId,
+      storeId,
+      force = false,
+    } = event.data as {
+      jobId: string;
+      storeId: string;
+      force?: boolean;
+    };
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/llms-txt-requested fired without ids');
       return;
@@ -118,8 +126,8 @@ export const bulkAiLlmsTxt: InngestFunction.Any = inngest.createFunction(
         return;
       }
 
-      // Smart-skip: only regenerate if llmsTxt is empty
-      if (store.llmsTxt?.trim()) {
+      // Smart-skip: only regenerate if llmsTxt is empty. When force=true, bypass.
+      if (!force && store.llmsTxt?.trim()) {
         skipped++;
         await prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -218,10 +226,15 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
         });
     }
 
+    // Only mark completed if the merchant didn't cancel.
+    const llmsFinalRow = await prisma.bulkAiJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
     await prisma.bulkAiJob.update({
       where: { id: jobId },
       data: {
-        status: 'completed',
+        status: llmsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
         processed: filled + skipped + failed,
         filled,
         skipped,
@@ -232,7 +245,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
     });
 
     logger.info(
-      { jobId, storeId, filled, skipped, failed, quotaReached },
+      { jobId, storeId, filled, skipped, failed, quotaReached, force },
       'bulk-ai-llms-txt complete'
     );
   }
@@ -251,7 +264,15 @@ export const bulkAiCitationCopy: InngestFunction.Any = inngest.createFunction(
     triggers: [{ event: 'bulk-ai/citation-copy-requested' }],
   },
   async ({ event }) => {
-    const { jobId, storeId } = event.data as { jobId: string; storeId: string };
+    const {
+      jobId,
+      storeId,
+      force = false,
+    } = event.data as {
+      jobId: string;
+      storeId: string;
+      force?: boolean;
+    };
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/citation-copy-requested fired without ids');
       return;
@@ -321,8 +342,24 @@ export const bulkAiCitationCopy: InngestFunction.Any = inngest.createFunction(
         if (products.length === 0) break;
 
         for (const p of products) {
+          // Cooperative cancellation — check every 5 products.
+          if (processed % 5 === 0 && processed > 0) {
+            const currentJob = await prisma.bulkAiJob.findUnique({
+              where: { id: jobId },
+              select: { status: true },
+            });
+            if (currentJob?.status === 'cancelled') {
+              logger.info(
+                { jobId, storeId, processed, filled, skipped, failed },
+                'bulk-ai-citation-copy: cancelled by merchant'
+              );
+              break;
+            }
+          }
+
           // Smart-skip: only fill if citation copy is empty.
-          if (p.citationCopy?.trim()) {
+          // When force=true, process even if already populated.
+          if (!force && p.citationCopy?.trim()) {
             skipped++;
             processed++;
             continue;
@@ -405,10 +442,15 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
         });
     }
 
+    // Only mark completed if the merchant didn't cancel.
+    const citationFinalRow = await prisma.bulkAiJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
     await prisma.bulkAiJob.update({
       where: { id: jobId },
       data: {
-        status: 'completed',
+        status: citationFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
         processed,
         filled,
         skipped,
@@ -419,7 +461,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
     });
 
     logger.info(
-      { jobId, storeId, filled, skipped, failed, quotaReached },
+      { jobId, storeId, filled, skipped, failed, quotaReached, force },
       'bulk-ai-citation-copy complete'
     );
   }
@@ -438,7 +480,15 @@ export const bulkAiBrandFacts: InngestFunction.Any = inngest.createFunction(
     triggers: [{ event: 'bulk-ai/brand-facts-requested' }],
   },
   async ({ event }) => {
-    const { jobId, storeId } = event.data as { jobId: string; storeId: string };
+    const {
+      jobId,
+      storeId,
+      force = false,
+    } = event.data as {
+      jobId: string;
+      storeId: string;
+      force?: boolean;
+    };
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/brand-facts-requested fired without ids');
       return;
@@ -494,8 +544,8 @@ export const bulkAiBrandFacts: InngestFunction.Any = inngest.createFunction(
         return;
       }
 
-      // Smart-skip: only fill if aboutJson is empty.
-      if (store.aboutJson) {
+      // Smart-skip: only fill if aboutJson is empty. When force=true, bypass.
+      if (!force && store.aboutJson) {
         skipped++;
         await prisma.bulkAiJob.update({
           where: { id: jobId },
@@ -589,10 +639,15 @@ Populate using only the information provided above. For keyCategories, use the c
         });
     }
 
+    // Only mark completed if the merchant didn't cancel.
+    const factsFinalRow = await prisma.bulkAiJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
     await prisma.bulkAiJob.update({
       where: { id: jobId },
       data: {
-        status: 'completed',
+        status: factsFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
         processed: filled + skipped + failed,
         filled,
         skipped,
@@ -603,7 +658,7 @@ Populate using only the information provided above. For keyCategories, use the c
     });
 
     logger.info(
-      { jobId, storeId, filled, skipped, failed, quotaReached },
+      { jobId, storeId, filled, skipped, failed, quotaReached, force },
       'bulk-ai-brand-facts complete'
     );
   }

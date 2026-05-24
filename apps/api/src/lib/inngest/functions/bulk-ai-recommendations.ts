@@ -19,10 +19,17 @@ import { inngest } from '../client';
  * Priority in recommendation.service.ts:
  *   manual cross-sells > AI recommendations > FBT
  *
- * Each re-sweep fully replaces prior AI recs for the source product so
- * stale picks never accumulate. Smart-skip is intentionally NOT applied
- * here — re-sweeping the catalogue is the correct way to refresh recs
- * as the catalogue grows.
+ * Re-sweep semantics:
+ *   - Default: smart-skip products that already have AI recs in
+ *     `ai_recommendation`. Only newly-added products without recs get a
+ *     Gemini call. Preserves prior recs + saves quota.
+ *   - `force: true` in the event payload: bypass smart-skip and process
+ *     every product. Each per-product transaction deletes the prior
+ *     recs then inserts the freshly-generated ones, so re-running with
+ *     force fully replaces stale picks.
+ *   - Cooperative cancellation: the per-product loop polls
+ *     `bulk_ai_jobs.status` every 5 items and exits cleanly if a
+ *     merchant clicks Cancel.
  *
  * Mirrors the pattern of bulk-ai-seo / bulk-ai-translate / bulk-ai-aeo:
  *   - concurrency key on storeId (one sweep per store at a time)
@@ -80,7 +87,15 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
     triggers: [{ event: 'bulk-ai/recommendations-requested' }],
   },
   async ({ event, step }) => {
-    const { jobId, storeId } = event.data as { jobId: string; storeId: string };
+    const {
+      jobId,
+      storeId,
+      force = false,
+    } = event.data as {
+      jobId: string;
+      storeId: string;
+      force?: boolean;
+    };
 
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/recommendations-requested fired without ids');
@@ -199,11 +214,28 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
       let processed = 0;
 
       for (const product of products) {
+        // Cooperative cancellation — check every 5 items whether the
+        // merchant clicked Cancel. If so, break out cleanly.
+        if (processed % 5 === 0 && processed > 0) {
+          const currentJob = await prisma.bulkAiJob.findUnique({
+            where: { id: jobId },
+            select: { status: true },
+          });
+          if (currentJob?.status === 'cancelled') {
+            logger.info(
+              { jobId, storeId, processed, filled, skipped, failed },
+              'bulk-ai-recommendations: cancelled by merchant'
+            );
+            break;
+          }
+        }
+
         // Skip products that already have AI recs from a prior sweep.
+        // When force=true, bypass the skip so every product gets fresh recs.
         // Counts toward `skipped` in the job summary, NOT `failed`, so
         // re-runs report cleanly: e.g. "230 skipped, 1 filled" when the
         // merchant fixes the one product that failed last time.
-        if (productsWithRecs.has(product.id)) {
+        if (!force && productsWithRecs.has(product.id)) {
           skipped++;
           processed++;
           if (processed % 25 === 0 || processed === products.length) {
@@ -344,18 +376,21 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
       }
     }
 
+    // Only mark completed if the merchant didn't cancel — otherwise the
+    // status row already says 'cancelled' from the cancel endpoint.
+    const finalRow = await prisma.bulkAiJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
     await prisma.bulkAiJob.update({
       where: { id: jobId },
       data: {
-        status: 'completed',
+        status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
         completedAt: new Date(),
         errors: errors as object,
       },
     });
 
-    logger.info(
-      { jobId, storeId, filled, skipped, failed, errorCount: errors.length, quotaReached },
-      'bulk-ai-recommendations complete'
-    );
+    logger.info({ jobId, storeId, quotaReached, force }, 'bulk-ai-recommendations complete');
   }
 );

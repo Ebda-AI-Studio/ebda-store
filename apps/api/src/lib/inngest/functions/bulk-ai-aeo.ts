@@ -194,10 +194,12 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
       jobId,
       storeId,
       count = 8,
+      force = false,
     } = event.data as {
       jobId: string;
       storeId: string;
       count?: number;
+      force?: boolean;
     };
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/faq-aeo-requested fired without ids');
@@ -296,6 +298,25 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
       }
       const paymentMethodsList =
         methodSet.size > 0 ? Array.from(methodSet).join(', ') : 'cash on delivery';
+
+      // When force=true, delete existing AI-drafted FAQs so we regenerate
+      // them cleanly. Manually-edited entries are always preserved.
+      if (force) {
+        await prisma.storeFaq.deleteMany({
+          where: { storeId, manuallyEdited: false },
+        });
+        // Re-fetch locked questions after deletion so the loop below
+        // doesn't conflict with any stale state.
+        const reloadedFaqs = await prisma.storeFaq.findMany({
+          where: { storeId },
+          select: { question: true, manuallyEdited: true, orderIndex: true },
+        });
+        lockedQuestions.clear();
+        for (const f of reloadedFaqs) {
+          if (f.manuallyEdited) lockedQuestions.add(f.question.trim().toLowerCase());
+        }
+        logger.info({ jobId, storeId }, 'bulk-ai-faq-aeo: cleared non-manual FAQs (force=true)');
+      }
 
       const prompt = `You are an SEO + AEO expert helping a Kuwait-based e-commerce store author its FAQ page.
 
@@ -407,10 +428,15 @@ No other text, no markdown code fences — pure JSON only.`;
       }
     }
 
+    // Only mark completed if the merchant didn't cancel.
+    const faqFinalRow = await prisma.bulkAiJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
     await prisma.bulkAiJob.update({
       where: { id: jobId },
       data: {
-        status: 'completed',
+        status: faqFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
         processed: filled + skipped + failed,
         filled,
         skipped,
@@ -451,10 +477,12 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
       jobId,
       storeId,
       count = 3,
+      force = false,
     } = event.data as {
       jobId: string;
       storeId: string;
       count?: number;
+      force?: boolean;
     };
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/howto-aeo-requested fired without ids');
@@ -513,6 +541,27 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
         existingHowtos.filter(h => h.manuallyEdited).map(h => h.title.trim().toLowerCase())
       );
       const maxOrder = existingHowtos.reduce((m, h) => Math.max(m, h.orderIndex), -1);
+
+      // When force=true, delete existing AI-drafted HowTos so we regenerate
+      // them cleanly. Manually-edited entries are always preserved.
+      if (force) {
+        await prisma.storeHowto.deleteMany({
+          where: { storeId, manuallyEdited: false },
+        });
+        // Re-fetch locked titles after deletion.
+        const reloadedHowtos = await prisma.storeHowto.findMany({
+          where: { storeId },
+          select: { title: true, manuallyEdited: true, orderIndex: true },
+        });
+        lockedTitles.clear();
+        for (const h of reloadedHowtos) {
+          if (h.manuallyEdited) lockedTitles.add(h.title.trim().toLowerCase());
+        }
+        logger.info(
+          { jobId, storeId },
+          'bulk-ai-howto-aeo: cleared non-manual HowTos (force=true)'
+        );
+      }
 
       const catNames = sampleCats.map(c => c.name).join(', ') || 'none';
       const prodSample =
@@ -639,10 +688,15 @@ No markdown, no code fences — pure JSON only.`;
       }
     }
 
+    // Only mark completed if the merchant didn't cancel.
+    const howtoFinalRow = await prisma.bulkAiJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
     await prisma.bulkAiJob.update({
       where: { id: jobId },
       data: {
-        status: 'completed',
+        status: howtoFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
         processed: filled + skipped + failed,
         filled,
         skipped,
@@ -707,7 +761,15 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
     triggers: [{ event: 'bulk-ai/meta-aeo-requested' }],
   },
   async ({ event }) => {
-    const { jobId, storeId } = event.data as { jobId: string; storeId: string };
+    const {
+      jobId,
+      storeId,
+      force = false,
+    } = event.data as {
+      jobId: string;
+      storeId: string;
+      force?: boolean;
+    };
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/meta-aeo-requested fired without ids');
       return;
@@ -769,8 +831,8 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
       // columns). Skip only if the dedicated AEO field is already
       // populated — so running the SEO sweep first no longer locks AEO
       // out of every row. Merchant clears the AEO column from admin if
-      // they want a re-run.
-      if (!store.metaDescriptionAeo?.trim()) {
+      // they want a re-run.  When force=true, bypass the skip entirely.
+      if (force || !store.metaDescriptionAeo?.trim()) {
         try {
           await assertAiQuota();
 
@@ -852,9 +914,25 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
         if (products.length === 0) break;
 
         for (const p of products) {
+          // Cooperative cancellation — check every 5 products.
+          if (processed % 5 === 0 && processed > 0) {
+            const currentJob = await prisma.bulkAiJob.findUnique({
+              where: { id: jobId },
+              select: { status: true },
+            });
+            if (currentJob?.status === 'cancelled') {
+              logger.info(
+                { jobId, storeId, processed, filled, skipped, failed },
+                'bulk-ai-meta-aeo: cancelled by merchant'
+              );
+              break;
+            }
+          }
+
           // Smart-skip: only fill if AEO column is empty. SEO content
           // in metaDescription is irrelevant — AEO is a separate field.
-          if (p.metaDescriptionAeo?.trim()) {
+          // When force=true, process even if already populated.
+          if (!force && p.metaDescriptionAeo?.trim()) {
             skipped++;
             processed++;
             continue;
@@ -942,7 +1020,8 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
         if (cats.length === 0) break;
 
         for (const c of cats) {
-          if (c.metaDescriptionAeo?.trim()) {
+          // When force=true, process even if already populated.
+          if (!force && c.metaDescriptionAeo?.trim()) {
             skipped++;
             processed++;
             continue;
@@ -1015,10 +1094,15 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
       }
     }
 
+    // Only mark completed if the merchant didn't cancel.
+    const metaFinalRow = await prisma.bulkAiJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
     await prisma.bulkAiJob.update({
       where: { id: jobId },
       data: {
-        status: 'completed',
+        status: metaFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
         processed,
         filled,
         skipped,
@@ -1029,7 +1113,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
     });
 
     logger.info(
-      { jobId, storeId, filled, skipped, failed, quotaReached },
+      { jobId, storeId, filled, skipped, failed, quotaReached, force },
       'bulk-ai-meta-aeo complete'
     );
   }

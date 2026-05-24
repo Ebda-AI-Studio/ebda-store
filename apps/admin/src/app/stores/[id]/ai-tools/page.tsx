@@ -34,7 +34,7 @@ interface BulkAiJob {
     | 'llms_txt'
     | 'citation_copy'
     | 'brand_facts';
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   direction: 'to_ar' | 'to_en' | null;
   total: number;
   processed: number;
@@ -109,17 +109,28 @@ export default function AiToolsPage() {
     | 'translate-ar'
     | 'translate-en'
     | 'seo'
+    | 'seo-force'
     | 'faq-aeo'
+    | 'faq-aeo-force'
     | 'howto-aeo'
+    | 'howto-aeo-force'
     | 'meta-aeo'
+    | 'meta-aeo-force'
     | 'aeo-all'
+    | 'aeo-all-force'
     | 'recommendations'
+    | 'recommendations-force'
     | 'llms-txt'
+    | 'llms-txt-force'
     | 'citation-copy'
+    | 'citation-copy-force'
     | 'brand-facts'
+    | 'brand-facts-force'
     | 'geo-all'
+    | 'geo-all-force'
     | null
   >(null);
+  const [cancelling, setCancelling] = useState<string | null>(null); // jobId being cancelled
 
   const fetchJobs = useCallback(async () => {
     if (!storeId) return;
@@ -159,7 +170,7 @@ export default function AiToolsPage() {
   // Active single-job polling
   useEffect(() => {
     if (!activeJob) return;
-    if (activeJob.status === 'completed' || activeJob.status === 'failed') return;
+    if (isTerminal(activeJob.status)) return;
 
     const interval = setInterval(() => {
       fetchActiveJob(activeJob.id);
@@ -171,7 +182,7 @@ export default function AiToolsPage() {
   // Active master sweep polling
   useEffect(() => {
     if (!activeMaster) return;
-    const allDone = activeMaster.jobs.every(j => j.status === 'completed' || j.status === 'failed');
+    const allDone = activeMaster.jobs.every(j => isTerminal(j.status));
     if (allDone && activeMaster.jobs.length === activeMaster.jobIds.length) return;
 
     const interval = setInterval(() => {
@@ -422,10 +433,81 @@ export default function AiToolsPage() {
     }
   }
 
+  type StartingKey = NonNullable<typeof starting>;
+  async function startForce(endpoint: string, kind: StartingKey, body: object = {}) {
+    if (
+      !confirm(
+        `This will REPLACE all existing ${endpoint.replace('/bulk/', '')} content for this store. Continue?`
+      )
+    )
+      return;
+    setError(null);
+    setStarting(kind);
+    try {
+      const isMaster = endpoint.includes('sweep-all');
+      if (isMaster) {
+        const { data, error: apiError } = await apiPost<{ masterRunId: string; jobs: BulkAiJob[] }>(
+          `/api/v1/stores/${storeId}/ai${endpoint}`,
+          { force: true, ...body }
+        );
+        if (apiError || !data) {
+          setError(apiError?.message || 'Failed');
+          return;
+        }
+        setActiveMaster({
+          masterRunId: data.masterRunId,
+          jobIds: data.jobs.map(j => j.id),
+          label: `Re-run fresh — ${endpoint.includes('aeo') ? 'all AEO' : 'all GEO'} sweeps`,
+          jobs: data.jobs.map(j => ({ ...j, errors: null })) as BulkAiJobDetail[],
+        });
+      } else {
+        const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
+          `/api/v1/stores/${storeId}/ai${endpoint}`,
+          { force: true, ...body }
+        );
+        if (apiError || !data) {
+          setError(apiError?.message || 'Failed');
+          return;
+        }
+        setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
+      }
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
+  const isTerminal = (s: string) => s === 'completed' || s === 'failed' || s === 'cancelled';
   const anyRunning =
-    (!!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed') ||
-    (!!activeMaster &&
-      activeMaster.jobs.some(j => j.status !== 'completed' && j.status !== 'failed'));
+    (!!activeJob && !isTerminal(activeJob.status)) ||
+    (!!activeMaster && activeMaster.jobs.some(j => !isTerminal(j.status)));
+
+  async function cancelJob(jobId: string) {
+    if (!confirm('Cancel this sweep? Already-processed items keep their changes.')) return;
+    setCancelling(jobId);
+    try {
+      await apiPost(`/api/v1/stores/${storeId}/ai/jobs/${jobId}/cancel`, {});
+      // Re-fetch immediately so the UI reflects cancelled state.
+      await fetchActiveJob(jobId);
+      await fetchJobs();
+    } catch {
+      // Ignore — progress poll will pick up the cancelled state.
+    } finally {
+      setCancelling(null);
+    }
+  }
+
+  async function cancelMasterSweep(sweep: MasterSweep) {
+    if (!confirm('Cancel this sweep? Already-processed items keep their changes.')) return;
+    // Cancel all child jobs in parallel.
+    await Promise.allSettled(
+      sweep.jobIds.map(id => apiPost(`/api/v1/stores/${storeId}/ai/jobs/${id}/cancel`, {}))
+    );
+    await fetchMasterJobs(sweep);
+    await fetchJobs();
+  }
 
   return (
     <AdminLayout
@@ -476,6 +558,9 @@ export default function AiToolsPage() {
           loading={starting === 'seo'}
           disabled={anyRunning}
           onClick={startSeo}
+          onForce={() => startForce('/bulk/seo', 'seo-force')}
+          forceLoading={starting === 'seo-force'}
+          forceTooltip="Overwrites existing SEO meta on all entities."
         />
         <BulkActionCard
           title="AI product recommendations"
@@ -484,38 +569,29 @@ export default function AiToolsPage() {
           loading={starting === 'recommendations'}
           disabled={anyRunning}
           onClick={startRecommendations}
+          onForce={() => startForce('/bulk/recommendations', 'recommendations-force')}
+          forceLoading={starting === 'recommendations-force'}
+          forceTooltip="Re-generates recommendations for every product, replacing existing AI picks."
         />
       </div>
 
       {/* ── AEO ───────────────────────────────────────────────────── */}
       <SectionHeading title="AEO — Answer Engine Optimization" className="mt-6">
-        <button
-          type="button"
-          onClick={startAeoAll}
-          disabled={starting === 'aeo-all' || anyRunning}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {starting === 'aeo-all' ? (
-            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-          ) : (
-            <span aria-hidden>✨</span>
-          )}
-          {starting === 'aeo-all' ? 'Starting…' : 'Run all AEO sweeps'}
-        </button>
+        <div className="flex items-center gap-2">
+          <MasterSweepButton
+            label="Run all AEO sweeps"
+            loading={starting === 'aeo-all'}
+            disabled={anyRunning}
+            onClick={startAeoAll}
+          />
+          <MasterSweepButton
+            label="Re-run fresh"
+            loading={starting === 'aeo-all-force'}
+            disabled={anyRunning}
+            onClick={() => startForce('/bulk/aeo-sweep-all', 'aeo-all-force', { count: 8 })}
+            variant="outline"
+          />
+        </div>
       </SectionHeading>
       <div className="mt-3 grid gap-4 md:grid-cols-3">
         <BulkActionCard
@@ -525,6 +601,9 @@ export default function AiToolsPage() {
           loading={starting === 'faq-aeo'}
           disabled={anyRunning}
           onClick={startFaqAeo}
+          onForce={() => startForce('/bulk/faq-aeo', 'faq-aeo-force', { count: 8 })}
+          forceLoading={starting === 'faq-aeo-force'}
+          forceTooltip="Deletes all existing AI-drafted FAQs and regenerates from scratch. Manually-edited FAQs are preserved."
           resultsHref={`/stores/${storeId}/seo#faqs`}
           resultsLabel="View FAQs on SEO page"
         />
@@ -535,6 +614,9 @@ export default function AiToolsPage() {
           loading={starting === 'howto-aeo'}
           disabled={anyRunning}
           onClick={startHowtoAeo}
+          onForce={() => startForce('/bulk/howto-aeo', 'howto-aeo-force', { count: 3 })}
+          forceLoading={starting === 'howto-aeo-force'}
+          forceTooltip="Deletes all existing AI-drafted HowTos and regenerates from scratch. Manually-edited guides are preserved."
           resultsHref={`/stores/${storeId}/seo#howtos`}
           resultsLabel="View HowTos on SEO page"
         />
@@ -545,6 +627,9 @@ export default function AiToolsPage() {
           loading={starting === 'meta-aeo'}
           disabled={anyRunning}
           onClick={startMetaAeo}
+          onForce={() => startForce('/bulk/meta-aeo', 'meta-aeo-force')}
+          forceLoading={starting === 'meta-aeo-force'}
+          forceTooltip="Overwrites existing AEO meta descriptions on all entities."
           resultsHref={`/stores/${storeId}/seo`}
           resultsLabel="View meta on SEO page"
         />
@@ -552,33 +637,21 @@ export default function AiToolsPage() {
 
       {/* ── GEO ───────────────────────────────────────────────────── */}
       <SectionHeading title="GEO — Generative Engine Optimization" className="mt-6">
-        <button
-          type="button"
-          onClick={startGeoAll}
-          disabled={starting === 'geo-all' || anyRunning}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {starting === 'geo-all' ? (
-            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-          ) : (
-            <span aria-hidden>✨</span>
-          )}
-          {starting === 'geo-all' ? 'Starting…' : 'Run all GEO sweeps'}
-        </button>
+        <div className="flex items-center gap-2">
+          <MasterSweepButton
+            label="Run all GEO sweeps"
+            loading={starting === 'geo-all'}
+            disabled={anyRunning}
+            onClick={startGeoAll}
+          />
+          <MasterSweepButton
+            label="Re-run fresh"
+            loading={starting === 'geo-all-force'}
+            disabled={anyRunning}
+            onClick={() => startForce('/bulk/geo-sweep-all', 'geo-all-force')}
+            variant="outline"
+          />
+        </div>
       </SectionHeading>
       <p className="mt-1 text-xs text-muted-foreground">
         Optimises your store for LLM-powered search — ChatGPT, Perplexity, Google AI Overview, Bing
@@ -592,6 +665,9 @@ export default function AiToolsPage() {
           loading={starting === 'llms-txt'}
           disabled={anyRunning}
           onClick={startLlmsTxt}
+          onForce={() => startForce('/bulk/llms-txt', 'llms-txt-force')}
+          forceLoading={starting === 'llms-txt-force'}
+          forceTooltip="Overwrites existing LLMs.txt with a freshly generated version."
         />
         <BulkActionCard
           title="Product citation copy"
@@ -600,6 +676,9 @@ export default function AiToolsPage() {
           loading={starting === 'citation-copy'}
           disabled={anyRunning}
           onClick={startCitationCopy}
+          onForce={() => startForce('/bulk/citation-copy', 'citation-copy-force')}
+          forceLoading={starting === 'citation-copy-force'}
+          forceTooltip="Overwrites existing citation copy on all products."
         />
         <BulkActionCard
           title="Brand facts JSON"
@@ -608,6 +687,9 @@ export default function AiToolsPage() {
           loading={starting === 'brand-facts'}
           disabled={anyRunning}
           onClick={startBrandFacts}
+          onForce={() => startForce('/bulk/brand-facts', 'brand-facts-force')}
+          forceLoading={starting === 'brand-facts-force'}
+          forceTooltip="Overwrites existing brand facts JSON with freshly generated data."
         />
       </div>
 
@@ -615,6 +697,8 @@ export default function AiToolsPage() {
       {activeJob && (
         <ActiveJobCard
           job={activeJob}
+          cancelling={cancelling === activeJob.id}
+          onCancel={() => cancelJob(activeJob.id)}
           onClose={() => {
             setActiveJob(null);
             fetchJobs();
@@ -626,6 +710,7 @@ export default function AiToolsPage() {
       {activeMaster && (
         <MasterSweepCard
           sweep={activeMaster}
+          onCancel={() => cancelMasterSweep(activeMaster)}
           onClose={() => {
             setActiveMaster(null);
             fetchJobs();
@@ -713,6 +798,10 @@ function BulkActionCard({
   loading,
   disabled,
   onClick,
+  onForce,
+  forceLoading,
+  forceLabel = 'Re-run fresh',
+  forceTooltip = 'Replaces existing content with a fresh AI generation.',
   resultsHref,
   resultsLabel,
 }: {
@@ -722,40 +811,50 @@ function BulkActionCard({
   loading: boolean;
   disabled: boolean;
   onClick: () => void;
+  onForce?: () => void;
+  forceLoading?: boolean;
+  forceLabel?: string;
+  forceTooltip?: string;
   resultsHref?: string;
   resultsLabel?: string;
 }) {
+  const SpinIcon = () => (
+    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
   return (
     <div className="rounded-xl border bg-card p-5 shadow-sm">
       <h3 className="mb-2 text-base font-semibold">{title}</h3>
       <p className="mb-4 text-sm text-muted-foreground">{body}</p>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={loading || disabled}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? (
-          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-        ) : (
-          <span aria-hidden>✨</span>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={loading || disabled}
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
+          <span>{loading ? 'Starting…' : buttonLabel}</span>
+        </button>
+        {onForce && (
+          <button
+            type="button"
+            onClick={onForce}
+            disabled={forceLoading || disabled}
+            title={forceTooltip}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/10 px-3 py-2 text-xs font-semibold text-[#fc6b02] transition-opacity hover:bg-[#fc6b02]/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {forceLoading ? <SpinIcon /> : <span aria-hidden>♻️</span>}
+            <span>{forceLoading ? '…' : forceLabel}</span>
+          </button>
         )}
-        <span>{loading ? 'Starting…' : buttonLabel}</span>
-      </button>
+      </div>
       {resultsHref && (
         <Link
           href={resultsHref}
@@ -769,15 +868,59 @@ function BulkActionCard({
   );
 }
 
+function MasterSweepButton({
+  label,
+  loading,
+  disabled,
+  onClick,
+  variant = 'primary',
+}: {
+  label: string;
+  loading: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  variant?: 'primary' | 'outline';
+}) {
+  const SpinIcon = () => (
+    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+  const baseClass =
+    'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
+  const variantClass =
+    variant === 'outline'
+      ? 'border border-[#fc6b02]/40 bg-[#fc6b02]/10 text-[#fc6b02]'
+      : 'bg-[#fc6b02] text-white';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading || disabled}
+      className={`${baseClass} ${variantClass}`}
+    >
+      {loading ? <SpinIcon /> : <span aria-hidden>{variant === 'outline' ? '♻️' : '✨'}</span>}
+      {loading ? 'Starting…' : label}
+    </button>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const styles =
     status === 'completed'
       ? 'bg-emerald-100 text-emerald-700'
       : status === 'failed'
         ? 'bg-destructive/15 text-destructive'
-        : status === 'running'
-          ? 'bg-amber-100 text-amber-700'
-          : 'bg-muted text-foreground';
+        : status === 'cancelled'
+          ? 'bg-muted text-muted-foreground'
+          : status === 'running'
+            ? 'bg-amber-100 text-amber-700'
+            : 'bg-muted text-foreground';
   return (
     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${styles}`}>
       {status}
@@ -785,9 +928,21 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function ActiveJobCard({ job, onClose }: { job: BulkAiJobDetail; onClose: () => void }) {
+function ActiveJobCard({
+  job,
+  cancelling,
+  onCancel,
+  onClose,
+}: {
+  job: BulkAiJobDetail;
+  cancelling?: boolean;
+  onCancel?: () => void;
+  onClose: () => void;
+}) {
   const pct = job.total > 0 ? Math.min(100, Math.round((job.processed / job.total) * 100)) : 0;
-  const isDone = job.status === 'completed' || job.status === 'failed';
+  const isDone =
+    job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled';
+  const isActive = job.status === 'running' || job.status === 'queued';
 
   return (
     <div className="mt-6 rounded-xl border-2 border-[#fc6b02]/30 bg-[#fc6b02]/5 p-5">
@@ -795,22 +950,36 @@ function ActiveJobCard({ job, onClose }: { job: BulkAiJobDetail; onClose: () => 
         <div>
           <h3 className="text-base font-semibold">{jobKindLabel(job.kind, job.direction)} sweep</h3>
           <p className="text-xs text-muted-foreground">
-            {isDone
-              ? job.completedAt
-                ? `Completed ${new Date(job.completedAt).toLocaleString()}`
-                : 'Completed'
-              : job.startedAt
-                ? `Started ${new Date(job.startedAt).toLocaleString()}`
-                : 'Queued'}
+            {job.status === 'cancelled'
+              ? 'Cancelled'
+              : isDone
+                ? job.completedAt
+                  ? `Completed ${new Date(job.completedAt).toLocaleString()}`
+                  : 'Completed'
+                : job.startedAt
+                  ? `Started ${new Date(job.startedAt).toLocaleString()}`
+                  : 'Queued'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          {isDone ? 'Dismiss' : 'Hide'}
-        </button>
+        <div className="flex items-center gap-2">
+          {isActive && onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={cancelling}
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20 disabled:opacity-50"
+            >
+              {cancelling ? 'Cancelling…' : 'Cancel'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            {isDone ? 'Dismiss' : 'Hide'}
+          </button>
+        </div>
       </div>
 
       <div className="mb-3">
@@ -855,7 +1024,15 @@ function ActiveJobCard({ job, onClose }: { job: BulkAiJobDetail; onClose: () => 
   );
 }
 
-function MasterSweepCard({ sweep, onClose }: { sweep: MasterSweep; onClose: () => void }) {
+function MasterSweepCard({
+  sweep,
+  onCancel,
+  onClose,
+}: {
+  sweep: MasterSweep;
+  onCancel?: () => void;
+  onClose: () => void;
+}) {
   const { jobs, label } = sweep;
 
   // Aggregate totals across all sub-jobs
@@ -871,15 +1048,19 @@ function MasterSweepCard({ sweep, onClose }: { sweep: MasterSweep; onClose: () =
   );
 
   const allDone =
-    jobs.length > 0 && jobs.every(j => j.status === 'completed' || j.status === 'failed');
+    jobs.length > 0 &&
+    jobs.every(j => j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled');
   const anyFailed = jobs.some(j => j.status === 'failed');
+  const anyActive = jobs.some(j => j.status === 'running' || j.status === 'queued');
   const pct =
     totals.total > 0 ? Math.min(100, Math.round((totals.processed / totals.total) * 100)) : 0;
 
   const overallStatus = allDone
     ? anyFailed
       ? 'failed'
-      : 'completed'
+      : jobs.every(j => j.status === 'cancelled')
+        ? 'cancelled'
+        : 'completed'
     : jobs.some(j => j.status === 'running')
       ? 'running'
       : 'queued';
@@ -896,13 +1077,24 @@ function MasterSweepCard({ sweep, onClose }: { sweep: MasterSweep; onClose: () =
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          {allDone ? 'Dismiss' : 'Hide'}
-        </button>
+        <div className="flex items-center gap-2">
+          {anyActive && onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20"
+            >
+              Cancel all
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            {allDone ? 'Dismiss' : 'Hide'}
+          </button>
+        </div>
       </div>
 
       <div className="mb-3">

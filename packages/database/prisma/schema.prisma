@@ -2013,6 +2013,7 @@ enum BulkAiJobStatus {
   running
   completed
   failed
+  cancelled
 }
 
 // Tracks every AI call made on behalf of a store so we can enforce

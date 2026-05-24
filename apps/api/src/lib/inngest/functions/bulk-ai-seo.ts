@@ -52,7 +52,15 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
     triggers: [{ event: 'bulk-ai/seo-requested' }],
   },
   async ({ event, step }) => {
-    const { jobId, storeId } = event.data;
+    const {
+      jobId,
+      storeId,
+      force = false,
+    } = event.data as {
+      jobId: string;
+      storeId: string;
+      force?: boolean;
+    };
     if (!jobId || !storeId) {
       logger.warn('bulk-ai/seo-requested fired without ids');
       return;
@@ -114,7 +122,7 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
       }
 
       // Store-level SEO
-      if (needsSeo(store)) {
+      if (force || needsSeo(store)) {
         try {
           const r = await callWithRetry(
             () =>
@@ -176,7 +184,7 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
         },
       });
       for (const c of cats) {
-        if (!needsSeo(c)) {
+        if (!force && !needsSeo(c)) {
           skipped++;
         } else {
           try {
@@ -259,7 +267,22 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
         if (products.length === 0) break;
 
         for (const p of products) {
-          if (!needsSeo(p)) {
+          // Cooperative cancellation — check every 5 products.
+          if (processed % 5 === 0 && processed > 0) {
+            const currentJob = await prisma.bulkAiJob.findUnique({
+              where: { id: jobId },
+              select: { status: true },
+            });
+            if (currentJob?.status === 'cancelled') {
+              logger.info(
+                { jobId, storeId, processed, filled, skipped, failed },
+                'bulk-ai-seo: cancelled by merchant'
+              );
+              break;
+            }
+          }
+
+          if (!force && !needsSeo(p)) {
             skipped++;
           } else {
             try {
@@ -326,10 +349,15 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
       }
     }
 
+    // Only mark completed if the merchant didn't cancel.
+    const finalRow = await prisma.bulkAiJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
     await prisma.bulkAiJob.update({
       where: { id: jobId },
       data: {
-        status: 'completed',
+        status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
         processed,
         filled,
         skipped,
@@ -340,7 +368,7 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
     });
 
     logger.info(
-      { jobId, storeId, filled, skipped, failed, errorCount: errors.length, quotaReached },
+      { jobId, storeId, filled, skipped, failed, errorCount: errors.length, quotaReached, force },
       'bulk-ai-seo complete'
     );
   }
