@@ -21,11 +21,21 @@ class RedisService {
           return Math.min(times * 500, 30000);
         },
         lazyConnect: true,
+        // When REDIS_KEY_PREFIX is set (e.g. `fwb-staging:` on staging),
+        // ioredis transparently prefixes every command's keys. All
+        // consumers (cache.set/get, csrf, session, ratelimit, lock,
+        // email-queue) get the prefix for free — no per-call changes
+        // needed. Prod leaves the env var unset so the prefix is ''
+        // and existing keys stay shaped as `cache:*`, `csrf:*`, etc.
+        keyPrefix: config.redisKeyPrefix || undefined,
       });
 
       this.client.on('connect', () => {
         this.isConnected = true;
-        logger.info('[REDIS] Connected successfully');
+        logger.info(
+          { keyPrefix: config.redisKeyPrefix || '(none)' },
+          '[REDIS] Connected successfully'
+        );
       });
 
       this.client.on('error', (err: Error) => {

@@ -55,6 +55,13 @@ export const config = {
 
   // Redis
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+  // Optional keyspace prefix applied to EVERY Redis command via the
+  // ioredis `keyPrefix` constructor option. Prod leaves this unset so
+  // existing cache/session/csrf keys keep their bare shape (no migration).
+  // Staging sets REDIS_KEY_PREFIX=fwb-staging: so its keys live under
+  // `fwb-staging:cache:*`, `fwb-staging:csrf:*` etc., fully isolated
+  // from prod traffic on the shared Railway Redis instance.
+  redisKeyPrefix: process.env.REDIS_KEY_PREFIX || '',
 
   // JWT - No fallback in production. Long lifetimes are intentional: the
   // admin PWA on a phone is expected to "stay logged in" between visits
