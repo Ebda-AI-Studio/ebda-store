@@ -109,28 +109,22 @@ export default function AiToolsPage() {
     | 'translate-ar'
     | 'translate-en'
     | 'seo'
-    | 'seo-force'
     | 'faq-aeo'
-    | 'faq-aeo-force'
     | 'howto-aeo'
-    | 'howto-aeo-force'
     | 'meta-aeo'
-    | 'meta-aeo-force'
     | 'aeo-all'
-    | 'aeo-all-force'
     | 'recommendations'
-    | 'recommendations-force'
     | 'llms-txt'
-    | 'llms-txt-force'
     | 'citation-copy'
-    | 'citation-copy-force'
     | 'brand-facts'
-    | 'brand-facts-force'
     | 'geo-all'
-    | 'geo-all-force'
     | null
   >(null);
   const [cancelling, setCancelling] = useState<string | null>(null); // jobId being cancelled
+
+  // Master sweep "replace existing" checkbox states
+  const [aeoForce, setAeoForce] = useState(false);
+  const [geoForce, setGeoForce] = useState(false);
 
   const fetchJobs = useCallback(async () => {
     if (!storeId) return;
@@ -213,242 +207,22 @@ export default function AiToolsPage() {
     }
   }
 
-  async function startSeo() {
-    setError(null);
-    setStarting('seo');
-    try {
-      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
-        `/api/v1/stores/${storeId}/ai/bulk/seo`,
-        {}
-      );
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start sweep');
-        return;
-      }
-      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
-  async function startFaqAeo() {
-    setError(null);
-    setStarting('faq-aeo');
-    try {
-      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
-        `/api/v1/stores/${storeId}/ai/bulk/faq-aeo`,
-        { count: 8 }
-      );
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start FAQ draft');
-        return;
-      }
-      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
-  async function startHowtoAeo() {
-    setError(null);
-    setStarting('howto-aeo');
-    try {
-      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
-        `/api/v1/stores/${storeId}/ai/bulk/howto-aeo`,
-        { count: 3 }
-      );
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start How-To draft');
-        return;
-      }
-      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
-  async function startMetaAeo() {
-    setError(null);
-    setStarting('meta-aeo');
-    try {
-      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
-        `/api/v1/stores/${storeId}/ai/bulk/meta-aeo`,
-        {}
-      );
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start meta rewrite');
-        return;
-      }
-      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
-  async function startAeoAll() {
-    setError(null);
-    setStarting('aeo-all');
-    try {
-      const { data, error: apiError } = await apiPost<{
-        masterRunId: string;
-        jobs: BulkAiJob[];
-      }>(`/api/v1/stores/${storeId}/ai/bulk/aeo-sweep-all`, { count: 8 });
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start AEO sweep');
-        return;
-      }
-      setActiveMaster({
-        masterRunId: data.masterRunId,
-        jobIds: data.jobs.map(j => j.id),
-        label: 'Run all AEO sweeps',
-        jobs: data.jobs.map(j => ({ ...j, errors: null })) as BulkAiJobDetail[],
-      });
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
-  async function startRecommendations() {
-    setError(null);
-    setStarting('recommendations');
-    try {
-      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
-        `/api/v1/stores/${storeId}/ai/bulk/recommendations`,
-        {}
-      );
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start recommendations sweep');
-        return;
-      }
-      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
-  async function startLlmsTxt() {
-    setError(null);
-    setStarting('llms-txt');
-    try {
-      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
-        `/api/v1/stores/${storeId}/ai/bulk/llms-txt`,
-        {}
-      );
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start LLMs.txt generation');
-        return;
-      }
-      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
-  async function startCitationCopy() {
-    setError(null);
-    setStarting('citation-copy');
-    try {
-      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
-        `/api/v1/stores/${storeId}/ai/bulk/citation-copy`,
-        {}
-      );
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start citation copy sweep');
-        return;
-      }
-      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
-  async function startBrandFacts() {
-    setError(null);
-    setStarting('brand-facts');
-    try {
-      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
-        `/api/v1/stores/${storeId}/ai/bulk/brand-facts`,
-        {}
-      );
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start brand facts sweep');
-        return;
-      }
-      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
-  async function startGeoAll() {
-    setError(null);
-    setStarting('geo-all');
-    try {
-      const { data, error: apiError } = await apiPost<{
-        masterRunId: string;
-        jobs: BulkAiJob[];
-      }>(`/api/v1/stores/${storeId}/ai/bulk/geo-sweep-all`, {});
-      if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start GEO sweep');
-        return;
-      }
-      setActiveMaster({
-        masterRunId: data.masterRunId,
-        jobIds: data.jobs.map(j => j.id),
-        label: 'Run all GEO sweeps',
-        jobs: data.jobs.map(j => ({ ...j, errors: null })) as BulkAiJobDetail[],
-      });
-      await fetchJobs();
-    } catch {
-      setError('Network error');
-    } finally {
-      setStarting(null);
-    }
-  }
-
   type StartingKey = NonNullable<typeof starting>;
-  async function startForce(endpoint: string, kind: StartingKey, body: object = {}) {
-    if (
-      !confirm(
-        `This will REPLACE all existing ${endpoint.replace('/bulk/', '')} content for this store. Continue?`
-      )
-    )
-      return;
+
+  /** Shared single-job starter. Handles smart-skip (default) and force paths. */
+  async function start(endpoint: string, key: StartingKey, body: object = {}, force = false) {
+    if (force) {
+      if (!confirm('This will REPLACE existing content for this sweep. Continue?')) return;
+    }
     setError(null);
-    setStarting(kind);
+    setStarting(key);
     try {
       const isMaster = endpoint.includes('sweep-all');
+      const payload = force ? { force: true, ...body } : { ...body };
       if (isMaster) {
         const { data, error: apiError } = await apiPost<{ masterRunId: string; jobs: BulkAiJob[] }>(
           `/api/v1/stores/${storeId}/ai${endpoint}`,
-          { force: true, ...body }
+          payload
         );
         if (apiError || !data) {
           setError(apiError?.message || 'Failed');
@@ -457,13 +231,13 @@ export default function AiToolsPage() {
         setActiveMaster({
           masterRunId: data.masterRunId,
           jobIds: data.jobs.map(j => j.id),
-          label: `Re-run fresh — ${endpoint.includes('aeo') ? 'all AEO' : 'all GEO'} sweeps`,
+          label: endpoint.includes('aeo') ? 'Run all AEO sweeps' : 'Run all GEO sweeps',
           jobs: data.jobs.map(j => ({ ...j, errors: null })) as BulkAiJobDetail[],
         });
       } else {
         const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
           `/api/v1/stores/${storeId}/ai${endpoint}`,
-          { force: true, ...body }
+          payload
         );
         if (apiError || !data) {
           setError(apiError?.message || 'Failed');
@@ -536,7 +310,7 @@ export default function AiToolsPage() {
           buttonLabel="Run sweep"
           loading={starting === 'translate-ar'}
           disabled={anyRunning}
-          onClick={() => startTranslate('to_ar')}
+          onAction={() => startTranslate('to_ar')}
         />
         <BulkActionCard
           title="Fill missing English"
@@ -544,7 +318,7 @@ export default function AiToolsPage() {
           buttonLabel="Run sweep"
           loading={starting === 'translate-en'}
           disabled={anyRunning}
-          onClick={() => startTranslate('to_en')}
+          onAction={() => startTranslate('to_en')}
         />
       </div>
 
@@ -557,9 +331,7 @@ export default function AiToolsPage() {
           buttonLabel="Run sweep"
           loading={starting === 'seo'}
           disabled={anyRunning}
-          onClick={startSeo}
-          onForce={() => startForce('/bulk/seo', 'seo-force')}
-          forceLoading={starting === 'seo-force'}
+          onAction={force => start('/bulk/seo', 'seo', {}, force)}
           forceTooltip="Overwrites existing SEO meta on all entities."
         />
         <BulkActionCard
@@ -568,28 +340,25 @@ export default function AiToolsPage() {
           buttonLabel="Run sweep"
           loading={starting === 'recommendations'}
           disabled={anyRunning}
-          onClick={startRecommendations}
-          onForce={() => startForce('/bulk/recommendations', 'recommendations-force')}
-          forceLoading={starting === 'recommendations-force'}
+          onAction={force => start('/bulk/recommendations', 'recommendations', {}, force)}
           forceTooltip="Re-generates recommendations for every product, replacing existing AI picks."
         />
       </div>
 
       {/* ── AEO ───────────────────────────────────────────────────── */}
       <SectionHeading title="AEO — Answer Engine Optimization" className="mt-6">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <ReplaceCheckbox
+            id="aeo-force"
+            checked={aeoForce}
+            onChange={setAeoForce}
+            tooltip="Overwrites existing AEO content. Without this, sweeps skip entities that already have content."
+          />
           <MasterSweepButton
             label="Run all AEO sweeps"
             loading={starting === 'aeo-all'}
             disabled={anyRunning}
-            onClick={startAeoAll}
-          />
-          <MasterSweepButton
-            label="Re-run fresh"
-            loading={starting === 'aeo-all-force'}
-            disabled={anyRunning}
-            onClick={() => startForce('/bulk/aeo-sweep-all', 'aeo-all-force', { count: 8 })}
-            variant="outline"
+            onClick={() => start('/bulk/aeo-sweep-all', 'aeo-all', { count: 8 }, aeoForce)}
           />
         </div>
       </SectionHeading>
@@ -600,9 +369,7 @@ export default function AiToolsPage() {
           buttonLabel="Draft FAQs"
           loading={starting === 'faq-aeo'}
           disabled={anyRunning}
-          onClick={startFaqAeo}
-          onForce={() => startForce('/bulk/faq-aeo', 'faq-aeo-force', { count: 8 })}
-          forceLoading={starting === 'faq-aeo-force'}
+          onAction={force => start('/bulk/faq-aeo', 'faq-aeo', { count: 8 }, force)}
           forceTooltip="Deletes all existing AI-drafted FAQs and regenerates from scratch. Manually-edited FAQs are preserved."
           resultsHref={`/stores/${storeId}/seo#faqs`}
           resultsLabel="View FAQs on SEO page"
@@ -613,9 +380,7 @@ export default function AiToolsPage() {
           buttonLabel="Draft HowTos"
           loading={starting === 'howto-aeo'}
           disabled={anyRunning}
-          onClick={startHowtoAeo}
-          onForce={() => startForce('/bulk/howto-aeo', 'howto-aeo-force', { count: 3 })}
-          forceLoading={starting === 'howto-aeo-force'}
+          onAction={force => start('/bulk/howto-aeo', 'howto-aeo', { count: 3 }, force)}
           forceTooltip="Deletes all existing AI-drafted HowTos and regenerates from scratch. Manually-edited guides are preserved."
           resultsHref={`/stores/${storeId}/seo#howtos`}
           resultsLabel="View HowTos on SEO page"
@@ -626,9 +391,7 @@ export default function AiToolsPage() {
           buttonLabel="Rewrite meta"
           loading={starting === 'meta-aeo'}
           disabled={anyRunning}
-          onClick={startMetaAeo}
-          onForce={() => startForce('/bulk/meta-aeo', 'meta-aeo-force')}
-          forceLoading={starting === 'meta-aeo-force'}
+          onAction={force => start('/bulk/meta-aeo', 'meta-aeo', {}, force)}
           forceTooltip="Overwrites existing AEO meta descriptions on all entities."
           resultsHref={`/stores/${storeId}/seo`}
           resultsLabel="View meta on SEO page"
@@ -637,19 +400,18 @@ export default function AiToolsPage() {
 
       {/* ── GEO ───────────────────────────────────────────────────── */}
       <SectionHeading title="GEO — Generative Engine Optimization" className="mt-6">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <ReplaceCheckbox
+            id="geo-force"
+            checked={geoForce}
+            onChange={setGeoForce}
+            tooltip="Overwrites existing GEO content. Without this, sweeps skip entities that already have content."
+          />
           <MasterSweepButton
             label="Run all GEO sweeps"
             loading={starting === 'geo-all'}
             disabled={anyRunning}
-            onClick={startGeoAll}
-          />
-          <MasterSweepButton
-            label="Re-run fresh"
-            loading={starting === 'geo-all-force'}
-            disabled={anyRunning}
-            onClick={() => startForce('/bulk/geo-sweep-all', 'geo-all-force')}
-            variant="outline"
+            onClick={() => start('/bulk/geo-sweep-all', 'geo-all', {}, geoForce)}
           />
         </div>
       </SectionHeading>
@@ -664,9 +426,7 @@ export default function AiToolsPage() {
           buttonLabel="Generate"
           loading={starting === 'llms-txt'}
           disabled={anyRunning}
-          onClick={startLlmsTxt}
-          onForce={() => startForce('/bulk/llms-txt', 'llms-txt-force')}
-          forceLoading={starting === 'llms-txt-force'}
+          onAction={force => start('/bulk/llms-txt', 'llms-txt', {}, force)}
           forceTooltip="Overwrites existing LLMs.txt with a freshly generated version."
         />
         <BulkActionCard
@@ -675,9 +435,7 @@ export default function AiToolsPage() {
           buttonLabel="Run sweep"
           loading={starting === 'citation-copy'}
           disabled={anyRunning}
-          onClick={startCitationCopy}
-          onForce={() => startForce('/bulk/citation-copy', 'citation-copy-force')}
-          forceLoading={starting === 'citation-copy-force'}
+          onAction={force => start('/bulk/citation-copy', 'citation-copy', {}, force)}
           forceTooltip="Overwrites existing citation copy on all products."
         />
         <BulkActionCard
@@ -686,9 +444,7 @@ export default function AiToolsPage() {
           buttonLabel="Generate"
           loading={starting === 'brand-facts'}
           disabled={anyRunning}
-          onClick={startBrandFacts}
-          onForce={() => startForce('/bulk/brand-facts', 'brand-facts-force')}
-          forceLoading={starting === 'brand-facts-force'}
+          onAction={force => start('/bulk/brand-facts', 'brand-facts', {}, force)}
           forceTooltip="Overwrites existing brand facts JSON with freshly generated data."
         />
       </div>
@@ -791,16 +547,46 @@ function SectionHeading({
   );
 }
 
+/** Small inline checkbox used by both master-sweep areas and individual cards. */
+function ReplaceCheckbox({
+  id,
+  checked,
+  onChange,
+  tooltip,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  tooltip: string;
+}) {
+  return (
+    <label htmlFor={id} className="flex cursor-pointer items-center gap-1.5 select-none">
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        className="h-3.5 w-3.5 cursor-pointer accent-[#fc6b02]"
+      />
+      <span className="text-xs text-muted-foreground">Replace existing</span>
+      <span
+        title={tooltip}
+        className="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground"
+        aria-label={tooltip}
+      >
+        i
+      </span>
+    </label>
+  );
+}
+
 function BulkActionCard({
   title,
   body,
   buttonLabel,
   loading,
   disabled,
-  onClick,
-  onForce,
-  forceLoading,
-  forceLabel = 'Re-run fresh',
+  onAction,
   forceTooltip = 'Replaces existing content with a fresh AI generation.',
   resultsHref,
   resultsLabel,
@@ -810,14 +596,14 @@ function BulkActionCard({
   buttonLabel: string;
   loading: boolean;
   disabled: boolean;
-  onClick: () => void;
-  onForce?: () => void;
-  forceLoading?: boolean;
-  forceLabel?: string;
+  /** Called with force=true when checkbox is checked (after confirm), false otherwise. */
+  onAction: (force: boolean) => void;
   forceTooltip?: string;
   resultsHref?: string;
   resultsLabel?: string;
 }) {
+  const [replaceExisting, setReplaceExisting] = useState(false);
+
   const SpinIcon = () => (
     <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -828,33 +614,37 @@ function BulkActionCard({
       />
     </svg>
   );
+
+  // Generate a stable id for the checkbox based on the card title
+  const checkboxId = `replace-${title
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')}`;
+
   return (
     <div className="rounded-xl border bg-card p-5 shadow-sm">
       <h3 className="mb-2 text-base font-semibold">{title}</h3>
-      <p className="mb-4 text-sm text-muted-foreground">{body}</p>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onClick}
-          disabled={loading || disabled}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
-          <span>{loading ? 'Starting…' : buttonLabel}</span>
-        </button>
-        {onForce && (
-          <button
-            type="button"
-            onClick={onForce}
-            disabled={forceLoading || disabled}
-            title={forceTooltip}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/10 px-3 py-2 text-xs font-semibold text-[#fc6b02] transition-opacity hover:bg-[#fc6b02]/20 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {forceLoading ? <SpinIcon /> : <span aria-hidden>♻️</span>}
-            <span>{forceLoading ? '…' : forceLabel}</span>
-          </button>
-        )}
+      <p className="mb-3 text-sm text-muted-foreground">{body}</p>
+
+      <div className="mb-4">
+        <ReplaceCheckbox
+          id={checkboxId}
+          checked={replaceExisting}
+          onChange={setReplaceExisting}
+          tooltip={forceTooltip}
+        />
       </div>
+
+      <button
+        type="button"
+        onClick={() => onAction(replaceExisting)}
+        disabled={loading || disabled}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
+        <span>{loading ? 'Starting…' : buttonLabel}</span>
+      </button>
+
       {resultsHref && (
         <Link
           href={resultsHref}
@@ -873,13 +663,11 @@ function MasterSweepButton({
   loading,
   disabled,
   onClick,
-  variant = 'primary',
 }: {
   label: string;
   loading: boolean;
   disabled: boolean;
   onClick: () => void;
-  variant?: 'primary' | 'outline';
 }) {
   const SpinIcon = () => (
     <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -891,20 +679,14 @@ function MasterSweepButton({
       />
     </svg>
   );
-  const baseClass =
-    'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
-  const variantClass =
-    variant === 'outline'
-      ? 'border border-[#fc6b02]/40 bg-[#fc6b02]/10 text-[#fc6b02]'
-      : 'bg-[#fc6b02] text-white';
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={loading || disabled}
-      className={`${baseClass} ${variantClass}`}
+      className="inline-flex items-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {loading ? <SpinIcon /> : <span aria-hidden>{variant === 'outline' ? '♻️' : '✨'}</span>}
+      {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
       {loading ? 'Starting…' : label}
     </button>
   );
