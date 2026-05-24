@@ -589,4 +589,285 @@ router.post(
   }
 );
 
+// =====================================================================
+// AEO master sweep — fires faq_aeo + howto_aeo + meta_aeo in parallel.
+// All three jobs share a master_run_id tag in their summary field so
+// the admin UI can poll + aggregate them as a single combined card.
+// =====================================================================
+
+router.post(
+  '/bulk/aeo-sweep-all',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const masterRunId = crypto.randomUUID();
+
+      // Create all three jobs in parallel
+      const [faqJob, howtoJob, metaJob] = await Promise.all([
+        prisma.bulkAiJob.create({
+          data: {
+            storeId,
+            userId: req.user!.userId,
+            kind: 'faq_aeo',
+            errors: { master_run_id: masterRunId } as object,
+          },
+          select: { id: true, status: true, kind: true, createdAt: true },
+        }),
+        prisma.bulkAiJob.create({
+          data: {
+            storeId,
+            userId: req.user!.userId,
+            kind: 'howto_aeo',
+            errors: { master_run_id: masterRunId } as object,
+          },
+          select: { id: true, status: true, kind: true, createdAt: true },
+        }),
+        prisma.bulkAiJob.create({
+          data: {
+            storeId,
+            userId: req.user!.userId,
+            kind: 'meta_aeo',
+            errors: { master_run_id: masterRunId } as object,
+          },
+          select: { id: true, status: true, kind: true, createdAt: true },
+        }),
+      ]);
+
+      // Fire all three Inngest events, handling failures per-job
+      const count = Math.min(parseInt(String(req.body?.count ?? '8'), 10) || 8, 20);
+      const enqueueResults = await Promise.allSettled([
+        inngest
+          .send({ name: 'bulk-ai/faq-aeo-requested', data: { jobId: faqJob.id, storeId, count } })
+          .catch(err => markJobFailedIfEnqueueFailed(faqJob.id, err)),
+        inngest
+          .send({
+            name: 'bulk-ai/howto-aeo-requested',
+            data: { jobId: howtoJob.id, storeId, count: 3 },
+          })
+          .catch(err => markJobFailedIfEnqueueFailed(howtoJob.id, err)),
+        inngest
+          .send({ name: 'bulk-ai/meta-aeo-requested', data: { jobId: metaJob.id, storeId } })
+          .catch(err => markJobFailedIfEnqueueFailed(metaJob.id, err)),
+      ]);
+
+      const anyFailed = enqueueResults.some(r => r.status === 'rejected');
+      if (anyFailed) {
+        // At least one enqueue failed — return 503 so the UI can retry.
+        // The per-job markJobFailedIfEnqueueFailed calls above already
+        // persisted the failure on those individual jobs.
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'One or more AEO sweeps could not be enqueued. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({
+        success: true,
+        data: {
+          masterRunId,
+          jobs: [faqJob, howtoJob, metaJob],
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================================
+// GEO bulk sweeps — LLMs.txt generation, product citation copy,
+// and brand facts JSON.  Mirrors the AEO pattern exactly.
+// =====================================================================
+
+router.post(
+  '/bulk/llms-txt',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'llms_txt' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/llms-txt-requested',
+          data: { jobId: job.id, storeId },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the LLMs.txt generation right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/bulk/citation-copy',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'citation_copy' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/citation-copy-requested',
+          data: { jobId: job.id, storeId },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the citation copy sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/bulk/brand-facts',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'brand_facts' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/brand-facts-requested',
+          data: { jobId: job.id, storeId },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the brand facts sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/bulk/geo-sweep-all',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const masterRunId = crypto.randomUUID();
+
+      const [llmsJob, citationJob, factsJob] = await Promise.all([
+        prisma.bulkAiJob.create({
+          data: {
+            storeId,
+            userId: req.user!.userId,
+            kind: 'llms_txt',
+            errors: { master_run_id: masterRunId } as object,
+          },
+          select: { id: true, status: true, kind: true, createdAt: true },
+        }),
+        prisma.bulkAiJob.create({
+          data: {
+            storeId,
+            userId: req.user!.userId,
+            kind: 'citation_copy',
+            errors: { master_run_id: masterRunId } as object,
+          },
+          select: { id: true, status: true, kind: true, createdAt: true },
+        }),
+        prisma.bulkAiJob.create({
+          data: {
+            storeId,
+            userId: req.user!.userId,
+            kind: 'brand_facts',
+            errors: { master_run_id: masterRunId } as object,
+          },
+          select: { id: true, status: true, kind: true, createdAt: true },
+        }),
+      ]);
+
+      const enqueueResults = await Promise.allSettled([
+        inngest
+          .send({ name: 'bulk-ai/llms-txt-requested', data: { jobId: llmsJob.id, storeId } })
+          .catch(err => markJobFailedIfEnqueueFailed(llmsJob.id, err)),
+        inngest
+          .send({
+            name: 'bulk-ai/citation-copy-requested',
+            data: { jobId: citationJob.id, storeId },
+          })
+          .catch(err => markJobFailedIfEnqueueFailed(citationJob.id, err)),
+        inngest
+          .send({ name: 'bulk-ai/brand-facts-requested', data: { jobId: factsJob.id, storeId } })
+          .catch(err => markJobFailedIfEnqueueFailed(factsJob.id, err)),
+      ]);
+
+      const anyFailed = enqueueResults.some(r => r.status === 'rejected');
+      if (anyFailed) {
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'One or more GEO sweeps could not be enqueued. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({
+        success: true,
+        data: {
+          masterRunId,
+          jobs: [llmsJob, citationJob, factsJob],
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

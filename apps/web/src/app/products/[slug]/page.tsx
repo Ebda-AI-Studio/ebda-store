@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
+import { pickMetaDescription } from '../../../lib/seo/meta-description';
 import {
   productJsonLd,
   breadcrumbJsonLd,
@@ -97,6 +98,11 @@ export async function generateMetadata({
 interface ProductData {
   name: string;
   description?: string;
+  descriptionAr?: string;
+  metaDescription?: string | null;
+  metaDescriptionAr?: string | null;
+  metaDescriptionAeo?: string | null;
+  metaDescriptionAeoAr?: string | null;
   price: number;
   images?: Array<{ url: string; alt?: string }>;
   categories?: Array<{ category?: { name?: string } }>;
@@ -104,8 +110,10 @@ interface ProductData {
 
 function buildProductMetadata(product: ProductData, storeName: string): Metadata {
   const title = product.name;
+  // AEO > SEO > plain description (truncated to 160 chars for meta tag).
+  const rawDescription = pickMetaDescription(product) || product.description;
   const description =
-    product.description?.slice(0, 160) ||
+    rawDescription?.slice(0, 160) ||
     `Buy ${product.name} at ${storeName}. Fast delivery in Kuwait.`;
   const ogImage = product.images?.[0]?.url;
   const category = product.categories?.[0]?.category?.name;

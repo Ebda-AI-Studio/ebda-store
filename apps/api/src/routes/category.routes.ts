@@ -27,6 +27,8 @@ const createCategorySchema = z.object({
   metaTitleAr: z.string().max(180).optional().nullable(),
   metaDescription: z.string().max(400).optional().nullable(),
   metaDescriptionAr: z.string().max(400).optional().nullable(),
+  metaDescriptionAeo: z.string().max(400).optional().nullable(),
+  metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
 });
 
 const updateCategorySchema = z.object({
@@ -45,6 +47,8 @@ const updateCategorySchema = z.object({
   metaTitleAr: z.string().max(180).optional().nullable(),
   metaDescription: z.string().max(400).optional().nullable(),
   metaDescriptionAr: z.string().max(400).optional().nullable(),
+  metaDescriptionAeo: z.string().max(400).optional().nullable(),
+  metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
 });
 
 // GET /stores/:storeId/categories/best-sellers-image — read the
@@ -301,6 +305,13 @@ router.put(
           ...(data.metaDescription !== undefined ? { metaDescription: data.metaDescription } : {}),
           ...(data.metaDescriptionAr !== undefined
             ? { metaDescriptionAr: data.metaDescriptionAr }
+            : {}),
+          // AEO — separate conversational copy column.
+          ...(data.metaDescriptionAeo !== undefined
+            ? { metaDescriptionAeo: data.metaDescriptionAeo }
+            : {}),
+          ...(data.metaDescriptionAeoAr !== undefined
+            ? { metaDescriptionAeoAr: data.metaDescriptionAeoAr }
             : {}),
         },
         include: {

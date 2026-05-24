@@ -88,6 +88,9 @@ interface CreateProductData {
   metaTitleAr?: string | null;
   metaDescription?: string | null;
   metaDescriptionAr?: string | null;
+  /** AEO — conversational answer-engine copy. Separate from SEO meta. */
+  metaDescriptionAeo?: string | null;
+  metaDescriptionAeoAr?: string | null;
 }
 
 type UpdateProductData = Partial<CreateProductData>;
@@ -406,6 +409,13 @@ export class ProductService {
           ...(data.metaDescription !== undefined ? { metaDescription: data.metaDescription } : {}),
           ...(data.metaDescriptionAr !== undefined
             ? { metaDescriptionAr: data.metaDescriptionAr }
+            : {}),
+          // AEO — separate conversational copy column.
+          ...(data.metaDescriptionAeo !== undefined
+            ? { metaDescriptionAeo: data.metaDescriptionAeo }
+            : {}),
+          ...(data.metaDescriptionAeoAr !== undefined
+            ? { metaDescriptionAeoAr: data.metaDescriptionAeoAr }
             : {}),
         },
         include: {

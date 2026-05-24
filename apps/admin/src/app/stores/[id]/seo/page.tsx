@@ -13,6 +13,8 @@ interface SeoSettings {
   metaTitleAr: string;
   metaDescription: string;
   metaDescriptionAr: string;
+  metaDescriptionAeo: string;
+  metaDescriptionAeoAr: string;
   ogImage: string;
   twitterHandle: string;
   googleSiteVerification: string;
@@ -129,6 +131,8 @@ const DEFAULT_SETTINGS: SeoSettings = {
   metaTitleAr: '',
   metaDescription: '',
   metaDescriptionAr: '',
+  metaDescriptionAeo: '',
+  metaDescriptionAeoAr: '',
   ogImage: '',
   twitterHandle: '',
   googleSiteVerification: '',
@@ -217,6 +221,8 @@ export default function StoreSeoPage() {
           metaTitleAr: seo.metaTitleAr || '',
           metaDescription: seo.metaDescription || '',
           metaDescriptionAr: seo.metaDescriptionAr || '',
+          metaDescriptionAeo: (seo as SeoSettings).metaDescriptionAeo || '',
+          metaDescriptionAeoAr: (seo as SeoSettings).metaDescriptionAeoAr || '',
           ogImage: seo.ogImage || '',
           twitterHandle: seo.twitterHandle || '',
           googleSiteVerification: seo.googleSiteVerification || '',
@@ -646,6 +652,71 @@ export default function StoreSeoPage() {
               maxLength={DESC_MAX + 50}
               className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
                 settings.metaDescriptionAr.length > DESC_MAX
+                  ? 'border-destructive/40'
+                  : 'border-border'
+              }`}
+            />
+          </div>
+        </div>
+
+        {/* AEO — Conversational Answer Engine copy */}
+        <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10">
+              <span className="text-xs font-bold text-primary">AEO</span>
+            </div>
+            <div>
+              <h2 className="font-semibold text-foreground">Answer Engine Optimization</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Conversational copy for AI answer engines (Perplexity, Google AI Overview, Bing
+                Copilot). Auto-filled by the AEO sweep; you can edit per-entity.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium text-foreground">
+                AEO meta description (EN)
+              </label>
+              <CharCount value={settings.metaDescriptionAeo} max={DESC_MAX} />
+            </div>
+            <textarea
+              value={settings.metaDescriptionAeo}
+              onChange={e => setSettings(prev => ({ ...prev, metaDescriptionAeo: e.target.value }))}
+              placeholder="Conversational answer-engine copy. e.g. «Wady Aljuz is a Kuwait-based online grocery store specializing in…»"
+              rows={3}
+              maxLength={DESC_MAX + 50}
+              className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
+                settings.metaDescriptionAeo.length > DESC_MAX
+                  ? 'border-destructive/40'
+                  : 'border-border'
+              }`}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Direct-answer style, 130–160 chars. Leave blank to let the AEO sweep fill it.
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium text-foreground">
+                AEO meta description (AR)
+              </label>
+              <CharCount value={settings.metaDescriptionAeoAr} max={DESC_MAX} />
+            </div>
+            <textarea
+              lang="ar"
+              dir="rtl"
+              value={settings.metaDescriptionAeoAr}
+              onChange={e =>
+                setSettings(prev => ({ ...prev, metaDescriptionAeoAr: e.target.value }))
+              }
+              placeholder="نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني كويتي متخصص في…»"
+              rows={3}
+              maxLength={DESC_MAX + 50}
+              className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none ${
+                settings.metaDescriptionAeoAr.length > DESC_MAX
                   ? 'border-destructive/40'
                   : 'border-border'
               }`}

@@ -40,6 +40,9 @@ const createProductSchema = z.object({
   metaTitleAr: z.string().max(180).optional().nullable(),
   metaDescription: z.string().max(400).optional().nullable(),
   metaDescriptionAr: z.string().max(400).optional().nullable(),
+  // AEO — conversational answer-engine copy (separate from SEO meta).
+  metaDescriptionAeo: z.string().max(400).optional().nullable(),
+  metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
   categories: z.array(z.string()).optional(),
   images: z
     .array(

@@ -9,6 +9,7 @@ import { auditLogArchive } from './audit-log-archive';
 import { bulkAiTranslate } from './bulk-ai-translate';
 import { bulkAiSeo } from './bulk-ai-seo';
 import { bulkAiFaqAeo, bulkAiHowtoAeo, bulkAiMetaAeo } from './bulk-ai-aeo';
+import { bulkAiLlmsTxt, bulkAiCitationCopy, bulkAiBrandFacts } from './bulk-ai-geo';
 import { bulkAiRecommendations } from './bulk-ai-recommendations';
 import { reviewRequest } from './review-request';
 import { reviewModeration } from './review-moderation';
@@ -54,6 +55,9 @@ export const inngestFunctions: InngestFunction.Any[] = [
   bulkAiHowtoAeo,
   bulkAiMetaAeo,
   bulkAiRecommendations,
+  bulkAiLlmsTxt,
+  bulkAiCitationCopy,
+  bulkAiBrandFacts,
   reviewRequest,
   reviewModeration,
   abandonedCartPurge,

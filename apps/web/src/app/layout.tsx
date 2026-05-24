@@ -10,6 +10,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { FeatureProvider } from '../contexts/FeatureContext';
 import { getStore } from '../lib/store-resolver';
 import { organizationJsonLd, getSiteUrl } from '../lib/structured-data';
+import { pickMetaDescription } from '../lib/seo/meta-description';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
@@ -134,9 +135,7 @@ export async function generateMetadata(): Promise<Metadata> {
     | undefined;
   const preferAr = defaultLanguage === 'ar';
   const localizedTitle = preferAr ? store.metaTitleAr || store.metaTitle : store.metaTitle;
-  const localizedDescription = preferAr
-    ? store.metaDescriptionAr || store.metaDescription
-    : store.metaDescription;
+  const localizedDescription = pickMetaDescription(store, preferAr ? 'ar' : 'en');
   const localizedStoreName = preferAr && store.nameAr ? store.nameAr : store.name;
 
   const description =

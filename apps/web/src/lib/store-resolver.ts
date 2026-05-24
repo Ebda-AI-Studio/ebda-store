@@ -64,6 +64,8 @@ export interface ResolvedStore {
   metaTitleAr?: string;
   metaDescription?: string;
   metaDescriptionAr?: string;
+  metaDescriptionAeo?: string;
+  metaDescriptionAeoAr?: string;
   ogImage?: string;
   twitterHandle?: string;
   googleSiteVerification?: string;
@@ -108,6 +110,10 @@ export interface ResolvedStore {
   heroCtaTextAr?: string | null;
   heroCtaLink?: string | null;
   heroImage?: string | null;
+
+  // GEO — merchant-editable /llms.txt content + brand-facts JSON-LD data
+  llmsTxt?: string | null;
+  aboutJson?: Record<string, unknown> | null;
 
   // Store FAQs + HowTos (active only, ordered by orderIndex)
   faqs?: Array<{
@@ -258,6 +264,8 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,
       metaDescriptionAr: storeData.metaDescriptionAr,
+      metaDescriptionAeo: storeData.metaDescriptionAeo,
+      metaDescriptionAeoAr: storeData.metaDescriptionAeoAr,
       ogImage: storeData.ogImage,
       twitterHandle: storeData.twitterHandle,
       googleSiteVerification: storeData.googleSiteVerification,
@@ -294,6 +302,13 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
           : null,
       faqs: Array.isArray(storeData.faqs) ? storeData.faqs : undefined,
       howtos: Array.isArray(storeData.howtos) ? storeData.howtos : undefined,
+      llmsTxt: typeof storeData.llmsTxt === 'string' ? storeData.llmsTxt : null,
+      aboutJson:
+        storeData.aboutJson &&
+        typeof storeData.aboutJson === 'object' &&
+        !Array.isArray(storeData.aboutJson)
+          ? (storeData.aboutJson as Record<string, unknown>)
+          : null,
     };
   } catch (error) {
     console.error(`Error fetching store for domain ${domain}:`, error);
@@ -385,6 +400,8 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,
       metaDescriptionAr: storeData.metaDescriptionAr,
+      metaDescriptionAeo: storeData.metaDescriptionAeo,
+      metaDescriptionAeoAr: storeData.metaDescriptionAeoAr,
       ogImage: storeData.ogImage,
       twitterHandle: storeData.twitterHandle,
       googleSiteVerification: storeData.googleSiteVerification,
@@ -421,6 +438,13 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
           : null,
       faqs: Array.isArray(storeData.faqs) ? storeData.faqs : undefined,
       howtos: Array.isArray(storeData.howtos) ? storeData.howtos : undefined,
+      llmsTxt: typeof storeData.llmsTxt === 'string' ? storeData.llmsTxt : null,
+      aboutJson:
+        storeData.aboutJson &&
+        typeof storeData.aboutJson === 'object' &&
+        !Array.isArray(storeData.aboutJson)
+          ? (storeData.aboutJson as Record<string, unknown>)
+          : null,
     };
   } catch (error) {
     console.error(`Error fetching store for slug ${slug}:`, error);
@@ -574,6 +598,8 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       metaTitleAr: storeData.metaTitleAr,
       metaDescription: storeData.metaDescription,
       metaDescriptionAr: storeData.metaDescriptionAr,
+      metaDescriptionAeo: storeData.metaDescriptionAeo,
+      metaDescriptionAeoAr: storeData.metaDescriptionAeoAr,
       ogImage: storeData.ogImage,
       twitterHandle: storeData.twitterHandle,
       googleSiteVerification: storeData.googleSiteVerification,

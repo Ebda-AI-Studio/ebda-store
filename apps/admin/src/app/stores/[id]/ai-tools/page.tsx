@@ -24,7 +24,16 @@ import { apiGet, apiPost } from '../../../../lib/api';
 
 interface BulkAiJob {
   id: string;
-  kind: 'translate' | 'seo' | 'faq_aeo' | 'howto_aeo' | 'meta_aeo' | 'recommendations';
+  kind:
+    | 'translate'
+    | 'seo'
+    | 'faq_aeo'
+    | 'howto_aeo'
+    | 'meta_aeo'
+    | 'recommendations'
+    | 'llms_txt'
+    | 'citation_copy'
+    | 'brand_facts';
   status: 'queued' | 'running' | 'completed' | 'failed';
   direction: 'to_ar' | 'to_en' | null;
   total: number;
@@ -48,14 +57,45 @@ interface BulkAiJobDetail extends BulkAiJob {
   }> | null;
 }
 
+/** Three jobs launched by a master sweep button, tracked as a unit. */
+interface MasterSweep {
+  masterRunId: string;
+  jobIds: string[];
+  label: string;
+  jobs: BulkAiJobDetail[];
+}
+
 // Poll cadence for active bulk-AI jobs. 4s is the sweet spot:
 // - fast enough that progress feels live (UI ticks within 4s of each
 //   batch persist)
 // - slow enough to stay under the global 100 req / 15 min ip-keyed
-//   rate limiter (4s × 2 requests/tick = 30 req/min = 450 req per
-//   15min window; mitigated by the api-side skip rule for these
-//   exact polling endpoints — see middleware/security.ts)
+//   rate limiter
 const POLL_MS = 4000;
+
+function jobKindLabel(kind: BulkAiJob['kind'], direction?: 'to_ar' | 'to_en' | null): string {
+  switch (kind) {
+    case 'translate':
+      return `Translate (${direction === 'to_en' ? '→ EN' : '→ AR'})`;
+    case 'seo':
+      return 'SEO meta';
+    case 'faq_aeo':
+      return 'Draft FAQs';
+    case 'howto_aeo':
+      return 'Draft HowTos';
+    case 'meta_aeo':
+      return 'Meta AEO rewrite';
+    case 'recommendations':
+      return 'AI recommendations';
+    case 'llms_txt':
+      return 'LLMs.txt';
+    case 'citation_copy':
+      return 'Citation copy';
+    case 'brand_facts':
+      return 'Brand facts';
+    default:
+      return kind;
+  }
+}
 
 export default function AiToolsPage() {
   const params = useParams();
@@ -63,6 +103,7 @@ export default function AiToolsPage() {
 
   const [jobs, setJobs] = useState<BulkAiJob[]>([]);
   const [activeJob, setActiveJob] = useState<BulkAiJobDetail | null>(null);
+  const [activeMaster, setActiveMaster] = useState<MasterSweep | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState<
     | 'translate-ar'
@@ -71,7 +112,12 @@ export default function AiToolsPage() {
     | 'faq-aeo'
     | 'howto-aeo'
     | 'meta-aeo'
+    | 'aeo-all'
     | 'recommendations'
+    | 'llms-txt'
+    | 'citation-copy'
+    | 'brand-facts'
+    | 'geo-all'
     | null
   >(null);
 
@@ -91,11 +137,26 @@ export default function AiToolsPage() {
     [storeId]
   );
 
+  const fetchMasterJobs = useCallback(
+    async (sweep: MasterSweep) => {
+      const results = await Promise.all(
+        sweep.jobIds.map(id =>
+          apiGet<{ job: BulkAiJobDetail }>(`/api/v1/stores/${storeId}/ai/bulk/${id}`).then(
+            r => r.data?.job
+          )
+        )
+      );
+      const jobs = results.filter((j): j is BulkAiJobDetail => !!j);
+      setActiveMaster(prev => (prev ? { ...prev, jobs } : null));
+    },
+    [storeId]
+  );
+
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
 
-  // Active-job polling — stop when terminal
+  // Active single-job polling
   useEffect(() => {
     if (!activeJob) return;
     if (activeJob.status === 'completed' || activeJob.status === 'failed') return;
@@ -106,6 +167,19 @@ export default function AiToolsPage() {
     }, POLL_MS);
     return () => clearInterval(interval);
   }, [activeJob, fetchActiveJob, fetchJobs]);
+
+  // Active master sweep polling
+  useEffect(() => {
+    if (!activeMaster) return;
+    const allDone = activeMaster.jobs.every(j => j.status === 'completed' || j.status === 'failed');
+    if (allDone && activeMaster.jobs.length === activeMaster.jobIds.length) return;
+
+    const interval = setInterval(() => {
+      fetchMasterJobs(activeMaster);
+      fetchJobs();
+    }, POLL_MS);
+    return () => clearInterval(interval);
+  }, [activeMaster, fetchMasterJobs, fetchJobs]);
 
   async function startTranslate(direction: 'to_ar' | 'to_en') {
     setError(null);
@@ -212,6 +286,32 @@ export default function AiToolsPage() {
     }
   }
 
+  async function startAeoAll() {
+    setError(null);
+    setStarting('aeo-all');
+    try {
+      const { data, error: apiError } = await apiPost<{
+        masterRunId: string;
+        jobs: BulkAiJob[];
+      }>(`/api/v1/stores/${storeId}/ai/bulk/aeo-sweep-all`, { count: 8 });
+      if (apiError || !data) {
+        setError(apiError?.message || 'Failed to start AEO sweep');
+        return;
+      }
+      setActiveMaster({
+        masterRunId: data.masterRunId,
+        jobIds: data.jobs.map(j => j.id),
+        label: 'Run all AEO sweeps',
+        jobs: data.jobs.map(j => ({ ...j, errors: null })) as BulkAiJobDetail[],
+      });
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
   async function startRecommendations() {
     setError(null);
     setStarting('recommendations');
@@ -233,10 +333,104 @@ export default function AiToolsPage() {
     }
   }
 
+  async function startLlmsTxt() {
+    setError(null);
+    setStarting('llms-txt');
+    try {
+      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
+        `/api/v1/stores/${storeId}/ai/bulk/llms-txt`,
+        {}
+      );
+      if (apiError || !data) {
+        setError(apiError?.message || 'Failed to start LLMs.txt generation');
+        return;
+      }
+      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
+  async function startCitationCopy() {
+    setError(null);
+    setStarting('citation-copy');
+    try {
+      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
+        `/api/v1/stores/${storeId}/ai/bulk/citation-copy`,
+        {}
+      );
+      if (apiError || !data) {
+        setError(apiError?.message || 'Failed to start citation copy sweep');
+        return;
+      }
+      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
+  async function startBrandFacts() {
+    setError(null);
+    setStarting('brand-facts');
+    try {
+      const { data, error: apiError } = await apiPost<{ job: BulkAiJob }>(
+        `/api/v1/stores/${storeId}/ai/bulk/brand-facts`,
+        {}
+      );
+      if (apiError || !data) {
+        setError(apiError?.message || 'Failed to start brand facts sweep');
+        return;
+      }
+      setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
+  async function startGeoAll() {
+    setError(null);
+    setStarting('geo-all');
+    try {
+      const { data, error: apiError } = await apiPost<{
+        masterRunId: string;
+        jobs: BulkAiJob[];
+      }>(`/api/v1/stores/${storeId}/ai/bulk/geo-sweep-all`, {});
+      if (apiError || !data) {
+        setError(apiError?.message || 'Failed to start GEO sweep');
+        return;
+      }
+      setActiveMaster({
+        masterRunId: data.masterRunId,
+        jobIds: data.jobs.map(j => j.id),
+        label: 'Run all GEO sweeps',
+        jobs: data.jobs.map(j => ({ ...j, errors: null })) as BulkAiJobDetail[],
+      });
+      await fetchJobs();
+    } catch {
+      setError('Network error');
+    } finally {
+      setStarting(null);
+    }
+  }
+
+  const anyRunning =
+    (!!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed') ||
+    (!!activeMaster &&
+      activeMaster.jobs.some(j => j.status !== 'completed' && j.status !== 'failed'));
+
   return (
     <AdminLayout
       title="AI Tools"
-      subtitle="Catalogue-wide translation, SEO, and AEO sweeps"
+      subtitle="Catalogue-wide translation, SEO, AEO, and GEO sweeps"
       actions={
         <Link href={`/stores/${storeId}`}>
           <Button type="button" variant="outline">
@@ -251,15 +445,15 @@ export default function AiToolsPage() {
         </div>
       )}
 
+      {/* ── Translation ───────────────────────────────────────────── */}
+      <SectionHeading title="Translation" />
       <div className="grid gap-4 md:grid-cols-3">
         <BulkActionCard
           title="Fill missing Arabic"
           body="Walks every product, category, and the store row. Translates the English value into Arabic only when the Arabic field is empty."
           buttonLabel="Run sweep"
           loading={starting === 'translate-ar'}
-          disabled={
-            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
-          }
+          disabled={anyRunning}
           onClick={() => startTranslate('to_ar')}
         />
         <BulkActionCard
@@ -267,32 +461,69 @@ export default function AiToolsPage() {
           body="Reverse direction. For every Arabic-only field, fills the English side. Skips already-bilingual entities."
           buttonLabel="Run sweep"
           loading={starting === 'translate-en'}
-          disabled={
-            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
-          }
+          disabled={anyRunning}
           onClick={() => startTranslate('to_en')}
         />
+      </div>
+
+      {/* ── SEO ───────────────────────────────────────────────────── */}
+      <SectionHeading title="SEO" className="mt-6" />
+      <div className="grid gap-4 md:grid-cols-3">
         <BulkActionCard
           title="Generate missing SEO meta"
           body="For the store row and every product, generates meta title + description in EN and AR when those fields are empty. Skips entities that already have SEO."
           buttonLabel="Run sweep"
           loading={starting === 'seo'}
-          disabled={
-            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
-          }
+          disabled={anyRunning}
           onClick={startSeo}
+        />
+        <BulkActionCard
+          title="AI product recommendations"
+          body='Generate AI-driven cross-sell recommendations across your catalogue. Fills the storefront "You might also like" section on each product page. Re-running updates existing suggestions.'
+          buttonLabel="Run sweep"
+          loading={starting === 'recommendations'}
+          disabled={anyRunning}
+          onClick={startRecommendations}
         />
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
+      {/* ── AEO ───────────────────────────────────────────────────── */}
+      <SectionHeading title="AEO — Answer Engine Optimization" className="mt-6">
+        <button
+          type="button"
+          onClick={startAeoAll}
+          disabled={starting === 'aeo-all' || anyRunning}
+          className="inline-flex items-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {starting === 'aeo-all' ? (
+            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+          ) : (
+            <span aria-hidden>✨</span>
+          )}
+          {starting === 'aeo-all' ? 'Starting…' : 'Run all AEO sweeps'}
+        </button>
+      </SectionHeading>
+      <div className="mt-3 grid gap-4 md:grid-cols-3">
         <BulkActionCard
           title="Draft FAQs with AI"
           body="Generates up to 8 store-level FAQ items covering delivery, payments, returns, product care, and more — bilingual (EN + AR). Skips questions a merchant has already edited."
           buttonLabel="Draft FAQs"
           loading={starting === 'faq-aeo'}
-          disabled={
-            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
-          }
+          disabled={anyRunning}
           onClick={startFaqAeo}
           resultsHref={`/stores/${storeId}/seo#faqs`}
           resultsLabel="View FAQs on SEO page"
@@ -302,37 +533,85 @@ export default function AiToolsPage() {
           body="Drafts up to 3 step-by-step HowTo guides relevant to the store's product mix (e.g. how to place an order, how to return an item). Bilingual EN + AR."
           buttonLabel="Draft HowTos"
           loading={starting === 'howto-aeo'}
-          disabled={
-            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
-          }
+          disabled={anyRunning}
           onClick={startHowtoAeo}
           resultsHref={`/stores/${storeId}/seo#howtos`}
           resultsLabel="View HowTos on SEO page"
         />
         <BulkActionCard
           title="Rewrite Meta Descriptions (AEO)"
-          body="Rewrites empty store and product meta descriptions in a conversational, direct-answer style suited for AI answer engines. Only fills blank fields — never overwrites existing content."
+          body="Rewrites empty store, product, and category meta descriptions in a conversational, direct-answer style suited for AI answer engines. Only fills blank AEO fields — never overwrites existing content."
           buttonLabel="Rewrite meta"
           loading={starting === 'meta-aeo'}
-          disabled={
-            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
-          }
+          disabled={anyRunning}
           onClick={startMetaAeo}
           resultsHref={`/stores/${storeId}/seo`}
           resultsLabel="View meta on SEO page"
         />
+      </div>
+
+      {/* ── GEO ───────────────────────────────────────────────────── */}
+      <SectionHeading title="GEO — Generative Engine Optimization" className="mt-6">
+        <button
+          type="button"
+          onClick={startGeoAll}
+          disabled={starting === 'geo-all' || anyRunning}
+          className="inline-flex items-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {starting === 'geo-all' ? (
+            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+          ) : (
+            <span aria-hidden>✨</span>
+          )}
+          {starting === 'geo-all' ? 'Starting…' : 'Run all GEO sweeps'}
+        </button>
+      </SectionHeading>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Optimises your store for LLM-powered search — ChatGPT, Perplexity, Google AI Overview, Bing
+        Copilot.
+      </p>
+      <div className="mt-3 grid gap-4 md:grid-cols-3">
         <BulkActionCard
-          title="AI product recommendations"
-          body='Generate AI-driven cross-sell recommendations across your catalogue. Fills the storefront "You might also like" section on each product page. Re-running updates existing suggestions.'
+          title="Generate LLMs.txt"
+          body="Creates a /llms.txt file listing your store's categories, example product URLs, and key info. AI crawlers use this to understand your catalogue without scraping every page."
+          buttonLabel="Generate"
+          loading={starting === 'llms-txt'}
+          disabled={anyRunning}
+          onClick={startLlmsTxt}
+        />
+        <BulkActionCard
+          title="Product citation copy"
+          body='Rewrites product descriptions in "definitive first sentence + key specs" format — the exact style AI assistants quote when answering product questions. Fills empty products only.'
           buttonLabel="Run sweep"
-          loading={starting === 'recommendations'}
-          disabled={
-            !!activeJob && activeJob.status !== 'completed' && activeJob.status !== 'failed'
-          }
-          onClick={startRecommendations}
+          loading={starting === 'citation-copy'}
+          disabled={anyRunning}
+          onClick={startCitationCopy}
+        />
+        <BulkActionCard
+          title="Brand facts JSON"
+          body="Generates structured brand facts (location, categories, languages, contact methods) as a JSON-LD Organization block. Emitted on every storefront page to improve AI knowledge-graph entries."
+          buttonLabel="Generate"
+          loading={starting === 'brand-facts'}
+          disabled={anyRunning}
+          onClick={startBrandFacts}
         />
       </div>
 
+      {/* Active single-job progress */}
       {activeJob && (
         <ActiveJobCard
           job={activeJob}
@@ -343,6 +622,18 @@ export default function AiToolsPage() {
         />
       )}
 
+      {/* Active master sweep progress */}
+      {activeMaster && (
+        <MasterSweepCard
+          sweep={activeMaster}
+          onClose={() => {
+            setActiveMaster(null);
+            fetchJobs();
+          }}
+        />
+      )}
+
+      {/* Recent runs table */}
       <div className="mt-8">
         <h2 className="mb-3 text-lg font-semibold">Recent runs</h2>
         {jobs.length === 0 ? (
@@ -367,19 +658,7 @@ export default function AiToolsPage() {
                     <td className="px-4 py-3 text-muted-foreground">
                       {new Date(j.createdAt).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 font-medium">
-                      {j.kind === 'translate'
-                        ? `Translate (${j.direction === 'to_en' ? '→ EN' : '→ AR'})`
-                        : j.kind === 'seo'
-                          ? 'SEO meta'
-                          : j.kind === 'faq_aeo'
-                            ? 'Draft FAQs'
-                            : j.kind === 'howto_aeo'
-                              ? 'Draft HowTos'
-                              : j.kind === 'recommendations'
-                                ? 'AI recommendations'
-                                : 'Meta AEO rewrite'}
-                    </td>
+                    <td className="px-4 py-3 font-medium">{jobKindLabel(j.kind, j.direction)}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={j.status} />
                     </td>
@@ -406,6 +685,27 @@ export default function AiToolsPage() {
   );
 }
 
+// -----------------------------------------------------------------------
+// Sub-components
+// -----------------------------------------------------------------------
+
+function SectionHeading({
+  title,
+  className,
+  children,
+}: {
+  title: string;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className={`flex items-center justify-between gap-3 ${className ?? ''}`}>
+      <h2 className="text-base font-semibold text-foreground">{title}</h2>
+      {children}
+    </div>
+  );
+}
+
 function BulkActionCard({
   title,
   body,
@@ -422,10 +722,6 @@ function BulkActionCard({
   loading: boolean;
   disabled: boolean;
   onClick: () => void;
-  // Deep-link to where the AI-generated output ends up. Without this
-  // merchants finish a sweep and have no idea where the FAQs / HowTos /
-  // meta tags actually live — see [[ai-sweep-discoverability]] for the
-  // origin of this UX gap.
   resultsHref?: string;
   resultsLabel?: string;
 }) {
@@ -497,19 +793,7 @@ function ActiveJobCard({ job, onClose }: { job: BulkAiJobDetail; onClose: () => 
     <div className="mt-6 rounded-xl border-2 border-[#fc6b02]/30 bg-[#fc6b02]/5 p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold">
-            {job.kind === 'translate'
-              ? `Translation sweep (${job.direction === 'to_en' ? '→ EN' : '→ AR'})`
-              : job.kind === 'seo'
-                ? 'SEO meta sweep'
-                : job.kind === 'faq_aeo'
-                  ? 'FAQ draft sweep'
-                  : job.kind === 'howto_aeo'
-                    ? 'HowTo draft sweep'
-                    : job.kind === 'recommendations'
-                      ? 'AI recommendations sweep'
-                      : 'Meta AEO rewrite sweep'}
-          </h3>
+          <h3 className="text-base font-semibold">{jobKindLabel(job.kind, job.direction)} sweep</h3>
           <p className="text-xs text-muted-foreground">
             {isDone
               ? job.completedAt
@@ -567,6 +851,90 @@ function ActiveJobCard({ job, onClose }: { job: BulkAiJobDetail; onClose: () => 
           </ul>
         </details>
       )}
+    </div>
+  );
+}
+
+function MasterSweepCard({ sweep, onClose }: { sweep: MasterSweep; onClose: () => void }) {
+  const { jobs, label } = sweep;
+
+  // Aggregate totals across all sub-jobs
+  const totals = jobs.reduce(
+    (acc, j) => ({
+      processed: acc.processed + j.processed,
+      total: acc.total + j.total,
+      filled: acc.filled + j.filled,
+      skipped: acc.skipped + j.skipped,
+      failed: acc.failed + j.failed,
+    }),
+    { processed: 0, total: 0, filled: 0, skipped: 0, failed: 0 }
+  );
+
+  const allDone =
+    jobs.length > 0 && jobs.every(j => j.status === 'completed' || j.status === 'failed');
+  const anyFailed = jobs.some(j => j.status === 'failed');
+  const pct =
+    totals.total > 0 ? Math.min(100, Math.round((totals.processed / totals.total) * 100)) : 0;
+
+  const overallStatus = allDone
+    ? anyFailed
+      ? 'failed'
+      : 'completed'
+    : jobs.some(j => j.status === 'running')
+      ? 'running'
+      : 'queued';
+
+  return (
+    <div className="mt-6 rounded-xl border-2 border-[#fc6b02]/30 bg-[#fc6b02]/5 p-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold">{label}</h3>
+          <div className="mt-0.5 flex items-center gap-2">
+            <StatusBadge status={overallStatus} />
+            <span className="text-xs text-muted-foreground">
+              {jobs.map(j => jobKindLabel(j.kind)).join(' + ')}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
+          {allDone ? 'Dismiss' : 'Hide'}
+        </button>
+      </div>
+
+      <div className="mb-3">
+        <div className="mb-1 flex items-center justify-between text-xs">
+          <span className="font-medium">
+            {totals.processed} / {totals.total}
+          </span>
+          <span className="text-muted-foreground">{pct}%</span>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded bg-white/70">
+          <div className="h-full bg-[#fc6b02] transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 text-sm">
+        <Stat label="Filled" value={totals.filled} tone="ok" />
+        <Stat label="Skipped" value={totals.skipped} tone="muted" />
+        <Stat label="Failed" value={totals.failed} tone={totals.failed > 0 ? 'bad' : 'muted'} />
+      </div>
+
+      {/* Per-sub-job status chips */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {jobs.map(j => (
+          <div
+            key={j.id}
+            className="flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1 text-xs"
+          >
+            <StatusBadge status={j.status} />
+            <span className="font-medium">{jobKindLabel(j.kind)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

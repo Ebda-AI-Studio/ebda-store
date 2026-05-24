@@ -87,6 +87,8 @@ export interface StoreData {
   metaTitleAr?: string;
   metaDescription?: string;
   metaDescriptionAr?: string;
+  metaDescriptionAeo?: string;
+  metaDescriptionAeoAr?: string;
   ogImage?: string;
   twitterHandle?: string;
   googleSiteVerification?: string;

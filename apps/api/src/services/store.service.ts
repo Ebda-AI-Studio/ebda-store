@@ -707,6 +707,8 @@ export class StoreService {
       metaTitleAr?: string;
       metaDescription?: string;
       metaDescriptionAr?: string;
+      metaDescriptionAeo?: string | null;
+      metaDescriptionAeoAr?: string | null;
       ogImage?: string;
       twitterHandle?: string;
       googleSiteVerification?: string;
@@ -723,6 +725,12 @@ export class StoreService {
         metaTitleAr: seo.metaTitleAr,
         metaDescription: seo.metaDescription,
         metaDescriptionAr: seo.metaDescriptionAr,
+        ...(seo.metaDescriptionAeo !== undefined
+          ? { metaDescriptionAeo: seo.metaDescriptionAeo }
+          : {}),
+        ...(seo.metaDescriptionAeoAr !== undefined
+          ? { metaDescriptionAeoAr: seo.metaDescriptionAeoAr }
+          : {}),
         ogImage: seo.ogImage,
         twitterHandle: seo.twitterHandle,
         googleSiteVerification: seo.googleSiteVerification,

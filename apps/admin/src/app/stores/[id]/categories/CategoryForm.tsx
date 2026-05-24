@@ -17,6 +17,8 @@ interface CategoryFormData {
   metaTitleAr?: string;
   metaDescription?: string;
   metaDescriptionAr?: string;
+  metaDescriptionAeo?: string;
+  metaDescriptionAeoAr?: string;
 }
 
 interface CategoryFormProps {
@@ -320,6 +322,42 @@ export function CategoryForm({
                 value={form.metaDescriptionAr ?? ''}
                 onChange={e =>
                   onFormChange(prev => ({ ...prev, metaDescriptionAr: e.target.value }))
+                }
+                className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="col-span-2">
+              <p className="mb-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">AEO</span> — Conversational copy for
+                AI answer engines. Auto-filled by the AEO sweep; you can edit here.
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                AEO meta EN ({(form.metaDescriptionAeo ?? '').length}/160)
+              </label>
+              <textarea
+                maxLength={180}
+                rows={2}
+                value={form.metaDescriptionAeo ?? ''}
+                onChange={e =>
+                  onFormChange(prev => ({ ...prev, metaDescriptionAeo: e.target.value }))
+                }
+                className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                AEO meta AR ({(form.metaDescriptionAeoAr ?? '').length}/160)
+              </label>
+              <textarea
+                maxLength={180}
+                rows={2}
+                lang="ar"
+                dir="rtl"
+                value={form.metaDescriptionAeoAr ?? ''}
+                onChange={e =>
+                  onFormChange(prev => ({ ...prev, metaDescriptionAeoAr: e.target.value }))
                 }
                 className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />

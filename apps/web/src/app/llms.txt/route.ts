@@ -32,6 +32,9 @@ interface PublicStore {
   address?: string;
   domain?: string;
   status?: string;
+  // Set by the bulk-ai-llms-txt sweep (or hand-edited by the merchant).
+  // When non-empty, served verbatim — overrides the auto-generated body.
+  llmsTxt?: string | null;
 }
 
 interface PublicCategory {
@@ -277,6 +280,20 @@ export async function GET() {
     // The public store endpoint always includes id, so this should never fall
     // back to slug — but we guard anyway.
     const storeId: string = store.id || storeSlug;
+
+    // Merchant-provided / AI-generated body short-circuits the auto-build.
+    // Set by the bulk-ai-llms-txt sweep, or hand-edited from the admin SEO
+    // page. Empty/whitespace falls through to the auto-generated body so
+    // stores that haven't run the sweep still serve a useful response.
+    if (store.llmsTxt && store.llmsTxt.trim()) {
+      return new Response(store.llmsTxt, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/markdown; charset=utf-8',
+          'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=86400',
+        },
+      });
+    }
 
     const [categories, products] = await Promise.all([
       fetchCategories(storeId),

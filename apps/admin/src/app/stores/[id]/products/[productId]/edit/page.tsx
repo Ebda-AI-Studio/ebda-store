@@ -86,6 +86,8 @@ export default function EditProductPage() {
     metaTitleAr: '',
     metaDescription: '',
     metaDescriptionAr: '',
+    metaDescriptionAeo: '',
+    metaDescriptionAeoAr: '',
   });
 
   const [seoGenerating, setSeoGenerating] = useState(false);
@@ -173,6 +175,10 @@ export default function EditProductPage() {
           metaDescription: (p as Product & { metaDescription?: string }).metaDescription || '',
           metaDescriptionAr:
             (p as Product & { metaDescriptionAr?: string }).metaDescriptionAr || '',
+          metaDescriptionAeo:
+            (p as Product & { metaDescriptionAeo?: string }).metaDescriptionAeo || '',
+          metaDescriptionAeoAr:
+            (p as Product & { metaDescriptionAeoAr?: string }).metaDescriptionAeoAr || '',
         });
       } catch {
         setError(t('loadFailed'));
@@ -265,6 +271,8 @@ export default function EditProductPage() {
         metaTitleAr: formData.metaTitleAr || null,
         metaDescription: formData.metaDescription || null,
         metaDescriptionAr: formData.metaDescriptionAr || null,
+        metaDescriptionAeo: formData.metaDescriptionAeo || null,
+        metaDescriptionAeoAr: formData.metaDescriptionAeoAr || null,
         images: images.map((url, i) => ({ url, position: i })),
       };
 
@@ -619,6 +627,31 @@ export default function EditProductPage() {
                   lang="ar"
                   dir="rtl"
                 />
+              </div>
+              <div className="col-span-2 border-t border-border pt-4 mt-1">
+                <p className="text-xs text-muted-foreground mb-3">
+                  <span className="font-medium text-foreground">AEO</span> — Conversational
+                  answer-engine copy for AI search (Perplexity, Google AI Overview). Auto-filled by
+                  the AEO sweep; you can edit here.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Textarea
+                    label={`AEO meta description EN (${formData.metaDescriptionAeo.length}/160)`}
+                    value={formData.metaDescriptionAeo}
+                    onChange={e => updateField('metaDescriptionAeo', e.target.value)}
+                    maxLength={180}
+                    rows={3}
+                  />
+                  <Textarea
+                    label={`AEO meta description AR (${formData.metaDescriptionAeoAr.length}/160)`}
+                    value={formData.metaDescriptionAeoAr}
+                    onChange={e => updateField('metaDescriptionAeoAr', e.target.value)}
+                    maxLength={180}
+                    rows={3}
+                    lang="ar"
+                    dir="rtl"
+                  />
+                </div>
               </div>
             </div>
           </div>

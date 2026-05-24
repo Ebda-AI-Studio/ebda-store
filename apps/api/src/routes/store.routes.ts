@@ -113,6 +113,9 @@ const seoSchema = z
     metaTitleAr: optionalStr(200),
     metaDescription: optionalStr(500),
     metaDescriptionAr: optionalStr(500),
+    // AEO — conversational answer-engine copy.
+    metaDescriptionAeo: z.string().max(400).optional().nullable(),
+    metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
     ogImage: optionalUrl,
     twitterHandle: optionalStr(50),
     googleSiteVerification: optionalGoogleVerification,
@@ -703,6 +706,8 @@ router.get(
           metaTitleAr: true,
           metaDescription: true,
           metaDescriptionAr: true,
+          metaDescriptionAeo: true,
+          metaDescriptionAeoAr: true,
           ogImage: true,
           twitterHandle: true,
           googleSiteVerification: true,

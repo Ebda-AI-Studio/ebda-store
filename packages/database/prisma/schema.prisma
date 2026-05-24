@@ -285,6 +285,13 @@ model Store {
   /// Supports {storeName}, {customerName}, {items}, {total}, {currency} placeholder vars.
   botCopy                   Json?   @map("bot_copy")
 
+  // GEO (Generative Engine Optimization) — LLM-search visibility fields.
+  // Written by bulk-ai-geo Inngest sweep. Merchantscan edit via admin.
+  /// LLMs.txt content for this store — served at /<slug>/llms.txt by the storefront.
+  llmsTxt                   String? @map("llms_txt")
+  /// Structured brand facts: { foundedYear?, location?, categories[], certifications?, languages[], contact? }
+  aboutJson                 Json?   @map("about_json")
+
   // Accounting Settings (Batch 1)
   accountingEnabled    Boolean @default(true) @map("accounting_enabled")
   defaultTaxRateBps    Int     @default(0) @map("default_tax_rate_bps")
@@ -566,6 +573,10 @@ model Product {
   // sweep. Storefront coalesces at render time: AEO > SEO > null.
   metaDescriptionAeo   String?    @map("meta_description_aeo")
   metaDescriptionAeoAr String?    @map("meta_description_aeo_ar")
+  // GEO — LLM citation copy. Written by bulk-ai-citation-copy sweep.
+  // Format: "Definitive first sentence. Key specs bullet block."
+  citationCopy   String? @map("citation_copy")
+  citationCopyAr String? @map("citation_copy_ar")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
   deletedAt         DateTime?     @map("deleted_at") // Soft delete support
@@ -1991,6 +2002,10 @@ enum BulkAiJobKind {
   howto_aeo
   meta_aeo
   recommendations
+  // GEO sweep kinds
+  llms_txt
+  citation_copy
+  brand_facts
 }
 
 enum BulkAiJobStatus {

@@ -73,9 +73,32 @@ export function productJsonLd(product: ProductForJsonLd, store: ResolvedStore) {
 
 /**
  * Schema.org Organization structured data for the store.
+ * When `store.aboutJson` is present (populated by the GEO brand-facts sweep),
+ * its fields are merged into the node to enrich LLM-search visibility.
+ * aboutJson fields never overwrite the core fields (name, url, logo, etc.) —
+ * they only add supplemental properties like `description`, `areaServed`,
+ * `knowsLanguage`, `contactPoint`, etc.
  */
 export function organizationJsonLd(store: ResolvedStore) {
   const siteUrl = getSiteUrl(store);
+
+  // Merge brand-facts from GEO sweep without overriding core fields.
+  const aboutOverrides: Record<string, unknown> =
+    store.aboutJson && typeof store.aboutJson === 'object' ? { ...store.aboutJson } : {};
+  // Remove keys that the canonical fields below own so we never double-set.
+  for (const key of [
+    '@context',
+    '@type',
+    'name',
+    'url',
+    'logo',
+    'email',
+    'telephone',
+    'address',
+    'sameAs',
+  ]) {
+    delete aboutOverrides[key];
+  }
 
   return {
     '@context': 'https://schema.org',
@@ -98,6 +121,8 @@ export function organizationJsonLd(store: ResolvedStore) {
           sameAs: Object.values(store.socialLinks).filter(Boolean),
         }
       : {}),
+    // GEO brand-facts enrichment (supplemental only — core fields above win).
+    ...aboutOverrides,
   };
 }
 

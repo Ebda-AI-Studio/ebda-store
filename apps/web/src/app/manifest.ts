@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { getStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
+import { pickMetaDescription } from '../lib/seo/meta-description';
 
 /**
  * Convert HSL string (e.g. "26 100% 50%") to hex color.
@@ -137,7 +138,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   return {
     name: store.name,
     short_name: store.name,
-    description: store.metaDescription || `Shop at ${store.name}`,
+    description: pickMetaDescription(store) || `Shop at ${store.name}`,
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',
