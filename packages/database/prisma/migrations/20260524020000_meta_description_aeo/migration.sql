@@ -10,12 +10,17 @@
 --   * Merchant can edit each independently from the admin form
 --   * Forward-compatible to a future GEO column (metaDescriptionGeo)
 --
--- All three entities (store, product, category) gain the AEO columns so
--- the meta-aeo sweep matches the SEO sweep's coverage.
+-- All three entities (stores, products, categories) gain the AEO columns
+-- so the meta-aeo sweep matches the SEO sweep's coverage.
+--
+-- Table names are the @@map'd plural form (stores / products / categories),
+-- not the singular Prisma model names. IF NOT EXISTS guards make the
+-- migration idempotent for any local environment that partially applied
+-- an earlier copy of this file.
 
-ALTER TABLE "store"     ADD COLUMN "meta_description_aeo"    TEXT;
-ALTER TABLE "store"     ADD COLUMN "meta_description_aeo_ar" TEXT;
-ALTER TABLE "product"   ADD COLUMN "meta_description_aeo"    TEXT;
-ALTER TABLE "product"   ADD COLUMN "meta_description_aeo_ar" TEXT;
-ALTER TABLE "category"  ADD COLUMN "meta_description_aeo"    TEXT;
-ALTER TABLE "category"  ADD COLUMN "meta_description_aeo_ar" TEXT;
+ALTER TABLE "stores"     ADD COLUMN IF NOT EXISTS "meta_description_aeo"    TEXT;
+ALTER TABLE "stores"     ADD COLUMN IF NOT EXISTS "meta_description_aeo_ar" TEXT;
+ALTER TABLE "products"   ADD COLUMN IF NOT EXISTS "meta_description_aeo"    TEXT;
+ALTER TABLE "products"   ADD COLUMN IF NOT EXISTS "meta_description_aeo_ar" TEXT;
+ALTER TABLE "categories" ADD COLUMN IF NOT EXISTS "meta_description_aeo"    TEXT;
+ALTER TABLE "categories" ADD COLUMN IF NOT EXISTS "meta_description_aeo_ar" TEXT;
