@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
+import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 
 /**
@@ -43,47 +44,6 @@ const CANDIDATE_SLICE = 50;
 const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-/**
- * Retry a single Gemini call on transient errors (503, 429-rate-limit,
- * network resets). Uses exponential backoff: 2s → 4s → 8s (+up to 500ms
- * jitter). Caps at 15s per wait. Max 3 attempts (1 initial + 2 retries).
- *
- * NOT applied to quota-cap errors (AI_QUOTA_DAILY_EXCEEDED /
- * AI_QUOTA_MONTHLY_EXCEEDED — those have a `.code` property and are
- * caught + re-thrown by isAiQuotaCapError before reaching this wrapper).
- * NOT applied to auth errors (401/403) or bad-input errors (400).
- *
- * Per-product retry, NOT per-sweep: completed products are never re-run,
- * and the ERROR_CAP / quota-gate whole-sweep bailout still applies.
- */
-async function callWithRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3): Promise<T> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      const status =
-        (err as { status?: number; response?: { status?: number } })?.status ??
-        (err as { response?: { status?: number } })?.response?.status;
-      const msg = (err instanceof Error ? err.message : String(err)) ?? '';
-      const transient =
-        status === 503 ||
-        (status === 429 && !isAiQuotaCapError(err)) ||
-        /timeout|ECONNRESET|ETIMEDOUT/i.test(msg);
-
-      if (!transient || attempt === maxAttempts) throw err;
-
-      const delayMs = Math.min(2000 * 2 ** (attempt - 1), 15000) + Math.floor(Math.random() * 500);
-      logger.warn(
-        { label, attempt, maxAttempts, status, err: msg },
-        '[bulk-ai] transient gemini failure, retrying'
-      );
-      await sleep(delayMs);
-    }
-  }
-  // TypeScript: unreachable — loop always returns or throws
-  throw new Error('callWithRetry: exhausted attempts');
-}
 
 function getGenAI(): GoogleGenerativeAI {
   if (!config.googleAiKey) {

@@ -159,18 +159,23 @@ router.get(
 // GET /public/:storeId/products/:productId/recommendations
 // Mounted under '/public' in routes/index.ts, so the leading '/public'
 // is NOT part of the route path here.
+//
+// Intentionally NOT gated by `upsell_crosssell`. That flag is for the
+// admin-side merchandising tools (manual cross-sell / upsell relations
+// CRUD). The customer-facing related products feed has three layers:
+//   1. Manual cross-sell relations  (admin curates)
+//   2. AI recommendations           (bulk-ai-recommendations sweep)
+//   3. Same-category fallback       (basic catalog UX, no addon)
+// Gating layers 2 + 3 behind the addon defeats the point of running
+// the AI sweep and breaks the "you might also like" baseline UX. The
+// service itself layers manual > AI > FBT > same-category, so if a
+// merchant doesn't have manual relations the storefront still gets
+// the AI + category results their plan tier expects.
 router.get(
   '/:storeId/products/:productId/recommendations',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
-
-      const enabled = await featureService.isFeatureEnabled(storeId, 'upsell_crosssell');
-      if (!enabled) {
-        res.json({ success: true, data: { crossSell: [], upsell: [], alsoLike: [] } });
-        return;
-      }
-
       const recommendations = await recommendationService.getProductRecommendations(
         storeId,
         productId

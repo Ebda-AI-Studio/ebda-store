@@ -3,6 +3,7 @@ import { prisma } from '@force/database';
 import { AIService } from '../../../services/ai.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
+import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 
 /**
@@ -20,41 +21,6 @@ const ERROR_CAP = 50;
 // AI_BULK_THROTTLE_MS env to slow down or speed up.
 const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-/**
- * Retry a single Gemini call on transient errors (503, 429-rate-limit,
- * network resets). Exponential backoff: 2s → 4s → 8s (+up to 500ms
- * jitter, capped at 15s). Max 3 attempts (1 initial + 2 retries).
- *
- * Does NOT retry quota-cap errors (those have .code and are re-thrown
- * by isAiQuotaCapError). Does NOT retry 401/403/400.
- */
-async function callWithRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 3): Promise<T> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      const status =
-        (err as { status?: number; response?: { status?: number } })?.status ??
-        (err as { response?: { status?: number } })?.response?.status;
-      const msg = (err instanceof Error ? err.message : String(err)) ?? '';
-      const transient =
-        status === 503 ||
-        (status === 429 && !isAiQuotaCapError(err)) ||
-        /timeout|ECONNRESET|ETIMEDOUT/i.test(msg);
-
-      if (!transient || attempt === maxAttempts) throw err;
-
-      const delayMs = Math.min(2000 * 2 ** (attempt - 1), 15000) + Math.floor(Math.random() * 500);
-      logger.warn(
-        { label, attempt, maxAttempts, status, err: msg },
-        '[bulk-ai] transient gemini failure, retrying'
-      );
-      await sleep(delayMs);
-    }
-  }
-  throw new Error('callWithRetry: exhausted attempts');
-}
 
 interface BulkError {
   entityKind: 'product' | 'category' | 'store';

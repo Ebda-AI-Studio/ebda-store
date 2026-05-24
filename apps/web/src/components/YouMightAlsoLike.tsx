@@ -70,10 +70,18 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
         if (data.success && data.data) {
           const upsell: RecommendedProduct[] = data.data.upsell || [];
           const alsoLike: RecommendedProduct[] = data.data.alsoLike || [];
-          // Merge + dedupe by id.
+          // AI recommendations come back in `crossSell` slot when no
+          // manual cross-sell relations exist for the product (per
+          // recommendation.service.ts: manual > AI > FBT). Merge them
+          // in here too so semantic recs surface in this section rather
+          // than ONLY in FrequentlyBoughtTogether — "you might also
+          // like" is the better semantic home for AI similarity recs.
+          const crossSell: RecommendedProduct[] = data.data.crossSell || [];
+          // Merge in priority order — upsell first (merchant-curated),
+          // then AI cross-sell, then category fallback — and dedupe.
           const seen = new Set<string>();
           const merged: RecommendedProduct[] = [];
-          for (const p of [...upsell, ...alsoLike]) {
+          for (const p of [...upsell, ...crossSell, ...alsoLike]) {
             if (!seen.has(p.id)) {
               seen.add(p.id);
               merged.push(p);
