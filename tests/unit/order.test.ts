@@ -42,6 +42,12 @@ vi.mock('@force/database', () => ({
     inventoryHistory: {
       create: vi.fn().mockResolvedValue({}),
     },
+    coupon: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    backorderLine: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
   },

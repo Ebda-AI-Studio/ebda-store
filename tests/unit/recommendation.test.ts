@@ -34,6 +34,9 @@ vi.mock('@force/database', () => ({
     order: {
       findMany: vi.fn(),
     },
+    aiRecommendation: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   },
 }));
 

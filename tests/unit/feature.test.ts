@@ -39,8 +39,8 @@ import { featureService } from '../../apps/api/src/services/feature.service';
 
 describe('Feature Registry', () => {
   describe('FEATURE_KEYS_ARRAY', () => {
-    it('has exactly 21 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(21);
+    it('has exactly 22 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(22);
     });
   });
 
