@@ -182,13 +182,26 @@ if (!process.env.INNGEST_DEPLOY_ID) {
   }
 }
 
-export const inngest = new Inngest({
-  id: 'force-api',
-  // Inngest's SDK auto-detects dev mode from the absence of an event
-  // key, but on Railway we always have NODE_ENV=production set even
-  // for staging — be explicit so dev mode is never accidentally on
-  // in a deployed environment.
-  isDev: config.nodeEnv !== 'production',
-  eventKey: config.inngestEventKey || undefined,
-  signingKey: config.inngestSigningKey || undefined,
-});
+// In CI (and any test run), the Inngest dev server is not running.
+// Rather than letting every inngest.send() throw a "fetch failed" network
+// error that spams logs and can cascade into test failures, we substitute a
+// lightweight no-op client that swallows all sends silently.
+//
+// Activation: set INNGEST_DRY_RUN=true OR NODE_ENV=test.
+// Production and local dev are never affected (NODE_ENV=production/development,
+// INNGEST_DRY_RUN unset).
+const isDryRun = process.env.INNGEST_DRY_RUN === 'true' || process.env.NODE_ENV === 'test';
+
+export const inngest = isDryRun
+  ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ({ send: async () => ({ ids: [] }), createFunction: () => ({}) } as any)
+  : new Inngest({
+      id: 'force-api',
+      // Inngest's SDK auto-detects dev mode from the absence of an event
+      // key, but on Railway we always have NODE_ENV=production set even
+      // for staging — be explicit so dev mode is never accidentally on
+      // in a deployed environment.
+      isDev: config.nodeEnv !== 'production',
+      eventKey: config.inngestEventKey || undefined,
+      signingKey: config.inngestSigningKey || undefined,
+    });

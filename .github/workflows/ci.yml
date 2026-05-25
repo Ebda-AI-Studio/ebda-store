@@ -228,6 +228,7 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
           NODE_ENV: test
+          INNGEST_DRY_RUN: 'true'
 
       - name: Run integration tests
         run: npx vitest run tests/integration --reporter=verbose
@@ -243,6 +244,9 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
           NODE_ENV: test
+          # Suppress inngest.send() network calls — dev server is not running in CI.
+          # The client.ts no-op path activates when this is 'true' OR NODE_ENV=test.
+          INNGEST_DRY_RUN: 'true'
           # Match the value passed to the seed step above so the login test
           # can authenticate with the seeded super admin.
           ADMIN_PASSWORD: test-admin-password-ci
@@ -323,6 +327,8 @@ jobs:
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
           NODE_ENV: test
+          # Suppress inngest.send() network calls — dev server is not running in CI.
+          INNGEST_DRY_RUN: 'true'
           WEB_URL: http://localhost:3000
           ADMIN_URL: http://localhost:3001
 
@@ -382,14 +388,14 @@ jobs:
       - name: Telegram alert
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
         run: |
-          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ALERT_CHAT_ID" ]; then
             echo "telegram secrets not configured — skipping alert"
             exit 0
           fi
           curl -sS -X POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \
             -d parse_mode=Markdown \
             -d text="🔴 [CI FAIL] ${{ github.repository }} on \`${{ github.sha }}\` — see https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
