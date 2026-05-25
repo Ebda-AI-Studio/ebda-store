@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main, develop]
 
+# CRITICAL: cancel superseded runs. Without this, multiple pushes to main
+# in quick succession all run to completion, burning GitHub Actions minutes.
+# Set 2026-05-25 after a session burned ~25 minutes on stale stuck runs.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '20'
 
@@ -13,6 +20,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +42,7 @@ jobs:
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -67,6 +76,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [lint, typecheck]
     steps:
       - uses: actions/checkout@v4
@@ -94,6 +104,7 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [build]
     steps:
       - uses: actions/checkout@v4
@@ -130,6 +141,7 @@ jobs:
   test-integration:
     name: Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [build]
     services:
       postgres:
@@ -250,6 +262,7 @@ jobs:
   test-e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [build]
     services:
       postgres:
@@ -324,6 +337,7 @@ jobs:
   security:
     name: Security Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -357,3 +371,25 @@ jobs:
         with:
           path: ./
           extra_args: --only-verified
+
+  notify-failure:
+    name: Notify on failure (main only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [lint, typecheck, security, build, test-unit, test-integration, test-e2e]
+    if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Telegram alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "telegram secrets not configured — skipping alert"
+            exit 0
+          fi
+          curl -sS -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode=Markdown \
+            -d text="🔴 [CI FAIL] ${{ github.repository }} on \`${{ github.sha }}\` — see https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

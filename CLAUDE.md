@@ -451,3 +451,6 @@ for the full context.
 
 9. **Version-agnostic lookup for externally-versioned names** — Meta template names can be renamed via Reset-to-Draft. Dropdowns must resolve by base-name match (strip `_v2`, `_v3` suffixes) not exact-name lookup.
    Reference: commit `1507ef67` (FWB)
+
+10. **CI/CD + 5-layer testing standard** — every workflow file converges to the canonical shape: `ci.yml` with concurrency group + per-job `timeout-minutes` (anti-hang), `notify-failure` Telegram alert (sleep-proof), audit split (prod zero-tolerance, dev gated at high), Prisma `db:generate` before typecheck, integration tests TRUNCATE in `beforeAll`, module-level `setInterval`/`setTimeout` cleared in teardown, gitleaks paired with `.gitleaks.toml` + `.gitleaksignore`. Branch hygiene: only `main` (+ `preview` if staging). Codified 2026-05-25 after a session burned 30+ CI iterations on ad-hoc per-repo drift.
+    Reference: `~/.claude/projects/-Users-ahmadsharaf/memory/feedback-force-ai-ci-cd-standard.md`
