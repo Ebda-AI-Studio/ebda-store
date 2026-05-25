@@ -54,6 +54,7 @@ describe('Store Management', () => {
         lastName: superAdminUser.lastName,
         role: 'super_admin',
         status: 'active',
+        emailVerified: true,
       },
     });
     superAdminId = superAdmin.id;
@@ -67,6 +68,7 @@ describe('Store Management', () => {
         lastName: storeAdminUser.lastName,
         role: 'store_admin',
         status: 'active',
+        emailVerified: true,
       },
     });
     storeAdminId = storeAdmin.id;
@@ -242,6 +244,7 @@ describe('Store Management', () => {
           lastName: 'Admin',
           role: 'store_admin',
           status: 'active',
+          emailVerified: true,
         },
       });
       otherUserId = otherUser.id;

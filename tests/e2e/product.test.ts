@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
-import express from 'express';
+import express, { Router } from 'express';
 import { prisma } from '@force/database';
 import productRoutes from '@api/routes/product.routes';
 import authRoutes from '@api/routes/auth.routes';
@@ -15,7 +15,9 @@ import { authenticate } from '@api/middleware/auth';
 const app = express();
 app.use(express.json());
 app.use('/auth', authRoutes);
-app.use('/products', authenticate, productRoutes);
+const storeRouter = Router({ mergeParams: true });
+storeRouter.use('/:storeId/products', authenticate, productRoutes);
+app.use('/stores', storeRouter);
 app.use(errorHandler);
 
 // Test data
@@ -37,6 +39,7 @@ describe('Product Management', () => {
         lastName: 'Tester',
         role: 'super_admin',
         status: 'active',
+        emailVerified: true,
       },
     });
     testUserId = user.id;
@@ -73,14 +76,13 @@ describe('Product Management', () => {
     await prisma.$disconnect();
   });
 
-  describe('POST /products', () => {
+  describe('POST /stores/:storeId/products', () => {
     it('should create a product with required fields', async () => {
       if (!authToken || !testStoreId) {
         throw new Error('Prerequisites not met');
       }
 
       const productData = {
-        storeId: testStoreId,
         name: 'Test Product',
         slug: `test-product-${Date.now()}`,
         price: 10000, // 10 KWD in fils
@@ -89,7 +91,7 @@ describe('Product Management', () => {
       };
 
       const res = await request(app)
-        .post('/products')
+        .post(`/stores/${testStoreId}/products`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(productData);
 
@@ -108,10 +110,9 @@ describe('Product Management', () => {
       }
 
       const res = await request(app)
-        .post('/products')
+        .post(`/stores/${testStoreId}/products`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          storeId: testStoreId,
           name: 'Invalid Product',
           slug: 'invalid-product',
           // Missing price
@@ -127,10 +128,9 @@ describe('Product Management', () => {
       }
 
       const res = await request(app)
-        .post('/products')
+        .post(`/stores/${testStoreId}/products`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          storeId: testStoreId,
           name: 'Negative Price Product',
           slug: 'negative-price',
           price: -100,
@@ -141,14 +141,14 @@ describe('Product Management', () => {
     });
   });
 
-  describe('GET /products/:id', () => {
+  describe('GET /stores/:storeId/products/:id', () => {
     it('should retrieve a product by ID', async () => {
       if (!authToken || !createdProductId) {
         throw new Error('Prerequisites not met');
       }
 
       const res = await request(app)
-        .get(`/products/${createdProductId}`)
+        .get(`/stores/${testStoreId}/products/${createdProductId}`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
@@ -162,7 +162,7 @@ describe('Product Management', () => {
       }
 
       const res = await request(app)
-        .get('/products/non-existent-id')
+        .get(`/stores/${testStoreId}/products/non-existent-id`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(404);
@@ -170,14 +170,14 @@ describe('Product Management', () => {
     });
   });
 
-  describe('PUT /products/:id', () => {
+  describe('PUT /stores/:storeId/products/:id', () => {
     it('should update product details', async () => {
       if (!authToken || !createdProductId) {
         throw new Error('Prerequisites not met');
       }
 
       const res = await request(app)
-        .put(`/products/${createdProductId}`)
+        .put(`/stores/${testStoreId}/products/${createdProductId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           name: 'Updated Product Name',
@@ -196,7 +196,7 @@ describe('Product Management', () => {
       }
 
       const res = await request(app)
-        .put(`/products/${createdProductId}`)
+        .put(`/stores/${testStoreId}/products/${createdProductId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           inventory: 100,
@@ -215,7 +215,7 @@ describe('Product Management', () => {
 
       // Set low stock threshold
       await request(app)
-        .put(`/products/${createdProductId}`)
+        .put(`/stores/${testStoreId}/products/${createdProductId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           inventory: 5,
@@ -223,7 +223,7 @@ describe('Product Management', () => {
         });
 
       const res = await request(app)
-        .get(`/products/${createdProductId}`)
+        .get(`/stores/${testStoreId}/products/${createdProductId}`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.body.data.inventory).toBe(5);
@@ -240,7 +240,7 @@ describe('Product Management', () => {
       }
 
       const res = await request(app)
-        .put(`/products/${createdProductId}`)
+        .put(`/stores/${testStoreId}/products/${createdProductId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ status: 'draft' });
 
@@ -254,7 +254,7 @@ describe('Product Management', () => {
       }
 
       const res = await request(app)
-        .put(`/products/${createdProductId}`)
+        .put(`/stores/${testStoreId}/products/${createdProductId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ status: 'invalid_status' });
 
@@ -263,14 +263,14 @@ describe('Product Management', () => {
     });
   });
 
-  describe('DELETE /products/:id', () => {
+  describe('DELETE /stores/:storeId/products/:id', () => {
     it('should soft delete a product', async () => {
       if (!authToken || !createdProductId) {
         throw new Error('Prerequisites not met');
       }
 
       const res = await request(app)
-        .delete(`/products/${createdProductId}`)
+        .delete(`/stores/${testStoreId}/products/${createdProductId}`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);

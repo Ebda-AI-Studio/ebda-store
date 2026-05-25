@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
-import express from 'express';
+import express, { Router } from 'express';
 import { prisma } from '@force/database';
 import cartRoutes from '@api/routes/cart.routes';
 import orderRoutes from '@api/routes/order.routes';
@@ -19,8 +19,10 @@ const app = express();
 app.use(express.json());
 app.use('/auth', authRoutes);
 app.use('/public', publicRoutes);
-app.use('/cart', cartRoutes);
-app.use('/orders', authenticate, orderRoutes);
+const storeRouter = Router({ mergeParams: true });
+storeRouter.use('/:storeId/cart', cartRoutes);
+storeRouter.use('/:storeId/orders', authenticate, orderRoutes);
+app.use('/stores', storeRouter);
 app.use(errorHandler);
 
 // Test data
@@ -30,6 +32,8 @@ let testProductId: string | null = null;
 let testProduct2Id: string | null = null;
 let testCustomerId: string | null = null;
 let authToken: string | null = null;
+
+const TEST_SESSION_ID = `test-session-${Date.now()}`;
 
 describe('Checkout Flow', () => {
   beforeAll(async () => {
@@ -135,7 +139,10 @@ describe('Checkout Flow', () => {
     it('should create a new cart', async () => {
       if (!testStoreId) throw new Error('Store not created');
 
-      const res = await request(app).post('/cart').send({ storeId: testStoreId });
+      const res = await request(app)
+        .post(`/stores/${testStoreId}/cart`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({ storeId: testStoreId });
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
@@ -148,10 +155,13 @@ describe('Checkout Flow', () => {
     it('should add item to cart', async () => {
       if (!cartId || !testProductId) throw new Error('Prerequisites not met');
 
-      const res = await request(app).post(`/cart/${cartId}/items`).send({
-        productId: testProductId,
-        quantity: 2,
-      });
+      const res = await request(app)
+        .post(`/stores/${testStoreId}/cart/${cartId}/items`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({
+          productId: testProductId,
+          quantity: 2,
+        });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -163,10 +173,13 @@ describe('Checkout Flow', () => {
     it('should add second item to cart', async () => {
       if (!cartId || !testProduct2Id) throw new Error('Prerequisites not met');
 
-      const res = await request(app).post(`/cart/${cartId}/items`).send({
-        productId: testProduct2Id,
-        quantity: 1,
-      });
+      const res = await request(app)
+        .post(`/stores/${testStoreId}/cart/${cartId}/items`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({
+          productId: testProduct2Id,
+          quantity: 1,
+        });
 
       expect(res.status).toBe(200);
       expect(res.body.data.items).toHaveLength(2);
@@ -176,7 +189,8 @@ describe('Checkout Flow', () => {
       if (!cartId || !testProductId) throw new Error('Prerequisites not met');
 
       const res = await request(app)
-        .put(`/cart/${cartId}/items/${testProductId}`)
+        .put(`/stores/${testStoreId}/cart/${cartId}/items/${testProductId}`)
+        .set('x-session-id', TEST_SESSION_ID)
         .send({ quantity: 3 });
 
       expect(res.status).toBe(200);
@@ -187,7 +201,9 @@ describe('Checkout Flow', () => {
     it('should calculate cart totals correctly', async () => {
       if (!cartId) throw new Error('Cart not created');
 
-      const res = await request(app).get(`/cart/${cartId}`);
+      const res = await request(app)
+        .get(`/stores/${testStoreId}/cart/${cartId}`)
+        .set('x-session-id', TEST_SESSION_ID);
 
       expect(res.status).toBe(200);
       // 3 x 5000 + 1 x 7500 = 22500
@@ -197,7 +213,9 @@ describe('Checkout Flow', () => {
     it('should remove item from cart', async () => {
       if (!cartId || !testProduct2Id) throw new Error('Prerequisites not met');
 
-      const res = await request(app).delete(`/cart/${cartId}/items/${testProduct2Id}`);
+      const res = await request(app)
+        .delete(`/stores/${testStoreId}/cart/${cartId}/items/${testProduct2Id}`)
+        .set('x-session-id', TEST_SESSION_ID);
 
       expect(res.status).toBe(200);
       expect(res.body.data.items).toHaveLength(1);
@@ -207,7 +225,8 @@ describe('Checkout Flow', () => {
       if (!cartId || !testProductId) throw new Error('Prerequisites not met');
 
       const res = await request(app)
-        .put(`/cart/${cartId}/items/${testProductId}`)
+        .put(`/stores/${testStoreId}/cart/${cartId}/items/${testProductId}`)
+        .set('x-session-id', TEST_SESSION_ID)
         .send({ quantity: 1000 }); // More than available
 
       expect(res.status).toBe(400);
@@ -218,8 +237,9 @@ describe('Checkout Flow', () => {
       if (!cartId || !authToken || !testCustomerId) throw new Error('Prerequisites not met');
 
       const res = await request(app)
-        .post(`/cart/${cartId}/checkout`)
+        .post(`/stores/${testStoreId}/cart/${cartId}/checkout`)
         .set('Authorization', `Bearer ${authToken}`)
+        .set('x-session-id', TEST_SESSION_ID)
         .send({
           customerId: testCustomerId,
           shippingAddress: {
@@ -274,16 +294,22 @@ describe('Checkout Flow', () => {
     });
 
     it('should create cart for coupon test', async () => {
-      const res = await request(app).post('/cart').send({ storeId: testStoreId });
+      const res = await request(app)
+        .post(`/stores/${testStoreId}/cart`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({ storeId: testStoreId });
 
       expect(res.status).toBe(201);
       cartId = res.body.data.id;
 
       // Add item
-      await request(app).post(`/cart/${cartId}/items`).send({
-        productId: testProductId,
-        quantity: 2,
-      });
+      await request(app)
+        .post(`/stores/${testStoreId}/cart/${cartId}/items`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({
+          productId: testProductId,
+          quantity: 2,
+        });
     });
 
     it('should apply valid coupon to cart', async () => {
@@ -291,7 +317,10 @@ describe('Checkout Flow', () => {
 
       const coupon = await prisma.coupon.findUnique({ where: { id: couponId! } });
 
-      const res = await request(app).post(`/cart/${cartId}/coupon`).send({ code: coupon?.code });
+      const res = await request(app)
+        .post(`/stores/${testStoreId}/cart/${cartId}/coupon`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({ code: coupon?.code });
 
       expect(res.status).toBe(200);
       expect(res.body.data.coupon).toBeDefined();
@@ -303,7 +332,10 @@ describe('Checkout Flow', () => {
     it('should reject invalid coupon code', async () => {
       if (!cartId) throw new Error('Cart not created');
 
-      const res = await request(app).post(`/cart/${cartId}/coupon`).send({ code: 'INVALID-CODE' });
+      const res = await request(app)
+        .post(`/stores/${testStoreId}/cart/${cartId}/coupon`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({ code: 'INVALID-CODE' });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('INVALID_COUPON');
@@ -325,7 +357,8 @@ describe('Checkout Flow', () => {
       });
 
       const res = await request(app)
-        .post(`/cart/${cartId}/coupon`)
+        .post(`/stores/${testStoreId}/cart/${cartId}/coupon`)
+        .set('x-session-id', TEST_SESSION_ID)
         .send({ code: expiredCoupon.code });
 
       expect(res.status).toBe(400);
@@ -337,7 +370,10 @@ describe('Checkout Flow', () => {
 
     it('should reject coupon below minimum order value', async () => {
       // Create cart with low value
-      const lowValueCart = await request(app).post('/cart').send({ storeId: testStoreId });
+      const lowValueCart = await request(app)
+        .post(`/stores/${testStoreId}/cart`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({ storeId: testStoreId });
 
       const lowCartId = lowValueCart.body.data.id;
 
@@ -353,14 +389,20 @@ describe('Checkout Flow', () => {
         },
       });
 
-      await request(app).post(`/cart/${lowCartId}/items`).send({
-        productId: cheapProduct.id,
-        quantity: 1,
-      });
+      await request(app)
+        .post(`/stores/${testStoreId}/cart/${lowCartId}/items`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({
+          productId: cheapProduct.id,
+          quantity: 1,
+        });
 
       const coupon = await prisma.coupon.findUnique({ where: { id: couponId! } });
 
-      const res = await request(app).post(`/cart/${lowCartId}/coupon`).send({ code: coupon?.code });
+      const res = await request(app)
+        .post(`/stores/${testStoreId}/cart/${lowCartId}/coupon`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({ code: coupon?.code });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('MIN_ORDER_NOT_MET');
@@ -374,7 +416,9 @@ describe('Checkout Flow', () => {
     it('should remove coupon from cart', async () => {
       if (!cartId) throw new Error('Cart not created');
 
-      const res = await request(app).delete(`/cart/${cartId}/coupon`);
+      const res = await request(app)
+        .delete(`/stores/${testStoreId}/cart/${cartId}/coupon`)
+        .set('x-session-id', TEST_SESSION_ID);
 
       expect(res.status).toBe(200);
       expect(res.body.data.coupon).toBeNull();
@@ -387,23 +431,32 @@ describe('Checkout Flow', () => {
 
     beforeAll(async () => {
       // Create cart
-      const res = await request(app).post('/cart').send({ storeId: testStoreId });
+      const res = await request(app)
+        .post(`/stores/${testStoreId}/cart`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({ storeId: testStoreId });
       cartId = res.body.data.id;
 
       // Add items
-      await request(app).post(`/cart/${cartId}/items`).send({
-        productId: testProductId,
-        quantity: 1,
-      });
+      await request(app)
+        .post(`/stores/${testStoreId}/cart/${cartId}/items`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({
+          productId: testProductId,
+          quantity: 1,
+        });
     });
 
     it('should calculate shipping based on location', async () => {
       if (!cartId) throw new Error('Cart not created');
 
-      const res = await request(app).post(`/cart/${cartId}/shipping`).send({
-        country: 'Kuwait',
-        city: 'Kuwait City',
-      });
+      const res = await request(app)
+        .post(`/stores/${testStoreId}/cart/${cartId}/shipping`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({
+          country: 'Kuwait',
+          city: 'Kuwait City',
+        });
 
       expect(res.status).toBe(200);
       expect(res.body.data.shippingOptions).toBeDefined();
@@ -413,10 +466,13 @@ describe('Checkout Flow', () => {
     it('should apply selected shipping to cart', async () => {
       if (!cartId) throw new Error('Cart not created');
 
-      const res = await request(app).put(`/cart/${cartId}/shipping`).send({
-        shippingMethod: 'standard',
-        shippingCost: 1500, // 1.5 KWD
-      });
+      const res = await request(app)
+        .put(`/stores/${testStoreId}/cart/${cartId}/shipping`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({
+          shippingMethod: 'standard',
+          shippingCost: 1500, // 1.5 KWD
+        });
 
       expect(res.status).toBe(200);
       expect(res.body.data.shippingCost).toBe(1500);
@@ -428,19 +484,26 @@ describe('Checkout Flow', () => {
   describe('Guest Checkout', () => {
     it('should allow checkout without authentication', async () => {
       // Create cart
-      const cartRes = await request(app).post('/cart').send({ storeId: testStoreId });
+      const cartRes = await request(app)
+        .post(`/stores/${testStoreId}/cart`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({ storeId: testStoreId });
 
       const cartId = cartRes.body.data.id;
 
       // Add item
-      await request(app).post(`/cart/${cartId}/items`).send({
-        productId: testProductId,
-        quantity: 1,
-      });
+      await request(app)
+        .post(`/stores/${testStoreId}/cart/${cartId}/items`)
+        .set('x-session-id', TEST_SESSION_ID)
+        .send({
+          productId: testProductId,
+          quantity: 1,
+        });
 
       // Checkout as guest (no auth token)
       const res = await request(app)
-        .post(`/cart/${cartId}/checkout`)
+        .post(`/stores/${testStoreId}/cart/${cartId}/checkout`)
+        .set('x-session-id', TEST_SESSION_ID)
         .send({
           guestEmail: 'guest@example.com',
           shippingAddress: {
