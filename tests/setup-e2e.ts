@@ -20,6 +20,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { beforeAll } from 'vitest';
 
 const argvJoined = process.argv.join(' ');
 const isIntegrationRun =
@@ -114,4 +115,50 @@ if (isIntegrationRun) {
     await g.prisma.$disconnect().catch(() => {});
     g.prisma = undefined;
   }
+
+  // ── Truncate test tables before the integration suite runs ────────────────
+  // Accounting-specific tables accumulate leftover rows when a previous CI
+  // run's afterAll cleanup is blocked by RLS (prisma proxy requires
+  // app.current_store_id GUC; deleteMany outside a tenant context silently
+  // matches 0 rows). TRUNCATE is not subject to RLS policies (it requires
+  // TRUNCATE privilege, not DML access) so it reliably clears stale data.
+  //
+  // We only truncate tables that integration tests write to directly and
+  // that carry the unique constraint triggering the CI failures:
+  //   journal_entries(store_id, source, source_id)  ← the offending constraint
+  //   accounts(store_id, code)
+  //   sequences(store_id, kind)
+  // Plus all child/sibling accounting tables CASCADE handles them anyway, but
+  // listing them explicitly avoids ordering issues.
+  //
+  // We intentionally leave: users, stores, orders, products, order_items,
+  // payments — the seeded admin user + demo store are needed by api.test.ts,
+  // and stores created by accounting tests use unique UUIDs so they don't
+  // conflict within a single run.
+  beforeAll(async () => {
+    // Lazy import ensures prisma uses the DATABASE_URL resolved above.
+    const { prisma } = await import('@force/database');
+    await prisma.$executeRawUnsafe(`
+      TRUNCATE TABLE
+        journal_lines,
+        journal_entries,
+        accounts,
+        sequences,
+        purchase_order_items,
+        purchase_orders,
+        backorder_lines,
+        stock_adjustment_items,
+        stock_adjustments,
+        expenses,
+        reorder_suggestions,
+        reorder_rules,
+        deadstock_flags,
+        profit_anomalies,
+        customer_cohort_snapshots,
+        customer_rfm_snapshots,
+        funnel_snapshots,
+        suppliers
+      RESTART IDENTITY CASCADE
+    `);
+  });
 }
