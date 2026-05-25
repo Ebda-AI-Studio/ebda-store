@@ -97,11 +97,11 @@ describe('Product Management', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.name).toBe(productData.name);
-      expect(res.body.data.price).toBe(productData.price);
-      expect(res.body.data.inventory).toBe(productData.inventory);
+      expect(res.body.data.product.name).toBe(productData.name);
+      expect(res.body.data.product.price).toBe(productData.price);
+      expect(res.body.data.product.inventory).toBe(productData.inventory);
 
-      createdProductId = res.body.data.id;
+      createdProductId = res.body.data.product.id;
     });
 
     it('should validate required price field', async () => {
@@ -153,7 +153,7 @@ describe('Product Management', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.id).toBe(createdProductId);
+      expect(res.body.data.product.id).toBe(createdProductId);
     });
 
     it('should return 404 for non-existent product', async () => {
@@ -186,8 +186,8 @@ describe('Product Management', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.name).toBe('Updated Product Name');
-      expect(res.body.data.price).toBe(15000);
+      expect(res.body.data.product.name).toBe('Updated Product Name');
+      expect(res.body.data.product.price).toBe(15000);
     });
 
     it('should update inventory correctly', async () => {
@@ -203,7 +203,7 @@ describe('Product Management', () => {
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.inventory).toBe(100);
+      expect(res.body.data.product.inventory).toBe(100);
     });
   });
 
@@ -226,10 +226,9 @@ describe('Product Management', () => {
         .get(`/stores/${testStoreId}/products/${createdProductId}`)
         .set('Authorization', `Bearer ${authToken}`);
 
-      expect(res.body.data.inventory).toBe(5);
-      expect(res.body.data.lowStockThreshold).toBe(10);
-      // Product is below threshold
-      expect(res.body.data.inventory).toBeLessThan(res.body.data.lowStockThreshold);
+      expect(res.body.data.product.inventory).toBe(5);
+      expect(res.body.data.product.lowStockThreshold).toBe(10);
+      expect(res.body.data.product.inventory).toBeLessThan(res.body.data.product.lowStockThreshold);
     });
   });
 
@@ -245,7 +244,7 @@ describe('Product Management', () => {
         .send({ status: 'draft' });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.status).toBe('draft');
+      expect(res.body.data.product.status).toBe('draft');
     });
 
     it('should only allow valid status values', async () => {

@@ -15,6 +15,7 @@ import express, { Router } from 'express';
 import { prisma } from '@force/database';
 import cartRoutes from '@api/routes/cart.routes';
 import orderRoutes from '@api/routes/order.routes';
+import couponRoutes from '@api/routes/coupon.routes';
 import publicRoutes from '@api/routes/public.routes';
 import authRoutes from '@api/routes/auth.routes';
 import { errorHandler } from '@api/middleware/error-handler';
@@ -25,6 +26,7 @@ const app = express();
 app.use(express.json());
 app.use('/auth', authRoutes);
 app.use('/public', publicRoutes);
+app.use('/', couponRoutes);
 const storeRouter = Router({ mergeParams: true });
 storeRouter.use('/:storeId/cart', cartRoutes);
 storeRouter.use('/:storeId/orders', authenticate, orderRoutes);
@@ -266,6 +268,7 @@ describe('Checkout Flow', () => {
 
   describe('Coupon Validation', () => {
     let couponId: string | null = null;
+    let couponCode: string | null = null;
 
     beforeAll(async () => {
       const coupon = await prisma.coupon.create({
@@ -284,6 +287,7 @@ describe('Checkout Flow', () => {
         },
       });
       couponId = coupon.id;
+      couponCode = coupon.code;
     });
 
     afterAll(async () => {
@@ -293,25 +297,31 @@ describe('Checkout Flow', () => {
     });
 
     it('should validate a valid coupon via public endpoint', async () => {
-      const coupon = await prisma.coupon.findUnique({ where: { id: couponId! } });
+      if (!couponCode || !testStoreId) throw new Error('Prerequisites not met');
 
       const res = await request(app)
         .post(`/public/${testStoreId}/coupons/validate`)
-        .send({ code: coupon?.code, orderTotal: 10000 });
+        .send({ code: couponCode, orderTotal: 10000 });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(res.body.data.coupon).toBeDefined();
+      expect(res.body.data.discount).toBe(1000);
     });
 
     it('should reject invalid coupon code', async () => {
+      if (!testStoreId) throw new Error('Prerequisites not met');
+
       const res = await request(app)
         .post(`/public/${testStoreId}/coupons/validate`)
         .send({ code: 'INVALID-CODE', orderTotal: 10000 });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(404);
     });
 
     it('should reject expired coupon', async () => {
+      if (!testStoreId) throw new Error('Prerequisites not met');
+
       const expiredCoupon = await prisma.coupon.create({
         data: {
           storeId: testStoreId!,
@@ -335,13 +345,14 @@ describe('Checkout Flow', () => {
     });
 
     it('should reject coupon below minimum order value', async () => {
-      const coupon = await prisma.coupon.findUnique({ where: { id: couponId! } });
+      if (!testStoreId || !couponCode) throw new Error('Prerequisites not met');
 
       const res = await request(app)
         .post(`/public/${testStoreId}/coupons/validate`)
-        .send({ code: coupon?.code, orderTotal: 100 }); // Below minOrderAmount of 5000
+        .send({ code: couponCode, orderTotal: 100 });
 
       expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('MIN_ORDER_NOT_MET');
     });
   });
 

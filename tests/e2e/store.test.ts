@@ -59,11 +59,14 @@ describe('Store Management', () => {
     });
     superAdminId = superAdmin.id;
 
-    // Create store admin user
+    const storeAdminHashedPassword = await import('bcryptjs').then(bcrypt =>
+      bcrypt.hash(storeAdminUser.password, 12)
+    );
+
     const storeAdmin = await prisma.user.create({
       data: {
         email: storeAdminUser.email,
-        passwordHash: hashedPassword,
+        passwordHash: storeAdminHashedPassword,
         firstName: storeAdminUser.firstName,
         lastName: storeAdminUser.lastName,
         role: 'store_admin',
@@ -126,12 +129,11 @@ describe('Store Management', () => {
       createdStoreId = res.body.data.store.id;
     });
 
-    it('should reject duplicate store slug', async () => {
+    it('should auto-deduplicate duplicate store slug', async () => {
       if (!superAdminToken || !createdStoreId) {
         throw new Error('Prerequisites not met');
       }
 
-      // Get the existing store slug
       const store = await prisma.store.findUnique({ where: { id: createdStoreId } });
 
       const res = await request(app)
@@ -143,8 +145,11 @@ describe('Store Management', () => {
           ownerId: storeAdminId,
         });
 
-      expect(res.status).toBe(409);
-      expect(res.body.success).toBe(false);
+      expect(res.status).toBe(201);
+      expect(res.body.data.store.slug).not.toBe(store?.slug);
+      expect(res.body.data.store.slug).toContain(store?.slug?.split('-')[0] ?? '');
+
+      await prisma.store.delete({ where: { id: res.body.data.store.id } }).catch(() => {});
     });
   });
 
