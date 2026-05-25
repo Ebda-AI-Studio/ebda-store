@@ -308,6 +308,27 @@ model Store {
   aiNarrationEnabled Boolean @default(true) @map("ai_narration_enabled")
   insightsRollupCron String  @default("daily") @map("insights_rollup_cron")
 
+  // WhatsApp Native Catalog Bot (Phase A, 2026-05-25)
+  // bot_mode controls which state machine branch WBS activates:
+  //   legacy_chat                    — original category/product list bot (default)
+  //   native_catalog                 — Meta Commerce Catalog send + pre-catalog greeting flow
+  //   native_catalog_with_gemini_agent — native_catalog + Gemini AI agent on Agent path
+  // Flip via Admin → WhatsApp → Bot Mode dropdown. No automatic cutover on existing stores.
+  botMode           String  @default("legacy_chat")  @map("bot_mode")
+  /// Service menu configuration (JSON). Shape:
+  /// { orderNow: bool, subscriptionBoxes: bool, locationsHours: bool, chatWithAgent: bool,
+  ///   labels: { en: { orderNow?, subscriptionBoxes?, locationsHours?, chatWithAgent? },
+  ///              ar: { ... } } }
+  /// Absent = WBS uses canonical defaults.
+  botServiceMenu    Json?   @map("bot_service_menu")
+  /// FB Commerce Catalog ID (per-merchant, obtained from Meta Business Manager)
+  metaCatalogId     String? @map("meta_catalog_id")
+  /// FB Business Manager ID
+  metaBusinessId    String? @map("meta_business_id")
+  /// Long-lived User Access Token for the Meta Catalog API, encrypted via
+  /// CREDENTIAL_ENCRYPTION_KEY (same pattern as wbsApiKey). NEVER returned plain.
+  metaAccessToken   String? @map("meta_access_token")
+
   // Relations
   owner                    User                       @relation(fields: [ownerId], references: [id])
   // Customer accounts that authenticate against this store. Distinct from
@@ -455,25 +476,54 @@ model StorePage {
 }
 
 model Customer {
-  id          String   @id @default(uuid())
-  storeId     String   @map("store_id")
-  email       String
-  firstName   String   @map("first_name")
-  lastName    String   @map("last_name")
-  phone       String?
-  notes       String?
-  totalOrders Int      @default(0) @map("total_orders")
-  totalSpent  Int      @default(0) @map("total_spent")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id               String    @id @default(uuid())
+  storeId          String    @map("store_id")
+  email            String
+  firstName        String    @map("first_name")
+  lastName         String    @map("last_name")
+  phone            String?
+  notes            String?
+  totalOrders      Int       @default(0) @map("total_orders")
+  totalSpent       Int       @default(0) @map("total_spent")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  /// Sticky language for the WhatsApp bot — 'en' | 'ar' | null (not yet set).
+  /// Persisted when the customer taps a language button in the bot flow.
+  preferredLocale  String?   @map("preferred_locale")
+  /// When the customer last picked a language. Used to decide whether to
+  /// skip the language picker on return visits within 30 days.
+  lastLocaleChoice DateTime? @map("last_locale_choice")
 
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store     Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  addresses CustomerAddress[]
 
   @@unique([storeId, email])
   @@index([storeId])
   @@index([email])
   @@index([createdAt])
   @@map("customers")
+}
+
+/// Saved delivery addresses for a customer. Created during the WhatsApp
+/// native catalog bot checkout flow when the customer types a new address.
+/// The first address is automatically set as default (isDefault=true).
+model CustomerAddress {
+  id             String   @id @default(uuid())
+  customerId     String   @map("customer_id")
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label          String?
+  street         String
+  block          String?
+  area           String
+  governorate    String?
+  buildingNumber String?  @map("building_number")
+  notes          String?
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@map("customer_addresses")
 }
 
 enum StoreStatus {
