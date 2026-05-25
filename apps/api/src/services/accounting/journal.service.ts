@@ -105,30 +105,62 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
   };
 
   let entry: JournalEntry;
-  try {
-    const client = input.tx ?? prisma;
-    entry = await client.journalEntry.create({ data: createData });
-  } catch (err: unknown) {
-    // P2002 = unique constraint violation. With the
-    // journal_entries_store_source_source_id_unique partial index in place,
-    // a concurrent caller raced us and won. Find and return their entry —
-    // idempotency contract preserved.
-    if (
-      err instanceof PrismaNs.PrismaClientKnownRequestError &&
-      err.code === 'P2002' &&
-      input.sourceId
-    ) {
-      const client = input.tx ?? prisma;
-      const winner = await client.journalEntry.findFirst({
-        where: {
-          storeId: input.storeId,
-          source: input.source,
-          sourceId: input.sourceId,
-        },
-      });
-      if (winner) return winner;
+
+  if (input.tx && input.sourceId) {
+    // We are inside a caller's Postgres transaction. A plain `create` that hits
+    // the partial unique index on (store_id, source, source_id) would raise
+    // P2002 and put the ENTIRE outer transaction into ABORTED state — every
+    // subsequent statement in the transaction then throws "current transaction
+    // is aborted, commands ignored until end of transaction block".
+    //
+    // Fix: wrap the create in a Postgres SAVEPOINT so that a conflict only
+    // rolls back to the savepoint, leaving the outer transaction healthy.
+    // If the conflict fires we fall back to a findFirst on the existing entry.
+    const sp = `je_idem_${Date.now()}`;
+    try {
+      await input.tx.$executeRawUnsafe(`SAVEPOINT "${sp}"`);
+      entry = await input.tx.journalEntry.create({ data: createData });
+      await input.tx.$executeRawUnsafe(`RELEASE SAVEPOINT "${sp}"`);
+    } catch (err: unknown) {
+      await input.tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT "${sp}"`);
+      if (err instanceof PrismaNs.PrismaClientKnownRequestError && err.code === 'P2002') {
+        // A concurrent caller (or a retry) already posted this entry — return it.
+        const winner = await input.tx.journalEntry.findFirst({
+          where: {
+            storeId: input.storeId,
+            source: input.source,
+            sourceId: input.sourceId,
+          },
+        });
+        if (winner) return winner;
+      }
+      throw err;
     }
-    throw err;
+  } else {
+    // No outer transaction: a plain try/catch is safe because there is no
+    // parent transaction state to corrupt on a P2002.
+    try {
+      const client = input.tx ?? prisma;
+      entry = await client.journalEntry.create({ data: createData });
+    } catch (err: unknown) {
+      // P2002 = unique constraint violation on
+      // journal_entries_store_source_source_id_unique partial index.
+      if (
+        err instanceof PrismaNs.PrismaClientKnownRequestError &&
+        err.code === 'P2002' &&
+        input.sourceId
+      ) {
+        const winner = await prisma.journalEntry.findFirst({
+          where: {
+            storeId: input.storeId,
+            source: input.source,
+            sourceId: input.sourceId,
+          },
+        });
+        if (winner) return winner;
+      }
+      throw err;
+    }
   }
 
   // Non-blocking UI refresh signal — best-effort, never throws
