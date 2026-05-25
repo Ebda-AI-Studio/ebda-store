@@ -27,6 +27,13 @@ echo "-> FWB pre-push CI gate: lint + typecheck + unit tests"
 # Standing emnapi trap — see feedback-emnapi-lockfile-desync-after-add.md.
 npm ci --dry-run 2>&1 | grep -E "^npm error" && exit 1 || true
 
+# Generate Prisma client before typecheck. Without this, apps/api typecheck
+# reports ~396 phantom errors (all "any" / "unknown" types from missing
+# @prisma/client type declarations). CI does this implicitly via the build
+# step, but the pre-push hook needs to be explicit.
+echo "-> generating prisma client (needed for typecheck)..."
+npm run db:generate >/dev/null 2>&1
+
 npm run lint
 
 echo "-> typechecking apps..."
