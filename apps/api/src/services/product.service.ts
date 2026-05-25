@@ -5,6 +5,7 @@ import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
+import { inngest } from '../lib/inngest/client';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -323,6 +324,15 @@ export class ProductService {
     });
 
     await this.invalidateStoreProductCache(storeId);
+
+    // Fire product.upserted for Meta Catalog sync (Phase A — native catalog bot).
+    // Fire-and-forget: catalog sync failure must never block the product save.
+    void inngest
+      .send({ name: 'product.upserted' as any, data: { storeId, productId: product.id } })
+      .catch(err =>
+        logger.warn({ err, productId: product.id }, '[product.create] inngest send failed')
+      );
+
     return product;
   }
 
@@ -430,6 +440,11 @@ export class ProductService {
 
     await this.invalidateStoreProductCache(storeId);
 
+    // Fire product.upserted for Meta Catalog sync. Fire-and-forget.
+    void inngest
+      .send({ name: 'product.upserted' as any, data: { storeId, productId } })
+      .catch(err => logger.warn({ err, productId }, '[product.update] inngest send failed'));
+
     // Fire-and-forget R2 cleanup for any image URL that disappeared
     // during this update. Runs AFTER the transaction commits so a
     // transient R2 hiccup can't roll back legitimate DB edits, and
@@ -459,6 +474,11 @@ export class ProductService {
     });
 
     await this.invalidateStoreProductCache(storeId);
+
+    // Fire product.deleted for Meta Catalog sync. Fire-and-forget.
+    void inngest
+      .send({ name: 'product.deleted' as any, data: { storeId, productId } })
+      .catch(err => logger.warn({ err, productId }, '[product.delete] inngest send failed'));
   }
 
   static async updateInventory(storeId: string, productId: string, quantity: number) {
