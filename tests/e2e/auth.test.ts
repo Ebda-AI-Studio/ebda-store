@@ -9,7 +9,6 @@ import express from 'express';
 import { prisma } from '@force/database';
 import authRoutes from '@api/routes/auth.routes';
 import { errorHandler } from '@api/middleware/error-handler';
-import bcrypt from 'bcryptjs';
 
 const app = express();
 app.use(express.json());
@@ -30,6 +29,10 @@ let refreshToken: string | null = null;
 
 describe('Authentication Flow', () => {
   beforeAll(async () => {
+    // Delete refresh tokens for test users first to avoid FK constraint
+    await prisma.refreshToken.deleteMany({
+      where: { user: { email: { startsWith: 'test-' } } },
+    });
     // Clean up any existing test users
     await prisma.user.deleteMany({
       where: { email: { startsWith: 'test-' } },
@@ -39,6 +42,7 @@ describe('Authentication Flow', () => {
   afterAll(async () => {
     // Cleanup
     if (createdUserId) {
+      await prisma.refreshToken.deleteMany({ where: { userId: createdUserId } }).catch(() => {});
       await prisma.user.delete({ where: { id: createdUserId } }).catch(() => {});
     }
     await prisma.$disconnect();
@@ -94,6 +98,16 @@ describe('Authentication Flow', () => {
   });
 
   describe('POST /auth/login', () => {
+    beforeAll(async () => {
+      // Registration created the user but with emailVerified=false.
+      // Manually verify so login tests can obtain tokens.
+      const user = await prisma.user.findFirst({ where: { email: testUser.email } });
+      if (user) {
+        await prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+        createdUserId = user.id;
+      }
+    });
+
     it('should login with valid credentials', async () => {
       const res = await request(app).post('/auth/login').send({
         email: testUser.email,
