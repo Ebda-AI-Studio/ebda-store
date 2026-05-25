@@ -182,7 +182,7 @@ describe('Authentication Flow', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.email).toBe(testUser.email);
+      expect(res.body.data.user.email).toBe(testUser.email);
     });
 
     it('should reject request without token', async () => {

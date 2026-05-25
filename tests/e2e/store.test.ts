@@ -120,10 +120,10 @@ describe('Store Management', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.name).toBe(storeData.name);
-      expect(res.body.data.slug).toBe(storeData.slug);
+      expect(res.body.data.store.name).toBe(storeData.name);
+      expect(res.body.data.store.slug).toBe(storeData.slug);
 
-      createdStoreId = res.body.data.id;
+      createdStoreId = res.body.data.store.id;
     });
 
     it('should reject duplicate store slug', async () => {
@@ -160,7 +160,7 @@ describe('Store Management', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.id).toBe(createdStoreId);
+      expect(res.body.data.store.id).toBe(createdStoreId);
     });
 
     it('should allow store owner to access their store', async () => {
@@ -203,7 +203,7 @@ describe('Store Management', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.name).toBe('Updated Store Name');
+      expect(res.body.data.store.name).toBe('Updated Store Name');
     });
 
     it('should update store theme', async () => {
