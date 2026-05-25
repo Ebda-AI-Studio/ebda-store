@@ -12,7 +12,7 @@ name: Auto-fix watchdog
 
 on:
   schedule:
-    - cron: '7,24,41,58 * * * *'
+    - cron: '13 */2 * * *'
   workflow_dispatch: {}
 
 permissions:
