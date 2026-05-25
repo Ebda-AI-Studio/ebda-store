@@ -120,7 +120,7 @@
   }
 
   /* RTL Support */
-  [dir="rtl"] {
+  [dir='rtl'] {
     font-family: 'IBM Plex Sans Arabic', 'Plus Jakarta Sans', system-ui, sans-serif;
   }
 
@@ -140,24 +140,24 @@
    *      names, prices, and footer text read at the same visual size as
    *      their English counterparts.
    */
-  html[lang="ar"],
-  html[dir="rtl"],
-  [dir="rtl"] {
+  html[lang='ar'],
+  html[dir='rtl'],
+  [dir='rtl'] {
     font-size-adjust: 0.5;
   }
 }
 
 @layer base {
-  html[lang="ar"] body,
-  html[dir="rtl"] body {
+  html[lang='ar'] body,
+  html[dir='rtl'] body {
     /* ~5% smaller body baseline keeps Arabic text visually matched to the
        English version without changing line-heights or spacing. The 1024px
        breakpoint mirrors the EN body bump above (16 → 17px). */
     font-size: 15.2px;
   }
   @media (min-width: 1024px) {
-    html[lang="ar"] body,
-    html[dir="rtl"] body {
+    html[lang='ar'] body,
+    html[dir='rtl'] body {
       font-size: 16.15px;
     }
   }
@@ -176,11 +176,12 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 @layer base {
-
   /*
    * Arabic shaping fix.
    *
@@ -223,7 +224,9 @@
     line-height: 1.6;
   }
   @media (min-width: 1024px) {
-    body { font-size: 17px; }
+    body {
+      font-size: 17px;
+    }
   }
 
   /* Focus visible for accessibility */
@@ -237,7 +240,9 @@
   }
 
   /* Clickable affordance — :where() keeps specificity zero so utilities win */
-  :where(button, [role='button'], a, summary, [type='submit'], [type='button']):not(:disabled):not([aria-disabled='true']) {
+  :where(button, [role='button'], a, summary, [type='submit'], [type='button']):not(:disabled):not(
+      [aria-disabled='true']
+    ) {
     cursor: pointer;
   }
   :where(button, [type='submit'], [type='button']):disabled,
@@ -246,14 +251,22 @@
   }
 
   /* Native form controls + scrollbars follow theme */
-  html { color-scheme: light; }
-  html.dark { color-scheme: dark; }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
 
   /* Eliminate 300ms tap-zoom delay on touch devices */
-  html { touch-action: manipulation; }
+  html {
+    touch-action: manipulation;
+  }
 
   /* Prevent scroll-chaining out of modals/drawers */
-  :where([role='dialog'], [data-overlay]) { overscroll-behavior: contain; }
+  :where([role='dialog'], [data-overlay]) {
+    overscroll-behavior: contain;
+  }
 }
 
 @layer components {
@@ -333,7 +346,8 @@
 
   /* Hero Section */
   .hero-gradient {
-    background: linear-gradient(135deg,
+    background: linear-gradient(
+      135deg,
       hsl(30 100% 97%) 0%,
       hsl(0 0% 100%) 50%,
       hsl(30 100% 97%) 100%
@@ -533,8 +547,12 @@
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Combined fade + lift used by the modern hero and product grid. The
@@ -542,13 +560,25 @@
    resolves to `calc(var(--i) * 60ms)` — the previous JS implementation
    ran 12 setTimeouts and re-rendered on every step. */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @keyframes heroFadeIn {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @keyframes slideUp {
@@ -607,12 +637,18 @@
 }
 
 @keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
   }
   50% {
@@ -621,8 +657,12 @@
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 /* Animation Classes */
@@ -664,18 +704,42 @@
   animation: slideUp 0.4s ease-out forwards;
 }
 
-.stagger-animation > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-animation > *:nth-child(2) { animation-delay: 0.1s; }
-.stagger-animation > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-animation > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger-animation > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-animation > *:nth-child(6) { animation-delay: 0.3s; }
-.stagger-animation > *:nth-child(7) { animation-delay: 0.35s; }
-.stagger-animation > *:nth-child(8) { animation-delay: 0.4s; }
-.stagger-animation > *:nth-child(9) { animation-delay: 0.45s; }
-.stagger-animation > *:nth-child(10) { animation-delay: 0.5s; }
-.stagger-animation > *:nth-child(11) { animation-delay: 0.55s; }
-.stagger-animation > *:nth-child(12) { animation-delay: 0.6s; }
+.stagger-animation > *:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.stagger-animation > *:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.stagger-animation > *:nth-child(3) {
+  animation-delay: 0.15s;
+}
+.stagger-animation > *:nth-child(4) {
+  animation-delay: 0.2s;
+}
+.stagger-animation > *:nth-child(5) {
+  animation-delay: 0.25s;
+}
+.stagger-animation > *:nth-child(6) {
+  animation-delay: 0.3s;
+}
+.stagger-animation > *:nth-child(7) {
+  animation-delay: 0.35s;
+}
+.stagger-animation > *:nth-child(8) {
+  animation-delay: 0.4s;
+}
+.stagger-animation > *:nth-child(9) {
+  animation-delay: 0.45s;
+}
+.stagger-animation > *:nth-child(10) {
+  animation-delay: 0.5s;
+}
+.stagger-animation > *:nth-child(11) {
+  animation-delay: 0.55s;
+}
+.stagger-animation > *:nth-child(12) {
+  animation-delay: 0.6s;
+}
 
 /* Shimmer loading effect */
 .shimmer {
@@ -715,7 +779,8 @@
 }
 
 .force-gradient-hero {
-  background: linear-gradient(135deg,
+  background: linear-gradient(
+    135deg,
     hsl(30 100% 97%) 0%,
     hsl(0 0% 100%) 40%,
     hsl(30 100% 98%) 100%
@@ -723,15 +788,15 @@
 }
 
 /* RTL Utilities */
-[dir="rtl"] .rtl\:space-x-reverse > :not([hidden]) ~ :not([hidden]) {
+[dir='rtl'] .rtl\:space-x-reverse > :not([hidden]) ~ :not([hidden]) {
   --tw-space-x-reverse: 1;
 }
 
-[dir="rtl"] .rtl\:rotate-180 {
+[dir='rtl'] .rtl\:rotate-180 {
   transform: rotate(180deg);
 }
 
-[dir="rtl"] .rtl\:text-right {
+[dir='rtl'] .rtl\:text-right {
   text-align: right;
 }
 
@@ -784,7 +849,9 @@
 
 /* Accessibility: disable animations for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

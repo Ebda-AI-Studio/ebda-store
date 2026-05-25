@@ -88,7 +88,7 @@
   }
 
   /* RTL Support */
-  [dir="rtl"] {
+  [dir='rtl'] {
     font-family: 'IBM Plex Arabic', 'Plus Jakarta Sans', system-ui, sans-serif;
   }
 }
@@ -105,11 +105,12 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 @layer base {
-
   body {
     @apply bg-background text-foreground;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -127,7 +128,9 @@
   }
 
   /* Clickable affordance — :where() keeps specificity zero so utilities win */
-  :where(button, [role='button'], a, summary, [type='submit'], [type='button']):not(:disabled):not([aria-disabled='true']) {
+  :where(button, [role='button'], a, summary, [type='submit'], [type='button']):not(:disabled):not(
+      [aria-disabled='true']
+    ) {
     cursor: pointer;
   }
   :where(button, [type='submit'], [type='button']):disabled,
@@ -136,14 +139,22 @@
   }
 
   /* Native form controls + scrollbars follow theme */
-  html { color-scheme: light; }
-  html.dark { color-scheme: dark; }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
 
   /* Eliminate 300ms tap-zoom delay on touch devices */
-  html { touch-action: manipulation; }
+  html {
+    touch-action: manipulation;
+  }
 
   /* Prevent scroll-chaining out of modals/drawers */
-  :where([role='dialog'], [data-overlay]) { overscroll-behavior: contain; }
+  :where([role='dialog'], [data-overlay]) {
+    overscroll-behavior: contain;
+  }
 }
 
 @layer components {
@@ -216,7 +227,7 @@
     box-shadow: inset 3px 0 0 0 hsl(var(--primary));
   }
 
-  [dir="rtl"] .force-nav-item.active {
+  [dir='rtl'] .force-nav-item.active {
     box-shadow: inset -3px 0 0 0 hsl(var(--primary));
   }
 
@@ -272,7 +283,7 @@
     animation: dropdownEnter 0.2s ease-out;
   }
 
-  [dir="rtl"] .force-dropdown {
+  [dir='rtl'] .force-dropdown {
     @apply right-auto left-0;
   }
 
@@ -402,7 +413,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
   }
   50% {
@@ -450,14 +462,30 @@
   animation: slideUp 0.4s ease-out forwards;
 }
 
-.stagger-animation > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-animation > *:nth-child(2) { animation-delay: 0.1s; }
-.stagger-animation > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-animation > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger-animation > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-animation > *:nth-child(6) { animation-delay: 0.3s; }
-.stagger-animation > *:nth-child(7) { animation-delay: 0.35s; }
-.stagger-animation > *:nth-child(8) { animation-delay: 0.4s; }
+.stagger-animation > *:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.stagger-animation > *:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.stagger-animation > *:nth-child(3) {
+  animation-delay: 0.15s;
+}
+.stagger-animation > *:nth-child(4) {
+  animation-delay: 0.2s;
+}
+.stagger-animation > *:nth-child(5) {
+  animation-delay: 0.25s;
+}
+.stagger-animation > *:nth-child(6) {
+  animation-delay: 0.3s;
+}
+.stagger-animation > *:nth-child(7) {
+  animation-delay: 0.35s;
+}
+.stagger-animation > *:nth-child(8) {
+  animation-delay: 0.4s;
+}
 
 /* Shimmer loading effect */
 .shimmer {
@@ -543,11 +571,11 @@ main > div {
 }
 
 /* RTL Utilities */
-[dir="rtl"] .rtl\:space-x-reverse > :not([hidden]) ~ :not([hidden]) {
+[dir='rtl'] .rtl\:space-x-reverse > :not([hidden]) ~ :not([hidden]) {
   --tw-space-x-reverse: 1;
 }
 
-[dir="rtl"] .rtl\:rotate-180 {
+[dir='rtl'] .rtl\:rotate-180 {
   transform: rotate(180deg);
 }
 
@@ -565,11 +593,11 @@ main > div {
     @apply -translate-x-full;
   }
 
-  [dir="rtl"] .sidebar-mobile {
+  [dir='rtl'] .sidebar-mobile {
     @apply left-auto right-0;
   }
 
-  [dir="rtl"] .sidebar-mobile.closed {
+  [dir='rtl'] .sidebar-mobile.closed {
     @apply translate-x-full;
   }
 }
@@ -592,7 +620,9 @@ main > div {
 
 /* Accessibility: disable animations for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

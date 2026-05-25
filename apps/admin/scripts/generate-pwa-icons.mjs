@@ -35,41 +35,41 @@ const SRC = path.join(APP, 'public', 'favicon.svg');
 const PUB = path.join(APP, 'public');
 
 if (!fs.existsSync(SRC)) {
-    console.error(`Source SVG not found: ${SRC}`);
-    process.exit(1);
+  console.error(`Source SVG not found: ${SRC}`);
+  process.exit(1);
 }
 
 async function loadSharp() {
-    const candidates = [
-        path.join(APP, 'node_modules', 'sharp'),
-        path.resolve(APP, '..', '..', 'node_modules', 'sharp'),
-    ];
-    for (const dir of candidates) {
-        if (fs.existsSync(dir)) {
-            const req = createRequire(pathToFileURL(path.join(dir, 'package.json')));
-            return req('sharp');
-        }
+  const candidates = [
+    path.join(APP, 'node_modules', 'sharp'),
+    path.resolve(APP, '..', '..', 'node_modules', 'sharp'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) {
+      const req = createRequire(pathToFileURL(path.join(dir, 'package.json')));
+      return req('sharp');
     }
-    console.error('sharp not found. Run `npm install` at the monorepo root.');
-    process.exit(1);
+  }
+  console.error('sharp not found. Run `npm install` at the monorepo root.');
+  process.exit(1);
 }
 
 const sharp = await loadSharp();
 const svg = fs.readFileSync(SRC);
 
 const targets = [
-    { out: 'icon-192x192.png',     size: 192 },
-    { out: 'icon-384x384.png',     size: 384 },
-    { out: 'icon-512x512.png',     size: 512 },
-    { out: 'apple-touch-icon.png', size: 180 },
-    { out: 'favicon-32.png',       size: 32  },
-    { out: 'favicon-16.png',       size: 16  },
+  { out: 'icon-192x192.png', size: 192 },
+  { out: 'icon-384x384.png', size: 384 },
+  { out: 'icon-512x512.png', size: 512 },
+  { out: 'apple-touch-icon.png', size: 180 },
+  { out: 'favicon-32.png', size: 32 },
+  { out: 'favicon-16.png', size: 16 },
 ];
 
 for (const t of targets) {
-    await sharp(svg, { density: Math.max(384, t.size * 2) })
-        .resize(t.size, t.size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-        .png({ compressionLevel: 9 })
-        .toFile(path.join(PUB, t.out));
-    console.log(`✓ ${t.out} (${t.size}×${t.size})`);
+  await sharp(svg, { density: Math.max(384, t.size * 2) })
+    .resize(t.size, t.size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png({ compressionLevel: 9 })
+    .toFile(path.join(PUB, t.out));
+  console.log(`✓ ${t.out} (${t.size}×${t.size})`);
 }

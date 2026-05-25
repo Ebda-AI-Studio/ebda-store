@@ -194,7 +194,9 @@ async function main() {
   console.log(`\n${replacements.length} replacement(s) staged.`);
 
   if (!APPLY) {
-    console.log('\nDRY-RUN. Pass --apply to upload + rewrite layout_settings + delete old R2 keys.');
+    console.log(
+      '\nDRY-RUN. Pass --apply to upload + rewrite layout_settings + delete old R2 keys.'
+    );
     await prisma.$disconnect();
     return;
   }

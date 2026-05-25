@@ -74,7 +74,7 @@ updated: 2026-05-24
 
 ## Sign-off
 
-| Role         | Name         | Date         | Notes                                      |
-| ------------ | ------------ | ------------ | ------------------------------------------ |
-| Engineer     | ****\_\_**** | **\_\_\_\_** |                                            |
-| Merchant rep | ****\_\_**** | **\_\_\_\_** | only required before first merchant launch |
+| Role         | Name             | Date         | Notes                                      |
+| ------------ | ---------------- | ------------ | ------------------------------------------ |
+| Engineer     | \***\*\_\_\*\*** | **\_\_\_\_** |                                            |
+| Merchant rep | \***\*\_\_\*\*** | **\_\_\_\_** | only required before first merchant launch |

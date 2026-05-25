@@ -26,8 +26,7 @@ const args = Object.fromEntries(
 );
 
 const APP_ID = process.env.ONESIGNAL_ADMIN_APP_ID || process.env.ONESIGNAL_APP_ID;
-const REST_KEY =
-  process.env.ONESIGNAL_ADMIN_REST_API_KEY || process.env.ONESIGNAL_REST_API_KEY;
+const REST_KEY = process.env.ONESIGNAL_ADMIN_REST_API_KEY || process.env.ONESIGNAL_REST_API_KEY;
 
 if (!APP_ID || !REST_KEY) {
   console.error(

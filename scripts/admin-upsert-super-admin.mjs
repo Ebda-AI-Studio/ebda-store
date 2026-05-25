@@ -57,7 +57,9 @@ if (existing) {
     where: { email, storeId: { not: null } },
   });
   if (asCustomer > 0) {
-    console.log(`Note: ${email} also exists as a customer on ${asCustomer} store(s). Those rows are independent of this admin row.`);
+    console.log(
+      `Note: ${email} also exists as a customer on ${asCustomer} store(s). Those rows are independent of this admin row.`
+    );
   }
   console.log(`No existing admin user with email ${email}.`);
   console.log(`Plan: create new super_admin.`);

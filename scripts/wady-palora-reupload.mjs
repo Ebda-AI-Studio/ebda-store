@@ -47,11 +47,29 @@ if (!ENDPOINT || !ACCESS_KEY || !SECRET_KEY || !BUCKET || !PUBLIC_URL) {
 // Manual mappings for products whose images can't be matched by name
 // (the local zip uses generic IMG_xxxx filenames). Update these and
 // re-run if the user provides a mapping.
+// Painting mappings — each picked by reading the image and matching its
+// visual content to the product nameAr. The brick-wall + key + Dome-of-
+// the-Rock + Palestinian-map iconography varies per piece; the
+// product names cluster into four heritage themes plus the
+// "على هذه الأرض ما يستحق الحياة" piece (IMG_0525 carries that exact
+// text in the embellishment). Files referenced live under the
+// extracted-zip path inside SOURCE_ROOT.
+const PAINT_DIR = path.join(SOURCE_ROOT, 'قسم اللوحات/_unzip/مجلد بلا عنوان ١٢');
 const MANUAL_PAINTING_MAP = {
-  // 'product nameAr exactly': 'absolute path to png/jpg',
+  'لوحة على هذه الارض ما يستحق الحياه': path.join(PAINT_DIR, 'IMG_0525.png'),
+  'لوحة فن من التراث الفلسطيني': path.join(PAINT_DIR, 'IMG_0526.png'),
+  'لوحة جمال من صنع اليد': path.join(PAINT_DIR, 'IMG_0528.png'),
+  'لوحة فن ينبض بالوطن': path.join(PAINT_DIR, 'IMG_0531.png'),
+  'لوحة فن التراث الفلسطيني': path.join(PAINT_DIR, 'IMG_0532.png'),
 };
+// Kufis — no individual product photos exist locally; only a single
+// collage covers all three. Better than 404 placeholder until the
+// merchant uploads per-kufi photos via the admin UI.
+const KUFIS_COLLAGE = path.join(SOURCE_ROOT, 'قسم الكوفيات/كوفيات.png');
 const MANUAL_KUFI_MAP = {
-  // 'كوفية 1': '/Users/.../kufi-1.jpg',
+  'كوفية 1': KUFIS_COLLAGE,
+  'كوفية 2': KUFIS_COLLAGE,
+  'كوفية 3': KUFIS_COLLAGE,
 };
 
 const ARABIC_DIACRITICS = /[ً-ْٰـ]/g; // strip tashkeel + tatweel

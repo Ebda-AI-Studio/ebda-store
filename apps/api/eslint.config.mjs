@@ -1,4 +1,4 @@
-import tseslint from "typescript-eslint";
+import tseslint from 'typescript-eslint';
 
 // Block sub-120s Redis cache TTLs outside an allow-list. Short TTLs
 // have repeatedly caused Vercel/Neon cost spikes — see the
@@ -33,16 +33,16 @@ const cacheTtlSelectors = [
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: ['dist/**', 'node_modules/**'],
   },
   ...tseslint.configs.recommended,
   {
-    files: ["**/*.ts"],
+    files: ['**/*.ts'],
     rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-      "no-console": "warn",
-      "no-restricted-syntax": ["error", ...cacheTtlSelectors],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-console': 'warn',
+      'no-restricted-syntax': ['error', ...cacheTtlSelectors],
     },
   },
   ...(cacheTtlAllowlist.length > 0
@@ -50,7 +50,7 @@ export default [
         {
           files: cacheTtlAllowlist,
           rules: {
-            "no-restricted-syntax": "off",
+            'no-restricted-syntax': 'off',
           },
         },
       ]

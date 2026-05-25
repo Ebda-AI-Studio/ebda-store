@@ -35,7 +35,9 @@ const APPLY = process.argv.includes('--apply');
 const { groups } = JSON.parse(readFileSync('/tmp/wady-variant-groups.json', 'utf8'));
 
 console.log(`Mode: ${APPLY ? 'APPLY' : 'DRY-RUN'}`);
-console.log(`Clean groups to fold: ${groups.length} (${groups.reduce((s, g) => s + g.products.length, 0)} products)`);
+console.log(
+  `Clean groups to fold: ${groups.length} (${groups.reduce((s, g) => s + g.products.length, 0)} products)`
+);
 
 // Map axis-key → Arabic option label
 const AXIS_LABEL = {
@@ -125,7 +127,9 @@ for (const g of groups) {
     for (const m of g.products) {
       const role = m.id === parent.id ? 'PARENT' : 'variant';
       const axisVal = m.meta?.axes?.[axisKey] ?? '—';
-      console.log(`    ${role.padEnd(7)}  ${m.sku?.padEnd(8) || '-'} ${(m.nameAr || m.name).slice(0, 50)}  → ${axisVal}`);
+      console.log(
+        `    ${role.padEnd(7)}  ${m.sku?.padEnd(8) || '-'} ${(m.nameAr || m.name).slice(0, 50)}  → ${axisVal}`
+      );
     }
     foldedProducts += siblings.length;
     createdVariants += g.products.length;
@@ -161,9 +165,9 @@ for (const g of groups) {
 
         // 3) one ProductOptionValue per distinct axis value in the
         //    group (use the canonical value, not the surface form)
-        const distinctValues = [...new Set(
-          g.products.map(p => p.meta?.axes?.[axisKey]).filter(Boolean)
-        )];
+        const distinctValues = [
+          ...new Set(g.products.map(p => p.meta?.axes?.[axisKey]).filter(Boolean)),
+        ];
         const valueIdByCanonical = new Map();
         for (const [i, val] of distinctValues.entries()) {
           let pov = await tx.productOptionValue.findFirst({
@@ -210,8 +214,7 @@ for (const g of groups) {
           const variantTitleAr =
             (memberRow.nameAr ?? memberRow.name ?? '').trim() ||
             `${parentRow.name} ${axisVal ?? ''}`.trim();
-          const variantTitle =
-            (memberRow.name ?? memberRow.nameAr ?? '').trim() || variantTitleAr;
+          const variantTitle = (memberRow.name ?? memberRow.nameAr ?? '').trim() || variantTitleAr;
 
           const created = await tx.productVariant.create({
             data: {

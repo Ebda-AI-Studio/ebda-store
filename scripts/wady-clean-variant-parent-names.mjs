@@ -28,12 +28,52 @@ function skuRank(sku) {
 // by reading the parent's original name and stripping just the axis
 // token.
 const AXIS_VALUES = {
-  form: ['حب', 'حبوب', 'ناعم', 'خشن', 'مطحون', 'بودرة', 'باودر', 'مفروم', 'عيدان', 'كامل', 'كاملة', 'عيدان كاملة'],
+  form: [
+    'حب',
+    'حبوب',
+    'ناعم',
+    'خشن',
+    'مطحون',
+    'بودرة',
+    'باودر',
+    'مفروم',
+    'عيدان',
+    'كامل',
+    'كاملة',
+    'عيدان كاملة',
+  ],
   color: ['اسود', 'أسود', 'ابيض', 'أبيض', 'احمر', 'أحمر', 'اصفر', 'أصفر', 'اخضر', 'أخضر', 'ذهبي'],
   size: ['صغير', 'وسط', 'متوسط', 'كبير', 'إكسترا', 'اكسترا', 'مميز'],
   taste: ['مر', 'حلو', 'حار'],
-  origin: ['سوري', 'مصري', 'ايراني', 'إيراني', 'هندي', 'تركي', 'فلسطيني', 'فلسطينية', 'الفلسطيني', 'الفلسطينية', 'لبناني'],
-  treatment: ['محمص', 'محمصة', 'مالح', 'مملح', 'بدون ملح', 'مدخن', 'مدخنة', 'مجفف', 'مجففة', 'مجففه', 'يابس', 'يابسة', 'طازج', 'طازجة'],
+  origin: [
+    'سوري',
+    'مصري',
+    'ايراني',
+    'إيراني',
+    'هندي',
+    'تركي',
+    'فلسطيني',
+    'فلسطينية',
+    'الفلسطيني',
+    'الفلسطينية',
+    'لبناني',
+  ],
+  treatment: [
+    'محمص',
+    'محمصة',
+    'مالح',
+    'مملح',
+    'بدون ملح',
+    'مدخن',
+    'مدخنة',
+    'مجفف',
+    'مجففة',
+    'مجففه',
+    'يابس',
+    'يابسة',
+    'طازج',
+    'طازجة',
+  ],
 };
 
 // English equivalents — strip these from machine-translated `name`
@@ -41,7 +81,18 @@ const AXIS_VALUES = {
 // settles back to "cumin" / "Indian" instead of carrying a variant
 // label into the storefront card.
 const AXIS_VALUES_EN = {
-  form: ['fine', 'soft', 'coarse', 'ground', 'whole', 'powder', 'powdered', 'sticks', 'chopsticks', 'minced'],
+  form: [
+    'fine',
+    'soft',
+    'coarse',
+    'ground',
+    'whole',
+    'powder',
+    'powdered',
+    'sticks',
+    'chopsticks',
+    'minced',
+  ],
   color: ['black', 'white', 'red', 'yellow', 'green', 'golden'],
   size: ['small', 'medium', 'large', 'extra', 'premium'],
   taste: ['sweet', 'bitter', 'hot'],
@@ -101,6 +152,8 @@ for (const g of groups) {
   updated += 1;
 }
 
-console.log(`\n${APPLY ? 'Updated' : 'Would update'} ${updated} parent name(s); skipped ${skipped} group(s).`);
+console.log(
+  `\n${APPLY ? 'Updated' : 'Would update'} ${updated} parent name(s); skipped ${skipped} group(s).`
+);
 await prisma.$disconnect();
 if (!APPLY) console.log('\nDRY RUN — pass --apply to write.');

@@ -53,12 +53,10 @@ async function gateBlogEnabled(storeId: string, res: Response): Promise<boolean>
     return true;
   }
   if (!store.blogEnabled) {
-    res
-      .status(404)
-      .json({
-        success: false,
-        error: { code: 'BLOG_DISABLED', message: 'Blog not enabled for this store' },
-      });
+    res.status(404).json({
+      success: false,
+      error: { code: 'BLOG_DISABLED', message: 'Blog not enabled for this store' },
+    });
     return true;
   }
   return false;

@@ -45,7 +45,9 @@ if (total === 0) {
 }
 
 if (!APPLY) {
-  console.log('DRY RUN — pass --apply to delete (and optionally --export to write a JSONL backup to R2 first).');
+  console.log(
+    'DRY RUN — pass --apply to delete (and optionally --export to write a JSONL backup to R2 first).'
+  );
   await prisma.$disconnect();
   process.exit(0);
 }
@@ -102,7 +104,9 @@ if (EXPORT_TO_R2) {
       ContentEncoding: 'utf-8',
     })
   );
-  console.log(`✓ Archived ${written} rows to s3://${bucket}/${key} (${(body.length / 1024 / 1024).toFixed(1)} MB)`);
+  console.log(
+    `✓ Archived ${written} rows to s3://${bucket}/${key} (${(body.length / 1024 / 1024).toFixed(1)} MB)`
+  );
 }
 
 // Delete in batches so a 200k-row delete doesn't hold a lock long enough

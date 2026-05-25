@@ -18,13 +18,13 @@ import { readFileSync } from 'fs';
 const STORE_ID = 'dfc1c208-1c30-4eba-9821-6f3be15e3506';
 const APPLY = process.argv.includes('--apply');
 
-const { buckets, proposal } = JSON.parse(
-  readFileSync('/tmp/wady-classification.json', 'utf8')
-);
+const { buckets, proposal } = JSON.parse(readFileSync('/tmp/wady-classification.json', 'utf8'));
 
 console.log(`Mode: ${APPLY ? 'APPLY' : 'DRY-RUN'}`);
 console.log(`Store: ${STORE_ID}`);
-console.log(`Proposal covers ${proposal.length} products into ${Object.keys(buckets).length} buckets.`);
+console.log(
+  `Proposal covers ${proposal.length} products into ${Object.keys(buckets).length} buckets.`
+);
 
 // ---------------------------------------------------------------
 // Step 1 — upsert the 8 new categories
@@ -82,7 +82,9 @@ for (const item of proposal) {
   }
   const newCategoryId = slugToId.get(item.newBucket);
   if (!newCategoryId) {
-    console.warn(`  WARN: bucket ${item.newBucket} not in slugToId — skipping product ${item.productId}`);
+    console.warn(
+      `  WARN: bucket ${item.newBucket} not in slugToId — skipping product ${item.productId}`
+    );
     skipped += 1;
     continue;
   }
@@ -111,7 +113,13 @@ const oldCats = await prisma.category.findMany({
     deletedAt: null,
     slug: { notIn: Object.keys(buckets) },
   },
-  select: { id: true, name: true, nameAr: true, slug: true, _count: { select: { products: true } } },
+  select: {
+    id: true,
+    name: true,
+    nameAr: true,
+    slug: true,
+    _count: { select: { products: true } },
+  },
 });
 let deleted = 0;
 for (const cat of oldCats) {
@@ -122,7 +130,9 @@ for (const cat of oldCats) {
         data: { deletedAt: new Date(), isActive: false },
       });
     }
-    console.log(`  ${APPLY ? 'soft-deleted' : 'would soft-delete'} old empty category: ${cat.nameAr || cat.name}`);
+    console.log(
+      `  ${APPLY ? 'soft-deleted' : 'would soft-delete'} old empty category: ${cat.nameAr || cat.name}`
+    );
     deleted += 1;
   } else {
     console.log(`  KEPT (${cat._count.products} products still linked): ${cat.nameAr || cat.name}`);

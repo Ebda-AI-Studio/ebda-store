@@ -104,7 +104,9 @@ for (const [size, inv] of Object.entries(inventoryBySize)) {
 console.log('\nPlanned variants:');
 for (const v of VARIANTS) {
   const inv = inventoryBySize[v.sizeAr] ?? 0;
-  console.log(`  ${v.sizeAr.padEnd(8)}  ${(v.price / 1000).toFixed(3).padStart(7)} KWD  inv=${inv}`);
+  console.log(
+    `  ${v.sizeAr.padEnd(8)}  ${(v.price / 1000).toFixed(3).padStart(7)} KWD  inv=${inv}`
+  );
 }
 console.log('\nFolds:');
 for (const [sku, def] of Object.entries(PLAN)) {

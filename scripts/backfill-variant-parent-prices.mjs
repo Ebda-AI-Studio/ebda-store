@@ -46,19 +46,22 @@ let skipped = 0;
 for (const p of parents) {
   if (p.variants.length === 0) {
     skipped += 1;
-    console.log(`  ${p.sku?.padEnd(8) || '-'} (${(p.nameAr || p.name || '').slice(0, 30)}) — no active variants, skipping`);
+    console.log(
+      `  ${p.sku?.padEnd(8) || '-'} (${(p.nameAr || p.name || '').slice(0, 30)}) — no active variants, skipping`
+    );
     continue;
   }
-  const variantPrices = p.variants
-    .map(v => v.price)
-    .filter((x) => typeof x === 'number');
+  const variantPrices = p.variants.map(v => v.price).filter(x => typeof x === 'number');
   if (variantPrices.length === 0) {
     skipped += 1;
     continue;
   }
   const minPrice = Math.min(...variantPrices);
   const anyVariantHasCompare = p.variants.some(
-    v => typeof v.compareAtPrice === 'number' && typeof v.price === 'number' && v.compareAtPrice > v.price
+    v =>
+      typeof v.compareAtPrice === 'number' &&
+      typeof v.price === 'number' &&
+      v.compareAtPrice > v.price
   );
 
   const data = {};
@@ -83,13 +86,17 @@ for (const p of parents) {
 
   const before = `price=${(p.price / 1000).toFixed(3)} compareAt=${p.compareAtPrice ? (p.compareAtPrice / 1000).toFixed(3) : '-'}`;
   const after = `price=${(minPrice / 1000).toFixed(3)} compareAt=${'compareAtPrice' in data ? '-' : p.compareAtPrice ? (p.compareAtPrice / 1000).toFixed(3) : '-'}`;
-  console.log(`  ${p.sku?.padEnd(8) || '-'} (${(p.nameAr || p.name || '').slice(0, 30).padEnd(30)})  ${before}  →  ${after}`);
+  console.log(
+    `  ${p.sku?.padEnd(8) || '-'} (${(p.nameAr || p.name || '').slice(0, 30).padEnd(30)})  ${before}  →  ${after}`
+  );
 
   if (APPLY) {
     await prisma.product.update({ where: { id: p.id }, data });
   }
 }
 
-console.log(`\nWould-update: price=${priceUpdates}, clear-compareAt=${compareClears}, skipped (no variants)=${skipped}`);
+console.log(
+  `\nWould-update: price=${priceUpdates}, clear-compareAt=${compareClears}, skipped (no variants)=${skipped}`
+);
 await prisma.$disconnect();
 if (!APPLY) console.log('\nDRY RUN — pass --apply to write.');

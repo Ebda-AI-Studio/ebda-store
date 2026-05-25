@@ -62,7 +62,7 @@ const AXES = {
       وسط: 'وسط',
       متوسط: 'وسط',
       كبير: 'كبير',
-      'إكسترا': 'إكسترا',
+      إكسترا: 'إكسترا',
       اكسترا: 'إكسترا',
       مميز: 'مميز',
     },
@@ -81,7 +81,7 @@ const AXES = {
       سوري: 'سوري',
       مصري: 'مصري',
       ايراني: 'إيراني',
-      'إيراني': 'إيراني',
+      إيراني: 'إيراني',
       هندي: 'هندي',
       تركي: 'تركي',
       فلسطيني: 'فلسطيني',
@@ -123,7 +123,8 @@ for (const [axis, def] of Object.entries(AXES)) {
 const TOKENS_SORTED = [...TOKEN_TO_AXIS.keys()].sort((a, b) => b.length - a.length);
 
 // Numeric size like "500g" / "1 كغ"
-const SIZE_REGEX = /(\d+\s*(?:g|gm|gr|gram|grams|kg|ك|كغ|جم|غم|غرام|مل|ml|l|ل|لتر|قطعة|قطع|عبوة|كيس|باكيت)\b)/giu;
+const SIZE_REGEX =
+  /(\d+\s*(?:g|gm|gr|gram|grams|kg|ك|كغ|جم|غم|غرام|مل|ml|l|ل|لتر|قطعة|قطع|عبوة|كيس|باكيت)\b)/giu;
 
 function normalizeArabic(s) {
   return (s || '')
@@ -265,7 +266,12 @@ md += `## Multi-axis groups (needs merchant review)\n\n`;
 md += `These products share a base name but differ on more than one axis. They COULD be a 2-dimensional variant table (e.g. color × grind) or they could be genuinely distinct SKUs that happen to share a base word.\n\n`;
 for (const g of ungroupedMulti) {
   md += `### \`${g.base}\` × ${g.products.length}  —  axes vary: ${g.axes.join(', ')}\n\n`;
-  md += '| SKU | Name (Ar) | ' + g.axes.map(a => AXES[a].label).join(' | ') + ' | Price |\n|---|---|' + g.axes.map(() => '---').join('|') + '|---|\n';
+  md +=
+    '| SKU | Name (Ar) | ' +
+    g.axes.map(a => AXES[a].label).join(' | ') +
+    ' | Price |\n|---|---|' +
+    g.axes.map(() => '---').join('|') +
+    '|---|\n';
   for (const p of g.products) {
     const price = (p.price / 1000).toFixed(3);
     const axisCells = g.axes.map(a => p.meta.axes[a] || '—').join(' | ');
@@ -277,8 +283,12 @@ for (const g of ungroupedMulti) {
 writeFileSync('/tmp/wady-variant-groups.json', JSON.stringify({ groups, ungroupedMulti }, null, 2));
 writeFileSync('/tmp/wady-variant-groups.md', md);
 
-console.log(`Clean single-axis groups: ${groups.length} (${groups.reduce((s, g) => s + g.products.length, 0)} products)`);
-console.log(`Multi-axis groups (review): ${ungroupedMulti.length} (${ungroupedMulti.reduce((s, g) => s + g.products.length, 0)} products)`);
+console.log(
+  `Clean single-axis groups: ${groups.length} (${groups.reduce((s, g) => s + g.products.length, 0)} products)`
+);
+console.log(
+  `Multi-axis groups (review): ${ungroupedMulti.length} (${ungroupedMulti.reduce((s, g) => s + g.products.length, 0)} products)`
+);
 console.log(`\nTop clean groups:`);
 for (const g of groups.slice(0, 12)) {
   console.log(`  ${g.products.length}× ${g.base} (axis: ${g.axis})`);

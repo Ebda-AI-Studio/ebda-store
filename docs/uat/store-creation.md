@@ -65,7 +65,7 @@ After sign-off, delete the UAT test store to keep the test DB clean:
 
 ## Sign-off
 
-| Role         | Name         | Date         | Notes                                      |
-| ------------ | ------------ | ------------ | ------------------------------------------ |
-| Engineer     | ****\_\_**** | **\_\_\_\_** |                                            |
-| Merchant rep | ****\_\_**** | **\_\_\_\_** | only required before first merchant launch |
+| Role         | Name             | Date         | Notes                                      |
+| ------------ | ---------------- | ------------ | ------------------------------------------ |
+| Engineer     | \***\*\_\_\*\*** | **\_\_\_\_** |                                            |
+| Merchant rep | \***\*\_\_\*\*** | **\_\_\_\_** | only required before first merchant launch |

@@ -19,7 +19,8 @@ for (const p of parents) {
       `${p.variants.length > 3 ? ' ⚠' : ''}`
   );
   if (p.variants.length > 3) {
-    for (const v of p.variants) console.log(`     variant: ${v.sku || '-'}  ${v.titleAr || v.title}`);
+    for (const v of p.variants)
+      console.log(`     variant: ${v.sku || '-'}  ${v.titleAr || v.title}`);
   }
 }
 await prisma.$disconnect();
