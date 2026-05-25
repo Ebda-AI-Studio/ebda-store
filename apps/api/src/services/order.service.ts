@@ -510,7 +510,9 @@ export class OrderService {
             locale: order.locale ?? undefined,
           },
         })
-        .catch(err => logger.error({ err, orderId: order.id }, 'Failed to enqueue order/created'));
+        .catch((err: unknown) =>
+          logger.error({ err, orderId: order.id }, 'Failed to enqueue order/created')
+        );
 
       try {
         socketService.newOrderNotification(storeId, {
@@ -708,7 +710,9 @@ export class OrderService {
       // Queue review-request email (7-day delay handled inside the Inngest fn)
       inngest
         .send({ name: 'order/delivered', data: { orderId, storeId } })
-        .catch(err => logger.error({ err, orderId }, 'Failed to enqueue review-request event'));
+        .catch((err: unknown) =>
+          logger.error({ err, orderId }, 'Failed to enqueue review-request event')
+        );
 
       affiliateService
         .processCommission(storeId, orderId)
@@ -789,7 +793,9 @@ export class OrderService {
       // can send a WhatsApp shipping notification.
       inngest
         .send({ name: 'order/shipped', data: { orderId, storeId } })
-        .catch(err => logger.error({ err, orderId }, 'Failed to enqueue order/shipped event'));
+        .catch((err: unknown) =>
+          logger.error({ err, orderId }, 'Failed to enqueue order/shipped event')
+        );
     } else if (status === 'confirmed' && shippingAddrFull) {
       // Payment success / order confirmed
       void EmailService.sendPaymentSuccess(
@@ -996,7 +1002,7 @@ export class OrderService {
     // mid-refund state.
     inngest
       .send({ name: 'order/refunded', data: { orderId, storeId } })
-      .catch(err =>
+      .catch((err: unknown) =>
         logger.error({ err, orderId, storeId }, '[OrderService] Failed to enqueue order/refunded')
       );
 

@@ -379,7 +379,9 @@ router.post(
             locale: undefined,
           },
         })
-        .catch(err => logger.error({ err, orderId }, '[COD] Failed to enqueue order/created'));
+        .catch((err: unknown) =>
+          logger.error({ err, orderId }, '[COD] Failed to enqueue order/created')
+        );
 
       await auditLog({
         action: 'order.cod_marked_paid',
@@ -470,7 +472,7 @@ router.post(
                 locale: undefined,
               },
             })
-            .catch(err =>
+            .catch((err: unknown) =>
               logger.error({ err, orderId: o.id }, '[COD bulk] Failed to enqueue order/created')
             )
         )
@@ -604,7 +606,7 @@ router.post(
                 locale: undefined,
               },
             })
-            .catch(err =>
+            .catch((err: unknown) =>
               logger.error(
                 { err, orderId: order.id },
                 '[Refresh] Failed to enqueue post-payment order/created'
@@ -755,7 +757,7 @@ router.post(
       const needsSideEffects =
         status.status === 'completed' && statusChanged && payment.status === 'completed';
       if (needsSideEffects) {
-        await OrderService.applyRefundEffects(storeId, orderId).catch(err =>
+        await OrderService.applyRefundEffects(storeId, orderId).catch((err: unknown) =>
           logger.error(
             { err, orderId, storeId },
             '[refresh-refund-status] applyRefundEffects failed'
@@ -766,7 +768,7 @@ router.post(
             where: { id: orderId },
             data: { status: 'refunded', paymentStatus: 'refunded' },
           })
-          .catch(err =>
+          .catch((err: unknown) =>
             logger.error({ err, orderId }, '[refresh-refund-status] order status update failed')
           );
       }

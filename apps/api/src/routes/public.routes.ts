@@ -1271,7 +1271,7 @@ router.post(
           name: 'review/submitted',
           data: { reviewId: review.id, storeId: order.storeId },
         })
-        .catch(err =>
+        .catch((err: unknown) =>
           logger.warn({ err, reviewId: review.id }, '[ReviewSubmit] inngest enqueue failed')
         );
 

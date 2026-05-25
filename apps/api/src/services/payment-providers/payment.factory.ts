@@ -992,7 +992,7 @@ export class PaymentService {
             locale: order.locale ?? undefined,
           },
         })
-        .catch(err =>
+        .catch((err: unknown) =>
           logger.error(
             { err, orderId: order.id },
             '[PAYMENT WEBHOOK] Failed to enqueue post-payment order/created'

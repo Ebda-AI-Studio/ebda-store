@@ -350,7 +350,7 @@ describe('TapPaymentProvider', () => {
 
     it('should include Arabic names', async () => {
       const methods = await provider.getPaymentMethods(5000, 'KWD');
-      const knetMethod = methods.find(m => m.code === 'knet');
+      const knetMethod = methods.find((m: { code: string }) => m.code === 'knet');
 
       expect(knetMethod?.nameAr).toBe('كي نت');
     });

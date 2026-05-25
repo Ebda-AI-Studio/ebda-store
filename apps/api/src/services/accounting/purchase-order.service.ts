@@ -253,7 +253,9 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         clearedBackorders,
       },
     })
-    .catch(err => logger.error({ err, poId: input.poId }, 'Failed to enqueue stock/po-received'));
+    .catch((err: unknown) =>
+      logger.error({ err, poId: input.poId }, 'Failed to enqueue stock/po-received')
+    );
 
   return { po, clearedBackorders };
 }

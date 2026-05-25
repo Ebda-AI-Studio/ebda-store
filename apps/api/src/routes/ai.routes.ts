@@ -676,19 +676,19 @@ router.post(
             name: 'bulk-ai/faq-aeo-requested',
             data: { jobId: faqJob.id, storeId, count, force },
           })
-          .catch(err => markJobFailedIfEnqueueFailed(faqJob.id, err)),
+          .catch((err: unknown) => markJobFailedIfEnqueueFailed(faqJob.id, err)),
         inngest
           .send({
             name: 'bulk-ai/howto-aeo-requested',
             data: { jobId: howtoJob.id, storeId, count: 3, force },
           })
-          .catch(err => markJobFailedIfEnqueueFailed(howtoJob.id, err)),
+          .catch((err: unknown) => markJobFailedIfEnqueueFailed(howtoJob.id, err)),
         inngest
           .send({
             name: 'bulk-ai/meta-aeo-requested',
             data: { jobId: metaJob.id, storeId, force },
           })
-          .catch(err => markJobFailedIfEnqueueFailed(metaJob.id, err)),
+          .catch((err: unknown) => markJobFailedIfEnqueueFailed(metaJob.id, err)),
       ]);
 
       const anyFailed = enqueueResults.some(r => r.status === 'rejected');
@@ -906,19 +906,19 @@ router.post(
             name: 'bulk-ai/llms-txt-requested',
             data: { jobId: llmsJob.id, storeId, force: geoForce },
           })
-          .catch(err => markJobFailedIfEnqueueFailed(llmsJob.id, err)),
+          .catch((err: unknown) => markJobFailedIfEnqueueFailed(llmsJob.id, err)),
         inngest
           .send({
             name: 'bulk-ai/citation-copy-requested',
             data: { jobId: citationJob.id, storeId, force: geoForce },
           })
-          .catch(err => markJobFailedIfEnqueueFailed(citationJob.id, err)),
+          .catch((err: unknown) => markJobFailedIfEnqueueFailed(citationJob.id, err)),
         inngest
           .send({
             name: 'bulk-ai/brand-facts-requested',
             data: { jobId: factsJob.id, storeId, force: geoForce },
           })
-          .catch(err => markJobFailedIfEnqueueFailed(factsJob.id, err)),
+          .catch((err: unknown) => markJobFailedIfEnqueueFailed(factsJob.id, err)),
       ]);
 
       const anyFailed = enqueueResults.some(r => r.status === 'rejected');
