@@ -237,7 +237,6 @@ jobs:
           # setup-e2e.ts uses this in preference to DATABASE_URL so integration
           # tests run against ep-spring-dew (staging), never ep-falling-meadow (prod).
           # The secret is set via: gh secret set TEST_DATABASE_URL --repo ForceAI-KW/force-website-builder
-          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
           DATABASE_URL: postgresql://test:test@localhost:5432/force_test
           DIRECT_URL: postgresql://test:test@localhost:5432/force_test
           REDIS_URL: redis://localhost:6379
