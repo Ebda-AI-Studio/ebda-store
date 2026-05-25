@@ -1,0 +1,17 @@
+# Gitleaks allowlist — known false positives
+# Each line is `<commit>:<file>:<rule>:<line>` matching gitleaks Fingerprint output.
+# Only add entries here that are PROVEN false positives — never silence real leaks.
+
+# Test fixtures (literal value: "test-encryption-key-that-is-32-chars" + similar)
+a1a6ebfda21ac56a902ec497fc10ca79d132dfd4:tests/unit/wbs-bridge.test.ts:generic-api-key:61
+58d8530ce3bf1a07ffc35c043279feeae5102809:tests/unit/payment-provider.test.ts:generic-api-key:22
+
+# Documentation example (Google Apps Script template with placeholder TOKEN constant)
+d6d35fa6dd3b1a3b2a6b72bbabb1cdfcc478e1fb:docs/apps-script-gmail-to-telegram.gs:generic-api-key:25
+
+# CI workflow env-var name references (not actual secret values — names like
+# "ENCRYPTION_KEY" used in `env:` blocks that GitHub Actions resolves from
+# repository secrets at runtime; gitleaks sees the name's entropy)
+c8e3b3ba15048ba4c9c9d741d902698ef06a3355:.github/workflows/ci.yml:generic-api-key:210
+768cc5e9298be4b497cc0a181731e0b480086e25:.github/workflows/ci.yml:generic-api-key:159
+768cc5e9298be4b497cc0a181731e0b480086e25:.github/workflows/ci.yml:generic-api-key:215
