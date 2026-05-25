@@ -28,6 +28,9 @@ import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import logger from '../lib/logger';
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
+import { CustomerAddressService } from '../services/customer-address.service';
+
+const addressSvc = new CustomerAddressService(prisma as any);
 
 const router = Router();
 
@@ -937,6 +940,52 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
   } catch (err) {
     logger.error({ err: (err as Error).message }, '[wa-bridge] templates/status failed');
     res.status(500).json({ success: false, error: 'STATUS_CALLBACK_FAILED' });
+  }
+});
+
+// ─── GET /customer-addresses?customerId= ────────────────────────────────────
+// Returns saved delivery addresses for a customer, default first.
+// Called by the WBS bot during checkout to offer the customer's saved addresses.
+router.get('/customer-addresses', waBridgeAuth, async (req: Request, res: Response) => {
+  try {
+    const customerId = req.query.customerId as string | undefined;
+    if (!customerId) {
+      res.status(400).json({ success: false, error: { code: 'CUSTOMER_ID_REQUIRED' } });
+      return;
+    }
+    const addresses = await addressSvc.listForCustomer(customerId);
+    res.status(200).json({ success: true, data: { addresses } });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, '[wa-bridge] customer-addresses GET failed');
+    res.status(500).json({ success: false, error: { code: 'ADDRESS_FETCH_FAILED' } });
+  }
+});
+
+// ─── POST /customer-addresses ────────────────────────────────────────────────
+// Creates a new delivery address for a customer.
+// Body: { customerId, street, area, block?, governorate?, buildingNumber?, label?, notes? }
+// The first address created is automatically marked isDefault=true.
+router.post('/customer-addresses', waBridgeAuth, async (req: Request, res: Response) => {
+  try {
+    const { customerId, street, area, block, governorate, buildingNumber, label, notes } =
+      req.body ?? {};
+    if (!customerId || !street || !area) {
+      res.status(400).json({ success: false, error: { code: 'MISSING_FIELDS' } });
+      return;
+    }
+    const address = await addressSvc.createForCustomer(customerId, {
+      street,
+      area,
+      block,
+      governorate,
+      buildingNumber,
+      label,
+      notes,
+    });
+    res.status(201).json({ success: true, data: { address } });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, '[wa-bridge] customer-addresses POST failed');
+    res.status(500).json({ success: false, error: { code: 'ADDRESS_CREATE_FAILED' } });
   }
 });
 
