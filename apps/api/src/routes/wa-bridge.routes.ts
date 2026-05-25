@@ -27,6 +27,7 @@ import { prisma } from '@force/database';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import logger from '../lib/logger';
+import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
 
 const router = Router();
 
@@ -57,6 +58,10 @@ const bridgeRateLimit = rateLimit({
 // that don't have a WBS API key — that endpoint's auth IS the signed
 // JWT carrying the cart payload.
 router.use(bridgeRateLimit);
+
+// Timing middleware — emits structured {path, method, status, durationMs}
+// per request for latency diagnosis. Phase 0 instrumentation.
+router.use(waBridgeTiming(logger));
 
 const PAGE_SIZE = 10; // Meta interactive list cap
 const CHECKOUT_TOKEN_TTL_SECONDS = 30 * 60; // 30 minutes
