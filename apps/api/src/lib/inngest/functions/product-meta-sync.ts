@@ -1,3 +1,4 @@
+import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
 import { prisma as defaultPrisma } from '@force/database';
 import logger from '../../logger';
@@ -92,7 +93,7 @@ export const productMetaSync = async ({
   });
 };
 
-export const productMetaSyncFn = inngest.createFunction(
+export const productMetaSyncFn: InngestFunction.Any = inngest.createFunction(
   {
     id: 'product-meta-sync',
     name: 'Product → Meta Catalog sync',
@@ -102,7 +103,7 @@ export const productMetaSyncFn = inngest.createFunction(
   productMetaSync as any
 );
 
-export const productMetaSyncDeleteFn = inngest.createFunction(
+export const productMetaSyncDeleteFn: InngestFunction.Any = inngest.createFunction(
   {
     id: 'product-meta-sync-delete',
     name: 'Product delete → Meta Catalog',
