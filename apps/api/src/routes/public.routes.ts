@@ -810,7 +810,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
     if (!result) {
       res.status(404).json({
         success: false,
-        error: { code: 'NOT_FOUND', message: 'Store not found' },
+        error: { code: 'STORE_NOT_FOUND', message: 'Store not found' },
       });
       return;
     }

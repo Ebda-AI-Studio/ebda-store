@@ -315,11 +315,12 @@ describe('Checkout Flow', () => {
         data: {
           storeId: testStoreId!,
           code: `EXPIRED-${Date.now()}`,
-          discountType: 'fixed',
-          discountValue: 500,
+          name: 'Test Coupon Expired',
+          type: 'fixed',
+          value: 500,
           isActive: true,
-          validFrom: new Date(Date.now() - 86400000 * 2),
-          validUntil: new Date(Date.now() - 86400000), // Expired yesterday
+          startsAt: new Date(Date.now() - 86400000 * 2),
+          expiresAt: new Date(Date.now() - 86400000), // Expired yesterday
         },
       });
 

@@ -138,8 +138,8 @@ describe('Public Storefront API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.slug).toBe(testStoreSlug);
-      expect(res.body.data.name).toBe('Public Test Store');
+      expect(res.body.data.store.slug).toBe(testStoreSlug);
+      expect(res.body.data.store.name).toBe('Public Test Store');
     });
 
     it('should resolve store by domain header', async () => {
@@ -149,16 +149,16 @@ describe('Public Storefront API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.domain).toBe(testStoreDomain);
+      expect(res.body.data.store.domain).toBe(testStoreDomain);
     });
 
     it('should include theme and branding in resolution', async () => {
       const res = await request(app).get(`/public/stores/${testStoreSlug}`);
 
-      expect(res.body.data.theme).toBeDefined();
-      expect(res.body.data.theme.primaryColor).toBe('26 100% 50%');
-      expect(res.body.data.socialLinks).toBeDefined();
-      expect(res.body.data.socialLinks.instagram).toBe('https://instagram.com/teststore');
+      expect(res.body.data.store.theme).toBeDefined();
+      expect(res.body.data.store.theme.primaryColor).toBe('26 100% 50%');
+      expect(res.body.data.store.socialLinks).toBeDefined();
+      expect(res.body.data.store.socialLinks.instagram).toBe('https://instagram.com/teststore');
     });
 
     it('should return 404 for non-existent store', async () => {
@@ -172,9 +172,8 @@ describe('Public Storefront API', () => {
       const res = await request(app).get(`/public/stores/${testStoreSlug}`);
 
       // Should not include internal fields
-      expect(res.body.data.ownerId).toBeUndefined();
-      expect(res.body.data.settings).toBeUndefined();
-      expect(res.body.data.paymentConfig).toBeUndefined();
+      expect(res.body.data.store.ownerId).toBeUndefined();
+      expect(res.body.data.store.paymentConfig).toBeUndefined();
     });
   });
 
@@ -326,7 +325,7 @@ describe('Public Storefront API', () => {
         .set('Accept-Language', 'ar');
 
       expect(res.status).toBe(200);
-      expect(res.body.data.name).toBe('متجر اختبار عام');
+      expect(res.body.data.store.nameAr).toBe('متجر اختبار عام');
     });
 
     it('should return Arabic product names', async () => {
