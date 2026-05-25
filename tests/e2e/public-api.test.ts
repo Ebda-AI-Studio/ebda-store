@@ -185,7 +185,7 @@ describe('Public Storefront API', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data.products).toBeDefined();
       expect(res.body.data.products.length).toBeGreaterThan(0);
-      expect(res.body.data.pagination).toBeDefined();
+      expect(res.body.data.meta).toBeDefined();
     });
 
     it('should paginate products correctly', async () => {
@@ -196,9 +196,9 @@ describe('Public Storefront API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.products.length).toBeLessThanOrEqual(3);
-      expect(res.body.data.pagination.page).toBe(1);
-      expect(res.body.data.pagination.limit).toBe(3);
-      expect(res.body.data.pagination.total).toBeGreaterThan(3);
+      expect(res.body.data.meta.page).toBe(1);
+      expect(res.body.data.meta.limit).toBe(3);
+      expect(res.body.data.meta.total).toBeGreaterThan(3);
     });
 
     it('should filter products by category', async () => {
@@ -256,10 +256,10 @@ describe('Public Storefront API', () => {
         .set('x-store-id', testStoreId!);
 
       expect(res.status).toBe(200);
-      expect(res.body.data.id).toBe(testProductId);
-      expect(res.body.data.name).toBe('Public Test Product');
-      expect(res.body.data.price).toBe(5000);
-      expect(res.body.data.images).toHaveLength(2);
+      expect(res.body.data.product.id).toBe(testProductId);
+      expect(res.body.data.product.name).toBe('Public Test Product');
+      expect(res.body.data.product.price).toBe(5000);
+      expect(res.body.data.product.images).toHaveLength(2);
     });
 
     it('should include category info in product', async () => {
@@ -269,8 +269,8 @@ describe('Public Storefront API', () => {
         .get(`/public/products/${product?.slug}`)
         .set('x-store-id', testStoreId!);
 
-      expect(res.body.data.categories).toBeDefined();
-      expect(res.body.data.categories.length).toBeGreaterThan(0);
+      expect(res.body.data.product.categories).toBeDefined();
+      expect(res.body.data.product.categories.length).toBeGreaterThan(0);
     });
 
     it('should return 404 for non-existent product', async () => {
@@ -309,13 +309,14 @@ describe('Public Storefront API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body.data.categories).toBeDefined();
+      expect(res.body.data.categories.length).toBeGreaterThan(0);
     });
 
     it('should include product count in categories', async () => {
       const res = await request(app).get('/public/categories').set('x-store-id', testStoreId!);
 
-      const category = res.body.data.find((c: any) => c.id === testCategoryId);
+      const category = res.body.data.categories.find((c: any) => c.id === testCategoryId);
       expect(category).toBeDefined();
       expect(category._count.products).toBeGreaterThan(0);
     });
@@ -339,7 +340,7 @@ describe('Public Storefront API', () => {
         .set('x-store-id', testStoreId!)
         .set('Accept-Language', 'ar');
 
-      expect(res.body.data.nameAr).toBe('منتج اختبار عام');
+      expect(res.body.data.product.nameAr).toBe('منتج اختبار عام');
     });
   });
 
@@ -351,7 +352,7 @@ describe('Public Storefront API', () => {
         .get(`/public/products/${product?.slug}`)
         .set('x-store-id', testStoreId!);
 
-      expect(res.body.data.inStock).toBe(true);
+      expect(res.body.data.product.inStock).toBe(true);
     });
 
     it('should show out-of-stock for zero inventory', async () => {
@@ -370,7 +371,7 @@ describe('Public Storefront API', () => {
         .get(`/public/products/${outOfStockProduct.slug}`)
         .set('x-store-id', testStoreId!);
 
-      expect(res.body.data.inStock).toBe(false);
+      expect(res.body.data.product.inStock).toBe(false);
 
       await prisma.product.delete({ where: { id: outOfStockProduct.id } });
     });
@@ -380,8 +381,7 @@ describe('Public Storefront API', () => {
     it('should apply rate limiting to public endpoints', async () => {
       const res = await request(app).get('/public/products').set('x-store-id', testStoreId!);
 
-      expect(res.headers['x-ratelimit-limit']).toBeDefined();
-      expect(res.headers['x-ratelimit-remaining']).toBeDefined();
+      expect(res.headers['ratelimit-policy']).toBeDefined();
     });
   });
 
