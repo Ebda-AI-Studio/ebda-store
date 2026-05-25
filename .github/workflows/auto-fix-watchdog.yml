@@ -1,0 +1,120 @@
+name: Auto-fix watchdog
+
+# Layer C of the 3-layer Force AI autonomous CI fix stack.
+# Runs in the cloud every 17 min - independent of whether Ahmad's laptop
+# is open or asleep. Detects CI failures across all 3 Force AI Suite repos
+# that have been open >30 min WITHOUT an auto-fix PR opened against the SHA.
+# Pings Telegram with an ESCALATION message: "human attention needed".
+#
+# Complements:
+#   Layer A: in-session CronCreate (while Claude Code is open)
+#   Layer B: macOS launchd (while Mac is awake, Claude Code closed OK)
+
+on:
+  schedule:
+    - cron: '7,24,41,58 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: auto-fix-watchdog-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  watchdog:
+    name: Cross-repo CI failure escalator
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check all 3 Force AI Suite repos for stale failures
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CROSS_REPO_TOKEN: ${{ secrets.ESCALATOR_PAT }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+        run: |
+          set -euo pipefail
+
+          REPOS=(
+            "ForceAI-KW/force-website-builder:ci.yml"
+            "ForceAI-KW/whatsapp-broadcaster:pr-validation.yml"
+            "ForceAI-KW/Force-Media-CRM:ci.yml"
+          )
+
+          if [ -n "${CROSS_REPO_TOKEN:-}" ]; then
+            export GH_TOKEN="$CROSS_REPO_TOKEN"
+          fi
+
+          telegram() {
+            if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_ALERT_CHAT_ID:-}" ]; then
+              echo "telegram secrets not set - would have sent: $1"
+              return 0
+            fi
+            curl -sS -m 10 -X POST \
+              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \
+              -d parse_mode=Markdown \
+              -d disable_web_page_preview=true \
+              -d text="$1" >/dev/null || echo "telegram send failed"
+          }
+
+          ESCALATIONS=0
+          for REPO_ENTRY in "${REPOS[@]}"; do
+            REPO="${REPO_ENTRY%:*}"
+            WORKFLOW="${REPO_ENTRY#*:}"
+
+            RUN_JSON=$(gh run list \
+              --repo "$REPO" \
+              --workflow="$WORKFLOW" \
+              --status=failure \
+              --limit=1 \
+              --json databaseId,headSha,createdAt,displayTitle 2>/dev/null || echo "[]")
+
+            RUN_ID=$(echo "$RUN_JSON" | jq -r '.[0].databaseId // empty')
+            SHA=$(echo "$RUN_JSON" | jq -r '.[0].headSha // empty')
+            CREATED=$(echo "$RUN_JSON" | jq -r '.[0].createdAt // empty')
+            TITLE=$(echo "$RUN_JSON" | jq -r '.[0].displayTitle // empty')
+
+            if [ -z "$RUN_ID" ]; then
+              echo "$REPO: no failed runs"
+              continue
+            fi
+
+            RUN_EPOCH=$(date -d "$CREATED" "+%s" 2>/dev/null || echo "0")
+            NOW_EPOCH=$(date "+%s")
+            AGE_MIN=$(( (NOW_EPOCH - RUN_EPOCH) / 60 ))
+
+            if [ "$AGE_MIN" -lt 30 ]; then
+              echo "$REPO: failure $RUN_ID is fresh (${AGE_MIN}min) - Layer A/B handle it"
+              continue
+            fi
+
+            if [ "$AGE_MIN" -gt 240 ]; then
+              echo "$REPO: failure $RUN_ID is ancient (${AGE_MIN}min) - already known, suppressing"
+              continue
+            fi
+
+            EXISTING_PR=$(gh pr list \
+              --repo "$REPO" \
+              --state=open \
+              --search "auto-fix ${SHA:0:8}" \
+              --json number 2>/dev/null \
+              | jq -r '.[0].number // empty')
+
+            if [ -n "$EXISTING_PR" ]; then
+              echo "$REPO: auto-fix PR #$EXISTING_PR exists for ${SHA:0:8}"
+              continue
+            fi
+
+            ESCALATIONS=$(( ESCALATIONS + 1 ))
+            SHORT_SHA="${SHA:0:8}"
+            MSG="*Escalation* - \`${REPO}\` CI failing for ${AGE_MIN}min without auto-fix PR. sha: \`${SHORT_SHA}\` title: ${TITLE} run: https://github.com/${REPO}/actions/runs/${RUN_ID}"
+            telegram "$MSG"
+            echo "$REPO: ESCALATED (${AGE_MIN}min stale)"
+          done
+
+          echo ""
+          echo "watchdog summary: ${ESCALATIONS} escalations sent"
