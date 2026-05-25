@@ -199,6 +199,7 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/force_test
           DIRECT_URL: postgresql://test:test@localhost:5432/force_test
           ADMIN_PASSWORD: test-admin-password-ci
+          ADMIN_EMAIL: admin@forcemedia.com
 
       - name: Build API
         run: npm run build -w apps/api

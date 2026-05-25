@@ -47,6 +47,19 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
+  // Handle JSON parse errors from Express body-parser
+  if (err instanceof SyntaxError && 'body' in err) {
+    logger.debug({ err: { message: err.message } }, 'JSON parse error');
+    res.status(400).json({
+      success: false,
+      error: {
+        code: 'INVALID_JSON',
+        message: 'Request body contains invalid JSON',
+      },
+    });
+    return;
+  }
+
   // Handle Zod validation errors
   if (err instanceof ZodError) {
     logger.debug({ issues: err.issues }, 'Validation error');

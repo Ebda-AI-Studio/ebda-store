@@ -134,7 +134,7 @@ describe('API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: ADMIN_EMAIL,
-          password: 'testpassword',
+          password: 'TestPassword1!',
           firstName: 'Test',
           lastName: 'User',
         }),
