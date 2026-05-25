@@ -20,7 +20,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
@@ -39,7 +39,9 @@ const bridgeRateLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
   keyGenerator: req =>
-    (req.headers['x-wbs-api-key'] as string | undefined) || req.ip || 'anonymous',
+    (req.headers['x-wbs-api-key'] as string | undefined) ||
+    ipKeyGenerator(req.ip ?? '') ||
+    'anonymous',
   message: {
     success: false,
     error: 'rate_limit_exceeded',

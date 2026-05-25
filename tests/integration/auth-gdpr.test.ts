@@ -5,34 +5,57 @@
  *
  * Hits the running API at http://localhost:4000 against the integration
  * Postgres + Redis from tests/setup.ts. Each test owns its own freshly
- * registered customer so erasing one doesn't poison the others.
+ * created customer so erasing one doesn't poison the others.
+ *
+ * We create test users directly via Prisma with emailVerified=true rather
+ * than going through POST /auth/register, because registration now gates
+ * token issuance behind email verification (correct prod behavior). Tests
+ * must not depend on /auth/register returning tokens.
  */
 
 import { describe, it, expect } from 'vitest';
+import { prisma } from '@force/database';
+import bcrypt from 'bcryptjs';
 
 const API_HOST = process.env.API_HOST || 'http://localhost:4000';
 const API_URL = `${API_HOST}/api/v1`;
 
+const GDPR_TEST_PASSWORD = 'GdprTest!234';
+
+/**
+ * Create a verified customer in the DB and log them in to get an access
+ * token. Bypasses the email-verification step that POST /auth/register
+ * now enforces.
+ */
 async function registerCustomer() {
   const email = `gdpr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
-  const res = await fetch(`${API_URL}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const passwordHash = await bcrypt.hash(GDPR_TEST_PASSWORD, 10);
+
+  const user = await prisma.user.create({
+    data: {
       email,
-      password: 'GdprTest!234',
+      passwordHash,
       firstName: 'Privacy',
       lastName: 'Tester',
-    }),
+      role: 'customer',
+      emailVerified: true, // must be true so /auth/login issues tokens
+    },
+    select: { id: true },
   });
-  if (res.status !== 201) {
+
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: GDPR_TEST_PASSWORD }),
+  });
+  if (!res.ok) {
     const body = await res.text();
-    throw new Error(`register failed (${res.status}): ${body}`);
+    throw new Error(`login failed (${res.status}): ${body}`);
   }
   const json = await res.json();
   return {
     email,
-    userId: json.data.user.id as string,
+    userId: user.id,
     accessToken: json.data.accessToken as string,
   };
 }

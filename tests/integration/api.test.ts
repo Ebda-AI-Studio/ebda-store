@@ -3,7 +3,9 @@
  * Tests for API endpoints and their integration with services
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { prisma } from '@force/database';
+import bcrypt from 'bcryptjs';
 
 // API base URL for testing. Health is the public/load-balancer endpoint
 // (no /api/v1 prefix). Everything else lives under /api/v1.
@@ -19,6 +21,36 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 let authToken: string;
 let customerToken: string;
 let testStoreId: string;
+
+// Create a verified customer directly in DB and log them in to obtain a
+// token. We bypass /auth/register because registration now always returns
+// { emailVerificationSent: true } (email-verification gate is correct prod
+// behavior). Tests that need a customer token must not rely on register
+// issuing tokens.
+const CUSTOMER_TEST_EMAIL = `customer-${Date.now()}@example.test`;
+const CUSTOMER_TEST_PASSWORD = 'CustomerTest!1';
+
+beforeAll(async () => {
+  const passwordHash = await bcrypt.hash(CUSTOMER_TEST_PASSWORD, 10);
+  await prisma.user.create({
+    data: {
+      email: CUSTOMER_TEST_EMAIL,
+      passwordHash,
+      firstName: 'Customer',
+      lastName: 'Test',
+      role: 'customer',
+      emailVerified: true, // bypass email-verification gate so login issues tokens
+    },
+  });
+
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: CUSTOMER_TEST_EMAIL, password: CUSTOMER_TEST_PASSWORD }),
+  });
+  const json = await res.json();
+  customerToken = json.data?.accessToken as string;
+});
 
 describe('API Integration Tests', () => {
   describe('Health Check', () => {
@@ -70,25 +102,28 @@ describe('API Integration Tests', () => {
       expect(data.error.code).toBe('INVALID_CREDENTIALS');
     });
 
-    it('should register new user', async () => {
+    it('should register new user and return email verification response', async () => {
+      // Registration now triggers email verification and returns
+      // { emailVerificationSent: true } — no tokens are issued until the
+      // user verifies their email. This is correct prod behavior; tests
+      // that need a customerToken must create verified users directly (see
+      // beforeAll above).
       const uniqueEmail = `test-${Date.now()}@example.com`;
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: uniqueEmail,
-          password: 'testpassword123',
+          password: 'TestUser!1',
           firstName: 'Test',
           lastName: 'User',
         }),
       });
       const data = await response.json();
 
-      expect(response.status).toBe(201);
+      expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      expect(data.data.user.email).toBe(uniqueEmail);
-
-      customerToken = data.data.accessToken;
+      expect(data.data.emailVerificationSent).toBe(true);
     });
 
     it('should reject duplicate email registration', async () => {
