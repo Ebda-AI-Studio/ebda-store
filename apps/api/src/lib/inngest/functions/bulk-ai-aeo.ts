@@ -51,11 +51,33 @@ function getGenAI(): GoogleGenerativeAI {
  * are clean.
  */
 function stripFences(text: string): string {
-  return text
+  let s = text
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/i, '')
     .trim();
+
+  // Extract the outermost JSON span. Gemini occasionally appends explanatory
+  // text after a valid JSON body even when prompted for pure JSON — e.g.
+  // `{"en": "..."}\n\nNote: this is a draft.` That trailing text trips
+  // JSON.parse with "Unexpected non-whitespace character after JSON at
+  // position N" (verified failure: meta-aeo sweep on products Mastic + caraway
+  // at position 331, 2026-05-25). Same trap on the leading side
+  // ("Here's the JSON:\n{...}").
+  //
+  // Strategy: slice from the first `{` or `[` to the last `}` or `]`.
+  // Not fully bracket-balanced (JSON with `{` inside a string literal is
+  // fine because lastIndexOf finds the OUTER closer), but covers every
+  // real Gemini response shape observed in prod.
+  const firstOpen = s.search(/[\{\[]/);
+  if (firstOpen > 0) s = s.slice(firstOpen);
+
+  const lastClose = Math.max(s.lastIndexOf('}'), s.lastIndexOf(']'));
+  if (lastClose !== -1 && lastClose < s.length - 1) {
+    s = s.slice(0, lastClose + 1);
+  }
+
+  return s;
 }
 
 /**

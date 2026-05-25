@@ -42,11 +42,27 @@ function getGenAI(): GoogleGenerativeAI {
 }
 
 function stripFences(text: string): string {
-  return text
+  let s = text
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/i, '')
     .trim();
+
+  // Extract the outermost JSON span. Gemini occasionally appends explanatory
+  // text after a valid JSON body even when prompted for pure JSON. Slice
+  // from the first `{` or `[` to the last `}` or `]`. See bulk-ai-aeo.ts
+  // for full rationale (2026-05-25 fix after Mastic + caraway products
+  // failed AEO meta sweep with "Unexpected non-whitespace character after
+  // JSON at position 331").
+  const firstOpen = s.search(/[\{\[]/);
+  if (firstOpen > 0) s = s.slice(firstOpen);
+
+  const lastClose = Math.max(s.lastIndexOf('}'), s.lastIndexOf(']'));
+  if (lastClose !== -1 && lastClose < s.length - 1) {
+    s = s.slice(0, lastClose + 1);
+  }
+
+  return s;
 }
 
 // -----------------------------------------------------------------------
