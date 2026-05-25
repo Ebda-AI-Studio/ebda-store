@@ -146,9 +146,22 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
       : costVolume7d; // no prior data → no spike
 
   // ---- 5. Build metric array ----
+  // Skip cost_spike when the 7d window has zero inventory movement AND the
+  // baseline is thin (<10 units/week). The metric reads InventoryHistory.quantity
+  // (movement volume, not cost dollars), so a quiet week on a thin store
+  // produces a -100% delta that always trips P0 — that's noise, not signal.
+  const includeCostSpike = !(costVolume7d === 0 && costVolumeBaseline < 10);
   const rawMetrics: Array<{ metric: AnomalyMetric; current: number; baseline: number }> = [
     { metric: 'margin_drop', current: margin7d, baseline: margin28d },
-    { metric: 'cost_spike', current: costVolume7d, baseline: costVolumeBaseline },
+    ...(includeCostSpike
+      ? [
+          {
+            metric: 'cost_spike' as AnomalyMetric,
+            current: costVolume7d,
+            baseline: costVolumeBaseline,
+          },
+        ]
+      : []),
     { metric: 'revenue_drop', current: revenue7d, baseline: revenueBaseline },
     { metric: 'refund_spike', current: refunds7dCount, baseline: refundBaseline },
   ];

@@ -124,3 +124,7 @@ graphify-out/.chunks/
 graphify-out/.graphify_ast.json
 graphify-out/.graphify_chunk_*.json
 graphify-out/.graphify_semantic.json
+
+# stryker mutation testing temp sandbox (transient — never commit)
+stryker-tmp/
+.stryker-tmp/
