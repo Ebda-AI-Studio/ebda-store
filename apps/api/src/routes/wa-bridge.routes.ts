@@ -29,8 +29,18 @@ import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import logger from '../lib/logger';
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
 import { CustomerAddressService } from '../services/customer-address.service';
+import { encryption } from '../services/encryption.service';
 
 const addressSvc = new CustomerAddressService(prisma as any);
+
+/** Default service menu when the merchant hasn't customized it. */
+const DEFAULT_SERVICE_MENU = {
+  orderNow: true,
+  subscriptionBoxes: false,
+  locationsHours: true,
+  chatWithAgent: true,
+  labels: { en: {}, ar: {} },
+};
 
 const router = Router();
 
@@ -940,6 +950,114 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
   } catch (err) {
     logger.error({ err: (err as Error).message }, '[wa-bridge] templates/status failed');
     res.status(500).json({ success: false, error: 'STATUS_CALLBACK_FAILED' });
+  }
+});
+
+// ─── GET /store/service-menu?storeId= ───────────────────────────────────────
+// Returns the merchant's bot service menu config (or defaults if not configured).
+// WBS reads this on every 5-min catalog refresh + caches in Redis.
+router.get('/store/service-menu', waBridgeAuth, async (req: Request, res: Response) => {
+  try {
+    const storeId = req.query.storeId as string | undefined;
+    if (!storeId) {
+      res.status(400).json({ success: false, error: { code: 'STORE_ID_REQUIRED' } });
+      return;
+    }
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { botServiceMenu: true },
+    });
+    if (!store) {
+      res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
+      return;
+    }
+    const serviceMenu = store.botServiceMenu ?? DEFAULT_SERVICE_MENU;
+    res.status(200).json({ success: true, data: { serviceMenu } });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, '[wa-bridge] store/service-menu GET failed');
+    res.status(500).json({ success: false, error: { code: 'SERVICE_MENU_FETCH_FAILED' } });
+  }
+});
+
+// ─── GET /store/meta-catalog-config?storeId= ────────────────────────────────
+// Returns catalogId + businessId + hasToken (boolean). NEVER returns the token plain.
+router.get('/store/meta-catalog-config', waBridgeAuth, async (req: Request, res: Response) => {
+  try {
+    const storeId = req.query.storeId as string | undefined;
+    if (!storeId) {
+      res.status(400).json({ success: false, error: { code: 'STORE_ID_REQUIRED' } });
+      return;
+    }
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { metaCatalogId: true, metaBusinessId: true, metaAccessToken: true },
+    });
+    if (!store) {
+      res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      data: {
+        catalogId: store.metaCatalogId ?? null,
+        businessId: store.metaBusinessId ?? null,
+        // Never return the encrypted token — WBS reads it server-to-server via
+        // the inngest-receiver which uses the token stored on the client row.
+        hasToken: Boolean(store.metaAccessToken),
+      },
+    });
+  } catch (err) {
+    logger.error(
+      { err: (err as Error).message },
+      '[wa-bridge] store/meta-catalog-config GET failed'
+    );
+    res.status(500).json({ success: false, error: { code: 'CATALOG_CONFIG_FETCH_FAILED' } });
+  }
+});
+
+// ─── POST /store/meta-catalog-config ────────────────────────────────────────
+// Saves catalog ID + business ID + encrypted access token.
+// Called from FWB admin (Bot Config tab) when merchant saves the Meta IDs.
+const metaCatalogConfigSchema = z.object({
+  storeId: z.string().min(1),
+  catalogId: z.string().min(1).optional(),
+  businessId: z.string().min(1).optional(),
+  accessToken: z.string().min(1).optional(),
+});
+
+router.post('/store/meta-catalog-config', waBridgeAuth, async (req: Request, res: Response) => {
+  try {
+    const parse = metaCatalogConfigSchema.safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({ success: false, error: { code: 'INVALID_BODY' } });
+      return;
+    }
+    const { storeId, catalogId, businessId, accessToken } = parse.data;
+
+    const updateData: Record<string, unknown> = {};
+    if (catalogId !== undefined) updateData.metaCatalogId = catalogId;
+    if (businessId !== undefined) updateData.metaBusinessId = businessId;
+    // Encrypt the token at the boundary — never store plaintext
+    if (accessToken !== undefined) {
+      updateData.metaAccessToken = encryption.encrypt(accessToken);
+    }
+
+    await prisma.store.update({
+      where: { id: storeId },
+      data: updateData,
+    });
+
+    logger.info(
+      { storeId, hasCatalogId: Boolean(catalogId) },
+      '[wa-bridge] meta-catalog-config saved'
+    );
+    res.status(200).json({ success: true });
+  } catch (err) {
+    logger.error(
+      { err: (err as Error).message },
+      '[wa-bridge] store/meta-catalog-config POST failed'
+    );
+    res.status(500).json({ success: false, error: { code: 'CATALOG_CONFIG_SAVE_FAILED' } });
   }
 });
 
