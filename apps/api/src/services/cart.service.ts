@@ -14,13 +14,22 @@ export class CartService {
       },
     } as const;
 
-    // Try to find an existing cart for this session (or customer)
+    // Try to find an existing cart for this session (or customer).
+    //
+    // orderBy: updatedAt desc — when a customer logs in mid-session,
+    // BOTH their fresh session cart AND their older customer cart may
+    // match the OR clause. Without an explicit order, Postgres returns
+    // either at random which can resurrect an empty stale cart and
+    // cause a spurious EMPTY_CART on POST /orders. Returning the
+    // most-recently-touched cart matches the user's mental model
+    // ("my current cart") and prevents the test-order-cancel flakiness.
     let cart = await prisma.cart.findFirst({
       where: {
         storeId,
         OR: [{ sessionId }, ...(customerId ? [{ customerId }] : [])],
       },
       include: cartInclude,
+      orderBy: { updatedAt: 'desc' },
     });
 
     if (!cart) {
