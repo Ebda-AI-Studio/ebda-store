@@ -2,10 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
-    # Skip CI for commits that touch ONLY docs / plans / specs. CI gates
-    # exist to catch code regressions, not validate prose. Added 2026-05-27
-    # to cut ~30% of redundant runs.
+    # staging added 2026-05-27 — after the staging-deployment gate was
+    # introduced, staging is now an active integration target and needs
+    # the same CI rigor as main.
+    branches: [main, staging, develop]
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -15,7 +15,10 @@ on:
       - '.vscode/**'
       - '.editorconfig'
   pull_request:
-    branches: [main, develop]
+    # PRs targeting staging must run the full CI suite — that's the whole
+    # point of staging being a gate. Before 2026-05-27, PRs to staging
+    # never fired ci.yml and merged with only the secret-scanner check.
+    branches: [main, staging, develop]
     paths-ignore:
       - 'docs/**'
       - '*.md'
