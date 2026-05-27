@@ -12,7 +12,8 @@
 
 import { useState } from 'react';
 import { Button, useToast } from '@force/ui';
-import { apiPut } from '../../../../lib/api';
+import { apiPost, apiPut } from '../../../../lib/api';
+import { useAuth } from '../../../../lib/auth';
 import type { MetaCatalogConfig } from '../../../../lib/types/wa-bot';
 
 interface MetaCatalogCardProps {
@@ -20,14 +21,23 @@ interface MetaCatalogCardProps {
   initialConfig: MetaCatalogConfig;
 }
 
+interface ProvisionResponse {
+  metaCatalogId: string | null;
+  metaBusinessId: string | null;
+  hasMetaToken: boolean;
+}
+
 export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps) {
   const { success: toastSuccess, error: toastError } = useToast();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const [catalogId, setCatalogId] = useState(initialConfig.metaCatalogId ?? '');
   const [businessId, setBusinessId] = useState(initialConfig.metaBusinessId ?? '');
   const [accessToken, setAccessToken] = useState(''); // always start blank — never pre-fill
   const [hasToken, setHasToken] = useState(initialConfig.hasMetaToken);
   const [saving, setSaving] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -57,6 +67,32 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
         setHasToken(true);
       }
     }
+  };
+
+  const handleAutoProvision = async () => {
+    const alreadyProvisioned = catalogId.trim().length > 0;
+    const confirmMsg = alreadyProvisioned
+      ? 'A catalog id is already filled in. Clear it first if you really want to provision a new one. Continue anyway?'
+      : 'This will call Meta Graph API to create a brand-new Commerce Catalog under the Force AI parent Business Manager and assign it to this store. Continue?';
+    if (!window.confirm(confirmMsg)) return;
+
+    setProvisioning(true);
+    const { data, error } = await apiPost<ProvisionResponse>(
+      `/api/v1/stores/${storeId}/integrations/wbs/provision-meta-catalog`
+    );
+    setProvisioning(false);
+
+    if (error) {
+      toastError(error.message || 'Meta auto-provisioning failed');
+      return;
+    }
+    if (!data) return;
+
+    setCatalogId(data.metaCatalogId ?? '');
+    setBusinessId(data.metaBusinessId ?? '');
+    setHasToken(data.hasMetaToken);
+    setAccessToken('');
+    toastSuccess('Meta catalog provisioned — submit it for Meta review next.');
   };
 
   const isDirty =
@@ -157,6 +193,32 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
           </p>
         </div>
       </div>
+
+      {isSuperAdmin && (
+        <div className="mt-5 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                Provision automatically (super-admin)
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Creates a new Commerce Catalog under the Force AI parent Business Manager and fills
+                in the three fields above. Saves the merchant from navigating Meta Business Manager.
+                You still need to submit the catalog for Meta review afterwards.
+              </p>
+            </div>
+            <Button
+              onClick={handleAutoProvision}
+              disabled={provisioning}
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+            >
+              {provisioning ? 'Provisioning…' : 'Provision automatically'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-5 flex justify-end">
         <Button onClick={handleSave} disabled={saving || !isDirty} size="sm">

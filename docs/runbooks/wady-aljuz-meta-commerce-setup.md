@@ -10,6 +10,24 @@
 - `Store.meta_catalog_id`, `Store.meta_business_id`, `Store.meta_access_token` are nullable + encrypted at rest
 - An admin save that flips `botMode` to `native_catalog*` now fires a Telegram alert (see `wbs-integration.routes.ts`)
 
+## Fast path (super-admin only) — "Provision automatically" button
+
+If `FORCE_AI_META_BM_ID` + `FORCE_AI_META_ADMIN_TOKEN` are set on Railway (one-time Force AI setup), you can skip steps 1-5 and just:
+
+1. FWB admin → Wady Aljuz → WhatsApp Bot → **MetaCatalogCard**
+2. Click **Provision automatically** (super-admin only — button is hidden for store_admin)
+3. Confirm the modal — backend calls Meta Graph `POST /<BM>/owned_product_catalogs`, saves catalog id + business id + encrypted token back to the Store row
+4. Telegram alert fires from `fwb.wbs-integration.provisionMetaCatalog`
+5. Jump to **Step 6** (trigger initial product sync)
+
+The button refuses with `CATALOG_ALREADY_PROVISIONED` if the store already has a catalog id — clear it first if you really want a fresh one. If the env vars aren't set, it 503s with `PROVISIONER_NOT_CONFIGURED`.
+
+If anything in the Meta API call fails (rate limit, BM permission issue, scope missing), it returns `META_PROVISIONING_FAILED` with the stage that broke + the underlying Meta error. Fall back to the manual steps below.
+
+The manual steps 1-5 below are still the truth for: (a) first-time setup of the Force AI parent BM token itself, (b) any merchant who wants to keep their catalog under THEIR Business Manager instead of ours.
+
+---
+
 ## Step 1 — Create Meta Business Manager account (if not already)
 
 If Force AI doesn't already have a Meta Business Manager for the merchant, create one at https://business.facebook.com/. Use the Force Media admin email so account recovery is in-org.
