@@ -432,6 +432,36 @@ const server = httpServer.listen(config.port, () => {
         'Defaults are 30d access + 1y refresh; unset the env var to restore.'
     );
   }
+
+  // Self-PUT the Inngest serve endpoint after boot so the new container
+  // registers its functions with Inngest cloud. Without this, after a
+  // Railway redeploy the new container's function definitions stay
+  // unregistered until Inngest cloud happens to ping us — which can take
+  // 30+ min. Verified 2026-05-27: 3 bulk-ai jobs queued for 30 min on
+  // Wady Aljuz after a redeploy because functions hadn't synced.
+  //
+  // Fire-and-forget. If Inngest cloud is unreachable or the SDK rejects,
+  // log + move on — health check still passes, jobs will retry later.
+  setTimeout(() => {
+    fetch(`http://127.0.0.1:${config.port}/api/v1/inngest`, { method: 'PUT' })
+      .then(async res => {
+        const body = await res.text().catch(() => '');
+        if (res.ok) {
+          logger.info({ status: res.status, body: body.slice(0, 200) }, 'Inngest self-register OK');
+        } else {
+          logger.warn(
+            { status: res.status, body: body.slice(0, 200) },
+            'Inngest self-register non-2xx'
+          );
+        }
+      })
+      .catch(err => {
+        logger.warn(
+          { err: err instanceof Error ? err.message : String(err) },
+          'Inngest self-register failed'
+        );
+      });
+  }, 3000);
 });
 
 // Graceful shutdown handler
