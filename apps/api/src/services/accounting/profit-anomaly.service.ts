@@ -147,10 +147,19 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
 
   // ---- 5. Build metric array ----
   // Skip cost_spike when the 7d window has zero inventory movement AND the
-  // baseline is thin (<10 units/week). The metric reads InventoryHistory.quantity
-  // (movement volume, not cost dollars), so a quiet week on a thin store
+  // baseline is thin (<50 units/week). The metric reads InventoryHistory.quantity
+  // (movement VOLUME, not cost dollars), so a quiet week on a low-velocity store
   // produces a -100% delta that always trips P0 — that's noise, not signal.
-  const includeCostSpike = !(costVolume7d === 0 && costVolumeBaseline < 10);
+  //
+  // Threshold history:
+  //   v1 (2026-05-25): <10 — too tight, missed Wady Aljuz at baseline=12.67
+  //   v2 (2026-05-27): <50 — covers pilot-stage merchants (5-10 movements/day);
+  //                          a genuine cost-data outage on a real-volume store
+  //                          (50+ movements/week) still fires correctly.
+  //
+  // For TRUE merchant-launched stores, baseline will be hundreds/week,
+  // so this skip won't apply. We only suppress for thin-data stores.
+  const includeCostSpike = !(costVolume7d === 0 && costVolumeBaseline < 50);
   const rawMetrics: Array<{ metric: AnomalyMetric; current: number; baseline: number }> = [
     { metric: 'margin_drop', current: margin7d, baseline: margin28d },
     ...(includeCostSpike
