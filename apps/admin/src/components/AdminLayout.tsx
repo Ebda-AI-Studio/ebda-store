@@ -93,6 +93,8 @@ export function AdminLayout({
     stores: t('navStores'),
     users: t('navUsers'),
     auditLogs: t('navAuditLogs'),
+    // Super-admin store-scoped
+    manageFeatures: t('navManageFeatures'),
   };
 
   const hubLabels: HubLabels = {
@@ -203,9 +205,11 @@ export function AdminLayout({
     mode === 'super_admin'
       ? buildSuperAdminNav(navLabels)
       : buildStoreAdminNav(navStoreId, navLabels);
-  const navItems = allNavItems.filter(
-    item => !item.featureKey || isFeatureEnabled(item.featureKey)
-  );
+  const navItems = allNavItems.filter(item => {
+    if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
+    if (item.superAdminOnly && user?.role !== 'super_admin') return false;
+    return true;
+  });
 
   // Hub detection — only applies to store-admin mode with a resolved storeId.
   // Detects which hub the current URL belongs to, builds the tab list, and

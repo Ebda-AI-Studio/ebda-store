@@ -161,6 +161,111 @@ router.put(
   }
 );
 
+/**
+ * DELETE /admin/stores/:id/features/:featureKey
+ * Clear a single feature override so it falls back to PLAN_BASELINE.
+ * Idempotent — returns success even if no override existed.
+ */
+router.delete(
+  '/stores/:id/features/:featureKey',
+  authenticate,
+  authorize('super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id, featureKey } = req.params;
+
+      const keyParsed = featureKeySchema.safeParse(featureKey);
+      if (!keyParsed.success) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_FEATURE_KEY', message: `Unknown feature key: ${featureKey}` },
+        });
+        return;
+      }
+
+      const features = await featureService.clearFeatureOverride(id, keyParsed.data);
+
+      res.json({
+        success: true,
+        data: { features },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * DELETE /admin/stores/:id/features
+ * Reset ALL feature overrides for a store back to PLAN_BASELINE.
+ * Super-admin nuclear button — used by the "Reset to plan defaults"
+ * action on the Manage Features page.
+ */
+router.delete(
+  '/stores/:id/features',
+  authenticate,
+  authorize('super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const features = await featureService.resetAllOverrides(req.params.id);
+      res.json({
+        success: true,
+        data: { features },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PUT /admin/stores/:id/plan
+ * Change the store's plan. Per the 2026-05-27 architectural decision,
+ * this does NOT touch StoreFeature override rows — every existing
+ * override is preserved across upgrade and downgrade.
+ *
+ * Body: { plan: 'free' | 'starter' | 'professional' | 'enterprise' }
+ */
+router.put(
+  '/stores/:id/plan',
+  authenticate,
+  authorize('super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const bodySchema = z.object({
+        plan: z.enum(['free', 'starter', 'professional', 'enterprise']),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: parsed.error.issues[0]?.message ?? 'Invalid plan',
+          },
+        });
+        return;
+      }
+
+      const features = await featureService.setStorePlan(
+        req.params.id,
+        parsed.data.plan,
+        req.user!.userId
+      );
+
+      res.json({
+        success: true,
+        data: { plan: parsed.data.plan, features },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // ==========================================
 // Store Admin Routes
 // Mounted at /stores/:storeId — own store only

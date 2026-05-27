@@ -1,8 +1,8 @@
 # Staging deployment + promotion flow
 
-> Status: in adoption (2026-05-27). Until Ahmad finishes the dashboard flips
-> in §3, both Railway prod + staging are still auto-deploying from `main`.
-> Once §3 is done, the gate is live.
+> Status: **LIVE since 2026-05-27 afternoon.** Ahmad completed the Railway +
+> Vercel dashboard flips; staging now tracks the `staging` branch and prod
+> tracks `main`. All work goes feature → staging → main via PR promotion.
 
 ## Why this exists
 

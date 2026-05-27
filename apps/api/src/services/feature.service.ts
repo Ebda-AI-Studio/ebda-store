@@ -1,5 +1,5 @@
 import { prisma } from '@force/database';
-import { FeatureKey, FEATURE_KEYS_ARRAY } from '@force/shared';
+import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@force/shared';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
 
@@ -41,18 +41,35 @@ class FeatureService {
   // ==========================================
 
   /**
-   * Build the full 21-key feature map from a list of `storeFeature` rows.
-   * Pure transform; takes anything findMany-shaped so it can be reused
-   * with the transaction client during write paths (defends against
-   * Neon read-replica staleness — see updateStoreFeatures).
+   * Build the full feature map for a store, resolving:
+   *   1. Start with PLAN_BASELINE[plan] features enabled (defaults to false otherwise).
+   *   2. Apply StoreFeature row overrides: enabled=true ADDS, enabled=false REMOVES.
+   *
+   * Pure transform; takes plan + rows so it can be reused with the
+   * transaction client during write paths (defends against Neon
+   * read-replica staleness — see updateStoreFeatures).
+   *
+   * Plan-change behavior: super-admin overrides PRESERVED across upgrade
+   * AND downgrade. Plan changes never touch StoreFeature rows. See
+   * docs/superpowers/plans/2026-05-27-feature-tiering-and-access-control.md.
    */
   private rowsToMap(
+    plan: StorePlan,
     rows: Array<{ featureKey: string; enabled: boolean }>
   ): Record<FeatureKey, boolean> {
+    // Start with all false.
     const map = Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
       FeatureKey,
       boolean
     >;
+    // Layer 1: PLAN_BASELINE — what the plan includes by default.
+    const baseline = PLAN_BASELINE[plan] ?? [];
+    for (const key of baseline) {
+      if (FEATURE_KEYS_ARRAY.includes(key as FeatureKey)) {
+        map[key as FeatureKey] = true;
+      }
+    }
+    // Layer 2: per-store overrides on top.
     for (const row of rows) {
       if (FEATURE_KEYS_ARRAY.includes(row.featureKey as FeatureKey)) {
         map[row.featureKey as FeatureKey] = row.enabled;
@@ -62,11 +79,37 @@ class FeatureService {
   }
 
   private async readFromDb(storeId: string): Promise<Record<FeatureKey, boolean>> {
-    const rows = await prisma.storeFeature.findMany({
-      where: { storeId },
-      select: { featureKey: true, enabled: true },
-    });
-    return this.rowsToMap(rows);
+    const [store, rows] = await Promise.all([
+      prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } }),
+      prisma.storeFeature.findMany({
+        where: { storeId },
+        select: { featureKey: true, enabled: true },
+      }),
+    ]);
+    // If the store doesn't exist, return all-false (safe default; callers
+    // already handle missing stores at the route level via requireStoreAccess).
+    if (!store) {
+      return Object.fromEntries(FEATURE_KEYS_ARRAY.map(key => [key, false])) as Record<
+        FeatureKey,
+        boolean
+      >;
+    }
+    return this.rowsToMap(store.plan as StorePlan, rows);
+  }
+
+  /**
+   * Invalidate the cached feature map for a store. Call AFTER any change
+   * to `Store.plan` (which doesn't touch StoreFeature rows but does
+   * change the resolved map). Best-effort — if Redis is down, the next
+   * cache miss reads from DB anyway.
+   */
+  async invalidateCache(storeId: string): Promise<void> {
+    try {
+      await redis.delete(this.cacheKey(storeId));
+      logger.debug({ storeId }, '[FeatureService] Cache invalidated');
+    } catch (err) {
+      logger.warn({ err, storeId }, '[FeatureService] Cache invalidation failed (non-fatal)');
+    }
   }
 
   // ==========================================
@@ -149,11 +192,17 @@ class FeatureService {
           },
         });
       }
+      // Read plan + override rows via the SAME tx so the resolved map
+      // reflects the writes we just made.
+      const store = await tx.store.findUnique({
+        where: { id: storeId },
+        select: { plan: true },
+      });
       const rows = await tx.storeFeature.findMany({
         where: { storeId },
         select: { featureKey: true, enabled: true },
       });
-      return this.rowsToMap(rows);
+      return this.rowsToMap((store?.plan ?? 'free') as StorePlan, rows);
     });
 
     await this.writeToCache(storeId, freshFeatures);
@@ -176,6 +225,58 @@ class FeatureService {
     userId: string
   ): Promise<Record<FeatureKey, boolean>> {
     return this.updateStoreFeatures(storeId, { [featureKey]: enabled }, userId);
+  }
+
+  /**
+   * Removes a StoreFeature override row, so the feature falls back to
+   * the PLAN_BASELINE value. Used by the super-admin "Reset to plan
+   * defaults" button + the per-row "Clear override" action.
+   */
+  async clearFeatureOverride(
+    storeId: string,
+    featureKey: FeatureKey
+  ): Promise<Record<FeatureKey, boolean>> {
+    await prisma.storeFeature
+      .delete({ where: { storeId_featureKey: { storeId, featureKey } } })
+      .catch(() => {
+        // Row didn't exist — already at baseline. No-op.
+      });
+    await this.invalidateCache(storeId);
+    return this.getStoreFeatures(storeId);
+  }
+
+  /**
+   * Deletes ALL StoreFeature override rows for the store, resetting
+   * every feature to its plan baseline. Super-admin nuclear button.
+   */
+  async resetAllOverrides(storeId: string): Promise<Record<FeatureKey, boolean>> {
+    await prisma.storeFeature.deleteMany({ where: { storeId } });
+    await this.invalidateCache(storeId);
+    logger.info({ storeId }, '[FeatureService] All overrides cleared (reset to plan baseline)');
+    return this.getStoreFeatures(storeId);
+  }
+
+  /**
+   * Changes the store's plan. Per the 2026-05-27 architectural decision,
+   * this does NOT touch StoreFeature rows — every existing override is
+   * preserved across upgrade and downgrade. Returns the freshly resolved
+   * feature map.
+   */
+  async setStorePlan(
+    storeId: string,
+    plan: StorePlan,
+    userId: string
+  ): Promise<Record<FeatureKey, boolean>> {
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { plan, updatedAt: new Date() },
+    });
+    await this.invalidateCache(storeId);
+    logger.info(
+      { storeId, plan, userId },
+      '[FeatureService] Store plan changed (overrides preserved)'
+    );
+    return this.getStoreFeatures(storeId);
   }
 }
 

@@ -12,7 +12,7 @@ import { prisma } from '@force/database';
 import featureRoutes from '@api/routes/feature.routes';
 import authRoutes from '@api/routes/auth.routes';
 import { errorHandler } from '@api/middleware/error-handler';
-import { FEATURE_KEYS_ARRAY } from '@force/shared';
+import { FEATURE_KEYS_ARRAY, PLAN_BASELINE } from '@force/shared';
 
 // ==========================================
 // App Setup
@@ -152,9 +152,15 @@ describe('Feature Toggle Engine', () => {
       const { features } = res.body.data;
       expect(features).toBeDefined();
 
-      // Every known feature key must be present and false
+      // Resolved-map semantics (2026-05-27): features that are in
+      // PLAN_BASELINE for the store's plan return true; everything else
+      // returns false. The test store uses the Prisma schema default
+      // `plan = 'starter'` (NOT free — see Store model in schema.prisma),
+      // so the resolved map should match PLAN_BASELINE.starter.
+      const baseline = new Set(PLAN_BASELINE.starter);
       for (const key of FEATURE_KEYS_ARRAY) {
-        expect(features[key]).toBe(false);
+        const expected = baseline.has(key);
+        expect(features[key]).toBe(expected);
       }
     });
   });
@@ -181,8 +187,11 @@ describe('Feature Toggle Engine', () => {
       expect(features).toBeDefined();
       expect(features.coupons).toBe(true);
       expect(features.loyalty).toBe(true);
-      // All other features should remain false
-      expect(features.reviews).toBe(false);
+      // 2026-05-27: `reviews` is in PLAN_BASELINE.starter (default plan)
+      // so it resolves to true even without an override row. Keys not in
+      // starter baseline (e.g. sms — enterprise-only) remain false.
+      expect(features.reviews).toBe(true);
+      expect(features.sms).toBe(false);
     });
   });
 

@@ -9,7 +9,18 @@ vi.mock('@api/lib/inngest/client', () => ({
   },
 }));
 
+// Mock the feature gate so the function doesn't try to read prisma at
+// module init. Default: whatsapp feature ENABLED so existing skip-paths
+// (no catalog id, no wbs base url) are still exercised. Individual tests
+// can override per-test if they want to verify the feature-disabled path.
+vi.mock('@api/services/feature.service', () => ({
+  featureService: {
+    isFeatureEnabled: vi.fn().mockResolvedValue(true),
+  },
+}));
+
 import { productMetaSync } from '@api/lib/inngest/functions/product-meta-sync';
+import { featureService } from '@api/services/feature.service';
 
 describe('productMetaSync', () => {
   beforeEach(() => {
