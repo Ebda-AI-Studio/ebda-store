@@ -252,7 +252,7 @@ describe('API Integration Tests', () => {
 
       expect(response.status).toBe(404);
       expect(data.success).toBe(false);
-      expect(data.error.code).toBe('NOT_FOUND');
+      expect(data.error.code).toBe('STORE_NOT_FOUND');
     });
   });
 

@@ -31,6 +31,10 @@ const createProductSchema = z.object({
   costPrice: z.number().int().min(0).optional().nullable(),
   sku: z.string().optional(),
   inventory: z.number().int().min(0).optional(),
+  // Per-product threshold for the LOW STOCK badge / merchant alerts.
+  // Default lives on the schema (5). Without this in Zod, the createProductSchema
+  // strips it and merchant edits silently no-op.
+  lowStockThreshold: z.number().int().min(0).optional(),
   status: z.enum(['draft', 'active', 'archived']).optional(),
   isFeatured: z.boolean().optional(),
   isNew: z.boolean().optional(),

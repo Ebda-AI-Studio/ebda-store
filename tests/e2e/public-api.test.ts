@@ -20,6 +20,7 @@ let testStoreId: string | null = null;
 let testUserId: string | null = null;
 let testProductId: string | null = null;
 let testCategoryId: string | null = null;
+let testCategorySlug: string | null = null;
 let testStoreSlug: string | null = null;
 let testStoreDomain: string | null = null;
 
@@ -76,6 +77,7 @@ describe('Public Storefront API', () => {
       },
     });
     testCategoryId = category.id;
+    testCategorySlug = category.slug;
 
     // Create test products. Product ↔ Category is a many-to-many join
     // (`ProductCategory`), and images are a separate `ProductImage` table —
@@ -205,7 +207,9 @@ describe('Public Storefront API', () => {
       const res = await request(app)
         .get('/public/products')
         .set('x-store-id', testStoreId!)
-        .query({ category: testCategoryId });
+        // listPublic filters by category SLUG (see product.service.ts:584),
+        // not categoryId. Pass slug here to match.
+        .query({ category: testCategorySlug });
 
       expect(res.status).toBe(200);
       expect(res.body.data.products.length).toBeGreaterThan(0);
@@ -318,7 +322,7 @@ describe('Public Storefront API', () => {
 
       const category = res.body.data.categories.find((c: any) => c.id === testCategoryId);
       expect(category).toBeDefined();
-      expect(category._count.products).toBeGreaterThan(0);
+      expect(category.productCount).toBeGreaterThan(0);
     });
   });
 
