@@ -66,9 +66,14 @@ jobs:
             REPO="${REPO_ENTRY%:*}"
             WORKFLOW="${REPO_ENTRY#*:}"
 
+            # Filter to MAIN branch only. Staging is the integration branch
+            # under the 2026-05-27 staging gate — failures there are
+            # expected during stabilization and should NOT page Ahmad.
+            # Open-feature-branch failures are PR-level, also not page-worthy.
             RUN_JSON=$(gh run list \
               --repo "$REPO" \
               --workflow="$WORKFLOW" \
+              --branch=main \
               --status=failure \
               --limit=1 \
               --json databaseId,headSha,createdAt,displayTitle 2>/dev/null || echo "[]")
@@ -79,7 +84,19 @@ jobs:
             TITLE=$(echo "$RUN_JSON" | jq -r '.[0].displayTitle // empty')
 
             if [ -z "$RUN_ID" ]; then
-              echo "$REPO: no failed runs"
+              echo "$REPO: no failed runs on main"
+              continue
+            fi
+
+            # SHA-currency check: if the failing SHA is no longer the HEAD
+            # of main, it has been superseded by a later commit. Either the
+            # later commit fixed it (so the alert is stale) or the later
+            # commit is itself failing (which would surface as a fresher
+            # failure on its own — we'll see it on the next watchdog tick).
+            # Either way, don't escalate a SHA that's no longer current.
+            MAIN_HEAD=$(gh api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha' 2>/dev/null || echo "")
+            if [ -n "$MAIN_HEAD" ] && [ "$SHA" != "$MAIN_HEAD" ]; then
+              echo "$REPO: failing sha ${SHA:0:8} is no longer HEAD (HEAD is ${MAIN_HEAD:0:8}) - superseded, suppressing"
               continue
             fi
 
@@ -100,7 +117,7 @@ jobs:
             EXISTING_PR=$(gh pr list \
               --repo "$REPO" \
               --state=open \
-              --search "auto-fix ${SHA:0:8}" \
+              --head "auto-fix/${SHA:0:8}" \
               --json number 2>/dev/null \
               | jq -r '.[0].number // empty')
 
@@ -109,11 +126,36 @@ jobs:
               continue
             fi
 
+            # Auto-fix layers A+B can be intentionally paused (state file
+            # ~/.claude/auto-fix-paused on Ahmad's local machine, plus the
+            # PRs in staging that disabled the cron triggers). When paused,
+            # the watchdog still detects the failure but tones down the
+            # message — Ahmad already knows main is red, no need to page
+            # repeatedly with "auto-fix system can't help."
+            #
+            # Detection: look for a tag `auto-fix-paused` in the repo. Set
+            # via `gh api -X POST repos/<repo>/git/refs --field ref='refs/tags/auto-fix-paused' --field sha='<any-sha>'`.
+            # Clear with `gh api -X DELETE repos/<repo>/git/refs/tags/auto-fix-paused`.
+            PAUSED_TAG=$(gh api "repos/${REPO}/git/refs/tags/auto-fix-paused" --jq '.ref // empty' 2>/dev/null || echo "")
+            PREFIX="*Escalation*"
+            SUFFIX="without auto-fix PR"
+            if [ -n "$PAUSED_TAG" ]; then
+              PREFIX="*FYI*"
+              SUFFIX="(auto-fix is paused — no PR will be opened automatically)"
+            fi
+
+            # Pull commit metadata for context — the bare "CI fail" alert
+            # earlier today wasn't enough info to decide whether to act.
+            COMMIT_JSON=$(gh api "repos/${REPO}/commits/${SHA}" --jq '{message: .commit.message, author: .commit.author.name}' 2>/dev/null || echo '{}')
+            COMMIT_TITLE=$(echo "$COMMIT_JSON" | jq -r '.message // ""' | head -n 1 | cut -c1-100)
+            COMMIT_AUTHOR=$(echo "$COMMIT_JSON" | jq -r '.author // "unknown"')
+
             ESCALATIONS=$(( ESCALATIONS + 1 ))
             SHORT_SHA="${SHA:0:8}"
-            MSG="*Escalation* - \`${REPO}\` CI failing for ${AGE_MIN}min without auto-fix PR. sha: \`${SHORT_SHA}\` title: ${TITLE} run: https://github.com/${REPO}/actions/runs/${RUN_ID}"
+            MSG=$(printf '%s — `%s` main red for %dmin %s\n*branch:* `main`\n*sha:* `%s`\n*commit:* %s\n*author:* %s\n*workflow:* `%s`\n[view run](https://github.com/%s/actions/runs/%s)' \
+              "$PREFIX" "$REPO" "$AGE_MIN" "$SUFFIX" "$SHORT_SHA" "$COMMIT_TITLE" "$COMMIT_AUTHOR" "$WORKFLOW" "$REPO" "$RUN_ID")
             telegram "$MSG"
-            echo "$REPO: ESCALATED (${AGE_MIN}min stale)"
+            echo "$REPO: ESCALATED (${AGE_MIN}min stale, paused=$([ -n "$PAUSED_TAG" ] && echo yes || echo no))"
           done
 
           echo ""
