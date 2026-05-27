@@ -15,6 +15,13 @@ COPY packages/config/package.json ./packages/config/
 
 RUN npm ci
 
+# Rebuild sharp against Alpine musl libc + force-fetch the linuxmusl-x64
+# binary. The lockfile was regenerated on macOS, which omits the
+# @img/sharp-linuxmusl-x64 optional dep, so npm ci skips it inside Alpine.
+# Without this rebuild the API crashes at boot when ai.service or
+# image-resize.service `import sharp from 'sharp'`.
+RUN npm rebuild sharp --foreground-scripts
+
 FROM node:20-alpine AS builder
 
 RUN apk add --no-cache openssl
