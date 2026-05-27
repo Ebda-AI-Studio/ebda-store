@@ -10,6 +10,7 @@ import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { getAuthUser } from '../utils/store-helpers';
 import { requireFeature } from '../middleware/feature-gate';
+import { featureService } from '../services/feature.service';
 import { bustCorsCache } from '../lib/cors-cache';
 import { auditLog } from '../middleware/security';
 
@@ -487,6 +488,38 @@ router.patch(
         where: { id: req.params.id },
         data: { status: status as StoreStatus },
       });
+
+      // Invalidate the feature cache — store.status doesn't change the
+      // resolved feature map directly, but downstream gates (storefront
+      // 503, Inngest function skip) read it via the same Redis path on
+      // the next request, so a clean cache reduces stale-state windows.
+      await featureService.invalidateCache(req.params.id).catch(() => {});
+
+      // Write an audit log entry so super-admin actions are traceable.
+      // Two-tier visibility (2026-05-27): per-store entries (storeId = X)
+      // are visible to that store's admins for their own team-action
+      // trail; super-admin sees the cross-store trail.
+      await prisma.auditLog
+        .create({
+          data: {
+            action: status === 'suspended' ? 'store.suspend' : 'store.reactivate',
+            userId: req.user!.userId,
+            storeId: req.params.id,
+            resourceType: 'store',
+            resourceId: req.params.id,
+            details: {
+              previousStatus: store.status === status ? 'unknown' : 'flipped',
+              newStatus: status,
+            },
+            ipAddress: req.ip ?? null,
+            userAgent: req.headers['user-agent'] ?? null,
+          },
+        })
+        .catch(err => {
+          // Don't fail the status change if audit log write fails.
+          // Logged elsewhere; status change is the source of truth.
+          logger.warn({ err, storeId: req.params.id }, '[store.status] audit log write failed');
+        });
 
       res.json({ success: true, data: store });
     } catch (error) {

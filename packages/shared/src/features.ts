@@ -1,7 +1,12 @@
 // Feature Toggle Engine — Feature Registry
 import { z } from 'zod';
 
-// All toggleable feature keys (22 — added floating_widget 2026-05-21)
+// All toggleable feature keys.
+// 2026-05-21: 22 features (added floating_widget).
+// 2026-05-27: +14 sub-features (inventory.* + accounting.*) for the 3-tier
+//   plan system. The parent `inventory` flag stays for backwards
+//   compatibility but new code paths read the granular sub-keys via
+//   PLAN_BASELINE in `./plan-baselines.ts`.
 export const FEATURE_KEYS_ARRAY = [
   'coupons',
   'loyalty',
@@ -25,6 +30,22 @@ export const FEATURE_KEYS_ARRAY = [
   'seo',
   'search_autocomplete',
   'floating_widget',
+  // Inventory sub-features (2026-05-27)
+  'inventory.basic',
+  'inventory.stock_alerts',
+  'inventory.backorder',
+  'inventory.multi_warehouse',
+  'inventory.barcode',
+  'inventory.purchase_orders',
+  'inventory.bulk_adjustments',
+  // Accounting sub-features (2026-05-27)
+  'accounting.basic',
+  'accounting.expenses',
+  'accounting.invoicing',
+  'accounting.tax_reports',
+  'accounting.multi_currency',
+  'accounting.profit_anomaly',
+  'accounting.bank_reconcile',
 ] as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS_ARRAY)[number];
@@ -285,6 +306,153 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'مجموعة أزرار ثابتة على المتجر — تتقلص إلى دائرة واحدة، وتتوسع إلى إجراءات يختارها التاجر (واتساب، إنستغرام، هاتف، بريد إلكتروني، موسيقى الخلفية، روابط مخصصة). قابل للتخصيص بدرجة عالية: الموقع، اتجاه التوسع، الألوان والتسميات لكل زر.',
     category: 'engagement',
+    tier: 'addon',
+  },
+  // -------- Inventory sub-features (2026-05-27) --------
+  'inventory.basic': {
+    key: 'inventory.basic',
+    name: 'Inventory — Stock Tracking',
+    nameAr: 'المخزون — تتبع المخزون',
+    description:
+      'Per-product stock counts, low-stock badge on storefront, manual stock adjustment in admin.',
+    descriptionAr:
+      'عدد المخزون لكل منتج، شارة المخزون المنخفض في المتجر، وتعديل المخزون يدوياً من لوحة التحكم.',
+    category: 'operations',
+    tier: 'core',
+  },
+  'inventory.stock_alerts': {
+    key: 'inventory.stock_alerts',
+    name: 'Inventory — Low-Stock Alerts',
+    nameAr: 'المخزون — تنبيهات المخزون المنخفض',
+    description:
+      'Auto-email the merchant when a product drops below its per-product low-stock threshold.',
+    descriptionAr: 'إرسال بريد إلكتروني تلقائي للتاجر عند انخفاض منتج عن حد المخزون المحدد له.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'inventory.backorder': {
+    key: 'inventory.backorder',
+    name: 'Inventory — Backorder',
+    nameAr: 'المخزون — الطلب المسبق',
+    description:
+      'Accept customer orders when a product is out of stock; queue for fulfillment when restocked.',
+    descriptionAr:
+      'قبول طلبات العملاء عند نفاد المنتج وحفظها في قائمة انتظار التنفيذ عند توفر المخزون.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'inventory.multi_warehouse': {
+    key: 'inventory.multi_warehouse',
+    name: 'Inventory — Multi-Warehouse',
+    nameAr: 'المخزون — مستودعات متعددة',
+    description: 'Track stock counts per warehouse and route orders by proximity or rule.',
+    descriptionAr: 'تتبع المخزون لكل مستودع وتوجيه الطلبات حسب القرب أو حسب قاعدة محددة.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'inventory.barcode': {
+    key: 'inventory.barcode',
+    name: 'Inventory — Barcode Scanning',
+    nameAr: 'المخزون — مسح الباركود',
+    description:
+      'Scan barcodes from mobile to receive stock, pick orders, and audit inventory counts.',
+    descriptionAr: 'مسح الباركود من الجوال لاستلام المخزون وتجهيز الطلبات ومراجعة الكميات.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'inventory.purchase_orders': {
+    key: 'inventory.purchase_orders',
+    name: 'Inventory — Purchase Orders',
+    nameAr: 'المخزون — أوامر الشراء',
+    description:
+      'Supplier purchase-order workflow with cost capture, receive-against-PO, and supplier ledger.',
+    descriptionAr:
+      'سير عمل أوامر الشراء من المورّدين مع تسجيل التكلفة والاستلام مقابل الأمر ودفتر المورّد.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'inventory.bulk_adjustments': {
+    key: 'inventory.bulk_adjustments',
+    name: 'Inventory — Bulk Adjustments',
+    nameAr: 'المخزون — التعديلات المجمّعة',
+    description: 'CSV/Excel import for stock reconciliation across hundreds of products at once.',
+    descriptionAr: 'استيراد من CSV/Excel لمطابقة المخزون عبر مئات المنتجات دفعةً واحدة.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  // -------- Accounting sub-features (2026-05-27) --------
+  'accounting.basic': {
+    key: 'accounting.basic',
+    name: 'Accounting — Journal + P&L',
+    nameAr: 'المحاسبة — دفتر اليومية والربح والخسارة',
+    description:
+      'Double-entry journal with auto-posted sales/refund/cost entries and a simple Profit & Loss report.',
+    descriptionAr:
+      'دفتر يومية بقيد مزدوج مع قيود مبيعات/مرتجعات/تكلفة تلقائية وتقرير ربح وخسارة مبسط.',
+    category: 'operations',
+    tier: 'core',
+  },
+  'accounting.expenses': {
+    key: 'accounting.expenses',
+    name: 'Accounting — Expense Tracking',
+    nameAr: 'المحاسبة — تتبع المصروفات',
+    description:
+      'Categorized expense entry with receipts attachment and monthly summary by category.',
+    descriptionAr: 'تسجيل المصروفات مصنّفاً مع إرفاق الفواتير وملخص شهري حسب الفئة.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'accounting.invoicing': {
+    key: 'accounting.invoicing',
+    name: 'Accounting — Invoicing',
+    nameAr: 'المحاسبة — إصدار الفواتير',
+    description:
+      'Kuwait-compliant invoice generation with tax line, bilingual layout, and PDF export.',
+    descriptionAr:
+      'إصدار فواتير متوافقة مع متطلبات الكويت تتضمّن خانة الضريبة وتصميماً ثنائي اللغة وتصدير PDF.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'accounting.tax_reports': {
+    key: 'accounting.tax_reports',
+    name: 'Accounting — Tax Reports',
+    nameAr: 'المحاسبة — التقارير الضريبية',
+    description: 'VAT/sales-tax export per reporting period with full transaction-level breakdown.',
+    descriptionAr: 'تصدير ضريبة القيمة المضافة/المبيعات لكل دورة مع تفصيل كامل على مستوى المعاملة.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'accounting.multi_currency': {
+    key: 'accounting.multi_currency',
+    name: 'Accounting — Multi-Currency',
+    nameAr: 'المحاسبة — تعدد العملات',
+    description:
+      'Track non-KWD transactions with FX rates and automatic KWD conversion at the book-keeping level.',
+    descriptionAr:
+      'تتبع المعاملات بعملات غير الدينار مع أسعار صرف وتحويل تلقائي إلى الدينار على مستوى الدفاتر.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'accounting.profit_anomaly': {
+    key: 'accounting.profit_anomaly',
+    name: 'Accounting — Profit Anomaly Watch',
+    nameAr: 'المحاسبة — مراقبة شذوذ الأرباح',
+    description:
+      'AI-driven margin watcher that flags sales below cost and unusual margin drops vs. baseline.',
+    descriptionAr:
+      'مراقب هوامش بالذكاء الاصطناعي ينبّه عند البيع تحت التكلفة أو هبوط الهامش بشكل غير مألوف.',
+    category: 'operations',
+    tier: 'addon',
+  },
+  'accounting.bank_reconcile': {
+    key: 'accounting.bank_reconcile',
+    name: 'Accounting — Bank Reconciliation',
+    nameAr: 'المحاسبة — مطابقة كشف البنك',
+    description:
+      'Bank statement import (CSV/OFX) with automated match against the ledger and manual override.',
+    descriptionAr:
+      'استيراد كشف البنك (CSV/OFX) مع مطابقة آلية بدفتر اليومية وإمكانية التصحيح اليدوي.',
+    category: 'operations',
     tier: 'addon',
   },
 };

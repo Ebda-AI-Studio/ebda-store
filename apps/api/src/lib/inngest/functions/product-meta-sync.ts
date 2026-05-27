@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
 import { prisma as defaultPrisma } from '@force/database';
 import logger from '../../logger';
+import { featureService } from '../../../services/feature.service';
 
 interface SyncArgs {
   event: { data: { storeId: string; productId: string; action: 'upsert' | 'delete' } };
@@ -18,6 +19,9 @@ interface SyncArgs {
  * product.service.ts after successful DB writes.
  *
  * Skips silently when:
+ *   - store does not have the `whatsapp` feature enabled (plan gate —
+ *     part of the 2026-05-27 cross-product gating; merchant on Starter
+ *     plan with no whatsapp override should not sync to Meta)
  *   - store has no meta_catalog_id (native catalog not configured)
  *   - store has no wbsBaseUrl in settings (WBS not wired for this store)
  */
@@ -29,6 +33,18 @@ export const productMetaSync = async ({
   const { storeId, productId, action } = event.data;
 
   return step.run('fanout-to-wbs', async () => {
+    // Feature gate first — cheapest check + clearest signal in logs when
+    // a merchant is on a plan that doesn't include WhatsApp (or the
+    // super-admin has revoked the override).
+    const whatsappEnabled = await featureService.isFeatureEnabled(storeId, 'whatsapp');
+    if (!whatsappEnabled) {
+      logger.info(
+        { storeId, productId, action },
+        'product-meta-sync: whatsapp feature not enabled for this store, skipping'
+      );
+      return { skipped: true, reason: 'feature-not-enabled' };
+    }
+
     const store = await prisma.store.findUnique({
       where: { id: storeId },
       select: { metaCatalogId: true, settings: true },
