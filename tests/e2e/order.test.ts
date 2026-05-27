@@ -327,38 +327,46 @@ describe('Order Flow', () => {
   });
 
   describe('Order Cancellation', () => {
-    // TODO(2026-05-27): test is flaky in CI — POST /orders returns 400
-    // INSUFFICIENT_INVENTORY even after resetting inventory to 50 at the
-    // top of the test. Cross-test contamination from prior tests in this
-    // file (or parallel test files via shared DB) keeps draining the
-    // product before the POST executes. The order-cancel + inventory-restore
-    // logic itself IS exercised by other tests; this specific assertion
-    // setup needs a refactor to use its own dedicated test product instead
-    // of testProductId shared across all tests in this file. Skipped to
-    // unblock the stabilization PR; tracked as a follow-up.
-    it.skip('should cancel order and restore inventory', async () => {
-      if (!authToken || !testStoreId || !testProductId) {
+    let cancelProduct: { id: string } | null = null;
+
+    beforeAll(async () => {
+      if (!testStoreId) return;
+      cancelProduct = await prisma.product.create({
+        data: {
+          storeId: testStoreId,
+          name: 'Cancel-Test Product',
+          slug: `cancel-test-product-${Date.now()}`,
+          price: 5000,
+          inventory: 100,
+          status: 'active',
+        },
+      });
+    });
+
+    afterAll(async () => {
+      if (!cancelProduct) return;
+      // productId is on CartItem directly (not nested under Cart). Cascade
+      // FKs would cover this, but explicit cleanup avoids cross-file teardown
+      // race conditions.
+      await prisma.cartItem.deleteMany({ where: { productId: cancelProduct.id } });
+      await prisma.orderItem.deleteMany({ where: { productId: cancelProduct.id } });
+      await prisma.product.delete({ where: { id: cancelProduct.id } }).catch(() => {});
+    });
+
+    it('should cancel order and restore inventory', async () => {
+      if (!authToken || !testStoreId || !cancelProduct) {
         throw new Error('Prerequisites not met');
       }
 
-      // Reset product inventory to a known good value so prior tests in
-      // this file (which consume from the same testProductId) can't drain
-      // it below the 5 we're about to add to the cart. Without this, the
-      // cart-add succeeds but POST /orders returns 400 INSUFFICIENT_STOCK.
-      await prisma.product.update({
-        where: { id: testProductId },
-        data: { inventory: 50 },
-      });
-
-      // Get current inventory after the reset
+      // Get current inventory before creating the order
       const productBefore = await prisma.product.findUnique({
-        where: { id: testProductId },
+        where: { id: cancelProduct.id },
       });
       const inventoryBefore = productBefore?.inventory ?? 0;
 
       // Create a fresh session and add items to the cart for this order
       const cancelSessionId = `test-cancel-session-${Date.now()}`;
-      await CartService.addItem(testStoreId, cancelSessionId, testProductId!, 5);
+      await CartService.addItem(testStoreId, cancelSessionId, cancelProduct.id, 5);
 
       // Create a new order to cancel
       const createRes = await request(app)
@@ -391,13 +399,13 @@ describe('Order Flow', () => {
 
       // Verify inventory was restored
       const productAfter = await prisma.product.findUnique({
-        where: { id: testProductId },
+        where: { id: cancelProduct.id },
       });
 
       // Should be back to inventory before this order
       expect(productAfter?.inventory).toBe(inventoryBefore);
 
-      // Cleanup
+      // Cleanup order rows (product cleanup is in afterAll)
       await prisma.orderItem.deleteMany({ where: { orderId: cancelOrderId } });
       await prisma.order.delete({ where: { id: cancelOrderId } }).catch(() => {});
       // Cleanup cancel session cart
