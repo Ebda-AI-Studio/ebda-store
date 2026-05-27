@@ -15,12 +15,17 @@ COPY packages/config/package.json ./packages/config/
 
 RUN npm ci
 
-# Rebuild sharp against Alpine musl libc + force-fetch the linuxmusl-x64
-# binary. The lockfile was regenerated on macOS, which omits the
-# @img/sharp-linuxmusl-x64 optional dep, so npm ci skips it inside Alpine.
-# Without this rebuild the API crashes at boot when ai.service or
-# image-resize.service `import sharp from 'sharp'`.
-RUN npm rebuild sharp --foreground-scripts
+# Install platform-specific sharp binary for Alpine musl.
+# The lockfile was regenerated on macOS, which only contains
+# @img/sharp-darwin-* variants; @img/sharp-linuxmusl-x64 is missing
+# entirely. npm ci honors the lockfile so the linuxmusl binary is
+# never fetched. `npm rebuild sharp` doesn't help since sharp 0.34+
+# uses precompiled binaries, not source compilation.
+#
+# Fix per sharp's own error message: explicitly install with platform
+# overrides. --no-save + --package-lock-only=false prevents lockfile
+# pollution; the install only adds files under node_modules.
+RUN npm install --os=linux --libc=musl --cpu=x64 --include=optional --no-save sharp@0.34.5
 
 FROM node:20-alpine AS builder
 
