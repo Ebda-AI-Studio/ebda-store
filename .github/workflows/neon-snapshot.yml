@@ -3,6 +3,21 @@ name: Neon snapshot
 on:
   push:
     branches: [main]
+    # Skip snapshots for commits that touch ONLY docs / plans / specs / config
+    # files. The snapshot is a rollback-safety artifact for schema/code changes;
+    # plan-doc commits don't need it. Cuts ~30% of snapshots without losing
+    # rollback coverage. Added 2026-05-27 after burst pushes flooded Neon
+    # branch quota during the wa native catalog bot build.
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitleaksignore'
+      - '.gitleaks.toml'
+      - '.github/workflows/auto-fix-watchdog.yml'
+      - '.github/workflows/lighthouse-nightly.yml'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.vscode/**'
+      - '.editorconfig'
 
 permissions:
   contents: read

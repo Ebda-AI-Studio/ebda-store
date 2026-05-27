@@ -3,8 +3,27 @@ name: CI
 on:
   push:
     branches: [main, develop]
+    # Skip CI for commits that touch ONLY docs / plans / specs. CI gates
+    # exist to catch code regressions, not validate prose. Added 2026-05-27
+    # to cut ~30% of redundant runs.
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitleaksignore'
+      - '.gitleaks.toml'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.vscode/**'
+      - '.editorconfig'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitleaksignore'
+      - '.gitleaks.toml'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.vscode/**'
+      - '.editorconfig'
 
 # CRITICAL: cancel superseded runs. Without this, multiple pushes to main
 # in quick succession all run to completion, burning GitHub Actions minutes.
