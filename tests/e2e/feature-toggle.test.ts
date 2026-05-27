@@ -154,10 +154,10 @@ describe('Feature Toggle Engine', () => {
 
       // Resolved-map semantics (2026-05-27): features that are in
       // PLAN_BASELINE for the store's plan return true; everything else
-      // returns false. Test store is on default `free` plan which baselines
-      // ['coupons','reviews','inventory.basic']. Keys NOT in that baseline
-      // should still be false (no override rows exist for this fresh store).
-      const baseline = new Set(PLAN_BASELINE.free);
+      // returns false. The test store uses the Prisma schema default
+      // `plan = 'starter'` (NOT free — see Store model in schema.prisma),
+      // so the resolved map should match PLAN_BASELINE.starter.
+      const baseline = new Set(PLAN_BASELINE.starter);
       for (const key of FEATURE_KEYS_ARRAY) {
         const expected = baseline.has(key);
         expect(features[key]).toBe(expected);
@@ -187,9 +187,9 @@ describe('Feature Toggle Engine', () => {
       expect(features).toBeDefined();
       expect(features.coupons).toBe(true);
       expect(features.loyalty).toBe(true);
-      // 2026-05-27: `reviews` is in PLAN_BASELINE.free so it resolves to
-      // true even without an override row. Keys not in baseline (e.g. sms)
-      // remain false.
+      // 2026-05-27: `reviews` is in PLAN_BASELINE.starter (default plan)
+      // so it resolves to true even without an override row. Keys not in
+      // starter baseline (e.g. sms — enterprise-only) remain false.
       expect(features.reviews).toBe(true);
       expect(features.sms).toBe(false);
     });
