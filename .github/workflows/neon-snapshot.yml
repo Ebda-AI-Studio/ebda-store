@@ -15,6 +15,7 @@ on:
       - '.gitleaks.toml'
       - '.github/workflows/auto-fix-watchdog.yml'
       - '.github/workflows/lighthouse-nightly.yml'
+      - '.github/workflows/load-test-nightly.yml'
       - '.github/ISSUE_TEMPLATE/**'
       - '.vscode/**'
       - '.editorconfig'

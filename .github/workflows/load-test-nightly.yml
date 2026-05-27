@@ -16,8 +16,9 @@ name: Load Test (Nightly)
 # intentionally gated to manual workflow_dispatch only (not the nightly cron).
 
 on:
-  schedule:
-    - cron: '0 3 * * *'
+  # schedule: DISABLED 2026-05-27 — load tests are intended for pre-launch + post-infra-change runs, NOT nightly. Pure waste of action minutes when no real merchant load exists. Use workflow_dispatch to fire manually.
+  # schedule:
+  #   - cron: \'0 3 * * *\'
   workflow_dispatch:
     inputs:
       scenario:
