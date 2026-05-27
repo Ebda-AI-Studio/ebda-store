@@ -4,4 +4,5 @@
 export * from './types';
 export * from './utils';
 export * from './features';
+export * from './plan-baselines';
 export * from './notifications';
