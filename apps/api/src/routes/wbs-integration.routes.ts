@@ -23,6 +23,7 @@ import { buildTemplatesForStore } from '../lib/wa-templates/buildForStore';
 import { resolveHeaderHandle } from '../lib/wa-templates/resolveHeaderHandle';
 import { auditLog } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
+import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
@@ -429,6 +430,15 @@ router.put(
         logger.info({ storeId }, '[WBS-INTEGRATION] WBS integration disabled by admin');
       }
 
+      // Capture previous botMode to detect transitions for Telegram alert.
+      const prevStore =
+        input.botMode !== undefined
+          ? await prisma.store.findUnique({
+              where: { id: storeId },
+              select: { botMode: true, name: true, slug: true },
+            })
+          : null;
+
       const updated = await prisma.store.update({
         where: { id: storeId },
         data: updateData,
@@ -452,6 +462,29 @@ router.put(
           metaAccessToken: true, // used to derive hasMetaToken only
         },
       });
+
+      // Phase E.2 — Telegram alert on bot_mode transition to native_catalog
+      // variants. Lets Ahmad see in-channel when a merchant flips to native
+      // catalog mode (manual cutover for the first few merchants until the
+      // flow is verified at scale). Fire-and-forget; doesn't block the save.
+      if (
+        prevStore &&
+        input.botMode !== undefined &&
+        prevStore.botMode !== input.botMode &&
+        (input.botMode === 'native_catalog' || input.botMode === 'native_catalog_with_gemini_agent')
+      ) {
+        void sendAlert({
+          level: 'info',
+          scope: 'store',
+          store: { id: storeId, name: prevStore.name, slug: prevStore.slug },
+          source: 'fwb.wbs-integration.botMode',
+          title: `Store flipped to ${input.botMode}`,
+          body: `Bot mode changed from ${prevStore.botMode ?? 'unset'} to ${input.botMode}. Verify Meta Commerce catalog is approved + access token still valid.`,
+          context: { prevBotMode: prevStore.botMode, newBotMode: input.botMode },
+        }).catch(err => {
+          logger.warn({ err, storeId }, '[WBS-INTEGRATION] botMode alert send failed');
+        });
+      }
 
       // ── Sync waCustomerOrderingEnabled to WBS ─────────────────────────────
       // Non-blocking: any error here MUST NOT fail the save — the FWB Store
