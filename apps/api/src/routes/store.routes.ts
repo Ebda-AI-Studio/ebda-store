@@ -131,6 +131,9 @@ const contactSchema = z
     whatsapp: optionalStr(50),
     address: optionalStr(500),
     addressAr: optionalStr(500),
+    // Phase D.6 — WhatsApp bot "Locations & Hours" branch
+    businessHours: optionalStr(500),
+    googleMapsUrl: optionalStr(2000),
   })
   .strip();
 

@@ -641,6 +641,9 @@ export class StoreService {
       whatsapp?: string;
       address?: string;
       addressAr?: string;
+      /** Phase D.6 — WhatsApp bot "Locations & Hours" branch */
+      businessHours?: string;
+      googleMapsUrl?: string;
     }
   ) {
     const store = await this.getById(storeId);
@@ -654,6 +657,8 @@ export class StoreService {
         whatsapp: contact.whatsapp,
         address: contact.address,
         addressAr: contact.addressAr,
+        businessHours: contact.businessHours,
+        googleMapsUrl: contact.googleMapsUrl,
       },
     });
 

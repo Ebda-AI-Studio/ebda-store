@@ -1,0 +1,168 @@
+'use client';
+
+/**
+ * MetaCatalogCard — form for Meta Commerce Catalog credentials.
+ *
+ * The access token is write-only: once saved, the field shows "Token set ✓"
+ * and the user must type a new value to rotate it. The current token is NEVER
+ * returned to the browser (hasMetaToken boolean only).
+ *
+ * Saves via PUT /api/v1/stores/:id/integrations/wbs { metaCatalogId, metaBusinessId, metaAccessToken }.
+ */
+
+import { useState } from 'react';
+import { Button, useToast } from '@force/ui';
+import { apiPut } from '../../../lib/api';
+import type { MetaCatalogConfig } from '../../../lib/types/wa-bot';
+
+interface MetaCatalogCardProps {
+  storeId: string;
+  initialConfig: MetaCatalogConfig;
+}
+
+export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps) {
+  const { success: toastSuccess, error: toastError } = useToast();
+
+  const [catalogId, setCatalogId] = useState(initialConfig.metaCatalogId ?? '');
+  const [businessId, setBusinessId] = useState(initialConfig.metaBusinessId ?? '');
+  const [accessToken, setAccessToken] = useState(''); // always start blank — never pre-fill
+  const [hasToken, setHasToken] = useState(initialConfig.hasMetaToken);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+
+    const body: Record<string, string | null> = {
+      metaCatalogId: catalogId.trim() || null,
+      metaBusinessId: businessId.trim() || null,
+    };
+
+    // Only include access token in the payload if the user typed something new.
+    // An empty string = "no change". null would clear the token — we don't offer
+    // a clear button here; the merchant just rotates by typing a new value.
+    if (accessToken.trim()) {
+      body.metaAccessToken = accessToken.trim();
+    }
+
+    const { error } = await apiPut(`/api/v1/stores/${storeId}/integrations/wbs`, body);
+    setSaving(false);
+
+    if (error) {
+      toastError(error.message || 'Failed to save Meta catalog config');
+    } else {
+      toastSuccess('Meta catalog config saved');
+      // Clear the token input — it was accepted, never show it again
+      if (accessToken.trim()) {
+        setAccessToken('');
+        setHasToken(true);
+      }
+    }
+  };
+
+  const isDirty =
+    catalogId.trim() !== (initialConfig.metaCatalogId ?? '') ||
+    businessId.trim() !== (initialConfig.metaBusinessId ?? '') ||
+    accessToken.trim().length > 0;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-6">
+      <h2 className="text-base font-semibold text-foreground mb-1">Meta Commerce Catalog</h2>
+      <p className="text-sm text-muted-foreground mb-5">
+        Required for <span className="font-medium">Native Catalog</span> bot modes. Find these IDs
+        in your{' '}
+        <a
+          href="https://business.facebook.com/commerce"
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary underline"
+        >
+          Meta Business Manager
+        </a>
+        .
+      </p>
+
+      <div className="space-y-4">
+        {/* Catalog ID */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">Catalog ID</label>
+          <input
+            type="text"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="e.g. 123456789012345"
+            value={catalogId}
+            onChange={e => setCatalogId(e.target.value)}
+            autoComplete="off"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            From Meta Commerce Manager → Catalog Settings.
+          </p>
+        </div>
+
+        {/* Business ID */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Business Account ID
+          </label>
+          <input
+            type="text"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="e.g. 987654321098765"
+            value={businessId}
+            onChange={e => setBusinessId(e.target.value)}
+            autoComplete="off"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            From Meta Business Manager → Business Settings → Business Info.
+          </p>
+        </div>
+
+        {/* Access Token — write-only */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            System User Access Token
+          </label>
+          {hasToken && !accessToken && (
+            <div className="mb-2 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800 dark:bg-emerald-950/30">
+              <svg
+                className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              <span className="text-sm text-emerald-700 dark:text-emerald-300">Token set ✓</span>
+            </div>
+          )}
+          <input
+            type="password"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder={
+              hasToken ? 'Type a new token to rotate it' : 'Paste your System User token'
+            }
+            value={accessToken}
+            onChange={e => setAccessToken(e.target.value)}
+            autoComplete="new-password"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Create a System User in Meta Business Manager → grant{' '}
+            <code className="bg-muted rounded px-1">catalog_management</code> permission. Token is
+            encrypted at rest and never shown again after saving.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex justify-end">
+        <Button onClick={handleSave} disabled={saving || !isDirty} size="sm">
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </div>
+  );
+}

@@ -44,6 +44,19 @@ const templateEntryWithChannelsSchema = templateEntrySchema.extend({
     .optional(),
 });
 
+const botServiceMenuSchema = z.object({
+  orderNow: z.boolean(),
+  subscriptionBoxes: z.boolean(),
+  locationsHours: z.boolean(),
+  chatWithAgent: z.boolean(),
+  labels: z
+    .object({
+      en: z.record(z.string()).optional(),
+      ar: z.record(z.string()).optional(),
+    })
+    .optional(),
+});
+
 const wbsIntegrationSchema = z.object({
   // wbsEnabled: optional on first-connect PUT (only wbsApiKey may be sent)
   wbsEnabled: z.boolean().optional(),
@@ -77,6 +90,23 @@ const wbsIntegrationSchema = z.object({
     .record(z.object({ en: z.string().optional(), ar: z.string().optional() }))
     .nullable()
     .optional(),
+  /**
+   * Phase D — bot mode for native catalog support.
+   * 'legacy_chat' (default) | 'native_catalog' | 'native_catalog_with_gemini_agent'
+   */
+  botMode: z.enum(['legacy_chat', 'native_catalog', 'native_catalog_with_gemini_agent']).optional(),
+  /** Phase D — which services appear in the WhatsApp bot service menu. */
+  botServiceMenu: botServiceMenuSchema.nullable().optional(),
+  /** Phase D — Meta Commerce catalog ID (from Meta Business Manager). */
+  metaCatalogId: z.string().min(1).nullable().optional(),
+  /** Phase D — Meta Business Account ID. */
+  metaBusinessId: z.string().min(1).nullable().optional(),
+  /**
+   * Phase D — Meta System User access token. Write-only from the admin.
+   * NEVER returned to the client — stored encrypted at rest.
+   * Undefined means "no change"; null means "clear token".
+   */
+  metaAccessToken: z.string().min(1).nullable().optional(),
 });
 
 type WbsIntegrationInput = z.infer<typeof wbsIntegrationSchema>;
@@ -122,6 +152,12 @@ router.get(
           waCustomerOrderingEnabled: true,
           botCopy: true,
           logo: true,
+          // Phase D — bot config
+          botMode: true,
+          botServiceMenu: true,
+          metaCatalogId: true,
+          metaBusinessId: true,
+          metaAccessToken: true, // only used to derive hasToken — never returned plain
         },
       });
 
@@ -216,6 +252,12 @@ router.get(
           waCustomerOrderingEnabled: store.waCustomerOrderingEnabled,
           botCopy: store.botCopy ?? null,
           storeHasLogo: Boolean(store.logo),
+          // Phase D — bot config (never return metaAccessToken plain)
+          botMode: store.botMode ?? 'legacy_chat',
+          botServiceMenu: store.botServiceMenu ?? null,
+          metaCatalogId: store.metaCatalogId ?? null,
+          metaBusinessId: store.metaBusinessId ?? null,
+          hasMetaToken: Boolean(store.metaAccessToken),
           connectedTenant,
           ...(connectedTenantError ? { connectedTenantError } : {}),
         },
@@ -352,6 +394,25 @@ router.put(
         updateData.botCopy = input.botCopy;
       }
 
+      // Phase D — bot mode + service menu + meta catalog config
+      if (input.botMode !== undefined) {
+        updateData.botMode = input.botMode;
+      }
+      if (input.botServiceMenu !== undefined) {
+        updateData.botServiceMenu = input.botServiceMenu;
+      }
+      if (input.metaCatalogId !== undefined) {
+        updateData.metaCatalogId = input.metaCatalogId;
+      }
+      if (input.metaBusinessId !== undefined) {
+        updateData.metaBusinessId = input.metaBusinessId;
+      }
+      if (input.metaAccessToken !== undefined) {
+        // null = clear token; any other value = encrypt and store
+        updateData.metaAccessToken =
+          input.metaAccessToken === null ? null : encryption.encrypt(input.metaAccessToken);
+      }
+
       // API key handling
       if (isNewApiKey && input.wbsApiKey) {
         updateData.wbsApiKey = encryption.encrypt(input.wbsApiKey);
@@ -383,6 +444,12 @@ router.put(
           wbsTemplateUseLogoHeader: true,
           waCustomerOrderingEnabled: true,
           botCopy: true,
+          // Phase D
+          botMode: true,
+          botServiceMenu: true,
+          metaCatalogId: true,
+          metaBusinessId: true,
+          metaAccessToken: true, // used to derive hasMetaToken only
         },
       });
 
@@ -563,6 +630,12 @@ router.put(
           wbsTemplates: updated.wbsTemplates,
           waCustomerOrderingEnabled: updated.waCustomerOrderingEnabled,
           botCopy: updated.botCopy ?? null,
+          // Phase D
+          botMode: updated.botMode ?? 'legacy_chat',
+          botServiceMenu: updated.botServiceMenu ?? null,
+          metaCatalogId: updated.metaCatalogId ?? null,
+          metaBusinessId: updated.metaBusinessId ?? null,
+          hasMetaToken: Boolean(updated.metaAccessToken),
           // Phase 7 atomic: surface what happened to the auto-generated
           // templates so the UI can show "Connected + 12 templates pending"
           ...(templatesAutoSeeded !== undefined && {

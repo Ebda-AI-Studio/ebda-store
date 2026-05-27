@@ -1267,6 +1267,10 @@
       "whatsappOrderUpdates": {
         "title": "Order Updates",
         "description": "Toggle automatic WhatsApp messages to customers on each step of their order (paid, shipped, delivered)"
+      },
+      "waBotConfig": {
+        "title": "WhatsApp Bot Config",
+        "description": "Bot mode · service menu · Meta Commerce catalog credentials"
       }
     }
   },

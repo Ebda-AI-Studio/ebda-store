@@ -205,12 +205,15 @@ model Store {
   socialLinks Json @default("{}") @map("social_links") // StoreSocialLinks JSON
 
   // Contact Information
-  email     String?
-  phone     String?
-  phoneAr   String? @map("phone_ar")
-  whatsapp  String?
-  address   String?
-  addressAr String? @map("address_ar")
+  email          String?
+  phone          String?
+  phoneAr        String? @map("phone_ar")
+  whatsapp       String?
+  address        String?
+  addressAr      String? @map("address_ar")
+  // Used by WhatsApp bot "Locations & Hours" branch (Phase D.6 / Wave 2A)
+  businessHours  String? @map("business_hours")  // free-text, e.g. "Sat–Thu 9am–10pm"
+  googleMapsUrl  String? @map("google_maps_url")  // full Maps URL for the store location
 
   // Announcement Bar
   announcementBar Json? @map("announcement_bar") // AnnouncementBar JSON
