@@ -78,6 +78,8 @@ interface CreateProductData {
   costPrice?: number | null;
   sku?: string;
   inventory?: number;
+  /** Per-product threshold for the LOW STOCK badge / merchant alerts. */
+  lowStockThreshold?: number;
   status?: 'draft' | 'active' | 'archived';
   isFeatured?: boolean;
   isNew?: boolean;
@@ -296,6 +298,9 @@ export class ProductService {
         costPrice: data.costPrice ?? null,
         sku: data.sku,
         inventory: data.inventory ?? 0,
+        ...(data.lowStockThreshold !== undefined
+          ? { lowStockThreshold: data.lowStockThreshold }
+          : {}),
         status: data.status ?? 'draft',
         featured: data.isFeatured ?? false,
         isNew: data.isNew ?? false,
@@ -409,6 +414,9 @@ export class ProductService {
           ...(data.costPrice !== undefined ? { costPrice: data.costPrice } : {}),
           sku: data.sku,
           inventory: data.inventory,
+          ...(data.lowStockThreshold !== undefined
+            ? { lowStockThreshold: data.lowStockThreshold }
+            : {}),
           status: data.status,
           // Curated flags driven by the admin product edit form. We accept
           // them only when explicitly present in the patch so callers that

@@ -169,9 +169,19 @@ describe('Store Management', () => {
     });
 
     it('should allow store owner to access their store', async () => {
-      if (!storeAdminToken || !createdStoreId) {
+      if (!storeAdminToken || !createdStoreId || !storeAdminId) {
         throw new Error('Prerequisites not met');
       }
+
+      // The POST /stores route always assigns ownership to the AUTHENTICATED
+      // caller (super_admin in this test) regardless of any ownerId in the
+      // body — intentional in store.routes.ts:398 to prevent impersonation.
+      // Re-assign ownership to storeAdmin directly via Prisma so
+      // requireStoreAccess lets storeAdmin through.
+      await prisma.store.update({
+        where: { id: createdStoreId },
+        data: { ownerId: storeAdminId },
+      });
 
       const res = await request(app)
         .get(`/stores/${createdStoreId}`)
