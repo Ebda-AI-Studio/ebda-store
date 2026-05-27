@@ -671,17 +671,30 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
 const cartFromWaSchema = z.object({
   items: z
     .array(
-      z.object({
-        productId: z.string().uuid(),
-        quantity: z.number().int().min(1).max(99),
-      })
+      z
+        .object({
+          // productId OR productRetailerId (native catalog uses retailer_id = product.id UUID)
+          productId: z.string().uuid().optional(),
+          productRetailerId: z.string().uuid().optional(),
+          quantity: z.number().int().min(1).max(99),
+        })
+        .refine(i => i.productId || i.productRetailerId, {
+          message: 'Each item must have productId or productRetailerId',
+        })
     )
     .min(1)
     .max(20),
-  customerPhone: z.string().min(8).max(20),
+  customerPhone: z.string().min(8).max(20).optional(),
+  waId: z.string().min(8).max(20).optional(), // native catalog alias for customerPhone
+  customerId: z.string().min(1).optional(), // FWB customer ID (native catalog flow)
   customerName: z.string().min(1).max(120).optional(),
   locale: z.enum(['ar', 'en']).optional(),
   waConversationId: z.string().min(1).max(120).optional(),
+  // Phase C native catalog fields:
+  addressId: z.string().min(1).optional(), // saved CustomerAddress ID
+  addressFreeform: z.string().min(1).max(500).optional(), // raw text address
+  paymentMethod: z.enum(['cash', 'online']).optional(), // defaults to 'online' (checkout URL)
+  storeId: z.string().min(1).optional(), // explicit storeId override
 });
 router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) => {
   try {
@@ -692,7 +705,32 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
         .json({ success: false, error: 'INVALID_PAYLOAD', issues: parse.error.issues });
       return;
     }
-    const { items, customerPhone, customerName, locale, waConversationId } = parse.data;
+    const {
+      items: rawItems,
+      customerPhone: rawCustomerPhone,
+      waId: rawWaId,
+      customerId,
+      customerName,
+      locale,
+      waConversationId,
+      addressId,
+      addressFreeform,
+      paymentMethod = 'online',
+    } = parse.data;
+
+    // Normalize: accept either customerPhone or waId (native catalog sends waId)
+    const customerPhone = rawCustomerPhone || rawWaId;
+    if (!customerPhone) {
+      res.status(400).json({ success: false, error: 'CUSTOMER_PHONE_REQUIRED' });
+      return;
+    }
+
+    // Normalize items: accept productRetailerId as alias for productId
+    const items = rawItems.map(i => ({
+      productId: (i.productId || i.productRetailerId) as string,
+      quantity: i.quantity,
+    }));
+
     const store = req.bridgeStore!;
 
     // Verify every product belongs to bridge store + still in stock.
@@ -762,12 +800,17 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
       storeId: store.id,
       storeSlug: store.slug,
       customerPhone,
+      customerId: customerId || null,
       customerName: customerName || null,
       locale: locale || 'auto',
       waConversationId: waConversationId || null,
       items: cartItems,
       totalFils,
       currency: store.currency,
+      // Phase C native catalog fields (passed through for downstream order creation)
+      addressId: addressId || null,
+      addressFreeform: addressFreeform || null,
+      paymentMethod,
     };
     const checkoutToken = jwt.sign(tokenPayload, config.jwtSecret, {
       expiresIn: CHECKOUT_TOKEN_TTL_SECONDS,
@@ -779,15 +822,34 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
     const checkoutUrl = `${storefrontBase}/checkout?waToken=${encodeURIComponent(checkoutToken)}`;
 
     logger.info(
-      { storeId: store.id, customerPhone: customerPhone.slice(-4), totalFils, items: items.length },
+      {
+        storeId: store.id,
+        customerPhone: customerPhone.slice(-4),
+        totalFils,
+        items: items.length,
+        paymentMethod,
+        hasAddress: !!(addressId || addressFreeform),
+      },
       '[wa-bridge] cart token issued'
     );
+
+    // For cash orders, WBS needs an orderId in the response to confirm to the customer.
+    // Phase C: token is issued in both cases; cash path returns checkoutUrl too so WBS
+    // can use it as a fallback if needed. Full server-side order creation from the bot
+    // (without storefront checkout redirect) is deferred to Phase D/E.
+    // The `orderId` field in the response for cash = the JWT sub claim from checkoutToken
+    // (used as a temp order reference until the storefront redeems + creates the real order).
+    const tempOrderId = `wa-${checkoutToken.slice(-8)}`; // short unique handle for confirmation msg
 
     res.json({
       success: true,
       data: {
         checkoutUrl,
         checkoutToken,
+        // Phase C additions: WBS uses these to send appropriate message to customer
+        paymentUrl: paymentMethod === 'online' ? checkoutUrl : undefined,
+        orderId: tempOrderId,
+        paymentMethod,
         expiresAt: new Date(Date.now() + CHECKOUT_TOKEN_TTL_SECONDS * 1000).toISOString(),
         summary: {
           itemCount: items.reduce((s, i) => s + i.quantity, 0),
