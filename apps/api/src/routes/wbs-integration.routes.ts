@@ -18,6 +18,11 @@ import { authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { encryption } from '../services/encryption.service';
 import { wbsBridgeService, WbsUnauthorizedError } from '../services/wbs-bridge.service';
+import {
+  provisionCatalog,
+  isProvisioningConfigured,
+  MetaProvisionerError,
+} from '../services/meta-provisioner.service';
 import { config } from '../config';
 import { buildTemplatesForStore } from '../lib/wa-templates/buildForStore';
 import { resolveHeaderHandle } from '../lib/wa-templates/resolveHeaderHandle';
@@ -676,6 +681,152 @@ router.put(
             templatesAutoSubmitted,
             templatesAutoError,
           }),
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /stores/:id/integrations/wbs/provision-meta-catalog ───────────────
+//
+// Super-admin only. Calls Meta Graph API to auto-create a Commerce Catalog
+// under the Force AI parent Business Manager, assigns the system user, then
+// persists the catalog id + BM id + encrypted access token onto the Store row
+// — so the merchant doesn't have to navigate Meta Business Manager themselves.
+//
+// Refuses if:
+//   - the Force AI master credentials aren't configured (env vars missing)
+//   - the store already has a metaCatalogId (rotation goes through PUT)
+//
+// On success returns { metaCatalogId, metaBusinessId, hasMetaToken }.
+
+router.post(
+  '/:id/integrations/wbs/provision-meta-catalog',
+  authenticate,
+  authorize('super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id: storeId } = req.params;
+      const user = getAuthUser(req);
+
+      if (!isProvisioningConfigured()) {
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'PROVISIONER_NOT_CONFIGURED',
+            message:
+              'Meta auto-provisioning is not configured. Set FORCE_AI_META_BM_ID + ' +
+              'FORCE_AI_META_ADMIN_TOKEN on Railway (one-time Force AI setup).',
+          },
+        });
+        return;
+      }
+
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          id: true,
+          name: true,
+          nameAr: true,
+          slug: true,
+          metaCatalogId: true,
+        },
+      });
+
+      if (!store) {
+        res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
+        return;
+      }
+
+      if (store.metaCatalogId) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'CATALOG_ALREADY_PROVISIONED',
+            message:
+              'This store already has a Meta catalog id. Clear it from the form before re-provisioning.',
+          },
+        });
+        return;
+      }
+
+      // Catalog name shown to customers in WhatsApp UI — prefer the brand name.
+      const catalogName = store.name || store.slug;
+
+      let result;
+      try {
+        result = await provisionCatalog({ storeId, catalogName });
+      } catch (err) {
+        if (err instanceof MetaProvisionerError) {
+          logger.error(
+            { storeId, stage: err.stage, metaError: err.metaError },
+            '[WBS-INTEGRATION] Meta auto-provisioning failed'
+          );
+          res.status(502).json({
+            success: false,
+            error: {
+              code: 'META_PROVISIONING_FAILED',
+              message: err.message,
+              stage: err.stage,
+            },
+          });
+          return;
+        }
+        throw err;
+      }
+
+      // Persist (token is encrypted at rest — matches the PUT path)
+      const updated = await prisma.store.update({
+        where: { id: storeId },
+        data: {
+          metaCatalogId: result.catalogId,
+          metaBusinessId: result.businessId,
+          metaAccessToken: encryption.encrypt(result.accessToken),
+        },
+        select: {
+          slug: true,
+          name: true,
+          metaCatalogId: true,
+          metaBusinessId: true,
+          metaAccessToken: true,
+        },
+      });
+
+      await auditLog({
+        action: 'store.meta_catalog_provisioned',
+        userId: user.userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        details: {
+          catalogId: result.catalogId,
+          businessId: result.businessId,
+          catalogName,
+        },
+      });
+
+      // Telegram heads-up — same channel as the bot-mode flip alerts.
+      sendAlert({
+        level: 'info',
+        scope: 'store',
+        source: 'fwb.wbs-integration.provisionMetaCatalog',
+        store: { id: storeId, name: updated.name, slug: updated.slug },
+        title: 'Meta Commerce catalog auto-provisioned',
+        body:
+          `New Meta catalog ${result.catalogId} created under Force AI BM ${result.businessId}. ` +
+          `Submit it for Meta review before flipping bot_mode to a native_catalog variant.`,
+      }).catch(err => {
+        logger.warn({ err }, 'sendAlert failed (non-blocking)');
+      });
+
+      res.json({
+        success: true,
+        data: {
+          metaCatalogId: updated.metaCatalogId,
+          metaBusinessId: updated.metaBusinessId,
+          hasMetaToken: Boolean(updated.metaAccessToken),
         },
       });
     } catch (err) {
