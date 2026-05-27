@@ -1,0 +1,110 @@
+# Super-admin playbook
+
+> How to onboard a new merchant, change plans, grant/revoke individual features, and suspend / reactivate a store.
+
+## Roles
+
+- **`super_admin`** — Ahmad and any future Force AI staff. Can see and toggle ALL features for any store, change plans, and suspend/reactivate. Sees the "Manage Features" link in the store sidebar.
+- **`store_admin`** — Merchant team. Can see + use only the features that resolve to enabled for their store. Does NOT see "Manage Features" or any plan-change UI. Plan is shown read-only.
+
+## Plans
+
+Force Store: **Starter / Professional / Enterprise** (plus `free` as a stripped fallback for the demo state / lapsed payment).
+
+| Domain                                                                               | Starter            | Professional       | Enterprise         |
+| ------------------------------------------------------------------------------------ | ------------------ | ------------------ | ------------------ |
+| Storefront essentials (cart, checkout, search, reviews, wishlist, returns, PWA, SEO) | ✓                  | ✓                  | ✓                  |
+| AI features (translation, SEO copy, category suggest, bulk sweep, AEO/GEO)           | ✓                  | ✓                  | ✓                  |
+| Inventory — basic stock tracking                                                     | ✓                  | ✓                  | ✓                  |
+| Inventory — stock alerts + backorder                                                 | —                  | ✓                  | ✓                  |
+| Inventory — multi-warehouse + barcode + PO + bulk adjustments                        | —                  | —                  | ✓                  |
+| Accounting — journal + expenses + invoicing                                          | —                  | ✓                  | ✓                  |
+| Accounting — tax reports + multi-currency + profit anomaly + bank reconcile          | —                  | —                  | ✓                  |
+| Loyalty + push notifications + upsell-crosssell                                      | —                  | ✓                  | ✓                  |
+| Affiliate program + SMS + floating widget                                            | —                  | —                  | ✓                  |
+| Force WhatsApp bot integration                                                       | **Separate quote** | **Separate quote** | **Separate quote** |
+
+The canonical source is `packages/shared/src/plan-baselines.ts` — when the table here disagrees with the code, the code is right.
+
+## Resolution rule
+
+```
+isFeatureEnabled(storeId, key) =
+  StoreFeature row exists?  → row.enabled       (override wins)
+  else                       → PLAN_BASELINE[store.plan].includes(key)
+```
+
+**Plan changes never touch StoreFeature rows.** Every override is preserved across upgrade AND downgrade. Super-admin manually clears overrides if a clean slate is wanted after a plan change.
+
+## How to onboard a new merchant
+
+1. Sign the contract + collect payment.
+2. From the super-admin sidebar, create the store (existing `POST /admin/stores` flow).
+3. The store is created on `plan = free` by default. From the "Manage Features" page, **change the plan dropdown to the tier the merchant signed for** (Starter / Professional / Enterprise).
+4. If the merchant paid for any **out-of-plan** add-ons (e.g. Starter but with Loyalty added, or Pro but with profit_anomaly), grant them per-row from the same Manage Features page. The feature shows ⚪ "Not in Starter" → click → it becomes 🔵 "Granted by override".
+5. Onboarding continues per the existing checklist (branding, catalog import, payment provider, training).
+
+## How to change a merchant's plan
+
+1. Go to the store's **Manage Features** page (super-admin sidebar).
+2. Change the plan dropdown. Confirm in the modal — overrides will be preserved.
+3. The UI re-renders: features that newly fall into the baseline now show 🟢 "Included in [NewPlan]". Features the merchant had as overrides keep their override badge.
+4. If you want a clean slate after a downgrade (e.g. merchant dropped from Enterprise to Pro and shouldn't keep grandfathered features), use **"Reset to plan defaults"** at the bottom of the Manage Features page. Confirm in modal — this DELETEs ALL StoreFeature override rows for the store.
+
+## How to grant or revoke a single feature
+
+From the Manage Features page, click the toggle in the row. Action depends on the current tri-state:
+
+| State           | What the toggle does                                                         |
+| --------------- | ---------------------------------------------------------------------------- |
+| 🟢 Baseline ON  | Creates an override row `enabled=false` (revoke from plan) — row becomes 🔴  |
+| 🔴 Override OFF | DELETEs the override row — falls back to baseline 🟢                         |
+| ⚪ Baseline OFF | Creates an override row `enabled=true` (grant outside plan) — row becomes 🔵 |
+| 🔵 Override ON  | DELETEs the override row — falls back to baseline ⚪                         |
+
+Audit log records every toggle: action, user, store, ip, timestamp. Visible in the AuditLog table at `prisma.auditLog`.
+
+## How to suspend a store
+
+Suspension is for missed renewals + AUP violations. **Super-admin only.**
+
+1. Go to the store's **Settings** page → Danger Zone (visible only to super-admin).
+2. Click **"Suspend Store"**. Confirm modal.
+3. Internal effects:
+   - `Store.status = 'suspended'`
+   - Feature cache invalidated
+   - AuditLog entry written (`action: store.suspend`)
+4. External effects:
+   - Storefront serves the `StoreMaintenance` page (HTTP 200 with branded "we'll be back soon" + "Powered by Force AI" link)
+   - Store admin can still log into admin (so they can pay invoice + click reactivate)
+   - Background jobs (Inngest functions, abandoned cart reminders, etc.) skip suspended stores
+
+## How to reactivate
+
+Same UI, the button reads "Reactivate Store" in green when status is suspended. Click → confirm → `status` flips to `active`. Storefront returns immediately on the next request.
+
+## Force WhatsApp side
+
+Force WhatsApp is a **separate product** with its own 3-tier plan system on the WBS side (`Client.plan` + `ClientFeature` table). Same super-admin UI pattern in WBS admin frontend.
+
+**Cross-product rule (HARD):** `wbs.bot.*` features REQUIRE a linked active Force Store. WBS plan can be at any tier, but if no Force Store is linked OR the linked store is suspended/inactive, all bot features resolve to disabled. Bulk campaigns + unified inbox + templates work without Force Store. Super-admin override on a `wbs.bot.*` feature CANNOT bypass this precondition — it's a runtime check, not a config flag.
+
+## Where the code lives
+
+| What                                 | Path                                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| Plan baseline constants              | `packages/shared/src/plan-baselines.ts`                                      |
+| Feature registry (with sub-features) | `packages/shared/src/features.ts`                                            |
+| Resolver                             | `apps/api/src/services/feature.service.ts`                                   |
+| Super-admin endpoints                | `apps/api/src/routes/feature.routes.ts`                                      |
+| Suspend endpoint                     | `apps/api/src/routes/store.routes.ts` (`PATCH /stores/:id/status`)           |
+| Manage Features page                 | `apps/admin/src/app/stores/[id]/features/FeatureMatrix.tsx`                  |
+| Super-admin wrapper                  | `apps/admin/src/components/RequireSuperAdmin.tsx`                            |
+| Storefront suspension page           | `apps/web/src/components/StoreMaintenance.tsx`                               |
+| WBS-side mirror                      | `whatsapp-bulk-sender/backend/src/lib/plan-baselines.js` + `feature-gate.js` |
+
+## Related runbooks
+
+- [`ROLLBACK.md`](ROLLBACK.md) — code + DB rollback
+- [`STAGING-DEPLOYMENT.md`](STAGING-DEPLOYMENT.md) — promotion flow
+- [`../business/04-pricing-tiers.md`](../business/04-pricing-tiers.md) — proposal pricing framework

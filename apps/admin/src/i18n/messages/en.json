@@ -3674,6 +3674,7 @@
       "navStores": "Stores",
       "navUsers": "Users",
       "navAuditLogs": "Audit Logs",
+      "navManageFeatures": "Manage Features",
       "hubTabs": {
         "products": "Products",
         "pageBuilder": "Page Builder",

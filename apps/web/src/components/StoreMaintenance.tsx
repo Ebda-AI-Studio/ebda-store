@@ -48,7 +48,7 @@ export function StoreMaintenance() {
     'يخضع حالياً لأعمال الصيانة. يرجى المحاولة مرة أخرى لاحقاً.'
   );
   const contactHeading = t('Need to reach us?', 'تحتاج للتواصل معنا؟');
-  const poweredByLabel = t('Powered by Force', 'مدعوم من Force');
+  const poweredByLabel = t('Powered by Force AI', 'مدعوم من Force AI');
 
   // Normalize the WhatsApp number to digits so wa.me works regardless of the
   // format the merchant typed (the admin form accepts "+965 9999 1234",
@@ -171,7 +171,7 @@ export function StoreMaintenance() {
 
         <footer className="mt-16 text-xs text-muted-foreground">
           <a
-            href="https://forcemediakw.com"
+            href="https://store.forcemediakw.com"
             target="_blank"
             rel="noopener noreferrer"
             className="transition-colors hover:text-foreground"
