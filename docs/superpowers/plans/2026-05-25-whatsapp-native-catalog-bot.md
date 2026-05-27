@@ -1,14 +1,24 @@
 # WhatsApp Native Catalog Bot Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
+> (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the in-chat product-listing bot with Meta Native WhatsApp Catalog, layered on top of the existing `wa-ordering.js` state machine, adding pre-catalog greeting/language/services flow + saved-address + payment-method steps. Target ≤3s p95 per interaction (current ~15s+).
+**Goal:** Replace the in-chat product-listing bot with Meta Native WhatsApp Catalog, layered on top
+of the existing `wa-ordering.js` state machine, adding pre-catalog greeting/language/services flow +
+saved-address + payment-method steps. Target ≤3s p95 per interaction (current ~15s+).
 
-**Architecture:** Cross-repo (FWB + WBS). FWB owns products/customers/orders + Inngest fanout on product changes. WBS owns the state machine + Meta Graph API calls (catalog sync + interactive messages). Catalog hosted at Meta Commerce eliminates per-message bridge calls; only async background sync hits FWB.
+**Architecture:** Cross-repo (FWB + WBS). FWB owns products/customers/orders + Inngest fanout on
+product changes. WBS owns the state machine + Meta Graph API calls (catalog sync + interactive
+messages). Catalog hosted at Meta Commerce eliminates per-message bridge calls; only async
+background sync hits FWB.
 
-**Tech Stack:** Node 20, Express, Prisma 7 (FWB) / Prisma 5 (WBS), Neon Postgres, Redis (BullMQ + cache), Inngest (FWB), Meta WhatsApp Cloud API v22, Meta Graph API for Catalog Object, Next.js 16 (FWB admin).
+**Tech Stack:** Node 20, Express, Prisma 7 (FWB) / Prisma 5 (WBS), Neon Postgres, Redis (BullMQ +
+cache), Inngest (FWB), Meta WhatsApp Cloud API v22, Meta Graph API for Catalog Object, Next.js 16
+(FWB admin).
 
-**Spec:** [`docs/superpowers/specs/2026-05-25-whatsapp-native-catalog-bot-design.md`](../specs/2026-05-25-whatsapp-native-catalog-bot-design.md)
+**Spec:**
+[`docs/superpowers/specs/2026-05-25-whatsapp-native-catalog-bot-design.md`](../specs/2026-05-25-whatsapp-native-catalog-bot-design.md)
 
 ---
 
@@ -64,14 +74,16 @@
 
 ## Phase 0 — Latency Diagnosis (Day 0.5)
 
-**Goal**: Measure where the current 15s+ comes from. Apply quick wins BEFORE building new flow on top of slow bedrock.
+**Goal**: Measure where the current 15s+ comes from. Apply quick wins BEFORE building new flow on
+top of slow bedrock.
 
 ### Task 0.1: Add pino timing middleware to FWB wa-bridge routes
 
 **Files:**
 
 - Create: `apps/api/src/lib/observability/wa-bridge-timing.ts`
-- Modify: `apps/api/src/routes/wa-bridge.routes.ts:1-20` (add `router.use(waBridgeTiming)` after `waBridgeAuth`)
+- Modify: `apps/api/src/routes/wa-bridge.routes.ts:1-20` (add `router.use(waBridgeTiming)` after
+  `waBridgeAuth`)
 - Test: `tests/unit/wa-bridge-timing.test.ts`
 
 - [ ] **Step 1: Write the failing test**
@@ -111,7 +123,8 @@ describe('waBridgeTiming', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/ahmadsharaf/Desktop/projects/force-website-builder && npx vitest run tests/unit/wa-bridge-timing.test.ts`
+Run:
+`cd /Users/ahmadsharaf/Desktop/projects/force-website-builder && npx vitest run tests/unit/wa-bridge-timing.test.ts`
 Expected: FAIL with "Cannot find module '@api/lib/observability/wa-bridge-timing'"
 
 - [ ] **Step 3: Write minimal implementation**
@@ -152,12 +165,12 @@ export const waBridgeTiming =
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npx vitest run tests/unit/wa-bridge-timing.test.ts`
-Expected: PASS
+Run: `npx vitest run tests/unit/wa-bridge-timing.test.ts` Expected: PASS
 
 - [ ] **Step 5: Wire into wa-bridge router**
 
-Modify `apps/api/src/routes/wa-bridge.routes.ts` — find the line `const router = Router();` and add right after `router.use(waBridgeAuth);` (or before the first route if no current `.use`):
+Modify `apps/api/src/routes/wa-bridge.routes.ts` — find the line `const router = Router();` and add
+right after `router.use(waBridgeAuth);` (or before the first route if no current `.use`):
 
 ```ts
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
@@ -184,7 +197,8 @@ git push origin main
 
 - [ ] **Step 1: Wrap every fetch with hr-time + log**
 
-In `wa-bridge-client.js`, for each exported function (e.g. `getStoreCatalog`, `getCustomerHistory`, `postCartFromWA`, `postTemplatesStatus`), wrap the fetch:
+In `wa-bridge-client.js`, for each exported function (e.g. `getStoreCatalog`, `getCustomerHistory`,
+`postCartFromWA`, `postTemplatesStatus`), wrap the fetch:
 
 ```js
 // before:
@@ -383,7 +397,8 @@ git push origin main
 
 **Files:**
 
-- Modify: `backend/src/services/wa-ordering.js` — search for any function with consecutive `await waBridge.xxx()` calls
+- Modify: `backend/src/services/wa-ordering.js` — search for any function with consecutive
+  `await waBridge.xxx()` calls
 
 - [ ] **Step 1: Search for the pattern**
 
@@ -392,7 +407,8 @@ cd /Users/ahmadsharaf/Desktop/projects/whatsapp-bulk-sender/backend/src/services
 grep -nE "await waBridge\." wa-ordering.js | head -20
 ```
 
-Identify any spot where 2+ consecutive `await waBridge.xxx()` calls are independent of each other (don't depend on each other's return values).
+Identify any spot where 2+ consecutive `await waBridge.xxx()` calls are independent of each other
+(don't depend on each other's return values).
 
 - [ ] **Step 2: Convert to Promise.all**
 
@@ -439,7 +455,9 @@ git commit -m "docs(uat): wa-bot latency post quick-wins"
 git push origin main
 ```
 
-**Phase 0 acceptance gate**: bridge call p95 ≤ 1.5s OR documented blocker (Meta API constraint, Railway plan limit) that justifies remaining latency. If not met, escalate to Ahmad before starting Phase A.
+**Phase 0 acceptance gate**: bridge call p95 ≤ 1.5s OR documented blocker (Meta API constraint,
+Railway plan limit) that justifies remaining latency. If not met, escalate to Ahmad before starting
+Phase A.
 
 ---
 
@@ -505,7 +523,8 @@ model CustomerAddress {
 
 - [ ] **Step 2: Create the migration SQL**
 
-Use plural table names because FWB uses `@@map` to plural per memory `feedback-prisma-migration-uses-mapped-table-names.md`:
+Use plural table names because FWB uses `@@map` to plural per memory
+`feedback-prisma-migration-uses-mapped-table-names.md`:
 
 ```sql
 -- packages/database/prisma/migrations/20260525120000_wa_native_catalog_bot/migration.sql
@@ -632,8 +651,8 @@ describe('CustomerAddressService', () => {
 
 - [ ] **Step 2: Run test, expect fail**
 
-Run: `npx vitest run tests/unit/customer-address-service.test.ts`
-Expected: FAIL with "Cannot find module '@api/services/customer-address.service'"
+Run: `npx vitest run tests/unit/customer-address-service.test.ts` Expected: FAIL with "Cannot find
+module '@api/services/customer-address.service'"
 
 - [ ] **Step 3: Implement**
 
@@ -684,7 +703,8 @@ git push origin main
 
 **Files:**
 
-- Modify: `apps/api/src/routes/wa-bridge.routes.ts` (add 2 endpoints at the end of the file before `export default router`)
+- Modify: `apps/api/src/routes/wa-bridge.routes.ts` (add 2 endpoints at the end of the file before
+  `export default router`)
 - Test: `tests/integration/wa-bridge-customer-addresses.test.ts`
 
 - [ ] **Step 1: Write the failing integration test**
@@ -801,11 +821,15 @@ git push origin main
 - Test: `tests/integration/wa-bridge-store-config.test.ts`
 
 - [ ] **Step 1: Write the failing test** (analogous to A.3) — covers:
-  - `GET /wa-bridge/store/service-menu?storeId=` returns `{ orderNow, subscriptionBoxes, locationsHours, chatWithAgent, labels: { en, ar } }`
-  - `GET /wa-bridge/store/meta-catalog-config?storeId=` returns `{ catalogId, businessId, hasToken: bool }` (NEVER returns the token plain)
-  - `POST /wa-bridge/store/meta-catalog-config` with `{ storeId, catalogId, businessId, accessToken }` saves the encrypted token
+  - `GET /wa-bridge/store/service-menu?storeId=` returns
+    `{ orderNow, subscriptionBoxes, locationsHours, chatWithAgent, labels: { en, ar } }`
+  - `GET /wa-bridge/store/meta-catalog-config?storeId=` returns
+    `{ catalogId, businessId, hasToken: bool }` (NEVER returns the token plain)
+  - `POST /wa-bridge/store/meta-catalog-config` with
+    `{ storeId, catalogId, businessId, accessToken }` saves the encrypted token
 
-- [ ] **Step 2: Implement the routes** with the encryption pattern (lookup how WBS encrypts `whatsapp_access_token` — same pattern with `CREDENTIAL_ENCRYPTION_KEY`)
+- [ ] **Step 2: Implement the routes** with the encryption pattern (lookup how WBS encrypts
+      `whatsapp_access_token` — same pattern with `CREDENTIAL_ENCRYPTION_KEY`)
 
 - [ ] **Step 3: Run test, pass, commit**
 
@@ -852,12 +876,10 @@ describe('productMetaSync', () => {
     const step = { run: vi.fn((name, fn) => fn()) };
     const mockPrisma = {
       store: {
-        findUnique: vi
-          .fn()
-          .mockResolvedValue({
-            meta_catalog_id: 'cat123',
-            settings: { wbsBaseUrl: 'http://wbs:3001' },
-          }),
+        findUnique: vi.fn().mockResolvedValue({
+          meta_catalog_id: 'cat123',
+          settings: { wbsBaseUrl: 'http://wbs:3001' },
+        }),
       },
       product: { findUnique: vi.fn().mockResolvedValue({ id: 'prod1', name: 'X' }) },
     };
@@ -966,7 +988,8 @@ export const productMetaSyncDeleteFn = inngest.createFunction(
 
 - [ ] **Step 3: Register in inngest/client.ts**
 
-In `apps/api/src/lib/inngest/client.ts`, find the `functions` array and append `productMetaSyncFn, productMetaSyncDeleteFn`.
+In `apps/api/src/lib/inngest/client.ts`, find the `functions` array and append
+`productMetaSyncFn, productMetaSyncDeleteFn`.
 
 - [ ] **Step 4: Fire events from product.service.ts**
 
@@ -1206,7 +1229,8 @@ git commit -m "feat(wbs): meta catalog service + inngest receiver endpoint"
 git push origin main
 ```
 
-**Phase A acceptance gate**: a product create in FWB admin appears in Meta Commerce Manager within 10s (manual smoke).
+**Phase A acceptance gate**: a product create in FWB admin appears in Meta Commerce Manager within
+10s (manual smoke).
 
 ---
 
@@ -1435,7 +1459,8 @@ git push origin main
 
 **Files:**
 
-- Modify: `backend/src/services/wa-ordering.js` (top-of-file state list comment + STATES constant if exists)
+- Modify: `backend/src/services/wa-ordering.js` (top-of-file state list comment + STATES constant if
+  exists)
 
 - [ ] **Step 1: Find the state-list comment** (lines 13-25 per earlier inspection)
 
@@ -1469,7 +1494,8 @@ Replace the existing state-list comment with the full new enum (preserving old s
  */
 ```
 
-- [ ] **Step 2: No code change yet — commit the comment update so plan reviewers see the target state**
+- [ ] **Step 2: No code change yet — commit the comment update so plan reviewers see the target
+      state**
 
 ```bash
 git add backend/src/services/wa-ordering.js
@@ -1796,7 +1822,8 @@ git commit -m "feat(wbs): bot-service-router with order/agent/locations/subscrip
 git push origin main
 ```
 
-**Phase B acceptance gate**: Manual smoke against test WhatsApp number: "Hi" → bilingual greeting → tap English → service menu → tap each option → correct branch fires.
+**Phase B acceptance gate**: Manual smoke against test WhatsApp number: "Hi" → bilingual greeting →
+tap English → service menu → tap each option → correct branch fires.
 
 ---
 
@@ -1908,9 +1935,12 @@ git push origin main
 **Files:**
 
 - Modify: `backend/src/services/wa-ordering.js`
-- Modify: `backend/src/services/wa-bridge-client.js` (add `getCustomerAddresses`, `createCustomerAddress`)
+- Modify: `backend/src/services/wa-bridge-client.js` (add `getCustomerAddresses`,
+  `createCustomerAddress`)
 
-- [ ] **Step 1: Failing test**: Checkout button → bot queries addresses → if none, asks for new; if some, sends list. State moves to `awaiting_address_choice` (or `awaiting_new_address` if none saved).
+- [ ] **Step 1: Failing test**: Checkout button → bot queries addresses → if none, asks for new; if
+      some, sends list. State moves to `awaiting_address_choice` (or `awaiting_new_address` if none
+      saved).
 
 - [ ] **Step 2: Implement**
 
@@ -2014,7 +2044,9 @@ git push origin main
 
 - Modify: `backend/src/services/wa-ordering.js`
 
-- [ ] **Step 1: Failing test**: User taps a saved address → state moves to `awaiting_payment`, payment buttons sent. User in `awaiting_new_address` sends text → parsed → saved via bridge → state moves to `awaiting_payment`.
+- [ ] **Step 1: Failing test**: User taps a saved address → state moves to `awaiting_payment`,
+      payment buttons sent. User in `awaiting_new_address` sends text → parsed → saved via bridge →
+      state moves to `awaiting_payment`.
 
 - [ ] **Step 2: Implement `handleAddressChoice` + `handleNewAddress`**
 
@@ -2107,9 +2139,12 @@ git push origin main
 **Files:**
 
 - Modify: `backend/src/services/wa-ordering.js`
-- Modify: `apps/api/src/routes/wa-bridge.routes.ts` (extend `/cart/from-wa` to accept `addressId` + `paymentMethod`)
+- Modify: `apps/api/src/routes/wa-bridge.routes.ts` (extend `/cart/from-wa` to accept `addressId` +
+  `paymentMethod`)
 
-- [ ] **Step 1: Failing test**: User taps Cash → bot calls bridge `/cart/from-wa` with `{paymentMethod: 'cash', addressId}` → bridge returns order → bot sends confirmation → state `completed`.
+- [ ] **Step 1: Failing test**: User taps Cash → bot calls bridge `/cart/from-wa` with
+      `{paymentMethod: 'cash', addressId}` → bridge returns order → bot sends confirmation → state
+      `completed`.
 
 - [ ] **Step 2: Implement `handlePaymentChoice` + bridge update**
 
@@ -2174,7 +2209,8 @@ async function handlePaymentChoice(client, session, waId, message) {
 }
 ```
 
-Update `/cart/from-wa` route in FWB to accept the new fields (addressId, addressFreeform, paymentMethod, locale) — pass through to order service.
+Update `/cart/from-wa` route in FWB to accept the new fields (addressId, addressFreeform,
+paymentMethod, locale) — pass through to order service.
 
 - [ ] **Step 3: Tests + commit (both repos)**
 
@@ -2184,13 +2220,17 @@ Update `/cart/from-wa` route in FWB to accept the new fields (addressId, address
 
 - Modify: `backend/src/services/wa-ordering.js`
 
-- [ ] **Step 1: Test that free-form text in any new state replies with localized "please use buttons" + re-sends the state's interactive message.**
+- [ ] **Step 1: Test that free-form text in any new state replies with localized "please use
+      buttons" + re-sends the state's interactive message.**
 
-- [ ] **Step 2: Implement a helper `replyUseButtons(client, session, waId, locale)` that wraps a single text + re-send of current state's interactive.**
+- [ ] **Step 2: Implement a helper `replyUseButtons(client, session, waId, locale)` that wraps a
+      single text + re-send of current state's interactive.**
 
 - [ ] **Step 3: Commit**
 
-**Phase C acceptance gate**: end-to-end test: Hi → English → Order Now → catalog opens → 2 items added → Checkout → saved address picked → Cash → confirmation. Order appears in FWB admin within 3s of Cash tap.
+**Phase C acceptance gate**: end-to-end test: Hi → English → Order Now → catalog opens → 2 items
+added → Checkout → saved address picked → Cash → confirmation. Order appears in FWB admin within 3s
+of Cash tap.
 
 ---
 
@@ -2200,7 +2240,8 @@ Update `/cart/from-wa` route in FWB to accept the new fields (addressId, address
 
 **Files:**
 
-- Create: `packages/database/prisma/migrations/20260525120100_default_bot_service_menu/migration.sql`
+- Create:
+  `packages/database/prisma/migrations/20260525120100_default_bot_service_menu/migration.sql`
 
 - [ ] **Step 1: Add data migration**
 
@@ -2223,14 +2264,17 @@ WHERE "bot_service_menu" IS NULL;
 - [ ] Create the 4 admin UI files described in File Structure
 - [ ] Each card hits the corresponding wa-bridge endpoint via existing apiPut/apiGet patterns
 - [ ] Add sidebar link in `apps/admin/src/components/layout/Sidebar.tsx` under "WhatsApp" group
-- [ ] Each card: tests via Playwright smoke (`tests/smoke/admin-wa-bot.spec.ts`) — load page + assert all 3 cards render + a save round-trip works
+- [ ] Each card: tests via Playwright smoke (`tests/smoke/admin-wa-bot.spec.ts`) — load page +
+      assert all 3 cards render + a save round-trip works
 
 ### Task D.6: Locations & Hours pulls from `Store.profile`
 
-- [ ] Add `Store.profile.businessHours`, `Store.profile.googleMapsUrl`, `Store.profile.addressAr` fields to the schema (additive migration)
+- [ ] Add `Store.profile.businessHours`, `Store.profile.googleMapsUrl`, `Store.profile.addressAr`
+      fields to the schema (additive migration)
 - [ ] Verify `routeLocations` reads these correctly
 
-**Phase D acceptance gate**: A merchant can log into FWB admin → Store → WhatsApp Bot → toggle which services appear + paste their Meta catalog credentials. Save → smoke test confirms changes are live.
+**Phase D acceptance gate**: A merchant can log into FWB admin → Store → WhatsApp Bot → toggle which
+services appear + paste their Meta catalog credentials. Save → smoke test confirms changes are live.
 
 ---
 
@@ -2254,12 +2298,14 @@ Step-by-step:
 
 ### Task E.2: Flip Wady Aljuz to `native_catalog_with_gemini_agent`
 
-- [ ] Once Meta approves catalog, set `Store.bot_mode = 'native_catalog_with_gemini_agent'` via FWB admin
+- [ ] Once Meta approves catalog, set `Store.bot_mode = 'native_catalog_with_gemini_agent'` via FWB
+      admin
 - [ ] Send Telegram notify on this state change (new alert in WBS notify service)
 
 ### Task E.3: Smoke test against Wady Aljuz number
 
-Real WhatsApp number sends "Hi" → walks the full flow. Captured screenshots in `docs/uat/whatsapp-native-catalog-bot-wady-aljuz-smoke.md`.
+Real WhatsApp number sends "Hi" → walks the full flow. Captured screenshots in
+`docs/uat/whatsapp-native-catalog-bot-wady-aljuz-smoke.md`.
 
 ### Task E.4: 24-hour monitor
 
@@ -2276,7 +2322,8 @@ Real WhatsApp number sends "Hi" → walks the full flow. Captured screenshots in
 - §4.2 State machine → covered by Phase B + C task list
 - §4.3 Data model → Phase A.1 migration
 - §4.4 New FWB endpoints → Phase A.3 + A.4
-- §4.5 New WBS services → Phase A.6 (metaCatalog), Phase B.1 (wa-interactive), B.4 (bot-service-router)
+- §4.5 New WBS services → Phase A.6 (metaCatalog), Phase B.1 (wa-interactive), B.4
+  (bot-service-router)
 - §5 Performance → Phase 0 (tasks 0.1-0.6)
 - §6 Migration → Phase E
 - §7 Testing → tests appear inline per-task; UAT doc in Phase 0.3 + E.3
@@ -2288,14 +2335,18 @@ Real WhatsApp number sends "Hi" → walks the full flow. Captured screenshots in
 
 **Type consistency**:
 
-- `CustomerAddressService` method names: `listForCustomer`, `createForCustomer` (same in test + impl)
-- `metaCatalogService` exports: `upsertProduct`, `deleteProduct`, `getCatalogStatus` (same everywhere)
-- `wa-interactive` exports: `buildButtons`, `buildList`, `buildCatalogMessage`, `buildProductListMessage`, `parseInteractiveReply`
+- `CustomerAddressService` method names: `listForCustomer`, `createForCustomer` (same in test +
+  impl)
+- `metaCatalogService` exports: `upsertProduct`, `deleteProduct`, `getCatalogStatus` (same
+  everywhere)
+- `wa-interactive` exports: `buildButtons`, `buildList`, `buildCatalogMessage`,
+  `buildProductListMessage`, `parseInteractiveReply`
 - `wa_carts.state` enum: matches the comment in Task B.2 throughout C and D
 
 **Known gaps to revisit on first execution**:
 
-- `getCustomerByPhone` referenced in `handleGreeting` — need to verify this exists on `wa-bridge-client.js`; if not, add a small endpoint + client method in Phase A
+- `getCustomerByPhone` referenced in `handleGreeting` — need to verify this exists on
+  `wa-bridge-client.js`; if not, add a small endpoint + client method in Phase A
 - `getStoreProfile` referenced in `routeLocations` — same caveat
 
 ---
