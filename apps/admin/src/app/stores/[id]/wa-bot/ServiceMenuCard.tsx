@@ -9,10 +9,10 @@
 
 import { useState } from 'react';
 import { Button, useToast } from '@force/ui';
-import { apiPut } from '../../../lib/api';
-import { Toggle } from '../../../components/Toggle';
-import type { BotServiceMenu } from '../../../lib/types/wa-bot';
-import { DEFAULT_SERVICE_MENU } from '../../../lib/types/wa-bot';
+import { apiPut } from '../../../../lib/api';
+import { Toggle } from '../../../../components/Toggle';
+import type { BotServiceMenu } from '../../../../lib/types/wa-bot';
+import { DEFAULT_SERVICE_MENU } from '../../../../lib/types/wa-bot';
 
 interface ServiceMenuItem {
   key: keyof Omit<BotServiceMenu, 'labels'>;
@@ -68,11 +68,11 @@ export function ServiceMenuCard({ storeId, initialMenu }: ServiceMenuCardProps) 
   const [showLabels, setShowLabels] = useState(false);
 
   const toggle = (key: keyof Omit<BotServiceMenu, 'labels'>) => {
-    setMenu(prev => ({ ...prev, [key]: !prev[key] }));
+    setMenu((prev: BotServiceMenu) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const setLabel = (locale: 'en' | 'ar', labelKey: string, value: string) => {
-    setMenu(prev => ({
+    setMenu((prev: BotServiceMenu) => ({
       ...prev,
       labels: {
         ...prev.labels,
@@ -106,7 +106,7 @@ export function ServiceMenuCard({ storeId, initialMenu }: ServiceMenuCardProps) 
 
       <div className="space-y-4">
         {MENU_ITEMS.map(item => (
-          <div key={item.key} className="flex items-start gap-3">
+          <div key={String(item.key)} className="flex items-start gap-3">
             <Toggle checked={menu[item.key] as boolean} onChange={() => toggle(item.key)} />
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">{item.label}</p>

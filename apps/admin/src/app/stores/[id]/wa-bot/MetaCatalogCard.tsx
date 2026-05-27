@@ -12,8 +12,8 @@
 
 import { useState } from 'react';
 import { Button, useToast } from '@force/ui';
-import { apiPut } from '../../../lib/api';
-import type { MetaCatalogConfig } from '../../../lib/types/wa-bot';
+import { apiPut } from '../../../../lib/api';
+import type { MetaCatalogConfig } from '../../../../lib/types/wa-bot';
 
 interface MetaCatalogCardProps {
   storeId: string;

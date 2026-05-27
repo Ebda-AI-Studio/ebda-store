@@ -9,9 +9,9 @@
 
 import { useState } from 'react';
 import { Button, useToast } from '@force/ui';
-import { apiPut } from '../../../lib/api';
-import type { BotMode } from '../../../lib/types/wa-bot';
-import { BOT_MODE_LABELS } from '../../../lib/types/wa-bot';
+import { apiPut } from '../../../../lib/api';
+import type { BotMode } from '../../../../lib/types/wa-bot';
+import { BOT_MODE_LABELS } from '../../../../lib/types/wa-bot';
 
 const BOT_MODE_DESCRIPTIONS: Record<BotMode, string> = {
   legacy_chat: 'Customers browse and order via text messages. No Meta Commerce account required.',
