@@ -29,7 +29,18 @@ jobs:
     # on every PR. The check is curl-only (Vercel API + jq) so it runs fine
     # on the WSL2 runner without service-container needs.
     runs-on: [self-hosted, linux, wsl2]
+    # Defense-in-depth (2026-05-28): self-hosted runner + pull_request trigger
+    # could theoretically expose VERCEL_API_TOKEN to a fork PR. ForceAI-KW is
+    # private + solo-dev so forks are not possible today, but this guard
+    # rejects any PR not originating from this repo as a future-proofing
+    # measure. Schedule + workflow_dispatch are unaffected (no pull_request
+    # context to check).
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - name: Pull Vercel env vars and compare scopes
         env:
