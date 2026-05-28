@@ -19,6 +19,7 @@ import { PlatformCard } from './_components/PlatformCard';
 import { CustomerCard } from './_components/CustomerCard';
 import { NotesCard } from './_components/NotesCard';
 import { ActionFooter } from './_components/ActionFooter';
+import { OrderLifecycleTimeline } from '../../../../../components/order-timeline/OrderLifecycleTimeline';
 import type { OrderDetail } from './_components/types';
 
 export default function OrderDetailPage() {
@@ -214,6 +215,8 @@ export default function OrderDetailPage() {
                 <PlatformCard />
               </div>
             </div>
+
+            <OrderLifecycleTimeline storeId={storeId} orderId={orderId} />
 
             <ActionFooter
               order={order}

@@ -312,6 +312,7 @@ export default function AffiliatesPage() {
 
           {activeTab === 'affiliates' && (
             <AffiliatesTable
+              storeId={storeId}
               affiliates={affiliates}
               meta={meta}
               statusFilter={statusFilter}

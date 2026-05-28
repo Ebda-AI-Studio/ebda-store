@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
@@ -237,6 +238,27 @@ export default function LoyaltySettingsPage() {
             >
               {tPage('tabs.members')}
             </button>
+            {/* Transactions sub-page link */}
+            <Link
+              href={`/stores/${storeId}/loyalty/transactions`}
+              className="ms-auto px-4 py-2 rounded-lg font-medium text-sm bg-muted text-foreground hover:bg-muted/80 transition-colors inline-flex items-center gap-1.5"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
+              Transactions / المعاملات
+            </Link>
           </div>
 
           {activeTab === 'settings' && (

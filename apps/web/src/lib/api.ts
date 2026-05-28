@@ -630,6 +630,20 @@ class ApiClient {
     return this.request<{ order: Order }>(`/public/orders/${orderId}`);
   }
 
+  async getOrderTimeline(storeId: string, orderId: string) {
+    return this.request<{
+      timeline: Array<{
+        at: string;
+        source: string;
+        kind: string;
+        fromStatus?: string;
+        toStatus?: string;
+        details?: string;
+        location?: string;
+      }>;
+    }>(`/stores/${storeId}/orders/${orderId}/timeline`);
+  }
+
   // Store
   async getStore() {
     return this.request<{ store: Store }>('/public/store');
