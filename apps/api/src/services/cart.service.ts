@@ -1,5 +1,6 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { featureService } from './feature.service';
 
 export class CartService {
   static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
@@ -81,6 +82,15 @@ export class CartService {
     // Get or create cart first (outside transaction since getOrCreate has its own retry logic)
     const cart = await this.getOrCreate(storeId, sessionId, customerId);
 
+    // Resolve the backorder feature flag before entering the transaction.
+    // When disabled, per-product allowBackorder flags are ignored — out-of-stock
+    // items are rejected at the cart level, preventing backorder lines from
+    // ever reaching order creation.
+    const backorderFeatureEnabled = await featureService.isFeatureEnabled(
+      storeId,
+      'inventory.backorder'
+    );
+
     // Wrap the inventory check + cart item creation in a serializable transaction
     // to prevent a TOCTOU race where two concurrent addItem calls both pass the
     // inventory check before either has written. Note: the definitive inventory
@@ -102,13 +112,17 @@ export class CartService {
           where: { cartId: cart.id, productId },
         });
 
+        // effectiveAllowBackorder: the per-product flag is only honoured when
+        // the store-level inventory.backorder feature is enabled.
+        const effectiveAllowBackorder = backorderFeatureEnabled && product.allowBackorder;
+
         if (existingItem) {
           const newQuantity = existingItem.quantity + quantity;
 
           if (
             product.trackInventory &&
             product.inventory < newQuantity &&
-            !product.allowBackorder
+            !effectiveAllowBackorder
           ) {
             throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
           }
@@ -119,7 +133,7 @@ export class CartService {
           });
         } else {
           // Check inventory for new item
-          if (product.trackInventory && product.inventory < quantity && !product.allowBackorder) {
+          if (product.trackInventory && product.inventory < quantity && !effectiveAllowBackorder) {
             throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
           }
 
@@ -158,6 +172,12 @@ export class CartService {
       return cart;
     }
 
+    // Resolve the backorder feature flag before the transaction (same reason as addItem).
+    const backorderFeatureEnabled = await featureService.isFeatureEnabled(
+      storeId,
+      'inventory.backorder'
+    );
+
     const productIds = items.map(i => i.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds }, storeId, status: 'active' },
@@ -179,10 +199,14 @@ export class CartService {
           const existing = existingByProduct.get(item.productId);
           const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
 
+          // effectiveAllowBackorder: per-product flag only honoured when the
+          // store-level inventory.backorder feature is enabled.
+          const effectiveAllowBackorder = backorderFeatureEnabled && product.allowBackorder;
+
           if (
             product.trackInventory &&
             product.inventory < targetQuantity &&
-            !product.allowBackorder
+            !effectiveAllowBackorder
           ) {
             throw new AppError(
               400,
@@ -223,6 +247,12 @@ export class CartService {
   ) {
     const cart = await this.getOrCreate(storeId, sessionId, customerId);
 
+    // Resolve the backorder feature flag before the inventory check.
+    const backorderFeatureEnabled = await featureService.isFeatureEnabled(
+      storeId,
+      'inventory.backorder'
+    );
+
     const item = await prisma.cartItem.findFirst({
       where: { id: itemId, cartId: cart.id },
       include: { product: true },
@@ -235,10 +265,11 @@ export class CartService {
     if (quantity <= 0) {
       await prisma.cartItem.delete({ where: { id: itemId } });
     } else {
+      const effectiveAllowBackorder = backorderFeatureEnabled && item.product.allowBackorder;
       if (
         item.product.trackInventory &&
         item.product.inventory < quantity &&
-        !item.product.allowBackorder
+        !effectiveAllowBackorder
       ) {
         throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
       }
