@@ -24,7 +24,11 @@ on:
 
 jobs:
   verify-isolation:
-    runs-on: ubuntu-latest
+    # Flipped from ubuntu-latest → self-hosted 2026-05-28: org cloud billing
+    # was blocking the job from even starting, leaving rule 13 unverifiable
+    # on every PR. The check is curl-only (Vercel API + jq) so it runs fine
+    # on the WSL2 runner without service-container needs.
+    runs-on: [self-hosted, linux, wsl2]
     timeout-minutes: 5
     steps:
       - name: Pull Vercel env vars and compare scopes
