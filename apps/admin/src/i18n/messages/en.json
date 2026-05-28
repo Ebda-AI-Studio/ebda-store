@@ -3707,7 +3707,7 @@
         "orders": "Orders",
         "customers": "Customers",
         "stockDashboard": "Overview",
-        "inventory": "Stock levels",
+        "inventory": "Inventory",
         "adjustments": "Adjustments",
         "suppliers": "Suppliers",
         "purchaseOrders": "Purchase Orders",
@@ -3719,7 +3719,7 @@
         "journal": "Journal",
         "expenses": "Expenses",
         "reports": "Reports",
-        "analyticsOverview": "Overview",
+        "analyticsOverview": "Analytics",
         "insightsDashboard": "Insights",
         "insightsCohorts": "Cohorts",
         "insightsFunnel": "Funnel",
@@ -3729,7 +3729,7 @@
         "aiUsage": "Usage",
         "whatsapp": "WhatsApp",
         "marketingPixels": "Pixels",
-        "notifications": "Push",
+        "notifications": "Notifications",
         "newsletter": "Newsletter",
         "affiliates": "Affiliates",
         "abandonedCarts": "Abandoned Carts"
@@ -3817,7 +3817,7 @@
       }
     },
     "dashboard": {
-      "title": "Finance Dashboard",
+      "title": "Accounting Overview",
       "thisMonth": "This Month",
       "revenue": "Revenue",
       "expenses": "Expenses",
@@ -3954,7 +3954,7 @@
   "stock": {
     "navGroup": "Stock",
     "dashboard": {
-      "title": "Inventory",
+      "title": "Inventory Overview",
       "stockValue": "Stock Value",
       "onHandSkus": "On-hand SKUs",
       "lowStockSkus": "Low-stock SKUs",
@@ -4127,7 +4127,7 @@
   "insights": {
     "navGroup": "Insights",
     "dashboard": {
-      "title": "Insights Dashboard",
+      "title": "Insights",
       "aov": "Average Order Value",
       "mrr30d": "30-day Revenue",
       "repeatPurchase": "Repeat Purchase Rate",

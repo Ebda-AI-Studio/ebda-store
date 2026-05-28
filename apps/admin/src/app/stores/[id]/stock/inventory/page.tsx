@@ -45,7 +45,10 @@ export default function StockInventoryPage() {
   const [products, setProducts] = useState<ProductRow[] | null>(null);
   const [suggestedSet, setSuggestedSet] = useState<Set<string>>(new Set());
   const [deadSet, setDeadSet] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
+  // Per-fetch error: products failure used to trigger an early-return blank page.
+  // Now we render the table with an inline error banner + retry button so the
+  // bulk-backorder action and any other page chrome still render.
+  const [productsErr, setProductsErr] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -96,12 +99,12 @@ export default function StockInventoryPage() {
     apiGet<ProductsResponse>(`/api/v1/stores/${storeId}/products?status=active&limit=100`)
       .then(({ data, error: apiError }) => {
         if (apiError) {
-          setError(apiError.message);
+          setProductsErr(apiError.message);
         } else {
           setProducts(data?.products ?? []);
         }
       })
-      .catch(() => setError('Failed to load inventory'));
+      .catch(() => setProductsErr('Failed to load inventory'));
 
     // Reorder suggestions — fetch all open, build productId set
     apiGet<FlagListResponse>(
@@ -122,21 +125,21 @@ export default function StockInventoryPage() {
     });
   }, [storeId]);
 
-  if (error) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
-      </AdminLayout>
-    );
-  }
-
-  if (!products) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
-      </AdminLayout>
-    );
-  }
+  // Retry handler — clears the error and re-fires the products fetch
+  const retryProducts = () => {
+    if (!storeId) return;
+    setProductsErr(null);
+    setProducts(null);
+    apiGet<ProductsResponse>(`/api/v1/stores/${storeId}/products?status=active&limit=100`)
+      .then(({ data, error: apiError }) => {
+        if (apiError) {
+          setProductsErr(apiError.message);
+        } else {
+          setProducts(data?.products ?? []);
+        }
+      })
+      .catch(() => setProductsErr('Failed to load inventory'));
+  };
 
   const bulkBackorderButton =
     products && products.length > 0 ? (
@@ -162,9 +165,29 @@ export default function StockInventoryPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('description')} actions={bulkBackorderButton}>
       <div className="max-w-5xl">
-        {products.length === 0 ? (
+        {/* Inline error banner: products fetch failed but page stays mounted */}
+        {productsErr && (
+          <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive flex items-center justify-between gap-4">
+            <span title={productsErr}>Couldn't load products — {productsErr}</span>
+            <button
+              type="button"
+              onClick={retryProducts}
+              className="shrink-0 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-medium hover:bg-destructive/10 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Loading skeleton while first fetch is in-flight */}
+        {!products && !productsErr && (
+          <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
+        )}
+
+        {products && products.length === 0 && (
           <p className="text-muted-foreground text-sm">{tc('noResults')}</p>
-        ) : (
+        )}
+        {products && products.length > 0 && (
           <div className="rounded-xl border border-border overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/30">
