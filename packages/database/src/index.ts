@@ -179,7 +179,11 @@ export async function runInTenantContext<T>(storeId: string, fn: () => Promise<T
       );
       return tenantStorage.run(tx, fn);
     },
-    { timeout: 30000 }
+    // maxWait raised from Prisma's 2s default — admin dashboards fire 4-6
+    // parallel /stores/:id/* requests, each opening an interactive tx for
+    // RLS. Neon pgbouncer slot contention under that burst was firing P2028
+    // at ~2050ms. 10s gives headroom without masking real saturation.
+    { maxWait: 10000, timeout: 30000 }
   );
 }
 
@@ -196,10 +200,15 @@ export async function withTenantContext<T>(
   if (!UUID_RE.test(storeId)) {
     throw new Error('Invalid store ID format');
   }
-  return basePrisma.$transaction(async tx => {
-    await tx.$executeRawUnsafe(`SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`);
-    return fn(tx);
-  });
+  return basePrisma.$transaction(
+    async tx => {
+      await tx.$executeRawUnsafe(
+        `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
+      );
+      return fn(tx);
+    },
+    { maxWait: 10000, timeout: 30000 }
+  );
 }
 
 /**
@@ -231,8 +240,11 @@ export async function withTenantContext<T>(
  *   });
  */
 export async function withRlsBypass<T>(fn: (tx: TenantTx) => Promise<T>): Promise<T> {
-  return basePrisma.$transaction(async tx => {
-    await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
-    return fn(tx);
-  });
+  return basePrisma.$transaction(
+    async tx => {
+      await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
+      return fn(tx);
+    },
+    { maxWait: 10000, timeout: 30000 }
+  );
 }
