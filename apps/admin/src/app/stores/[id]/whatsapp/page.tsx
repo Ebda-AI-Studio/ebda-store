@@ -1,20 +1,26 @@
 'use client';
 
 /**
- * Master WhatsApp Integration page — Phase 7.1.
+ * Master WhatsApp Integration page.
  *
- * Consolidates all 4 WhatsApp sub-pages into a single tabbed view:
+ * Consolidates every WhatsApp sub-page into a single tabbed view:
  *   ?tab=connection     — connect WBS API key + template selection
+ *   ?tab=bot-config     — bot mode + service menu + Meta Commerce catalog
+ *                         (was /wa-bot — merged in 2026-05-28 to remove the
+ *                         page-bouncing overlap with this tabset)
  *   ?tab=templates      — generate + sync Meta templates
  *   ?tab=order-updates  — per-event toggle configuration
  *   ?tab=payment-link   — merchant-initiated payment links
+ *   ?tab=bot-copy       — per-store bot copy overrides
+ *   ?tab=bot-analytics  — per-store bot conversation metrics
  *
- * The 4 old page paths redirect here (thin redirect components).
+ * Old page paths redirect here (thin redirect components).
  */
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ConnectionTab } from '../../../../components/whatsapp/ConnectionTab';
+import { BotConfigTab } from '../../../../components/whatsapp/BotConfigTab';
 import { TemplatesTab } from '../../../../components/whatsapp/TemplatesTab';
 import { OrderUpdatesTab } from '../../../../components/whatsapp/OrderUpdatesTab';
 import { PaymentLinkTab } from '../../../../components/whatsapp/PaymentLinkTab';
@@ -25,6 +31,7 @@ import { BotAnalyticsTab } from '../../../../components/whatsapp/BotAnalyticsTab
 
 type TabKey =
   | 'connection'
+  | 'bot-config'
   | 'templates'
   | 'order-updates'
   | 'payment-link'
@@ -33,6 +40,7 @@ type TabKey =
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'connection', label: 'Connection' },
+  { key: 'bot-config', label: 'Bot Config' },
   { key: 'templates', label: 'Templates' },
   { key: 'order-updates', label: 'Order Updates' },
   { key: 'payment-link', label: 'Payment Link' },
@@ -43,6 +51,7 @@ const TABS: { key: TabKey; label: string }[] = [
 function isValidTab(value: string | null): value is TabKey {
   return (
     value === 'connection' ||
+    value === 'bot-config' ||
     value === 'templates' ||
     value === 'order-updates' ||
     value === 'payment-link' ||
@@ -94,6 +103,7 @@ export default function WhatsAppMasterPage() {
 
       {/* Tab panels */}
       {activeTab === 'connection' && <ConnectionTab storeId={storeId} />}
+      {activeTab === 'bot-config' && <BotConfigTab storeId={storeId} />}
       {activeTab === 'templates' && <TemplatesTab storeId={storeId} />}
       {activeTab === 'order-updates' && <OrderUpdatesTab storeId={storeId} />}
       {activeTab === 'payment-link' && <PaymentLinkTab storeId={storeId} />}
