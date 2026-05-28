@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useStore, useStoreUrl } from '../contexts/StoreContext';
-import { useTemplateComponents } from '../hooks/useTemplateComponents';
+import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
 import { useToast } from '@force/ui';
 import { API_URL } from '@/lib/api';
-import type { TemplateProduct } from '../templates/types';
+import { PecannbeeProductCard } from '../templates/shared/PecannbeeProductCard';
+import { gridGapClass } from '../templates/shared/card-size';
 
 interface RecommendedProduct {
   id: string;
@@ -18,9 +18,7 @@ interface RecommendedProduct {
   compareAtPrice?: number;
   images: Array<{ id: string; url: string; alt?: string }>;
   /** Variants of this product (added 2026-05-16 to gate Add-all-to-cart
-   *  for variant-parent products — those need the customer to pick a
-   *  size/colour/etc. before adding, so the storefront can't add them
-   *  silently from a recommendation card). Empty / missing = simple SKU. */
+   *  for variant-parent products). Empty / missing = simple SKU. */
   variants?: Array<{ id: string; price: number }>;
 }
 
@@ -29,34 +27,24 @@ interface FrequentlyBoughtTogetherProps {
   productId: string;
 }
 
-function toTpl(p: RecommendedProduct): TemplateProduct {
-  return {
-    id: p.id,
-    name: p.name,
-    nameAr: p.nameAr,
-    slug: p.slug,
-    price: p.price,
-    compareAtPrice: p.compareAtPrice,
-    images: p.images,
-    inStock: true,
-  };
-}
-
 export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBoughtTogetherProps) {
   const [products, setProducts] = useState<RecommendedProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { addItem, items: cartItems } = useCart();
   const { language, t } = useLanguage();
-  const { store } = useStore();
+  const { store, layout } = useStore();
   const storeUrl = useStoreUrl();
-  const { components: T, isLoading: templateLoading } = useTemplateComponents();
+  const templateId = useStoreTemplate();
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const isRtl = language === 'ar';
+  // Honour the same per-store productCardDefaults as the PLP and homepage
+  // carousels so frame/size/shape settings apply on this surface too.
+  // Eliminates the T.ProductGrid 4th render path: these cards now go through
+  // PecannbeeProductCard (same path as PLP and catalog listings).
+  const productCardDefaults = layout?.productCardDefaults;
 
   // Variant-parent products can't be added to cart silently from a
-  // recommendation card — the customer has to open the product detail
-  // page and pick a size/colour/SKU first. Helper here so single-add and
-  // add-all share the same detection logic.
+  // recommendation card. Helper shared by single-add and add-all.
   const hasVariants = (p: RecommendedProduct): boolean =>
     Array.isArray(p.variants) && p.variants.length > 0;
 
@@ -94,7 +82,7 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
     fetchRecommendations();
   }, [storeId, productId]);
 
-  if (isLoading || products.length === 0 || !T || templateLoading) return null;
+  if (isLoading || products.length === 0) return null;
 
   const cartQuantities: Record<string, number> = {};
   for (const item of cartItems) cartQuantities[item.productId] = item.quantity;
@@ -102,9 +90,6 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   const handleAddToCart = async (pid: string) => {
     const p = products.find(x => x.id === pid);
     if (!p) return;
-    // Variant-parent: redirect to PDP instead of trying to add. The card
-    // can't know which variant the customer wants — surface the message,
-    // open the product so they can pick.
     if (hasVariants(p)) {
       toastInfo(
         t('Choose a variant first', 'اختر نوع المنتج أولاً'),
@@ -124,23 +109,14 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
       slug: p.slug,
       image: p.images?.[0]?.url,
     });
-    // Add-to-cart toast is centralized in CartContext.addItem
-    // (Group E) — don't double-toast from per-component callers.
+    // Add-to-cart toast is centralized in CartContext.addItem (Group E).
   };
 
   const handleAddAllToCart = async () => {
-    // Partition: variant-parent products can't be added blind (need
-    // a SKU pick). Add the simple ones, then tell the merchant about
-    // the ones that need a variant pick so they're not silently lost.
     const simple = products.filter(p => !hasVariants(p));
     const needVariant = products.filter(p => hasVariants(p));
 
-    // Serialize the addItem calls instead of firing them in parallel.
-    // The previous Promise.all racing the calls meant the cart-context
-    // POSTs hit the API with stale local state — the second add saw
-    // the cart pre-first-add, so the API ended up with only one of
-    // the items merged in. Sequential awaits guarantee each addItem
-    // sees the post-previous-add cart state.
+    // Sequential awaits so each addItem sees the post-previous-add cart state.
     for (const p of simple) {
       await addItem({
         id: p.id,
@@ -175,8 +151,6 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
       );
     }
 
-    // Nothing added AND nothing flagged — defensive, shouldn't happen
-    // since products.length > 0 by the guard above, but covers edge cases.
     if (simple.length === 0 && needVariant.length === 0) {
       toastError(
         t('Nothing to add', 'لا يوجد ما يضاف'),
@@ -187,26 +161,63 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
 
   return (
     <div className="mt-16">
-      <div className="mb-6 flex items-center justify-between">
+      {/* Issue 3 fix (2026-05-28): flex-wrap + gap-3 prevents the heading
+          and CTA button from overlapping on narrow RTL mobile viewports.
+          shrink-0 on the button keeps it from squishing. LTR unaffected. */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-foreground">
           {t('Frequently Bought Together', 'يُشترى معاً في الغالب')}
         </h2>
         <button
           onClick={handleAddAllToCart}
-          className="rounded-xl border border-primary px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+          className="shrink-0 rounded-xl border border-primary px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
         >
           {t('Add All to Cart', 'أضف الكل إلى السلة')}
         </button>
       </div>
-      <T.ProductGrid
-        products={products.map(toTpl)}
-        isRtl={isRtl}
-        currency={store.currency}
-        columns={4}
-        cartQuantities={cartQuantities}
-        onAddToCart={handleAddToCart}
-        urlPrefix={storeUrl('')}
-      />
+      {/* Issue 2 fix (2026-05-28): PecannbeeProductCard honours per-store
+          productCardDefaults (frame, size, shape) the same as PLP/carousels.
+          Eliminates the T.ProductGrid 4th render path on the PDP. */}
+      <div
+        className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 ${
+          productCardDefaults?.cardGap
+            ? gridGapClass(productCardDefaults.cardGap)
+            : 'gap-3 sm:gap-4'
+        }`}
+        dir={isRtl ? 'rtl' : 'ltr'}
+      >
+        {products.map(p => (
+          <PecannbeeProductCard
+            key={p.id}
+            product={{
+              id: p.id,
+              name: p.name,
+              nameAr: p.nameAr,
+              slug: p.slug,
+              price: p.price,
+              compareAtPrice: p.compareAtPrice,
+              images: p.images,
+              inStock: true,
+              variants: p.variants,
+            }}
+            isRtl={isRtl}
+            currency={store.currency}
+            pack={templateId}
+            cardSize={productCardDefaults?.cardSize ?? 'md'}
+            cardAspect={productCardDefaults?.cardAspect}
+            cardShape={productCardDefaults?.cardShape}
+            showCardFrame={productCardDefaults?.showCardFrame}
+            cardFrameStyle={productCardDefaults?.cardFrameStyle}
+            cardFrameWidth={productCardDefaults?.cardFrameWidth}
+            cardFrameSize={productCardDefaults?.cardFrameSize}
+            cardFrameColor={productCardDefaults?.cardFrameColor}
+            showLabel={productCardDefaults?.showLabel}
+            showHover={productCardDefaults?.showHover}
+            urlPrefix={storeUrl('')}
+            onAddToCart={handleAddToCart}
+          />
+        ))}
+      </div>
     </div>
   );
 }
