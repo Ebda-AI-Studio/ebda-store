@@ -7,6 +7,7 @@ import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
 import {
   prisma,
+  withRlsBypass,
   Prisma,
   UserRole,
   ProductStatus,
@@ -1008,6 +1009,155 @@ router.get(
           },
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================================
+// Super-admin platform-wide AI usage summary.
+// Uses withRlsBypass so the query can aggregate across all stores
+// without being filtered by the tenant RLS policy.
+// Never exposed to store_admin — requireRole('super_admin') enforces this.
+// =====================================================================
+
+/**
+ * GET /admin/super-admin/ai-usage/summary
+ *
+ * Returns:
+ *   platform: { todayCount, monthCount, totalCached, totalUncached, cacheHitRatio }
+ *   stores:   [{ storeId, slug, name, plan, today, month, dailyCap, monthlyCap,
+ *               dailyPct, monthlyPct, lastCallAt, featureCounts }]
+ *
+ * Stores sorted by today desc (highest consumer first).
+ */
+router.get(
+  '/super-admin/ai-usage/summary',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '1000', 10);
+      const monthlyCap = parseInt(process.env.AI_MONTHLY_REQUEST_CAP ?? '20000', 10);
+
+      const now = new Date();
+      const startOfDay = new Date(now);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const startOfMonth = new Date(now);
+      startOfMonth.setUTCDate(1);
+      startOfMonth.setUTCHours(0, 0, 0, 0);
+
+      // withRlsBypass: aiUsage has RLS — must bypass to aggregate cross-tenant
+      const result = await withRlsBypass(async tx => {
+        // Platform-level totals
+        const [platformToday, platformMonth, platformCached] = await Promise.all([
+          tx.aiUsage.count({ where: { createdAt: { gte: startOfDay }, cachedHit: false } }),
+          tx.aiUsage.count({ where: { createdAt: { gte: startOfMonth }, cachedHit: false } }),
+          tx.aiUsage.count({ where: { createdAt: { gte: startOfMonth }, cachedHit: true } }),
+        ]);
+        const platformUncached = platformMonth;
+        const totalCalls = platformCached + platformUncached;
+        const cacheHitRatio = totalCalls > 0 ? platformCached / totalCalls : 0;
+
+        // Per-store aggregations: today count, month count, last call, feature breakdown
+        const storeStats = await tx.$queryRaw<
+          Array<{
+            store_id: string;
+            today_count: bigint;
+            month_count: bigint;
+            last_call_at: Date | null;
+            feature: string;
+            feature_count: bigint;
+          }>
+        >`
+          SELECT
+            store_id,
+            COUNT(*) FILTER (WHERE created_at >= ${startOfDay} AND cached_hit = false) AS today_count,
+            COUNT(*) FILTER (WHERE created_at >= ${startOfMonth} AND cached_hit = false) AS month_count,
+            MAX(created_at) AS last_call_at,
+            feature,
+            COUNT(*) AS feature_count
+          FROM ai_usage
+          GROUP BY store_id, feature
+        `;
+
+        // Fetch store metadata for all referenced storeIds
+        const storeIds = [...new Set(storeStats.map(r => r.store_id))];
+
+        const stores = await tx.store.findMany({
+          where: { id: { in: storeIds } },
+          select: { id: true, slug: true, name: true, plan: true },
+        });
+        const storeMap = new Map(stores.map(s => [s.id, s]));
+
+        // Aggregate per-store
+        type StoreAgg = {
+          storeId: string;
+          today: number;
+          month: number;
+          lastCallAt: Date | null;
+          featureCounts: Record<string, number>;
+        };
+        const byStore = new Map<string, StoreAgg>();
+
+        for (const row of storeStats) {
+          const existing = byStore.get(row.store_id);
+          if (!existing) {
+            byStore.set(row.store_id, {
+              storeId: row.store_id,
+              today: Number(row.today_count),
+              month: Number(row.month_count),
+              lastCallAt: row.last_call_at,
+              featureCounts: { [row.feature]: Number(row.feature_count) },
+            });
+          } else {
+            // today/month are the same value across feature rows for the same store
+            // (the FILTER means they only differ in feature_count). Accumulate max.
+            existing.today = Math.max(existing.today, Number(row.today_count));
+            existing.month = Math.max(existing.month, Number(row.month_count));
+            if (row.last_call_at && (!existing.lastCallAt || row.last_call_at > existing.lastCallAt)) {
+              existing.lastCallAt = row.last_call_at;
+            }
+            existing.featureCounts[row.feature] = Number(row.feature_count);
+          }
+        }
+
+        const storeRows = [...byStore.values()]
+          .map(s => {
+            const meta = storeMap.get(s.storeId);
+            const dailyPct = Math.min(100, Math.round((s.today / Math.max(dailyCap, 1)) * 100));
+            const monthlyPct = Math.min(100, Math.round((s.month / Math.max(monthlyCap, 1)) * 100));
+            return {
+              storeId: s.storeId,
+              slug: meta?.slug ?? s.storeId,
+              name: meta?.name ?? 'Unknown',
+              plan: meta?.plan ?? 'free',
+              today: s.today,
+              month: s.month,
+              dailyCap,
+              monthlyCap,
+              dailyPct,
+              monthlyPct,
+              lastCallAt: s.lastCallAt?.toISOString() ?? null,
+              featureCounts: s.featureCounts,
+            };
+          })
+          // Sort by today desc, then month desc
+          .sort((a, b) => b.today - a.today || b.month - a.month);
+
+        return {
+          platform: {
+            todayCount: platformToday,
+            monthCount: platformMonth,
+            totalCached: platformCached,
+            totalUncached: platformUncached,
+            cacheHitRatio,
+          },
+          stores: storeRows,
+        };
+      });
+
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

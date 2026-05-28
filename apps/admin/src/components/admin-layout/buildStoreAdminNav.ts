@@ -35,6 +35,8 @@ export type NavLabels = {
   stores: string;
   users: string;
   auditLogs: string;
+  /** Platform-wide AI usage rollup (super_admin only) */
+  platformAiUsage: string;
   // Super-admin store-scoped item
   manageFeatures: string;
 };
@@ -61,6 +63,12 @@ export function buildSuperAdminNav(labels: NavLabels): NavItem[] {
       name: labels.auditLogs,
       href: '/audit-logs',
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    },
+    {
+      // Sparkle icon — same as marketing hub to reinforce "AI" ownership
+      name: labels.platformAiUsage,
+      href: '/ai-usage',
+      icon: 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z',
     },
   ];
 }

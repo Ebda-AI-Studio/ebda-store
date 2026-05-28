@@ -8,6 +8,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { GeoResultsPanel } from './_components/GeoResultsPanel';
 import { AiSweepResultsPanels } from './_components/AiSweepResultsPanels';
+import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO
@@ -297,6 +298,11 @@ export default function AiToolsPage() {
         </Link>
       }
     >
+      {/* ── AI quota summary — visible before any sweep button ────── */}
+      <div className="mb-6">
+        <AiUsageSummaryCard storeId={storeId} embedded={true} />
+      </div>
+
       {error && (
         <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
