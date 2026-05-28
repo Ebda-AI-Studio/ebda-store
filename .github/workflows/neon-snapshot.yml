@@ -3,6 +3,12 @@ name: Neon snapshot
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_cloud:
+        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+        type: boolean
+        default: false
     # Skip snapshots for commits that touch ONLY docs / plans / specs / config
     # files. The snapshot is a rollback-safety artifact for schema/code changes;
     # plan-doc commits don't need it. Cuts ~30% of snapshots without losing
@@ -26,7 +32,7 @@ permissions:
 jobs:
   snapshot:
     name: Create Neon branch from production
-    runs-on: [self-hosted, linux, wsl2]
+    runs-on: ${{ inputs.force_cloud && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     steps:
       - name: Create branch + prune old snapshots
         env:

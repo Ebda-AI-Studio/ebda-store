@@ -25,11 +25,15 @@ on:
         description: 'Which scenario to run (all | storefront-browse | api-bursts | checkout-flow)'
         required: false
         default: 'all'
+      force_cloud:
+        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+        type: boolean
+        default: false
 
 jobs:
   load-test:
     name: k6 Load Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.force_cloud && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
 
     steps:
       - uses: actions/checkout@v4
