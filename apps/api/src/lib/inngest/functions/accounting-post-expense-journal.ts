@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postExpenseJournal } from '../../../services/accounting/posting/expense-posting';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Listens to `accounting/expense-posted` (fired by expense.service.postExpense)
@@ -34,6 +35,12 @@ export const accountingPostExpenseJournal: InngestFunction.Any = inngest.createF
         'accountingPostExpenseJournal: missing ids'
       );
       return { skipped: 'missing-ids' };
+    }
+    // Feature gate — skip journal posting when accounting.expenses is disabled.
+    const enabled = await featureService.isFeatureEnabled(storeId, 'accounting.expenses');
+    if (!enabled) {
+      logger.info({ storeId, expenseId }, 'accountingPostExpenseJournal: accounting.expenses disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'accounting.expenses' };
     }
     await step.run('post-journal', () => postExpenseJournal({ storeId, expenseId }));
     logger.info({ expenseId, storeId }, 'accountingPostExpenseJournal: posted');

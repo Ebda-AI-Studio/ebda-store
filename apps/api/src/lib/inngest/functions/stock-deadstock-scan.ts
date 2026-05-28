@@ -3,6 +3,7 @@ import { prisma } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runDeadstockScan } from '../../../services/accounting/deadstock-scan.service';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Cron-triggered dead-stock scan — runs every Sunday at 06:00 Kuwait time (03:00 UTC).
@@ -38,7 +39,15 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
     let totalExpired = 0;
 
     for (const store of stores) {
-      const result = await step.run(`scan-${store.id}`, () => runDeadstockScan(store.id));
+      const result = await step.run(`scan-${store.id}`, async () => {
+        // Feature gate — dead-stock analysis requires inventory.basic.
+        const enabled = await featureService.isFeatureEnabled(store.id, 'inventory.basic');
+        if (!enabled) {
+          logger.info({ storeId: store.id }, 'stock-deadstock-scan: inventory.basic disabled, skipping');
+          return { flagged: 0, expiredCount: 0, skipped: true };
+        }
+        return runDeadstockScan(store.id);
+      });
       totalFlagged += result.flagged;
       totalExpired += result.expiredCount;
     }
@@ -69,6 +78,13 @@ export const stockDeadstockScanOnDemand: InngestFunction.Any = inngest.createFun
     const { storeId, requestedBy } = event.data;
 
     logger.info({ storeId, requestedBy }, 'stock-deadstock-scan-on-demand: starting');
+
+    // Feature gate — skip when inventory.basic is disabled.
+    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.basic');
+    if (!enabled) {
+      logger.info({ storeId }, 'stock-deadstock-scan-on-demand: inventory.basic disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'inventory.basic' };
+    }
 
     const result = await step.run(`scan-${storeId}`, () => runDeadstockScan(storeId));
 

@@ -3,6 +3,7 @@ import { inngest } from '../client';
 import { prisma } from '@force/database';
 import { translateReview, detectSpamReview } from '../../ai/review-tools';
 import logger from '../../logger';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Auto-moderation for every submitted review.
@@ -34,6 +35,13 @@ export const reviewModeration: InngestFunction.Any = inngest.createFunction(
     if (!reviewId || !storeId) {
       logger.warn({ event: event.name }, '[REVIEW-MODERATION] fired without ids — skipping');
       return { skipped: 'missing-ids' };
+    }
+
+    // Feature gate — skip AI moderation when reviews feature is disabled.
+    const reviewsEnabled = await featureService.isFeatureEnabled(storeId, 'reviews');
+    if (!reviewsEnabled) {
+      logger.info({ storeId, reviewId }, '[REVIEW-MODERATION] reviews feature disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'reviews' };
     }
 
     // ── 1. Spam check — determines visibility ──────────────────────────────

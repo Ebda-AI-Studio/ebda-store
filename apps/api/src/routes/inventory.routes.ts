@@ -8,13 +8,14 @@ import { InventoryChangeType } from '@force/database';
 
 const router = Router();
 
-// Scope the feature gate to the inventory subtree only. The previous
-// `router.use(requireFeature('inventory'))` fired on every request routed
-// into this router — which, because both this router and reviewRoutes share
-// the same '/stores' mount prefix upstream, also caught unrelated URLs
-// (e.g. /stores/:id/reviews) and responded with a misleading
-// 'FEATURE_DISABLED: inventory' 403.
-router.use('/:storeId/inventory', requireFeature('inventory'));
+// Per-route feature gates — each inventory endpoint checks the appropriate
+// granular sub-feature key from PLAN_BASELINE. The old broad
+// `router.use(requireFeature('inventory'))` was replaced because:
+//  1. `inventory` (parent) is not in PLAN_BASELINE — only sub-keys are.
+//  2. A router-level .use() with a dynamic `:storeId` param in the path
+//     pattern fired on ALL requests mounted at this router including
+//     unrelated siblings (e.g. /stores/:id/reviews → 403 FEATURE_DISABLED).
+// Each handler below carries the narrowest applicable sub-key.
 
 // Validation schemas
 const adjustInventorySchema = z.object({
@@ -51,6 +52,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -72,6 +74,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -102,6 +105,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.stock_alerts'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -123,6 +127,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -157,6 +162,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.bulk_adjustments'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -191,6 +197,7 @@ router.put(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
@@ -221,6 +228,7 @@ router.put(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.stock_alerts'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
@@ -244,6 +252,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
@@ -270,6 +279,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

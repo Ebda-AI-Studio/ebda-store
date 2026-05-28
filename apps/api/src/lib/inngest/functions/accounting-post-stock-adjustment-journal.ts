@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postStockAdjustmentJournal } from '../../../services/accounting/posting/stock-adjustment-posting';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Listens to `stock/adjustment-posted` (fired by stock-adjustment.service.postAdjustment)
@@ -31,6 +32,12 @@ export const accountingPostStockAdjustmentJournal: InngestFunction.Any = inngest
         'accountingPostStockAdjustmentJournal: missing ids'
       );
       return { skipped: 'missing-ids' };
+    }
+    // Feature gate — skip GL posting when inventory.bulk_adjustments is disabled.
+    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.bulk_adjustments');
+    if (!enabled) {
+      logger.info({ storeId, adjustmentId }, 'accountingPostStockAdjustmentJournal: inventory.bulk_adjustments disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'inventory.bulk_adjustments' };
     }
     await step.run('post-journal', () => postStockAdjustmentJournal({ storeId, adjustmentId }));
     logger.info({ adjustmentId, storeId }, 'accountingPostStockAdjustmentJournal: posted');

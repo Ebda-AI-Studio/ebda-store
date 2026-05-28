@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { prisma, runInTenantContext } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import {
   listAccountsTree,
   createChildAccount,
@@ -39,6 +40,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tree = await runInTenantContext(req.params.storeId, () =>
@@ -70,6 +72,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const q = listQuerySchema.parse(req.query);
@@ -126,6 +129,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const entry = await runInTenantContext(req.params.storeId, () =>
@@ -179,6 +183,7 @@ router.post(
   authenticate,
   authorize('super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = manualEntrySchema.safeParse(req.body);
@@ -232,6 +237,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = createChildSchema.safeParse(req.body);
@@ -261,6 +267,7 @@ router.patch(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = setActiveSchema.safeParse(req.body);
@@ -289,6 +296,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : undefined;
@@ -313,6 +321,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const from = new Date(
@@ -366,6 +375,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : new Date();
@@ -416,6 +426,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const now = new Date();
@@ -474,6 +485,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : undefined;
@@ -513,6 +525,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const from = new Date(
@@ -573,6 +586,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : new Date();
