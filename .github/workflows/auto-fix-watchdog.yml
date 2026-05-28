@@ -13,7 +13,12 @@ name: Auto-fix watchdog
 on:
   schedule:
     - cron: '13 */2 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_cloud:
+        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -26,7 +31,7 @@ concurrency:
 jobs:
   watchdog:
     name: Cross-repo CI failure escalator
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.force_cloud && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 5
     steps:
       - name: Check all 3 Force AI Suite repos for stale failures

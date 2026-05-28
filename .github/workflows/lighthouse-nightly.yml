@@ -1,12 +1,18 @@
 name: Lighthouse storefront audit
+
 on:
   schedule:
     - cron: '0 4 * * *' # 4am UTC = 7am Kuwait
   workflow_dispatch:
+    inputs:
+      force_cloud:
+        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+        type: boolean
+        default: false
 
 jobs:
   lighthouse:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.force_cloud && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

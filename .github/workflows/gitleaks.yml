@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      force_cloud:
+        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -11,7 +17,7 @@ permissions:
 jobs:
   scan:
     name: Scan for leaked secrets
-    runs-on: [self-hosted, linux, wsl2]
+    runs-on: ${{ inputs.force_cloud && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     steps:
       - uses: actions/checkout@v4
         with:

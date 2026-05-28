@@ -1,0 +1,117 @@
+name: Cloud rescue
+
+# Fires when a watched workflow finishes on its first attempt with a failure.
+# Checks whether the failure looks like a runner-offline symptom (no steps
+# recorded, or the "Set up job" step itself failed). If so, re-triggers the
+# same workflow with force_cloud=true so it runs on ubuntu-latest instead of
+# the self-hosted runner.
+#
+# This is defense-in-depth for the self-hosted runner being down. The
+# notify-failure job in ci.yml already runs on ubuntu-latest for the same
+# reason (fail-open exception documented there).
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - Gitleaks
+      - Neon snapshot
+      - Preview env isolation (rule 13)
+      - Lighthouse Nightly
+      - Load Test Nightly
+      - Deploy
+      - Auto-fix watchdog
+    types:
+      - completed
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  rescue:
+    name: Re-run on cloud if runner was offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only act on first-attempt failures — avoid infinite rescue loops
+    if: >
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.run_attempt == 1
+    steps:
+      - name: Check for runner-offline symptom
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          JOBS=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs" --jq '.jobs')
+
+          # Runner-offline heuristic:
+          #   - No jobs at all (runner never picked it up), OR
+          #   - Every job has 0 steps (runner accepted but never started steps), OR
+          #   - The first step of any job is "Set up job" with conclusion=failure
+          #     (runner came up but couldn't initialise the container)
+          OFFLINE=$(echo "$JOBS" | jq '
+            if length == 0 then true
+            else
+              all(.[]; .steps | length == 0) or
+              any(.[]; .steps | length > 0 and .[0].name == "Set up job" and .[0].conclusion == "failure")
+            end
+          ')
+
+          echo "runner_offline=${OFFLINE}" >> "$GITHUB_OUTPUT"
+          echo "Runner-offline detected: ${OFFLINE}"
+
+      - name: Re-trigger workflow with force_cloud=true
+        if: steps.check.outputs.runner_offline == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          REPO: ${{ github.repository }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+        run: |
+          set -euo pipefail
+
+          # Map workflow display name to its filename
+          case "${WORKFLOW_NAME}" in
+            "CI")                              FILE="ci.yml" ;;
+            "Gitleaks")                        FILE="gitleaks.yml" ;;
+            "Neon snapshot")                   FILE="neon-snapshot.yml" ;;
+            "Preview env isolation (rule 13)") FILE="preview-env-isolation.yml" ;;
+            "Lighthouse Nightly")              FILE="lighthouse-nightly.yml" ;;
+            "Load Test Nightly")               FILE="load-test-nightly.yml" ;;
+            "Deploy")                          FILE="deploy.yml" ;;
+            "Auto-fix watchdog")               FILE="auto-fix-watchdog.yml" ;;
+            *)
+              echo "::warning::Unknown workflow name '${WORKFLOW_NAME}' — cannot rescue"
+              exit 0
+              ;;
+          esac
+
+          # Validate branch name before passing to gh CLI (defence against
+          # unexpected ref shapes; head_branch is GitHub-controlled but worth
+          # asserting the format before use in a shell argument).
+          if ! echo "${HEAD_BRANCH}" | grep -qE '^[a-zA-Z0-9_/.\-]+$'; then
+            echo "::error::Unexpected head_branch format '${HEAD_BRANCH}' — aborting rescue"
+            exit 1
+          fi
+
+          echo "Dispatching ${FILE} on branch ${HEAD_BRANCH} with force_cloud=true"
+          gh workflow run "${FILE}" \
+            --repo "${REPO}" \
+            --ref "${HEAD_BRANCH}" \
+            --field force_cloud=true
+
+          # Notify so Ahmad knows a cloud-rescue was triggered
+          if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_ALERT_CHAT_ID:-}" ]; then
+            curl -sS -X POST \
+              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \
+              -d parse_mode=Markdown \
+              -d text="⚠️ [CLOUD RESCUE] Self-hosted runner appears offline. Re-running \`${WORKFLOW_NAME}\` on \`${HEAD_BRANCH}\` via ubuntu-latest. Repo: ${REPO}"
+          fi

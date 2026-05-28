@@ -20,7 +20,12 @@ on:
     branches: [main]
   schedule:
     - cron: '0 6 * * 1' # Mondays 06:00 UTC — weekly drift check
-  workflow_dispatch: # manual trigger
+  workflow_dispatch:
+    inputs:
+      force_cloud:
+        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+        type: boolean
+        default: false
 
 jobs:
   verify-isolation:
@@ -28,7 +33,7 @@ jobs:
     # was blocking the job from even starting, leaving rule 13 unverifiable
     # on every PR. The check is curl-only (Vercel API + jq) so it runs fine
     # on the WSL2 runner without service-container needs.
-    runs-on: [self-hosted, linux, wsl2]
+    runs-on: ${{ inputs.force_cloud && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     # Defense-in-depth (2026-05-28): self-hosted runner + pull_request trigger
     # could theoretically expose VERCEL_API_TOKEN to a fork PR. ForceAI-KW is
     # private + solo-dev so forks are not possible today, but this guard
