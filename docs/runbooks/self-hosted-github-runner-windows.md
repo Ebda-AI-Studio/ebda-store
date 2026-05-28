@@ -160,9 +160,14 @@ jobs:
 
 GitHub matches when ALL listed labels are present, so the workflow lands on the WSL2 runner.
 
-**Option B — auto-route only the cheap jobs** (recommended — lower blast radius)
+**Option B — route everything except deploys/token-exfil** (current policy as of 2026-05-28)
 
-Keep `runs-on: ubuntu-latest` on integration / E2E jobs (they need GitHub-cloud's Docker), but flip lint / typecheck / audit / gitleaks to self-hosted:
+With Docker installed in WSL2, postgres and redis service containers work on the self-hosted runner.
+Flip lint / typecheck / audit / gitleaks / **integration tests** to self-hosted. Keep on `ubuntu-latest`:
+deploys (`railway up`, `vercel deploy`, `gh release create`), npm publish, Telegram `notify-failure`
+(must survive runner-offline), and any job that exfiltrates via a third-party token (Sentry release
+upload, OneSignal admin push, Resend API key, Vercel API). Playwright/E2E: conservative default —
+keep on cloud until browser download is verified inside WSL2 (decide per repo).
 
 ```yaml
 jobs:
@@ -175,12 +180,16 @@ jobs:
   gitleaks:
     runs-on: [self-hosted, linux, wsl2]
   integration:
-    runs-on: ubuntu-latest # needs postgres service container; stays on cloud
+    runs-on: [self-hosted, linux, wsl2] # Docker-in-WSL supplies postgres + redis service containers
   e2e:
-    runs-on: ubuntu-latest # same
+    runs-on: ubuntu-latest # playwright install downloads browsers; leave on cloud for now
+  deploy:
+    runs-on: ubuntu-latest # token-exfil (RAILWAY_TOKEN / VERCEL_TOKEN) — stays on cloud
+  notify-failure:
+    runs-on: ubuntu-latest # must fire even when self-hosted runner is offline
 ```
 
-That covers ~60% of CI minutes for ~5% of the failure-mode complexity.
+That covers ~75-80% of CI minutes with Docker unblocking the previously cloud-only integration jobs.
 
 ### 9. Smoke test
 
