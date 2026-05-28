@@ -26,6 +26,7 @@ import { redis } from './redis.service';
 import { AppError } from '../middleware/error-handler';
 import { assertAiQuota } from '../lib/ai-quota';
 import logger from '../lib/logger';
+import { sanitizeJsonControlChars } from '../lib/ai/parse-ai-json';
 
 // Gemini Vision accepts only these mime types for inline_data. Anything else
 // (image/svg+xml, image/gif, image/tiff, image/x-icon) gets a 400. We
@@ -188,15 +189,19 @@ function rethrowAsAppError(err: unknown, fallback: string): never {
 }
 
 /**
- * Strip Markdown code fences that Gemini sometimes wraps JSON in even
- * when responseMimeType is set. Defensive — most calls don't need it.
+ * Strip Markdown code fences AND escape unescaped control characters
+ * inside string literals. Gemini occasionally returns either, even with
+ * responseMimeType:application/json set. Defensive — most calls don't
+ * need it but 2026-05-28 Palestinian zatar citation copy proved the
+ * second pass is non-optional.
  */
 function stripJsonFences(text: string): string {
-  return text
+  const stripped = text
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/```$/, '')
     .trim();
+  return sanitizeJsonControlChars(stripped);
 }
 
 // ---------------------------------------------------------------------------

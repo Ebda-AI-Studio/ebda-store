@@ -437,6 +437,211 @@ router.get('/bulk/:jobId', async (req: Request, res: Response, next: NextFunctio
 });
 
 // =====================================================================
+// Per-product FAQ draft — generates up to 5 FAQ pairs for a single
+// product via Gemini, returned inline (no Inngest job). Merchant
+// reviews and accepts before FAQs are persisted.
+// =====================================================================
+
+const draftProductFaqsSchema = z.object({
+  productId: z.string().min(1),
+  count: z.number().int().min(1).max(10).default(5),
+});
+
+router.post(
+  '/product-faqs/draft',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { productId, count } = draftProductFaqsSchema.parse(req.body);
+
+      // Verify the product belongs to this store.
+      const product = await prisma.product.findFirst({
+        where: { id: productId, storeId },
+        select: {
+          id: true,
+          name: true,
+          nameAr: true,
+          description: true,
+          descriptionAr: true,
+        },
+      });
+      if (!product) {
+        throw new AppError(404, 'NOT_FOUND', 'Product not found');
+      }
+
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, nameAr: true },
+      });
+
+      // Use the Gemini model to draft product-specific FAQs.
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const apiKey = process.env.GOOGLE_GENERATIVE_AI_KEY;
+      if (!apiKey) {
+        throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI service is not configured');
+      }
+      const genai = new GoogleGenerativeAI(apiKey);
+      const model = genai.getGenerativeModel({
+        model: process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest',
+      });
+
+      const prompt = `You are an SEO + AEO expert helping a Kuwait-based e-commerce store write product FAQs.
+
+Store: ${store?.name ?? storeId}
+Product: ${product.name}${product.nameAr ? ` / ${product.nameAr}` : ''}
+Description: ${product.description ?? '(no description provided)'}
+
+Draft exactly ${count} FAQ pairs that real customers would ask about this specific product.
+Cover: sizing/fit, materials, shipping time, return policy, how to use, care instructions — pick the most relevant for this product.
+Each FAQ must have a question AND answer in BOTH English AND Arabic (formal MSA, not dialect).
+
+Return ONLY valid JSON — no markdown, no explanation:
+[
+  {
+    "question": "English question?",
+    "questionAr": "السؤال بالعربية؟",
+    "answer": "English answer.",
+    "answerAr": "الإجابة بالعربية."
+  }
+]`;
+
+      const result = await model.generateContent(prompt);
+      const raw = result.response.text();
+
+      // Extract outermost JSON array to tolerate any trailing text Gemini adds.
+      const start = raw.indexOf('[');
+      const end = raw.lastIndexOf(']');
+      if (start === -1 || end === -1) {
+        throw new AppError(502, 'AI_PARSE_ERROR', 'AI returned unexpected format');
+      }
+      const faqs = JSON.parse(raw.slice(start, end + 1)) as Array<{
+        question: string;
+        questionAr?: string;
+        answer: string;
+        answerAr?: string;
+      }>;
+
+      // Record AI usage for quota tracking (non-blocking).
+      prisma.aiUsage
+        .create({
+          data: {
+            storeId,
+            feature: 'product_faq_draft',
+            inputTokens: 0,
+            outputTokens: 0,
+            cachedHit: false,
+          },
+        })
+        .catch(() => {
+          /* intentionally swallowed */
+        });
+
+      res.json({ success: true, data: { faqs } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================================
+// AI Usage — summary + paginated log for merchant quota visibility.
+// =====================================================================
+
+router.get('/usage/summary', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const now = new Date();
+
+    const startOfDay = new Date(now);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const startOfMonth = new Date(now);
+    startOfMonth.setUTCDate(1);
+    startOfMonth.setUTCHours(0, 0, 0, 0);
+
+    const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '1000', 10);
+    const monthlyCap = parseInt(process.env.AI_MONTHLY_REQUEST_CAP ?? '20000', 10);
+
+    const [todayCount, monthCount, last30] = await Promise.all([
+      prisma.aiUsage.count({
+        where: { storeId, createdAt: { gte: startOfDay }, cachedHit: false },
+      }),
+      prisma.aiUsage.count({
+        where: { storeId, createdAt: { gte: startOfMonth }, cachedHit: false },
+      }),
+      prisma.$queryRaw<Array<{ day: Date; total: bigint }>>`
+          SELECT
+            DATE_TRUNC('day', created_at) AS day,
+            COUNT(*) AS total
+          FROM ai_usage
+          WHERE store_id = ${storeId}
+            AND created_at >= NOW() - INTERVAL '30 days'
+          GROUP BY day
+          ORDER BY day ASC
+        `,
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        today: todayCount,
+        thisMonth: monthCount,
+        dailyCap,
+        monthlyCap,
+        // Convert bigint → number so JSON.stringify works.
+        last30Days: last30.map(r => ({
+          day: r.day.toISOString().slice(0, 10),
+          total: Number(r.total),
+        })),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/usage/log', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10));
+    const pageSize = Math.min(50, Math.max(1, parseInt(String(req.query.pageSize ?? '20'), 10)));
+    const skip = (page - 1) * pageSize;
+
+    const [rows, total] = await Promise.all([
+      prisma.aiUsage.findMany({
+        where: { storeId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+        select: {
+          id: true,
+          feature: true,
+          inputTokens: true,
+          outputTokens: true,
+          cachedHit: true,
+          createdAt: true,
+        },
+      }),
+      prisma.aiUsage.count({ where: { storeId } }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        rows,
+        total,
+        page,
+        pageSize,
+        pages: Math.ceil(total / pageSize),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// =====================================================================
 // AEO bulk sweeps — FAQ items, HowTo guides, conversational meta.
 // Each returns 202 + jobId; poll /bulk/:jobId for progress.
 // =====================================================================
@@ -967,6 +1172,158 @@ router.post(
         throw new AppError(404, 'JOB_NOT_CANCELLABLE', 'Job not found or already finished');
       }
       res.json({ success: true, data: { cancelled: true } });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+// ==========================================
+// AI Sweep Result Viewers
+// ==========================================
+// Closes the "every data has a UI" gap for the GEO sweeps. The bulk-ai
+// jobs write to `stores.llmsTxt` + `stores.aboutJson` + `ai_recommendation`,
+// then disappear from the admin's view. These endpoints expose the
+// CURRENT VALUES so the merchant can see what the sweep actually filled.
+
+/**
+ * GET /stores/:storeId/ai/results/geo
+ * Returns the current populated GEO outputs: llmsTxt content + brand
+ * facts JSON + a citation-copy fill-rate summary across products.
+ */
+router.get('/results/geo', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+
+    const [store, totalProducts, productsWithCitation] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { llmsTxt: true, aboutJson: true },
+      }),
+      prisma.product.count({ where: { storeId, deletedAt: null } }),
+      prisma.product.count({
+        where: { storeId, deletedAt: null, citationCopy: { not: null } },
+      }),
+    ]);
+
+    if (!store) {
+      throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        llmsTxt: store.llmsTxt ?? null,
+        brandFacts: store.aboutJson ?? null,
+        citationCopy: {
+          totalProducts,
+          filledProducts: productsWithCitation,
+          // Surface 0 instead of NaN when the store has no products yet.
+          fillRate: totalProducts === 0 ? 0 : productsWithCitation / totalProducts,
+        },
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /stores/:storeId/ai/results/recommendations?productId=...
+ * Returns the AI recommendations populated by the bulk-ai-recommendations
+ * sweep, scoped to ONE source product. Up to 25 target products with
+ * score + reason + name + slug + first image.
+ *
+ * Closes the gap where the admin product recommendations page only
+ * read `product_relations` (manual cross-sells) and ignored the
+ * `ai_recommendation` table that the sweep populates.
+ */
+router.get('/results/recommendations', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+    const productId = (req.query.productId as string | undefined)?.trim();
+    if (!productId) {
+      throw new AppError(400, 'PRODUCT_ID_REQUIRED', 'productId query param is required');
+    }
+
+    const rows = await prisma.aiRecommendation.findMany({
+      where: { storeId, sourceProductId: productId },
+      orderBy: { score: 'desc' },
+      take: 25,
+      select: {
+        id: true,
+        targetProductId: true,
+        score: true,
+        reason: true,
+        createdAt: true,
+        targetProduct: {
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            slug: true,
+            price: true,
+            images: {
+              take: 1,
+              orderBy: { position: 'asc' },
+              select: { url: true, alt: true },
+            },
+          },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        recommendations: rows.map(r => ({
+          id: r.id,
+          targetProductId: r.targetProductId,
+          score: r.score,
+          reason: r.reason,
+          createdAt: r.createdAt,
+          targetProduct: r.targetProduct,
+        })),
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /stores/:storeId/ai/results/recommendations/overview
+ * Store-wide rollup: which products HAVE AI recs vs which don't.
+ */
+router.get(
+  '/results/recommendations/overview',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const storeId = (req.params as { storeId: string }).storeId;
+
+      const [totalProducts, distinctSourcesWithRecs, totalRecs] = await Promise.all([
+        prisma.product.count({ where: { storeId, deletedAt: null } }),
+        prisma.aiRecommendation
+          .findMany({
+            where: { storeId },
+            distinct: ['sourceProductId'],
+            select: { sourceProductId: true },
+          })
+          .then(rows => rows.length),
+        prisma.aiRecommendation.count({ where: { storeId } }),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          totalProducts,
+          productsWithAiRecs: distinctSourcesWithRecs,
+          productsWithoutAiRecs: Math.max(0, totalProducts - distinctSourcesWithRecs),
+          totalRecommendations: totalRecs,
+          averageRecsPerProduct:
+            distinctSourcesWithRecs === 0 ? 0 : totalRecs / distinctSourcesWithRecs,
+        },
+      });
     } catch (e) {
       next(e);
     }

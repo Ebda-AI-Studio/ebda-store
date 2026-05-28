@@ -6,6 +6,7 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
 
 /**
  * AEO (Answer Engine Optimisation) bulk sweeps — drafts FAQ items,
@@ -377,7 +378,7 @@ No other text, no markdown code fences — pure JSON only.`;
           () => model.generateContent(prompt),
           `faq-aeo:${storeId}`
         );
-        const raw = stripFences(result.response.text());
+        const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
         drafted = parsed.slice(0, count);
@@ -633,7 +634,7 @@ No markdown, no code fences — pure JSON only.`;
           () => model.generateContent(prompt),
           `howto-aeo:${storeId}`
         );
-        const raw = stripFences(result.response.text());
+        const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
         drafted = parsed.slice(0, count);

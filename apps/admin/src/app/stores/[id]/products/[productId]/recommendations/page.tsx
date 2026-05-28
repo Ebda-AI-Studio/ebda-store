@@ -10,6 +10,7 @@ import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPut } from '../../../../../../lib/api';
 import { type ProductSummary } from './_components/ProductSearch';
 import { RelationSection } from './_components/RelationSection';
+import { AiSuggestionsPanel } from './_components/AiSuggestionsPanel';
 
 interface ProductRelation {
   targetProductId: string;
@@ -220,6 +221,20 @@ export default function ProductRecommendationsPage() {
           excludeIds={allSelectedIds}
           onAdd={addUpsell}
           onRemove={removeUpsell}
+        />
+      </div>
+
+      {/* AI-generated cross-sell picks from the bulk-ai-recommendations
+          sweep — see _components/AiSuggestionsPanel.tsx. The picks are
+          stored in `ai_recommendation` (separate from manual
+          `product_relations`) and rendered on the storefront as
+          "You might also like" when no manual cross-sell exists. */}
+      <div className="mt-6">
+        <AiSuggestionsPanel
+          storeId={storeId}
+          productId={productId}
+          alreadyInCrossSell={crossSell.map(p => p.id)}
+          onPromote={addCrossSell}
         />
       </div>
 
