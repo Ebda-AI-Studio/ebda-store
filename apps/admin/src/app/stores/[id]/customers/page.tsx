@@ -99,7 +99,7 @@ function formatDate(dateString: string) {
 const RFM_BADGE: Record<string, { label: string; bg: string; text: string }> = {
   vip: { label: 'VIP', bg: 'bg-yellow-100', text: 'text-yellow-800' },
   loyal: { label: 'Loyal', bg: 'bg-green-100', text: 'text-green-800' },
-  potential: { label: 'Potential', bg: 'bg-blue-100', text: 'text-blue-800' },
+  potential: { label: 'Active Buyer', bg: 'bg-blue-100', text: 'text-blue-800' },
   new_customer: { label: 'New', bg: 'bg-info/10', text: 'text-info' },
   at_risk: { label: 'At Risk', bg: 'bg-warning/10', text: 'text-warning-foreground' },
   hibernating: { label: 'Dormant', bg: 'bg-muted', text: 'text-muted-foreground' },

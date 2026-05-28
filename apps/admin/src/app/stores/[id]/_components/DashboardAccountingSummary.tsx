@@ -27,7 +27,7 @@ interface SegmentRow {
 const SEGMENT_LABEL: Record<string, string> = {
   vip: 'VIP',
   loyal: 'Loyal',
-  potential: 'Potential',
+  potential: 'Active Buyer',
   new_customer: 'New',
   at_risk: 'At Risk',
   hibernating: 'Dormant',

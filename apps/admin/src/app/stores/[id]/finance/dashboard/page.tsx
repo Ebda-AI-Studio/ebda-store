@@ -45,6 +45,16 @@ interface ProfitAnomaly {
   detectedAt: string;
 }
 
+/**
+ * Subset of the analytics/dashboard stats needed for the sales reconciliation
+ * panel. The full analytics endpoint returns more fields but we only surface
+ * the order-level revenue, order count, and paid total here.
+ */
+interface SalesStats {
+  totalRevenue: number;
+  totalOrders: number;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function kwd(fils: number | null | undefined): string {
@@ -73,6 +83,13 @@ export default function FinanceDashboardPage() {
   const [dashboardErr, setDashboardErr] = useState<string | null>(null);
   const [recentAnomalies, setRecentAnomalies] = useState<ProfitAnomaly[]>([]);
   const [pendingOcrCount, setPendingOcrCount] = useState<number | null>(null);
+  /**
+   * Sales revenue from actual paid orders (analytics endpoint). Shown alongside
+   * the accounting P&L so merchants without posted journal entries can still see
+   * real sales figures. The two numbers intentionally differ: analytics uses
+   * paid-order totals while accounting uses double-entry journal entries.
+   */
+  const [salesStats, setSalesStats] = useState<SalesStats | null>(null);
 
   // Build YYYY-MM-DD strings from the resolved date range.
   function toDateStr(d: Date): string {
@@ -102,6 +119,25 @@ export default function FinanceDashboardPage() {
         }
       })
       .catch(() => setDashboardErr('Failed to load finance dashboard'));
+
+    // Sales stats from the canonical analytics endpoint. This is the same
+    // source used by the Analytics hub — paid order totals from the orders
+    // table, NOT from accounting journal entries. Merchants without posted
+    // journal entries will see $0 in the P&L section above but real numbers
+    // here. Both numbers are intentionally surfaced so the merchant can
+    // reconcile them. Failure is best-effort — the panel simply disappears.
+    apiGet<{ stats?: { totalRevenue?: number; totalOrders?: number } }>(
+      `/api/v1/stores/${storeId}/analytics/dashboard?startDate=${resolved.startDate.toISOString()}&endDate=${resolved.endDate.toISOString()}`
+    )
+      .then(({ data: ad }) => {
+        const s = ad?.stats;
+        if (s && typeof s.totalRevenue === 'number') {
+          setSalesStats({ totalRevenue: s.totalRevenue, totalOrders: s.totalOrders ?? 0 });
+        }
+      })
+      .catch(() => {
+        // best-effort — panel stays hidden on failure
+      });
 
     // Recent unacknowledged anomalies (top 3) — defensive against missing
     // `data` field on the API response (e.g. anomalies feature not yet
@@ -225,6 +261,46 @@ export default function FinanceDashboardPage() {
               </div>
             </div>
           </section>
+
+          {/* ── Sales Orders reconciliation ──────────────────────────────
+               Canonical order-based revenue from the analytics endpoint.
+               This matches the numbers shown in the Analytics hub and is
+               based on PAID orders in the orders table — completely separate
+               from the double-entry journal entries above.
+               When journal entries haven't been posted yet, this panel is
+               the source of truth for actual sales. Both panels are shown
+               together so the merchant can reconcile them over time.
+          ─────────────────────────────────────────────────────────────── */}
+          {salesStats && (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="text-base font-semibold">{t('salesOrdersTitle')}</h2>
+                <span className="rounded-full bg-info/10 px-2 py-0.5 text-xs font-medium text-info">
+                  {t('salesOrdersSource')}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-border p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                    {t('salesOrdersRevenue')}
+                  </p>
+                  <p className="text-2xl font-semibold font-mono text-green-700">
+                    {kwd(salesStats.totalRevenue)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">KWD</p>
+                </div>
+                <div className="rounded-xl border border-border p-4 space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                    {t('salesOrdersCount')}
+                  </p>
+                  <p className="text-2xl font-semibold font-mono text-foreground">
+                    {salesStats.totalOrders.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{t('salesOrdersCountUnit')}</p>
+                </div>
+              </div>
+            </section>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Stock Value */}

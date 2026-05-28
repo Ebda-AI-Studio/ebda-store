@@ -3837,7 +3837,12 @@
       "negativeBalanceTooltip": "رصيد سالب — تحقق من الرصيد الافتتاحي وتسويات المخزون",
       "recentAnomalies": "الشذوذات الأخيرة",
       "pendingOcrDrafts": "مسودات OCR المعلقة",
-      "viewAll": "عرض الكل"
+      "viewAll": "عرض الكل",
+      "salesOrdersTitle": "المبيعات (من الطلبات)",
+      "salesOrdersSource": "الطلبات",
+      "salesOrdersRevenue": "إيرادات الطلبات المدفوعة",
+      "salesOrdersCount": "الطلبات المدفوعة",
+      "salesOrdersCountUnit": "طلب في الفترة"
     },
     "anomalies": {
       "title": "شذوذات الربحية",
@@ -4173,7 +4178,7 @@
       "segment": {
         "vip": "VIP",
         "loyal": "مخلص",
-        "potential": "محتمل",
+        "potential": "مشتري نشط",
         "new_customer": "جديد",
         "at_risk": "في خطر",
         "hibernating": "خامل",

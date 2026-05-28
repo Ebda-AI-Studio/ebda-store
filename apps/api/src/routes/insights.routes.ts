@@ -38,8 +38,8 @@ const SEGMENT_ACTIONS: Record<RfmSegment, { en: string; ar: string }> = {
     ar: 'أرسل رسائل شكر مخصصة وعرض منتجات مكملة ترقى بمستوى المشتريات.',
   },
   potential: {
-    en: 'Nurture with targeted promotions to convert into loyal repeat buyers.',
-    ar: 'استهدفهم بعروض موجهة لتحويلهم إلى مشترين متكررين دائمين.',
+    en: 'Keep them engaged — they have ordered before. Offer personalised promotions to build frequency.',
+    ar: 'حافظ على تفاعلهم — لقد اشتروا من قبل. قدّم عروضاً مخصصة لزيادة تكرار الشراء.',
   },
   new_customer: {
     en: 'Welcome with an onboarding discount and highlight best-sellers.',
