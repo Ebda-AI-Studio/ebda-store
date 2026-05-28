@@ -44,6 +44,16 @@ vi.mock('@force/database', () => ({
   },
 }));
 
+// CartService now resolves the inventory.backorder feature flag before
+// each inventory check. Default to enabled so existing tests pass unmodified.
+vi.mock('@api/services/feature.service', () => ({
+  featureService: {
+    isFeatureEnabled: vi.fn().mockResolvedValue(true),
+    getStoreFeatures: vi.fn(),
+    invalidateCache: vi.fn(),
+  },
+}));
+
 describe('CartService', () => {
   const mockStoreId = 'store-123';
   const mockSessionId = 'session-456';

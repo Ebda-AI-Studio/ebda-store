@@ -30,6 +30,7 @@ import logger from '../lib/logger';
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
 import { CustomerAddressService } from '../services/customer-address.service';
 import { encryption } from '../services/encryption.service';
+import { featureService } from '../services/feature.service';
 
 const addressSvc = new CustomerAddressService(prisma as any);
 
@@ -759,12 +760,19 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
       return;
     }
 
-    // Inventory check (allow backorder per product flag).
+    // Inventory check (allow backorder only when the store-level feature flag
+    // AND the per-product flag are both enabled).
+    const backorderFeatureEnabled = await featureService.isFeatureEnabled(
+      store.id,
+      'inventory.backorder'
+    );
     const oos = items
       .map(i => ({ item: i, product: byId.get(i.productId)! }))
       .filter(
         ({ item, product }) =>
-          product.trackInventory && product.inventory < item.quantity && !product.allowBackorder
+          product.trackInventory &&
+          product.inventory < item.quantity &&
+          !(backorderFeatureEnabled && product.allowBackorder)
       );
     if (oos.length > 0) {
       res.status(409).json({

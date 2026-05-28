@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { runInTenantContext } from '@force/database';
 import { listOpenBackorders, cancelBackorder } from '../services/accounting/backorder.service';
 
@@ -17,6 +18,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.backorder'),
   async (req, res, next) => {
     try {
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -35,6 +37,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.backorder'),
   async (req, res, next) => {
     try {
       const body = cancelSchema.safeParse(req.body);
