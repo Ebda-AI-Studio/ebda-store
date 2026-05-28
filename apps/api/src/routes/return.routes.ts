@@ -400,6 +400,17 @@ router.put(
 
       const returnRequest = await ReturnService.updateTracking(storeId, id, trackingNumber);
 
+      await auditLog({
+        action: 'return.tracking_updated',
+        userId: req.user!.userId,
+        storeId,
+        resourceType: 'return',
+        resourceId: id,
+        details: { trackingNumber },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
       res.json({
         success: true,
         data: { return: returnRequest },

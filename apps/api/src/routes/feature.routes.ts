@@ -5,6 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@force/database';
 import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@force/shared';
 import { featureService } from '../services/feature.service';
+import { auditLog } from '../middleware/security';
 
 const router = Router();
 
@@ -102,6 +103,17 @@ router.put(
 
       const features = await featureService.updateStoreFeatures(id, parsed.data, req.user!.userId);
 
+      await auditLog({
+        action: 'store.features_bulk_updated',
+        userId: req.user!.userId,
+        storeId: id,
+        resourceType: 'store',
+        resourceId: id,
+        details: { updates: parsed.data },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
       res.json({
         success: true,
         data: { features },
@@ -151,6 +163,17 @@ router.put(
         req.user!.userId
       );
 
+      await auditLog({
+        action: 'store.feature_toggled',
+        userId: req.user!.userId,
+        storeId: id,
+        resourceType: 'store_feature',
+        resourceId: keyParsed.data,
+        details: { featureKey: keyParsed.data, enabled: bodyParsed.data.enabled },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
       res.json({
         success: true,
         data: { features },
@@ -186,6 +209,17 @@ router.delete(
 
       const features = await featureService.clearFeatureOverride(id, keyParsed.data);
 
+      await auditLog({
+        action: 'store.feature_override_cleared',
+        userId: req.user!.userId,
+        storeId: id,
+        resourceType: 'store_feature',
+        resourceId: keyParsed.data,
+        details: { featureKey: keyParsed.data, reason: 'fell_back_to_plan_baseline' },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
       res.json({
         success: true,
         data: { features },
@@ -210,6 +244,18 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const features = await featureService.resetAllOverrides(req.params.id);
+
+      await auditLog({
+        action: 'store.features_reset_to_baseline',
+        userId: req.user!.userId,
+        storeId: req.params.id,
+        resourceType: 'store',
+        resourceId: req.params.id,
+        details: { reason: 'super_admin_reset_all_overrides' },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
       res.json({
         success: true,
         data: { features },
@@ -250,11 +296,28 @@ router.put(
         return;
       }
 
+      // Capture previous plan so the audit row shows from → to.
+      const prev = await prisma.store.findUnique({
+        where: { id: req.params.id },
+        select: { plan: true },
+      });
+
       const features = await featureService.setStorePlan(
         req.params.id,
         parsed.data.plan,
         req.user!.userId
       );
+
+      await auditLog({
+        action: 'store.plan_changed',
+        userId: req.user!.userId,
+        storeId: req.params.id,
+        resourceType: 'store',
+        resourceId: req.params.id,
+        details: { fromPlan: prev?.plan ?? null, toPlan: parsed.data.plan },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       res.json({
         success: true,

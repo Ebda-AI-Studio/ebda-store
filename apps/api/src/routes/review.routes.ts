@@ -8,6 +8,7 @@ import { ReviewService } from '../services/review.service';
 import { LoyaltyService } from '../services/loyalty.service';
 import logger from '../lib/logger';
 import { prisma } from '@force/database';
+import { auditLog } from '../middleware/security';
 import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
 
 // `mergeParams: true` so the child router's handlers see `:storeId` from
@@ -256,6 +257,17 @@ router.post(
       const { id } = req.params;
       const review = await ReviewService.approve(req.storeId!, id);
 
+      await auditLog({
+        action: 'review.approved',
+        userId: req.user!.userId,
+        storeId: req.storeId!,
+        resourceType: 'review',
+        resourceId: id,
+        details: { productId: review.productId, customerId: review.customerId },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
       // Award review bonus points if the review has a customer
       if (review.customerId) {
         try {
@@ -294,6 +306,17 @@ router.post(
     try {
       const { id } = req.params;
       const review = await ReviewService.reject(req.storeId!, id);
+
+      await auditLog({
+        action: 'review.rejected',
+        userId: req.user!.userId,
+        storeId: req.storeId!,
+        resourceType: 'review',
+        resourceId: id,
+        details: { productId: review.productId, customerId: review.customerId },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
 
       res.json({
         success: true,

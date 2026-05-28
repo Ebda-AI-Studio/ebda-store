@@ -1,15 +1,18 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { PaymentEventsTimeline } from '../../../../../../components/payment-events/PaymentEventsTimeline';
 import { formatMoney } from './format';
 import type { OrderDetail } from './types';
 
 interface PaymentCardProps {
   order: OrderDetail;
   onEdit?: () => void;
+  /** Viewer role — used to gate the super-admin raw-payload button on the timeline. */
+  userRole?: 'super_admin' | 'store_admin' | 'customer';
 }
 
-export function PaymentCard({ order, onEdit }: PaymentCardProps) {
+export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {
   const t = useT('orders.detail');
   const isPaid = order.paymentStatus === 'paid';
   const remain = isPaid ? 0 : order.total;
@@ -146,6 +149,14 @@ export function PaymentCard({ order, onEdit }: PaymentCardProps) {
               {t('paymentLink')}
             </a>
           )}
+
+          {/* Payment events lifecycle log — one timeline per payment row.
+              Only shown to admin viewers (store_admin or super_admin).
+              Lazy-fetches on first expand so the order detail page load
+              is not affected when the user never opens the toggle. */}
+          {order.payments?.map(p => (
+            <PaymentEventsTimeline key={p.id} paymentId={p.id} userRole={userRole} />
+          ))}
         </div>
       </div>
     </section>

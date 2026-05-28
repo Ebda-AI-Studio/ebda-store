@@ -404,7 +404,17 @@ export interface AuditLogEntry {
   userId?: string;
   resourceType: string;
   resourceId?: string;
-  details?: Record<string, string | number | boolean | null>;
+  /**
+   * Free-form JSON metadata. Accepts nested objects so callers can record
+   * structured transitions like `{ role: { from: 'store_admin', to: 'super_admin' } }`.
+   * The audit_logs table column is JSONB so anything serialisable fits.
+   */
+  details?: Record<string, unknown>;
+  /**
+   * Optional store scope — denormalised so per-store audit queries don't
+   * need to join through resource → store. NULL for platform-wide events.
+   */
+  storeId?: string;
   ip?: string;
   userAgent?: string;
 }
@@ -421,6 +431,7 @@ export async function auditLog(entry: AuditLogEntry) {
       data: {
         action: entry.action,
         userId: entry.userId,
+        storeId: entry.storeId,
         resourceType: entry.resourceType,
         resourceId: entry.resourceId,
         details: entry.details ? JSON.parse(JSON.stringify(entry.details)) : {},

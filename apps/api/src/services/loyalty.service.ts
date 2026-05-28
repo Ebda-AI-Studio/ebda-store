@@ -332,14 +332,19 @@ export class LoyaltyService {
     const basePoints = Math.floor(orderTotalKWD * settings.pointsPerDinar);
     const pointsEarned = Math.floor(basePoints * tierInfo.multiplier);
 
-    // Update balance and log transaction atomically
-    const [updated] = await prisma.$transaction([
+    // Update balance and log transaction atomically. Compute the new
+    // tier into a local first so we can detect a tier flip and write
+    // an audit-only `tier_changed` bookkeeping row alongside the earn.
+    const newTier = this.calculateTier(loyalty.totalEarned + pointsEarned, settings);
+    const tierFlipped = newTier !== loyalty.tier;
+
+    const txs: Prisma.PrismaPromise<unknown>[] = [
       prisma.loyaltyPoints.update({
         where: { id: loyalty.id },
         data: {
           points: { increment: pointsEarned },
           totalEarned: { increment: pointsEarned },
-          tier: this.calculateTier(loyalty.totalEarned + pointsEarned, settings),
+          tier: newTier,
         },
       }),
       prisma.loyaltyTransaction.create({
@@ -356,7 +361,25 @@ export class LoyaltyService {
               : null,
         },
       }),
-    ]);
+    ];
+
+    if (tierFlipped) {
+      txs.push(
+        prisma.loyaltyTransaction.create({
+          data: {
+            storeId,
+            customerId,
+            orderId,
+            type: 'tier_changed',
+            points: 0,
+            description: `Tier ${loyalty.tier} → ${newTier} (from order earn)`,
+          },
+        })
+      );
+    }
+
+    const results = await prisma.$transaction(txs);
+    const updated = results[0] as { points: number };
 
     return {
       pointsEarned,
@@ -429,13 +452,15 @@ export class LoyaltyService {
     const newPoints = loyalty.points - pointsToReverse;
     const newTotalEarned = Math.max(0, loyalty.totalEarned - earn.points);
 
-    const [updated] = await prisma.$transaction([
+    const newTier = this.calculateTier(newTotalEarned, settings);
+    const tierFlipped = newTier !== loyalty.tier;
+    const reverseTxs: Prisma.PrismaPromise<unknown>[] = [
       prisma.loyaltyPoints.update({
         where: { id: loyalty.id },
         data: {
           points: newPoints,
           totalEarned: newTotalEarned,
-          tier: this.calculateTier(newTotalEarned, settings),
+          tier: newTier,
         },
       }),
       prisma.loyaltyTransaction.create({
@@ -448,7 +473,25 @@ export class LoyaltyService {
           description: tag,
         },
       }),
-    ]);
+    ];
+
+    if (tierFlipped) {
+      reverseTxs.push(
+        prisma.loyaltyTransaction.create({
+          data: {
+            storeId,
+            customerId: earn.customerId,
+            orderId,
+            type: 'tier_changed',
+            points: 0,
+            description: `Tier ${loyalty.tier} → ${newTier} (from refund reverse)`,
+          },
+        })
+      );
+    }
+
+    const reverseResults = await prisma.$transaction(reverseTxs);
+    const updated = reverseResults[0] as { points: number };
 
     // Loyalty disabled at refund time still reverses — the points were
     // earned under the program and should come back out. Logged for clarity.

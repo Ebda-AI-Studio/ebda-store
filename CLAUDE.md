@@ -53,6 +53,19 @@ If `design.md` is missing from a future session's project root, recreate it
 from the project memory `feedback-fwb-sizing-rules.md` (or ask Ahmad to point
 to the latest version).
 
+## Every data has a UI — applies to every PR
+
+**Rule (codified 2026-05-28):** every database table whose rows have business meaning to a human user (merchant, super-admin, customer) MUST have a UI surface to view them. Backend-only data with no viewer is a defect, not a feature.
+
+- At plan time: identify who needs to view the data. "Nobody" means dead data — delete it.
+- At PR time: the test plan MUST include "open the UI at /xxx → verify rows render."
+- For subagent dispatches: the prompt MUST include the UI surface in scope.
+- Anti-patterns to refuse: "audit data, just query the DB", "Sentry catches it", "we'll build UI later", "super_admin can use Prisma Studio."
+
+Exempt: pure infra tables (`_prisma_migrations`, rate-limit counters, AsyncLocalStorage breadcrumbs).
+
+Full audience routing table + checklist at `~/.claude/projects/-Users-ahmadsharaf/memory/feedback-every-data-needs-ui.md`.
+
 ## Platform-level fixes — applies to every change in this repo
 
 **Every UI/UX/feature change MUST be platform-level. NEVER tenant-scoped, NEVER theme-specific without an explicit reason.**
