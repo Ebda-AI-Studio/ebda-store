@@ -7,6 +7,7 @@ import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../lib/api';
 import { GeoResultsPanel } from './_components/GeoResultsPanel';
+import { AiSweepResultsPanels } from './_components/AiSweepResultsPanels';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO
@@ -477,6 +478,9 @@ export default function AiToolsPage() {
           }}
         />
       )}
+
+      {/* Sweep result viewers (read-only panels for translate / seo / faqs / howtos / meta-aeo) */}
+      <AiSweepResultsPanels storeId={storeId} />
 
       {/* Recent runs table */}
       <div className="mt-8">

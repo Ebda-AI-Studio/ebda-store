@@ -1335,4 +1335,338 @@ router.get(
   }
 );
 
+// =====================================================================
+// Sweep Result Viewers (read-only) — translate, seo, faqs, howtos,
+// meta-aeo.  All follow the same auth chain as the rest of the file.
+// =====================================================================
+
+/**
+ * GET /stores/:storeId/ai/results/translate
+ * AR fill-rate for products and categories + 5 recently-translated
+ * products (nameAr filled in the last 30 days).
+ */
+router.get('/results/translate', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+    const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [totalProducts, productsWithAr, totalCategories, categoriesWithAr, recentlyTranslated] =
+      await Promise.all([
+        prisma.product.count({ where: { storeId, deletedAt: null } }),
+        prisma.product.count({
+          where: { storeId, deletedAt: null, nameAr: { not: null } },
+        }),
+        prisma.category.count({ where: { storeId } }),
+        prisma.category.count({
+          where: { storeId, nameAr: { not: null } },
+        }),
+        // Products that got an Arabic name in the last 30 days
+        prisma.product.findMany({
+          where: {
+            storeId,
+            deletedAt: null,
+            nameAr: { not: null },
+            updatedAt: { gte: since30d },
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+    if (!totalProducts && !totalCategories) {
+      throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        products: {
+          total: totalProducts,
+          filled: productsWithAr,
+          fillRate: totalProducts === 0 ? 0 : productsWithAr / totalProducts,
+        },
+        categories: {
+          total: totalCategories,
+          filled: categoriesWithAr,
+          fillRate: totalCategories === 0 ? 0 : categoriesWithAr / totalCategories,
+        },
+        recentlyTranslated,
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /stores/:storeId/ai/results/seo
+ * SEO meta fill-rate for products, categories, and the store row.
+ * Returns sample of 5 most-recently-updated products with their meta.
+ */
+router.get('/results/seo', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+
+    const [
+      store,
+      totalProducts,
+      productsWithMeta,
+      totalCategories,
+      categoriesWithMeta,
+      recentProducts,
+    ] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { metaTitle: true, metaDescription: true },
+      }),
+      prisma.product.count({ where: { storeId, deletedAt: null } }),
+      prisma.product.count({
+        where: {
+          storeId,
+          deletedAt: null,
+          metaTitle: { not: null },
+          metaDescription: { not: null },
+        },
+      }),
+      prisma.category.count({ where: { storeId } }),
+      prisma.category.count({
+        where: {
+          storeId,
+          metaTitle: { not: null },
+          metaDescription: { not: null },
+        },
+      }),
+      prisma.product.findMany({
+        where: {
+          storeId,
+          deletedAt: null,
+          metaTitle: { not: null },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          metaTitle: true,
+          metaDescription: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+
+    if (!store) {
+      throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        storeMetaFilled: !!(store.metaTitle?.trim() && store.metaDescription?.trim()),
+        products: {
+          total: totalProducts,
+          filled: productsWithMeta,
+          fillRate: totalProducts === 0 ? 0 : productsWithMeta / totalProducts,
+        },
+        categories: {
+          total: totalCategories,
+          filled: categoriesWithMeta,
+          fillRate: totalCategories === 0 ? 0 : categoriesWithMeta / totalCategories,
+        },
+        // Truncated to 80 chars each for display
+        recentProducts: recentProducts.map(p => ({
+          id: p.id,
+          name: p.name,
+          metaTitle: p.metaTitle ? p.metaTitle.slice(0, 80) : null,
+          metaDescription: p.metaDescription ? p.metaDescription.slice(0, 80) : null,
+          updatedAt: p.updatedAt,
+        })),
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /stores/:storeId/ai/results/faqs
+ * Full list of store-level FAQ rows + count + last-updated timestamp.
+ */
+router.get('/results/faqs', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+
+    const faqs = await prisma.storeFaq.findMany({
+      where: { storeId, isActive: true },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        question: true,
+        questionAr: true,
+        answer: true,
+        answerAr: true,
+        aiDrafted: true,
+        manuallyEdited: true,
+        updatedAt: true,
+      },
+    });
+
+    const lastUpdated =
+      faqs.length > 0
+        ? faqs.reduce((latest, f) => (f.updatedAt > latest.updatedAt ? f : latest)).updatedAt
+        : null;
+
+    res.json({
+      success: true,
+      data: {
+        count: faqs.length,
+        lastUpdated,
+        faqs: faqs.map(f => ({
+          ...f,
+          // Truncate answer to 150 chars for the panel preview
+          answerPreview: f.answer.slice(0, 150),
+          answerArPreview: f.answerAr ? f.answerAr.slice(0, 150) : null,
+        })),
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /stores/:storeId/ai/results/howtos
+ * Full list of store-level HowTo guides + step count per guide.
+ */
+router.get('/results/howtos', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+
+    const howtos = await prisma.storeHowto.findMany({
+      where: { storeId, isActive: true },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        title: true,
+        titleAr: true,
+        description: true,
+        steps: true,
+        stepsAr: true,
+        aiDrafted: true,
+        manuallyEdited: true,
+        updatedAt: true,
+      },
+    });
+
+    const lastUpdated =
+      howtos.length > 0
+        ? howtos.reduce((latest, h) => (h.updatedAt > latest.updatedAt ? h : latest)).updatedAt
+        : null;
+
+    res.json({
+      success: true,
+      data: {
+        count: howtos.length,
+        lastUpdated,
+        howtos: howtos.map(h => {
+          // steps is stored as JSON array; derive step count safely
+          const stepCount = Array.isArray(h.steps) ? (h.steps as unknown[]).length : 0;
+          return {
+            id: h.id,
+            title: h.title,
+            titleAr: h.titleAr,
+            descriptionPreview: h.description.slice(0, 150),
+            stepCount,
+            aiDrafted: h.aiDrafted,
+            manuallyEdited: h.manuallyEdited,
+            updatedAt: h.updatedAt,
+          };
+        }),
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /stores/:storeId/ai/results/meta-aeo
+ * Fill-rate for the metaDescriptionAeo column (written by bulk-ai-meta-aeo)
+ * across store, products, and categories, plus 5 most-recently-rewritten
+ * products with the conversational description shown.
+ */
+router.get('/results/meta-aeo', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+
+    const [
+      store,
+      totalProducts,
+      productsWithAeo,
+      totalCategories,
+      categoriesWithAeo,
+      recentProducts,
+    ] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { metaDescriptionAeo: true },
+      }),
+      prisma.product.count({ where: { storeId, deletedAt: null } }),
+      prisma.product.count({
+        where: { storeId, deletedAt: null, metaDescriptionAeo: { not: null } },
+      }),
+      prisma.category.count({ where: { storeId } }),
+      prisma.category.count({
+        where: { storeId, metaDescriptionAeo: { not: null } },
+      }),
+      prisma.product.findMany({
+        where: { storeId, deletedAt: null, metaDescriptionAeo: { not: null } },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          metaDescriptionAeo: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+
+    if (!store) {
+      throw new AppError(404, 'STORE_NOT_FOUND', 'Store not found');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        storeAeoFilled: !!store.metaDescriptionAeo?.trim(),
+        storeMetaDescriptionAeo: store.metaDescriptionAeo ?? null,
+        products: {
+          total: totalProducts,
+          filled: productsWithAeo,
+          fillRate: totalProducts === 0 ? 0 : productsWithAeo / totalProducts,
+        },
+        categories: {
+          total: totalCategories,
+          filled: categoriesWithAeo,
+          fillRate: totalCategories === 0 ? 0 : categoriesWithAeo / totalCategories,
+        },
+        recentProducts: recentProducts.map(p => ({
+          id: p.id,
+          name: p.name,
+          metaDescriptionAeo: p.metaDescriptionAeo,
+          updatedAt: p.updatedAt,
+        })),
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
 export default router;
