@@ -205,6 +205,12 @@ export default function AffiliateEventsPage() {
                 <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground capitalize">
                   {affiliate.status}
                 </span>
+                <Link
+                  href={`/stores/${storeId}/affiliates/${affiliateId}/audit-trail`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Audit Trail →
+                </Link>
               </div>
             </div>
           </div>

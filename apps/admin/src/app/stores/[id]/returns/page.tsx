@@ -139,6 +139,7 @@ export default function ReturnsPage() {
       <ReturnDetailsDrawer
         record={selectedReturn}
         open={showDetails}
+        storeId={storeId}
         onClose={closeDetails}
         onApprove={handleApprove}
         onReject={handleReject}
