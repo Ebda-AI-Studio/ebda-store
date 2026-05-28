@@ -93,6 +93,7 @@ export function AdminLayout({
     stores: t('navStores'),
     users: t('navUsers'),
     auditLogs: t('navAuditLogs'),
+    platformAiUsage: t('navPlatformAiUsage'),
     // Super-admin store-scoped
     manageFeatures: t('navManageFeatures'),
   };

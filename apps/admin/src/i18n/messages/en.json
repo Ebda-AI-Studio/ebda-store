@@ -3703,6 +3703,7 @@
       "navStores": "Stores",
       "navUsers": "Users",
       "navAuditLogs": "Audit Logs",
+        "navPlatformAiUsage": "AI Usage (platform)",
       "navManageFeatures": "Manage Features",
       "hubTabs": {
         "products": "Products",
