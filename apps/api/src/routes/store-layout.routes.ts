@@ -17,6 +17,7 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
 import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
 import { redis } from '../services/redis.service';
+import { invalidateCached } from '../lib/public-cache';
 import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
@@ -593,6 +594,15 @@ router.put(
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
+
+      // Bust the public store cache so the storefront picks up the new
+      // layout on the next request rather than waiting out the
+      // `Cache-Control: public, max-age=60, s-maxage=120` TTL.
+      // Mirrors the same pattern used by StoreService.updateTheme and
+      // updateBranding (2026-05-28 save-audit fix).
+      void invalidateCached(`public:store:${storeId}`).catch(err =>
+        logger.warn({ err, storeId }, '[store-layout.put] cache invalidation failed')
+      );
 
       res.json({ success: true, data: { layout: merged } });
     } catch (error) {

@@ -413,7 +413,7 @@ export default function StoreLayoutPage() {
                 description={t('sections.hero.description')}
                 enabled={layout.hero.enabled}
                 onToggle={v => updateSection('hero', s => ({ ...s, enabled: v }))}
-                defaultExpanded={layout.hero.enabled}
+                defaultExpanded={false}
               >
                 <div className="mb-2 text-xs font-medium text-muted-foreground">
                   {t('sections.hero.modeLabel')}
@@ -516,7 +516,7 @@ export default function StoreLayoutPage() {
                 description={t('sections.categories.description')}
                 enabled={layout.categories.enabled}
                 onToggle={v => updateSection('categories', s => ({ ...s, enabled: v }))}
-                defaultExpanded={layout.categories.enabled}
+                defaultExpanded={false}
               >
                 {/* Desktop controls */}
                 <p className="mt-2 mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -907,7 +907,7 @@ export default function StoreLayoutPage() {
                 description={t('sections.newArrivals.description')}
                 enabled={layout.newArrivals.enabled}
                 onToggle={v => updateSection('newArrivals', s => ({ ...s, enabled: v }))}
-                defaultExpanded={layout.newArrivals.enabled}
+                defaultExpanded={false}
               >
                 <NumberField
                   label={t('sections.newArrivals.limit')}
@@ -1020,7 +1020,7 @@ export default function StoreLayoutPage() {
                 description={t('sections.bestSellers.description')}
                 enabled={layout.bestSellers.enabled}
                 onToggle={v => updateSection('bestSellers', s => ({ ...s, enabled: v }))}
-                defaultExpanded={layout.bestSellers.enabled}
+                defaultExpanded={false}
               >
                 <NumberField
                   label={t('sections.bestSellers.limit')}
@@ -1133,7 +1133,7 @@ export default function StoreLayoutPage() {
                 description={t('sections.filterSidebar.description')}
                 enabled={layout.filterSidebar.enabled}
                 onToggle={v => updateSection('filterSidebar', s => ({ ...s, enabled: v }))}
-                defaultExpanded={layout.filterSidebar.enabled}
+                defaultExpanded={false}
               >
                 <RowToggle
                   label={t('sections.filterSidebar.defaultOpen')}
@@ -1148,7 +1148,7 @@ export default function StoreLayoutPage() {
                 description={t('sections.testimonials.description')}
                 enabled={layout.testimonials.enabled}
                 onToggle={v => updateSection('testimonials', s => ({ ...s, enabled: v }))}
-                defaultExpanded={layout.testimonials.enabled}
+                defaultExpanded={false}
               >
                 <div className="grid grid-cols-2 gap-3">
                   <NumberField
@@ -1238,7 +1238,7 @@ export default function StoreLayoutPage() {
                 description={t('sections.reviewSection.description')}
                 enabled={layout.reviewSection.enabled}
                 onToggle={v => updateSection('reviewSection', s => ({ ...s, enabled: v }))}
-                defaultExpanded={layout.reviewSection.enabled}
+                defaultExpanded={false}
               ></SectionCard>
 
               {/* Brand Story — folded into page-builder 2026-05-20 (was a
@@ -3132,7 +3132,7 @@ function ExtraCarouselCard({
       description={`Source: ${extra.productSource}. Drag-reorder support coming in v2.`}
       enabled={enabled}
       onToggle={v => onPatch({ enabled: v })}
-      defaultExpanded={enabled}
+      defaultExpanded={false}
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -3388,7 +3388,7 @@ function ExtraSectionCard({
       description={description}
       enabled={enabled}
       onToggle={v => onPatch({ enabled: v })}
-      defaultExpanded={enabled}
+      defaultExpanded={false}
     >
       <div className="space-y-4">
         <ColorField

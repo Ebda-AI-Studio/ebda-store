@@ -119,12 +119,27 @@ export function middleware(request: NextRequest) {
   // token in a same-origin cookie at middleware time so root layout +
   // every page sees it consistently.
   //
-  // Cookie is SameSite=None + Secure so it's sent in cross-site iframe
-  // contexts (admin.forcemediakw.com embedding wadyaljuz.com).
-  // TTL = 1h matches the Redis preview-token TTL on the API side.
+  // 2026-05-28 LEAK FIX: The admin iframe ALWAYS includes a ?_preview=<tick>
+  // param (see page-builder iframe src construction). Normal visitors NEVER
+  // have ?_preview= in their URL. We gate draft-cookie propagation on this:
+  //   - ?_preview= present  → admin preview iframe → set/refresh draft cookie
+  //                           AND propagate it as x-preview-draft header.
+  //   - ?_preview= absent   → normal visitor (or same-browser re-visit after
+  //                           previewing) → CLEAR the draft cookie immediately.
+  //
+  // This prevents unsaved admin changes from leaking to real storefront visitors
+  // who happen to open the store in the same browser used for admin previewing.
+  // Cookie is SameSite=None + Secure so it survives cross-site iframe contexts
+  // (admin.forcemediakw.com framing wadyaljuz.com). TTL = 1h matches Redis.
   const draftToken = request.nextUrl.searchParams.get('_layoutDraft');
+  // _preview=<tick> is injected unconditionally by the admin page-builder iframe
+  // URL (see apps/admin/.../page-builder/page.tsx line ~1667). Its presence
+  // confirms we are inside an admin preview iframe, not a normal storefront visit.
+  const isPreviewIframe = request.nextUrl.searchParams.has('_preview');
+
   const draftCookie = (response: NextResponse) => {
-    if (draftToken) {
+    if (draftToken && isPreviewIframe) {
+      // Inside the admin iframe and the initial ?_layoutDraft= load — set cookie.
       response.cookies.set('force-preview-draft', draftToken, {
         path: '/',
         maxAge: 3600,
@@ -132,6 +147,19 @@ export function middleware(request: NextRequest) {
         secure: true,
         httpOnly: true,
       });
+    } else if (!isPreviewIframe) {
+      // Normal visitor (no ?_preview=) — clear any stale draft cookie so unsaved
+      // admin changes are never visible on the public storefront.
+      const staleDraft = request.cookies.get('force-preview-draft')?.value;
+      if (staleDraft) {
+        response.cookies.set('force-preview-draft', '', {
+          path: '/',
+          maxAge: 0,
+          sameSite: 'none',
+          secure: true,
+          httpOnly: true,
+        });
+      }
     }
     return response;
   };
@@ -150,17 +178,21 @@ export function middleware(request: NextRequest) {
   // Always set the original host header
   requestHeaders.set('x-original-host', hostname);
 
-  // Also propagate the draft token as a REQUEST header so server
-  // components in the SAME request can read it (cookies set in the
-  // response aren't visible to that response's server components).
-  // Layout.tsx reads this header on first ?_layoutDraft load AND falls
-  // back to the cookie on subsequent navigations in the iframe.
-  if (draftToken) {
+  // Propagate the draft token as a REQUEST header so server components in the
+  // SAME request can read it (cookies set in the response aren't visible to
+  // that response's server components). Only propagate when we are inside the
+  // admin preview iframe (?_preview= guard) to prevent draft cookie from
+  // affecting normal visitors who have a stale draft cookie in the same browser.
+  if (draftToken && isPreviewIframe) {
+    // First ?_layoutDraft= load inside the iframe — token is in the URL.
     requestHeaders.set('x-preview-draft', draftToken);
-  } else {
+  } else if (isPreviewIframe) {
+    // Subsequent navigation within the iframe (Link click drops ?_layoutDraft
+    // from URL but ?_preview= stays). Read from cookie to keep draft active.
     const cookieDraft = request.cookies.get('force-preview-draft')?.value;
     if (cookieDraft) requestHeaders.set('x-preview-draft', cookieDraft);
   }
+  // Else: normal visitor — no x-preview-draft header → layout.tsx serves committed layout.
 
   if (storeIdentifier) {
     // This is a custom domain - set store identification headers

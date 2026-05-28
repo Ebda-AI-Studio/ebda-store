@@ -61,6 +61,10 @@ const typographySchema = z.object({
       // Broad zones
       beforeHeader: zoneSchema.optional(),
       header: zoneSchema.optional(),
+      // storeName is a sub-zone of the header (store name text in the header
+      // bar). Previously missing from this schema which caused Zod to silently
+      // strip merchant edits made from the page-builder Header card — 2026-05-28.
+      storeName: zoneSchema.optional(),
       categories: zoneSchema.optional(),
       products: zoneSchema.optional(),
       footer: zoneSchema.optional(),
