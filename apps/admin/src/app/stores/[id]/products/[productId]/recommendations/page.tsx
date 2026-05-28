@@ -155,6 +155,15 @@ export default function ProductRecommendationsPage() {
     setCrossSell(prev => prev.filter(p => p.id !== id));
   }, []);
 
+  // Used by AiSuggestionsPanel "Demote all" to strip a batch of ids
+  // (the AI-promoted ones) from the manual cross-sell list in one shot
+  // instead of re-rendering N times via removeCrossSell.
+  const removeManyCrossSell = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    setCrossSell(prev => prev.filter(p => !idSet.has(p.id)));
+  }, []);
+
   const addUpsell = useCallback((product: ProductSummary) => {
     setUpsell(prev => {
       if (prev.length >= MAX_UPSELL) return prev;
@@ -235,6 +244,8 @@ export default function ProductRecommendationsPage() {
           productId={productId}
           alreadyInCrossSell={crossSell.map(p => p.id)}
           onPromote={addCrossSell}
+          onDemoteAll={removeManyCrossSell}
+          maxCrossSell={MAX_CROSS_SELL}
         />
       </div>
 
