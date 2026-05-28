@@ -1295,6 +1295,12 @@
         "title": "إعدادات بوت واتساب",
         "description": "وضع البوت · قائمة الخدمات · بيانات كتالوج ميتا كوميرس"
       }
+    },
+    "metaCatalogCard": {
+      "provisionLabel": "إعداد تلقائي · مُدار بواسطة Force AI",
+      "provisionDescription": "ينشئ كتالوج تجاري جديد ضمن حساب Business Manager الرئيسي لـ Force AI ويملأ الحقول الثلاثة أعلاه. يغني المتجر عن التنقل داخل Meta Business Manager. ستحتاج لاحقًا إلى تقديم الكتالوج لمراجعة ميتا.",
+      "provisionButton": "إعداد تلقائي",
+      "provisioningButton": "جارٍ الإعداد…"
     }
   },
   "branding": {

@@ -16,9 +16,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { Button, useToast } from '@force/ui';
+import { Button, Modal, useToast } from '@force/ui';
 import { apiGet } from '../../../../../../../lib/api';
 import type { ProductSummary } from './ProductSearch';
+
+/** Number of promotable items above which a confirmation modal is shown. */
+const PROMOTE_ALL_CONFIRM_THRESHOLD = 5;
 
 interface AiRec {
   id: string;
@@ -64,6 +67,8 @@ export function AiSuggestionsPanel({
   const [recs, setRecs] = useState<AiRec[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Controls the "Promote N recommendations?" confirmation modal. */
+  const [showPromoteAllModal, setShowPromoteAllModal] = useState(false);
   const { success: toastSuccess } = useToast();
 
   const load = useCallback(async () => {
@@ -110,7 +115,16 @@ export function AiSuggestionsPanel({
     .map(r => r.targetProduct?.id)
     .filter((id): id is string => typeof id === 'string' && alreadyInCrossSell.includes(id));
 
-  const promoteAll = () => {
+  /**
+   * Applies all promotable AI picks to the manual cross-sell list.
+   * Called either directly (when count ≤ PROMOTE_ALL_CONFIRM_THRESHOLD)
+   * or after modal confirmation (when count > threshold).
+   *
+   * Uses the existing parent PUT /relations flow: onPromote populates
+   * client state N times, then the page-level "Save" button sends
+   * ONE bulk PUT — no per-item API calls are made here.
+   */
+  const executePromoteAll = useCallback(() => {
     if (promotableRecs.length === 0) return;
     // Respect the parent's per-row cap. parent.addCrossSell already
     // dedupes + ignores anything past MAX_CROSS_SELL, so we can iterate
@@ -134,6 +148,20 @@ export function AiSuggestionsPanel({
         ? `Promoted ${capped} (max ${maxCrossSell} reached — ${promoted - capped} skipped)`
         : `Promoted ${promoted} AI picks to manual cross-sell`
     );
+  }, [promotableRecs, onPromote, maxCrossSell, alreadyInCrossSell.length, toastSuccess]);
+
+  /**
+   * Entry point for the "Promote all" button.
+   * Shows a confirmation modal when the count exceeds
+   * PROMOTE_ALL_CONFIRM_THRESHOLD to prevent accidental bulk promotions.
+   */
+  const promoteAll = () => {
+    if (promotableRecs.length === 0) return;
+    if (promotableRecs.length > PROMOTE_ALL_CONFIRM_THRESHOLD) {
+      setShowPromoteAllModal(true);
+      return;
+    }
+    executePromoteAll();
   };
 
   const demoteAll = () => {
@@ -265,6 +293,40 @@ export function AiSuggestionsPanel({
           })}
         </ul>
       )}
+
+      {/* Confirmation modal — shown when "Promote all" is clicked for
+          more than PROMOTE_ALL_CONFIRM_THRESHOLD items to prevent
+          accidental bulk promotions. */}
+      <Modal
+        isOpen={showPromoteAllModal}
+        onClose={() => setShowPromoteAllModal(false)}
+        title="Promote all recommendations?"
+        size="sm"
+      >
+        <p className="text-sm text-muted-foreground mb-1">
+          This will add <strong>{promotableRecs.length}</strong> AI-suggested product
+          {promotableRecs.length !== 1 ? 's' : ''} to the manual cross-sell list.
+        </p>
+        <p className="text-xs text-muted-foreground mb-4">
+          <span className="font-medium">ترقية {promotableRecs.length} توصية؟</span> سيتم إضافتها إلى
+          قائمة البيع المتقاطع اليدوي.
+        </p>
+        <div className="flex justify-end gap-3">
+          <Button size="sm" variant="outline" onClick={() => setShowPromoteAllModal(false)}>
+            Cancel <span className="text-muted-foreground/70 ml-1 font-normal">/ إلغاء</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setShowPromoteAllModal(false);
+              executePromoteAll();
+            }}
+          >
+            Promote {promotableRecs.length}{' '}
+            <span className="text-muted-foreground/70 ml-1 font-normal">/ ترقية الكل</span>
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

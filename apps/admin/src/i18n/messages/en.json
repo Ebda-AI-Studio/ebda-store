@@ -1295,6 +1295,12 @@
         "title": "WhatsApp Bot Config",
         "description": "Bot mode · service menu · Meta Commerce catalog credentials"
       }
+    },
+    "metaCatalogCard": {
+      "provisionLabel": "Provision automatically · Force AI assisted",
+      "provisionDescription": "Creates a new Commerce Catalog under the Force AI parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
+      "provisionButton": "Provision automatically",
+      "provisioningButton": "Provisioning…"
     }
   },
   "branding": {

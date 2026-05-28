@@ -199,7 +199,10 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">
-                Provision automatically (super-admin)
+                Provision automatically · Force AI assisted
+                <span className="ms-1.5 text-xs font-normal text-muted-foreground">
+                  / إعداد تلقائي · مُدار بواسطة Force AI
+                </span>
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Creates a new Commerce Catalog under the Force AI parent Business Manager and fills
