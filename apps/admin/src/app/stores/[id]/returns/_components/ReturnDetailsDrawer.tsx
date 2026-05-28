@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { Button, Badge } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
+import { ReturnLifecycleTimeline } from '../../../../../components/return-timeline/ReturnLifecycleTimeline';
 import { RETURN_COLORS } from './types';
 import type { ReturnRecord } from './types';
 
@@ -18,6 +19,7 @@ function formatCurrency(amount: number) {
 interface ReturnDetailsDrawerProps {
   record: ReturnRecord | null;
   open: boolean;
+  storeId: string;
   onClose: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
@@ -33,6 +35,7 @@ interface ReturnDetailsDrawerProps {
 export function ReturnDetailsDrawer({
   record,
   open,
+  storeId,
   onClose,
   onApprove,
   onReject,
@@ -159,6 +162,9 @@ export function ReturnDetailsDrawer({
               {formatCurrency(record.refundAmount)}
             </span>
           </div>
+
+          {/* Lifecycle timeline — collapsible, read-only audit trail */}
+          <ReturnLifecycleTimeline storeId={storeId} returnId={record.id} />
 
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t">

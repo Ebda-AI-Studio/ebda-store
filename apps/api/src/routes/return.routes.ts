@@ -6,6 +6,7 @@ import { ReturnService } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { prisma } from '@force/database';
 
 const router = Router({ mergeParams: true });
 
@@ -415,6 +416,78 @@ router.put(
         success: true,
         data: { return: returnRequest },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// GET /stores/:storeId/returns/admin/:id/timeline
+// Read-only lifecycle history for a single return.
+// Reads from audit_logs (actions: return.*) — append-only since return
+// transitions are recorded there at every state-change site.
+// ==========================================
+
+router.get(
+  '/admin/:id/timeline',
+  authenticate,
+  requirePermission('returns:read'),
+  requireStoreAccess,
+  requireFeature('returns'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id: returnId } = req.params;
+
+      // Verify the return belongs to this store before exposing audit rows.
+      const returnRecord = await prisma.return.findFirst({
+        where: { id: returnId, storeId },
+        select: { id: true, returnNumber: true, status: true, createdAt: true },
+      });
+
+      if (!returnRecord) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Return not found' },
+        });
+        return;
+      }
+
+      // Audit rows keyed by resourceId=returnId. Some older rows may have
+      // been written without storeId on the audit call — include them via
+      // OR so we never miss history on old data.
+      const auditRows = await prisma.auditLog.findMany({
+        where: {
+          resourceType: 'return',
+          resourceId: returnId,
+          OR: [{ storeId }, { storeId: null }],
+        },
+        include: { user: { select: { firstName: true, lastName: true, role: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      });
+
+      const timeline = auditRows.map(row => {
+        const details = row.details as Record<string, unknown>;
+        return {
+          id: row.id,
+          at: row.createdAt.toISOString(),
+          action: row.action,
+          details: {
+            returnNumber: details?.returnNumber != null ? String(details.returnNumber) : null,
+            reason: details?.reason != null ? String(details.reason) : null,
+            refundMethod: details?.refundMethod != null ? String(details.refundMethod) : null,
+            trackingNumber: details?.trackingNumber != null ? String(details.trackingNumber) : null,
+            notes: details?.notes != null ? String(details.notes) : null,
+          },
+          actorName: row.user
+            ? `${row.user.firstName ?? ''} ${row.user.lastName ?? ''}`.trim()
+            : null,
+          actorRole: row.user?.role ?? null,
+        };
+      });
+
+      res.json({ success: true, data: { timeline, returnNumber: returnRecord.returnNumber } });
     } catch (error) {
       next(error);
     }

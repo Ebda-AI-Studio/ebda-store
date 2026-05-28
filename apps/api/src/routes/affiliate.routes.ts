@@ -414,12 +414,14 @@ router.post(
 );
 
 // ==========================================
-// Event history (audit trail)
+// Event history — actual affiliate_events table (append-only audit trail)
+// GET /stores/:storeId/affiliates/:id/audit-trail
+// Distinct path from /events (which returns combined referrals+payouts view)
+// so both routes can be served without one shadowing the other.
 // ==========================================
 
-// GET /stores/:storeId/affiliates/:id/events
 router.get(
-  '/:storeId/affiliates/:id/events',
+  '/:storeId/affiliates/:id/audit-trail',
   ...adminMiddleware,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
