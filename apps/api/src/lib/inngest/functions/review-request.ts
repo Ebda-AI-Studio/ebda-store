@@ -4,6 +4,7 @@ import { signReviewToken } from '../../review-token';
 import logger from '../../logger';
 import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Post-purchase review request — fires when an order transitions to
@@ -34,6 +35,13 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
     if (!orderId || !storeId) {
       logger.warn({ event: event.name }, '[REVIEW-REQUEST] fired without ids — skipping');
       return { skipped: 'missing-ids' };
+    }
+
+    // Feature gate — skip review requests when reviews feature is disabled.
+    const reviewsEnabled = await featureService.isFeatureEnabled(storeId, 'reviews');
+    if (!reviewsEnabled) {
+      logger.info({ storeId, orderId }, '[REVIEW-REQUEST] reviews feature disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'reviews' };
     }
 
     // Durable 7-day wait — survives API restarts / redeploys

@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postRefundJournal } from '../../../services/accounting/posting/refund-posting';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Listens to the canonical order/refunded Inngest event (fired by
@@ -31,6 +32,12 @@ export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFu
         'accountingPostRefundJournal: missing ids'
       );
       return { skipped: 'missing-ids' };
+    }
+    // Feature gate — skip reversal when accounting.basic is disabled.
+    const accountingEnabled = await featureService.isFeatureEnabled(storeId, 'accounting.basic');
+    if (!accountingEnabled) {
+      logger.info({ storeId, orderId }, 'accountingPostRefundJournal: accounting.basic disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
     }
     const result = await step.run('reverse-journal', () =>
       postRefundJournal({ orderId, reason: refundReason })

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { runInTenantContext } from '@force/database';
 import {
   createPurchaseOrder,
@@ -47,6 +48,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.purchase_orders'),
   async (req, res, next) => {
     try {
       const status = typeof req.query.status === 'string' ? req.query.status : undefined;
@@ -75,6 +77,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.purchase_orders'),
   async (req, res, next) => {
     try {
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -96,6 +99,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.purchase_orders'),
   async (req, res, next) => {
     try {
       const body = createSchema.safeParse(req.body);
@@ -123,6 +127,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.purchase_orders'),
   async (req, res, next) => {
     try {
       const body = receiveSchema.safeParse(req.body);
@@ -150,6 +155,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.purchase_orders'),
   async (req, res, next) => {
     try {
       const data = await runInTenantContext(req.params.storeId, () =>

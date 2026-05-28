@@ -3,6 +3,7 @@ import { prisma } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runProfitAnomalyScan } from '../../../services/accounting/profit-anomaly.service';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Daily profit anomaly scan — runs at 06:30 Kuwait time (03:30 UTC).
@@ -38,7 +39,15 @@ export const accountingProfitAnomalyCron: InngestFunction.Any = inngest.createFu
     let totalP0 = 0;
 
     for (const store of stores) {
-      const result = await step.run(`anomaly-${store.id}`, () => runProfitAnomalyScan(store.id));
+      const result = await step.run(`anomaly-${store.id}`, async () => {
+        // Feature gate — skip stores without accounting.profit_anomaly enabled.
+        const enabled = await featureService.isFeatureEnabled(store.id, 'accounting.profit_anomaly');
+        if (!enabled) {
+          logger.info({ storeId: store.id }, 'accounting-profit-anomaly: feature disabled, skipping');
+          return { detected: 0, p0Count: 0, skipped: true };
+        }
+        return runProfitAnomalyScan(store.id);
+      });
       totalDetected += result.detected;
       totalP0 += result.p0Count;
     }

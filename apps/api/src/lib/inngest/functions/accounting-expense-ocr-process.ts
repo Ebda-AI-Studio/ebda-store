@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { processExpenseReceipt } from '../../../services/accounting/expense-ocr.service';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Inngest function — OCR-process an uploaded expense receipt.
@@ -37,6 +38,13 @@ export const accountingExpenseOcrProcess: InngestFunction.Any = inngest.createFu
         'accountingExpenseOcrProcess: missing ids'
       );
       return { skipped: 'missing-ids' };
+    }
+
+    // Feature gate — skip OCR when accounting.expenses is disabled.
+    const enabled = await featureService.isFeatureEnabled(storeId, 'accounting.expenses');
+    if (!enabled) {
+      logger.info({ storeId }, 'accountingExpenseOcrProcess: accounting.expenses disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'accounting.expenses' };
     }
 
     const result = await step.run('process-ocr', () =>

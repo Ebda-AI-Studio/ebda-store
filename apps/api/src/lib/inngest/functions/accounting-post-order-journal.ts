@@ -2,6 +2,7 @@ import type { InngestFunction } from 'inngest';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postOrderPaymentJournal } from '../../../services/accounting/posting/order-posting';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Listens to the canonical order/created Inngest event (fired by OrderService
@@ -39,6 +40,12 @@ export const accountingPostOrderJournal: InngestFunction.Any = inngest.createFun
         'accountingPostOrderJournal: missing ids'
       );
       return { skipped: 'missing-ids' };
+    }
+    // Feature gate — skip journal posting when accounting.basic is disabled for the store.
+    const accountingEnabled = await featureService.isFeatureEnabled(storeId, 'accounting.basic');
+    if (!accountingEnabled) {
+      logger.info({ storeId, orderId }, 'accountingPostOrderJournal: accounting.basic disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
     }
     await step.run('post-journal', () => postOrderPaymentJournal({ orderId }));
     logger.info({ orderId, storeId }, 'accountingPostOrderJournal: posted');

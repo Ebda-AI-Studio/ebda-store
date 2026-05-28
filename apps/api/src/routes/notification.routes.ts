@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { notificationConfigService } from '../services/notification-config.service';
 import { pushService } from '../services/push.service';
 import logger from '../lib/logger';
@@ -372,6 +373,7 @@ router.get(
 // Register a push subscription (anonymous users can subscribe)
 router.post(
   '/public/:storeId/push/subscribe',
+  requireFeature('push_notifications'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

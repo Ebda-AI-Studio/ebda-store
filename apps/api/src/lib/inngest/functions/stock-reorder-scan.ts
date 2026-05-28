@@ -3,6 +3,7 @@ import { prisma } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runReorderScan } from '../../../services/accounting/reorder-scan.service';
+import { featureService } from '../../../services/feature.service';
 
 /**
  * Cron-triggered reorder scan — runs every day at 06:00 Kuwait time (03:00 UTC).
@@ -37,7 +38,15 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
     let totalExpired = 0;
 
     for (const store of stores) {
-      const result = await step.run(`scan-${store.id}`, () => runReorderScan(store.id));
+      const result = await step.run(`scan-${store.id}`, async () => {
+        // Feature gate — reorder suggestions require inventory.purchase_orders.
+        const enabled = await featureService.isFeatureEnabled(store.id, 'inventory.purchase_orders');
+        if (!enabled) {
+          logger.info({ storeId: store.id }, 'stock-reorder-scan: inventory.purchase_orders disabled, skipping');
+          return { suggested: 0, expiredCount: 0, skipped: true };
+        }
+        return runReorderScan(store.id);
+      });
       totalSuggested += result.suggested;
       totalExpired += result.expiredCount;
     }
@@ -68,6 +77,13 @@ export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunct
     const { storeId, requestedBy } = event.data;
 
     logger.info({ storeId, requestedBy }, 'stock-reorder-scan-on-demand: starting');
+
+    // Feature gate — skip when inventory.purchase_orders is disabled.
+    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.purchase_orders');
+    if (!enabled) {
+      logger.info({ storeId }, 'stock-reorder-scan-on-demand: inventory.purchase_orders disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'inventory.purchase_orders' };
+    }
 
     const result = await step.run(`scan-${storeId}`, () => runReorderScan(storeId));
 

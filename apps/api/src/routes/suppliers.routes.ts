@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { runInTenantContext } from '@force/database';
 import {
   createSupplier,
@@ -33,6 +34,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req, res, next) => {
     try {
       const includeInactive = req.query.includeInactive === 'true';
@@ -51,6 +53,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req, res, next) => {
     try {
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -72,6 +75,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req, res, next) => {
     try {
       const body = createSchema.safeParse(req.body);
@@ -94,6 +98,7 @@ router.patch(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req, res, next) => {
     try {
       const body = updateSchema.safeParse(req.body);
@@ -116,6 +121,7 @@ router.delete(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.basic'),
   async (req, res, next) => {
     try {
       await runInTenantContext(req.params.storeId, () =>

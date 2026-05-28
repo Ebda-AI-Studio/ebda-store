@@ -3,6 +3,7 @@ import multer from 'multer';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
 import { runInTenantContext } from '@force/database';
@@ -56,6 +57,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
       const status = typeof req.query.status === 'string' ? req.query.status : undefined;
@@ -87,6 +89,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -109,6 +112,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
       const body = createSchema.safeParse(req.body);
@@ -136,6 +140,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -154,6 +159,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
       const data = await runInTenantContext(req.params.storeId, () =>
@@ -172,6 +178,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.expenses'),
   async (req, res, next) => {
     try {
       // reason is accepted but not stored on the model (v1 — no rejection reason column yet)
@@ -198,6 +205,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.expenses'),
   uploadLimiter,
   dailyUploadLimiter,
   receiptUpload.single('file'),
