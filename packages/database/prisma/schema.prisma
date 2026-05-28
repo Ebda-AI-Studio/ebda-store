@@ -69,6 +69,7 @@ model User {
   pushSubscriptions      PushSubscription[]      @relation("UserPushSubscriptions")
   onesignalSubscriptions OneSignalSubscription[] @relation("UserOneSignalSubscriptions")
   abandonedCarts         AbandonedCart[]         @relation("AbandonedCartCustomer")
+  triggeredPaymentEvents PaymentEvent[]
 
   // Composite unique (storeId, email) — one customer account per email per
   // store. Admins (storeId NULL) are not subject to this constraint thanks
@@ -394,6 +395,7 @@ model Store {
   funnelSnapshots          FunnelSnapshot[]
   customerRfmSnapshots     CustomerRfmSnapshot[]
   whatsAppTemplates        WhatsAppTemplate[]
+  paymentEvents            PaymentEvent[]
 
   @@index([ownerId])
   @@index([status])
@@ -1046,7 +1048,8 @@ model Payment {
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order  Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events PaymentEvent[]
 
   @@index([orderId])
   @@index([transactionId])
@@ -1054,6 +1057,65 @@ model Payment {
   @@index([status])
   @@index([createdAt])
   @@map("payments")
+}
+
+/// Append-only log of every state transition + webhook receipt for a
+/// Payment row. Closes the audit gap left by the in-place updates on
+/// `payments.status`. Written from `payment-event.service.ts` at every
+/// Payment mutation site + every provider webhook handler — never
+/// updated, never deleted (rollups + retention are done separately).
+///
+/// Query examples:
+///   - Lifecycle of a single payment:
+///       SELECT * FROM payment_events WHERE payment_id = $1 ORDER BY occurred_at;
+///   - All webhook-driven completes today:
+///       SELECT * FROM payment_events
+///       WHERE event_type='webhook' AND to_status='completed' AND occurred_at >= now()::date;
+///   - Reconciliation gap (Tap settled vs we received):
+///       compare `provider_payload->>'settlement_id'` to your bank statement
+model PaymentEvent {
+  id           String   @id @default(uuid())
+  paymentId    String   @map("payment_id")
+  /// Denormalized so we can scope by store without joining payments → orders.
+  storeId      String   @map("store_id")
+  /// Denormalized for convenience in audit queries.
+  orderId      String   @map("order_id")
+  /// 'created' | 'status_change' | 'webhook' | 'refund' | 'admin_action' | 'reconciliation'
+  /// Free-form to avoid migration churn when we add a new event type.
+  eventType    String   @map("event_type")
+  /// Null on the very first event ('created').
+  fromStatus   PaymentStatus? @map("from_status")
+  /// Null when an event was informational (e.g. webhook received but no
+  /// state change — duplicate, signature replay, etc.).
+  toStatus     PaymentStatus? @map("to_status")
+  /// Provider name when the event is webhook-driven: 'tap' | 'myfatoorah' | 'hesabe' | 'upayments'.
+  provider     String?
+  /// Raw provider POST body when event_type='webhook'. Lets us replay
+  /// a dispute 6+ months later even if metadata on Payment has been
+  /// overwritten by a later event.
+  providerPayload Json? @map("provider_payload")
+  /// Free-form details: idempotency key, signature hash, refund reason,
+  /// admin notes, reconciliation diff — whatever the writer wants
+  /// preserved without bloating the columns. Always non-null (default {}).
+  details      Json     @default("{}")
+  /// User who triggered the event (admin refund, customer cancel, etc.).
+  /// Null for webhook + system events.
+  triggeredByUserId String? @map("triggered_by_user_id")
+  /// Time the event actually occurred (provider timestamp if known,
+  /// else server clock). Indexed for time-range queries.
+  occurredAt   DateTime @default(now()) @map("occurred_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  payment       Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  store         Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  triggeredBy   User?   @relation(fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId, occurredAt])
+  @@index([storeId, occurredAt(sort: Desc)])
+  @@index([orderId, occurredAt])
+  @@index([eventType])
+  @@index([provider, occurredAt])
+  @@map("payment_events")
 }
 
 enum PaymentStatus {

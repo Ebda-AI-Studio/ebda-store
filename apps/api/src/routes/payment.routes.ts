@@ -9,6 +9,7 @@ import { paymentLimiter, auditLog } from '../middleware/security';
 import { config } from '../config';
 import { getAuthUser } from '../utils/store-helpers';
 import { OrderService } from '../services/order.service';
+import { recordPaymentEvent } from '../services/payment-event.service';
 import logger from '../lib/logger';
 
 const router = Router();
@@ -292,6 +293,17 @@ router.post(
           // successfully-initiated payment, even if a downstream step throws.
           rollbackContext = null;
 
+          await recordPaymentEvent({
+            paymentId: payment.id,
+            storeId: order.storeId,
+            orderId: order.id,
+            eventType: 'created',
+            toStatus: 'cod_pending',
+            provider: 'cod',
+            triggeredByUserId: req.user?.userId ?? null,
+            details: { amount: order.total + codFee, codFee, originalTotal: order.total },
+          });
+
           await auditLog({
             action: 'payment.created',
             // Guest checkout: req.user is undefined, audit log accepts that.
@@ -554,6 +566,24 @@ router.post(
           userAgent: req.headers['user-agent'],
         });
 
+        // Append-only audit row.
+        await recordPaymentEvent({
+          paymentId: paymentRow.id,
+          storeId: refundStoreId,
+          orderId: paymentRow.orderId,
+          eventType: 'refund',
+          fromStatus: paymentRow.status,
+          toStatus: r.amount >= paymentRow.amount ? 'refunded' : 'partially_refunded',
+          provider: paymentRow.provider,
+          triggeredByUserId: user.userId,
+          details: {
+            refundId: r.refundId,
+            amount: r.amount,
+            reason: data.reason ?? null,
+            initiatedBy: user.role,
+          },
+        });
+
         return r;
       });
 
@@ -651,6 +681,122 @@ router.get(
         success: true,
         data: { payment },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// Payment Audit Log
+// ==========================================
+
+/**
+ * GET /payments/:id/events
+ * Returns the append-only `payment_events` rows for a payment, newest
+ * first. Super-admin can read any store; store-admin can read only
+ * payments scoped to a store they own.
+ *
+ * Access control: same precedent as POST /payments/refund — load the
+ * payment with its store ownerId, then accept the request only when
+ * the requester is super_admin or is the store owner.
+ */
+router.get('/:id/events', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = getAuthUser(req);
+    const { id: paymentId } = req.params;
+
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: {
+        id: true,
+        order: { select: { store: { select: { id: true, ownerId: true } } } },
+      },
+    });
+
+    if (!payment) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Payment not found' },
+      });
+      return;
+    }
+
+    const isOwner = payment.order.store.ownerId === user.userId;
+    if (user.role !== 'super_admin' && !isOwner) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Payment not found' },
+      });
+      return;
+    }
+
+    const events = await prisma.paymentEvent.findMany({
+      where: { paymentId },
+      orderBy: { occurredAt: 'desc' },
+      select: {
+        id: true,
+        eventType: true,
+        fromStatus: true,
+        toStatus: true,
+        provider: true,
+        // providerPayload is intentionally omitted from the LIST shape —
+        // payloads can be large + may contain PII. The single-event
+        // endpoint below returns it gated to super_admin.
+        details: true,
+        triggeredByUserId: true,
+        occurredAt: true,
+        createdAt: true,
+      },
+      take: 200,
+    });
+
+    res.json({ success: true, data: { events } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /payments/events/:eventId/payload
+ * Returns the raw provider_payload for a single payment_events row.
+ * Super-admin only because raw payloads may contain customer PII +
+ * provider-internal references we don't want to leak to store_admin
+ * dashboards by default.
+ */
+router.get(
+  '/events/:eventId/payload',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = getAuthUser(req);
+      if (user.role !== 'super_admin') {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Super-admin only' },
+        });
+        return;
+      }
+      const { eventId } = req.params;
+      const event = await prisma.paymentEvent.findUnique({
+        where: { id: eventId },
+        select: {
+          id: true,
+          paymentId: true,
+          eventType: true,
+          provider: true,
+          providerPayload: true,
+          occurredAt: true,
+        },
+      });
+      if (!event) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Payment event not found' },
+        });
+        return;
+      }
+      res.json({ success: true, data: event });
     } catch (error) {
       next(error);
     }

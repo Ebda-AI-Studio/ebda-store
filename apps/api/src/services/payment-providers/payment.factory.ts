@@ -9,6 +9,7 @@ import { inngest } from '../../lib/inngest/client';
 import { OneSignalService } from '../onesignal.service';
 import { redis } from '../redis.service';
 import { sendAlert } from '../alerts.service';
+import { recordPaymentEvent } from '../payment-event.service';
 import {
   IPaymentProvider,
   PaymentProvider,
@@ -540,7 +541,7 @@ export class PaymentService {
     const response = await p.createPayment(request);
 
     // Store payment record in database
-    await prisma.payment.create({
+    const payment = await prisma.payment.create({
       data: {
         orderId: request.orderId,
         provider: p.name,
@@ -557,6 +558,23 @@ export class PaymentService {
           paymentUrl: response.paymentUrl,
           ...response.metadata,
         },
+      },
+      include: { order: { select: { storeId: true } } },
+    });
+
+    // Append-only audit row — see payment-event.service.ts
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      storeId: payment.order.storeId,
+      orderId: payment.orderId,
+      eventType: 'created',
+      toStatus: 'pending',
+      provider: p.name,
+      details: {
+        amount: request.amount,
+        currency: request.currency,
+        transactionId: response.transactionId,
+        invoiceId: response.invoiceId,
       },
     });
 
@@ -880,6 +898,26 @@ export class PaymentService {
         },
       });
 
+      // Append-only audit row — refund webhook receipt with raw payload.
+      const refundToStatus =
+        newStatus === 'completed' && payment.status !== 'refunded' ? ('refunded' as const) : null;
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        storeId: payment.order?.storeId ?? '',
+        orderId: payment.orderId,
+        eventType: 'webhook',
+        fromStatus: payment.status,
+        toStatus: refundToStatus,
+        provider,
+        providerPayload: payload as Prisma.InputJsonValue,
+        details: {
+          flavour: 'refund',
+          refundId: webhookData.refund.refundId,
+          refundStatus: newStatus,
+          refundReference: webhookData.refund.refundReference ?? null,
+        },
+      });
+
       // Out-of-band refund detection: if Payment.status was not already
       // 'refunded' / 'partially_refunded' when the executed webhook arrived,
       // the admin Refund-via-provider button never ran — someone refunded
@@ -938,6 +976,7 @@ export class PaymentService {
     }
 
     // Update payment
+    const prevPaymentStatus = payment.status;
     await prisma.payment.update({
       where: { id: payment.id },
       data: {
@@ -950,6 +989,26 @@ export class PaymentService {
           paidCurrency: webhookData.currency,
           paidAmount: webhookData.amount,
         },
+      },
+    });
+
+    // Append-only audit row — every payment webhook receipt persists the
+    // raw provider payload so a dispute 6+ months later can be replayed
+    // even if `payments.metadata` has since been overwritten.
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      storeId: payment.order?.storeId ?? '',
+      orderId: payment.orderId,
+      eventType: 'webhook',
+      fromStatus: prevPaymentStatus,
+      toStatus: webhookData.status,
+      provider,
+      providerPayload: payload as Prisma.InputJsonValue,
+      details: {
+        webhookEvent: webhookData.event,
+        paymentMethod: webhookData.paymentMethod,
+        paidCurrency: webhookData.currency,
+        paidAmount: webhookData.amount,
       },
     });
 
