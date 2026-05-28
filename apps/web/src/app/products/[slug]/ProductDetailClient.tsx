@@ -10,7 +10,7 @@ import type { StoreLayoutSettings } from '@force/shared';
 import { api, type Product, type ProductVariant } from '@/lib/api';
 import { getProductPricing } from '@/lib/product-pricing';
 import { useCart } from '../../../contexts/CartContext';
-import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
+import { useStore, useStoreUrl, useStoreTemplate } from '../../../contexts/StoreContext';
 import { useFeatures } from '../../../contexts/FeatureContext';
 import { ShopChrome } from '../../../components';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
@@ -18,6 +18,8 @@ import { trackViewContent, trackAddToCart } from '../../../components/MarketingP
 import { VariantSelector } from '../../../components/VariantSelector';
 import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../../templates/adapters';
+import { PecannbeeProductCard } from '../../../templates/shared/PecannbeeProductCard';
+import { gridGapClass } from '../../../templates/shared/card-size';
 import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 import { SpecTable } from '../../../templates/shared/SpecTable';
@@ -145,8 +147,6 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
 
   // When the selected variant changes to one with its own imageUrl, jump the
   // gallery to index 0 so the variant image is the active hero immediately.
-  // Reverting to no variant (or one without imageUrl) leaves the user on
-  // whichever product image they were already browsing.
   useEffect(() => {
     if (selectedVariant?.imageUrl) {
       setSelectedImage(0);
@@ -154,11 +154,22 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   }, [selectedVariant?.imageUrl]);
   const { success: toastSuccess, error: toastError } = useToast();
   const { addItem } = useCart();
-  const { store } = useStore();
+  // Issue 1 fix (2026-05-28): destructure ctxLayout so we can merge it
+  // with the server-side prop layout and forward to ShopChrome — the footer
+  // bgColor (and other chrome overrides) were not applied on the PDP because
+  // the layout prop was never forwarded to ShopChrome before this fix.
+  const { store, layout: ctxLayout } = useStore();
   const storeUrl = useStoreUrl();
-  const { components: T, isLoading: templateLoading } = useTemplateComponents();
+  const templateId = useStoreTemplate();
+  // useTemplateComponents is kept for its loading state — used to gate the
+  // related-products render so cards don't flash before hydration.
+  const { isLoading: templateLoading } = useTemplateComponents();
   const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
+  // Prop layout wins (server-side fetch); ctx layout is the lazy-fetched fallback.
+  const resolvedLayout = layout ?? ctxLayout ?? undefined;
+  // Issue 2: pass productCardDefaults to all card surfaces on this page.
+  const productCardDefaults = resolvedLayout?.productCardDefaults;
 
   useEffect(() => {
     if (!slug) return;
@@ -300,7 +311,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
 
   if (isLoading) {
     return (
-      <ShopChrome>
+      <ShopChrome layout={resolvedLayout}>
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
           <ProductSkeleton />
         </div>
@@ -310,7 +321,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
 
   if (error || !product) {
     return (
-      <ShopChrome>
+      <ShopChrome layout={resolvedLayout}>
         <div className="mx-auto max-w-7xl px-4 py-16 text-center flex-1">
           <h1 className="text-2xl font-bold text-foreground">
             {error || t('Product not found', 'المنتج غير موجود')}
@@ -330,11 +341,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   }
 
   const productImages = product.images || [];
-  // When the shopper picks a variant that has its own `imageUrl`, swap the
+  // When the shopper picks a variant that has its own imageUrl, swap the
   // gallery's main image to that URL by prepending a synthetic image entry.
-  // Deselecting the variant (selectedVariant === null) reverts to the
-  // product's original image set with no extra cleanup needed — we never
-  // mutate productImages, only derive `images`.
   const images = selectedVariant?.imageUrl
     ? [
         {
@@ -349,8 +357,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const categoryNameEn = cat0?.category?.name;
   const categoryNameAr = cat0?.category?.nameAr;
   const categoryName = language === 'ar' && categoryNameAr ? categoryNameAr : categoryNameEn;
-  // Localized product name for breadcrumb / heading / image alt. Falls
-  // through to English when nameAr isn't supplied for this SKU.
+  // Localized product name for breadcrumb / heading / image alt.
   const displayName = language === 'ar' && product.nameAr ? product.nameAr : product.name;
 
   // Derived variant/option availability
@@ -359,11 +366,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const hasVariants = productVariants.length > 0;
   const hasOptions = productOptions.length > 0;
 
-  // Variant-aware pricing — see lib/product-pricing.ts for the rules.
-  // The shared helper guarantees the same behaviour across the detail
-  // page, list view, and the three template-grid cards. Detail-page
-  // surface uses `range` for un-selected variant products (the customer
-  // is already on the page; show the full spread before they pick).
+  // Variant-aware pricing
   const pricing = getProductPricing(product, selectedVariant, 'detail');
   const { displayPrice, displayCompare, minVariantPrice, maxVariantPrice } = pricing;
 
@@ -375,7 +378,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const outOfStock = effectiveInventory === 0;
 
   return (
-    <ShopChrome>
+    <ShopChrome layout={resolvedLayout}>
       {/* Whole product detail page — gallery + info + variants +
           related-products + frequently-bought-together — falls under
           the merchant's "Products" typography zone. */}
@@ -474,12 +477,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           <div>
             <div className="mb-4 flex items-center gap-2">
               {categoryName && <Badge variant="secondary">{categoryName}</Badge>}
-              {/* Discount badge only when there's a CONCRETE compare-at to
+              {/* Discount badge only when there is a CONCRETE compare-at to
                   compare against. For products with variants we wait for
-                  the customer to pick one before deciding whether to flag
-                  a discount — the parent's own compareAtPrice is usually
-                  stale data from before the variant fold and would
-                  produce a fake "X% OFF" badge. */}
+                  the customer to pick one before flagging a discount. */}
               {displayCompare && displayCompare > displayPrice && (
                 <Badge variant="destructive">
                   {Math.round((1 - displayPrice / displayCompare) * 100)}% OFF
@@ -490,11 +490,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
 
             <h1 className="text-3xl font-bold text-foreground">{displayName}</h1>
 
-            {/* Price — see lib/product-pricing.ts:
-                  - selected variant: that variant's price + compareAt
-                  - hasVariants no-selection on detail page: "min – max"
-                  - all-variant prices identical: single number
-                  - no variants: parent's price + compareAt */}
+            {/* Price */}
             <div className="mt-4 flex items-baseline gap-3">
               <span className="text-3xl font-bold text-primary">
                 {pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
@@ -513,7 +509,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               <p className="mt-6 text-muted-foreground leading-relaxed">{product.description}</p>
             )}
 
-            {/* Variant Selector -- rendered when the API returns variants and options */}
+            {/* Variant Selector */}
             {hasVariants && hasOptions && (
               <VariantSelector
                 variants={productVariants}
@@ -557,10 +553,6 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 </div>
                 {effectiveInventory !== undefined && effectiveInventory !== null && (
                   <span className="text-sm text-muted-foreground">
-                    {/* Customers don't need to see exact stock counts —
-                        "99 متوفر" reads like a low-stock urgency cue at
-                        glance and felt off to the merchant. Just say
-                        "in stock" / "out of stock". */}
                     {effectiveInventory > 0
                       ? t('In Stock', 'متوفر')
                       : t('Out of Stock', 'غير متوفر')}
@@ -614,10 +606,6 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               </div>
             )}
 
-            {/* Sprint 4 (2026-05-17): share row + spec table. ShareProductRow
-                renders X/Facebook/Telegram/WhatsApp + copy-link. SpecTable
-                renders structured key-value rows from product.specifications
-                JSON; returns null when empty so no chrome bloat. */}
             <ShareProductRow
               productName={language === 'ar' && product.nameAr ? product.nameAr : product.name}
               url={typeof window !== 'undefined' ? window.location.href : ''}
@@ -634,19 +622,14 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           </div>
         </div>
 
-        {/* Product FAQ — rendered when the product has authored Q&A */}
+        {/* Product FAQ */}
         {product?.faqs && product.faqs.length > 0 && (
           <ProductFAQSection faqs={product.faqs} language={language} t={t} />
         )}
 
         {/* Product Reviews — gated on BOTH the platform feature flag
-            (isEnabled('reviews'): is the reviews feature unlocked at all?)
-            AND the per-store layout toggle (layout.reviewSection.enabled:
-            does THIS store want to display a reviews section?). Default
-            for new stores is enabled=false (see store-layout.ts
-            DEFAULT_LAYOUT_SETTINGS comment) so a brand-new store doesn't
-            show a "be the first to review" placeholder that reads as
-            staged content under the fake-reviews-illegal posture. */}
+            AND the per-store layout toggle. Default for new stores is
+            enabled=false so a brand-new store does not show a placeholder. */}
         {isEnabled('reviews') &&
           layout?.reviewSection?.enabled &&
           product &&
@@ -661,19 +644,56 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           </>
         )}
 
-        {/* Related Products */}
-        {relatedProducts.length > 0 && T && !templateLoading && (
+        {/* Related Products — uses PecannbeeProductCard (same canonical card
+            as PLP / search) so per-store productCardDefaults (frame, size,
+            shape) are honoured here too. Eliminates the T.ProductGrid 4th
+            render path on the PDP per the standing platform rule. */}
+        {relatedProducts.length > 0 && !templateLoading && (
           <div className="mt-16">
             <h2 className="text-2xl font-bold text-foreground mb-6">
               {t('Related Products', 'منتجات ذات صلة')}
             </h2>
-            <T.ProductGrid
-              products={relatedProducts.map(toTemplateProduct)}
-              isRtl={language === 'ar'}
-              currency={store.currency}
-              columns={3}
-              urlPrefix={storeUrl('')}
-            />
+            <div
+              className={`grid grid-cols-2 sm:grid-cols-3 ${
+                productCardDefaults?.cardGap
+                  ? gridGapClass(productCardDefaults.cardGap)
+                  : 'gap-3 sm:gap-4'
+              }`}
+              dir={language === 'ar' ? 'rtl' : 'ltr'}
+            >
+              {relatedProducts.map(p => (
+                <PecannbeeProductCard
+                  key={p.id}
+                  product={toTemplateProduct(p)}
+                  isRtl={language === 'ar'}
+                  currency={store.currency}
+                  pack={templateId}
+                  cardSize={productCardDefaults?.cardSize ?? 'md'}
+                  cardAspect={productCardDefaults?.cardAspect}
+                  cardShape={productCardDefaults?.cardShape}
+                  showCardFrame={productCardDefaults?.showCardFrame}
+                  cardFrameStyle={productCardDefaults?.cardFrameStyle}
+                  cardFrameWidth={productCardDefaults?.cardFrameWidth}
+                  cardFrameSize={productCardDefaults?.cardFrameSize}
+                  cardFrameColor={productCardDefaults?.cardFrameColor}
+                  showLabel={productCardDefaults?.showLabel}
+                  showHover={productCardDefaults?.showHover}
+                  urlPrefix={storeUrl('')}
+                  onAddToCart={async productId => {
+                    const found = relatedProducts.find(x => x.id === productId);
+                    if (found)
+                      addItem({
+                        id: found.id,
+                        name: found.name,
+                        price: found.price,
+                        slug: found.slug,
+                        image: found.images?.[0]?.url,
+                        category: found.categories?.[0]?.category?.name,
+                      });
+                  }}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
