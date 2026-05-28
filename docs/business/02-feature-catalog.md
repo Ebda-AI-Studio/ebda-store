@@ -113,6 +113,7 @@ Most e-commerce platforms make you connect QuickBooks or Xero for proper account
 - **Journal Entries** — Record any financial event against the right accounts.
 - **Expenses** — Log operating expenses with a two-step approval workflow.
 - **Profit & Loss** — A live P&L report that reflects your actual store activity.
+- **Payment Audit Trail** — Every payment now has an append-only event log: the initial intent, every webhook from Tap / MyFatoorah / Hesabe / UPayments, every refund, every admin action — all preserved with the raw provider payload. If a dispute is raised 6 months later, the full sequence (with proof from the provider) is one click away. Most platforms only show you the latest payment status; we keep the full lineage.
 
 This is the depth of accounting software typically found in platforms that cost ten times more.
 
@@ -235,6 +236,18 @@ When the platform ships a new feature or design improvement, all stores receive 
 ## 6. WhatsApp Customer Ordering — واتساب التسوّق المباشر (Phase 6 + Phase 8)
 
 Force Store connects to the **Force WhatsApp Business Platform** to turn every customer DM into a complete order — without any human agent typing it out.
+
+### One-click Meta catalog setup — إعداد كتالوج Meta بضغطة واحدة
+
+Connecting your store to WhatsApp's Native Catalog feature usually requires merchants to navigate Meta Business Manager — create a Business account, create a Commerce Catalog, generate a system-user token, copy 3 IDs into the admin panel. We removed all of that.
+
+From Admin → WhatsApp Bot → Meta Commerce Catalog, click **Provision automatically**. The Force AI backend calls the Meta Graph API on your behalf to:
+
+1. Create a new Commerce Catalog under the Force AI parent Business Manager (your store appears as a named catalog inside our umbrella account).
+2. Assign the long-lived access token automatically.
+3. Save the catalog ID + business ID + token (encrypted at rest) back to your store.
+
+Then the existing product-sync pipeline pushes your full catalog to Meta within ~60 seconds. The only manual step left is submitting the catalog for Meta's 24-48-hour review — and we'll send you a Telegram alert as soon as the cutover is safe.
 
 ### How it works for the customer
 

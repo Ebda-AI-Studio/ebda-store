@@ -242,12 +242,13 @@ Before sending a proposal:
 ## 6. Operational discipline (what you do after the client pays)
 
 1. **Generate the store** — use the super_admin store-creation flow
-2. **Enable features** — flip `StoreFeature` rows for everything the client paid for
-3. **Set tier internally** — set `Store.plan` enum to whichever value tracks this client best (you control the meaning of `free` / `starter` / `professional` / `enterprise` internally; clients never see this)
+2. **Pick a plan tier** — set `Store.plan` to `free` / `starter` / `professional` / `enterprise`. The plan-baseline resolver (see `packages/shared/src/plan-baselines.ts`) automatically enables every feature included in that tier — no manual `StoreFeature` row creation needed for baseline features.
+3. **Layer overrides only for hybrid deals** — only flip `StoreFeature` rows for features OUTSIDE the chosen plan's baseline (e.g. a starter client who paid for the `whatsapp_bot` add-on). Plan changes never touch override rows, so upgrading or downgrading the store doesn't lose merchant-paid extras.
 4. **Configure payment provider** — set up Tap/MyFatoorah/Hesabe/UPayments credentials per the client's account
-5. **Onboard the client** — branding, catalog import (Excel → Force Store), theme config, training session
-6. **Verify it works** — place a test order, verify webhooks fire, verify order confirmation email arrives
-7. **Hand over** — give the client admin credentials, schedule the training session, schedule a 2-week check-in
+5. **Provision Meta Commerce catalog** — if the client paid for the WhatsApp Native Catalog Bot, click **Provision automatically** in Admin → WhatsApp Bot → MetaCatalogCard. No Meta Business Manager steps required from the client.
+6. **Onboard the client** — branding, catalog import (Excel → Force Store), theme config, training session
+7. **Verify it works** — place a test order, verify webhooks fire, verify order confirmation email arrives, check the `payment_events` audit log shows the full lifecycle
+8. **Hand over** — give the client admin credentials, schedule the training session, schedule a 2-week check-in
 
 ---
 
@@ -264,6 +265,7 @@ is backed by concrete infrastructure a merchant's CTO can audit:
 | 4h critical response                    | Auto-fix watchdog detects red main within 17min · Telegram + email dual channel · `scripts/rollback.sh` reverts the bad deploy + redeploys Vercel + Railway in <5min                                                                                                                                                                                  |
 | Daily backups + 30-day retention        | Neon continuous WAL + on-demand `prod-<sha>` branch per commit (`docs/ROLLBACK.md` documents restore procedure) · `scripts/backup-db.sh` local pg_dump 30-day rotation at `~/Desktop/projects/_backups/<project>/`                                                                                                                                    |
 | Kuwait Law 13/2023 Data Processor split | `/auth/me/erase` + `/auth/me/export` endpoints actually implemented · 72h breach notification path via alert bridge · per-store tenant isolation via RLS (`apps/api/src/middleware/tenant-context.ts`)                                                                                                                                                |
+| Payment auditability (dispute-proof)    | Append-only `payment_events` table records every payment-status transition + raw provider webhook payload (`apps/api/src/services/payment-event.service.ts`) · `GET /api/v1/payments/:id/events` returns the full lifecycle · 6-month-later dispute can be reconstructed with proof from Tap / MyFatoorah / Hesabe / UPayments                        |
 
 **When to bring this table up:**
 

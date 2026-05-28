@@ -11,6 +11,7 @@ import { prisma } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
+import { recordPaymentEvent } from '../services/payment-event.service';
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
 import type { Currency } from '../services/payment-providers/types';
@@ -367,6 +368,19 @@ router.post(
         }),
       ]);
 
+      // Append-only audit row for the COD completion.
+      await recordPaymentEvent({
+        paymentId: codPayment.id,
+        storeId: order.storeId,
+        orderId,
+        eventType: 'status_change',
+        fromStatus: codPayment.status,
+        toStatus: 'completed',
+        provider: 'cod',
+        triggeredByUserId: user.userId,
+        details: { reason: 'cod_marked_paid', orderNumber: order.orderNumber },
+      });
+
       // Fire the same post-payment fanout the webhook handler does —
       // accounting journal + WhatsApp WBS notification both rely on this event.
       inngest
@@ -456,6 +470,25 @@ router.post(
       ]);
 
       await prisma.$transaction(updates);
+
+      // Append-only audit rows — one per payment flipped. Fire-and-forget
+      // (Promise.allSettled) so a transient log-write failure on one row
+      // doesn't break the bulk action for the others.
+      await Promise.allSettled(
+        codOrders.map(o =>
+          recordPaymentEvent({
+            paymentId: o.payments[0].id,
+            storeId: o.storeId,
+            orderId: o.id,
+            eventType: 'status_change',
+            fromStatus: o.payments[0].status,
+            toStatus: 'completed',
+            provider: 'cod',
+            triggeredByUserId: user.userId,
+            details: { reason: 'cod_bulk_marked_paid', orderNumber: o.orderNumber },
+          })
+        )
+      );
 
       // Fire one order/created event per updated order so accounting journal +
       // WBS WhatsApp both receive the paid notification. Promise.allSettled so
@@ -593,6 +626,18 @@ router.post(
           }),
         ]);
 
+        await recordPaymentEvent({
+          paymentId: payment.id,
+          storeId: order.storeId,
+          orderId: order.id,
+          eventType: 'admin_action',
+          fromStatus: payment.status,
+          toStatus: 'completed',
+          provider: payment.provider,
+          triggeredByUserId: user.userId,
+          details: { reason: 'manual_refresh', providerStatus: status.status },
+        });
+
         // Fire the same post-payment fanout the webhook handler does so
         // notifications + analytics catch up on the missed webhook event.
         if (statusChanged) {
@@ -624,6 +669,18 @@ router.post(
             data: { paymentStatus: 'failed' },
           }),
         ]);
+
+        await recordPaymentEvent({
+          paymentId: payment.id,
+          storeId: order.storeId,
+          orderId: order.id,
+          eventType: 'admin_action',
+          fromStatus: payment.status,
+          toStatus: status.status,
+          provider: payment.provider,
+          triggeredByUserId: user.userId,
+          details: { reason: 'manual_refresh', providerStatus: status.status },
+        });
       }
 
       await auditLog({
@@ -749,6 +806,26 @@ router.post(
       await prisma.payment.update({
         where: { id: payment.id },
         data: updateData,
+      });
+
+      // Append-only audit row. Records the refund-status refresh — fromStatus
+      // is the pre-update payment status; toStatus is what we just wrote (or
+      // null when only metadata changed without a status flip).
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        storeId,
+        orderId,
+        eventType: 'reconciliation',
+        fromStatus: payment.status,
+        toStatus: (updateData.status as typeof payment.status | undefined) ?? null,
+        provider: payment.provider,
+        triggeredByUserId: user.userId,
+        details: {
+          reason: 'manual_refund_status_refresh',
+          providerStatus: status.status,
+          refundId: payment.refundId,
+          refundedAmount: updateData.refundedAmount ?? null,
+        },
       });
 
       // If this is the first time we see the refund as executed AND no
