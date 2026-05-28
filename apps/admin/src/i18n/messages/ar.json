@@ -3954,7 +3954,7 @@
   "stock": {
     "navGroup": "المخزون",
     "dashboard": {
-      "title": "لوحة تحكم المخزون",
+      "title": "المخزون",
       "stockValue": "قيمة المخزون",
       "onHandSkus": "أصناف متوفرة",
       "lowStockSkus": "أصناف منخفضة المخزون",
