@@ -253,6 +253,16 @@ export class OrderService {
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
+    // Resolve the backorder feature flag BEFORE the transaction so we do not
+    // make an async service call inside a Prisma interactive transaction
+    // (that would extend the transaction's hold time unnecessarily and is a
+    // Neon cold-start risk). The flag is captured once and referenced by the
+    // closure below.
+    const backorderFeatureEnabled = await featureService.isFeatureEnabled(
+      storeId,
+      'inventory.backorder'
+    );
+
     // Create order in transaction.
     //
     // DB-006: Inventory is validated with a row-level lock (SELECT ... FOR UPDATE)
@@ -264,8 +274,10 @@ export class OrderService {
       // the same Product row until this transaction commits or rolls back.
       //
       // backorderedItems collects items where the pre-decrement inventory was
-      // insufficient — these get a BackorderLine row created after the order is
-      // persisted (further down in this transaction).
+      // insufficient and the inventory.backorder feature is enabled — these get
+      // a BackorderLine row created after the order is persisted (further down
+      // in this transaction). When the feature is disabled, out-of-stock items
+      // are rejected regardless of the per-product allowBackorder flag.
       const backorderedItems: Array<{ productId: string; variantId?: string; quantity: number }> =
         [];
 
@@ -281,7 +293,12 @@ export class OrderService {
               FOR UPDATE
             `;
             if (!lockedVariant || lockedVariant.inventory < item.quantity) {
-              if (!lockedVariant?.allow_backorder) {
+              // Backorder is only accepted when BOTH the store-level feature flag
+              // AND the per-product flag are enabled. Without this second check
+              // a merchant who disables the feature still has their per-product
+              // allowBackorder flags set to true, so orders would silently
+              // generate BackorderLine rows — the billing/enforcement gap.
+              if (!backorderFeatureEnabled || !lockedVariant?.allow_backorder) {
                 throw new AppError(
                   400,
                   'INSUFFICIENT_INVENTORY',
@@ -305,7 +322,8 @@ export class OrderService {
               FOR UPDATE
             `;
             if (!lockedProduct || lockedProduct.inventory < item.quantity) {
-              if (!lockedProduct?.allow_backorder) {
+              // Same dual-check: store feature flag AND per-product flag.
+              if (!backorderFeatureEnabled || !lockedProduct?.allow_backorder) {
                 throw new AppError(
                   400,
                   'INSUFFICIENT_INVENTORY',

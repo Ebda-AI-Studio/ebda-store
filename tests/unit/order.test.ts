@@ -78,6 +78,17 @@ vi.mock('@api/services/cart.service', () => ({
   },
 }));
 
+// The order service checks the inventory.backorder feature flag before
+// creating BackorderLine rows. Default to enabled so existing tests that
+// don't care about this flag still pass unmodified.
+vi.mock('@api/services/feature.service', () => ({
+  featureService: {
+    isFeatureEnabled: vi.fn().mockResolvedValue(true),
+    getStoreFeatures: vi.fn(),
+    invalidateCache: vi.fn(),
+  },
+}));
+
 import { CartService } from '@api/services/cart.service';
 
 describe('OrderService', () => {

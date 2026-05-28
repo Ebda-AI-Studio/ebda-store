@@ -5,6 +5,7 @@ import { ProductService } from '../services/product.service';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 
@@ -316,6 +317,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('inventory.backorder'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
