@@ -26,7 +26,7 @@ permissions:
 jobs:
   snapshot:
     name: Create Neon branch from production
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, wsl2]
     steps:
       - name: Create branch + prune old snapshots
         env:
@@ -48,7 +48,10 @@ jobs:
             -d "{\"branch\":{\"name\":\"${BRANCH_NAME}\"}}" \
             | jq -r '.branch | "Created: " + .name + " (" + .id + ")"'
           BRANCHES_JSON=$(curl -fsSL "${API}/branches" -H "Authorization: Bearer ${NEON_API_KEY}")
-          OLD_IDS=$(echo "$BRANCHES_JSON" | jq -r '.branches | map(select(.name | startswith("prod-"))) | sort_by(.created_at) | reverse | .[9:] | .[].id')
+          # Retention raised from 9 → 30 (2026-05-28): Neon Pro tier gives 5000 branches/project,
+          # so the free-tier cap is no longer the constraint. 30 ≈ ~3-4 days of rollback coverage
+          # at FWB push cadence.
+          OLD_IDS=$(echo "$BRANCHES_JSON" | jq -r '.branches | map(select(.name | startswith("prod-"))) | sort_by(.created_at) | reverse | .[30:] | .[].id')
           for branch_id in $OLD_IDS; do
             curl -fsSL -X DELETE "${API}/branches/${branch_id}" \
               -H "Authorization: Bearer ${NEON_API_KEY}" || echo "::warning::Failed to delete ${branch_id}"
