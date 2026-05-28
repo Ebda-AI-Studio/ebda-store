@@ -366,21 +366,9 @@ export default function StoreSettingsPage() {
       color: 'bg-[#25D366]/10 text-[#25D366]',
       icon: <WhatsAppIcon className="h-6 w-6" />,
     },
-    {
-      key: 'waBotConfig',
-      href: `/stores/${storeId}/wa-bot`,
-      color: 'bg-[#25D366]/10 text-[#25D366]',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"
-          />
-        </svg>
-      ),
-    },
+    // 2026-05-28: waBotConfig card removed — Bot Mode + Service Menu +
+    // Meta Catalog merged into the WhatsApp Integration tabset (above)
+    // as the "Bot Config" tab to remove the page-bouncing overlap.
   ];
 
   return (
