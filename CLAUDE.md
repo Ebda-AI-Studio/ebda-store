@@ -93,6 +93,8 @@ When Ahmad reports a bug or asks for a feature, the fix MUST land in a place whe
 
 ## Tech Stack
 
+> **GSC + AI crawler runbook:** `docs/runbooks/google-search-console-indexing.md` — covers what to submit to Google Search Console for wadyaljuz.com, llms.txt status (Google ignores it), AI-crawler robots.txt strategy, and bilingual hreflang guidance.
+
 - **API**: Express.js + TypeScript (apps/api)
 - **Admin Dashboard**: Next.js 16 + App Router (apps/admin) — `next-intl` for i18n
 - **Storefront**: Next.js 16 + App Router (apps/web)
