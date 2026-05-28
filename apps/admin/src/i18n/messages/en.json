@@ -3831,7 +3831,12 @@
       "negativeBalanceTooltip": "Negative balance — check opening balance + stock adjustments",
       "recentAnomalies": "Recent anomalies",
       "pendingOcrDrafts": "Pending OCR drafts",
-      "viewAll": "View all"
+      "viewAll": "View all",
+      "salesOrdersTitle": "Sales (from Orders)",
+      "salesOrdersSource": "Orders",
+      "salesOrdersRevenue": "Paid Orders Revenue",
+      "salesOrdersCount": "Paid Orders",
+      "salesOrdersCountUnit": "orders in period"
     },
     "anomalies": {
       "title": "Profit Anomalies",
@@ -4167,7 +4172,7 @@
       "segment": {
         "vip": "VIP",
         "loyal": "Loyal",
-        "potential": "Potential",
+        "potential": "Active Buyer",
         "new_customer": "New",
         "at_risk": "At Risk",
         "hibernating": "Hibernating",

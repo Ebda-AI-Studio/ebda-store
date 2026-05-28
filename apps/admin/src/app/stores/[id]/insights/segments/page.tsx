@@ -141,7 +141,8 @@ export default function InsightsSegmentsPage() {
                   </div>
                   <div>
                     <h3 className="text-base font-semibold capitalize">
-                      {seg.segment.replace(/_/g, ' ')}
+                      {/* Use i18n label so the display matches the customers page badge */}
+                      {t(`segment.${seg.segment}`) || seg.segment.replace(/_/g, ' ')}
                     </h3>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">

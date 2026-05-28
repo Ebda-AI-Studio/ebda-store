@@ -143,7 +143,8 @@ function quintile(values: number[], v: number, invert = false): number {
 // RFM segment classification
 // ---------------------------------------------------------------------------
 
-function classifySegment(params: {
+/** Exported for unit testing only. Internal RFM classification logic. */
+export function classifySegment(params: {
   recencyDays: number;
   rQ: number; // recency quintile 1-5
   fQ: number; // frequency quintile 1-5

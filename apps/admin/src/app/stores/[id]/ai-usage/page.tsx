@@ -159,16 +159,19 @@ export default function AiUsagePage() {
       if (!isAuthenticated || !storeId) return;
       setLoadError(false);
       try {
+        // apiGet already unwraps the outer { success, data } envelope — the
+        // returned `data` field IS the inner payload directly (SummaryData /
+        // LogData), not a double-wrapped { data: SummaryData }.
         const [summaryRes, logRes] = await Promise.all([
-          apiGet<{ data: SummaryData }>(`/api/v1/stores/${storeId}/ai/usage/summary`),
-          apiGet<{ data: LogData }>(`/api/v1/stores/${storeId}/ai/usage/log?page=${p}&pageSize=20`),
+          apiGet<SummaryData>(`/api/v1/stores/${storeId}/ai/usage/summary`),
+          apiGet<LogData>(`/api/v1/stores/${storeId}/ai/usage/log?page=${p}&pageSize=20`),
         ]);
         if (summaryRes.error || logRes.error) {
           setLoadError(true);
           return;
         }
-        setSummary(summaryRes.data?.data ?? null);
-        setLog(logRes.data?.data ?? null);
+        setSummary(summaryRes.data ?? null);
+        setLog(logRes.data ?? null);
       } catch {
         setLoadError(true);
       } finally {
