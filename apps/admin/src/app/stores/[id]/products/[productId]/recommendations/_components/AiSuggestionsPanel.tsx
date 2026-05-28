@@ -43,9 +43,24 @@ interface Props {
   alreadyInCrossSell: string[];
   /** Called when merchant clicks "Promote to cross-sell". Parent appends + persists. */
   onPromote: (product: ProductSummary) => void;
+  /**
+   * Called when merchant clicks "Demote all". Parent removes the listed
+   * ids from the manual cross-sell list. Storefront falls back to AI
+   * picks (priority tier 2) on the next render.
+   */
+  onDemoteAll: (ids: string[]) => void;
+  /** Soft cap on manual cross-sell entries — used to gate "Promote all". */
+  maxCrossSell: number;
 }
 
-export function AiSuggestionsPanel({ storeId, productId, alreadyInCrossSell, onPromote }: Props) {
+export function AiSuggestionsPanel({
+  storeId,
+  productId,
+  alreadyInCrossSell,
+  onPromote,
+  onDemoteAll,
+  maxCrossSell,
+}: Props) {
   const [recs, setRecs] = useState<AiRec[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,23 +98,109 @@ export function AiSuggestionsPanel({ storeId, productId, alreadyInCrossSell, onP
     toastSuccess(`Added "${rec.targetProduct.name}" to cross-sell`);
   };
 
+  // Suggestions that aren't already in the manual cross-sell list AND
+  // have a resolvable target product. The "Promote all" / "Demote all"
+  // actions read from this filtered view so the buttons reflect what
+  // would actually change.
+  const promotableRecs = recs.filter(
+    r => r.targetProduct != null && !alreadyInCrossSell.includes(r.targetProduct.id)
+  );
+
+  const aiIdsAlreadyAdded = recs
+    .map(r => r.targetProduct?.id)
+    .filter((id): id is string => typeof id === 'string' && alreadyInCrossSell.includes(id));
+
+  const promoteAll = () => {
+    if (promotableRecs.length === 0) return;
+    // Respect the parent's per-row cap. parent.addCrossSell already
+    // dedupes + ignores anything past MAX_CROSS_SELL, so we can iterate
+    // safely without tracking the running count ourselves.
+    let promoted = 0;
+    for (const rec of promotableRecs) {
+      const tp = rec.targetProduct;
+      if (!tp) continue;
+      onPromote({
+        id: tp.id,
+        name: tp.name,
+        price: tp.price,
+        images: tp.images.map(i => ({ url: i.url })),
+        status: 'active',
+      });
+      promoted++;
+    }
+    const capped = Math.min(promoted, maxCrossSell - alreadyInCrossSell.length);
+    toastSuccess(
+      capped < promoted
+        ? `Promoted ${capped} (max ${maxCrossSell} reached — ${promoted - capped} skipped)`
+        : `Promoted ${promoted} AI picks to manual cross-sell`
+    );
+  };
+
+  const demoteAll = () => {
+    if (aiIdsAlreadyAdded.length === 0) return;
+    const ok = window.confirm(
+      `Remove ${aiIdsAlreadyAdded.length} AI-promoted product(s) from the manual cross-sell list? ` +
+        `The storefront will fall back to AI picks (priority tier 2) on the next render.`
+    );
+    if (!ok) return;
+    onDemoteAll(aiIdsAlreadyAdded);
+    toastSuccess(`Demoted ${aiIdsAlreadyAdded.length} AI picks back to fallback rendering`);
+  };
+
   return (
     <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
         <h3 className="text-sm font-semibold text-foreground">
           AI suggestions{' '}
           <span className="text-muted-foreground font-normal">/ اقتراحات الذكاء الاصطناعي</span>
         </h3>
-        <Button onClick={load} size="sm" variant="outline">
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Bulk actions — disabled when there's nothing to act on so the
+              empty state is unambiguous. The per-row Promote button still
+              works for the granular case. */}
+          <Button
+            onClick={promoteAll}
+            size="sm"
+            variant="default"
+            disabled={
+              loading || promotableRecs.length === 0 || alreadyInCrossSell.length >= maxCrossSell
+            }
+            title={
+              promotableRecs.length === 0
+                ? 'Nothing to promote — all suggestions already in the cross-sell list'
+                : alreadyInCrossSell.length >= maxCrossSell
+                  ? `Cross-sell list at max (${maxCrossSell}). Remove an entry first.`
+                  : `Promote ${promotableRecs.length} suggestion(s)`
+            }
+          >
+            Promote all{' '}
+            <span className="text-muted-foreground/70 ml-1 font-normal">/ ترقية الكل</span>
+          </Button>
+          <Button
+            onClick={demoteAll}
+            size="sm"
+            variant="outline"
+            disabled={loading || aiIdsAlreadyAdded.length === 0}
+            title={
+              aiIdsAlreadyAdded.length === 0
+                ? 'Nothing to demote — none of the AI picks are in the manual cross-sell list'
+                : `Demote ${aiIdsAlreadyAdded.length} AI pick(s) back to fallback rendering`
+            }
+          >
+            Demote all <span className="text-muted-foreground/70 ml-1 font-normal">/ خفض الكل</span>
+          </Button>
+          <Button onClick={load} size="sm" variant="outline">
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <p className="text-xs text-muted-foreground mb-3">
         Picks from the last <strong>AI recommendations</strong> sweep. These show automatically on
         the storefront "You might also like" section when no manual cross-sell is set. Click{' '}
-        <strong>Promote</strong> to add a pick to the manual cross-sell list (which then takes
-        priority over AI picks on the storefront).
+        <strong>Promote</strong> to add a single pick, or use <strong>Promote all</strong> /{' '}
+        <strong>Demote all</strong> at the top to flip the whole list. Promoted picks take priority
+        over the AI defaults on the storefront.
       </p>
 
       {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
