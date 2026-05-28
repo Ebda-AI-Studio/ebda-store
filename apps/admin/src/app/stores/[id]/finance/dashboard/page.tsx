@@ -65,7 +65,12 @@ export default function FinanceDashboardPage() {
   const [customRange, setCustomRange] = useState<ResolvedDateRange | undefined>(undefined);
 
   const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Per-card error state: main dashboard fetch failure used to blank
+  // the entire page via {data && ...}. Now the KPI/chart sections always
+  // render; a failed main fetch shows "—" in each card + a per-card
+  // "Couldn't load" hint (title= carries the raw error for hover-debug).
+  // Anomalies + OCR sections are already defensive — untouched.
+  const [dashboardErr, setDashboardErr] = useState<string | null>(null);
   const [recentAnomalies, setRecentAnomalies] = useState<ProfitAnomaly[]>([]);
   const [pendingOcrCount, setPendingOcrCount] = useState<number | null>(null);
 
@@ -81,7 +86,7 @@ export default function FinanceDashboardPage() {
     if (!storeId) return;
 
     setData(null);
-    setError(null);
+    setDashboardErr(null);
 
     const resolved = resolveDateRange(period, customRange);
     const from = toDateStr(resolved.startDate);
@@ -91,12 +96,12 @@ export default function FinanceDashboardPage() {
     apiGet<DashboardData>(`/api/v1/stores/${storeId}/finance/dashboard?from=${from}&to=${to}`)
       .then(({ data: d, error: apiError }) => {
         if (apiError) {
-          setError(apiError.message);
+          setDashboardErr(apiError.message);
         } else if (d) {
           setData(d);
         }
       })
-      .catch(() => setError('Failed to load finance dashboard'));
+      .catch(() => setDashboardErr('Failed to load finance dashboard'));
 
     // Recent unacknowledged anomalies (top 3) — defensive against missing
     // `data` field on the API response (e.g. anomalies feature not yet
@@ -140,15 +145,15 @@ export default function FinanceDashboardPage() {
         }}
       />
 
-      {error && (
-        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error}
-        </div>
+      {/* Loading state — only while no response (success OR error) has arrived */}
+      {!data && !dashboardErr && (
+        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
       )}
 
-      {!data && !error && <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>}
-
-      {data && (
+      {/* Always render the dashboard sections once any response has landed.
+          Cards show "—" + "Couldn't load" when dashboardErr is set so the
+          anomaly / OCR widgets (already defensive) keep rendering regardless. */}
+      {(data || dashboardErr) && (
         <div className="max-w-5xl space-y-6">
           {/* P&L window KPIs */}
           <section>
@@ -159,10 +164,19 @@ export default function FinanceDashboardPage() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('revenue')}
                 </p>
-                <p className="text-2xl font-semibold font-mono text-green-700">
-                  {kwd(thisMonth.revenue)}
+                <p
+                  className={`text-2xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : 'text-green-700'}`}
+                  title={dashboardErr ?? undefined}
+                >
+                  {dashboardErr ? '—' : kwd(thisMonth.revenue)}
                 </p>
-                <p className="text-xs text-muted-foreground">KWD</p>
+                {dashboardErr ? (
+                  <p className="text-xs text-destructive truncate" title={dashboardErr}>
+                    Couldn't load
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">KWD</p>
+                )}
               </div>
 
               {/* Expenses */}
@@ -170,22 +184,44 @@ export default function FinanceDashboardPage() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t('expenses')}
                 </p>
-                <p className="text-2xl font-semibold font-mono text-red-600">
-                  {kwd(thisMonth.expenses)}
+                <p
+                  className={`text-2xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : 'text-red-600'}`}
+                  title={dashboardErr ?? undefined}
+                >
+                  {dashboardErr ? '—' : kwd(thisMonth.expenses)}
                 </p>
-                <p className="text-xs text-muted-foreground">KWD</p>
+                {dashboardErr ? (
+                  <p className="text-xs text-destructive truncate" title={dashboardErr}>
+                    Couldn't load
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">KWD</p>
+                )}
               </div>
 
               {/* Net Income */}
               <div className="rounded-xl border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('net')}</p>
                 <p
-                  className={`text-2xl font-semibold font-mono ${netPositive ? 'text-green-700' : 'text-red-600'}`}
+                  className={`text-2xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : netPositive ? 'text-green-700' : 'text-red-600'}`}
+                  title={dashboardErr ?? undefined}
                 >
-                  {netPositive ? '' : '−'}
-                  {kwd(Math.abs(thisMonth.net))}
+                  {dashboardErr ? (
+                    '—'
+                  ) : (
+                    <>
+                      {netPositive ? '' : '−'}
+                      {kwd(Math.abs(thisMonth.net))}
+                    </>
+                  )}
                 </p>
-                <p className="text-xs text-muted-foreground">KWD</p>
+                {dashboardErr ? (
+                  <p className="text-xs text-destructive truncate" title={dashboardErr}>
+                    Couldn't load
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">KWD</p>
+                )}
               </div>
             </div>
           </section>
@@ -196,8 +232,19 @@ export default function FinanceDashboardPage() {
               <h2 className="text-base font-semibold mb-3">{t('stockValue')}</h2>
               <div className="rounded-xl border border-border p-6 flex items-center justify-center">
                 <div className="text-center space-y-1">
-                  <p className="text-3xl font-semibold font-mono">{kwd(stockValue)}</p>
-                  <p className="text-sm text-muted-foreground">KWD</p>
+                  <p
+                    className={`text-3xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : ''}`}
+                    title={dashboardErr ?? undefined}
+                  >
+                    {dashboardErr ? '—' : kwd(stockValue)}
+                  </p>
+                  {dashboardErr ? (
+                    <p className="text-xs text-destructive truncate" title={dashboardErr}>
+                      Couldn't load
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">KWD</p>
+                  )}
                 </div>
               </div>
             </section>
@@ -206,7 +253,11 @@ export default function FinanceDashboardPage() {
             <section>
               <h2 className="text-base font-semibold mb-3">{t('cash')}</h2>
               <div className="rounded-xl border border-border overflow-hidden">
-                {cash.length === 0 ? (
+                {dashboardErr ? (
+                  <div className="p-4 text-sm text-muted-foreground" title={dashboardErr}>
+                    — <span className="text-xs text-destructive">Couldn't load</span>
+                  </div>
+                ) : cash.length === 0 ? (
                   <div className="p-4 text-sm text-muted-foreground">—</div>
                 ) : (
                   <table className="w-full text-sm">
@@ -252,36 +303,39 @@ export default function FinanceDashboardPage() {
             <section className="lg:col-span-2">
               <h2 className="text-base font-semibold mb-3">{t('balanceSheet')}</h2>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="rounded-xl border border-border p-4 space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                    {t('assets')}
-                  </p>
-                  <p className="text-xl font-semibold font-mono">{kwd(balanceSheet.totalAssets)}</p>
-                  <p className="text-xs text-muted-foreground">KWD</p>
-                </div>
-                <div className="rounded-xl border border-border p-4 space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                    {t('liabilities')}
-                  </p>
-                  <p className="text-xl font-semibold font-mono">
-                    {kwd(balanceSheet.totalLiabilities)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">KWD</p>
-                </div>
-                <div className="rounded-xl border border-border p-4 space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                    {t('equity')}
-                  </p>
-                  <p className="text-xl font-semibold font-mono">{kwd(balanceSheet.totalEquity)}</p>
-                  <p className="text-xs text-muted-foreground">KWD</p>
-                </div>
+                {(
+                  [
+                    { labelKey: 'assets', val: balanceSheet.totalAssets },
+                    { labelKey: 'liabilities', val: balanceSheet.totalLiabilities },
+                    { labelKey: 'equity', val: balanceSheet.totalEquity },
+                  ] as { labelKey: 'assets' | 'liabilities' | 'equity'; val: number }[]
+                ).map(({ labelKey, val }) => (
+                  <div key={labelKey} className="rounded-xl border border-border p-4 space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {t(labelKey)}
+                    </p>
+                    <p
+                      className={`text-xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : ''}`}
+                      title={dashboardErr ?? undefined}
+                    >
+                      {dashboardErr ? '—' : kwd(val)}
+                    </p>
+                    {dashboardErr ? (
+                      <p className="text-xs text-destructive truncate" title={dashboardErr}>
+                        Couldn't load
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">KWD</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </section>
           </div>
 
           {/* ── Smart layer cards ─────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent anomalies */}
+            {/* Recent anomalies — already defensive, unchanged */}
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-semibold">{t('recentAnomalies')}</h2>
@@ -335,7 +389,7 @@ export default function FinanceDashboardPage() {
               </div>
             </section>
 
-            {/* Pending OCR drafts */}
+            {/* Pending OCR drafts — already defensive, unchanged */}
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base font-semibold">{t('pendingOcrDrafts')}</h2>

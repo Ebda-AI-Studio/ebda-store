@@ -3707,7 +3707,7 @@
         "orders": "الطلبات",
         "customers": "العملاء",
         "stockDashboard": "نظرة عامة",
-        "inventory": "مستويات المخزون",
+        "inventory": "الجرد",
         "adjustments": "التسويات",
         "suppliers": "الموردون",
         "purchaseOrders": "أوامر الشراء",
@@ -3719,7 +3719,7 @@
         "journal": "اليومية",
         "expenses": "المصروفات",
         "reports": "التقارير",
-        "analyticsOverview": "نظرة عامة",
+        "analyticsOverview": "التحليلات",
         "insightsDashboard": "الإحصاءات",
         "insightsCohorts": "الشرائح الزمنية",
         "insightsFunnel": "قمع الشراء",
@@ -3817,7 +3817,7 @@
       }
     },
     "dashboard": {
-      "title": "لوحة تحكم المالية",
+      "title": "نظرة عامة على المحاسبة",
       "thisMonth": "هذا الشهر",
       "revenue": "الإيرادات",
       "expenses": "المصروفات",
@@ -3954,7 +3954,7 @@
   "stock": {
     "navGroup": "المخزون",
     "dashboard": {
-      "title": "المخزون",
+      "title": "نظرة عامة على المخزون",
       "stockValue": "قيمة المخزون",
       "onHandSkus": "أصناف متوفرة",
       "lowStockSkus": "أصناف منخفضة المخزون",
@@ -4127,7 +4127,7 @@
   "insights": {
     "navGroup": "تحليلات ذكية",
     "dashboard": {
-      "title": "لوحة تحليلات ذكية",
+      "title": "الإحصاءات",
       "aov": "متوسط قيمة الطلب",
       "mrr30d": "إيرادات 30 يوماً",
       "repeatPurchase": "معدل تكرار الشراء",

@@ -144,7 +144,11 @@ export default function StoreCustomersPage() {
       }>(`/api/v1/stores/${storeId}/orders?page=1&limit=${limit}`);
 
       if (firstError || !firstData) {
+        // Set the per-fetch error and fall through to `finally` so the
+        // customers table keeps rendering (empty state + inline retry).
+        // The original `return` here caused a blank table body — removed.
         setError(firstError?.message || t('fetchFailed'));
+        setCustomers([]);
         return;
       }
 
@@ -240,28 +244,30 @@ export default function StoreCustomersPage() {
       // Sort by total spent descending
       const sorted = Array.from(customerMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
       setCustomers(sorted);
-
-      // Fetch RFM snapshots in the background — graceful no-op if not yet computed
-      apiGet<Array<{ customerId: string; segment: string }>>(
-        `/api/v1/stores/${storeId}/insights/customers/rfm-batch`
-      )
-        .then(({ data }) => {
-          if (!data) return;
-          const rows = unwrapList<{ customerId: string; segment: string }>(data);
-          setRfmMap(
-            new Map(
-              rows.map((r: { customerId: string; segment: string }) => [r.customerId, r.segment])
-            )
-          );
-        })
-        .catch(() => {
-          // insights not yet computed — badge stays hidden
-        });
     } catch {
       setError(t('connectionError'));
     } finally {
       setIsLoading(false);
     }
+
+    // Segments / RFM fetch is intentionally OUTSIDE the main try/catch so
+    // a segments API failure never sets the customers-page error state and
+    // never leaves the table blank. Badges simply stay hidden.
+    apiGet<Array<{ customerId: string; segment: string }>>(
+      `/api/v1/stores/${storeId}/insights/customers/rfm-batch`
+    )
+      .then(({ data }) => {
+        if (!data) return;
+        const rows = unwrapList<{ customerId: string; segment: string }>(data);
+        setRfmMap(
+          new Map(
+            rows.map((r: { customerId: string; segment: string }) => [r.customerId, r.segment])
+          )
+        );
+      })
+      .catch(() => {
+        // insights not yet computed — RFM badges stay hidden, no error state
+      });
   }, [storeId, t]);
 
   useEffect(() => {
