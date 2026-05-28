@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { affiliateService } from '../services/affiliate.service';
+import { listAffiliateEvents } from '../services/affiliate-event.service';
 
 const router = Router();
 
@@ -317,6 +318,27 @@ router.post(
       const data = payoutSchema.parse(req.body);
       const payout = await affiliateService.createPayout(req.params.storeId, req.params.id, data);
       res.status(201).json({ success: true, data: { payout } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ==========================================
+// Event history (audit trail)
+// ==========================================
+
+// GET /stores/:storeId/affiliates/:id/events
+router.get(
+  '/:storeId/affiliates/:id/events',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Verify the affiliate exists and belongs to this store before returning events.
+      await affiliateService.getById(req.params.storeId, req.params.id);
+
+      const events = await listAffiliateEvents(req.params.id, req.params.storeId);
+      res.json({ success: true, data: { events } });
     } catch (error) {
       next(error);
     }

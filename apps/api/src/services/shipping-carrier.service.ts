@@ -7,6 +7,7 @@ import { prisma } from '@force/database';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
+import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 
 import { iCarryCarrier } from './carriers/icarry.carrier';
@@ -412,6 +413,20 @@ class ShippingCarrierService {
       data: { status: 'processing' },
     });
 
+    await auditLog({
+      action: 'shipment.cancelled',
+      storeId: shipment.storeId,
+      resourceType: 'shipment',
+      resourceId: shipmentId,
+      details: {
+        orderId: shipment.orderId,
+        carrier: shipment.carrier,
+        fromStatus: shipment.status,
+        toStatus: 'cancelled',
+        carrierCancelled: cancelled,
+      },
+    });
+
     return updatedShipment;
   }
 
@@ -467,6 +482,7 @@ class ShippingCarrierService {
       description: h.description,
     }));
 
+    const prevStatus = shipment.status;
     const updatedShipment = await prisma.shipment.update({
       where: { id: shipmentId },
       data: {
@@ -475,6 +491,22 @@ class ShippingCarrierService {
         estimatedDeliveryAt: tracking.estimatedDelivery,
       },
     });
+
+    if (prevStatus !== tracking.status) {
+      await auditLog({
+        action: 'shipment.status_changed',
+        storeId: shipment.storeId,
+        resourceType: 'shipment',
+        resourceId: shipmentId,
+        details: {
+          orderId: shipment.orderId,
+          carrier: shipment.carrier,
+          fromStatus: prevStatus,
+          toStatus: tracking.status,
+          source: 'carrier_poll',
+        },
+      });
+    }
 
     // If delivered, update Order and dispatch notification
     if (tracking.status === 'delivered' && shipment.status !== 'delivered') {
@@ -562,6 +594,7 @@ class ShippingCarrierService {
       description: result.description,
     };
 
+    const prevWebhookStatus = shipment.status;
     const updatedShipment = await prisma.shipment.update({
       where: { id: shipment.id },
       data: {
@@ -569,6 +602,23 @@ class ShippingCarrierService {
         statusHistory: [...history, newEntry],
       },
     });
+
+    if (prevWebhookStatus !== result.status) {
+      await auditLog({
+        action: 'shipment.status_changed',
+        storeId: shipment.storeId,
+        resourceType: 'shipment',
+        resourceId: shipment.id,
+        details: {
+          orderId: shipment.orderId,
+          carrier: shipment.carrier,
+          fromStatus: prevWebhookStatus,
+          toStatus: result.status,
+          source: 'carrier_webhook',
+          location: result.location ?? null,
+        },
+      });
+    }
 
     // If delivered → update Order + notify
     if (result.status === 'delivered' && shipment.status !== 'delivered') {

@@ -65,11 +65,12 @@ model User {
   returns                Return[]
   loyaltyPoints          LoyaltyPoints[]
   loyaltyTransactions    LoyaltyTransaction[]
-  featureToggles         StoreFeature[]          @relation("FeatureToggledBy")
-  pushSubscriptions      PushSubscription[]      @relation("UserPushSubscriptions")
-  onesignalSubscriptions OneSignalSubscription[] @relation("UserOneSignalSubscriptions")
-  abandonedCarts         AbandonedCart[]         @relation("AbandonedCartCustomer")
-  triggeredPaymentEvents PaymentEvent[]
+  featureToggles           StoreFeature[]          @relation("FeatureToggledBy")
+  pushSubscriptions        PushSubscription[]      @relation("UserPushSubscriptions")
+  onesignalSubscriptions   OneSignalSubscription[] @relation("UserOneSignalSubscriptions")
+  abandonedCarts           AbandonedCart[]         @relation("AbandonedCartCustomer")
+  triggeredPaymentEvents   PaymentEvent[]
+  triggeredAffiliateEvents AffiliateEvent[]        @relation("AffiliateEventTriggeredBy")
 
   // Composite unique (storeId, email) — one customer account per email per
   // store. Admins (storeId NULL) are not subject to this constraint thanks
@@ -372,6 +373,7 @@ model Store {
   affiliateReferrals       AffiliateReferral[]
   affiliatePayouts         AffiliatePayout[]
   affiliateConfig          AffiliateConfig?
+  affiliateEvents          AffiliateEvent[]
   pages                    StorePage[]
   bulkImportJobs           BulkImportJob[]
   aiUsage                  AiUsage[]
@@ -1627,6 +1629,7 @@ model Affiliate {
   store     Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
   referrals AffiliateReferral[]
   payouts   AffiliatePayout[]
+  events    AffiliateEvent[]
 
   @@unique([storeId, referralCode])
   @@unique([storeId, email])
@@ -1698,6 +1701,33 @@ model AffiliateConfig {
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@map("affiliate_configs")
+}
+
+// Append-only audit trail for every Affiliate status change and
+// financial event. Mirrors the PaymentEvent pattern — never updated,
+// never deleted. storeId is denormalized so admin queries can be
+// scoped to a store without joining affiliates.
+model AffiliateEvent {
+  id                String   @id @default(uuid())
+  affiliateId       String   @map("affiliate_id")
+  storeId           String   @map("store_id")
+  eventType         String   @map("event_type") // approve | reject | suspend | commission_recorded | payout_initiated | payout_completed | created
+  fromStatus        String?  @map("from_status")
+  toStatus          String?  @map("to_status")
+  triggeredByUserId String?  @map("triggered_by_user_id")
+  details           Json     @default("{}") @map("details")
+  occurredAt        DateTime @default(now()) @map("occurred_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  affiliate       Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  store           Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  triggeredByUser User?     @relation("AffiliateEventTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([affiliateId, occurredAt])
+  @@index([storeId, occurredAt(sort: Desc)])
+  @@index([eventType])
+  @@map("affiliate_events")
 }
 
 // ==========================================
@@ -1952,6 +1982,7 @@ enum LoyaltyTransactionType {
   redeem_product // Points redeemed for free product
   expire // Points expired
   adjust // Manual adjustment
+  tier_changed // Customer tier flipped (bronze ↔ silver ↔ gold ↔ platinum) — 0-point bookkeeping row that records the transition. Audit-trail only.
 }
 
 // ==========================================

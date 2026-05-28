@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto';
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
+import { recordAffiliateEvent } from './affiliate-event.service';
 
 // ==========================================
 // Interfaces
@@ -190,6 +191,14 @@ class AffiliateService {
       '[AffiliateService] New affiliate applied'
     );
 
+    void recordAffiliateEvent({
+      affiliateId: affiliate.id,
+      storeId,
+      eventType: 'created',
+      toStatus: status,
+      details: { source: 'public_signup', autoApprove: config.autoApprove },
+    });
+
     return affiliate;
   }
 
@@ -226,6 +235,14 @@ class AffiliateService {
       { storeId, affiliateId: affiliate.id },
       '[AffiliateService] Admin created affiliate'
     );
+
+    void recordAffiliateEvent({
+      affiliateId: affiliate.id,
+      storeId,
+      eventType: 'created',
+      toStatus: 'approved',
+      details: { source: 'admin_invite' },
+    });
 
     return affiliate;
   }
@@ -307,10 +324,21 @@ class AffiliateService {
       throw new AppError(400, 'INVALID_STATUS', 'Only pending affiliates can be approved');
     }
 
-    return prisma.affiliate.update({
+    const updated = await prisma.affiliate.update({
       where: { id },
       data: { status: 'approved', approvedAt: new Date(), approvedBy: userId },
     });
+
+    void recordAffiliateEvent({
+      affiliateId: id,
+      storeId,
+      eventType: 'approve',
+      fromStatus: affiliate.status,
+      toStatus: 'approved',
+      triggeredByUserId: userId,
+    });
+
+    return updated;
   }
 
   async reject(storeId: string, id: string, userId: string) {
@@ -320,19 +348,41 @@ class AffiliateService {
       throw new AppError(400, 'INVALID_STATUS', 'Only pending affiliates can be rejected');
     }
 
-    return prisma.affiliate.update({
+    const updated = await prisma.affiliate.update({
       where: { id },
       data: { status: 'rejected', approvedBy: userId },
     });
+
+    void recordAffiliateEvent({
+      affiliateId: id,
+      storeId,
+      eventType: 'reject',
+      fromStatus: affiliate.status,
+      toStatus: 'rejected',
+      triggeredByUserId: userId,
+    });
+
+    return updated;
   }
 
   async suspend(storeId: string, id: string, userId: string) {
-    await this.getById(storeId, id);
+    const affiliate = await this.getById(storeId, id);
 
-    return prisma.affiliate.update({
+    const updated = await prisma.affiliate.update({
       where: { id },
       data: { status: 'suspended', approvedBy: userId },
     });
+
+    void recordAffiliateEvent({
+      affiliateId: id,
+      storeId,
+      eventType: 'suspend',
+      fromStatus: affiliate.status,
+      toStatus: 'suspended',
+      triggeredByUserId: userId,
+    });
+
+    return updated;
   }
 
   // ---- Delete ----
@@ -475,6 +525,13 @@ class AffiliateService {
       '[AffiliateService] Commission processed'
     );
 
+    void recordAffiliateEvent({
+      affiliateId: referral.affiliateId,
+      storeId,
+      eventType: 'commission_recorded',
+      details: { orderId, commissionAmount, rate, referralId: referral.id },
+    });
+
     return { commissionAmount, rate };
   }
 
@@ -519,6 +576,13 @@ class AffiliateService {
       { storeId, orderId, affiliateId: referral.affiliateId, amount },
       '[AffiliateService] Commission reversed (order refunded)'
     );
+
+    void recordAffiliateEvent({
+      affiliateId: referral.affiliateId,
+      storeId,
+      eventType: 'commission_reversed',
+      details: { orderId, amount, referralId: referral.id },
+    });
 
     return { amount };
   }
@@ -613,6 +677,13 @@ class AffiliateService {
       { storeId, affiliateId, payoutId: payout.id, amount: data.amount },
       '[AffiliateService] Payout created'
     );
+
+    void recordAffiliateEvent({
+      affiliateId,
+      storeId,
+      eventType: 'payout_initiated',
+      details: { payoutId: payout.id, amount: data.amount, method: payout.method },
+    });
 
     return payout;
   }

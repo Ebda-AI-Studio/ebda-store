@@ -7,6 +7,7 @@ import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { apiGet, apiPut, apiPost } from '../../../../../lib/api';
+import { useAuth } from '../../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 import { useLocale } from 'next-intl';
 import { ConfirmActionModal } from '../../../../../components/ConfirmActionModal';
@@ -29,6 +30,7 @@ export default function OrderDetailPage() {
   const tList = useT('orders.list');
   const locale = useLocale();
   const { success: toastSuccess, error: toastError } = useToast();
+  const { user } = useAuth();
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -202,7 +204,7 @@ export default function OrderDetailPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-4">
                 <DeliveryCard order={order} locale={locale} />
-                <PaymentCard order={order} />
+                <PaymentCard order={order} userRole={user?.role} />
                 <CustomerCard order={order} />
                 <NotesCard order={order} />
               </div>

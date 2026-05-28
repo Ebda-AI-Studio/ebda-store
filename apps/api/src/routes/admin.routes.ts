@@ -560,12 +560,28 @@ router.put(
       const changed = Object.keys(data).filter(k => k !== 'password');
       if (data.password) changed.push('password');
 
+      // Capture from/to for sensitive fields so a forensic reviewer
+      // doesn't need raw DB access to reconstruct what changed. Role
+      // and status changes are the highest-risk transitions — a role
+      // escalation from store_admin → super_admin warrants explicit
+      // before/after capture, not just "role changed."
+      const fromTo: Record<string, { from: string; to: string }> = {};
+      if (data.role !== undefined && data.role !== existing.role) {
+        fromTo.role = { from: existing.role, to: data.role };
+      }
+      if (data.status !== undefined && data.status !== existing.status) {
+        fromTo.status = { from: existing.status, to: data.status };
+      }
+      if (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
+        fromTo.email = { from: existing.email, to: data.email.toLowerCase() };
+      }
+
       await auditLog({
         action: 'user.updated',
         userId: req.user!.userId,
         resourceType: 'user',
         resourceId: id,
-        details: { changedFields: changed.join(', ') },
+        details: { changedFields: changed.join(', '), transitions: fromTo },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
