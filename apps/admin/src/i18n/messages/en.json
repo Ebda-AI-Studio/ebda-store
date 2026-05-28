@@ -599,6 +599,29 @@
       "actions": {
         "saveChanges": "Save Changes",
         "cancel": "Cancel"
+      },
+      "faqs": {
+        "title": "FAQs / الأسئلة الشائعة",
+        "description": "These FAQs appear on the product page and are injected as FAQ rich-results for Google.",
+        "empty": "No FAQs yet. Add one below or generate with AI.",
+        "question": "Question (EN)",
+        "questionAr": "Question (AR)",
+        "answer": "Answer (EN)",
+        "answerAr": "Answer (AR)",
+        "addFaq": "Add FAQ",
+        "generateWithAi": "Generate with AI",
+        "generating": "Generating…",
+        "saveRow": "Save",
+        "cancelRow": "Cancel",
+        "deleteConfirm": "Delete this FAQ?",
+        "loadError": "Failed to load FAQs.",
+        "saveError": "Failed to save FAQ.",
+        "deleteError": "Failed to delete FAQ.",
+        "aiError": "AI generation failed.",
+        "aiSuccess": "AI drafted {count} FAQs — review and save each one.",
+        "reviewNote": "AI draft — review before saving",
+        "saveAll": "Save all AI drafts",
+        "discardAll": "Discard AI drafts"
       }
     },
     "recommendations": {
@@ -3703,6 +3726,7 @@
         "insightsSegments": "Segments",
         "insightsProducts": "Products",
         "aiTools": "AI Tools",
+        "aiUsage": "Usage",
         "whatsapp": "WhatsApp",
         "marketingPixels": "Pixels",
         "notifications": "Push",
@@ -4166,6 +4190,36 @@
       "asp": "ASP",
       "stockOnHand": "Stock",
       "costPrice": "Cost"
+    }
+  },
+  "aiUsage": {
+    "title": "AI Usage",
+    "subtitle": "Monitor your store's AI call consumption and remaining quota.",
+    "loading": "Loading...",
+    "loadError": "Failed to load AI usage data.",
+    "cards": {
+      "today": "AI Calls Today",
+      "thisMonth": "Calls This Month",
+      "dailyCap": "Daily Cap",
+      "monthlyCap": "Monthly Cap",
+      "remaining": "Remaining Today"
+    },
+    "chart": {
+      "title": "Last 30 Days",
+      "calls": "calls"
+    },
+    "table": {
+      "title": "Recent AI Calls",
+      "date": "Date",
+      "feature": "Feature",
+      "tokens": "Tokens",
+      "status": "Status",
+      "cached": "Cached",
+      "live": "Live",
+      "empty": "No AI calls recorded yet.",
+      "prevPage": "Previous",
+      "nextPage": "Next",
+      "pageInfo": "Page {page} of {pages}"
     }
   }
 }

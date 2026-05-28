@@ -12,6 +12,7 @@ import { AITranslateMissingButton } from '../../../../../../components/AITransla
 import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPost, apiPut } from '../../../../../../lib/api';
 import { EditSidebar } from './_components/EditSidebar';
+import { ProductFaqSection } from './_components/ProductFaqSection';
 
 interface Product {
   id: string;
@@ -654,6 +655,10 @@ export default function EditProductPage() {
                 </div>
               </div>
             </div>
+
+            {/* FAQ editor — rendered after product loads. Uses the existing
+                /products/:id/faqs CRUD endpoints + AI draft endpoint. */}
+            {product && <ProductFaqSection storeId={storeId} productId={product.id} />}
           </div>
 
           <EditSidebar

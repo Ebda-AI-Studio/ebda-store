@@ -5,6 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { affiliateService } from '../services/affiliate.service';
 import { listAffiliateEvents } from '../services/affiliate-event.service';
+import { prisma } from '@force/database';
 
 const router = Router();
 
@@ -268,6 +269,94 @@ router.patch(
 // ==========================================
 // Referrals per affiliate
 // ==========================================
+
+// GET /stores/:storeId/affiliates/:id/events - Combined timeline of referrals + payouts
+router.get(
+  '/:storeId/affiliates/:id/events',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id: affiliateId } = req.params;
+
+      // Verify affiliate belongs to this store
+      const affiliate = await affiliateService.getById(storeId, affiliateId);
+      if (!affiliate) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Affiliate not found' },
+        });
+        return;
+      }
+
+      const [referrals, payouts] = await Promise.all([
+        prisma.affiliateReferral.findMany({
+          where: { storeId, affiliateId },
+          include: { order: { select: { id: true, orderNumber: true, total: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+        }),
+        prisma.affiliatePayout.findMany({
+          where: { storeId, affiliateId },
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+        }),
+      ]);
+
+      // Normalise into a unified event shape
+      interface AffiliateEvent {
+        id: string;
+        at: string;
+        kind: string;
+        details: Record<string, any>;
+      }
+
+      const events: AffiliateEvent[] = [];
+
+      for (const r of referrals) {
+        const kind = r.status === 'converted' ? 'referral.converted' : 'referral.clicked';
+        events.push({
+          id: `ref-${r.id}`,
+          at: (r.convertedAt ?? r.createdAt).toISOString(),
+          kind,
+          details: {
+            referralCode: r.referralCode,
+            orderId: r.orderId,
+            orderNumber: r.order?.orderNumber,
+            orderTotal: r.order?.total ? Number(r.order.total) : undefined,
+            commissionAmount: r.commissionAmount ? Number(r.commissionAmount) : undefined,
+            status: r.status,
+          },
+        });
+      }
+
+      for (const p of payouts) {
+        const kind =
+          p.status === 'completed'
+            ? 'payout.completed'
+            : p.status === 'pending'
+              ? 'payout.initiated'
+              : `payout.${p.status}`;
+        events.push({
+          id: `payout-${p.id}`,
+          at: (p.paidAt ?? p.createdAt).toISOString(),
+          kind,
+          details: {
+            amount: Number(p.amount),
+            method: p.method,
+            status: p.status,
+            notes: p.notes,
+          },
+        });
+      }
+
+      events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+      res.json({ success: true, data: { events, affiliate } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // GET /stores/:storeId/affiliates/:id/referrals
 router.get(

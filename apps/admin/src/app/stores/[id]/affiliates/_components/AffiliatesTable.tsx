@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import {
   formatFils,
@@ -11,6 +12,7 @@ import {
 } from './types';
 
 interface AffiliatesTableProps {
+  storeId: string;
   affiliates: Affiliate[];
   meta: Meta | null;
   statusFilter: string;
@@ -27,6 +29,7 @@ interface AffiliatesTableProps {
  * (approve/reject/suspend/payout), empty state, and pagination footer.
  */
 export function AffiliatesTable({
+  storeId,
   affiliates,
   meta,
   statusFilter,
@@ -151,6 +154,13 @@ export function AffiliatesTable({
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2 flex-wrap">
+                        {/* View events — always available */}
+                        <Link
+                          href={`/stores/${storeId}/affiliates/${affiliate.id}/events`}
+                          className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+                        >
+                          View events
+                        </Link>
                         {affiliate.status === 'pending' && (
                           <>
                             <button

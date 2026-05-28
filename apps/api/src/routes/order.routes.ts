@@ -1262,4 +1262,152 @@ router.post(
   }
 );
 
+// ==========================================
+// GET /stores/:storeId/orders/:orderId/timeline
+// ==========================================
+
+interface TimelineRow {
+  at: string;
+  source: 'audit' | 'shipment' | 'order';
+  kind: string;
+  fromStatus?: string;
+  toStatus?: string;
+  details?: string;
+  actorName?: string;
+  location?: string;
+}
+
+interface ShipmentHistoryEntry {
+  status: string;
+  timestamp: string;
+  location?: string;
+  description?: string;
+}
+
+/**
+ * GET /stores/:storeId/orders/:orderId/timeline
+ *
+ * Mixed-audience: admins authenticated via checkStoreAccess; customers
+ * verified by matching their own customerId on the order. actorName is
+ * redacted for non-admin callers.
+ */
+router.get(
+  '/:storeId/orders/:orderId/timeline',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, orderId } = req.params;
+      const user = (req as any).user;
+
+      // Resolve caller role — try admin middleware first, then customer check.
+      let isAdmin = false;
+      if (user) {
+        if (user.role === 'super_admin' || user.role === 'store_admin') {
+          // Verify the admin actually owns this store (reuse prisma check)
+          const store = await prisma.store.findFirst({
+            where: { id: storeId, ...(user.role !== 'super_admin' ? { userId: user.userId } : {}) },
+            select: { id: true },
+          });
+          if (store) isAdmin = true;
+        }
+      }
+
+      // Fetch the order to get customerId + synthetic event dates
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, storeId },
+        select: {
+          id: true,
+          customerId: true,
+          shippedAt: true,
+          deliveredAt: true,
+          createdAt: true,
+          // Order has a single optional Shipment relation (not an array).
+          shipment: {
+            select: { statusHistory: true },
+          },
+        },
+      });
+
+      if (!order) {
+        res.status(404).json({ success: false, error: { message: 'Order not found' } });
+        return;
+      }
+
+      // For non-admin callers verify ownership
+      if (!isAdmin) {
+        if (!user || order.customerId !== user.userId) {
+          res.status(403).json({ success: false, error: { message: 'Forbidden' } });
+          return;
+        }
+      }
+
+      const rows: TimelineRow[] = [];
+
+      // 1. Audit log entries for this order
+      const audits = await prisma.auditLog.findMany({
+        where: { storeId, resourceType: 'order', resourceId: orderId },
+        include: { user: { select: { firstName: true, lastName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      });
+
+      const auditKinds = new Set<string>();
+      for (const a of audits) {
+        auditKinds.add(a.action);
+        const d = a.details as Record<string, any>;
+        rows.push({
+          at: a.createdAt.toISOString(),
+          source: 'audit',
+          kind: a.action,
+          fromStatus: d?.fromStatus ?? d?.from,
+          toStatus: d?.toStatus ?? d?.to,
+          details: d?.notes ?? d?.description,
+          actorName:
+            isAdmin && a.user
+              ? `${a.user.firstName ?? ''} ${a.user.lastName ?? ''}`.trim()
+              : undefined,
+        });
+      }
+
+      // 2. Shipment status history entries
+      const shipment = order.shipment;
+      if (shipment) {
+        const history = (shipment.statusHistory as unknown as ShipmentHistoryEntry[]) ?? [];
+        for (const entry of history) {
+          rows.push({
+            at: entry.timestamp,
+            source: 'shipment',
+            kind: `shipment.${entry.status}`,
+            details: entry.description,
+            location: entry.location,
+          });
+        }
+      }
+
+      // 3. Synthetic order-level events for shippedAt/deliveredAt when no
+      //    matching audit log entry exists (avoids duplication)
+      if (order.shippedAt && !auditKinds.has('order.shipped')) {
+        rows.push({ at: order.shippedAt.toISOString(), source: 'order', kind: 'order.shipped' });
+      }
+      if (order.deliveredAt && !auditKinds.has('order.delivered')) {
+        rows.push({
+          at: order.deliveredAt.toISOString(),
+          source: 'order',
+          kind: 'order.delivered',
+        });
+      }
+      // Order creation event
+      if (!auditKinds.has('order.created')) {
+        rows.push({ at: order.createdAt.toISOString(), source: 'order', kind: 'order.created' });
+      }
+
+      // Sort newest first
+      rows.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+      res.json({ success: true, data: { timeline: rows.slice(0, 200) } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

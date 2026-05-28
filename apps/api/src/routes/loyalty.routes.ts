@@ -4,7 +4,7 @@ import { authenticate, authorize, customerUserId } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { LoyaltyService } from '../services/loyalty.service';
-import { LoyaltyTransactionType } from '@force/database';
+import { LoyaltyTransactionType, prisma } from '@force/database';
 
 const router = Router();
 
@@ -169,6 +169,74 @@ router.get(
       res.json({
         success: true,
         data: { points },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /stores/:storeId/loyalty/transactions - Store-level paginated transaction log (admin)
+router.get(
+  '/:storeId/loyalty/transactions',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('loyalty'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { page, limit, type, customerId, from, to } = req.query;
+
+      const pageNum = Math.max(1, parseInt((page as string) || '1') || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt((limit as string) || '50') || 50));
+      const skip = (pageNum - 1) * limitNum;
+
+      const where: any = { storeId };
+      if (type && typeof type === 'string' && type !== 'all') {
+        where.type = type as LoyaltyTransactionType;
+      }
+      if (customerId && typeof customerId === 'string') {
+        where.customerId = customerId;
+      }
+      if (from || to) {
+        where.createdAt = {};
+        if (from && typeof from === 'string') {
+          where.createdAt.gte = new Date(from);
+        }
+        if (to && typeof to === 'string') {
+          // Include the full 'to' day
+          const toDate = new Date(to);
+          toDate.setHours(23, 59, 59, 999);
+          where.createdAt.lte = toDate;
+        }
+      }
+
+      const [transactions, total] = await Promise.all([
+        prisma.loyaltyTransaction.findMany({
+          where,
+          include: {
+            customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+            order: { select: { id: true, orderNumber: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limitNum,
+        }),
+        prisma.loyaltyTransaction.count({ where }),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          transactions,
+          meta: {
+            page: pageNum,
+            limit: limitNum,
+            total,
+            totalPages: Math.ceil(total / limitNum),
+          },
+        },
       });
     } catch (error) {
       next(error);

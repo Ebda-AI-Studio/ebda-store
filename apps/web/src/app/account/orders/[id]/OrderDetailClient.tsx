@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
@@ -100,6 +100,22 @@ export default function OrderDetailClient() {
   // Controls visibility of the tracking number modal (shown when trackingUrl is absent)
   const [showTrackingModal, setShowTrackingModal] = useState(false);
 
+  // Order timeline (collapsible, lazy-loaded)
+  const [timelineExpanded, setTimelineExpanded] = useState(false);
+  const [timelineRows, setTimelineRows] = useState<
+    Array<{
+      at: string;
+      source: string;
+      kind: string;
+      fromStatus?: string;
+      toStatus?: string;
+      details?: string;
+      location?: string;
+    }>
+  >([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineFetched, setTimelineFetched] = useState(false);
+
   useEffect(() => {
     if (orderId) {
       fetchOrder();
@@ -123,6 +139,29 @@ export default function OrderDetailClient() {
       setIsLoading(false);
     }
   }
+
+  const fetchTimeline = useCallback(async () => {
+    if (timelineFetched || !order) return;
+    setTimelineLoading(true);
+    try {
+      const result = await api.getOrderTimeline(order.storeId, order.id);
+      if (result.success && result.data) {
+        setTimelineRows(result.data.timeline ?? []);
+      }
+    } catch {
+      // non-blocking — timeline is supplementary info
+    } finally {
+      setTimelineLoading(false);
+      setTimelineFetched(true);
+    }
+  }, [order, timelineFetched]);
+
+  const handleTimelineToggle = useCallback(() => {
+    setTimelineExpanded(v => {
+      if (!v) fetchTimeline();
+      return !v;
+    });
+  }, [fetchTimeline]);
 
   // Per-tenant wrappers — render in the store's timezone using the
   // visitor's chosen language. The bare-date version uses the long preset
@@ -785,6 +824,99 @@ export default function OrderDetailClient() {
               '\u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629'
             )}
           </button>
+        )}
+      </div>
+
+      {/* Order Timeline (collapsible, lazy-loaded) */}
+      <div className="mt-6 rounded-2xl border border-border bg-card">
+        <button
+          type="button"
+          onClick={handleTimelineToggle}
+          className="flex w-full items-center justify-between p-5 text-start"
+          aria-expanded={timelineExpanded}
+        >
+          <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            {t('Order Timeline', 'مسار الطلب')}
+          </span>
+          <svg
+            className={`h-4 w-4 text-muted-foreground transition-transform ${timelineExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {timelineExpanded && (
+          <div className="border-t border-border px-5 pb-5 pt-4">
+            {timelineLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary" />
+              </div>
+            )}
+            {!timelineLoading && timelineRows.length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                {t('No timeline events yet', 'لا توجد أحداث حتى الآن')}
+              </p>
+            )}
+            {!timelineLoading && timelineRows.length > 0 && (
+              <ol className="space-y-0">
+                {timelineRows.map((row, idx) => (
+                  <li key={`${row.at}-${idx}`} className="relative flex gap-3 pb-5 last:pb-0">
+                    {idx < timelineRows.length - 1 && (
+                      <span
+                        className="absolute start-3.5 top-7 h-[calc(100%-1.75rem)] w-px bg-border"
+                        aria-hidden
+                      />
+                    )}
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                      <svg
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    </span>
+                    <div className="flex-1 min-w-0 pt-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {row.kind.replace(/[._]/g, ' ')}
+                      </p>
+                      {row.fromStatus && row.toStatus && (
+                        <p className="text-xs text-muted-foreground">
+                          {row.fromStatus} → {row.toStatus}
+                        </p>
+                      )}
+                      {row.details && (
+                        <p className="text-xs text-muted-foreground">{row.details}</p>
+                      )}
+                      {row.location && (
+                        <p className="text-xs text-muted-foreground">{row.location}</p>
+                      )}
+                      <time
+                        dateTime={row.at}
+                        className="mt-0.5 block text-xs text-muted-foreground"
+                      >
+                        {new Date(row.at).toLocaleString(language === 'ar' ? 'ar-KW' : 'en-US', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })}
+                      </time>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
         )}
       </div>
 
