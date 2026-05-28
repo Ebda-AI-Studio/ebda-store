@@ -25,69 +25,73 @@ export function QuickActions({
     <div className="mt-8">
       <h2 className="mb-4 font-semibold text-foreground">{t('title')}</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {store.status === 'active' ? (
-          <button
-            type="button"
-            disabled={isChangingStatus}
-            onClick={onRequestSuspend}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-destructive/40 hover:shadow-md cursor-pointer text-start disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-              {isChangingStatus ? (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-destructive/40 border-t-red-600" />
-              ) : (
-                <svg
-                  className="h-5 w-5 text-destructive"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                  />
-                </svg>
-              )}
-            </div>
-            <div>
-              <p className="font-medium text-foreground">{t('suspend')}</p>
-              <p className="text-xs text-muted-foreground">{t('suspendDescription')}</p>
-            </div>
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={isChangingStatus}
-            onClick={onActivate}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-success/40 hover:shadow-md cursor-pointer text-start disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-              {isChangingStatus ? (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-success/40 border-t-green-600" />
-              ) : (
-                <svg
-                  className="h-5 w-5 text-success"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              )}
-            </div>
-            <div>
-              <p className="font-medium text-foreground">{t('activate')}</p>
-              <p className="text-xs text-muted-foreground">{t('activateDescription')}</p>
-            </div>
-          </button>
-        )}
+        {/* Suspend / Activate — super_admin only. The PATCH /stores/:id/status
+            endpoint also enforces authorize('super_admin') server-side so
+            hiding the button here is defence-in-depth, not the only gate. */}
+        {isSuperAdmin &&
+          (store.status === 'active' ? (
+            <button
+              type="button"
+              disabled={isChangingStatus}
+              onClick={onRequestSuspend}
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-destructive/40 hover:shadow-md cursor-pointer text-start disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
+                {isChangingStatus ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-destructive/40 border-t-red-600" />
+                ) : (
+                  <svg
+                    className="h-5 w-5 text-destructive"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                    />
+                  </svg>
+                )}
+              </div>
+              <div>
+                <p className="font-medium text-foreground">{t('suspend')}</p>
+                <p className="text-xs text-muted-foreground">{t('suspendDescription')}</p>
+              </div>
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={isChangingStatus}
+              onClick={onActivate}
+              className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:border-success/40 hover:shadow-md cursor-pointer text-start disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
+                {isChangingStatus ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-success/40 border-t-green-600" />
+                ) : (
+                  <svg
+                    className="h-5 w-5 text-success"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                )}
+              </div>
+              <div>
+                <p className="font-medium text-foreground">{t('activate')}</p>
+                <p className="text-xs text-muted-foreground">{t('activateDescription')}</p>
+              </div>
+            </button>
+          ))}
 
         <Link
           href={`/stores/${store.id}/products`}
