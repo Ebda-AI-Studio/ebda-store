@@ -6,6 +6,7 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
 
 /**
  * Catalogue-wide AI product recommendations sweep.
@@ -295,7 +296,7 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
           let parsed: LlmRec[];
 
           try {
-            parsed = JSON.parse(stripFences(raw));
+            parsed = JSON.parse(sanitizeJsonControlChars(stripFences(raw)));
           } catch {
             throw new Error('LLM returned unparseable JSON');
           }

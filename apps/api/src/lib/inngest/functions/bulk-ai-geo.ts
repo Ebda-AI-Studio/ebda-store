@@ -6,6 +6,7 @@ import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
 
 /**
  * GEO (Generative Engine Optimization) bulk sweeps — generates content
@@ -406,7 +407,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
               () => model.generateContent(prompt),
               `citation-copy:product:${p.id}`
             );
-            const raw = stripFences(result.response.text());
+            const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
             const parsed = JSON.parse(raw) as { en: string; ar: string };
 
             if (typeof parsed.en === 'string' && parsed.en.trim()) {
@@ -617,7 +618,7 @@ Populate using only the information provided above. For keyCategories, use the c
           () => model.generateContent(prompt),
           `brand-facts:${storeId}`
         );
-        const raw = stripFences(result.response.text());
+        const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
         const parsed = JSON.parse(raw);
 
         if (parsed && typeof parsed === 'object') {

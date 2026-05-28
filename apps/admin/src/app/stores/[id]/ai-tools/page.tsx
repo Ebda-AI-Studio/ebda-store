@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../lib/api';
+import { GeoResultsPanel } from './_components/GeoResultsPanel';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO
@@ -448,6 +449,9 @@ export default function AiToolsPage() {
           forceTooltip="Overwrites existing brand facts JSON with freshly generated data."
         />
       </div>
+
+      {/* Currently populated GEO outputs — closes the every-data-has-a-UI gap. */}
+      <GeoResultsPanel storeId={storeId} refreshTrigger={jobs.length} />
 
       {/* Active single-job progress */}
       {activeJob && (
