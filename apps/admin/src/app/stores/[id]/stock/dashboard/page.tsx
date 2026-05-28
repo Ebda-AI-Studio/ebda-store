@@ -46,41 +46,59 @@ export default function StockDashboardPage() {
   const [backorderCount, setBackorderCount] = useState<number | null>(null);
   const [reorderCount, setReorderCount] = useState<number | null>(null);
   const [deadstockCount, setDeadstockCount] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Per-card error state — fixes the original "Database operation failed"
+  // bug where a single failing fetch (e.g. /finance/dashboard for a store
+  // with no chart of accounts) blanked the entire page. Now each card
+  // shows its own "Couldn't load" message + the other cards continue
+  // to render whatever they successfully fetched.
+  const [financeErr, setFinanceErr] = useState<string | null>(null);
+  const [onHandErr, setOnHandErr] = useState<string | null>(null);
+  const [lowStockErr, setLowStockErr] = useState<string | null>(null);
+  const [backorderErr, setBackorderErr] = useState<string | null>(null);
+  const [reorderErr, setReorderErr] = useState<string | null>(null);
+  const [deadstockErr, setDeadstockErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!storeId) return;
 
-    // Finance dashboard (stock value)
+    // Finance dashboard (stock value) — most likely culprit when the
+    // store hasn't seeded Chart of Accounts yet. Failure here used to
+    // blank the whole page via setError(); now it's contained.
     apiGet<FinanceDashboard>(`/api/v1/stores/${storeId}/finance/dashboard`).then(
       ({ data, error: e }) => {
-        if (e) setError(e.message);
+        if (e) setFinanceErr(e.message);
         else if (data) setDashboard(data);
       }
     );
 
     // On-hand SKUs (active products count)
     apiGet<ProductsResponse>(`/api/v1/stores/${storeId}/products?status=active&limit=1`).then(
-      ({ data }) => {
-        if (data) setOnHandCount(data.meta?.total ?? data.products?.length ?? 0);
+      ({ data, error: e }) => {
+        if (e) setOnHandErr(e.message);
+        else if (data) setOnHandCount(data.meta?.total ?? data.products?.length ?? 0);
       }
     );
 
     // Low-stock SKUs
-    apiGet<LowStockResponse>(`/api/v1/stores/${storeId}/analytics/low-stock`).then(({ data }) => {
-      if (data) setLowStockCount(data.products?.length ?? 0);
-    });
+    apiGet<LowStockResponse>(`/api/v1/stores/${storeId}/analytics/low-stock`).then(
+      ({ data, error: e }) => {
+        if (e) setLowStockErr(e.message);
+        else if (data) setLowStockCount(data.products?.length ?? 0);
+      }
+    );
 
     // Open backorders
-    apiGet<BackordersArray>(`/api/v1/stores/${storeId}/backorders`).then(({ data }) => {
-      if (data) setBackorderCount(data.length);
+    apiGet<BackordersArray>(`/api/v1/stores/${storeId}/backorders`).then(({ data, error: e }) => {
+      if (e) setBackorderErr(e.message);
+      else if (data) setBackorderCount(data.length);
     });
 
     // Reorder suggestions (open)
     apiGet<SuggestionListResponse>(
       `/api/v1/stores/${storeId}/stock/reorder-suggestions?status=open&perPage=1`
-    ).then(({ data }) => {
-      if (data) {
+    ).then(({ data, error: e }) => {
+      if (e) setReorderErr(e.message);
+      else if (data) {
         setReorderCount(data.meta?.total ?? data.data?.length ?? 0);
       }
     });
@@ -88,22 +106,32 @@ export default function StockDashboardPage() {
     // Dead-stock flags (open)
     apiGet<SuggestionListResponse>(
       `/api/v1/stores/${storeId}/stock/deadstock-flags?status=open&perPage=1`
-    ).then(({ data }) => {
-      if (data) {
+    ).then(({ data, error: e }) => {
+      if (e) setDeadstockErr(e.message);
+      else if (data) {
         setDeadstockCount(data.meta?.total ?? data.data?.length ?? 0);
       }
     });
   }, [storeId]);
 
-  if (error) {
-    return (
-      <AdminLayout title={t('title')}>
-        <div className="p-6 text-red-600 text-sm">{error}</div>
-      </AdminLayout>
-    );
-  }
+  // Show the loading state ONLY while we're waiting on the first response
+  // from any of the 6 fetches. Once one comes back (success OR error),
+  // render the grid — empty cards show their own loading/error states.
+  const anyResponded =
+    dashboard !== null ||
+    onHandCount !== null ||
+    lowStockCount !== null ||
+    backorderCount !== null ||
+    reorderCount !== null ||
+    deadstockCount !== null ||
+    financeErr !== null ||
+    onHandErr !== null ||
+    lowStockErr !== null ||
+    backorderErr !== null ||
+    reorderErr !== null ||
+    deadstockErr !== null;
 
-  if (!dashboard) {
+  if (!anyResponded) {
     return (
       <AdminLayout title={t('title')}>
         <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
@@ -111,36 +139,44 @@ export default function StockDashboardPage() {
     );
   }
 
+  // Per-card values: `—` when the fetch failed, `…` while waiting,
+  // the actual number when resolved. No card silently disappears.
   const kpis = [
     {
       label: t('stockValue'),
-      value: `${(dashboard.stockValue / 1000).toFixed(3)} KWD`,
+      value: dashboard ? `${(dashboard.stockValue / 1000).toFixed(3)} KWD` : financeErr ? '—' : '…',
       highlight: true,
+      errMsg: financeErr,
     },
     {
       label: t('onHandSkus'),
-      value: onHandCount !== null ? String(onHandCount) : '…',
+      value: onHandCount !== null ? String(onHandCount) : onHandErr ? '—' : '…',
+      errMsg: onHandErr,
     },
     {
       label: t('lowStockSkus'),
-      value: lowStockCount !== null ? String(lowStockCount) : '…',
+      value: lowStockCount !== null ? String(lowStockCount) : lowStockErr ? '—' : '…',
       warn: lowStockCount !== null && lowStockCount > 0,
+      errMsg: lowStockErr,
     },
     {
       label: t('openBackorders'),
-      value: backorderCount !== null ? String(backorderCount) : '…',
+      value: backorderCount !== null ? String(backorderCount) : backorderErr ? '—' : '…',
+      errMsg: backorderErr,
     },
     {
       label: t('reorderSuggestions'),
-      value: reorderCount !== null ? String(reorderCount) : '…',
+      value: reorderCount !== null ? String(reorderCount) : reorderErr ? '—' : '…',
       warn: reorderCount !== null && reorderCount > 0,
       href: `/stores/${storeId}/stock/reorder`,
+      errMsg: reorderErr,
     },
     {
       label: t('deadStockCount'),
-      value: deadstockCount !== null ? String(deadstockCount) : '…',
+      value: deadstockCount !== null ? String(deadstockCount) : deadstockErr ? '—' : '…',
       warn: deadstockCount !== null && deadstockCount > 0,
       href: `/stores/${storeId}/stock/deadstock`,
+      errMsg: deadstockErr,
     },
   ];
 
@@ -158,13 +194,19 @@ export default function StockDashboardPage() {
                   'text-2xl font-semibold font-mono',
                   kpi.highlight ? 'text-primary' : '',
                   kpi.warn ? 'text-amber-600' : '',
+                  kpi.errMsg ? 'text-muted-foreground' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
               >
                 {kpi.value}
               </p>
-              {kpi.href && (
+              {kpi.errMsg && (
+                <p className="text-xs text-destructive truncate" title={kpi.errMsg}>
+                  Couldn't load
+                </p>
+              )}
+              {kpi.href && !kpi.errMsg && (
                 <p className="text-xs text-primary underline underline-offset-2 cursor-pointer">
                   {t('viewAll')}
                 </p>

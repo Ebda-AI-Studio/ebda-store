@@ -3954,7 +3954,7 @@
   "stock": {
     "navGroup": "Stock",
     "dashboard": {
-      "title": "Stock Dashboard",
+      "title": "Inventory",
       "stockValue": "Stock Value",
       "onHandSkus": "On-hand SKUs",
       "lowStockSkus": "Low-stock SKUs",
