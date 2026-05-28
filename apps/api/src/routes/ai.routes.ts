@@ -1255,7 +1255,12 @@ router.get('/results/recommendations', async (req: Request, res: Response, next:
         targetProductId: true,
         score: true,
         reason: true,
-        createdAt: true,
+        // AiRecommendation model uses `generatedAt` (NOT createdAt).
+        // PR #16 merged this with `createdAt` which fails tsc on Railway
+        // (Prisma client typed select doesn't expose that field). Hotfix
+        // restores the build. The response shape stays `createdAt` for
+        // backward compat with the AiSuggestionsPanel frontend.
+        generatedAt: true,
         targetProduct: {
           select: {
             id: true,
@@ -1281,7 +1286,7 @@ router.get('/results/recommendations', async (req: Request, res: Response, next:
           targetProductId: r.targetProductId,
           score: r.score,
           reason: r.reason,
-          createdAt: r.createdAt,
+          createdAt: r.generatedAt,
           targetProduct: r.targetProduct,
         })),
       },
