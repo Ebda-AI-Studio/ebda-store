@@ -35,7 +35,7 @@ vi.mock('@force/database', async importOriginal => {
   };
 });
 
-vi.mock('../../apps/api/src/middleware/rbac.middleware', () => ({
+vi.mock('../../apps/api/src/middleware/rbac', () => ({
   requireRole:
     (role: string) =>
     (
@@ -132,7 +132,7 @@ describe('GET /admin/super-admin/ai-usage/summary — route guard', () => {
 
   it('calls next() for super_admin user', () => {
     // Re-import the guard factory from our mock
-    const { requireRole } = require('../../apps/api/src/middleware/rbac.middleware');
+    const { requireRole } = require('../../apps/api/src/middleware/rbac');
     const guard = requireRole('super_admin');
 
     const req = createMockRequest({
@@ -148,7 +148,7 @@ describe('GET /admin/super-admin/ai-usage/summary — route guard', () => {
   });
 
   it('returns 403 for store_admin user', () => {
-    const { requireRole } = require('../../apps/api/src/middleware/rbac.middleware');
+    const { requireRole } = require('../../apps/api/src/middleware/rbac');
     const guard = requireRole('super_admin');
 
     const req = createMockRequest({
@@ -164,7 +164,7 @@ describe('GET /admin/super-admin/ai-usage/summary — route guard', () => {
   });
 
   it('returns 403 when user is not authenticated', () => {
-    const { requireRole } = require('../../apps/api/src/middleware/rbac.middleware');
+    const { requireRole } = require('../../apps/api/src/middleware/rbac');
     const guard = requireRole('super_admin');
 
     const req = createMockRequest({ user: null });
