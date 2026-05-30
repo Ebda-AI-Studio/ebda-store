@@ -200,8 +200,15 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
 // Redis-backed rate-limit store (F8)
 // ---------------------------------------------------------------------------
 
-/** Minimal ioredis shape rate-limit-redis needs: a raw `call(...)`. */
-type RedisCaller = { call: (...args: unknown[]) => unknown };
+/**
+ * Minimal ioredis shape rate-limit-redis needs: a raw `call(...)`.
+ * `any[]` (not `unknown[]`) on purpose: ioredis's overloaded `call` has a
+ * `string`-first signature that is contravariantly incompatible with an
+ * `unknown[]` param, so the real client wouldn't be assignable. `any[]` makes
+ * the param bivariant — the single SDK-shim seam for the redis store.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RedisCaller = { call: (...args: any[]) => unknown };
 
 /**
  * Build a RedisStore for express-rate-limit so limits are shared across all API
