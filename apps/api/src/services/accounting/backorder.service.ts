@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withMoneyTx } from '@force/database';
 import logger from '../../lib/logger';
 import { OrderService } from '../order.service';
 
@@ -71,7 +71,7 @@ export async function cancelBackorder(
 
   const now = new Date();
 
-  await prisma.$transaction(async tx => {
+  await withMoneyTx(prisma, async tx => {
     // 1. Mark the backorder line cancelled
     await tx.backorderLine.update({
       where: { id: backorderId },

@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withMoneyTx } from '@force/database';
 import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@force/shared';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
@@ -174,7 +174,7 @@ class FeatureService {
     // SELECT goes to the primary that just absorbed the writes —
     // avoids the Neon read-replica staleness window where the cache
     // would otherwise be repopulated with the pre-write row state.
-    const freshFeatures = await prisma.$transaction(async tx => {
+    const freshFeatures = await withMoneyTx(prisma, async tx => {
       for (const [featureKey, enabled] of Object.entries(updates)) {
         await tx.storeFeature.upsert({
           where: { storeId_featureKey: { storeId, featureKey } },

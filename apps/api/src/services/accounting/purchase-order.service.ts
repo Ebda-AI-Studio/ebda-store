@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withMoneyTx } from '@force/database';
 import type { Prisma, PurchaseOrder, PurchaseOrderItem } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { getSystemAccountIdByCode } from './account.service';
@@ -89,7 +89,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
     variance: number;
   }> = [];
 
-  const po = await prisma.$transaction(async tx => {
+  const po = await withMoneyTx(prisma, async tx => {
     const po = await tx.purchaseOrder.findUnique({
       where: { id: input.poId },
       include: { items: true },

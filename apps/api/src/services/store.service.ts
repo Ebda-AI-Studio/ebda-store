@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify } from '@force/shared';
 import { redis } from './redis.service';
@@ -316,7 +316,7 @@ export class StoreService {
   static async delete(storeId: string) {
     const store = await this.getById(storeId);
 
-    await prisma.$transaction(async tx => {
+    await withMoneyTx(prisma, async tx => {
       // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE
       // statements because the Prisma-typed approach kept hitting
       // P2003 (journal_entries_store_id_fkey) even with explicit

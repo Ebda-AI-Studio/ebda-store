@@ -1,4 +1,4 @@
-import { prisma, Prisma, ProductStatus } from '@force/database';
+import { prisma, Prisma, ProductStatus, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify } from '@force/shared';
 import { redis } from './redis.service';
@@ -369,7 +369,7 @@ export class ProductService {
 
     // Wrap image/category replacement and product update in a transaction
     // so that a failure mid-way does not leave orphaned or missing relations.
-    const updatedProduct = await prisma.$transaction(async tx => {
+    const updatedProduct = await withMoneyTx(prisma, async tx => {
       // If images are provided, replace all existing images
       if (data.images !== undefined) {
         await tx.productImage.deleteMany({ where: { productId } });

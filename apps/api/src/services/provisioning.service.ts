@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { prisma, Prisma, StoreStatus } from '@force/database';
+import { prisma, Prisma, StoreStatus, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { VercelDomainService } from './vercel-domain.service';
@@ -113,7 +113,7 @@ export class ProvisioningService {
     let result;
     try {
       // Create store, owner, and default category in a single transaction
-      result = await prisma.$transaction(async tx => {
+      result = await withMoneyTx(prisma, async tx => {
         // Check if owner email exists. Admin/store-owner accounts live in
         // the global namespace (storeId NULL); customers are scoped per
         // store via the composite unique. Provisioning a store always

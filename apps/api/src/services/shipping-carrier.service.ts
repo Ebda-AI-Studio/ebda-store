@@ -3,7 +3,7 @@
 // Orchestrates carrier integrations: shipment creation, tracking, webhooks
 // ==========================================
 
-import { prisma } from '@force/database';
+import { prisma, withMoneyTx } from '@force/database';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
@@ -269,7 +269,7 @@ class ShippingCarrierService {
     // because it's external and non-rollbackable.
     let shipment;
     try {
-      shipment = await prisma.$transaction(async tx => {
+      shipment = await withMoneyTx(prisma, async tx => {
         const created = await tx.shipment.create({
           data: {
             storeId,

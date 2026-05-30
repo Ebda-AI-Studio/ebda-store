@@ -1,4 +1,4 @@
-import { prisma, Prisma, ProductStatus } from '@force/database';
+import { prisma, Prisma, ProductStatus, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 
 interface ProductImportRow {
@@ -445,7 +445,7 @@ export class BulkService {
       const batch = validRows.slice(batchStart, batchStart + BATCH_SIZE);
 
       try {
-        await prisma.$transaction(async tx => {
+        await withMoneyTx(prisma, async tx => {
           for (const { rowIndex, row, slug, existing } of batch) {
             try {
               const productFields = {

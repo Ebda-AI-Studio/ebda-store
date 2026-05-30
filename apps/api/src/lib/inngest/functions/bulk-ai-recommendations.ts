@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, withMoneyTx } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -325,7 +325,7 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
           } else {
             // Fully replace prior AI recs for this source product so
             // re-sweeping the catalogue produces a clean result.
-            await prisma.$transaction(async tx => {
+            await withMoneyTx(prisma, async tx => {
               await tx.aiRecommendation.deleteMany({
                 where: { storeId, sourceProductId: product.id },
               });

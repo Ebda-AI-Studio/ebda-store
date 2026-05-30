@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { prisma } from '@force/database';
+import { prisma, withMoneyTx } from '@force/database';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
@@ -808,7 +808,7 @@ export class AuthService {
     const anonymizedEmail = `erased-${user.id}@anonymized.local`;
     const anonymizedAddressJson = { anonymized: true } as const;
 
-    await prisma.$transaction(async tx => {
+    await withMoneyTx(prisma, async tx => {
       // Orders: preserve for tax records (Kuwait MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before

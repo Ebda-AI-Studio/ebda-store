@@ -147,6 +147,10 @@ export {
 
 export { prisma as db };
 
+// Money-safe transaction wrapper (Neon pgbouncer P2028 guard). Use for every
+// interactive $transaction call site. See ./with-money-tx.ts.
+export { withMoneyTx } from './with-money-tx';
+
 /**
  * Run a callback inside a Prisma interactive transaction with
  * `app.current_store_id` set via SET LOCAL. All Prisma queries executed

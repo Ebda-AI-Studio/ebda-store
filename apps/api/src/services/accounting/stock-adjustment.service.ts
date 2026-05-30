@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withMoneyTx } from '@force/database';
 import type { StockAdjustment, StockAdjustmentItem, StockAdjustmentType } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';
@@ -129,7 +129,7 @@ export async function postAdjustment(
 
   const inventoryType = INVENTORY_TYPE_MAP[adjustment.type];
 
-  await prisma.$transaction(async tx => {
+  await withMoneyTx(prisma, async tx => {
     for (const item of adjustment.items) {
       if (item.variantId) {
         await tx.productVariant.update({

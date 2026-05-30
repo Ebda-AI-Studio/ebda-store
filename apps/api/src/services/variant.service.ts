@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
@@ -210,7 +210,7 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Option not found');
     }
 
-    await prisma.$transaction(async tx => {
+    await withMoneyTx(prisma, async tx => {
       // Delete all variants since they depend on options
       await tx.productVariant.deleteMany({ where: { productId } });
 
