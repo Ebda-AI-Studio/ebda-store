@@ -1,47 +1,112 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
+import { ShopChrome } from '../../../components';
+import { useStoreUrl } from '../../../contexts/StoreContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 
-interface BlogPost {
+export interface BlogDetail {
   id: string;
   slug: string;
   title: string;
-  excerpt?: string;
+  titleAr?: string | null;
+  excerpt?: string | null;
+  excerptAr?: string | null;
   content: string;
-  coverImage?: string;
-  publishedAt?: string;
-  author?: string;
-  tags?: string[];
+  contentAr?: string | null;
+  coverImage?: string | null;
+  publishedAt?: string | null;
+  createdAt: string;
 }
 
 /**
- * Client leaf for the blog detail page. All interactive / presentational
- * rendering lives here; the parent `page.tsx` is a server component that fetches
- * the post once for SSR metadata + JSON-LD and passes it down (F2).
+ * Client leaf for the blog detail page. The parent `page.tsx` is now a server
+ * component that fetches the post once for SSR metadata + Article JSON-LD (F2)
+ * and passes it down here for interactive / localized rendering.
+ *
+ * Body is rendered as paragraphs split on blank lines, each text node escaped
+ * by React's default JSX handling — NO `dangerouslySetInnerHTML`. Merchants
+ * supply plain text only, so the XSS surface stays at zero (unchanged from the
+ * original client-only implementation).
  */
-export function BlogPostClient({ post }: { post: BlogPost | null }) {
-  if (!post) return <div className="p-8 text-center">Post not found</div>;
+export function BlogPostClient({ post }: { post: BlogDetail | null }) {
+  const { isRtl } = useLanguage();
+  const storeUrl = useStoreUrl();
+
+  const body = post ? (isRtl && post.contentAr ? post.contentAr : post.content) : '';
+  const paragraphs = body
+    .split(/\n{2,}/)
+    .map(p => p.trim())
+    .filter(Boolean);
 
   return (
-    <article className="mx-auto max-w-3xl px-4 py-12">
-      {post.coverImage && (
-        <img src={post.coverImage} alt={post.title} className="mb-6 w-full rounded-lg" />
-      )}
-      <h1 className="text-3xl font-bold">{post.title}</h1>
-      {post.author && <p className="mt-2 text-sm text-muted-foreground">By {post.author}</p>}
-      <div className="prose mt-6 max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
-      {post.tags && post.tags.length > 0 && (
-        <div className="mt-8 flex flex-wrap gap-2">
-          {post.tags.map(t => (
-            <span key={t} className="rounded bg-muted px-2 py-1 text-xs">
-              {t}
-            </span>
-          ))}
+    <ShopChrome>
+      <article
+        dir={isRtl ? 'rtl' : 'ltr'}
+        className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
+      >
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          {!post ? (
+            <div className="text-center py-16">
+              <p className="text-foreground/60">{isRtl ? 'المقال غير موجود.' : 'Post not found.'}</p>
+              <Link
+                href={storeUrl('/blog')}
+                className="mt-3 inline-block text-sm font-semibold text-[hsl(var(--primary))] hover:underline"
+              >
+                {isRtl ? '← العودة للمدونة' : '← Back to blog'}
+              </Link>
+            </div>
+          ) : (
+            <>
+              <header className="mb-8">
+                <Link
+                  href={storeUrl('/blog')}
+                  prefetch={false}
+                  className="text-sm font-semibold text-foreground/60 hover:text-foreground"
+                >
+                  {isRtl ? '← المدونة' : '← Blog'}
+                </Link>
+                <p className="mt-6 text-xs text-foreground/55">
+                  {new Date(post.publishedAt ?? post.createdAt).toLocaleDateString(
+                    isRtl ? 'ar-KW' : 'en-KW',
+                    { year: 'numeric', month: 'long', day: 'numeric' }
+                  )}
+                </p>
+                <h1 className="mt-2 text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
+                  {isRtl && post.titleAr ? post.titleAr : post.title}
+                </h1>
+              </header>
+
+              {post.coverImage && (
+                <div className="relative aspect-[16/9] overflow-hidden rounded-lg bg-foreground/5 mb-8">
+                  <Image
+                    src={post.coverImage}
+                    alt={isRtl && post.titleAr ? post.titleAr : post.title}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 768px"
+                    priority
+                    className="object-cover"
+                  />
+                </div>
+              )}
+
+              <div className="prose-blog space-y-5 text-base sm:text-lg text-foreground/85 leading-relaxed">
+                {paragraphs.map((p, i) => (
+                  <p key={i}>{p}</p>
+                ))}
+              </div>
+
+              <ShareProductRow
+                productName={isRtl && post.titleAr ? post.titleAr : post.title}
+                url={typeof window !== 'undefined' ? window.location.href : ''}
+                className="mt-10 border-t border-foreground/10 pt-6"
+              />
+            </>
+          )}
         </div>
-      )}
-      <Link href="/blog" className="mt-8 inline-block text-primary underline">
-        ← Back to blog
-      </Link>
-    </article>
+      </article>
+    </ShopChrome>
   );
 }
