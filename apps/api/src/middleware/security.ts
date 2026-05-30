@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator, type Store } from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
@@ -195,6 +196,31 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
 // Rate Limiting (per-route)
 // ==========================================
 
+// ---------------------------------------------------------------------------
+// Redis-backed rate-limit store (F8)
+// ---------------------------------------------------------------------------
+
+/** Minimal ioredis shape rate-limit-redis needs: a raw `call(...)`. */
+type RedisCaller = { call: (...args: unknown[]) => unknown };
+
+/**
+ * Build a RedisStore for express-rate-limit so limits are shared across all API
+ * replicas. The default in-memory MemoryStore counts per-process, letting a
+ * client multiply its allowance by the replica count under horizontal scale
+ * (F8). Returns `undefined` when Redis is unavailable so express-rate-limit
+ * falls back to its in-memory store (dev / test only).
+ */
+export function makeRateLimitStore(
+  redisClient: RedisCaller | null | undefined,
+  prefix: string
+): Store | undefined {
+  if (!redisClient) return undefined;
+  return new RedisStore({
+    sendCommand: (...args: string[]) => redisClient.call(...args) as Promise<number | string>,
+    prefix: `rl:${prefix}:`,
+  });
+}
+
 // Strict limiter for auth endpoints.
 //
 // Two-layer brute-force defense: this 15-attempt window is the
@@ -226,6 +252,7 @@ const skipForLoadTest = (req: Request): boolean => {
 };
 const skipForLoadTestOrTests = (req: Request): boolean => isTestEnv || skipForLoadTest(req);
 export const authLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'auth'),
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,
   message: {
@@ -246,6 +273,7 @@ export const authLimiter = rateLimit({
 
 // Limiter for password reset
 export const passwordResetLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'pwreset'),
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // 3 attempts per hour
   message: {
@@ -262,6 +290,7 @@ export const passwordResetLimiter = rateLimit({
 
 // Limiter for API writes (orders, payments)
 export const writeLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'write'),
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 writes per minute
   message: {
@@ -275,6 +304,7 @@ export const writeLimiter = rateLimit({
 
 // Stricter limiter for payment operations
 export const paymentLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'payment'),
   windowMs: 60 * 1000, // 1 minute
   max: 10, // 10 payment attempts per minute
   message: {
@@ -288,6 +318,7 @@ export const paymentLimiter = rateLimit({
 
 // File upload limiter - more restrictive
 export const uploadLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'upload'),
   windowMs: 60 * 1000, // 1 minute
   max: 20, // 20 uploads per minute
   message: {
@@ -307,6 +338,7 @@ export const uploadLimiter = rateLimit({
 
 // Daily upload limit per user
 export const dailyUploadLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'upload-daily'),
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
   max: 500, // 500 uploads per day per user
   message: {
@@ -324,6 +356,7 @@ export const dailyUploadLimiter = rateLimit({
 
 // Public API rate limiter - protect public endpoints from abuse
 export const publicLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'public'),
   windowMs: 60 * 1000, // 1 minute
   // Storefront browsing burns through this fast on real mobile sessions:
   // home + Next.js App Router RSC prefetches on link hover/viewport entry +
@@ -344,6 +377,7 @@ export const publicLimiter = rateLimit({
 
 // Store resolver rate limiter - stricter for domain resolution
 export const storeResolveLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'store-resolve'),
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 requests per minute
   message: {
@@ -357,6 +391,7 @@ export const storeResolveLimiter = rateLimit({
 
 // Cart rate limiter - prevent cart bombing
 export const cartLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'cart'),
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 cart operations per minute
   message: {
@@ -379,6 +414,7 @@ export const cartLimiter = rateLimit({
 // loop). 5 attempts per minute per IP+session is generous for a real human
 // who fat-fingered their address but cuts off bot enumeration.
 export const newsletterLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'newsletter'),
   windowMs: 60 * 1000, // 1 minute
   max: 5,
   message: {

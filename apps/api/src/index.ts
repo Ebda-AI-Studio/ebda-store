@@ -8,7 +8,9 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config';
 import { errorHandler } from './middleware/error-handler';
 import { requestLogger } from './middleware/request-logger';
-import { securityHeaders, requestId, sanitizeInput, csrfProtection } from './middleware/security';
+import { securityHeaders, requestId, sanitizeInput, csrfProtection,
+  makeRateLimitStore,
+} from './middleware/security';
 import { authenticate } from './middleware/auth';
 import { requireRole } from './middleware/rbac';
 import routes from './routes';
@@ -219,6 +221,7 @@ app.use(
     },
     standardHeaders: true,
     legacyHeaders: false,
+    store: makeRateLimitStore(redis.getClient(), 'global'),
     // Skip the limiter for two cases:
     //
     // 1. Load test bypass token. We only check when LOAD_TEST_BYPASS_TOKEN
