@@ -35,12 +35,21 @@ vi.mock('@force/database', async importOriginal => {
   };
 });
 
-vi.mock('../../apps/api/src/middleware/rbac', () => ({
+vi.mock('../../apps/api/src/middleware/rbac.middleware', () => ({
   requireRole:
     (role: string) =>
-    (req: { user?: { role?: string } }, res: { status: (n: number) => { json: (v: unknown) => unknown }; json: (v: unknown) => unknown }, next: () => void) => {
+    (
+      req: { user?: { role?: string } },
+      res: {
+        status: (n: number) => { json: (v: unknown) => unknown };
+        json: (v: unknown) => unknown;
+      },
+      next: () => void
+    ) => {
       if (req.user?.role !== role) {
-        res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Forbidden' } });
+        res
+          .status(403)
+          .json({ success: false, error: { code: 'FORBIDDEN', message: 'Forbidden' } });
         return;
       }
       next();
@@ -123,10 +132,12 @@ describe('GET /admin/super-admin/ai-usage/summary — route guard', () => {
 
   it('calls next() for super_admin user', () => {
     // Re-import the guard factory from our mock
-    const { requireRole } = require('../../apps/api/src/middleware/rbac');
+    const { requireRole } = require('../../apps/api/src/middleware/rbac.middleware');
     const guard = requireRole('super_admin');
 
-    const req = createMockRequest({ user: { role: 'super_admin', userId: 'sa-1', email: 'a@b.com' } });
+    const req = createMockRequest({
+      user: { role: 'super_admin', userId: 'sa-1', email: 'a@b.com' },
+    });
     const res = createMockResponse();
     const next = createMockNext();
 
@@ -137,10 +148,12 @@ describe('GET /admin/super-admin/ai-usage/summary — route guard', () => {
   });
 
   it('returns 403 for store_admin user', () => {
-    const { requireRole } = require('../../apps/api/src/middleware/rbac');
+    const { requireRole } = require('../../apps/api/src/middleware/rbac.middleware');
     const guard = requireRole('super_admin');
 
-    const req = createMockRequest({ user: { role: 'store_admin', userId: 'sa-2', email: 'b@b.com' } });
+    const req = createMockRequest({
+      user: { role: 'store_admin', userId: 'sa-2', email: 'b@b.com' },
+    });
     const res = createMockResponse();
     const next = createMockNext();
 
@@ -151,7 +164,7 @@ describe('GET /admin/super-admin/ai-usage/summary — route guard', () => {
   });
 
   it('returns 403 when user is not authenticated', () => {
-    const { requireRole } = require('../../apps/api/src/middleware/rbac');
+    const { requireRole } = require('../../apps/api/src/middleware/rbac.middleware');
     const guard = requireRole('super_admin');
 
     const req = createMockRequest({ user: null });
@@ -229,7 +242,13 @@ describe('GET /admin/super-admin/ai-usage/summary — response shape', () => {
   it('cacheHitRatio is 0 when no calls exist', async () => {
     // Simulate empty platform
     const emptyResult = {
-      platform: { todayCount: 0, monthCount: 0, totalCached: 0, totalUncached: 0, cacheHitRatio: 0 },
+      platform: {
+        todayCount: 0,
+        monthCount: 0,
+        totalCached: 0,
+        totalUncached: 0,
+        cacheHitRatio: 0,
+      },
       stores: [],
     };
     mockWithRlsBypass.mockResolvedValueOnce(emptyResult);
@@ -242,7 +261,7 @@ describe('GET /admin/super-admin/ai-usage/summary — response shape', () => {
     const unsorted = [
       { storeId: 'a', today: 10, month: 100 },
       { storeId: 'b', today: 50, month: 200 },
-      { storeId: 'c', today: 0,  month: 500 },
+      { storeId: 'c', today: 0, month: 500 },
     ];
     const sorted = [...unsorted].sort((a, b) => b.today - a.today || b.month - a.month);
     expect(sorted[0].storeId).toBe('b');

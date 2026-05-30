@@ -53,6 +53,13 @@ vi.mock('@force/database', () => ({
   },
   Prisma: {},
   OrderStatus: {},
+  // withMoneyTx (F6) wraps prisma.$transaction. Delegate to the mocked
+  // $transaction so existing `expect(prisma.$transaction).toHaveBeenCalled()`
+  // assertions still hold; fall back to invoking the callback directly if a
+  // test passes a client without a mocked $transaction.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withMoneyTx: (client: any, fn: any) =>
+    client?.$transaction ? client.$transaction(fn) : fn(client),
 }));
 
 vi.mock('@api/services/email.service', () => ({
