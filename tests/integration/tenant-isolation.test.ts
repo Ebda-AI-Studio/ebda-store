@@ -18,8 +18,8 @@ let orderB = '';
 async function makeStore(slug: string): Promise<string> {
   const user = await prisma.user.create({
     data: {
-      email: `${slug}-${Date.now()}@test.com`,
-      password: 'hashed',
+      email: `${TEST_PREFIX}${slug}-${Date.now()}@test.com`,
+      passwordHash: 'hashed',
       firstName: 'Tenant',
       lastName: 'Isolation',
       role: 'store_admin',
@@ -58,6 +58,7 @@ beforeAll(async () => {
       subtotal: 10,
       total: 10,
       shippingAddress: {},
+      billingAddress: {},
     },
   });
   orderB = order.id;
