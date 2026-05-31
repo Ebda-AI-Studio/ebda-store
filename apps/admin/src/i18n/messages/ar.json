@@ -1114,7 +1114,21 @@
       "viewOrdersTitle": "عرض طلبات هذا العميل",
       "viewOrders": "الطلبات",
       "countSingular": "{count} عميل",
-      "countPlural": "{count} عميل"
+      "countPlural": "{count} عميل",
+      "paginationShowing": "عرض {from} إلى {to} من {total} عميل",
+      "previous": "السابق",
+      "next": "التالي",
+      "badges": {
+        "vip": "كبار العملاء",
+        "loyal": "عميل وفي",
+        "potential": "عميل محتمل",
+        "new_customer": "عميل جديد",
+        "at_risk": "في خطر",
+        "hibernating": "غير نشط",
+        "lost": "مفقود",
+        "activeBuyer": "مشترٍ نشط",
+        "new": "جديد"
+      }
     }
   },
   "analytics": {
