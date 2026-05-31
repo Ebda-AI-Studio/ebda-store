@@ -27,6 +27,7 @@ interface Product {
   costPrice?: number;
   sku?: string;
   inventory: number;
+  lowStockThreshold?: number;
   status: string;
   isFeatured: boolean;
   isNew: boolean;
@@ -78,6 +79,8 @@ export default function EditProductPage() {
     costPrice: '',
     sku: '',
     inventory: '',
+    // Per-product low-stock threshold — drives the LOW STOCK badge + alerts.
+    lowStockThreshold: '',
     status: 'draft',
     isFeatured: false,
     isNew: false,
@@ -166,6 +169,10 @@ export default function EditProductPage() {
           costPrice: p.costPrice ? (p.costPrice / 1000).toFixed(3) : '',
           sku: p.sku || '',
           inventory: String(p.inventory ?? 0),
+          lowStockThreshold:
+            p.lowStockThreshold === undefined || p.lowStockThreshold === null
+              ? ''
+              : String(p.lowStockThreshold),
           status: p.status || 'draft',
           isFeatured: p.isFeatured || false,
           isNew: p.isNew || false,
@@ -263,6 +270,11 @@ export default function EditProductPage() {
         costPrice: costPriceInFils,
         sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
+        // Only send when filled so an empty field doesn't clobber the existing
+        // threshold with 0. The API leaves it untouched when omitted.
+        ...(formData.lowStockThreshold !== ''
+          ? { lowStockThreshold: parseInt(formData.lowStockThreshold, 10) }
+          : {}),
         status: formData.status,
         isFeatured: formData.isFeatured,
         isNew: formData.isNew,
@@ -547,7 +559,7 @@ export default function EditProductPage() {
               <h2 className="text-lg font-semibold text-foreground mb-4">
                 {tSections('inventory')}
               </h2>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <Input
                   label={tFields('sku')}
                   value={formData.sku}
@@ -560,6 +572,14 @@ export default function EditProductPage() {
                   value={formData.inventory}
                   onChange={e => updateField('inventory', e.target.value)}
                   placeholder={tFields('quantityPlaceholder')}
+                />
+                <Input
+                  label={tFields('lowStockThreshold')}
+                  type="number"
+                  min={0}
+                  value={formData.lowStockThreshold}
+                  onChange={e => updateField('lowStockThreshold', e.target.value)}
+                  placeholder={tFields('lowStockThresholdPlaceholder')}
                 />
               </div>
             </div>
