@@ -7,7 +7,6 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
-import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useT } from '@/i18n/useT';
 import { ProductsToolbar } from './_components/ProductsToolbar';
 import { ProductFilters } from './_components/ProductFilters';
@@ -39,8 +38,8 @@ export default function StoreProductsPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [limit, setLimit] = useState(initialLimit);
   const [loading, setLoading] = useState(true);
+  // `search` holds the already-debounced term — SearchInput owns the debounce.
   const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search, 300);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -58,7 +57,7 @@ export default function StoreProductsPage() {
         limit: String(limit),
       });
       if (statusFilter !== 'all') queryParams.append('status', statusFilter);
-      if (debouncedSearch) queryParams.append('search', debouncedSearch);
+      if (search) queryParams.append('search', search);
 
       // API returns `{ products, meta }`; we used to read `data.pagination`,
       // which was always undefined and hid the pagination control entirely.
@@ -78,7 +77,7 @@ export default function StoreProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, storeId, page, limit, statusFilter, debouncedSearch]);
+  }, [isAuthenticated, storeId, page, limit, statusFilter, search]);
 
   // Fetch products whenever any of the list-query inputs change. fetchProducts
   // is memoized on [isAuthenticated, storeId, page, statusFilter, debouncedSearch]
@@ -88,10 +87,9 @@ export default function StoreProductsPage() {
     fetchProducts();
   }, [isAuthenticated, fetchProducts]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
     setPage(1);
-    fetchProducts();
   };
 
   const handleStatusFilterChange = (status: StatusFilter) => {
@@ -142,8 +140,7 @@ export default function StoreProductsPage() {
     >
       <ProductFilters
         search={search}
-        onSearchChange={setSearch}
-        onSearchSubmit={handleSearch}
+        onSearchChange={handleSearchChange}
         statusFilter={statusFilter}
         onStatusFilterChange={handleStatusFilterChange}
       />

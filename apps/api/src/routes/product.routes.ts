@@ -137,7 +137,8 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { page, limit, status, category, search, featured, ids } = req.query;
+      const { page, limit, status, category, search, featured, ids, withSalesQuantity } =
+        req.query;
       const idsParam =
         typeof ids === 'string' && ids.length > 0
           ? ids
@@ -155,6 +156,8 @@ router.get(
         search: search as string,
         featured: featured === 'true',
         ids: idsParam,
+        // Inventory page opts in to the per-product sold-units aggregate.
+        withSalesQuantity: withSalesQuantity === 'true',
       });
 
       res.json({
@@ -342,6 +345,69 @@ router.post(
       res.json({
         success: true,
         data: { updated: result.count, enabled },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /stores/:storeId/products/bulk-set-low-stock-threshold
+//
+// Set Product.lowStockThreshold for a SELECTED set of products in one shot.
+// Used by the inventory page's bulk threshold control. Unlike bulk-set-backorder
+// (which targets every active product) this takes an explicit productIds list so
+// the merchant controls exactly which rows change.
+//
+// Body: { productIds: string[]; lowStockThreshold: number }
+router.post(
+  '/bulk-set-low-stock-threshold',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('inventory.stock_alerts'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { productIds, lowStockThreshold } = req.body as {
+        productIds?: unknown;
+        lowStockThreshold?: unknown;
+      };
+      if (
+        !Array.isArray(productIds) ||
+        productIds.length === 0 ||
+        !productIds.every(id => typeof id === 'string' && id.length > 0)
+      ) {
+        throw new AppError(400, 'INVALID_BODY', 'productIds must be a non-empty string array');
+      }
+      if (
+        typeof lowStockThreshold !== 'number' ||
+        !Number.isInteger(lowStockThreshold) ||
+        lowStockThreshold < 0
+      ) {
+        throw new AppError(400, 'INVALID_BODY', 'lowStockThreshold must be a non-negative integer');
+      }
+
+      const result = await ProductService.bulkSetLowStockThreshold(
+        storeId,
+        productIds as string[],
+        lowStockThreshold
+      );
+
+      await auditLog({
+        action: 'product.bulk_low_stock_threshold',
+        userId: req.user!.userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        details: { lowStockThreshold, productCount: result.count },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({
+        success: true,
+        data: { updated: result.count, lowStockThreshold },
       });
     } catch (error) {
       next(error);

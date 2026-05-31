@@ -1,4 +1,4 @@
-import { prisma, Prisma, ProductStatus, withMoneyTx } from '@force/database';
+import { prisma, Prisma, ProductStatus, OrderStatus, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify } from '@force/shared';
 import { redis } from './redis.service';
@@ -113,7 +113,22 @@ interface ListProductsOptions {
    *  ExtraCarousel with `productSource === 'manual'`. Capped at 50.
    *  When provided, all other filters apply on top. */
   ids?: string[];
+  /** When true, augment each returned product with `soldQuantity` — the total
+   *  units sold (sum of order_items.quantity for realized-sale orders). Used by
+   *  the Inventory page's "Sales quantity" column. Computed with a single
+   *  groupBy over the page window (no N+1). */
+  withSalesQuantity?: boolean;
 }
+
+// Order statuses that represent a realized sale (units that actually left
+// inventory). pending / cancelled / refunded orders are excluded so "sales
+// quantity" reflects net sold units rather than gross order lines.
+const SOLD_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.confirmed,
+  OrderStatus.processing,
+  OrderStatus.shipped,
+  OrderStatus.delivered,
+];
 
 interface AdvancedSearchOptions {
   page?: number;
@@ -140,7 +155,7 @@ interface AdvancedSearchOptions {
 
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
-    const { status, category, search, featured, ids } = options;
+    const { status, category, search, featured, ids, withSalesQuantity } = options;
     const page = Math.max(1, options.page || 1);
     // Cap matches the admin per-page selector's max option (500). 100 was
     // too low — merchants hitting 200/500 in the UI got silently
@@ -196,8 +211,32 @@ export class ProductService {
       prisma.product.count({ where }),
     ]);
 
+    // Sales quantity = SUM(order_items.quantity) per product, restricted to the
+    // products on THIS page and to realized-sale order statuses. One groupBy for
+    // the whole page window — NOT a per-row query (no N+1). Off by default so the
+    // catalogue list path stays cheap; only the Inventory page opts in.
+    let productsOut:
+      | typeof products
+      | Array<(typeof products)[number] & { soldQuantity: number }> = products;
+    if (withSalesQuantity && products.length > 0) {
+      const productIds = products.map(p => p.id);
+      const grouped = await prisma.orderItem.groupBy({
+        by: ['productId'],
+        where: {
+          productId: { in: productIds },
+          order: { storeId, status: { in: SOLD_ORDER_STATUSES } },
+        },
+        _sum: { quantity: true },
+      });
+      const soldByProduct = new Map<string, number>();
+      for (const row of grouped) {
+        soldByProduct.set(row.productId, row._sum.quantity ?? 0);
+      }
+      productsOut = products.map(p => ({ ...p, soldQuantity: soldByProduct.get(p.id) ?? 0 }));
+    }
+
     return {
-      products,
+      products: productsOut,
       meta: {
         page,
         limit,
@@ -496,6 +535,31 @@ export class ProductService {
       where: { id: productId, storeId },
       data: { inventory: quantity },
     });
+  }
+
+  /**
+   * Bulk-set the low-stock threshold for a set of products in a store.
+   * A single store-scoped updateMany so a tenant can only ever touch its own
+   * products. Returns the affected count.
+   */
+  static async bulkSetLowStockThreshold(
+    storeId: string,
+    productIds: string[],
+    threshold: number
+  ) {
+    const safeIds = productIds.filter(id => typeof id === 'string' && id.length > 0);
+    if (safeIds.length === 0) {
+      return { count: 0 };
+    }
+
+    const result = await prisma.product.updateMany({
+      where: { storeId, id: { in: safeIds }, deletedAt: null },
+      data: { lowStockThreshold: threshold },
+    });
+
+    await this.invalidateStoreProductCache(storeId);
+
+    return result;
   }
 
   // Public methods (no store scope required)
