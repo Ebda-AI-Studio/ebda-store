@@ -639,6 +639,13 @@ model Product {
   deletedAt         DateTime?     @map("deleted_at") // Soft delete support
   allowBackorder    Boolean       @default(false) @map("allow_backorder")
   lastCostUpdateAt  DateTime?     @map("last_cost_update_at")
+  // Discount input columns — the admin enters a REGULAR (RRP) price plus a
+  // discount, and the service derives price/compareAtPrice from them.
+  // percentage: value is basis points (percent×100; e.g. 12.5% → 1250, range 0–10000).
+  // fixed:      value is fils (1 KWD = 1000 fils).
+  // When null the product has no admin-authored discount (legacy or no discount).
+  discountType      DiscountType? @map("discount_type")
+  discountValue     Int?          @map("discount_value")
 
   // Variants
   hasVariants Boolean @default(false) @map("has_variants")
@@ -693,6 +700,14 @@ enum ProductStatus {
   draft
   active
   archived
+}
+
+// Discount type for the admin-authored discount input (stored alongside
+// discountValue on the Product model). The service derives price /
+// compareAtPrice from these two columns at save time.
+enum DiscountType {
+  percentage // value is basis points (percent×100; 12.5% → 1250)
+  fixed      // value is fils (1 KWD = 1000 fils)
 }
 
 // ==========================================

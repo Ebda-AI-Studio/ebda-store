@@ -162,8 +162,12 @@ export interface Product {
   description?: string;
   descriptionAr?: string;
   price: number;
-  compareAtPrice?: number;
-  costPrice?: number;
+  compareAtPrice?: number | null;
+  costPrice?: number | null;
+  /** Stored discount type — 'percentage' | 'fixed'. null = no admin-authored discount. */
+  discountType?: 'percentage' | 'fixed' | null;
+  /** Stored discount value — basis points for percentage, fils for fixed. null when no discount. */
+  discountValue?: number | null;
   sku?: string | null;
   barcode?: string;
   inventory: number;

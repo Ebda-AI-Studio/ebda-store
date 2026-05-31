@@ -2,9 +2,18 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button, Input, Textarea } from '@force/ui';
-import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
+import { Button, Input, Textarea, Select } from '@force/ui';
+import {
+  recommendedSizeTextForTemplate,
+  type TemplateId,
+  applyDiscount,
+  computeDiscountAmount,
+  deriveDiscountInput,
+  formatPrice,
+} from '@force/shared';
 import { useT } from '@/i18n/useT';
+
+type DiscountTypeUI = 'none' | 'percentage' | 'fixed';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../../components/ImageUpload';
@@ -23,8 +32,10 @@ interface Product {
   description?: string;
   descriptionAr?: string;
   price: number;
-  compareAtPrice?: number;
-  costPrice?: number;
+  compareAtPrice?: number | null;
+  costPrice?: number | null;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number | null;
   sku?: string;
   inventory: number;
   lowStockThreshold?: number;
@@ -71,8 +82,8 @@ export default function EditProductPage() {
     nameAr: '',
     description: '',
     descriptionAr: '',
+    /** Regular (RRP) price as KWD string. Derived from product on load via deriveDiscountInput. */
     price: '',
-    compareAtPrice: '',
     // Cost-of-goods. Used for profit reporting (price - costPrice = margin)
     // and snapshotted onto OrderItem at sale time. Stored in fils on the
     // server, displayed/edited as KWD in the form.
@@ -93,6 +104,11 @@ export default function EditProductPage() {
     metaDescriptionAeo: '',
     metaDescriptionAeoAr: '',
   });
+
+  // Discount state — separate from formData since type is a union, not string.
+  const [discountType, setDiscountType] = useState<DiscountTypeUI>('none');
+  /** Discount value string: "12.5" for percentage (%), or KWD decimal for fixed. */
+  const [discountValue, setDiscountValue] = useState('');
 
   const [seoGenerating, setSeoGenerating] = useState(false);
   const [seoMessage, setSeoMessage] = useState<string | null>(null);
@@ -159,13 +175,21 @@ export default function EditProductPage() {
           );
         }
 
+        // Derive the regular price + discount fields from the stored product.
+        const derived = deriveDiscountInput({
+          price: p.price,
+          compareAtPrice: p.compareAtPrice ?? null,
+          discountType: p.discountType ?? null,
+          discountValue: p.discountValue ?? null,
+        });
+
         setFormData({
           name: p.name || '',
           nameAr: p.nameAr || '',
           description: p.description || '',
           descriptionAr: p.descriptionAr || '',
-          price: p.price ? (p.price / 1000).toFixed(3) : '',
-          compareAtPrice: p.compareAtPrice ? (p.compareAtPrice / 1000).toFixed(3) : '',
+          // Show the regular (RRP) price, not the discounted price.
+          price: derived.regularPrice ? (derived.regularPrice / 1000).toFixed(3) : '',
           costPrice: p.costPrice ? (p.costPrice / 1000).toFixed(3) : '',
           sku: p.sku || '',
           inventory: String(p.inventory ?? 0),
@@ -188,6 +212,18 @@ export default function EditProductPage() {
           metaDescriptionAeoAr:
             (p as Product & { metaDescriptionAeoAr?: string }).metaDescriptionAeoAr || '',
         });
+
+        // Pre-populate discount controls from derived input.
+        setDiscountType(derived.type);
+        if (derived.type === 'percentage') {
+          // stored as basis points → display as decimal percent (12.5).
+          setDiscountValue(String(derived.value / 100));
+        } else if (derived.type === 'fixed') {
+          // stored as fils → display as KWD.
+          setDiscountValue((derived.value / 1000).toFixed(3));
+        } else {
+          setDiscountValue('');
+        }
       } catch {
         setError(t('loadFailed'));
       } finally {
@@ -248,26 +284,54 @@ export default function EditProductPage() {
     setSaving(true);
 
     try {
-      const priceInFils = Math.round(parseFloat(formData.price) * 1000);
-      // Use `null` to explicitly clear an existing compare-at-price.
-      // `undefined` would be dropped from JSON and the API would leave
-      // the previous value untouched — the merchant could never remove
-      // a strike-through price once set.
-      const compareAtPriceInFils = formData.compareAtPrice
-        ? Math.round(parseFloat(formData.compareAtPrice) * 1000)
-        : null;
+      const regularPriceFils = Math.round(parseFloat(formData.price) * 1000);
       const costPriceInFils = formData.costPrice
         ? Math.round(parseFloat(formData.costPrice) * 1000)
         : null;
+
+      // Derive price + compareAtPrice from the discount input.
+      let finalPrice = regularPriceFils;
+      // Use `null` to explicitly clear an existing compare-at-price when
+      // no discount is set (Prisma needs null not undefined to clear the column).
+      let finalCompareAtPrice: number | null = null;
+      let apiDiscountType: 'percentage' | 'fixed' | null = null;
+      let apiDiscountValue: number | null = null;
+
+      if (discountType !== 'none' && discountValue !== '') {
+        if (discountType === 'percentage') {
+          const pct = parseFloat(discountValue);
+          if (Number.isFinite(pct) && pct > 0) {
+            const basisPoints = Math.round(pct * 100);
+            const result = applyDiscount(regularPriceFils, 'percentage', basisPoints);
+            finalPrice = result.price;
+            finalCompareAtPrice = result.compareAtPrice;
+            apiDiscountType = 'percentage';
+            apiDiscountValue = basisPoints;
+          }
+        } else {
+          const fixedFils = Math.round(parseFloat(discountValue) * 1000);
+          if (Number.isFinite(fixedFils) && fixedFils > 0) {
+            const result = applyDiscount(regularPriceFils, 'fixed', fixedFils);
+            finalPrice = result.price;
+            finalCompareAtPrice = result.compareAtPrice;
+            apiDiscountType = 'fixed';
+            apiDiscountValue = fixedFils;
+          }
+        }
+      }
 
       const body: Record<string, unknown> = {
         name: formData.name,
         nameAr: formData.nameAr || undefined,
         description: formData.description || undefined,
         descriptionAr: formData.descriptionAr || undefined,
-        price: priceInFils,
-        compareAtPrice: compareAtPriceInFils,
+        price: finalPrice,
+        // null clears an existing compare-at price when no discount is active.
+        compareAtPrice: finalCompareAtPrice,
         costPrice: costPriceInFils,
+        // null clears previously stored discount columns.
+        discountType: apiDiscountType,
+        discountValue: apiDiscountValue,
         sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
         // Only send when filled so an empty field doesn't clobber the existing
@@ -493,49 +557,111 @@ export default function EditProductPage() {
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground mb-4">{tSections('pricing')}</h2>
-              <div className="grid gap-4 sm:grid-cols-3">
+              {/* Row 1: Price (regular) + Cost */}
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   label={tFields('price')}
                   type="number"
                   step="0.001"
+                  min={0}
                   value={formData.price}
                   onChange={e => updateField('price', e.target.value)}
                   placeholder={tFields('pricePlaceholder')}
                   required
                 />
                 <Input
-                  label={tFields('compareAtPrice')}
-                  type="number"
-                  step="0.001"
-                  value={formData.compareAtPrice}
-                  onChange={e => updateField('compareAtPrice', e.target.value)}
-                  placeholder={tFields('pricePlaceholder')}
-                  error={(() => {
-                    const sale = parseFloat(formData.price);
-                    const original = parseFloat(formData.compareAtPrice);
-                    if (
-                      formData.compareAtPrice &&
-                      Number.isFinite(sale) &&
-                      Number.isFinite(original) &&
-                      original <= sale
-                    ) {
-                      return tFields('compareAtPriceWarn');
-                    }
-                    return undefined;
-                  })()}
-                />
-                <Input
                   label={tFields('costPrice')}
                   type="number"
                   step="0.001"
+                  min={0}
                   value={formData.costPrice}
                   onChange={e => updateField('costPrice', e.target.value)}
                   placeholder={tFields('pricePlaceholder')}
                 />
               </div>
-              {/* Live profit hint — only renders when both price and cost
-                  are filled. Helps the merchant see margin while pricing
-                  the product instead of guessing afterwards. */}
+              {/* Row 2: Discount dropdown + value input */}
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Select
+                  label={tFields('discountLabel')}
+                  value={discountType}
+                  onChange={e => {
+                    setDiscountType(e.target.value as DiscountTypeUI);
+                    setDiscountValue('');
+                  }}
+                  options={[
+                    { value: 'none', label: tFields('discountNone') },
+                    { value: 'percentage', label: tFields('discountPercentage') },
+                    { value: 'fixed', label: tFields('discountFixed') },
+                  ]}
+                />
+                {discountType !== 'none' && (
+                  <Input
+                    label={
+                      discountType === 'percentage'
+                        ? tFields('discountPercentage')
+                        : tFields('discountFixed')
+                    }
+                    type="number"
+                    step={discountType === 'percentage' ? '0.01' : '0.001'}
+                    min={0}
+                    max={discountType === 'percentage' ? 100 : undefined}
+                    value={discountValue}
+                    onChange={e => setDiscountValue(e.target.value)}
+                    placeholder={
+                      discountType === 'percentage'
+                        ? tFields('discountPercentagePlaceholder')
+                        : tFields('discountValuePlaceholder')
+                    }
+                  />
+                )}
+              </div>
+              {/* Row 3: Preview cell */}
+              {(() => {
+                if (discountType === 'none' || !discountValue || !formData.price) return null;
+                const regularFils = Math.round(parseFloat(formData.price) * 1000);
+                if (!Number.isFinite(regularFils) || regularFils <= 0) return null;
+
+                let discountedFils = regularFils;
+                let pctOff = 0;
+
+                if (discountType === 'percentage') {
+                  const pct = parseFloat(discountValue);
+                  if (!Number.isFinite(pct) || pct <= 0) return null;
+                  const basisPoints = Math.round(pct * 100);
+                  const amount = computeDiscountAmount(regularFils, 'percentage', basisPoints);
+                  discountedFils = regularFils - amount;
+                  pctOff = pct;
+                } else {
+                  const fixedFils = Math.round(parseFloat(discountValue) * 1000);
+                  if (!Number.isFinite(fixedFils) || fixedFils <= 0) return null;
+                  const amount = computeDiscountAmount(regularFils, 'fixed', fixedFils);
+                  discountedFils = regularFils - amount;
+                  pctOff = (amount / regularFils) * 100;
+                }
+
+                if (discountedFils <= 0 || discountedFils >= regularFils) return null;
+
+                return (
+                  <div className="mt-4 rounded-lg border border-border bg-muted/40 px-4 py-3">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {tFields('discountPreviewLabel')}
+                    </p>
+                    <p className="text-base font-semibold text-foreground">
+                      {formatPrice(discountedFils)}{' '}
+                      <span className="ml-2 text-sm font-normal line-through text-muted-foreground">
+                        {formatPrice(regularFils)}
+                      </span>{' '}
+                      <span className="ml-1 text-sm font-medium text-success">
+                        {tFields('discountOff').replace(
+                          '{pct}',
+                          pctOff.toFixed(1).replace(/\.0$/, '')
+                        )}
+                      </span>
+                    </p>
+                  </div>
+                );
+              })()}
+              {/* Live profit hint — only renders when both price and cost are filled */}
               {(() => {
                 const sellPrice = parseFloat(formData.price);
                 const cost = parseFloat(formData.costPrice);

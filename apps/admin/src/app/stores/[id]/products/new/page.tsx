@@ -3,12 +3,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
-import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
+import {
+  recommendedSizeTextForTemplate,
+  type TemplateId,
+  applyDiscount,
+  computeDiscountAmount,
+  formatPrice,
+} from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../lib/auth';
 import { apiGet, apiPost } from '../../../../../lib/api';
 import { useT } from '@/i18n/useT';
+
+type DiscountType = 'none' | 'percentage' | 'fixed';
 
 interface Category {
   id: string;
@@ -39,14 +47,19 @@ export default function NewProductPage() {
     nameAr: '',
     description: '',
     descriptionAr: '',
+    /** Regular (RRP) price as KWD string entered by the merchant. */
     price: '',
-    compareAtPrice: '',
     costPrice: '',
     sku: '',
     inventory: '',
     category: '',
     status: 'draft',
   });
+
+  // Discount state — separate from formData since they use non-string values.
+  const [discountType, setDiscountType] = useState<DiscountType>('none');
+  /** Discount value string: percentage as "12.5" (displays as %) or KWD for fixed. */
+  const [discountValue, setDiscountValue] = useState('');
 
   // Fetch categories for this store
   useEffect(() => {
@@ -92,22 +105,52 @@ export default function NewProductPage() {
     setIsLoading(true);
 
     try {
-      const priceInFils = Math.round(parseFloat(formData.price) * 1000);
-      const compareAtPriceInFils = formData.compareAtPrice
-        ? Math.round(parseFloat(formData.compareAtPrice) * 1000)
-        : undefined;
+      const regularPriceFils = Math.round(parseFloat(formData.price) * 1000);
       const costPriceInFils = formData.costPrice
         ? Math.round(parseFloat(formData.costPrice) * 1000)
         : null;
+
+      // Derive price + compareAtPrice from the discount input.
+      let finalPrice = regularPriceFils;
+      let finalCompareAtPrice: number | null = null;
+      let apiDiscountType: 'percentage' | 'fixed' | null = null;
+      let apiDiscountValue: number | null = null;
+
+      if (discountType !== 'none' && discountValue !== '') {
+        if (discountType === 'percentage') {
+          // UI shows decimal percent (e.g. 12.5) → store as basis points (1250).
+          const pct = parseFloat(discountValue);
+          if (Number.isFinite(pct) && pct > 0) {
+            const basisPoints = Math.round(pct * 100);
+            const result = applyDiscount(regularPriceFils, 'percentage', basisPoints);
+            finalPrice = result.price;
+            finalCompareAtPrice = result.compareAtPrice;
+            apiDiscountType = 'percentage';
+            apiDiscountValue = basisPoints;
+          }
+        } else {
+          // Fixed KWD → fils.
+          const fixedFils = Math.round(parseFloat(discountValue) * 1000);
+          if (Number.isFinite(fixedFils) && fixedFils > 0) {
+            const result = applyDiscount(regularPriceFils, 'fixed', fixedFils);
+            finalPrice = result.price;
+            finalCompareAtPrice = result.compareAtPrice;
+            apiDiscountType = 'fixed';
+            apiDiscountValue = fixedFils;
+          }
+        }
+      }
 
       const body: Record<string, unknown> = {
         name: formData.name,
         nameAr: formData.nameAr || undefined,
         description: formData.description || undefined,
         descriptionAr: formData.descriptionAr || undefined,
-        price: priceInFils,
-        compareAtPrice: compareAtPriceInFils,
+        price: finalPrice,
+        compareAtPrice: finalCompareAtPrice,
         costPrice: costPriceInFils,
+        discountType: apiDiscountType,
+        discountValue: apiDiscountValue,
         sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
         status: formData.status,
@@ -214,47 +257,111 @@ export default function NewProductPage() {
               <h2 className="text-lg font-semibold text-foreground mb-4">
                 {t('sections.pricing')}
               </h2>
-              <div className="grid gap-4 sm:grid-cols-3">
+              {/* Row 1: Price (regular) + Cost */}
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   label={t('fields.price')}
                   type="number"
                   step="0.001"
+                  min={0}
                   value={formData.price}
                   onChange={e => updateField('price', e.target.value)}
                   placeholder={t('fields.pricePlaceholder')}
                   required
                 />
                 <Input
-                  label={t('fields.compareAtPrice')}
-                  type="number"
-                  step="0.001"
-                  value={formData.compareAtPrice}
-                  onChange={e => updateField('compareAtPrice', e.target.value)}
-                  placeholder={t('fields.pricePlaceholder')}
-                  error={(() => {
-                    const sale = parseFloat(formData.price);
-                    const original = parseFloat(formData.compareAtPrice);
-                    if (
-                      formData.compareAtPrice &&
-                      Number.isFinite(sale) &&
-                      Number.isFinite(original) &&
-                      original <= sale
-                    ) {
-                      return t('fields.compareAtPriceWarn');
-                    }
-                    return undefined;
-                  })()}
-                />
-                <Input
                   label={t('fields.costPrice')}
                   type="number"
                   step="0.001"
+                  min={0}
                   value={formData.costPrice}
                   onChange={e => updateField('costPrice', e.target.value)}
                   placeholder={t('fields.pricePlaceholder')}
                 />
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">{t('fields.pricingHint')}</p>
+              {/* Row 2: Discount dropdown + value input */}
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Select
+                  label={t('fields.discountLabel')}
+                  value={discountType}
+                  onChange={e => {
+                    setDiscountType(e.target.value as DiscountType);
+                    setDiscountValue('');
+                  }}
+                  options={[
+                    { value: 'none', label: t('fields.discountNone') },
+                    { value: 'percentage', label: t('fields.discountPercentage') },
+                    { value: 'fixed', label: t('fields.discountFixed') },
+                  ]}
+                />
+                {discountType !== 'none' && (
+                  <Input
+                    label={
+                      discountType === 'percentage'
+                        ? t('fields.discountPercentage')
+                        : t('fields.discountFixed')
+                    }
+                    type="number"
+                    step={discountType === 'percentage' ? '0.01' : '0.001'}
+                    min={0}
+                    max={discountType === 'percentage' ? 100 : undefined}
+                    value={discountValue}
+                    onChange={e => setDiscountValue(e.target.value)}
+                    placeholder={
+                      discountType === 'percentage'
+                        ? t('fields.discountPercentagePlaceholder')
+                        : t('fields.discountValuePlaceholder')
+                    }
+                  />
+                )}
+              </div>
+              {/* Row 3: Preview cell */}
+              {(() => {
+                if (discountType === 'none' || !discountValue || !formData.price) return null;
+                const regularFils = Math.round(parseFloat(formData.price) * 1000);
+                if (!Number.isFinite(regularFils) || regularFils <= 0) return null;
+
+                let discountedFils = regularFils;
+                let pctOff = 0;
+
+                if (discountType === 'percentage') {
+                  const pct = parseFloat(discountValue);
+                  if (!Number.isFinite(pct) || pct <= 0) return null;
+                  const basisPoints = Math.round(pct * 100);
+                  const amount = computeDiscountAmount(regularFils, 'percentage', basisPoints);
+                  discountedFils = regularFils - amount;
+                  pctOff = pct;
+                } else {
+                  const fixedFils = Math.round(parseFloat(discountValue) * 1000);
+                  if (!Number.isFinite(fixedFils) || fixedFils <= 0) return null;
+                  const amount = computeDiscountAmount(regularFils, 'fixed', fixedFils);
+                  discountedFils = regularFils - amount;
+                  pctOff = (amount / regularFils) * 100;
+                }
+
+                if (discountedFils <= 0 || discountedFils >= regularFils) return null;
+
+                return (
+                  <div className="mt-4 rounded-lg border border-border bg-muted/40 px-4 py-3">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {t('fields.discountPreviewLabel')}
+                    </p>
+                    <p className="text-base font-semibold text-foreground">
+                      {formatPrice(discountedFils)}{' '}
+                      <span className="ml-2 text-sm font-normal line-through text-muted-foreground">
+                        {formatPrice(regularFils)}
+                      </span>{' '}
+                      <span className="ml-1 text-sm font-medium text-success">
+                        {t('fields.discountOff').replace(
+                          '{pct}',
+                          pctOff.toFixed(1).replace(/\.0$/, '')
+                        )}
+                      </span>
+                    </p>
+                  </div>
+                );
+              })()}
+              <p className="mt-3 text-xs text-muted-foreground">{t('fields.pricingHint')}</p>
             </div>
 
             <div className="rounded-xl border bg-card p-6 shadow-sm">
