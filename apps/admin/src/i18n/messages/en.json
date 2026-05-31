@@ -803,7 +803,8 @@
         "status": "Status",
         "date": "Date",
         "actions": "Actions",
-        "totalValue": "{amount} KWD"
+        "totalValue": "{amount} KWD",
+        "moreItems": "+{count} more"
       },
       "actions": {
         "updateStatusLabel": "Update order status",

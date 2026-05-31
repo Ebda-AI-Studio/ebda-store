@@ -6,7 +6,7 @@ import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { EmptyOrdersState } from './EmptyOrdersState';
-import { VALID_TRANSITIONS, type Order } from './types';
+import { VALID_TRANSITIONS, type Order, type OrderLineItem } from './types';
 
 interface OrdersTableProps {
   orders: Order[];
@@ -33,6 +33,24 @@ function formatDate(dateString: string) {
     month: 'short',
     day: 'numeric',
   });
+}
+
+/**
+ * Build a compact, single-line item summary for the orders list row, e.g.
+ * "2x Mastic, 1x Caraway +2 more". Shows the first two line items with their
+ * quantities and rolls the rest into a "+N more" suffix so the cell stays
+ * scannable. Returns null when the API didn't return items for the order.
+ */
+function summarizeItems(
+  items: OrderLineItem[] | undefined,
+  moreLabel: (count: number) => string
+): string | null {
+  if (!items || items.length === 0) return null;
+  const MAX_SHOWN = 2;
+  const shown = items.slice(0, MAX_SHOWN).map(it => `${it.quantity}x ${it.productName}`);
+  const remaining = items.length - MAX_SHOWN;
+  const summary = shown.join(', ');
+  return remaining > 0 ? `${summary} ${moreLabel(remaining)}` : summary;
 }
 
 export function OrdersTable({
@@ -87,14 +105,22 @@ export function OrdersTable({
     },
     {
       header: t('table.customer'),
-      cell: order => (
-        <div>
-          <p className="font-medium text-foreground">
-            {order.customer?.firstName} {order.customer?.lastName}
-          </p>
-          <p className="text-sm text-muted-foreground">{order.customer?.email}</p>
-        </div>
-      ),
+      cell: order => {
+        const itemSummary = summarizeItems(order.items, count => t('table.moreItems', { count }));
+        return (
+          <div>
+            <p className="font-medium text-foreground">
+              {order.customer?.firstName} {order.customer?.lastName}
+            </p>
+            <p className="text-sm text-muted-foreground">{order.customer?.email}</p>
+            {itemSummary && (
+              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1" title={itemSummary}>
+                {itemSummary}
+              </p>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: t('table.total'),

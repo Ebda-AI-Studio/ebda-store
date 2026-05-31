@@ -10,6 +10,14 @@ export interface OrderPayment {
   status: string;
 }
 
+export interface OrderLineItem {
+  id: string;
+  productName: string;
+  variantName?: string | null;
+  quantity: number;
+  price?: number;
+}
+
 export interface Order {
   id: string;
   orderNumber?: string;
@@ -19,6 +27,13 @@ export interface Order {
   paymentStatus: string;
   createdAt: string;
   payments?: OrderPayment[];
+  /**
+   * Line items as returned by the orders-list API (see
+   * apps/api/src/services/order.service.ts getStoreOrders → include.items).
+   * Used to render a compact item summary in the list row so merchants can
+   * tell orders apart without opening each one.
+   */
+  items?: OrderLineItem[];
 }
 
 export interface Pagination {

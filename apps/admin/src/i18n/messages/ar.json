@@ -803,7 +803,8 @@
         "status": "الحالة",
         "date": "التاريخ",
         "actions": "الإجراءات",
-        "totalValue": "{amount} د.ك"
+        "totalValue": "{amount} د.ك",
+        "moreItems": "+{count} أخرى"
       },
       "actions": {
         "updateStatusLabel": "تحديث حالة الطلب",
