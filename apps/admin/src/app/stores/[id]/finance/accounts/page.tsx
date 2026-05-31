@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,20 +60,87 @@ export default function AccountsPage() {
   const [tree, setTree] = useState<AccountsTree | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Seed-COA state
+  const [seeding, setSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState<string | null>(null);
+
+  // Create-custom-account form state
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [form, setForm] = useState({ parentId: '', code: '', nameEn: '', nameAr: '' });
+
+  function loadTree() {
     if (!storeId) return;
     apiGet<AccountsTree>(`/api/v1/stores/${storeId}/finance/accounts`)
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setError(apiError.message);
         } else if (data) {
+          setError(null);
           setTree(data);
         }
       })
       .catch(() => setError('Failed to load chart of accounts'));
+  }
+
+  useEffect(() => {
+    loadTree();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
-  if (error) {
+  // System (top-level) accounts are the only valid parents for a custom child.
+  const parentOptions = useMemo(() => {
+    if (!tree) return [];
+    const opts: { id: string; code: string; nameEn: string }[] = [];
+    for (const { key } of GROUPS) {
+      for (const node of tree[key] ?? []) {
+        if (node.isSystem) opts.push({ id: node.id, code: node.code, nameEn: node.nameEn });
+      }
+    }
+    return opts;
+  }, [tree]);
+
+  async function handleSeed() {
+    setSeeding(true);
+    setSeedMsg(null);
+    const { data, error: apiError } = await apiPost<{ created: number }>(
+      `/api/v1/stores/${storeId}/finance/accounts/seed`,
+      {}
+    );
+    setSeeding(false);
+    if (apiError) {
+      setSeedMsg(null);
+      setError(apiError.message || t('seedError'));
+      return;
+    }
+    setSeedMsg(t('seedSuccess', { count: data?.created ?? 0 }));
+    loadTree();
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setCreating(true);
+    setCreateErr(null);
+    const { error: apiError } = await apiPost(`/api/v1/stores/${storeId}/finance/accounts`, {
+      parentId: form.parentId,
+      code: form.code,
+      nameEn: form.nameEn,
+      nameAr: form.nameAr || undefined,
+    });
+    setCreating(false);
+    if (apiError) {
+      setCreateErr(apiError.message || t('createError'));
+      return;
+    }
+    setForm({ parentId: '', code: '', nameEn: '', nameAr: '' });
+    setShowCreate(false);
+    loadTree();
+  }
+
+  const total = tree ? GROUPS.reduce((sum, g) => sum + (tree[g.key]?.length ?? 0), 0) : 0;
+
+  if (error && !tree) {
     return (
       <AdminLayout title={t('title')}>
         <div className="p-6 text-red-600 text-sm">{error}</div>
@@ -89,11 +156,108 @@ export default function AccountsPage() {
     );
   }
 
-  const total = GROUPS.reduce((sum, g) => sum + (tree[g.key]?.length ?? 0), 0);
-
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-4xl space-y-6">
+        {/* Actions: seed COA + add custom account */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSeed}
+            disabled={seeding}
+            className="bg-primary text-primary-foreground rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-60"
+          >
+            {seeding ? t('seeding') : t('seedButton')}
+          </button>
+          {total > 0 && parentOptions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowCreate(v => !v)}
+              className="rounded-lg border border-border px-3 py-2 text-sm font-medium"
+            >
+              {t('createButton')}
+            </button>
+          )}
+        </div>
+
+        {seedMsg && <p className="text-sm text-emerald-600">{seedMsg}</p>}
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+
+        {/* Create custom account form */}
+        {showCreate && parentOptions.length > 0 && (
+          <form
+            onSubmit={handleCreate}
+            className="space-y-3 rounded-xl border border-border bg-muted/20 p-4"
+          >
+            <h2 className="text-base font-semibold">{t('createTitle')}</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-sm">
+                <span className="text-muted-foreground">{t('fieldParent')}</span>
+                <select
+                  required
+                  value={form.parentId}
+                  onChange={e => setForm(f => ({ ...f, parentId: e.target.value }))}
+                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                >
+                  <option value="">{t('selectParent')}</option>
+                  {parentOptions.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.code} · {p.nameEn}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="text-muted-foreground">{t('fieldCode')}</span>
+                <input
+                  required
+                  value={form.code}
+                  onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
+                  placeholder="5210"
+                  pattern="\d{4,6}"
+                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-sm"
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="text-muted-foreground">{t('fieldNameEn')}</span>
+                <input
+                  required
+                  value={form.nameEn}
+                  onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))}
+                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="text-muted-foreground">{t('fieldNameAr')}</span>
+                <input
+                  value={form.nameAr}
+                  onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))}
+                  dir="rtl"
+                  className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                />
+              </label>
+            </div>
+            {createErr && <p className="text-red-600 text-sm">{createErr}</p>}
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={creating}
+                className="bg-primary text-primary-foreground rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-60"
+              >
+                {creating ? t('creating') : t('createSubmit')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium"
+              >
+                {t('cancel')}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* COA tree */}
         {total === 0 ? (
           <p className="text-muted-foreground text-sm">{t('noAccountsHint')}</p>
         ) : (

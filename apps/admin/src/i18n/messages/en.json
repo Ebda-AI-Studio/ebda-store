@@ -3703,7 +3703,7 @@
       "navStores": "Stores",
       "navUsers": "Users",
       "navAuditLogs": "Audit Logs",
-        "navPlatformAiUsage": "AI Usage (platform)",
+      "navPlatformAiUsage": "AI Usage (platform)",
       "navManageFeatures": "Manage Features",
       "hubTabs": {
         "products": "Products",
@@ -3785,7 +3785,22 @@
       "system": "System",
       "code": "Code",
       "name": "Name",
-      "noAccountsHint": "No accounts seeded yet. Refresh or contact support."
+      "noAccountsHint": "No accounts seeded yet. Refresh or contact support.",
+      "seedButton": "Seed default accounts",
+      "seeding": "Seeding…",
+      "seedSuccess": "Seeded {count} account(s).",
+      "seedError": "Failed to seed accounts.",
+      "createButton": "Add custom account",
+      "createTitle": "Add custom account",
+      "fieldParent": "Parent account",
+      "selectParent": "Select a parent account",
+      "fieldCode": "Code",
+      "fieldNameEn": "Name (English)",
+      "fieldNameAr": "Name (Arabic)",
+      "createSubmit": "Create account",
+      "creating": "Creating…",
+      "createError": "Failed to create account.",
+      "cancel": "Cancel"
     },
     "journal": {
       "title": "Journal Entries",

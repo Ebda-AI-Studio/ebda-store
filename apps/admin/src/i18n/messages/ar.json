@@ -3703,7 +3703,7 @@
       "navStores": "المتاجر",
       "navUsers": "المستخدمون",
       "navAuditLogs": "سجلات التدقيق",
-        "navPlatformAiUsage": "استخدام الذكاء الاصطناعي (المنصة)",
+      "navPlatformAiUsage": "استخدام الذكاء الاصطناعي (المنصة)",
       "navManageFeatures": "إدارة الميزات",
       "hubTabs": {
         "products": "المنتجات",
@@ -3785,7 +3785,22 @@
       "system": "نظامي",
       "code": "الرمز",
       "name": "الاسم",
-      "noAccountsHint": "لا توجد حسابات بعد. حدّث الصفحة أو تواصل مع الدعم."
+      "noAccountsHint": "لا توجد حسابات بعد. حدّث الصفحة أو تواصل مع الدعم.",
+      "seedButton": "إنشاء الحسابات الافتراضية",
+      "seeding": "جارٍ الإنشاء…",
+      "seedSuccess": "تم إنشاء {count} حساب.",
+      "seedError": "تعذّر إنشاء الحسابات.",
+      "createButton": "إضافة حساب مخصص",
+      "createTitle": "إضافة حساب مخصص",
+      "fieldParent": "الحساب الرئيسي",
+      "selectParent": "اختر حسابًا رئيسيًا",
+      "fieldCode": "الرمز",
+      "fieldNameEn": "الاسم (بالإنجليزية)",
+      "fieldNameAr": "الاسم (بالعربية)",
+      "createSubmit": "إنشاء الحساب",
+      "creating": "جارٍ الإنشاء…",
+      "createError": "تعذّر إنشاء الحساب.",
+      "cancel": "إلغاء"
     },
     "journal": {
       "title": "قيود اليومية",
