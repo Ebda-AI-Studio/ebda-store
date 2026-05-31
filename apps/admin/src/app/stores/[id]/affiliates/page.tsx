@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiPut, apiPost, apiPatch } from '../../../../lib/api';
 import { AffiliateStatsCards } from './_components/AffiliateStatsCards';
 import { AffiliatesTable } from './_components/AffiliatesTable';
@@ -62,6 +63,8 @@ export default function AffiliatesPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('affiliates');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
+  // Debounced search term — client-side filter over fetched affiliates by name or email.
+  const [search, setSearch] = useState('');
 
   // Payout modal state
   const [showPayoutModal, setShowPayoutModal] = useState(false);
@@ -260,6 +263,15 @@ export default function AffiliatesPage() {
     }
   };
 
+  // Client-side filter: match affiliate name or email (case-insensitive).
+  const filteredAffiliates = useMemo(() => {
+    if (!search.trim()) return affiliates;
+    const q = search.toLowerCase();
+    return affiliates.filter(
+      a => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
+    );
+  }, [affiliates, search]);
+
   return (
     <AdminLayout
       title={tPage('title')}
@@ -311,9 +323,25 @@ export default function AffiliatesPage() {
           </div>
 
           {activeTab === 'affiliates' && (
+            <>
+              <div className="mb-4">
+                <SearchInput
+                  value={search}
+                  onSearch={val => {
+                    setSearch(val);
+                    setPage(1);
+                  }}
+                  placeholder={tPage('searchPlaceholder')}
+                  className="w-full sm:w-72"
+                />
+              </div>
+            </>
+          )}
+
+          {activeTab === 'affiliates' && (
             <AffiliatesTable
               storeId={storeId}
-              affiliates={affiliates}
+              affiliates={filteredAffiliates}
               meta={meta}
               statusFilter={statusFilter}
               page={page}

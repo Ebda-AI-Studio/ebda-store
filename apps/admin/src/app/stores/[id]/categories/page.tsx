@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
+import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { CategoryTable, type Category } from './CategoryTable';
@@ -45,6 +46,8 @@ export default function StoreCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Debounced search term — client-side filter over category name (EN + AR).
+  const [search, setSearch] = useState('');
 
   // Form state for add/edit
   const [showForm, setShowForm] = useState(false);
@@ -117,6 +120,15 @@ export default function StoreCategoriesPage() {
       setIsLoading(false);
     }
   }, [storeId, t]);
+
+  // Client-side filter: match category name (EN or AR), case-insensitive.
+  const filteredCategories = useMemo(() => {
+    if (!search.trim()) return categories;
+    const q = search.toLowerCase();
+    return categories.filter(
+      c => c.name.toLowerCase().includes(q) || (c.nameAr ?? '').toLowerCase().includes(q)
+    );
+  }, [categories, search]);
 
   useEffect(() => {
     fetchCategories();
@@ -277,6 +289,16 @@ export default function StoreCategoriesPage() {
         </div>
       }
     >
+      {/* Search bar */}
+      <div className="mb-4">
+        <SearchInput
+          value={search}
+          onSearch={setSearch}
+          placeholder={t('searchPlaceholder')}
+          className="w-full sm:w-72"
+        />
+      </div>
+
       {/* Error */}
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
@@ -337,7 +359,7 @@ export default function StoreCategoriesPage() {
       {/* Categories List */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <CategoryTable
-          categories={categories}
+          categories={filteredCategories}
           isLoading={isLoading}
           deletingId={deletingId}
           onEdit={openEditForm}

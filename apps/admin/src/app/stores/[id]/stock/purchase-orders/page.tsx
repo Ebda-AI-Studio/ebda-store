@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { SearchInput } from '@/components/SearchInput';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 
@@ -48,6 +49,8 @@ export default function PurchaseOrdersPage() {
 
   const [orders, setOrders] = useState<PurchaseOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Debounced search term — client-side filter over PO number and supplier name.
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!storeId) return;
@@ -61,6 +64,17 @@ export default function PurchaseOrdersPage() {
       })
       .catch(() => setError('Failed to load purchase orders'));
   }, [storeId]);
+
+  // Client-side filter: match PO number or supplier name (case-insensitive).
+  // Must be declared before early returns so hooks run unconditionally.
+  const filteredOrders = useMemo(() => {
+    if (!orders) return null;
+    if (!search.trim()) return orders;
+    const q = search.toLowerCase();
+    return orders.filter(
+      po => po.poNumber.toLowerCase().includes(q) || po.supplier.name.toLowerCase().includes(q)
+    );
+  }, [orders, search]);
 
   if (error) {
     return (
@@ -81,7 +95,13 @@ export default function PurchaseOrdersPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-5xl space-y-4">
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SearchInput
+            value={search}
+            onSearch={setSearch}
+            placeholder={t('searchPlaceholder')}
+            className="w-full sm:w-64"
+          />
           <button
             type="button"
             onClick={() => router.push(`/stores/${storeId}/stock/purchase-orders/new`)}
@@ -91,7 +111,7 @@ export default function PurchaseOrdersPage() {
           </button>
         </div>
 
-        {orders.length === 0 ? (
+        {filteredOrders !== null && filteredOrders.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No purchase orders yet. Create one with the button above.
           </p>
@@ -121,7 +141,7 @@ export default function PurchaseOrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map(po => (
+                {(filteredOrders ?? []).map(po => (
                   <tr
                     key={po.id}
                     className="border-t border-border/40 cursor-pointer hover:bg-muted/20 transition-colors"

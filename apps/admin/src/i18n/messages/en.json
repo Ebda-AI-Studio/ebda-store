@@ -2088,7 +2088,8 @@
       "inviteNotesPlaceholder": "e.g. Kuwait fashion micro-influencer, 50K followers",
       "inviteSubmit": "Add Affiliate",
       "inviting": "Adding…",
-      "inviteCancel": "Cancel"
+      "inviteCancel": "Cancel",
+      "searchPlaceholder": "Search affiliates…"
     },
     "tabs": {
       "affiliates": "Affiliates",
@@ -3403,7 +3404,8 @@
       "toastDeletedTitle": "Category Deleted",
       "toastDeletedBody": "\"{name}\" has been removed.",
       "errorTitle": "Error",
-      "deleteFailed": "Failed to delete category"
+      "deleteFailed": "Failed to delete category",
+      "searchPlaceholder": "Search categories…"
     },
     "form": {
       "editTitle": "Edit Category",
@@ -3517,7 +3519,8 @@
       "aiSaveResponseTitle": "Response saved",
       "aiSaveResponseBody": "Your owner response has been saved to the review.",
       "aiSaveResponseFailed": "Failed to save response. Please try again.",
-      "saving": "Saving..."
+      "saving": "Saving...",
+      "searchPlaceholder": "Search reviews…"
     }
   },
   "audit": {
@@ -4001,7 +4004,8 @@
       "allowsBackorder": "Allows Backorder",
       "quickAdjust": "Quick Adjust",
       "badgeReorder": "Reorder suggested",
-      "badgeDeadstock": "Dead stock"
+      "badgeDeadstock": "Dead stock",
+      "searchPlaceholder": "Search by name or SKU…"
     },
     "adjustments": {
       "title": "Stock Adjustments",
@@ -4032,8 +4036,11 @@
         "selectProduct": "Select product",
         "newQty": "New quantity",
         "submitDraft": "Save as draft",
-        "submitPost": "Save and post"
-      }
+        "submitPost": "Save and post",
+        "typeTip": "cycle_count = routine recount correction; damage = damaged, unsellable; theft = lost to theft or shrinkage; loss = lost or misplaced (not theft or damage); write_off = deliberately removed (expired or obsolete); found = previously-missing stock located (increases quantity); return_to_supplier = sent back to supplier.",
+        "glJournalTip": "GL journal = the accounting record (General Ledger). Posting auto-creates a balanced bookkeeping entry — e.g. a write-off debits a loss/expense account and credits inventory — keeping accounts accurate. Save as draft to review before it affects your books."
+      },
+      "searchPlaceholder": "Search adjustments…"
     },
     "suppliers": {
       "title": "Suppliers",
@@ -4057,8 +4064,10 @@
         "customTermsDays": "Custom terms days",
         "notes": "Notes (English)",
         "notesAr": "Notes (Arabic)",
-        "submit": "Create supplier"
-      }
+        "submit": "Create supplier",
+        "paymentTermsTip": "Payment terms = how long after receiving goods you've agreed to pay this supplier. Net 30 = within 30 days of invoice. Net 0 = immediately. Custom = your own number of days."
+      },
+      "searchPlaceholder": "Search suppliers…"
     },
     "purchaseOrders": {
       "title": "Purchase Orders",
@@ -4096,7 +4105,8 @@
         "receiveButton": "Receive",
         "cancelButton": "Cancel PO",
         "cancelConfirm": "Cancel this PO? This action cannot be undone."
-      }
+      },
+      "searchPlaceholder": "Search POs…"
     },
     "backorders": {
       "title": "Open Backorders",

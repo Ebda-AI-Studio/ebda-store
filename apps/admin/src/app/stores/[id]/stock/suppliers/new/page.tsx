@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { HelpTip } from '@/components/HelpTip';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPatch } from '@/lib/api';
 
@@ -192,8 +193,11 @@ export default function NewSupplierPage() {
 
         {/* Payment terms */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="space-y-1">
-            <span className="text-sm font-medium">{t('paymentTerms')}</span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium">{t('paymentTerms')}</span>
+              <HelpTip text={tNew('paymentTermsTip')} />
+            </div>
             <select
               value={paymentTerms}
               onChange={e => setPaymentTerms(e.target.value)}
@@ -205,7 +209,7 @@ export default function NewSupplierPage() {
                 </option>
               ))}
             </select>
-          </label>
+          </div>
 
           {paymentTerms === 'custom' && (
             <label className="space-y-1">

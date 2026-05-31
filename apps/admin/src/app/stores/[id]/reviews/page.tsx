@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Badge, Modal, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
@@ -95,6 +96,8 @@ export default function ReviewsPage() {
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { success: toastSuccess, error: showError } = useToast();
+  // Debounced search term — client-side filter over the current page of reviews.
+  const [search, setSearch] = useState('');
 
   // Translate toggle — per review show bodyTranslated when available
   const [showTranslated, setShowTranslated] = useState<Record<string, boolean>>({});
@@ -110,6 +113,22 @@ export default function ReviewsPage() {
   const [draftEn, setDraftEn] = useState('');
   const [draftAr, setDraftAr] = useState('');
   const [savingResponse, setSavingResponse] = useState(false);
+
+  // Client-side filter: match customer name, product name, or review body
+  // (case-insensitive). Applied on top of the status filter + pagination.
+  const filteredReviews = useMemo(() => {
+    if (!search.trim()) return reviews;
+    const q = search.toLowerCase();
+    return reviews.filter(
+      review =>
+        review.product.name.toLowerCase().includes(q) ||
+        review.body.toLowerCase().includes(q) ||
+        (review.customer
+          ? `${review.customer.firstName} ${review.customer.lastName}`.toLowerCase().includes(q) ||
+            review.customer.email.toLowerCase().includes(q)
+          : false)
+    );
+  }, [reviews, search]);
 
   const fetchReviews = useCallback(async () => {
     if (!storeId) return;
@@ -258,6 +277,16 @@ export default function ReviewsPage() {
 
   return (
     <AdminLayout title={t('title')} subtitle={t('subtitle')}>
+      {/* Search bar */}
+      <div className="mb-4">
+        <SearchInput
+          value={search}
+          onSearch={setSearch}
+          placeholder={t('searchPlaceholder')}
+          className="w-full sm:w-72"
+        />
+      </div>
+
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-2">
         <Button
@@ -301,7 +330,7 @@ export default function ReviewsPage() {
       <div className="rounded-xl border bg-card shadow-sm">
         {isLoading ? (
           <div className="p-8 text-center text-muted-foreground">{t('loading')}</div>
-        ) : reviews.length === 0 ? (
+        ) : filteredReviews.length === 0 ? (
           <div className="force-empty-state px-6">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
               <svg
@@ -323,7 +352,7 @@ export default function ReviewsPage() {
           </div>
         ) : (
           <div className="divide-y">
-            {reviews.map(review => {
+            {filteredReviews.map(review => {
               const isTranslated = showTranslated[review.id];
               const displayBody =
                 isTranslated && review.bodyTranslated ? review.bodyTranslated : review.body;
