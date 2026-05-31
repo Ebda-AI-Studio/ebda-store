@@ -2,10 +2,15 @@
 
 Live log of what changed this session so you can track it. Newest at top. FWB = force-website-builder, WBS = whatsapp-bulk-sender.
 
-## STATUS @ last update (tool channel was unstable — verify before trusting)
-**Prod main = `77e5e369`** (build fix + E1/E2 accounting + Batch A orders/customers). All LANDED + deploying.
-**NOT yet landed (safe on branches, ready):** `fix/batch-b-inventory` (D1/D5/D7), `fix/batch-c-ai` (H2/H3/F4b). Both conflict with main ONLY on the 2 i18n JSON files (additive keys). My automated deep-merge dropped keys on one attempt — DO NOT trust it; redo the B/C i18n merge as a careful key-union and verify A's keys (orders.list.table.moreItems, customers.page.badges) + B/C's keys all survive before pushing.
-**⚠️ DECISION NEEDED (C1):** the order-status relabel I shipped in Batch A is SEMANTICALLY MISLEADING. Code: `shipped` = handed-to-courier (fires shipped-email + WBS event), `delivered` = received-by-customer (sets deliveredAt, review request, loyalty). Relabeling shipped→"Delivered" + delivered→"Fulfilled" means the admin now sees "Delivered" while the order is only with the courier. Keep / revert / or do a proper backend enum change? Your call.
+## STATUS @ latest update — ALL 3 FEATURE BATCHES LANDED ✅
+**Prod main = `a1b2c3d4`.** Batches A+B+C all landed; i18n keys from all three verified coexisting on main (moreItems + lowStockThreshold + asOf), admin+api typecheck 0 errors. Deploying.
+- **Batch A (orders/customers):** C1 status relabel, C2 order-list item summary, C3 Active Buyer fallback badge.
+- **Batch B (inventory):** D5 shared SearchInput on inventory page (lists all items), D7 Cost/Price/Sales-quantity columns, D1 low-stock threshold per-product + bulk. (typecheck fix: typed `tx` param in product update tx.)
+- **Batch C (AI):** H2 bulk product-FAQ sweep (reuses single-FAQ core), H3 frequently-bought-together recommendations (co-purchase signal + hardened JSON parse), F4b velocity panel date+time.
+
+**⚠️ DECISION NEEDED (C1):** the order-status relabel in Batch A is SEMANTICALLY MISLEADING. Code: `shipped` = handed-to-courier (fires shipped-email + WBS event), `delivered` = received-by-customer (sets deliveredAt, review request, loyalty). Relabeling shipped→"Delivered" + delivered→"Fulfilled" means admin sees "Delivered" while the order is only with the courier. **Keep / revert / proper backend enum change? Your call.**
+
+**Still queued:** WBS bot (I2 remove image-per-category sends, I1 botMode persistence); A-group Settings→PageBuilder consolidation + B-group discount fields (design-gated).
 
 ## ✅ ALL CLEAR — no open blockers as of last update
 - **FWB Vercel build break — FIXED + VERIFIED on main (`77f5dcff`).** `layout.tsx` imports `API_URL` now; build clean.
