@@ -2,6 +2,10 @@
 
 Live log of what changed this session so you can track it. Newest at top. FWB = force-website-builder, WBS = whatsapp-bulk-sender.
 
+## C1 REVERTED + WBS bot merged (2026-06-01)
+- **C1 reverted** (`b3f8e21c`): order-status labels restored to accurate Shipped/Delivered (EN) + تم الشحن/تم التسليم (AR) at all blocks. Also removed en.json.bak/ar.json.bak accidentally committed by the c1 subagent. Batch B/C i18n keys verified intact. JSON valid.
+- **WBS bot I1/I2 merged** to WBS main `d8e965a0`.
+
 ## WBS bot fixes MERGED to WBS main `d8e965a0` (2026-06-01)
 - **I2** — removed the legacy image-per-category bot flow from `wa-ordering.js` (0 `sendMediaMessage('image')` category/product sends remain).
 - **I1** — admin WhatsApp-ordering settings now persists `botMode` (selector: legacy_chat / native_catalog / native_catalog_with_gemini_agent) + `metaCatalogId`. Pre-merge checks: JS syntax OK, en/ar JSON valid (23/23 parity).
