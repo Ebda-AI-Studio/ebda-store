@@ -36,7 +36,9 @@ const MODEL = process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest';
 let _client: GoogleGenerativeAI | null = null;
 
 function getClient(): GoogleGenerativeAI {
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_KEY;
+  // Accept GEMINI_API_KEY as a fallback so a prod deploy that set the shorter
+  // var name still works without a reconfig (trap: silent 503 if neither is set).
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_KEY ?? process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new AppError(503, 'AI_NOT_CONFIGURED', 'GOOGLE_GENERATIVE_AI_KEY is not set.');
   }

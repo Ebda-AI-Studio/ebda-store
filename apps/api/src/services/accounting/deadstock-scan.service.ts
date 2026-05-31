@@ -12,9 +12,14 @@
  *   4. Flag if daysSinceSale >= 90 AND stockValueFils >= 50000.
  *   5. Batch-call Gemini for bilingual clearance copy (max 20/call).
  *   6. findFirst+create/update DeadStockFlag rows (Prisma null-variant quirk).
+ *
+ * RLS note (2026-06-01): the entire scan body runs inside withRlsBypass so
+ * Inngest jobs (no tenant GUC in context) can read deadstock_flags, products,
+ * and order_items without being filtered to an empty result set by the
+ * direct-compare RLS policies.
  */
 
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 
@@ -70,9 +75,13 @@ const DEADSTOCK_VALUE_FILS_THRESHOLD = 50_000; // 500 KWD in fils (1 KWD = 1000 
 /**
  * Returns the number of days since the last paid OrderItem for this product in
  * this store. Returns 9999 if the product has never been sold.
+ *
+ * Accepts `tx` so it can participate in the caller's bypass transaction
+ * (required for Inngest jobs where no tenant GUC is set).
  */
-async function daysSinceLastSale(productId: string, storeId: string): Promise<number> {
-  const lastItem = await prisma.$queryRaw<{ last_sale: Date | null }[]>`
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function daysSinceLastSale(productId: string, storeId: string, tx: any): Promise<number> {
+  const lastItem = await tx.$queryRaw<{ last_sale: Date | null }[]>`
     SELECT MAX(o.created_at) AS last_sale
     FROM public.order_items oi
     JOIN public.orders o ON o.id = oi.order_id
@@ -120,184 +129,191 @@ Products: ${JSON.stringify(products)}`;
 export async function runDeadstockScan(storeId: string): Promise<DeadstockScanResult> {
   const scanStartedAt = new Date();
 
-  // -------------------------------------------------------------------------
-  // Step 1: Expire old open flags (>30 days)
-  // -------------------------------------------------------------------------
-  const expireThreshold = new Date(Date.now() - EXPIRE_AFTER_DAYS * 24 * 60 * 60 * 1000);
+  // Wrap the entire scan in withRlsBypass so Inngest jobs (which run with no
+  // tenant GUC) can read RLS-protected tables: deadstock_flags, products,
+  // order_items. The bypass GUC is SET LOCAL so it is transaction-scoped
+  // — no leak to other connections.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return withRlsBypass(async (tx: any) => {
+    // -------------------------------------------------------------------------
+    // Step 1: Expire old open flags (>30 days)
+    // -------------------------------------------------------------------------
+    const expireThreshold = new Date(Date.now() - EXPIRE_AFTER_DAYS * 24 * 60 * 60 * 1000);
 
-  const expiredResult = await prisma.$executeRaw`
-    UPDATE public.deadstock_flags
-    SET status = 'expired'
-    WHERE store_id = ${storeId}
-      AND status = 'open'
-      AND scanned_at < ${expireThreshold}
-  `;
-  const expiredCount = Number(expiredResult);
+    const expiredResult = await tx.$executeRaw`
+      UPDATE public.deadstock_flags
+      SET status = 'expired'
+      WHERE store_id = ${storeId}
+        AND status = 'open'
+        AND scanned_at < ${expireThreshold}
+    `;
+    const expiredCount = Number(expiredResult);
 
-  // -------------------------------------------------------------------------
-  // Step 2: List active products with trackInventory=true, inventory>0, costPrice>0
-  // -------------------------------------------------------------------------
-  const products = await prisma.product.findMany({
-    where: {
-      storeId,
-      trackInventory: true,
-      deletedAt: null,
-      status: 'active',
-      inventory: { gt: 0 },
-      costPrice: { gt: 0 },
-    },
-    select: {
-      id: true,
-      name: true,
-      nameAr: true,
-      inventory: true,
-      costPrice: true,
-    },
-  });
-
-  // -------------------------------------------------------------------------
-  // Steps 3–4: Compute metrics and collect candidates
-  // -------------------------------------------------------------------------
-  const candidates: DeadstockCandidate[] = [];
-
-  for (const product of products) {
-    const days = await daysSinceLastSale(product.id, storeId);
-    const stockValueFils = Math.round((product.inventory ?? 0) * (product.costPrice ?? 0));
-
-    if (days < DEADSTOCK_DAYS_THRESHOLD) continue;
-    if (stockValueFils < DEADSTOCK_VALUE_FILS_THRESHOLD) continue;
-
-    candidates.push({
-      productId: product.id,
-      name: product.name,
-      nameAr: product.nameAr,
-      daysSinceSale: days,
-      stockOnHand: product.inventory ?? 0,
-      stockValueFils,
-      costPrice: product.costPrice ?? 0,
-    });
-  }
-
-  const scanned = products.length;
-
-  if (candidates.length === 0) {
-    logger.info({ storeId, scanned, flagged: 0, expiredCount }, 'deadstock-scan: no candidates');
-    return { scanned, flagged: 0, expiredCount };
-  }
-
-  // -------------------------------------------------------------------------
-  // Step 5: Batch-call Gemini for bilingual clearance copy (max 20/call)
-  // -------------------------------------------------------------------------
-  const copyMap = new Map<
-    string,
-    { discountPercent: number; copyEn: string; copyAr: string | null }
-  >();
-
-  const chunks: DeadstockCandidate[][] = [];
-  for (let i = 0; i < candidates.length; i += GEMINI_CHUNK_SIZE) {
-    chunks.push(candidates.slice(i, i + GEMINI_CHUNK_SIZE));
-  }
-
-  for (let ci = 0; ci < chunks.length; ci++) {
-    if (ci > 0) {
-      await new Promise<void>(resolve => setTimeout(resolve, GEMINI_THROTTLE_MS));
-    }
-    const chunk = chunks[ci];
-    try {
-      const response = await callGemini<GeminiClearanceResponse>({
-        prompt: buildGeminiPrompt(chunk),
-        feature: 'deadstock-scan',
+    // -------------------------------------------------------------------------
+    // Step 2: List active products with trackInventory=true, inventory>0, costPrice>0
+    // -------------------------------------------------------------------------
+    const products = await tx.product.findMany({
+      where: {
         storeId,
+        trackInventory: true,
+        deletedAt: null,
+        status: 'active',
+        inventory: { gt: 0 },
+        costPrice: { gt: 0 },
+      },
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        inventory: true,
+        costPrice: true,
+      },
+    });
+
+    // -------------------------------------------------------------------------
+    // Steps 3–4: Compute metrics and collect candidates
+    // -------------------------------------------------------------------------
+    const candidates: DeadstockCandidate[] = [];
+
+    for (const product of products) {
+      const days = await daysSinceLastSale(product.id, storeId, tx);
+      const stockValueFils = Math.round((product.inventory ?? 0) * (product.costPrice ?? 0));
+
+      if (days < DEADSTOCK_DAYS_THRESHOLD) continue;
+      if (stockValueFils < DEADSTOCK_VALUE_FILS_THRESHOLD) continue;
+
+      candidates.push({
+        productId: product.id,
+        name: product.name,
+        nameAr: product.nameAr,
+        daysSinceSale: days,
+        stockOnHand: product.inventory ?? 0,
+        stockValueFils,
+        costPrice: product.costPrice ?? 0,
       });
-      for (const item of response.items ?? []) {
-        copyMap.set(item.productId, {
-          discountPercent: Math.max(10, Math.min(50, Math.round(item.discountPercent ?? 20))),
-          copyEn: item.copyEn?.slice(0, 80) || 'Clearance — limited time offer!',
-          copyAr: item.copyAr?.slice(0, 80) || null,
-        });
+    }
+
+    const scanned = products.length;
+
+    if (candidates.length === 0) {
+      logger.info({ storeId, scanned, flagged: 0, expiredCount }, 'deadstock-scan: no candidates');
+      return { scanned, flagged: 0, expiredCount };
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 5: Batch-call Gemini for bilingual clearance copy (max 20/call)
+    // -------------------------------------------------------------------------
+    const copyMap = new Map<
+      string,
+      { discountPercent: number; copyEn: string; copyAr: string | null }
+    >();
+
+    const chunks: DeadstockCandidate[][] = [];
+    for (let i = 0; i < candidates.length; i += GEMINI_CHUNK_SIZE) {
+      chunks.push(candidates.slice(i, i + GEMINI_CHUNK_SIZE));
+    }
+
+    for (let ci = 0; ci < chunks.length; ci++) {
+      if (ci > 0) {
+        await new Promise<void>(resolve => setTimeout(resolve, GEMINI_THROTTLE_MS));
       }
-    } catch (err) {
-      logger.warn(
-        { err, storeId, chunkIndex: ci },
-        'deadstock-scan: Gemini call failed for chunk — proceeding with fallback copy'
-      );
-      for (const c of chunk) {
-        if (!copyMap.has(c.productId)) {
-          copyMap.set(c.productId, {
-            discountPercent: 20,
-            copyEn: 'Clearance — limited time offer!',
-            copyAr: null,
+      const chunk = chunks[ci];
+      try {
+        const response = await callGemini<GeminiClearanceResponse>({
+          prompt: buildGeminiPrompt(chunk),
+          feature: 'deadstock-scan',
+          storeId,
+        });
+        for (const item of response.items ?? []) {
+          copyMap.set(item.productId, {
+            discountPercent: Math.max(10, Math.min(50, Math.round(item.discountPercent ?? 20))),
+            copyEn: item.copyEn?.slice(0, 80) || 'Clearance — limited time offer!',
+            copyAr: item.copyAr?.slice(0, 80) || null,
           });
+        }
+      } catch (err) {
+        logger.warn(
+          { err, storeId, chunkIndex: ci },
+          'deadstock-scan: Gemini call failed for chunk — proceeding with fallback copy'
+        );
+        for (const c of chunk) {
+          if (!copyMap.has(c.productId)) {
+            copyMap.set(c.productId, {
+              discountPercent: 20,
+              copyEn: 'Clearance — limited time offer!',
+              copyAr: null,
+            });
+          }
         }
       }
     }
-  }
 
-  // -------------------------------------------------------------------------
-  // Step 6: findFirst+create/update DeadStockFlag rows
-  //
-  // Prisma's compound-unique where clause doesn't support null members in the
-  // generated type (variantId: string is required). Use findFirst+create/update
-  // to handle null variantId correctly — same pattern as reorder-scan.service.ts.
-  // -------------------------------------------------------------------------
-  let rowsUpserted = 0;
+    // -------------------------------------------------------------------------
+    // Step 6: findFirst+create/update DeadStockFlag rows (using tx for RLS bypass)
+    //
+    // Prisma's compound-unique where clause doesn't support null members in the
+    // generated type (variantId: string is required). Use findFirst+create/update
+    // to handle null variantId correctly — same pattern as reorder-scan.service.ts.
+    // -------------------------------------------------------------------------
+    let rowsUpserted = 0;
 
-  for (const candidate of candidates) {
-    const copy = copyMap.get(candidate.productId) ?? {
-      discountPercent: 20,
-      copyEn: 'Clearance — limited time offer!',
-      copyAr: null,
-    };
-
-    try {
-      const existing = await prisma.deadStockFlag.findFirst({
-        where: {
-          storeId,
-          productId: candidate.productId,
-          variantId: null,
-          scannedAt: scanStartedAt,
-        },
-        select: { id: true },
-      });
-
-      const payload = {
-        daysSinceSale: candidate.daysSinceSale,
-        stockOnHand: candidate.stockOnHand,
-        stockValueFils: candidate.stockValueFils,
-        suggestedDiscountBps: Math.round(copy.discountPercent * 100),
-        clearanceCopyEn: copy.copyEn,
-        clearanceCopyAr: copy.copyAr ?? undefined,
-        status: 'open' as const,
+    for (const candidate of candidates) {
+      const copy = copyMap.get(candidate.productId) ?? {
+        discountPercent: 20,
+        copyEn: 'Clearance — limited time offer!',
+        copyAr: null,
       };
 
-      if (existing) {
-        await prisma.deadStockFlag.update({ where: { id: existing.id }, data: payload });
-      } else {
-        await prisma.deadStockFlag.create({
-          data: {
+      try {
+        const existing = await tx.deadStockFlag.findFirst({
+          where: {
             storeId,
             productId: candidate.productId,
             variantId: null,
             scannedAt: scanStartedAt,
-            ...payload,
           },
+          select: { id: true },
         });
+
+        const payload = {
+          daysSinceSale: candidate.daysSinceSale,
+          stockOnHand: candidate.stockOnHand,
+          stockValueFils: candidate.stockValueFils,
+          suggestedDiscountBps: Math.round(copy.discountPercent * 100),
+          clearanceCopyEn: copy.copyEn,
+          clearanceCopyAr: copy.copyAr ?? undefined,
+          status: 'open' as const,
+        };
+
+        if (existing) {
+          await tx.deadStockFlag.update({ where: { id: existing.id }, data: payload });
+        } else {
+          await tx.deadStockFlag.create({
+            data: {
+              storeId,
+              productId: candidate.productId,
+              variantId: null,
+              scannedAt: scanStartedAt,
+              ...payload,
+            },
+          });
+        }
+        rowsUpserted += 1;
+      } catch (err) {
+        logger.error(
+          { err, storeId, productId: candidate.productId },
+          'deadstock-scan: failed to upsert flag'
+        );
       }
-      rowsUpserted += 1;
-    } catch (err) {
-      logger.error(
-        { err, storeId, productId: candidate.productId },
-        'deadstock-scan: failed to upsert flag'
-      );
     }
-  }
 
-  logger.info(
-    { storeId, scanned, flagged: rowsUpserted, expiredCount },
-    'deadstock-scan completed'
-  );
+    logger.info(
+      { storeId, scanned, flagged: rowsUpserted, expiredCount },
+      'deadstock-scan completed'
+    );
 
-  return { scanned, flagged: rowsUpserted, expiredCount };
+    return { scanned, flagged: rowsUpserted, expiredCount };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +324,9 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
  * Creates a Coupon for the flagged product and marks the DeadStockFlag as
  * accepted_clearance. Called by the POST /stock/deadstock-flags/:id/clearance
  * route (Task 8).
+ *
+ * This function is called from an HTTP route handler (tenant context already
+ * set by middleware) — plain prisma calls are fine here; no bypass needed.
  */
 export async function createClearanceCouponFromFlag(
   flagId: string

@@ -183,7 +183,9 @@ export const config = {
   // launch and we need to disable cleanly without redeploying.
   // `AI_DAILY_TOKEN_BUDGET_PER_STORE` caps a single tenant's usage so
   // a runaway script can't burn the shared free quota.
-  googleAiKey: process.env.GOOGLE_GENERATIVE_AI_KEY || '',
+  // Accept GEMINI_API_KEY as a fallback so a prod deploy that set the shorter
+  // var name still works without a reconfig (trap: silent 503 if neither is set).
+  googleAiKey: process.env.GOOGLE_GENERATIVE_AI_KEY ?? process.env.GEMINI_API_KEY ?? '',
   aiFeaturesEnabled: process.env.AI_FEATURES_ENABLED !== 'false',
   aiDailyTokenBudgetPerStore: parseInt(process.env.AI_DAILY_TOKEN_BUDGET_PER_STORE || '200000', 10),
 

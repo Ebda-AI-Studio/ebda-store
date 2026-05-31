@@ -14,9 +14,14 @@
  *   5. Stage candidate when projectedStock < minQty.
  *   6. Batch-call Gemini for bilingual reasoning (max 20 candidates per call).
  *   7. Upsert ReorderSuggestion rows keyed on (storeId, productId, variantId, scannedAt).
+ *
+ * RLS note (2026-06-01): the entire scan body runs inside withRlsBypass so
+ * Inngest jobs (no tenant GUC in context) can read reorder_suggestions,
+ * purchase_order_items, backorder_lines and products without being filtered
+ * to an empty result set by the direct-compare RLS policies.
  */
 
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 
@@ -70,9 +75,18 @@ interface GeminiReasoningResponse {
  * Returns the supplierId from the most-recent PurchaseOrder line for this
  * product, or null if none exists. Used as a fallback when no ReorderRule
  * carries a preferredSupplierId.
+ *
+ * When `tx` is provided (inside a withRlsBypass callback) the query runs
+ * within the bypass transaction so RLS doesn't filter results. Falls back
+ * to the module-level `prisma` proxy for HTTP-context callers.
  */
-export async function pickLastSupplierForProduct(productId: string): Promise<string | null> {
-  const lastItem = await prisma.purchaseOrderItem.findFirst({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function pickLastSupplierForProduct(
+  productId: string,
+  tx?: any
+): Promise<string | null> {
+  const client = tx ?? prisma;
+  const lastItem = await client.purchaseOrderItem.findFirst({
     where: { productId },
     orderBy: { createdAt: 'desc' },
     include: { po: { select: { supplierId: true } } },
@@ -84,10 +98,16 @@ export async function pickLastSupplierForProduct(productId: string): Promise<str
 // Helper: sum OrderItem quantity for a product over the last N days (paid orders)
 // ---------------------------------------------------------------------------
 
-async function sumOrderQty(productId: string, storeId: string, days: number): Promise<number> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function sumOrderQty(
+  productId: string,
+  storeId: string,
+  days: number,
+  tx: any
+): Promise<number> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const result = await prisma.$queryRaw<{ total: bigint }[]>`
+  const result = await tx.$queryRaw<{ total: bigint }[]>`
     SELECT COALESCE(SUM(oi.quantity), 0) AS total
     FROM public.order_items oi
     JOIN public.orders o ON o.id = oi.order_id
@@ -142,247 +162,258 @@ const EXPIRE_AFTER_DAYS = 30;
 export async function runReorderScan(storeId: string): Promise<ReorderScanResult> {
   const scanStartedAt = new Date();
 
-  // -------------------------------------------------------------------------
-  // Step 1: Mark stale open suggestions as expired
-  // -------------------------------------------------------------------------
-  const expireThreshold = new Date(Date.now() - EXPIRE_AFTER_DAYS * 24 * 60 * 60 * 1000);
+  // Wrap the entire scan in withRlsBypass so Inngest jobs (which run with no
+  // tenant GUC) can read RLS-protected tables: reorder_suggestions,
+  // purchase_order_items, backorder_lines, and products. The bypass GUC is
+  // SET LOCAL so it is transaction-scoped — no leak to other connections.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return withRlsBypass(async (tx: any) => {
+    // -------------------------------------------------------------------------
+    // Step 1: Mark stale open suggestions as expired
+    // -------------------------------------------------------------------------
+    const expireThreshold = new Date(Date.now() - EXPIRE_AFTER_DAYS * 24 * 60 * 60 * 1000);
 
-  const expiredResult = await prisma.$executeRaw`
-    UPDATE public.reorder_suggestions
-    SET status = 'expired'
-    WHERE store_id = ${storeId}
-      AND status = 'open'
-      AND scanned_at < ${expireThreshold}
-  `;
-  const expiredCount = Number(expiredResult);
+    const expiredResult = await tx.$executeRaw`
+      UPDATE public.reorder_suggestions
+      SET status = 'expired'
+      WHERE store_id = ${storeId}
+        AND status = 'open'
+        AND scanned_at < ${expireThreshold}
+    `;
+    const expiredCount = Number(expiredResult);
 
-  // -------------------------------------------------------------------------
-  // Step 2: List active trackInventory products
-  // -------------------------------------------------------------------------
-  const products = await prisma.product.findMany({
-    where: {
-      storeId,
-      trackInventory: true,
-      deletedAt: null,
-      status: 'active',
-    },
-    select: {
-      id: true,
-      name: true,
-      nameAr: true,
-      sku: true,
-      inventory: true,
-      lowStockThreshold: true,
-      reorderRules: {
-        where: { variantId: null, isActive: true },
-        take: 1,
-        select: {
-          minQty: true,
-          reorderQty: true,
-          leadTimeDays: true,
-          safetyStockDays: true,
-          preferredSupplierId: true,
+    // -------------------------------------------------------------------------
+    // Step 2: List active trackInventory products
+    // -------------------------------------------------------------------------
+    const products = await tx.product.findMany({
+      where: {
+        storeId,
+        trackInventory: true,
+        deletedAt: null,
+        status: 'active',
+      },
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        sku: true,
+        inventory: true,
+        lowStockThreshold: true,
+        reorderRules: {
+          where: { variantId: null, isActive: true },
+          take: 1,
+          select: {
+            minQty: true,
+            reorderQty: true,
+            leadTimeDays: true,
+            safetyStockDays: true,
+            preferredSupplierId: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  // -------------------------------------------------------------------------
-  // Steps 3–4: Compute metrics and collect candidates
-  // -------------------------------------------------------------------------
-  const candidates: ReorderCandidate[] = [];
+    // -------------------------------------------------------------------------
+    // Steps 3–4: Compute metrics and collect candidates
+    // -------------------------------------------------------------------------
+    const candidates: ReorderCandidate[] = [];
 
-  for (const product of products) {
-    const qty7d = await sumOrderQty(product.id, storeId, 7);
-    const qty28d = await sumOrderQty(product.id, storeId, 28);
+    for (const product of products) {
+      const qty7d = await sumOrderQty(product.id, storeId, 7, tx);
+      const qty28d = await sumOrderQty(product.id, storeId, 28, tx);
 
-    const velocity7d = qty7d / 7;
-    const velocity28d = qty28d / 28;
-    const velocity = Math.max(velocity7d, velocity28d);
+      const velocity7d = qty7d / 7;
+      const velocity28d = qty28d / 28;
+      const velocity = Math.max(velocity7d, velocity28d);
 
-    const rule = product.reorderRules[0] ?? null;
+      const rule = product.reorderRules[0] ?? null;
 
-    const minQty = rule?.minQty ?? product.lowStockThreshold;
-    const leadTimeDays = rule?.leadTimeDays ?? 7;
-    const safetyStockDays = rule?.safetyStockDays ?? 7;
-    const defaultReorderQty = Math.max(Math.round(velocity * 14), minQty * 2);
-    const reorderQty = rule?.reorderQty ?? defaultReorderQty;
+      const minQty = rule?.minQty ?? product.lowStockThreshold;
+      const leadTimeDays = rule?.leadTimeDays ?? 7;
+      const safetyStockDays = rule?.safetyStockDays ?? 7;
+      const defaultReorderQty = Math.max(Math.round(velocity * 14), minQty * 2);
+      const reorderQty = rule?.reorderQty ?? defaultReorderQty;
 
-    const onHand = product.inventory;
+      const onHand = product.inventory;
 
-    // Sum qty - qtyReceived for active PO items (status IN ('sent','partial'))
-    const onOrderAgg = await prisma.purchaseOrderItem.aggregate({
-      where: {
-        productId: product.id,
-        po: {
-          storeId,
-          status: { in: ['sent', 'partial'] },
+      // Sum qty - qtyReceived for active PO items (status IN ('sent','partial'))
+      const onOrderAgg = await tx.purchaseOrderItem.aggregate({
+        where: {
+          productId: product.id,
+          po: {
+            storeId,
+            status: { in: ['sent', 'partial'] },
+          },
         },
-      },
-      _sum: { qty: true, qtyReceived: true },
-    });
-    const onOrder = Math.max(0, (onOrderAgg._sum.qty ?? 0) - (onOrderAgg._sum.qtyReceived ?? 0));
-
-    // Open backlog: qty - qtyFulfilled for unfulfilled, non-cancelled backorder lines
-    const backlogAgg = await prisma.backorderLine.aggregate({
-      where: {
-        productId: product.id,
-        storeId,
-        fulfilledAt: null,
-        cancelledAt: null,
-      },
-      _sum: { qty: true, qtyFulfilled: true },
-    });
-    const openBacklog = Math.max(
-      0,
-      (backlogAgg._sum.qty ?? 0) - (backlogAgg._sum.qtyFulfilled ?? 0)
-    );
-
-    const demandDuringLead = velocity * (leadTimeDays + safetyStockDays);
-    const projectedStock = onHand + onOrder - openBacklog - demandDuringLead;
-
-    if (projectedStock >= minQty) continue; // healthy — skip
-
-    const safeVelocity = Math.max(velocity, 0.01);
-    const urgencyDays = Math.round(onHand / safeVelocity);
-    const suggestedQty = Math.max(reorderQty, openBacklog + reorderQty - onHand - onOrder);
-
-    // Supplier: prefer rule's preferredSupplierId, else look up last PO
-    const supplierId = rule?.preferredSupplierId ?? (await pickLastSupplierForProduct(product.id));
-
-    candidates.push({
-      productId: product.id,
-      name: product.name,
-      nameAr: product.nameAr,
-      sku: product.sku,
-      velocity7d,
-      velocity28d,
-      onHand,
-      onOrder,
-      openBacklog,
-      urgencyDays,
-      suggestedQty: Math.round(suggestedQty),
-      supplierId,
-      leadTimeDays,
-      safetyStockDays,
-      minQty,
-    });
-  }
-
-  if (candidates.length === 0) {
-    logger.info({ storeId, scanned: 0, suggested: 0, expiredCount }, 'reorder-scan: no candidates');
-    return { scanned: 0, suggested: 0, expiredCount };
-  }
-
-  // -------------------------------------------------------------------------
-  // Step 5: Batch-call Gemini for bilingual reasoning
-  // -------------------------------------------------------------------------
-  const reasoningMap = new Map<string, { reasoningEn: string; reasoningAr: string | null }>();
-
-  const chunks: ReorderCandidate[][] = [];
-  for (let i = 0; i < candidates.length; i += GEMINI_CHUNK_SIZE) {
-    chunks.push(candidates.slice(i, i + GEMINI_CHUNK_SIZE));
-  }
-
-  for (let ci = 0; ci < chunks.length; ci++) {
-    if (ci > 0) {
-      await new Promise<void>(resolve => setTimeout(resolve, GEMINI_THROTTLE_MS));
-    }
-    const chunk = chunks[ci];
-    try {
-      const response = await callGemini<GeminiReasoningResponse>({
-        prompt: buildGeminiPrompt(chunk),
-        feature: 'reorder-scan',
-        storeId,
+        _sum: { qty: true, qtyReceived: true },
       });
-      for (const item of response.items ?? []) {
-        reasoningMap.set(item.productId, {
-          reasoningEn: item.reasoningEn ?? 'AI reasoning unavailable — manual review suggested',
-          reasoningAr: item.reasoningAr ?? null,
-        });
-      }
-    } catch (err) {
-      logger.warn(
-        { err, storeId, chunkIndex: ci },
-        'reorder-scan: Gemini call failed for chunk — proceeding without AI reasoning'
+      const onOrder = Math.max(0, (onOrderAgg._sum.qty ?? 0) - (onOrderAgg._sum.qtyReceived ?? 0));
+
+      // Open backlog: qty - qtyFulfilled for unfulfilled, non-cancelled backorder lines
+      const backlogAgg = await tx.backorderLine.aggregate({
+        where: {
+          productId: product.id,
+          storeId,
+          fulfilledAt: null,
+          cancelledAt: null,
+        },
+        _sum: { qty: true, qtyFulfilled: true },
+      });
+      const openBacklog = Math.max(
+        0,
+        (backlogAgg._sum.qty ?? 0) - (backlogAgg._sum.qtyFulfilled ?? 0)
       );
-      // Set fallback reasoning for all products in this chunk
-      for (const c of chunk) {
-        if (!reasoningMap.has(c.productId)) {
-          reasoningMap.set(c.productId, {
-            reasoningEn: 'AI reasoning unavailable — manual review suggested',
-            reasoningAr: null,
+
+      const demandDuringLead = velocity * (leadTimeDays + safetyStockDays);
+      const projectedStock = onHand + onOrder - openBacklog - demandDuringLead;
+
+      if (projectedStock >= minQty) continue; // healthy — skip
+
+      const safeVelocity = Math.max(velocity, 0.01);
+      const urgencyDays = Math.round(onHand / safeVelocity);
+      const suggestedQty = Math.max(reorderQty, openBacklog + reorderQty - onHand - onOrder);
+
+      // Supplier: prefer rule's preferredSupplierId, else look up last PO
+      const supplierId =
+        rule?.preferredSupplierId ?? (await pickLastSupplierForProduct(product.id, tx));
+
+      candidates.push({
+        productId: product.id,
+        name: product.name,
+        nameAr: product.nameAr,
+        sku: product.sku,
+        velocity7d,
+        velocity28d,
+        onHand,
+        onOrder,
+        openBacklog,
+        urgencyDays,
+        suggestedQty: Math.round(suggestedQty),
+        supplierId,
+        leadTimeDays,
+        safetyStockDays,
+        minQty,
+      });
+    }
+
+    if (candidates.length === 0) {
+      logger.info(
+        { storeId, scanned: 0, suggested: 0, expiredCount },
+        'reorder-scan: no candidates'
+      );
+      return { scanned: 0, suggested: 0, expiredCount };
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 5: Batch-call Gemini for bilingual reasoning
+    // -------------------------------------------------------------------------
+    const reasoningMap = new Map<string, { reasoningEn: string; reasoningAr: string | null }>();
+
+    const chunks: ReorderCandidate[][] = [];
+    for (let i = 0; i < candidates.length; i += GEMINI_CHUNK_SIZE) {
+      chunks.push(candidates.slice(i, i + GEMINI_CHUNK_SIZE));
+    }
+
+    for (let ci = 0; ci < chunks.length; ci++) {
+      if (ci > 0) {
+        await new Promise<void>(resolve => setTimeout(resolve, GEMINI_THROTTLE_MS));
+      }
+      const chunk = chunks[ci];
+      try {
+        const response = await callGemini<GeminiReasoningResponse>({
+          prompt: buildGeminiPrompt(chunk),
+          feature: 'reorder-scan',
+          storeId,
+        });
+        for (const item of response.items ?? []) {
+          reasoningMap.set(item.productId, {
+            reasoningEn: item.reasoningEn ?? 'AI reasoning unavailable — manual review suggested',
+            reasoningAr: item.reasoningAr ?? null,
           });
+        }
+      } catch (err) {
+        logger.warn(
+          { err, storeId, chunkIndex: ci },
+          'reorder-scan: Gemini call failed for chunk — proceeding without AI reasoning'
+        );
+        // Set fallback reasoning for all products in this chunk
+        for (const c of chunk) {
+          if (!reasoningMap.has(c.productId)) {
+            reasoningMap.set(c.productId, {
+              reasoningEn: 'AI reasoning unavailable — manual review suggested',
+              reasoningAr: null,
+            });
+          }
         }
       }
     }
-  }
 
-  // -------------------------------------------------------------------------
-  // Step 6: Upsert ReorderSuggestion rows
-  // -------------------------------------------------------------------------
-  let rowsUpserted = 0;
+    // -------------------------------------------------------------------------
+    // Step 6: Upsert ReorderSuggestion rows (using tx for RLS bypass)
+    // -------------------------------------------------------------------------
+    let rowsUpserted = 0;
 
-  for (const candidate of candidates) {
-    const reasoning = reasoningMap.get(candidate.productId) ?? {
-      reasoningEn: 'AI reasoning unavailable — manual review suggested',
-      reasoningAr: null,
-    };
-
-    try {
-      // Prisma's compound-unique where clause doesn't support null members
-      // (the generated type requires variantId: string). Use findFirst +
-      // create/update to handle the null-variantId case correctly.
-      const existing = await prisma.reorderSuggestion.findFirst({
-        where: {
-          storeId,
-          productId: candidate.productId,
-          variantId: null,
-          scannedAt: scanStartedAt,
-        },
-        select: { id: true },
-      });
-
-      const payload = {
-        suggestedQty: candidate.suggestedQty,
-        velocity7d: candidate.velocity7d,
-        velocity28d: candidate.velocity28d,
-        onHand: candidate.onHand,
-        onOrder: candidate.onOrder,
-        openBacklog: candidate.openBacklog,
-        urgencyDays: candidate.urgencyDays,
-        supplierId: candidate.supplierId,
-        reasoningEn: reasoning.reasoningEn,
-        reasoningAr: reasoning.reasoningAr ?? undefined,
-        status: 'open' as const,
+    for (const candidate of candidates) {
+      const reasoning = reasoningMap.get(candidate.productId) ?? {
+        reasoningEn: 'AI reasoning unavailable — manual review suggested',
+        reasoningAr: null,
       };
 
-      if (existing) {
-        await prisma.reorderSuggestion.update({ where: { id: existing.id }, data: payload });
-      } else {
-        await prisma.reorderSuggestion.create({
-          data: {
+      try {
+        // Prisma's compound-unique where clause doesn't support null members
+        // (the generated type requires variantId: string). Use findFirst +
+        // create/update to handle the null-variantId case correctly.
+        const existing = await tx.reorderSuggestion.findFirst({
+          where: {
             storeId,
             productId: candidate.productId,
             variantId: null,
             scannedAt: scanStartedAt,
-            ...payload,
           },
+          select: { id: true },
         });
+
+        const payload = {
+          suggestedQty: candidate.suggestedQty,
+          velocity7d: candidate.velocity7d,
+          velocity28d: candidate.velocity28d,
+          onHand: candidate.onHand,
+          onOrder: candidate.onOrder,
+          openBacklog: candidate.openBacklog,
+          urgencyDays: candidate.urgencyDays,
+          supplierId: candidate.supplierId,
+          reasoningEn: reasoning.reasoningEn,
+          reasoningAr: reasoning.reasoningAr ?? undefined,
+          status: 'open' as const,
+        };
+
+        if (existing) {
+          await tx.reorderSuggestion.update({ where: { id: existing.id }, data: payload });
+        } else {
+          await tx.reorderSuggestion.create({
+            data: {
+              storeId,
+              productId: candidate.productId,
+              variantId: null,
+              scannedAt: scanStartedAt,
+              ...payload,
+            },
+          });
+        }
+        rowsUpserted += 1;
+      } catch (err) {
+        logger.error(
+          { err, storeId, productId: candidate.productId },
+          'reorder-scan: failed to upsert suggestion'
+        );
       }
-      rowsUpserted += 1;
-    } catch (err) {
-      logger.error(
-        { err, storeId, productId: candidate.productId },
-        'reorder-scan: failed to upsert suggestion'
-      );
     }
-  }
 
-  logger.info(
-    { storeId, scanned: candidates.length, suggested: rowsUpserted, expiredCount },
-    'reorder-scan completed'
-  );
+    logger.info(
+      { storeId, scanned: candidates.length, suggested: rowsUpserted, expiredCount },
+      'reorder-scan completed'
+    );
 
-  return { scanned: candidates.length, suggested: rowsUpserted, expiredCount };
+    return { scanned: candidates.length, suggested: rowsUpserted, expiredCount };
+  });
 }
