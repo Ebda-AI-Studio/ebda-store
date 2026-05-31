@@ -2,6 +2,11 @@
 
 Live log of what changed this session so you can track it. Newest at top. FWB = force-website-builder, WBS = whatsapp-bulk-sender.
 
+## WBS bot fixes MERGED to WBS main `d8e965a0` (2026-06-01)
+- **I2** — removed the legacy image-per-category bot flow from `wa-ordering.js` (0 `sendMediaMessage('image')` category/product sends remain).
+- **I1** — admin WhatsApp-ordering settings now persists `botMode` (selector: legacy_chat / native_catalog / native_catalog_with_gemini_agent) + `metaCatalogId`. Pre-merge checks: JS syntax OK, en/ar JSON valid (23/23 parity).
+- **Still needs Ahmad** to make the bot actually use native catalog for a store: (a) set that store's botMode to `native_catalog` in admin settings (now possible via the new selector), (b) Meta catalog auto-provision needs `FORCE_AI_META_BM_ID` + `FORCE_AI_META_ADMIN_TOKEN` env + correct Meta token scopes (per DIAG-D).
+
 ## ✅ TRULY VERIFIED FINAL @ main `8b5ad921` — full tsc 0 errors (api+admin+web)
 Ran clean `npm ci` + `prisma generate` + `@force/database` build in a fresh worktree off origin/main, then `tsc --noEmit` on all 3 apps: **api=0, admin=0, web=0**. Authoritative verdict. One real bug had slipped my earlier grep-sweep claims — review `page.tsx` used `API_URL` without importing it — fixed in `8b5ad921`. Build is genuinely clean for Vercel + Railway.
 
