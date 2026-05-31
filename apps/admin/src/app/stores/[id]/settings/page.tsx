@@ -180,31 +180,38 @@ export default function StoreSettingsPage() {
         </svg>
       ),
     },
+    /*
+     * Navigation card REMOVED 2026-06-01 (consolidation). Navigation is
+     * now embedded in Page Builder (NavMenuEditor variant="embedded") so
+     * merchants can edit header links without page-hopping. The standalone
+     * /navigation page still works by URL so existing bookmarks don't 404.
+     *
+     * Hero / Announcement cards REMOVED 2026-05-21 (Ahmad audit). Page
+     * Builder owns hero slides, announcement bar visibility + content.
+     * The standalone /hero, /announcement pages still work by URL.
+     *
+     * Footer Links / pages card REMOVED 2026-06-01 (consolidation). Footer
+     * link editing is already embedded in Page Builder (FooterLinksEditor
+     * variant="embedded"). The standalone /pages route still works by URL.
+     *
+     * SEO stays in Settings since it's meta-tags + structured data, distinct
+     * from page-builder's typography zones.
+     */
     {
-      key: 'navigation',
-      href: `/stores/${storeId}/navigation`,
-      color: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300',
+      key: 'categories',
+      href: `/stores/${storeId}/categories`,
+      color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M4 6h16M4 12h16M4 18h16"
+            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
           />
         </svg>
       ),
     },
-    /*
-     * Hero / Categories / Announcement cards REMOVED 2026-05-21 (Ahmad
-     * audit). Page Builder under Catalog now owns hero slides, category
-     * tile config, and announcement bar visibility + content. The
-     * standalone /hero, /categories, /announcement pages still work by
-     * URL but are no longer discoverable from Settings — they're linked
-     * from inside the matching Page Builder section card. SEO stays in
-     * Settings since it's meta-tags + structured data, distinct from
-     * page-builder's typography zones.
-     */
     {
       key: 'seo',
       href: `/stores/${storeId}/seo`,
@@ -302,21 +309,6 @@ export default function StoreSettingsPage() {
       key: 'template',
       href: `/stores/${storeId}/template`,
       color: 'bg-primary/10 text-primary',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'pages',
-      href: `/stores/${storeId}/pages`,
-      color: 'bg-slate-100 text-slate-600',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
