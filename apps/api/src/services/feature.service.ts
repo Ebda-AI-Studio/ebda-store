@@ -1,4 +1,4 @@
-import { prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx } from '@force/database';
 import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@force/shared';
 import { redis } from './redis.service';
 import logger from '../lib/logger';

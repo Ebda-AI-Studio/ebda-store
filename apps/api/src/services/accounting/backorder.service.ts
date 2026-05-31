@@ -1,4 +1,4 @@
-import { prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx } from '@force/database';
 import logger from '../../lib/logger';
 import { OrderService } from '../order.service';
 

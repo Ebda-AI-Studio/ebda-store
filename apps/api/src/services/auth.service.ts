@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx } from '@force/database';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';

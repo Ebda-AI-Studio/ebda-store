@@ -3,7 +3,7 @@
 // Orchestrates carrier integrations: shipment creation, tracking, webhooks
 // ==========================================
 
-import { prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx } from '@force/database';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
 import { notificationDispatcher } from './notification-dispatcher.service';

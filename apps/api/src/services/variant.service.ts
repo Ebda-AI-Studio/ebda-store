@@ -1,4 +1,4 @@
-import { prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
