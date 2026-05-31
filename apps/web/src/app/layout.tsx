@@ -9,6 +9,7 @@ import { CartProvider } from '../contexts/CartContext';
 import { AuthProvider } from '../contexts/AuthContext';
 import { FeatureProvider } from '../contexts/FeatureContext';
 import { getStore } from '../lib/store-resolver';
+import { API_URL } from '../lib/api';
 import { organizationJsonLd, getSiteUrl } from '../lib/structured-data';
 import { pickMetaDescription } from '../lib/seo/meta-description';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
