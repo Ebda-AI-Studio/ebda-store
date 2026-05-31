@@ -2,6 +2,9 @@
 
 Live log of what changed this session so you can track it. Newest at top. FWB = force-website-builder, WBS = whatsapp-bulk-sender.
 
+## ✅ TRULY VERIFIED FINAL @ main `8b5ad921` — full tsc 0 errors (api+admin+web)
+Ran clean `npm ci` + `prisma generate` + `@force/database` build in a fresh worktree off origin/main, then `tsc --noEmit` on all 3 apps: **api=0, admin=0, web=0**. Authoritative verdict. One real bug had slipped my earlier grep-sweep claims — review `page.tsx` used `API_URL` without importing it — fixed in `8b5ad921`. Build is genuinely clean for Vercel + Railway.
+
 ## ✅ VERIFIED FINAL @ main `4cbe0974` — build-clean (3 source sweeps pass)
 Confirmed against origin/main via deterministic deps-independent sweeps: (1) no apps/web file uses `API_URL` without importing it; (2) no apps/api file uses `Prisma.` without importing it; (3) the only remaining `async tx =>` callbacks are `prisma.$transaction(...)` + `withRlsBypass(...)` forms which infer `tx` automatically — every `withMoneyTx` site is explicitly typed. Local `npx tsc` still shows ~3 phantom errors (`withMoneyTx`/`rate-limit-redis` "not found") which are STALE-dev-node_modules artifacts only — CI's fresh `npm ci` + `@force/database` rebuild resolves them.
 
