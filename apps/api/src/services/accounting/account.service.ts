@@ -14,8 +14,8 @@ import { postEntry } from './journal.service';
 export async function seedCoaForStore(
   storeId: string,
   tx?: Prisma.TransactionClient
-): Promise<void> {
-  const run = async (client: Prisma.TransactionClient) => {
+): Promise<number> {
+  const run = async (client: Prisma.TransactionClient): Promise<number> => {
     const existing = await client.account.findMany({
       where: { storeId, isSystem: true },
       select: { code: true },
@@ -40,6 +40,10 @@ export async function seedCoaForStore(
     // Opening balance — runs AFTER COA accounts exist so getSystemAccountIdByCode resolves.
     // Idempotent: postEntry's (source='opening_balance', sourceId=storeId) key catches re-runs.
     await postOpeningBalanceIfNeeded(storeId, client);
+
+    // Return the number of newly-created accounts so callers (e.g. the seed
+    // endpoint) can report it. 0 means the store was already fully seeded.
+    return toCreate.length;
   };
   if (tx) return run(tx);
   // No caller tx → wrap in withRlsBypass. seedCoaForStore is called by

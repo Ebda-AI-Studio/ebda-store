@@ -22,6 +22,7 @@ import {
   listAccountsTree,
   createChildAccount,
   setAccountActive,
+  seedCoaForStore,
 } from '../services/accounting/account.service';
 import { postEntry } from '../services/accounting/journal.service';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
@@ -209,6 +210,34 @@ router.post(
       );
 
       res.status(201).json({ data: entry });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /:storeId/finance/accounts/seed ────────────────────────────────────
+
+/**
+ * Seed (or back-fill) the standard Chart of Accounts for an existing store.
+ * `seedCoaForStore` is idempotent — it only inserts COA_TEMPLATE codes the
+ * store is missing, so this is safe to call repeatedly. Needed because the
+ * automatic seed only runs at store-create time; stores that pre-date that code
+ * (or were created via DB seeder) have zero accounts, which makes every
+ * journal-posting path throw "seed COA first". Returns the count created.
+ */
+router.post(
+  '/:storeId/finance/accounts/seed',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.basic'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const created = await runInTenantContext(req.params.storeId, () =>
+        seedCoaForStore(req.params.storeId)
+      );
+      res.status(201).json({ data: { created } });
     } catch (err) {
       next(err);
     }
