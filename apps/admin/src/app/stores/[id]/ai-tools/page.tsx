@@ -33,6 +33,7 @@ interface BulkAiJob {
     | 'faq_aeo'
     | 'howto_aeo'
     | 'meta_aeo'
+    | 'product_faqs'
     | 'recommendations'
     | 'llms_txt'
     | 'citation_copy'
@@ -87,6 +88,8 @@ function jobKindLabel(kind: BulkAiJob['kind'], direction?: 'to_ar' | 'to_en' | n
       return 'Draft HowTos';
     case 'meta_aeo':
       return 'Meta AEO rewrite';
+    case 'product_faqs':
+      return 'Product FAQs';
     case 'recommendations':
       return 'AI recommendations';
     case 'llms_txt':
@@ -115,6 +118,7 @@ export default function AiToolsPage() {
     | 'faq-aeo'
     | 'howto-aeo'
     | 'meta-aeo'
+    | 'product-faqs'
     | 'aeo-all'
     | 'recommendations'
     | 'llms-txt'
@@ -403,6 +407,15 @@ export default function AiToolsPage() {
           forceTooltip="Overwrites existing AEO meta descriptions on all entities."
           resultsHref={`/stores/${storeId}/seo`}
           resultsLabel="View meta on SEO page"
+        />
+        <BulkActionCard
+          title="Draft Product FAQs with AI"
+          body="Generates up to 5 bilingual (EN + AR) FAQ pairs for every product — the same drafting used by the per-product button, run across your whole catalogue. Skips products that already have FAQs."
+          buttonLabel="Draft product FAQs"
+          loading={starting === 'product-faqs'}
+          disabled={anyRunning}
+          onAction={force => start('/bulk/product-faqs', 'product-faqs', {}, force)}
+          forceTooltip="Re-drafts FAQs for every product, replacing AI-drafted FAQs. Manually-edited FAQs are preserved."
         />
       </div>
 

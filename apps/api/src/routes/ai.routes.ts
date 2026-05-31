@@ -14,6 +14,7 @@ import { writeLimiter } from '../middleware/security';
 import { AIService } from '../services/ai.service';
 import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
+import { generateProductFaqs } from '../lib/ai/product-faq-generator';
 import { prisma } from '@force/database';
 
 const router = Router({ mergeParams: true });
@@ -475,52 +476,32 @@ router.post(
         select: { name: true, nameAr: true },
       });
 
-      // Use the Gemini model to draft product-specific FAQs.
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const apiKey = process.env.GOOGLE_GENERATIVE_AI_KEY;
       if (!apiKey) {
         throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI service is not configured');
       }
-      const genai = new GoogleGenerativeAI(apiKey);
-      const model = genai.getGenerativeModel({
-        model: process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest',
-      });
 
-      const prompt = `You are an SEO + AEO expert helping a Kuwait-based e-commerce store write product FAQs.
-
-Store: ${store?.name ?? storeId}
-Product: ${product.name}${product.nameAr ? ` / ${product.nameAr}` : ''}
-Description: ${product.description ?? '(no description provided)'}
-
-Draft exactly ${count} FAQ pairs that real customers would ask about this specific product.
-Cover: sizing/fit, materials, shipping time, return policy, how to use, care instructions — pick the most relevant for this product.
-Each FAQ must have a question AND answer in BOTH English AND Arabic (formal MSA, not dialect).
-
-Return ONLY valid JSON — no markdown, no explanation:
-[
-  {
-    "question": "English question?",
-    "questionAr": "السؤال بالعربية؟",
-    "answer": "English answer.",
-    "answerAr": "الإجابة بالعربية."
-  }
-]`;
-
-      const result = await model.generateContent(prompt);
-      const raw = result.response.text();
-
-      // Extract outermost JSON array to tolerate any trailing text Gemini adds.
-      const start = raw.indexOf('[');
-      const end = raw.lastIndexOf(']');
-      if (start === -1 || end === -1) {
+      // Shared FAQ core — identical prompt + parse path as the bulk
+      // product-FAQ sweep (Inngest bulk-ai-product-faqs). DRY: both call
+      // generateProductFaqs so per-product and bulk output never diverge.
+      let faqs;
+      try {
+        faqs = await generateProductFaqs(
+          {
+            storeName: store?.name ?? storeId,
+            product: {
+              name: product.name,
+              nameAr: product.nameAr,
+              description: product.description,
+            },
+            count,
+          },
+          apiKey,
+          process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest'
+        );
+      } catch {
         throw new AppError(502, 'AI_PARSE_ERROR', 'AI returned unexpected format');
       }
-      const faqs = JSON.parse(raw.slice(start, end + 1)) as Array<{
-        question: string;
-        questionAr?: string;
-        answer: string;
-        answerAr?: string;
-      }>;
 
       // Record AI usage for quota tracking (non-blocking).
       prisma.aiUsage

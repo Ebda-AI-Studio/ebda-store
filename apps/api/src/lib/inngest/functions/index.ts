@@ -11,6 +11,7 @@ import { bulkAiSeo } from './bulk-ai-seo';
 import { bulkAiFaqAeo, bulkAiHowtoAeo, bulkAiMetaAeo } from './bulk-ai-aeo';
 import { bulkAiLlmsTxt, bulkAiCitationCopy, bulkAiBrandFacts } from './bulk-ai-geo';
 import { bulkAiRecommendations } from './bulk-ai-recommendations';
+import { bulkAiProductFaqs } from './bulk-ai-product-faqs';
 import { reviewRequest } from './review-request';
 import { reviewModeration } from './review-moderation';
 import {
@@ -56,6 +57,7 @@ export const inngestFunctions: InngestFunction.Any[] = [
   bulkAiHowtoAeo,
   bulkAiMetaAeo,
   bulkAiRecommendations,
+  bulkAiProductFaqs,
   bulkAiLlmsTxt,
   bulkAiCitationCopy,
   bulkAiBrandFacts,
