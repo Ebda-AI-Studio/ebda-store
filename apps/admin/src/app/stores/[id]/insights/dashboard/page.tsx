@@ -37,6 +37,9 @@ interface InsightsDashboard {
   topSegment: TopSegment | null;
   topSkus: TopSku[];
   yesterdayFunnel: YesterdayFunnel | null;
+  // ISO date of the snapshot powering the velocity panel. Mirrors the
+  // computedAt/snapshot date shown on the segments / cohorts / funnel panels.
+  velocityAsOf?: string | null;
   narration?: { en: string; ar: string } | null;
 }
 
@@ -208,7 +211,16 @@ export default function InsightsDashboardPage() {
         {/* Top 5 SKUs */}
         {data.topSkus.length > 0 && (
           <section>
-            <h2 className="text-base font-semibold mb-3">{t('topSkus')}</h2>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold">{t('topSkus')}</h2>
+              {/* Last-updated date+time — matches the segments / cohorts /
+                  funnel insights panels. */}
+              {data.velocityAsOf && (
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {t('asOf')}: {new Date(data.velocityAsOf).toLocaleString()}
+                </span>
+              )}
+            </div>
             <div className="rounded-xl border border-border overflow-hidden">
               <table className="w-full text-sm">
                 <thead>

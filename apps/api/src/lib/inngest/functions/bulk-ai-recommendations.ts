@@ -1,12 +1,12 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, withMoneyTx } from '@force/database';
+import { Prisma, prisma, withMoneyTx } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
-import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
+import { parseAiJson } from '../../ai/parse-ai-json';
 
 /**
  * Catalogue-wide AI product recommendations sweep.
@@ -60,33 +60,81 @@ function getGenAI(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(config.googleAiKey);
 }
 
+// How many of the strongest co-purchase pairs to load per product as a
+// frequently-bought-together signal for the prompt. Keeping this small
+// keeps the prompt focused — these are HARD signals (real orders), so
+// even 3-5 is enough to anchor Gemini toward genuine complements.
+const FBT_PAIRS_PER_PRODUCT = 6;
+// Only count co-purchases observed in the last N days so the signal
+// reflects the store's CURRENT catalogue behaviour, not stale history.
+const FBT_WINDOW_DAYS = 180;
+
 /**
- * Strip Markdown code fences that Gemini occasionally emits even when
- * responseMimeType is set to application/json. Defensive — most calls
- * are clean.
+ * Compute the strongest frequently-bought-together (FBT) pairs for the
+ * store from real order history. Self-joins `order_items` within the same
+ * order so each row is a co-occurrence of two DISTINCT products in one
+ * order, counts how many orders contain each unordered pair, and returns
+ * a map keyed by source productId → ranked list of co-bought productIds.
+ *
+ * This is genuine co-purchase signal (what customers ACTUALLY buy
+ * together), distinct from catalogue similarity. We feed the top
+ * FBT_PAIRS_PER_PRODUCT per product into the Gemini prompt so the model
+ * prioritises real complements over merely-similar products.
+ *
+ * Scoped to the store + non-cancelled/refunded orders + the FBT window.
+ * Returns an empty map for stores with no qualifying order history — the
+ * sweep then falls back to catalogue-only reasoning (prior behaviour).
  */
-function stripFences(text: string): string {
-  let s = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/i, '')
-    .trim();
+async function computeCoPurchasePairs(
+  storeId: string
+): Promise<Map<string, Array<{ productId: string; coOrders: number }>>> {
+  const since = new Date(Date.now() - FBT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  // Extract the outermost JSON span. Gemini occasionally appends explanatory
-  // text after a valid JSON body even when prompted for pure JSON. Slice
-  // from the first `{` or `[` to the last `}` or `]`. See bulk-ai-aeo.ts
-  // for full rationale (2026-05-25 fix after Mastic + caraway products
-  // failed AEO meta sweep with "Unexpected non-whitespace character after
-  // JSON at position 331").
-  const firstOpen = s.search(/[\{\[]/);
-  if (firstOpen > 0) s = s.slice(firstOpen);
+  // a.product_id < b.product_id makes each unordered pair appear once;
+  // we expand to both directions in JS below so either product can be the
+  // source. COUNT(DISTINCT o.id) so multiple lines of the same product in
+  // one order don't inflate the pair count.
+  const rows = await prisma.$queryRaw<
+    Array<{ a_id: string; b_id: string; co_orders: bigint }>
+  >(
+    Prisma.sql`
+      SELECT a.product_id AS a_id,
+             b.product_id AS b_id,
+             COUNT(DISTINCT o.id) AS co_orders
+      FROM order_items a
+      JOIN order_items b
+        ON a.order_id = b.order_id
+       AND a.product_id < b.product_id
+      JOIN orders o ON o.id = a.order_id
+      WHERE o.store_id = ${storeId}
+        AND o.created_at >= ${since}
+        AND o.status NOT IN ('cancelled', 'refunded')
+      GROUP BY a.product_id, b.product_id
+      HAVING COUNT(DISTINCT o.id) >= 1
+      ORDER BY co_orders DESC
+      LIMIT 2000
+    `
+  );
 
-  const lastClose = Math.max(s.lastIndexOf('}'), s.lastIndexOf(']'));
-  if (lastClose !== -1 && lastClose < s.length - 1) {
-    s = s.slice(0, lastClose + 1);
+  const map = new Map<string, Array<{ productId: string; coOrders: number }>>();
+  const push = (src: string, tgt: string, n: number) => {
+    const list = map.get(src) ?? [];
+    list.push({ productId: tgt, coOrders: n });
+    map.set(src, list);
+  };
+  for (const r of rows) {
+    const n = Number(r.co_orders);
+    // Expand to both directions so each product sees its co-bought set.
+    push(r.a_id, r.b_id, n);
+    push(r.b_id, r.a_id, n);
   }
-
-  return s;
+  // Keep only the strongest pairs per product (already globally sorted, so
+  // re-sort each bucket then trim).
+  for (const [src, list] of map) {
+    list.sort((x, y) => y.coOrders - x.coOrders);
+    map.set(src, list.slice(0, FBT_PAIRS_PER_PRODUCT));
+  }
+  return map;
 }
 
 interface LlmRec {
@@ -211,6 +259,26 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
         distinct: ['sourceProductId'],
       });
       const productsWithRecs = new Set(existingRecRows.map(r => r.sourceProductId));
+
+      // Frequently-bought-together signal from real order history. Passed
+      // into each product's prompt so Gemini prioritises genuine
+      // complements (products actually bought together) over merely-similar
+      // catalogue items. Empty map for stores with no order history → the
+      // prompt falls back to catalogue-only reasoning.
+      const nameById = new Map(catalogIndex.map(c => [c.id, c.name] as const));
+      let coPurchase: Map<string, Array<{ productId: string; coOrders: number }>>;
+      try {
+        coPurchase = await computeCoPurchasePairs(storeId);
+      } catch (err) {
+        // FBT is an enhancement, not a hard dependency — never fail the
+        // sweep because the co-purchase query had a problem.
+        logger.warn(
+          { jobId, storeId, err: err instanceof Error ? err.message : String(err) },
+          'bulk-ai-recommendations: co-purchase signal unavailable, falling back to catalogue-only'
+        );
+        coPurchase = new Map();
+      }
+
       logger.info(
         {
           jobId,
@@ -218,6 +286,7 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
           totalProducts: products.length,
           alreadyHaveRecs: productsWithRecs.size,
           toProcess: products.length - productsWithRecs.size,
+          productsWithCoPurchaseSignal: coPurchase.size,
         },
         'bulk-ai-recommendations: pre-sweep state'
       );
@@ -273,20 +342,46 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
             .slice(0, CANDIDATE_SLICE);
 
           const productCategory = product.categories[0]?.category.name ?? null;
-          const prompt = `Given a source product, pick the ${RECS_PER_PRODUCT} catalog products that best complement it (cross-sells or bundles — not substitutes). Output ONLY a JSON array, no prose.
+
+          // Frequently-bought-together signal — the products customers have
+          // ACTUALLY ordered alongside this one, ranked by co-order count.
+          // This is the strongest available complement signal; the prompt
+          // instructs Gemini to prioritise it.
+          const fbt = (coPurchase.get(product.id) ?? [])
+            .filter(p => nameById.has(p.productId))
+            .map(p => ({
+              productId: p.productId,
+              name: nameById.get(p.productId)!,
+              coOrders: p.coOrders,
+            }));
+          const fbtBlock =
+            fbt.length > 0
+              ? `\nFrequently bought together (REAL co-purchase data — customers ordered these in the SAME order as the source product; higher coOrders = stronger signal). Prioritise these when they fit as complements:\n${JSON.stringify(
+                  fbt
+                )}\n`
+              : '';
+
+          const prompt = `You recommend complementary products for an e-commerce store. Pick the ${RECS_PER_PRODUCT} catalog products that are most likely to be bought TOGETHER with the source product (genuine cross-sells / bundles / accessories — NOT substitutes or near-duplicates).
+
+Ranking priority:
+1. Products in the "Frequently bought together" list below — these are real co-purchases and should rank highest when they make sense as complements.
+2. Genuine complements that pair with the source product's use (accessories, consumables, items completing a set/recipe/outfit).
+3. Avoid substitutes (another item that REPLACES the source) and avoid near-identical products.
+
+Output ONLY a JSON array, no prose.
 
 Source product:
   id: ${product.id}
   name: ${product.name}
   category: ${productCategory ?? '—'}
   description: ${desc || '—'}
-
+${fbtBlock}
 Candidate catalog (pick IDs only from this list):
 ${JSON.stringify(candidates)}
 
-Output schema: [{"productId":"<id from candidate list>","score":0.0,"reason":"<one sentence>"}]
+Output schema: [{"productId":"<id from candidate list>","score":0.0,"reason":"<one sentence — mention if it's frequently bought together>"}]
 
-Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by descending score.`;
+Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by descending score (strongest complement first).`;
 
           const result = await callWithRetry(
             () => model.generateContent(prompt),
@@ -296,7 +391,10 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
           let parsed: LlmRec[];
 
           try {
-            parsed = JSON.parse(sanitizeJsonControlChars(stripFences(raw)));
+            // parseAiJson applies the outermost-JSON-span slice (strips any
+            // leading/trailing prose Gemini adds) + control-char sanitising
+            // before JSON.parse. See feedback-gemini-json-response-extra-text.
+            parsed = parseAiJson<LlmRec[]>(raw);
           } catch {
             throw new Error('LLM returned unparseable JSON');
           }

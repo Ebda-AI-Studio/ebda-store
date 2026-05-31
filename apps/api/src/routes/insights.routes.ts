@@ -226,6 +226,11 @@ router.get(
             };
           }),
           yesterdayFunnel: yesterdayFunnel ?? null,
+          // As-of timestamp for the velocity panel. The top-SKU velocity is
+          // computed live from the trailing 7d order window at request time,
+          // so "as of" is the moment this response was assembled. Mirrors the
+          // date+time the segments / cohorts / funnel panels show.
+          velocityAsOf: topSkus.length > 0 ? new Date().toISOString() : null,
           narration: narration ?? undefined,
         },
       });

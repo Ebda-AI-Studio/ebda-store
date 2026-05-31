@@ -55,6 +55,15 @@ type BulkAiSeoEvent = EventPayload & {
   };
 };
 
+type BulkAiProductFaqsEvent = EventPayload & {
+  name: 'bulk-ai/product-faqs-requested';
+  data: {
+    jobId: string;
+    storeId: string;
+    force?: boolean;
+  };
+};
+
 type OrderDeliveredEvent = EventPayload & {
   name: 'order/delivered';
   data: {
@@ -150,6 +159,7 @@ export type AppEvent =
   | InvoiceEmailRequestedEvent
   | BulkAiTranslateEvent
   | BulkAiSeoEvent
+  | BulkAiProductFaqsEvent
   | OrderDeliveredEvent
   | OrderShippedEvent
   | ReviewSubmittedEvent
