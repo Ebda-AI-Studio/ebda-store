@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { API_URL } from '../../../../lib/api';
 
 interface Product {
   id: string;
