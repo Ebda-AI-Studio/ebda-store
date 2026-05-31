@@ -423,7 +423,7 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
           } else {
             // Fully replace prior AI recs for this source product so
             // re-sweeping the catalogue produces a clean result.
-            await withMoneyTx(prisma, async tx => {
+            await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
               await tx.aiRecommendation.deleteMany({
                 where: { storeId, sourceProductId: product.id },
               });
