@@ -316,7 +316,7 @@ export class StoreService {
   static async delete(storeId: string) {
     const store = await this.getById(storeId);
 
-    await withMoneyTx(prisma, async tx => {
+    await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // 2026-05-21 — switched from prisma.deleteMany() to raw SQL DELETE
       // statements because the Prisma-typed approach kept hitting
       // P2003 (journal_entries_store_id_fkey) even with explicit

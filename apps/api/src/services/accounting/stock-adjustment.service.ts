@@ -129,7 +129,7 @@ export async function postAdjustment(
 
   const inventoryType = INVENTORY_TYPE_MAP[adjustment.type];
 
-  await withMoneyTx(prisma, async tx => {
+  await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
     for (const item of adjustment.items) {
       if (item.variantId) {
         await tx.productVariant.update({

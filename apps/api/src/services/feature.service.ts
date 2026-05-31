@@ -174,7 +174,7 @@ class FeatureService {
     // SELECT goes to the primary that just absorbed the writes —
     // avoids the Neon read-replica staleness window where the cache
     // would otherwise be repopulated with the pre-write row state.
-    const freshFeatures = await withMoneyTx(prisma, async tx => {
+    const freshFeatures = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       for (const [featureKey, enabled] of Object.entries(updates)) {
         await tx.storeFeature.upsert({
           where: { storeId_featureKey: { storeId, featureKey } },

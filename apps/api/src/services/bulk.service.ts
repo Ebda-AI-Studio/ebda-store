@@ -445,7 +445,7 @@ export class BulkService {
       const batch = validRows.slice(batchStart, batchStart + BATCH_SIZE);
 
       try {
-        await withMoneyTx(prisma, async tx => {
+        await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
           for (const { rowIndex, row, slug, existing } of batch) {
             try {
               const productFields = {

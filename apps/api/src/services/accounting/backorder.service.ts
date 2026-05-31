@@ -71,7 +71,7 @@ export async function cancelBackorder(
 
   const now = new Date();
 
-  await withMoneyTx(prisma, async tx => {
+  await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
     // 1. Mark the backorder line cancelled
     await tx.backorderLine.update({
       where: { id: backorderId },

@@ -210,7 +210,7 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Option not found');
     }
 
-    await withMoneyTx(prisma, async tx => {
+    await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // Delete all variants since they depend on options
       await tx.productVariant.deleteMany({ where: { productId } });
 

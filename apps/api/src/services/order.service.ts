@@ -268,7 +268,7 @@ export class OrderService {
     // DB-006: Inventory is validated with a row-level lock (SELECT ... FOR UPDATE)
     // *inside* the transaction so that two concurrent checkouts cannot both read
     // the same stale inventory count and both succeed when only one unit remains.
-    const order = await withMoneyTx(prisma, async tx => {
+    const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // Lock and re-validate inventory for each tracked item before decrementing.
       // FOR UPDATE prevents any concurrent transaction from reading or updating
       // the same Product row until this transaction commits or rolls back.
@@ -568,7 +568,7 @@ export class OrderService {
     orderId: string,
     sessionId: string
   ): Promise<void> {
-    await withMoneyTx(prisma, async tx => {
+    await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, storeId },
         include: { items: true, payments: true },
@@ -946,7 +946,7 @@ export class OrderService {
     if (!order) return;
 
     if (restoreInventory) {
-      await withMoneyTx(prisma, async tx => {
+      await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
         for (const item of order.items) {
           const [lockedProduct] = await tx.$queryRaw<
             Array<{ id: string; inventory: number; track_inventory: boolean }>
@@ -1222,7 +1222,7 @@ export class OrderService {
     // decremented for admin orders by default — the merchant
     // confirms physical availability before placing. The mark-paid
     // path elsewhere decrements as needed when payment lands.
-    const order = await withMoneyTx(prisma, async tx => {
+    const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       const created = await tx.order.create({
         data: {
           orderNumber,

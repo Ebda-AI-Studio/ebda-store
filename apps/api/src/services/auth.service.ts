@@ -808,7 +808,7 @@ export class AuthService {
     const anonymizedEmail = `erased-${user.id}@anonymized.local`;
     const anonymizedAddressJson = { anonymized: true } as const;
 
-    await withMoneyTx(prisma, async tx => {
+    await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // Orders: preserve for tax records (Kuwait MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
       // null it so the row's history loses the back-reference even before

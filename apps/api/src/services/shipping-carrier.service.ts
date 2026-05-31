@@ -269,7 +269,7 @@ class ShippingCarrierService {
     // because it's external and non-rollbackable.
     let shipment;
     try {
-      shipment = await withMoneyTx(prisma, async tx => {
+      shipment = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
         const created = await tx.shipment.create({
           data: {
             storeId,

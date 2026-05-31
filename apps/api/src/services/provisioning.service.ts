@@ -113,7 +113,7 @@ export class ProvisioningService {
     let result;
     try {
       // Create store, owner, and default category in a single transaction
-      result = await withMoneyTx(prisma, async tx => {
+      result = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
         // Check if owner email exists. Admin/store-owner accounts live in
         // the global namespace (storeId NULL); customers are scoped per
         // store via the composite unique. Provisioning a store always

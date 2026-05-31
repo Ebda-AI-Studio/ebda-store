@@ -89,7 +89,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
     variance: number;
   }> = [];
 
-  const po = await withMoneyTx(prisma, async tx => {
+  const po = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
     const po = await tx.purchaseOrder.findUnique({
       where: { id: input.poId },
       include: { items: true },
