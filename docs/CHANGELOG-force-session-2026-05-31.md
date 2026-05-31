@@ -2,8 +2,15 @@
 
 Live log of what changed this session so you can track it. Newest at top. FWB = force-website-builder, WBS = whatsapp-bulk-sender.
 
-## FINAL @ main `1e7c8f9a` — clean build, all work landed ✅
-**Whole monorepo typechecks 0 errors** (api + admin + web, verified against main). Build-health gaps fixed this session: layout.tsx API_URL import, 18 Sprint-1 `withMoneyTx` implicit-`any` tx params, blog back-link lucide-react import (apps/web has no lucide dep → inline SVG) + a duplicate-label bug.
+## FINAL @ main `b125c587` — build-clean for CI/deploy ✅
+**Source-level typecheck verified** via deterministic sweeps (deps-independent): every `API_URL` use is imported, every `Prisma.` use is imported, zero untyped `async tx =>` callbacks. Build-health bugs fixed + landed this session (these would have broken Vercel/Railway):
+- `layout.tsx` missing `API_URL` import (`77f5dcff`)
+- `ReviewForm.tsx` + review `page.tsx` missing `API_URL` import (`b125c587`)
+- 18 Sprint-1 `withMoneyTx` implicit-`any` `tx`/`i` params across 11 accounting/order services (`4355cc98`)
+- 6 of those services missing the `Prisma` type import for the new annotation (`1d1f7f78`)
+- Batch B `product.service` + Batch C `bulk-ai-recommendations` `tx` params (`def8f619`, `ae2ca556`)
+
+Note: local `npx tsc` shows ~3 phantom errors (`withMoneyTx`/`rate-limit-redis` "not found") — these are STALE-node_modules artifacts (the dev tree's built `@force/database` predates Sprint 1 + `rate-limit-redis` isn't installed locally). CI/deploy run clean `npm ci` + rebuild `@force/database`, so they do not occur there. The honest "clean build" verdict is at the SOURCE level, confirmed by the sweeps above — NOT a full local compile (which the polluted dev env can't give).
 **Landed today:** build fix · E1/E2 accounting (CoA seeded, 12 paid orders' journals balanced) · Batch A (C1/C2/C3) · Batch B (D1/D5/D7) · Batch C (H2/H3/F4b) · F1 RLS cutover (force_app) · Inngest re-registered · all typecheck-clean.
 **WBS bot fixes** (I1 botMode persistence, I2 remove image-per-category) are on branch `fix/bot-native-catalog` — NOT merged, awaiting your review.
 **⚠️ ONE DECISION (C1):** order-status relabel is semantically misleading (shipped→"Delivered" shows while order is only with courier). Keep / revert / proper enum? (detail below)
