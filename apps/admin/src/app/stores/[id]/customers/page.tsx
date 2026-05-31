@@ -95,15 +95,23 @@ function formatDate(dateString: string) {
   });
 }
 
-/** Segment → { label, bg-class, text-class } mapping for the badge */
-const RFM_BADGE: Record<string, { label: string; bg: string; text: string }> = {
-  vip: { label: 'VIP', bg: 'bg-yellow-100', text: 'text-yellow-800' },
-  loyal: { label: 'Loyal', bg: 'bg-green-100', text: 'text-green-800' },
-  potential: { label: 'Active Buyer', bg: 'bg-blue-100', text: 'text-blue-800' },
-  new_customer: { label: 'New', bg: 'bg-info/10', text: 'text-info' },
-  at_risk: { label: 'At Risk', bg: 'bg-warning/10', text: 'text-warning-foreground' },
-  hibernating: { label: 'Dormant', bg: 'bg-muted', text: 'text-muted-foreground' },
-  lost: { label: 'Lost', bg: 'bg-destructive/10', text: 'text-destructive' },
+/**
+ * Segment → color classes for the badge. Labels are resolved via i18n
+ * (`customers.page.badges.<segment>`) so they render bilingual. The two
+ * fallback badges ("activeBuyer" / "new") cover customers who have no RFM
+ * snapshot yet (zero-order or not-yet-analysed) so EVERY row shows a badge.
+ */
+const RFM_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
+  vip: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+  loyal: { bg: 'bg-green-100', text: 'text-green-800' },
+  potential: { bg: 'bg-blue-100', text: 'text-blue-800' },
+  new_customer: { bg: 'bg-info/10', text: 'text-info' },
+  at_risk: { bg: 'bg-warning/10', text: 'text-warning-foreground' },
+  hibernating: { bg: 'bg-muted', text: 'text-muted-foreground' },
+  lost: { bg: 'bg-destructive/10', text: 'text-destructive' },
+  // Fallback badges (no RFM snapshot)
+  activeBuyer: { bg: 'bg-blue-100', text: 'text-blue-800' },
+  new: { bg: 'bg-info/10', text: 'text-info' },
 };
 
 export default function StoreCustomersPage() {
@@ -527,13 +535,22 @@ export default function StoreCustomersPage() {
                           </p>
                           {(() => {
                             const seg = rfmMap.get(customer.id);
-                            const badge = seg ? RFM_BADGE[seg] : undefined;
-                            if (!badge) return null;
+                            // Use the RFM segment badge when the customer has a
+                            // snapshot; otherwise fall back so EVERY customer
+                            // shows a badge: "Active Buyer" for anyone who has
+                            // ordered, "New" for zero-order registrations.
+                            const badgeKey =
+                              seg && RFM_BADGE_COLORS[seg]
+                                ? seg
+                                : customer.totalOrders >= 1
+                                  ? 'activeBuyer'
+                                  : 'new';
+                            const colors = RFM_BADGE_COLORS[badgeKey];
                             return (
                               <span
-                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.bg} ${badge.text}`}
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${colors.bg} ${colors.text}`}
                               >
-                                {badge.label}
+                                {t(`badges.${badgeKey}`)}
                               </span>
                             );
                           })()}
