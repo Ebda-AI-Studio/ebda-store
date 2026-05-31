@@ -1114,7 +1114,21 @@
       "viewOrdersTitle": "View orders for this customer",
       "viewOrders": "Orders",
       "countSingular": "{count} customer",
-      "countPlural": "{count} customers"
+      "countPlural": "{count} customers",
+      "paginationShowing": "Showing {from} to {to} of {total} customers",
+      "previous": "Previous",
+      "next": "Next",
+      "badges": {
+        "vip": "VIP",
+        "loyal": "Loyal",
+        "potential": "Potential",
+        "new_customer": "New Customer",
+        "at_risk": "At Risk",
+        "hibernating": "Hibernating",
+        "lost": "Lost",
+        "activeBuyer": "Active Buyer",
+        "new": "New"
+      }
     }
   },
   "analytics": {

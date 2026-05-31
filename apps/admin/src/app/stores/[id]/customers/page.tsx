@@ -8,6 +8,8 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiFetch, unwrapList } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
+const CUSTOMERS_PAGE_SIZE = 10;
+
 interface OrderCustomer {
   id: string;
   firstName: string;
@@ -124,6 +126,8 @@ export default function StoreCustomersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  // Pagination state — client-side slice of filteredCustomers
+  const [page, setPage] = useState(1);
   // Track whether we are still fetching additional pages beyond the first
   const [isFetchingAll, setIsFetchingAll] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -292,6 +296,19 @@ export default function StoreCustomersPage() {
       (customer.phone?.toLowerCase().includes(s) ?? false)
     );
   });
+
+  // Reset to page 1 whenever the search term changes so the user always
+  // sees results from the beginning of the filtered set.
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  const totalPages = Math.ceil(filteredCustomers.length / CUSTOMERS_PAGE_SIZE);
+  // Slice the filtered list to the current page window.
+  const pagedCustomers = filteredCustomers.slice(
+    (page - 1) * CUSTOMERS_PAGE_SIZE,
+    page * CUSTOMERS_PAGE_SIZE
+  );
 
   /**
    * Trigger the server-side XLSX export. We hit the API via raw fetch
@@ -520,7 +537,7 @@ export default function StoreCustomersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredCustomers.map(customer => (
+                {pagedCustomers.map(customer => (
                   <tr key={customer.id} className="hover:bg-muted transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -648,6 +665,40 @@ export default function StoreCustomersPage() {
                 ))}
               </tbody>
             </table>
+
+            {/* Pagination controls — only rendered when there is more than
+                one page. The "Showing X to Y of Z" line is always visible
+                when the table is non-empty so merchants know how many
+                customers they have at a glance. */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t px-6 py-3">
+                <p className="text-sm text-muted-foreground">
+                  {t('paginationShowing', {
+                    from: (page - 1) * CUSTOMERS_PAGE_SIZE + 1,
+                    to: Math.min(page * CUSTOMERS_PAGE_SIZE, filteredCustomers.length),
+                    total: filteredCustomers.length,
+                  })}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === 1}
+                    onClick={() => setPage(p => p - 1)}
+                  >
+                    {t('previous')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === totalPages}
+                    onClick={() => setPage(p => p + 1)}
+                  >
+                    {t('next')}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

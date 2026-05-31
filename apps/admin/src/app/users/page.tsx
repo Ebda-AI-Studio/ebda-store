@@ -203,7 +203,13 @@ export default function UsersPage() {
         <div className="flex gap-2">
           <select
             value={roleFilter}
-            onChange={e => setRoleFilter(e.target.value)}
+            onChange={e => {
+              setRoleFilter(e.target.value);
+              // Reset to page 1 so the new filter always starts from the
+              // first result — staying on page N with fewer results would
+              // surface empty state and hide the pagination controls.
+              setPagination(prev => ({ ...prev, page: 1 }));
+            }}
             aria-label={t('filterRoleLabel')}
             className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
