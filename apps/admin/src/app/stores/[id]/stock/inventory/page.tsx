@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { SearchInput } from '@/components/SearchInput';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { formatPrice } from '@/lib/format';
 import { Button, useToast } from '@force/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -17,6 +19,13 @@ interface ProductRow {
   lowStockThreshold: number;
   allowBackorder: boolean;
   status: string;
+  /** Unit selling price in fils. */
+  price: number;
+  /** Cost-of-goods in fils. Null for rows that never had a cost set. */
+  costPrice: number | null;
+  /** Total units sold across realized-sale orders. Supplied by the API when
+   *  the list is requested with `withSalesQuantity=true`. */
+  soldQuantity: number;
 }
 
 interface ProductsResponse {
@@ -50,7 +59,21 @@ export default function StockInventoryPage() {
   // bulk-backorder action and any other page chrome still render.
   const [productsErr, setProductsErr] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  // Debounced search term (SearchInput owns the debounce) — filters the list
+  // by name + SKU server-side, matching the Products page search.
+  const [search, setSearch] = useState('');
+  // Bulk low-stock-threshold control state.
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [thresholdInput, setThresholdInput] = useState('');
   const { success: toastSuccess, error: toastError } = useToast();
+
+  // Build the inventory list URL. Lists ALL items (no status filter) so the
+  // merchant sees draft/archived stock too; opts into the sold-units aggregate.
+  const buildListUrl = (term: string) => {
+    const qs = new URLSearchParams({ limit: '100', withSalesQuantity: 'true' });
+    if (term) qs.set('search', term);
+    return `/api/v1/stores/${storeId}/products?${qs.toString()}`;
+  };
 
   // Whether every loaded product already allows backorder. Drives the
   // toggle button's label between "Enable all" and "Disable all".
@@ -95,8 +118,10 @@ export default function StockInventoryPage() {
   useEffect(() => {
     if (!storeId) return;
 
-    // Products list
-    apiGet<ProductsResponse>(`/api/v1/stores/${storeId}/products?status=active&limit=100`)
+    // Products list — re-fetches when the debounced search term changes.
+    setProducts(null);
+    setSelectedIds([]);
+    apiGet<ProductsResponse>(buildListUrl(search))
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setProductsErr(apiError.message);
@@ -123,14 +148,15 @@ export default function StockInventoryPage() {
         setDeadSet(new Set(data.data.map((f: FlagItem) => f.productId)));
       }
     });
-  }, [storeId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, search]);
 
   // Retry handler — clears the error and re-fires the products fetch
   const retryProducts = () => {
     if (!storeId) return;
     setProductsErr(null);
     setProducts(null);
-    apiGet<ProductsResponse>(`/api/v1/stores/${storeId}/products?status=active&limit=100`)
+    apiGet<ProductsResponse>(buildListUrl(search))
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setProductsErr(apiError.message);
@@ -139,6 +165,49 @@ export default function StockInventoryPage() {
         }
       })
       .catch(() => setProductsErr('Failed to load inventory'));
+  };
+
+  // ─── Bulk low-stock-threshold ────────────────────────────────────────────
+  const allSelected = useMemo(
+    () => Boolean(products && products.length > 0 && selectedIds.length === products.length),
+    [products, selectedIds]
+  );
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? [] : (products ?? []).map(p => p.id));
+  };
+
+  const handleBulkSetThreshold = async () => {
+    const value = parseInt(thresholdInput, 10);
+    if (Number.isNaN(value) || value < 0 || selectedIds.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const { data, error: apiError } = await apiPost<{ updated: number }>(
+        `/api/v1/stores/${storeId}/products/bulk-set-low-stock-threshold`,
+        { productIds: selectedIds, lowStockThreshold: value }
+      );
+      if (apiError) {
+        toastError(t('bulkThresholdFailed'), apiError.message || '');
+        return;
+      }
+      toastSuccess(t('bulkThresholdDone', { count: data?.updated ?? 0 }));
+      // Reflect the change locally without a full re-fetch.
+      setProducts(prev =>
+        prev
+          ? prev.map(p => (selectedIds.includes(p.id) ? { ...p, lowStockThreshold: value } : p))
+          : prev
+      );
+      setSelectedIds([]);
+      setThresholdInput('');
+    } catch (err) {
+      toastError(t('bulkThresholdFailed'), err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   const bulkBackorderButton =
@@ -164,7 +233,36 @@ export default function StockInventoryPage() {
 
   return (
     <AdminLayout title={t('title')} subtitle={t('description')} actions={bulkBackorderButton}>
-      <div className="max-w-5xl">
+      <div className="max-w-6xl">
+        {/* Search bar — same debounced component the Products page uses. */}
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SearchInput
+            value={search}
+            onSearch={setSearch}
+            placeholder={t('searchPlaceholder')}
+            className="w-full sm:w-72"
+          />
+          {selectedIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
+              <span className="text-xs text-muted-foreground">
+                {t('selectedCount', { count: selectedIds.length })}
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={thresholdInput}
+                onChange={e => setThresholdInput(e.target.value)}
+                placeholder={t('lowStockThreshold')}
+                aria-label={t('bulkSetThreshold')}
+                className="w-28 rounded-lg border border-border bg-card px-3 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <Button size="sm" disabled={bulkBusy} onClick={handleBulkSetThreshold}>
+                {bulkBusy ? '…' : t('bulkSetThreshold')}
+              </Button>
+            </div>
+          )}
+        </div>
+
         {/* Inline error banner: products fetch failed but page stays mounted */}
         {productsErr && (
           <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive flex items-center justify-between gap-4">
@@ -192,6 +290,15 @@ export default function StockInventoryPage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/30">
                 <tr>
+                  <th className="px-3 py-2 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleSelectAll}
+                      aria-label={t('selectAll')}
+                      className="rounded border-border"
+                    />
+                  </th>
                   <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
                     {t('sku')}
                   </th>
@@ -203,6 +310,15 @@ export default function StockInventoryPage() {
                   </th>
                   <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
                     {t('lowStockThreshold')}
+                  </th>
+                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
+                    {t('cost')}
+                  </th>
+                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
+                    {t('price')}
+                  </th>
+                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
+                    {t('salesQuantity')}
                   </th>
                   <th className="text-center px-3 py-2 font-medium text-muted-foreground w-28">
                     {t('allowsBackorder')}
@@ -217,6 +333,15 @@ export default function StockInventoryPage() {
                   const hasDead = deadSet.has(p.id);
                   return (
                     <tr key={p.id} className="border-t border-border/40">
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(p.id)}
+                          onChange={() => toggleSelection(p.id)}
+                          aria-label={p.name}
+                          className="rounded border-border"
+                        />
+                      </td>
                       <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
                         {p.sku ?? '—'}
                       </td>
@@ -245,6 +370,11 @@ export default function StockInventoryPage() {
                       <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
                         {p.lowStockThreshold}
                       </td>
+                      <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
+                        {p.costPrice == null ? '—' : formatPrice(p.costPrice)}
+                      </td>
+                      <td className="px-3 py-2 text-end font-mono text-xs">{formatPrice(p.price)}</td>
+                      <td className="px-3 py-2 text-end font-mono text-xs">{p.soldQuantity}</td>
                       <td className="px-3 py-2 text-center text-muted-foreground">
                         {p.allowBackorder ? '✓' : '—'}
                       </td>
