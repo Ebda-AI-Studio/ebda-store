@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ReviewForm } from './ReviewForm';
 import { ReviewErrorView } from './ReviewErrorView';
+import { API_URL } from '../../../../lib/api';
 
 interface ReviewProduct {
   id: string;
