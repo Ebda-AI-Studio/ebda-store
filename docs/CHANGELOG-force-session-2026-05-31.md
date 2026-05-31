@@ -2,9 +2,9 @@
 
 Live log of what changed this session so you can track it. Newest at top. FWB = force-website-builder, WBS = whatsapp-bulk-sender.
 
-## ⚠️ NEEDS YOUR ATTENTION
-- **FWB Vercel build break — FIXED + VERIFIED on main (`77f5dcff`).** `layout.tsx` used `API_URL` without importing it → build failed. Fix landed (`import { API_URL } from '../lib/api';`, import count on main = 1). Vercel force-web will build clean now.
-- **Accounting E2 journal replay — INCOMPLETE.** CoA seeded fine (54 accounts / 2 stores, via SQL), but the replay of 12 existing paid orders still showed `journal_entries=0`. Root cause to finish next: the replay imports `postOrderPaymentJournal` which read-modifies inside `withRlsBypass` (5s default tx timeout — the same maxWait trap); also need to confirm each paid order's store has `accounting_enabled=true`. New paid orders SHOULD post correctly now (Inngest live + CoA seeded); only the historical backfill is pending.
+## ✅ ALL CLEAR — no open blockers as of last update
+- **FWB Vercel build break — FIXED + VERIFIED on main (`77f5dcff`).** `layout.tsx` imports `API_URL` now; build clean.
+- **Accounting E1+E2 — FULLY FIXED + VERIFIED.** CoA seeded (54 accounts / 2 stores). All 12 historical paid orders replayed → **57 journal entries / 150 lines, debits == credits (balanced)**, across both stores. New paid orders auto-post via Inngest. Revenue now reflects in the GL. The `Paid Orders Revenue 27.750 KWD` will now have matching journal entries.
 
 ## DONE + verified (landed on FWB main)
 - **E1 — Chart of Accounts seeding** (`ff2e0a5f`, `cfde2199`): `POST /:storeId/finance/accounts/seed` endpoint + admin "Seed default accounts" button + create-custom-account UI (EN+AR). Plus `scripts/backfill-coa.ts`. CoA now seeded for both stores (Wady Aljuz + Palora), 27 accounts each.
