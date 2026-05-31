@@ -65,6 +65,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { Toggle } from '../../../../components/Toggle';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { FooterLinksEditor } from '../../../../components/FooterLinksEditor';
+import { NavMenuEditor } from '../../../../components/NavMenuEditor';
 import { apiGet, apiPost, apiPut, apiFetch } from '../../../../lib/api';
 import { getStoreHref } from '../../../../lib/store-url';
 
@@ -1340,6 +1341,34 @@ export default function StoreLayoutPage() {
                   })
                 }
               />
+
+              {/* Navigation — storefront header menu links.
+                  Embedded here so merchants can edit links without leaving
+                  the page-builder. Same NavMenuEditor renders on the
+                  standalone /navigation page (variant="standalone").
+                  Owns its own state + Save button (independent of
+                  page-builder Save). */}
+              <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold text-foreground">
+                      Storefront Navigation
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Header menu links — add, remove, and reorder items. Use relative paths (
+                      <code className="rounded bg-muted px-1 text-xs">/products</code>) for store
+                      pages or full URLs for external links.
+                    </p>
+                  </div>
+                  <a
+                    href={`/stores/${storeId}/navigation`}
+                    className="shrink-0 text-xs font-medium text-primary hover:underline"
+                  >
+                    Open standalone ↗
+                  </a>
+                </div>
+                <NavMenuEditor storeId={storeId} variant="embedded" />
+              </div>
 
               {/* Footer — bg, dividers, padding + typography zones
                   (footer / afterFooter). Folded the platform-wide typography

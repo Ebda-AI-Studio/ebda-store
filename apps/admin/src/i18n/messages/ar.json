@@ -3322,7 +3322,9 @@
       "socialTwitter": "X (Twitter)",
       "socialTwitterPlaceholder": "https://twitter.com/yourstore",
       "socialSaveError": "تعذّر حفظ روابط التواصل",
-      "socialSaveSuccess": "تم حفظ روابط التواصل"
+      "socialSaveSuccess": "تم حفظ روابط التواصل",
+      "socialRedirectNote": "روابط منصات التواصل الاجتماعي (إنستغرام، فيسبوك، تيك توك...) تُدار في الهوية البصرية ← التواصل الاجتماعي. عدِّلها هناك لتُبقي كل شيء في مكان واحد.",
+      "socialRedirectNoteLinkText": "الذهاب إلى الهوية البصرية ← التواصل الاجتماعي"
     }
   },
   "language": {
@@ -4258,6 +4260,12 @@
       "prevPage": "السابق",
       "nextPage": "التالي",
       "pageInfo": "صفحة {page} من {pages}"
+    }
+  },
+  "pageBuilder": {
+    "navSection": {
+      "heading": "تنقّل واجهة المتجر",
+      "description": "أضف الروابط وأزلها وأعد ترتيبها في قائمة الشريط العلوي بواجهة المتجر. استخدم مسارات نسبية (/products) لصفحات المتجر، أو روابط كاملة للروابط الخارجية."
     }
   }
 }

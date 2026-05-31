@@ -3322,7 +3322,9 @@
       "socialTwitter": "X (Twitter)",
       "socialTwitterPlaceholder": "https://twitter.com/yourstore",
       "socialSaveError": "Failed to save social links",
-      "socialSaveSuccess": "Social links saved"
+      "socialSaveSuccess": "Social links saved",
+      "socialRedirectNote": "Social platform links (Instagram, Facebook, TikTok, etc.) are managed in Branding → Social. Edit them there to keep everything in one place.",
+      "socialRedirectNoteLinkText": "Go to Branding → Social"
     }
   },
   "language": {
@@ -4258,6 +4260,12 @@
       "prevPage": "Previous",
       "nextPage": "Next",
       "pageInfo": "Page {page} of {pages}"
+    }
+  },
+  "pageBuilder": {
+    "navSection": {
+      "heading": "Storefront Navigation",
+      "description": "Add, remove, and reorder the links that appear in your storefront header menu. Use relative paths (/products) for store pages or full URLs for external links."
     }
   }
 }

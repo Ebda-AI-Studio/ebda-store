@@ -395,11 +395,14 @@ export default function StoreSeoPage() {
     setIsSavingSocial(true);
     setSocialMessage(null);
     try {
-      // Strip whitespace and filter out invalid URLs; send only truthy values
+      // Only save knowledge-graph fields (wikidata + wikipedia) from this page.
+      // Social platform URLs (instagram, facebook, tiktok, etc.) are managed
+      // exclusively in Branding → Social to avoid duplicate-save conflicts.
+      const knowledgeGraphKeys: (keyof SocialLinks)[] = ['wikidata', 'wikipedia'];
       const payload = Object.fromEntries(
-        Object.entries(socialLinks)
-          .map(([k, v]) => [k, v.trim()])
-          .filter(([, v]) => v === '' || isValidUrl(v as string))
+        knowledgeGraphKeys
+          .map(k => [k, socialLinks[k].trim()] as [string, string])
+          .filter(([, v]) => v === '' || isValidUrl(v))
       );
       const { error } = await apiPut(`/api/v1/stores/${storeId}/social`, payload);
       if (error) {
@@ -1184,7 +1187,11 @@ export default function StoreSeoPage() {
           )}
         </div>
 
-        {/* ===== Social & Knowledge Graph ===== */}
+        {/* ===== Knowledge Graph (Wikidata / Wikipedia) ===== */}
+        {/* Social platform URLs (Instagram, Facebook, TikTok, etc.) are edited
+            in Branding → Social to avoid duplication. Only knowledge-graph
+            fields — wikidata + wikipedia — remain here because they are
+            genuinely SEO-specific structured-data signals, not social links. */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -1201,7 +1208,7 @@ export default function StoreSeoPage() {
             </button>
           </div>
 
-          {/* Knowledge graph fields first — these are the highest-value signals */}
+          {/* Knowledge graph fields — highest-value structured-data signals */}
           <div className="grid gap-4 sm:grid-cols-2">
             {(
               [
@@ -1240,60 +1247,18 @@ export default function StoreSeoPage() {
             ))}
           </div>
 
-          {/* Social platform URLs */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {(
-              [
-                {
-                  key: 'instagram',
-                  labelKey: 'socialInstagram',
-                  placeholderKey: 'socialInstagramPlaceholder',
-                },
-                {
-                  key: 'tiktok',
-                  labelKey: 'socialTiktok',
-                  placeholderKey: 'socialTiktokPlaceholder',
-                },
-                {
-                  key: 'linkedin',
-                  labelKey: 'socialLinkedin',
-                  placeholderKey: 'socialLinkedinPlaceholder',
-                },
-                {
-                  key: 'facebook',
-                  labelKey: 'socialFacebook',
-                  placeholderKey: 'socialFacebookPlaceholder',
-                },
-                {
-                  key: 'youtube',
-                  labelKey: 'socialYoutube',
-                  placeholderKey: 'socialYoutubePlaceholder',
-                },
-                {
-                  key: 'twitter',
-                  labelKey: 'socialTwitter',
-                  placeholderKey: 'socialTwitterPlaceholder',
-                },
-              ] as const
-            ).map(({ key, labelKey, placeholderKey }) => (
-              <div key={key}>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  {t(labelKey)}
-                </label>
-                <input
-                  type="url"
-                  value={socialLinks[key]}
-                  onChange={e => setSocialLinks(prev => ({ ...prev, [key]: e.target.value }))}
-                  onBlur={e => setSocialLinks(prev => ({ ...prev, [key]: e.target.value.trim() }))}
-                  placeholder={t(placeholderKey)}
-                  className={`w-full rounded-lg border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
-                    socialLinks[key] && !isValidUrl(socialLinks[key])
-                      ? 'border-destructive/40'
-                      : 'border-border'
-                  }`}
-                />
-              </div>
-            ))}
+          {/* Redirect note — social platform URLs managed in Branding → Social */}
+          <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-4">
+            <p className="text-sm text-foreground">{t('socialRedirectNote')}</p>
+            <p className="mt-1.5 text-xs text-muted-foreground" dir="rtl">
+              {t('socialRedirectNote')}
+            </p>
+            <a
+              href={`/stores/${storeId}/branding`}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+            >
+              ↗ {t('socialRedirectNoteLinkText')}
+            </a>
           </div>
 
           {socialMessage && (
