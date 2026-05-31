@@ -701,6 +701,11 @@ router.get(
         ? { store: { ownerId: ownerScope } }
         : {};
 
+      // orders/customers are on RLS-protected tables. The dashboard is a
+      // cross-tenant read (super_admin sees all stores; store_admin sees all
+      // their own stores, which is still cross-tenant). Wrap order queries in
+      // withRlsBypass so no tenant GUC is needed — the where clause provides
+      // the application-level scoping via storeFilter/orderFilter.
       const [storeCount, userCount, orderCount, revenueResult, recentStores, recentOrders] =
         await Promise.all([
           prisma.store.count({ where: storeFilter }),
@@ -708,11 +713,13 @@ router.get(
           // Store admins don't have access to the cross-tenant user table —
           // return 0 so the dashboard widget renders without leaking data.
           ownerScope ? Promise.resolve(0) : prisma.user.count(),
-          prisma.order.count({ where: orderFilter }),
-          prisma.order.aggregate({
-            where: { ...orderFilter, paymentStatus: 'paid' },
-            _sum: { total: true },
-          }),
+          withRlsBypass((tx: Prisma.TransactionClient) => tx.order.count({ where: orderFilter })),
+          withRlsBypass((tx: Prisma.TransactionClient) =>
+            tx.order.aggregate({
+              where: { ...orderFilter, paymentStatus: 'paid' },
+              _sum: { total: true },
+            })
+          ),
           prisma.store.findMany({
             where: storeFilter,
             take: 5,
@@ -721,15 +728,17 @@ router.get(
               owner: { select: { email: true } },
             },
           }),
-          prisma.order.findMany({
-            where: orderFilter,
-            take: 10,
-            orderBy: { createdAt: 'desc' },
-            include: {
-              customer: { select: { email: true, firstName: true, lastName: true } },
-              store: { select: { name: true } },
-            },
-          }),
+          withRlsBypass((tx: Prisma.TransactionClient) =>
+            tx.order.findMany({
+              where: orderFilter,
+              take: 10,
+              orderBy: { createdAt: 'desc' },
+              include: {
+                customer: { select: { email: true, firstName: true, lastName: true } },
+                store: { select: { name: true } },
+              },
+            })
+          ),
         ]);
 
       res.json({
@@ -773,19 +782,24 @@ router.get(
         ];
       }
 
-      const [products, total] = await Promise.all([
-        prisma.product.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            store: { select: { id: true, name: true } },
-            images: { take: 1 },
-          },
-        }),
-        prisma.product.count({ where }),
-      ]);
+      // products is RLS-protected; this is a cross-tenant super-admin list.
+      // withRlsBypass allows reading across all stores; the where clause
+      // (storeId / status / search) provides application-level scoping.
+      const [products, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
+        Promise.all([
+          tx.product.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              store: { select: { id: true, name: true } },
+              images: { take: 1 },
+            },
+          }),
+          tx.product.count({ where }),
+        ])
+      );
 
       res.json({
         success: true,
@@ -816,27 +830,33 @@ router.get(
     try {
       const { id } = req.params;
 
-      const product = await prisma.product.findUnique({
-        where: { id },
-        include: {
-          store: { select: { id: true, name: true, slug: true } },
-          images: { orderBy: { position: 'asc' } },
-          categories: {
-            include: { category: { select: { id: true, name: true } } },
-          },
-          variants: {
-            include: {
-              options: {
-                include: {
-                  value: {
-                    include: { option: true },
+      // products is RLS-protected. The tenantContext middleware sets the GUC
+      // to req.params.id here, which is a product UUID, not a store UUID —
+      // that would cause RLS to filter to zero rows. Use withRlsBypass instead
+      // so the lookup works regardless of which store owns the product.
+      const product = await withRlsBypass((tx: Prisma.TransactionClient) =>
+        tx.product.findUnique({
+          where: { id },
+          include: {
+            store: { select: { id: true, name: true, slug: true } },
+            images: { orderBy: { position: 'asc' } },
+            categories: {
+              include: { category: { select: { id: true, name: true } } },
+            },
+            variants: {
+              include: {
+                options: {
+                  include: {
+                    value: {
+                      include: { option: true },
+                    },
                   },
                 },
               },
             },
           },
-        },
-      });
+        })
+      );
 
       if (!product) {
         res.status(404).json({
@@ -879,20 +899,25 @@ router.get(
       if (status) where.status = status as OrderStatus;
       if (paymentStatus) where.paymentStatus = paymentStatus as OrderPaymentStatus;
 
-      const [orders, total] = await Promise.all([
-        prisma.order.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            store: { select: { id: true, name: true } },
-            customer: { select: { id: true, email: true, firstName: true, lastName: true } },
-            items: { take: 3 },
-          },
-        }),
-        prisma.order.count({ where }),
-      ]);
+      // orders is RLS-protected; this is a cross-tenant super-admin list.
+      // withRlsBypass allows reading across all stores; the where clause
+      // (storeId / status / paymentStatus) provides application-level scoping.
+      const [orders, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
+        Promise.all([
+          tx.order.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              store: { select: { id: true, name: true } },
+              customer: { select: { id: true, email: true, firstName: true, lastName: true } },
+              items: { take: 3 },
+            },
+          }),
+          tx.order.count({ where }),
+        ])
+      );
 
       res.json({
         success: true,
@@ -934,18 +959,23 @@ router.get(
         ];
       }
 
-      const [customers, total] = await Promise.all([
-        prisma.customer.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            store: { select: { id: true, name: true } },
-          },
-        }),
-        prisma.customer.count({ where }),
-      ]);
+      // customers is RLS-protected; this is a cross-tenant super-admin list.
+      // withRlsBypass allows reading across all stores; the where clause
+      // (storeId / search) provides application-level scoping.
+      const [customers, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
+        Promise.all([
+          tx.customer.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              store: { select: { id: true, name: true } },
+            },
+          }),
+          tx.customer.count({ where }),
+        ])
+      );
 
       res.json({
         success: true,
@@ -982,20 +1012,25 @@ router.get(
       if (userId) where.userId = userId as string;
       if (resourceType) where.resourceType = resourceType as string;
 
-      const [logs, total] = await Promise.all([
-        prisma.auditLog.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            user: {
-              select: { id: true, email: true, firstName: true, lastName: true },
+      // audit_logs is RLS-protected; this is a cross-tenant super-admin viewer.
+      // withRlsBypass allows reading across all stores; the where clause
+      // (action / userId / resourceType) provides application-level scoping.
+      const [logs, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
+        Promise.all([
+          tx.auditLog.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              user: {
+                select: { id: true, email: true, firstName: true, lastName: true },
+              },
             },
-          },
-        }),
-        prisma.auditLog.count({ where }),
-      ]);
+          }),
+          tx.auditLog.count({ where }),
+        ])
+      );
 
       res.json({
         success: true,
@@ -1115,7 +1150,10 @@ router.get(
             // (the FILTER means they only differ in feature_count). Accumulate max.
             existing.today = Math.max(existing.today, Number(row.today_count));
             existing.month = Math.max(existing.month, Number(row.month_count));
-            if (row.last_call_at && (!existing.lastCallAt || row.last_call_at > existing.lastCallAt)) {
+            if (
+              row.last_call_at &&
+              (!existing.lastCallAt || row.last_call_at > existing.lastCallAt)
+            ) {
               existing.lastCallAt = row.last_call_at;
             }
             existing.featureCounts[row.feature] = Number(row.feature_count);
