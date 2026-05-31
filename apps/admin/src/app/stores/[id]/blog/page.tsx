@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiDelete } from '../../../../lib/api';
 
 interface BlogPost {
@@ -43,6 +44,8 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
   const [store, setStore] = useState<StoreInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Debounced search term — client-side filter over post title (EN or AR).
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +67,15 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
       cancelled = true;
     };
   }, [storeId]);
+
+  // Client-side filter: match EN or AR title (case-insensitive).
+  const filteredPosts = useMemo(() => {
+    if (!search.trim()) return posts;
+    const q = search.toLowerCase();
+    return posts.filter(
+      p => p.title.toLowerCase().includes(q) || (p.titleAr ?? '').toLowerCase().includes(q)
+    );
+  }, [posts, search]);
 
   const { publishedCount, draftCount } = useMemo(() => {
     let p = 0;
@@ -123,6 +135,16 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
           </div>
         )}
 
+        {/* Search bar — client-side filter by post title */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SearchInput
+            value={search}
+            onSearch={setSearch}
+            placeholder="Search posts…"
+            className="w-full sm:w-72"
+          />
+        </div>
+
         {!isLoading && posts.length > 0 && (
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
@@ -150,7 +172,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                 </li>
               ))}
             </ul>
-          ) : posts.length === 0 ? (
+          ) : filteredPosts.length === 0 ? (
             <div className="p-10 text-center">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <svg
@@ -181,7 +203,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
             </div>
           ) : (
             <ul className="divide-y">
-              {posts.map(post => {
+              {filteredPosts.map(post => {
                 const excerpt = post.excerpt || post.excerptAr;
                 return (
                   <li

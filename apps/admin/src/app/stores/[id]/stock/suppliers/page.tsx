@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { SearchInput } from '@/components/SearchInput';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPatch } from '@/lib/api';
 
@@ -35,6 +36,10 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  // Debounced search term (SearchInput owns the debounce) — client-side filter
+  // over fetched rows; supplier list is small enough that server-side paging
+  // is unnecessary.
+  const [search, setSearch] = useState('');
 
   function load() {
     if (!storeId) return;
@@ -53,6 +58,19 @@ export default function SuppliersPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
+
+  // Client-side filter: match name, contact name, or email (case-insensitive).
+  const filteredSuppliers = useMemo(() => {
+    if (!suppliers) return suppliers;
+    if (!search.trim()) return suppliers;
+    const q = search.toLowerCase();
+    return suppliers.filter(
+      s =>
+        s.name.toLowerCase().includes(q) ||
+        (s.contactName ?? '').toLowerCase().includes(q) ||
+        (s.email ?? '').toLowerCase().includes(q)
+    );
+  }, [suppliers, search]);
 
   async function handleDeactivate(id: string) {
     if (!confirm('Deactivate this supplier?')) return;
@@ -81,7 +99,13 @@ export default function SuppliersPage() {
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
       <div className="max-w-5xl space-y-4">
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SearchInput
+            value={search}
+            onSearch={setSearch}
+            placeholder={t('searchPlaceholder')}
+            className="w-full sm:w-64"
+          />
           <button
             type="button"
             onClick={() => router.push(`/stores/${storeId}/stock/suppliers/new`)}
@@ -91,7 +115,7 @@ export default function SuppliersPage() {
           </button>
         </div>
 
-        {suppliers.length === 0 ? (
+        {filteredSuppliers !== null && filteredSuppliers.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No suppliers yet. Add one with the button above.
           </p>
@@ -122,7 +146,7 @@ export default function SuppliersPage() {
                 </tr>
               </thead>
               <tbody>
-                {suppliers.map(s => (
+                {(filteredSuppliers ?? []).map(s => (
                   <tr key={s.id} className="border-t border-border/40">
                     <td className="px-3 py-2 font-medium truncate max-w-[12rem]">{s.name}</td>
                     <td className="px-3 py-2 text-muted-foreground truncate">

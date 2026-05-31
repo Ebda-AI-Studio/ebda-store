@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
+import { SearchInput } from '@/components/SearchInput';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
@@ -34,6 +35,8 @@ export default function StockAdjustmentsPage() {
 
   const [adjustments, setAdjustments] = useState<AdjustmentRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Debounced search term — client-side filter over adjustment number and type.
+  const [search, setSearch] = useState('');
 
   function toDateStr(d: Date): string {
     const yyyy = d.getFullYear();
@@ -58,16 +61,36 @@ export default function StockAdjustmentsPage() {
       .catch(() => setError('Failed to load stock adjustments'));
   }, [storeId, period, customRange]);
 
+  // Client-side filter: match adjustment number or type (case-insensitive).
+  const filteredAdjustments = useMemo(() => {
+    if (!adjustments) return adjustments;
+    if (!search.trim()) return adjustments;
+    const q = search.toLowerCase();
+    return adjustments.filter(
+      adj =>
+        adj.adjustmentNumber.toLowerCase().includes(q) ||
+        adj.type.replace(/_/g, ' ').toLowerCase().includes(q)
+    );
+  }, [adjustments, search]);
+
   return (
     <AdminLayout title={t('title')} subtitle={t('description')}>
-      <DateRangePicker
-        period={period}
-        custom={customRange}
-        onChange={(p, c) => {
-          setPeriod(p);
-          if (c) setCustomRange(c);
-        }}
-      />
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <DateRangePicker
+          period={period}
+          custom={customRange}
+          onChange={(p, c) => {
+            setPeriod(p);
+            if (c) setCustomRange(c);
+          }}
+        />
+        <SearchInput
+          value={search}
+          onSearch={setSearch}
+          placeholder={t('searchPlaceholder')}
+          className="w-full sm:w-64"
+        />
+      </div>
 
       {error && (
         <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
@@ -91,7 +114,7 @@ export default function StockAdjustmentsPage() {
             </button>
           </div>
 
-          {adjustments.length === 0 ? (
+          {(filteredAdjustments ?? adjustments).length === 0 ? (
             <p className="text-muted-foreground text-sm">
               No stock adjustments yet. Create one with the button above.
             </p>
@@ -118,7 +141,7 @@ export default function StockAdjustmentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {adjustments.map(adj => {
+                  {(filteredAdjustments ?? adjustments).map(adj => {
                     const isDraft = adj.status === 'draft';
                     const impact = adj.totalValueImpact / 1000;
                     const impactStr = `${impact >= 0 ? '+' : ''}${impact.toFixed(3)}`;
