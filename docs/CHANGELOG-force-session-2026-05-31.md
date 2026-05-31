@@ -2,9 +2,14 @@
 
 Live log of what changed this session so you can track it. Newest at top. FWB = force-website-builder, WBS = whatsapp-bulk-sender.
 
+## STATUS @ last update (tool channel was unstable — verify before trusting)
+**Prod main = `77e5e369`** (build fix + E1/E2 accounting + Batch A orders/customers). All LANDED + deploying.
+**NOT yet landed (safe on branches, ready):** `fix/batch-b-inventory` (D1/D5/D7), `fix/batch-c-ai` (H2/H3/F4b). Both conflict with main ONLY on the 2 i18n JSON files (additive keys). My automated deep-merge dropped keys on one attempt — DO NOT trust it; redo the B/C i18n merge as a careful key-union and verify A's keys (orders.list.table.moreItems, customers.page.badges) + B/C's keys all survive before pushing.
+**⚠️ DECISION NEEDED (C1):** the order-status relabel I shipped in Batch A is SEMANTICALLY MISLEADING. Code: `shipped` = handed-to-courier (fires shipped-email + WBS event), `delivered` = received-by-customer (sets deliveredAt, review request, loyalty). Relabeling shipped→"Delivered" + delivered→"Fulfilled" means the admin now sees "Delivered" while the order is only with the courier. Keep / revert / or do a proper backend enum change? Your call.
+
 ## ✅ ALL CLEAR — no open blockers as of last update
 - **FWB Vercel build break — FIXED + VERIFIED on main (`77f5dcff`).** `layout.tsx` imports `API_URL` now; build clean.
-- **Accounting E1+E2 — FULLY FIXED + VERIFIED.** CoA seeded (54 accounts / 2 stores). All 12 historical paid orders replayed → **57 journal entries / 150 lines, debits == credits (balanced)**, across both stores. New paid orders auto-post via Inngest. Revenue now reflects in the GL. The `Paid Orders Revenue 27.750 KWD` will now have matching journal entries.
+- **Accounting E1+E2 — FULLY FIXED + VERIFIED.** CoA seeded (54 accounts / 2 stores). All **12/12 historical paid orders** replayed → journal entries posted, **debits == credits (balanced, 56750==56750)** across both stores. New paid orders auto-post via Inngest. Revenue now reflects in the GL.
 
 ## DONE + verified (landed on FWB main)
 - **E1 — Chart of Accounts seeding** (`ff2e0a5f`, `cfde2199`): `POST /:storeId/finance/accounts/seed` endpoint + admin "Seed default accounts" button + create-custom-account UI (EN+AR). Plus `scripts/backfill-coa.ts`. CoA now seeded for both stores (Wady Aljuz + Palora), 27 accounts each.
