@@ -2,7 +2,14 @@
 
 Live log of what changed this session so you can track it. Newest at top. FWB = force-website-builder, WBS = whatsapp-bulk-sender.
 
-## STATUS @ latest update — ALL 3 FEATURE BATCHES LANDED ✅
+## FINAL @ main `1e7c8f9a` — clean build, all work landed ✅
+**Whole monorepo typechecks 0 errors** (api + admin + web, verified against main). Build-health gaps fixed this session: layout.tsx API_URL import, 18 Sprint-1 `withMoneyTx` implicit-`any` tx params, blog back-link lucide-react import (apps/web has no lucide dep → inline SVG) + a duplicate-label bug.
+**Landed today:** build fix · E1/E2 accounting (CoA seeded, 12 paid orders' journals balanced) · Batch A (C1/C2/C3) · Batch B (D1/D5/D7) · Batch C (H2/H3/F4b) · F1 RLS cutover (force_app) · Inngest re-registered · all typecheck-clean.
+**WBS bot fixes** (I1 botMode persistence, I2 remove image-per-category) are on branch `fix/bot-native-catalog` — NOT merged, awaiting your review.
+**⚠️ ONE DECISION (C1):** order-status relabel is semantically misleading (shipped→"Delivered" shows while order is only with courier). Keep / revert / proper enum? (detail below)
+**Still queued:** A-group settings→pagebuilder consolidation + B-group discount fields (design-gated); RLS fail-closed `IS NULL` removal (blocked on withRlsBypass migration — super-admin uses 28 unscoped queries); autoscaling/replicas (not enabled — needs Socket.io redis-adapter + cron leader-election first).
+
+## STATUS — ALL 3 FEATURE BATCHES LANDED ✅
 **Prod main = `a1b2c3d4`.** Batches A+B+C all landed; i18n keys from all three verified coexisting on main (moreItems + lowStockThreshold + asOf), admin+api typecheck 0 errors. Deploying.
 - **Batch A (orders/customers):** C1 status relabel, C2 order-list item summary, C3 Active Buyer fallback badge.
 - **Batch B (inventory):** D5 shared SearchInput on inventory page (lists all items), D7 Cost/Price/Sales-quantity columns, D1 low-stock threshold per-product + bulk. (typecheck fix: typed `tx` param in product update tx.)
