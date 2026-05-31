@@ -72,40 +72,49 @@ router.get(
     try {
       const storeId = req.params.storeId;
 
-      const [orderStats, , topSegmentRaw, yesterdayFunnel, topSkus, narration] = await Promise.all([
-        // AOV + MRR-equiv (last 30d)
-        runInTenantContext(storeId, () =>
-          prisma.order.aggregate({
-            where: {
-              storeId,
-              paymentStatus: 'paid',
-              createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-            },
-            _avg: { total: true },
-            _sum: { total: true },
-            _count: true,
-          })
-        ),
+      const [orderStats, prevOrderStats, topSegmentRaw, yesterdayFunnel, topSkus, narration] =
+        await Promise.all([
+          // AOV + MRR-equiv (last 30d)
+          runInTenantContext(storeId, () =>
+            prisma.order.aggregate({
+              where: {
+                storeId,
+                paymentStatus: 'paid',
+                createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+              },
+              _avg: { total: true },
+              _sum: { total: true },
+              _count: true,
+            })
+          ),
 
-        // Segment counts
-        runInTenantContext(storeId, () =>
-          prisma.customerRfmSnapshot.groupBy({
-            by: ['segment'],
-            where: { storeId },
-            _count: { id: true },
-          })
-        ),
+          // AOV for the PREVIOUS 30d window (days 30–60 ago) — drives the
+          // period-over-period change shown on the dashboard AOV tile.
+          runInTenantContext(storeId, () =>
+            prisma.order.aggregate({
+              where: {
+                storeId,
+                paymentStatus: 'paid',
+                createdAt: {
+                  gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+                  lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+                },
+              },
+              _avg: { total: true },
+            })
+          ),
 
-        // Top segment by count
-        runInTenantContext(storeId, () =>
-          prisma.customerRfmSnapshot.groupBy({
-            by: ['segment'],
-            where: { storeId },
-            _count: { id: true },
-            orderBy: { _count: { id: 'desc' } },
-            take: 1,
-          })
-        ),
+          // Top segment by count + revenue contribution
+          runInTenantContext(storeId, () =>
+            prisma.customerRfmSnapshot.groupBy({
+              by: ['segment'],
+              where: { storeId },
+              _count: { id: true },
+              _sum: { monetaryFils: true },
+              orderBy: { _count: { id: 'desc' } },
+              take: 1,
+            })
+          ),
 
         // Yesterday funnel snapshot
         runInTenantContext(storeId, () =>
@@ -178,21 +187,44 @@ router.get(
       const repeatPurchaseRate =
         totalBuyers.length > 0 ? Math.round((repeatBuyers.length / totalBuyers.length) * 100) : 0;
 
+      // Window length used to derive a per-day velocity from the 7d unit sums.
+      const TOP_SKU_WINDOW_DAYS = 7;
+      const topRfmSegment = topSegmentRaw[0];
+
       res.json({
         data: {
-          aov: orderStats._avg?.total ?? 0,
+          // Page contract: aov is an object with this/last-period fils so the
+          // tile can render a period-over-period delta (dashboard/page.tsx).
+          aov: {
+            thisPeriodFils: orderStats._avg?.total ?? 0,
+            lastPeriodFils: prevOrderStats._avg?.total ?? 0,
+          },
           mrr30d: orderStats._sum?.total ?? 0,
           orderCount30d: orderStats._count,
           repeatPurchaseRate,
-          topSegment: topSegmentRaw[0]?.segment ?? null,
-          topSkus: topSkus.map(s => ({
-            productId: s.productId,
-            name: productMap[s.productId]?.name ?? null,
-            nameAr: productMap[s.productId]?.nameAr ?? null,
-            sku: productMap[s.productId]?.sku ?? null,
-            revenue: s._sum?.total ?? 0,
-            unitsSold: s._sum?.quantity ?? 0,
-          })),
+          // Page contract: topSegment is an object (segment/count/revenue) — the
+          // page calls `topSegment.segment.replace(...)`, so a bare string here
+          // would throw. Null when the store has no RFM snapshot rows.
+          topSegment: topRfmSegment
+            ? {
+                segment: topRfmSegment.segment,
+                count: topRfmSegment._count.id,
+                revenueContributionFils: Number(topRfmSegment._sum.monetaryFils ?? 0),
+              }
+            : null,
+          topSkus: topSkus.map(s => {
+            const unitsSold7d = s._sum?.quantity ?? 0;
+            return {
+              productId: s.productId,
+              name: productMap[s.productId]?.name ?? null,
+              nameAr: productMap[s.productId]?.nameAr ?? null,
+              sku: productMap[s.productId]?.sku ?? null,
+              // Page contract: unitsSold7d + velocity (units/day) replace the
+              // old revenue/unitsSold field names (dashboard/page.tsx TopSku).
+              unitsSold7d,
+              velocity: unitsSold7d / TOP_SKU_WINDOW_DAYS,
+            };
+          }),
           yesterdayFunnel: yesterdayFunnel ?? null,
           narration: narration ?? undefined,
         },
@@ -307,11 +339,17 @@ router.get(
         generateInsightNarration(storeId, 'segment'),
       ]);
 
+      // Page contract (segments/page.tsx RfmSegmentRow): segment / count /
+      // totalMonetaryFils / recommendedAction as a flat string. The page calls
+      // `seg.segment.replace(...)` and renders `recommendedAction` directly as
+      // text, so the API must emit those exact field names + a flat string.
+      // English is the active locale used consistently across the insights
+      // pages (narration callouts also read `.en`).
       const segments = rawSegments.map(s => ({
-        name: s.segment,
+        segment: s.segment,
         count: s._count.id,
-        revenue: Number(s._sum.monetaryFils ?? 0),
-        recommendedAction: SEGMENT_ACTIONS[s.segment] ?? { en: '', ar: '' },
+        totalMonetaryFils: Number(s._sum.monetaryFils ?? 0),
+        recommendedAction: SEGMENT_ACTIONS[s.segment]?.en ?? null,
       }));
 
       res.json({ data: { segments, narration: narration ?? undefined } });
