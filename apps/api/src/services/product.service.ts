@@ -76,6 +76,15 @@ interface CreateProductData {
   compareAtPrice?: number | null;
   /** Cost-of-goods in fils. Used for profit reporting. */
   costPrice?: number | null;
+  /** Admin-authored discount type — 'percentage' | 'fixed'. null clears. */
+  discountType?: 'percentage' | 'fixed' | null;
+  /**
+   * Discount value:
+   *   percentage → basis points (percent×100; 12.5% → 1250)
+   *   fixed      → fils
+   * null when no discount.
+   */
+  discountValue?: number | null;
   sku?: string;
   inventory?: number;
   /** Per-product threshold for the LOW STOCK badge / merchant alerts. */
@@ -215,9 +224,8 @@ export class ProductService {
     // products on THIS page and to realized-sale order statuses. One groupBy for
     // the whole page window — NOT a per-row query (no N+1). Off by default so the
     // catalogue list path stays cheap; only the Inventory page opts in.
-    let productsOut:
-      | typeof products
-      | Array<(typeof products)[number] & { soldQuantity: number }> = products;
+    let productsOut: typeof products | Array<(typeof products)[number] & { soldQuantity: number }> =
+      products;
     if (withSalesQuantity && products.length > 0) {
       const productIds = products.map(p => p.id);
       const grouped = await prisma.orderItem.groupBy({
@@ -335,6 +343,10 @@ export class ProductService {
         price: data.price,
         compareAtPrice: data.compareAtPrice ?? null,
         costPrice: data.costPrice ?? null,
+        // Discount input columns — stored verbatim; the admin form pre-derives
+        // price/compareAtPrice before sending, so the service just persists.
+        discountType: data.discountType ?? null,
+        discountValue: data.discountValue ?? null,
         sku: data.sku,
         inventory: data.inventory ?? 0,
         ...(data.lowStockThreshold !== undefined
@@ -451,6 +463,9 @@ export class ProductService {
           // as the curated flags below.
           ...(data.compareAtPrice !== undefined ? { compareAtPrice: data.compareAtPrice } : {}),
           ...(data.costPrice !== undefined ? { costPrice: data.costPrice } : {}),
+          // Discount input columns — same undefined/null convention.
+          ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
+          ...(data.discountValue !== undefined ? { discountValue: data.discountValue } : {}),
           sku: data.sku,
           inventory: data.inventory,
           ...(data.lowStockThreshold !== undefined
@@ -542,11 +557,7 @@ export class ProductService {
    * A single store-scoped updateMany so a tenant can only ever touch its own
    * products. Returns the affected count.
    */
-  static async bulkSetLowStockThreshold(
-    storeId: string,
-    productIds: string[],
-    threshold: number
-  ) {
+  static async bulkSetLowStockThreshold(storeId: string, productIds: string[], threshold: number) {
     const safeIds = productIds.filter(id => typeof id === 'string' && id.length > 0);
     if (safeIds.length === 0) {
       return { count: 0 };

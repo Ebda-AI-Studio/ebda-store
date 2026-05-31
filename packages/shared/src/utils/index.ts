@@ -1,6 +1,7 @@
 // Shared Utilities
 
 // Export utility modules
+export * from './discount';
 export * from './image';
 export * from './csv';
 export { TEMPLATE_PRESETS, getTemplatePresets } from './template-presets';

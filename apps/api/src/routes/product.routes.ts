@@ -30,6 +30,12 @@ const createProductSchema = z.object({
   // Cost-of-goods in fils, used for profit reporting. Nullable so the
   // admin form can clear a previously-set value.
   costPrice: z.number().int().min(0).optional().nullable(),
+  // Admin-authored discount input. The service derives price/compareAtPrice
+  // from these at save time. null clears a previously-set discount.
+  discountType: z.enum(['percentage', 'fixed']).optional().nullable(),
+  // percentage → basis points (percent×100, e.g. 12.5%→1250, range 0–10000)
+  // fixed      → fils
+  discountValue: z.number().int().min(0).optional().nullable(),
   sku: z.string().optional(),
   inventory: z.number().int().min(0).optional(),
   // Per-product threshold for the LOW STOCK badge / merchant alerts.
@@ -137,8 +143,7 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { page, limit, status, category, search, featured, ids, withSalesQuantity } =
-        req.query;
+      const { page, limit, status, category, search, featured, ids, withSalesQuantity } = req.query;
       const idsParam =
         typeof ids === 'string' && ids.length > 0
           ? ids
