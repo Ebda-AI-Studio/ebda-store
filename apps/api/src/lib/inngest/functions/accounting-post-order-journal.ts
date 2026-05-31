@@ -3,6 +3,7 @@ import logger from '../../logger';
 import { inngest } from '../client';
 import { postOrderPaymentJournal } from '../../../services/accounting/posting/order-posting';
 import { featureService } from '../../../services/feature.service';
+import { SentryService } from '../../../services/sentry.service';
 
 /**
  * Listens to the canonical order/created Inngest event (fired by OrderService
@@ -47,7 +48,25 @@ export const accountingPostOrderJournal: InngestFunction.Any = inngest.createFun
       logger.info({ storeId, orderId }, 'accountingPostOrderJournal: accounting.basic disabled, skipping');
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
     }
-    await step.run('post-journal', () => postOrderPaymentJournal({ orderId }));
+    await step.run('post-journal', async () => {
+      try {
+        await postOrderPaymentJournal({ orderId });
+      } catch (err) {
+        // Surface the failure to structured logs + Sentry. Without this the
+        // throw is only visible in the Inngest dashboard — a starved COA (the
+        // "seed COA first" error) would otherwise fail silently after all
+        // retries exhaust. Rethrow so Inngest still records + retries the step.
+        logger.error(
+          { err, orderId, storeId },
+          'accountingPostOrderJournal: failed to post order payment journal'
+        );
+        SentryService.captureException(err as Error, {
+          tags: { fn: 'accounting-post-order-journal' },
+          extra: { orderId, storeId },
+        });
+        throw err;
+      }
+    });
     logger.info({ orderId, storeId }, 'accountingPostOrderJournal: posted');
     return { posted: true, orderId };
   }
