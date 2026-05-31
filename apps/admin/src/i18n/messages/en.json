@@ -578,7 +578,7 @@
         "compareAtPriceHint": "Original price shown struck-through next to the sale price. Set higher than Price to display a discount.",
         "compareAtPriceWarn": "Compare-at price must be higher than the price for the storefront to show a discount.",
         "costPrice": "Cost (KWD)",
-        "profitLabel": "Margin per unit:",
+        "profitLabel": "Profit margin per unit:",
         "pricePlaceholder": "0.000",
         "sku": "SKU",
         "skuPlaceholder": "PROD-001",
