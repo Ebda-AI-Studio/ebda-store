@@ -408,7 +408,7 @@ export class ProductService {
 
     // Wrap image/category replacement and product update in a transaction
     // so that a failure mid-way does not leave orphaned or missing relations.
-    const updatedProduct = await withMoneyTx(prisma, async tx => {
+    const updatedProduct = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // If images are provided, replace all existing images
       if (data.images !== undefined) {
         await tx.productImage.deleteMany({ where: { productId } });
