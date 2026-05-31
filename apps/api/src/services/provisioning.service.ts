@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { prisma, Prisma, StoreStatus, withMoneyTx } from '@force/database';
+import { prisma, Prisma, StoreStatus, withMoneyTx, withRlsBypass } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { VercelDomainService } from './vercel-domain.service';
@@ -112,8 +112,15 @@ export class ProvisioningService {
 
     let result;
     try {
-      // Create store, owner, and default category in a single transaction
+      // Create store, owner, and default category in a single transaction.
+      // The provisioning transaction creates rows in RLS-protected tables
+      // (categories, payment_configs) before we know the new storeId, so we
+      // cannot use runInTenantContext. SET LOCAL app.bypass_rls = 'true' gives
+      // the same transaction-scoped escape hatch as withRlsBypass — the GUC
+      // resets automatically when the transaction commits or rolls back.
       result = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+        await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
+
         // Check if owner email exists. Admin/store-owner accounts live in
         // the global namespace (storeId NULL); customers are scoped per
         // store via the composite unique. Provisioning a store always
@@ -290,23 +297,29 @@ export class ProvisioningService {
       ];
     }
 
-    const [stores, total] = await Promise.all([
-      prisma.store.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          owner: {
-            select: { id: true, email: true, firstName: true, lastName: true },
+    // _count.products and _count.orders require reading from RLS-protected
+    // tables (products, orders). Without bypass_rls, the correlated subqueries
+    // run as force_app with no tenant GUC → every count returns 0. Wrap in
+    // withRlsBypass so the aggregate can read across all tenants correctly.
+    const [stores, total] = await withRlsBypass((tx: Prisma.TransactionClient) =>
+      Promise.all([
+        tx.store.findMany({
+          where,
+          skip,
+          take: limit,
+          include: {
+            owner: {
+              select: { id: true, email: true, firstName: true, lastName: true },
+            },
+            _count: {
+              select: { products: true, orders: true },
+            },
           },
-          _count: {
-            select: { products: true, orders: true },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.store.count({ where }),
-    ]);
+          orderBy: { createdAt: 'desc' },
+        }),
+        tx.store.count({ where }),
+      ])
+    );
 
     return {
       stores,
