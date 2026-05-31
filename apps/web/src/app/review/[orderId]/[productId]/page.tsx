@@ -34,13 +34,14 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
 
   if (!token) notFound();
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://store-api.forcemediakw.com';
   let canSubmitData: { product: ReviewProduct; store: ReviewStore } | null = null;
   let errorCode: string | null = null;
 
   try {
+    // API_URL already includes the /api/v1 prefix (see lib/api.ts) — do not
+    // re-append it here or the request 404s on /api/v1/api/v1/...
     const res = await fetch(
-      `${apiUrl}/api/v1/public/reviews/can-submit?orderId=${encodeURIComponent(orderId)}&productId=${encodeURIComponent(productId)}&token=${encodeURIComponent(token)}`,
+      `${API_URL}/public/reviews/can-submit?orderId=${encodeURIComponent(orderId)}&productId=${encodeURIComponent(productId)}&token=${encodeURIComponent(token)}`,
       { cache: 'no-store' }
     );
 

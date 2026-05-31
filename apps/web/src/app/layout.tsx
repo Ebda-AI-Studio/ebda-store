@@ -339,11 +339,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const headersList = await headers();
   const draftToken =
     headersList.get('x-preview-draft') ?? cookieStore.get('force-preview-draft')?.value;
-  const draftBundle = await fetchDraftBundleForCurrentRequest(
-    store.id,
-    draftToken,
-    process.env.NEXT_PUBLIC_API_URL ?? ''
-  );
+  // API_URL already includes the /api/v1 prefix (see lib/api.ts); the helper
+  // appends the route path directly to avoid a doubled /api/v1/api/v1/ 404.
+  const draftBundle = await fetchDraftBundleForCurrentRequest(store.id, draftToken, API_URL);
   const storeDefaultLanguage = (store.settings as Record<string, unknown>)?.defaultLanguage as
     | 'en'
     | 'ar'

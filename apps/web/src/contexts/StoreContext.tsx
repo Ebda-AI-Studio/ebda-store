@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api } from '../lib/api';
+import { api, API_URL } from '../lib/api';
 import {
   type StoreTheme,
   type StoreSocialLinks,
@@ -216,10 +216,11 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/public/stores/${store.id}/layout`,
-          { credentials: 'include' }
-        );
+        // API_URL already includes the /api/v1 prefix (see lib/api.ts) — do not
+        // re-append it here or the request 404s on /api/v1/api/v1/...
+        const res = await fetch(`${API_URL}/public/stores/${store.id}/layout`, {
+          credentials: 'include',
+        });
         if (!res.ok) return;
         const data = (await res.json()) as {
           data?: { layout?: import('@force/shared').StoreLayoutSettings };

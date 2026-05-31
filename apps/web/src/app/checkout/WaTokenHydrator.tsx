@@ -21,7 +21,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
-import { api } from '../../lib/api';
+import { api, API_URL } from '../../lib/api';
 
 interface WaCartItem {
   productId: string;
@@ -75,8 +75,9 @@ export default function WaTokenHydrator() {
 
     (async () => {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
-        const res = await fetch(`${apiBase}/api/v1/wa-bridge/cart/redeem`, {
+        // API_URL already includes the /api/v1 prefix (see lib/api.ts) — do not
+        // re-append it here or the request 404s on /api/v1/api/v1/...
+        const res = await fetch(`${API_URL}/wa-bridge/cart/redeem`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
