@@ -71,19 +71,20 @@ Visual: 4 stacked pillars, each labeled with durability years.
 
 **One screenshot per key surface:**
 
-1. Storefront PDP — bilingual, mobile, KNET checkout button visible
+1. Storefront PDP — bilingual, mobile, KNET checkout button visible; product discount "Was / Now" strikethrough shown
 2. Admin Dashboard — 8-hub navigation, recent orders panel
 3. AI Bulk Sweep — "Translating 235 products to Arabic" progress UI
-4. Finance Hub — full Chart-of-Accounts with journal entries
-5. Page Builder — drag-and-drop section ordering with live preview
+4. Finance Hub — full Chart-of-Accounts with journal entries and P&L report
+5. Page Builder — drag-and-drop section ordering with live preview; Navigation + Footer consolidated here
+6. Product Discount — per-product discount dropdown (Percentage / Fixed KWD) with live discounted-price preview
 
-Visual: 5 phone/laptop mockups in a tight grid.
+Visual: 5-6 phone/laptop mockups in a tight grid.
 
 ---
 
 ## Slide 7 — Traction
 
-**As of 2026-05-22:**
+**As of 2026-05-22 — update before pitching:**
 
 - **2 live merchants** in production
   - **Wady Aljuz** (food/grocery): 235 products, 8 categories, KWD ~5,000 GMV/mo
@@ -215,7 +216,7 @@ Visual: Ahmad's photo + bio + Force Media logo connection.
 
 ### For Kuwait merchants
 
-> Try Force Store free for 30 days. No credit card. Talk to us at [forcemediakw.com/contact](https://forcemediakw.com/contact). Live demo of a working Kuwait store at [wadyaljuz.com](https://wadyaljuz.com).
+> **Request a tailored proposal.** Force Store is a managed e-commerce service — every client gets a custom contract built around the features they need. Talk to us at [forcemediakw.com/contact](https://forcemediakw.com/contact). Live demo of a working Kuwait store at [wadyaljuz.com](https://wadyaljuz.com).
 
 Visual: clean ask line with contact email + Force Store logo.
 
@@ -238,6 +239,7 @@ Every claim in this outline is backed by:
 - `docs/audits/2026-05-22-comprehensive-saas-audit.md` — full audit report
 - `docs/audits/_slices/05-business-features.md` — feature inventory
 - `docs/audits/_slices/06-cost-forecast.md` — per-merchant cost math + scaling
-- `packages/shared/src/features.ts` — FEATURE_REGISTRY (22 features, tier annotations)
+- `packages/shared/src/features.ts` — FEATURE_REGISTRY (22 parent features + 14 inventory/accounting sub-features)
+- `packages/shared/src/plan-baselines.ts` — plan tier feature baselines (starter/professional/enterprise)
 - `CLAUDE.md` lines 1–29 — strategic positioning + 4 pillars
 - Production tenants: [wadyaljuz.com](https://wadyaljuz.com) and Palora

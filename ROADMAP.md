@@ -1,196 +1,162 @@
-# Force Website Builder - Phase 2 Execution Roadmap
+# Force Store — Product Roadmap
 
-## Current Status (Phase 1 Complete)
-
-### Completed Features
-
-- [x] Monorepo architecture with npm workspaces
-- [x] Next.js 14 web storefront with products, cart, checkout, auth
-- [x] Express.js API with full CRUD operations
-- [x] Prisma ORM with PostgreSQL schema
-- [x] JWT authentication with refresh tokens
-- [x] Stripe payment integration with webhooks
-- [x] Security hardening (rate limiting, CSRF, audit logs)
-- [x] Role-based access control (RBAC)
-- [x] Force AI v1 (product descriptions, SEO, marketing copy)
+**Internal document. Last updated: 2026-06-01.**
 
 ---
 
-## Phase 2: Production Readiness
+## Shipped
 
-### 2.1 Database & Migrations
+### Platform & Infrastructure
 
-- [ ] Generate initial Prisma migration
-- [ ] Create seed script for demo data
-- [ ] Set up migration workflow for deployments
-- [ ] Add database backup strategy
+- [x] Monorepo architecture (npm workspaces) — apps: api, admin, web; packages: database, shared, ui, config
+- [x] Multi-tenancy with Row-Level Security (RLS) — database-level tenant isolation via AsyncLocalStorage + Prisma Proxy; non-owner `force_app` role enforces RLS in production
+- [x] Custom domains — auto-provisioned per merchant via Vercel API with SSL
+- [x] Role-based access — Super Admin (platform-wide), Store Admin (single store), Customer (storefront)
+- [x] Horizontal-scaling readiness — Redis adapter plumbing, Redis-backed rate-limiting, pooled DB connections; see `docs/SCALING.md`
+- [x] Upgrade-marketing gate — merchants who open a plan-gated feature see an on-brand "Available on the [Plan] plan" upsell page instead of a silent redirect
 
-### 2.2 Email System
+### Commerce Core
 
-- [ ] Implement email templates (order confirmation, shipping, password reset)
-- [ ] Set up email queue with retry logic
-- [ ] Add email verification flow
-- [ ] Configure SMTP or email service provider (SendGrid/Resend)
+- [x] Product management — categories, variants, inventory tracking, image galleries
+- [x] Product discount engine — per-product discount dropdown (None / Percentage % / Fixed KWD) with live discounted-price preview; `compareAtPrice` is now derived automatically
+- [x] Order lifecycle — cart, checkout, payment processing, status transitions with notification triggers
+- [x] Abandoned cart recovery — sweeps website carts + WhatsApp DM carts in one unified job
+- [x] Upsell & cross-sell — AI co-purchase signal driving "Frequently Bought Together" recommendations
+- [x] Returns & refunds — merchant-side return request management and refund processing
+- [x] Coupons — fixed + percentage discount codes
 
-### 2.3 File Storage
+### Storefront
 
-- [ ] Implement S3-compatible file upload service
-- [ ] Add image optimization pipeline
-- [ ] Configure CDN for static assets
-- [ ] Add file type validation and virus scanning
+- [x] 5 themes — Modern, Classic, Minimal, Bold, Elegant — each RTL-compatible and independently configurable
+- [x] Page builder — drag-and-drop section ordering + bilingual copy editing; Navigation links, Footer links, and Category page config are all consolidated inside the Page Builder (not separate settings pages)
+- [x] Dark mode — system `prefers-color-scheme` detection + manual toggle
+- [x] RTL / bilingual — Arabic + English with full right-to-left layout support; every database field has separate AR and EN columns
+- [x] PWA — service worker, push notification support, per-merchant installable app icon/name
+- [x] SEO — sitemap, robots.txt, JSON-LD structured data, meta descriptions, Open Graph
+- [x] Blog — built-in blog with admin management, homepage carousel, and SSR metadata
 
-### 2.4 Admin Dashboard Enhancements
+### AI Features (Google Gemini Flash Lite)
 
-- [ ] Complete orders management UI
-- [ ] Add customer management UI
-- [ ] Implement real-time analytics dashboard
-- [ ] Add bulk operations (import/export products)
-- [ ] Create AI content generation UI
+- [x] Auto-translate products (EN ↔ AR) — per-field and bulk sweep across entire catalog
+- [x] SEO title + description generation — store, categories, products, bilingual
+- [x] AEO meta rewrite — conversational rewrites for AI search engines (Google SGE, Perplexity, ChatGPT)
+- [x] FAQ + How-To guide generation — bulk sweep per product
+- [x] Category suggestion — AI-suggested chips on product edit
+- [x] Review spam detection, auto-translation, summarization, owner-response drafting
+- [x] Reorder + dead-stock AI — Gemini-powered reorder recommendations and dead-stock flags in Stock hub
 
-### 2.5 Testing
+### Accounting Module (Professional plan)
 
-- [ ] Add unit tests for services
-- [ ] Add integration tests for API routes
-- [ ] Add E2E tests for critical flows (checkout, auth)
-- [ ] Set up test coverage reporting
+- [x] Chart of Accounts — double-entry bookkeeping organized by account categories (54 default accounts seeded)
+- [x] Journal entries — auto-posted on paid orders (sales, cost of goods, refunds); manual entry UI
+- [x] Profit & Loss — live P&L report reflecting actual store activity
+- [x] Expense tracking — categorized expense entry with receipt attachment and monthly summary (Professional+)
+- [x] Invoicing — Kuwait-compliant invoice generation, bilingual layout, PDF export (Professional+)
+- [x] Tax reports — VAT/sales-tax export per reporting period (Enterprise+)
+- [x] Multi-currency — FX tracking with automatic KWD conversion at book-keeping level (Enterprise+)
+- [x] Profit anomaly watch — AI-driven margin watcher that flags below-cost sales (Enterprise+)
+- [x] Bank reconciliation — CSV/OFX import with automated ledger matching (Enterprise+)
+- [x] Payment audit trail — append-only `payment_events` table with raw provider webhook payload; every Tap/MyFatoorah/Hesabe/UPayments event preserved
+
+### Inventory (tiered by plan)
+
+- [x] Stock tracking — per-product counts, low-stock badge, manual adjustment (Starter+)
+- [x] Low-stock alerts — auto-email when product drops below per-product threshold (Professional+)
+- [x] Backorder — accept orders for out-of-stock products; queue for fulfillment (Professional+)
+- [x] Multi-warehouse — per-warehouse stock counts, proximity-based order routing (Enterprise+)
+- [x] Barcode scanning — mobile barcode scan for stock receipt, order picking, audit (Enterprise+)
+- [x] Purchase orders — supplier PO workflow with cost capture, receive-against-PO, supplier ledger (Enterprise+)
+- [x] Bulk adjustments — CSV/Excel import for stock reconciliation (Enterprise+)
+
+### Plan Tier System
+
+- [x] Four plan tiers — `free` (grace/lapsed state), `starter`, `professional`, `enterprise`
+- [x] Layered feature baselines in `packages/shared/src/plan-baselines.ts` — strict superset invariant unit-tested
+- [x] Super-admin per-store feature overrides — preserved across plan changes
+
+### Kuwait Payment Stack
+
+- [x] Tap Payments — KNET + Visa + Mastercard + Apple Pay
+- [x] MyFatoorah — KNET + cards + Apple Pay + STC Pay
+- [x] Hesabe — KNET + Visa/Mastercard
+- [x] UPayments — KNET + digital wallets
+- [x] Cash on Delivery — flat-fee option, no provider account required
+- [x] Smart payment links — typeahead product picker + custom amount, all 4 gateways
+
+### WhatsApp & Bot
+
+- [x] WhatsApp order notifications — 4 lifecycle templates (placed, confirmed, shipped, delivered), per-event per-channel toggles
+- [x] Customer DM ordering bot — Gemini NLU, natural Arabic/English, voice transcription, product photo matching, returning-customer personalization
+- [x] One-click Meta Commerce catalog provisioning — auto-creates catalog under Force AI parent BM via Graph API; no merchant BM setup required
+- [x] Bot analytics — funnel, intent breakdown, LLM stats, date range pickers
+- [x] Origin-aware delivery — WhatsApp-origin orders receive WhatsApp-only (no placeholder email)
+- [x] Abandoned cart recovery sweeps both website + WhatsApp DM carts
+
+### Communication
+
+- [x] SMS notifications — Unifonic API with Redis queue + circuit breaker (Enterprise+)
+- [x] Push notifications — W3C Web Push (VAPID), per-store browser subscriptions (Professional+)
+- [x] Transactional email — branded sender per merchant domain via Resend
+- [x] Newsletter broadcast — send to subscriber list from admin; XLSX/CSV export
+
+### Shipping
+
+- [x] iCarry integration — rate calculation and tracking
+- [x] Aramex integration — rate calculation and tracking
+- [x] Kuwait shipping zones — governorate and district structure
+- [x] Cash on delivery — flat-fee option
+
+### Other
+
+- [x] Affiliate program (Enterprise+) — referral tracking, commission management, invite emails
+- [x] Loyalty program (Professional+) — points earn/redeem, configurable redemption rate
+- [x] Marketing pixels — Meta/Facebook, Google, TikTok; fires only after cookie consent
+- [x] Floating widget (Enterprise+) — sticky multi-action button; position, direction, colors, labels all configurable
+- [x] Analytics hub — overview, cohort analysis, conversion funnel, customer segments, product analytics, date range pickers
 
 ---
 
-## Phase 3: Scaling & Performance
+## Next
 
-### 3.1 Caching
+These items are sequenced from `docs/HANDOFF-2026-06-01.md`. Priority order is approximate.
 
-- [ ] Implement Redis caching layer
-- [ ] Add product catalog caching
-- [ ] Cache session data
-- [ ] Add cache invalidation strategies
+### Near-term (design-gated or partially implemented)
 
-### 3.2 Search
-
-- [ ] Implement full-text product search
-- [ ] Add faceted filtering
-- [ ] Integrate Algolia or Elasticsearch (optional)
-- [ ] Add search analytics
-
-### 3.3 Performance
-
-- [ ] Optimize database queries (N+1 detection)
-- [ ] Add query result pagination
-- [ ] Implement lazy loading for images
-- [ ] Add service worker for offline support
-
----
-
-## Phase 4: Advanced Features
-
-### 4.1 Multi-tenancy
-
-- [ ] Complete store isolation
-- [ ] Add custom domain support
-- [ ] Implement store-specific themes
-- [ ] Add store analytics per tenant
-
-### 4.2 Force AI v2
-
-- [ ] AI-powered product recommendations
-- [ ] Automated inventory alerts
-- [ ] Smart pricing suggestions
-- [ ] Customer sentiment analysis
-
-### 4.3 Integrations
-
-- [ ] Shipping provider APIs (FedEx, UPS, DHL)
-- [ ] Accounting integrations (QuickBooks, Xero)
-- [ ] Marketing tools (Mailchimp, Klaviyo)
-- [ ] Social commerce (Instagram, Facebook shops)
-
-### 4.4 Analytics & Reporting
-
-- [ ] Sales analytics dashboard
-- [ ] Customer behavior tracking
-- [ ] Inventory reports
-- [ ] Financial reports
-
----
-
-## Deployment Checklist
-
-### Pre-deployment
-
-- [ ] Set all production environment variables
-- [ ] Configure SSL certificates
-- [ ] Set up database connection pooling
-- [ ] Enable production logging
-- [ ] Configure error monitoring (Sentry)
+- [ ] **Page Builder discount fields** — B1–B4: compare-price → active discount, percentage/dinar dropdown, live preview cell in the product form; requires schema change (discount type/value on product model) + storefront price resolution logic
+- [ ] **Settings → Page Builder full consolidation** — A1 Footer Links, A2 Storefront Navigation, A3 Branding social/SEO de-dup, A4 Category Pages access restoration, A5 page-builder preview covers all unsaved changes (currently homepage + layout only)
 
 ### Infrastructure
 
-- [ ] Deploy API to cloud provider (Vercel/AWS/GCP)
-- [ ] Deploy web storefront to Vercel
-- [ ] Deploy admin dashboard to Vercel
-- [ ] Set up PostgreSQL on managed service (Neon/Supabase/RDS)
-- [ ] Configure Redis for caching
+- [ ] **Horizontal scaling enablement** — Socket.io needs `@socket.io/redis-adapter` (cross-instance events currently break with >1 replica); 14 module-level `setInterval` crons need leader-election before replicas > 1 can be enabled; Railway replica config is ready
+- [ ] **RLS fail-closed** — drop the `IS NULL` policy escape; prerequisite is migrating all 28 super-admin cross-tenant reads to `withRlsBypass`, then rewriting the 41 `IS NULL` policies to explicit `app.bypass_rls` form
 
-### Post-deployment
+### WBS / Cross-product
 
-- [ ] Run database migrations
-- [ ] Verify webhook endpoints
-- [ ] Test payment flows with Stripe test mode
-- [ ] Set up uptime monitoring
-- [ ] Configure backup schedules
+- [ ] **WBS bot go-live** — set Bot Mode = `native_catalog` in admin settings + configure Meta env credentials for auto-provision; unblocked by Ahmad's Meta Business Manager access
+- [ ] **WBS audit backlog** — W2 O(N²) aggregate, W6 per-WABA pacing, W10 dead-letter, W11 RLS on contacts/messages, W12 opt-out, W13 recipient erasure, and more (see `whatsapp-bulk-sender/docs/audits/2026-05-30-master-audit.md`)
 
 ---
 
-## Tech Stack Summary
+## Tech Stack
 
-| Layer    | Technology                     |
-| -------- | ------------------------------ |
-| Frontend | Next.js 14, React, TailwindCSS |
-| Admin    | Next.js 14, Shadcn/UI          |
-| API      | Express.js, TypeScript         |
-| Database | PostgreSQL, Prisma ORM         |
-| Auth     | JWT, bcrypt                    |
-| Payments | Stripe                         |
-| AI       | Anthropic Claude API           |
-| Caching  | Redis (planned)                |
-| Storage  | S3-compatible (planned)        |
-
----
-
-## Priority Matrix
-
-### High Priority (Do First)
-
-1. Database migrations & seed data
-2. Email system for transactional emails
-3. File upload for product images
-4. E2E testing for checkout flow
-
-### Medium Priority
-
-5. Admin dashboard completion
-6. Redis caching
-7. Search improvements
-8. Unit tests
-
-### Lower Priority (Phase 3+)
-
-9. Multi-tenancy features
-10. Advanced AI features
-11. Third-party integrations
-12. Advanced analytics
+| Layer               | Technology                                                         |
+| ------------------- | ------------------------------------------------------------------ |
+| **API**             | Express.js 4 + TypeScript                                          |
+| **Admin Dashboard** | Next.js 16 (App Router)                                            |
+| **Storefront**      | Next.js 16 (App Router)                                            |
+| **Database**        | Neon PostgreSQL (serverless) + Prisma ORM                          |
+| **Cache & Queues**  | Redis                                                              |
+| **Storage**         | Cloudflare R2 (S3-compatible)                                      |
+| **Real-time**       | Socket.io (WebSocket notifications)                                |
+| **Auth**            | Custom JWT (HTTP-only cookies)                                     |
+| **Async Jobs**      | Inngest                                                            |
+| **AI**              | Google Gemini Flash Lite (`GOOGLE_GENERATIVE_AI_KEY`)              |
+| **Payments**        | Tap Payments, MyFatoorah, Hesabe, UPayments (Kuwait KNET gateways) |
+| **Email**           | Resend                                                             |
+| **Push**            | OneSignal + Web Push (VAPID)                                       |
+| **Hosting**         | Vercel (admin + storefront) + Railway (API)                        |
+| **Testing**         | Vitest (332+ tests)                                                |
 
 ---
 
-## Estimated Timeline
-
-| Phase   | Duration  | Status      |
-| ------- | --------- | ----------- |
-| Phase 1 | 2-3 weeks | ✅ Complete |
-| Phase 2 | 2-3 weeks | 🔄 Next     |
-| Phase 3 | 2-3 weeks | ⏳ Planned  |
-| Phase 4 | 4-6 weeks | ⏳ Planned  |
-
----
-
-_Last Updated: February 2026_
+_Last Updated: 2026-06-01_

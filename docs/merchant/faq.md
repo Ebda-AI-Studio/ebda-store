@@ -125,35 +125,34 @@ Check in order:
 
 ### How do I change the storefront colors? — كيف أغيّر ألوان المتجر؟
 
-**Admin → Storefront → Brand Colors**
+**Admin → Branding → Theme**
 
-Pick primary (main button color) + accent. Force Store auto-generates the full palette (hover states, disabled states, etc.) from those two. Preview live on the right pane.
+Pick your theme (Modern / Classic / Minimal / Bold / Elegant), then set your primary and accent brand colors. Force Store auto-generates the full palette (hover states, disabled states, etc.) from those two. Preview live on the right pane.
 
-من «الواجهة → الألوان». اختر اللون الرئيسي + اللون الثانوي. باقي درجات الألوان تُولَّد تلقائيًا. معاينة مباشرة بجانب الاختيار.
+من «Branding → Theme»: اختر القالب ثم اللون الرئيسي + اللون الثانوي. باقي درجات الألوان تُولَّد تلقائيًا. معاينة مباشرة بجانب الاختيار.
 
 ### Can I rearrange the home page sections? — أقدر أرتّب أقسام الصفحة الرئيسية؟
 
-Yes. **Admin → Storefront → Home Page Sections**:
+Yes. **Admin → Page Builder**:
 
 - Drag-and-drop the sections to reorder
 - Toggle visibility per section
 - Configure each section's content (featured categories: pick which; testimonials: pick which to show; etc.)
+- The Page Builder also manages Storefront Navigation links, Footer links, and Category page config — all in one place
 
-نعم — اسحب وأفلت لإعادة الترتيب، فعّل أو أوقف أي قسم، اختر محتوى كل قسم.
+نعم — من «Page Builder»: اسحب وأفلت لإعادة الترتيب، فعّل أو أوقف أي قسم، اختر محتوى كل قسم. Page Builder يضم أيضًا إعدادات التنقل والفوتر وصفحات الفئات.
 
 ### Can I add a blog? — أقدر أضيف مدوّنة؟
 
-Pages are supported via **Admin → Pages**:
+Yes — Force Store has a full built-in blog:
 
-- About Us
-- Shipping Policy
-- Return Policy
-- Privacy Policy
-- Custom pages (any title)
+- **Admin → Blog** — create, edit, and publish blog posts in Arabic and English
+- Blog posts appear in a carousel on your storefront homepage when the blog is enabled
+- Each post has bilingual rich-text editing, a cover image, and SEO meta fields (bilingual)
 
-Each page has bilingual rich-text editing. A full blog with category + author + RSS isn't built in yet — let us know if it'd help your store.
+Static pages (About Us, Shipping Policy, Return Policy, Privacy Policy, custom pages) are managed separately under **Admin → Pages**.
 
-الصفحات مدعومة (من نحن، الشحن، الإرجاع، سياسة الخصوصية، صفحات مخصّصة). المدوّنة الكاملة (تدوينات + كاتب + RSS) ليست موجودة حاليًا — أخبرنا لو تحتاجها.
+نعم — Force Store تدعم المدوّنة الكاملة: أنشئ مقالات من «Admin → Blog»، تظهر في كاروسيل على الصفحة الرئيسية. الصفحات الثابتة (من نحن، الشحن، الإرجاع، إلخ) من «Admin → Pages».
 
 ---
 

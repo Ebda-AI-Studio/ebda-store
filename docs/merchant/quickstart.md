@@ -54,7 +54,7 @@ Required fields:
 
 Optional but recommended:
 
-- Compare-at-price — for "Was 10 KWD, Now 8 KWD" strikethrough
+- **Discount** — choose None, Percentage (%), or Fixed KWD from the dropdown. The discounted price previews live as you type and shows as a "Was / Now" strikethrough on the storefront automatically. (No need to manually fill "compare-at-price" — it is derived from your discount setting.)
 - SKU — your internal product code
 - Weight in grams — needed for shipping calculations
 - Description (EN + AR) — formatted text with images
@@ -97,19 +97,22 @@ If you ship via a known carrier (Aramex, iCarry), enter your API credentials so 
 
 ## 7. Customize the storefront
 
-**Admin → Storefront**
+**Admin → Page Builder**
 
-You can customize:
+The Page Builder is the single destination for all storefront layout decisions. From here you can:
 
-- Hero banner (image + headline + CTA)
-- Featured categories (which 4-6 show on the home page)
-- Featured products (which appear in the "Bestsellers" carousel)
-- Testimonials (customer reviews shown on home)
-- Footer links + social media handles
+- **Homepage sections** — drag-and-drop to reorder, toggle visibility, edit each section's headline and subheadline (bilingual)
+- **Hero banner** — image + headline + CTA
+- **Featured categories** — which 4-6 show on the home page
+- **Featured products** — which appear in the "Bestsellers" carousel
+- **Testimonials** — customer reviews shown on the home page
+- **Storefront Navigation** — add, remove, or reorder header navigation links
+- **Footer links** — configure footer link groups and social media handles
+- **Category pages** — manage how your category grid is displayed
 
 All copy is bilingual.
 
-كل نصوص الواجهة قابلة للتخصيص بالعربية والإنجليزية: البانر الرئيسي، الفئات المميّزة، التقييمات، روابط الفوتر، الميديا.
+كل نصوص الواجهة قابلة للتخصيص بالعربية والإنجليزية من لوحة «Page Builder»: البانر الرئيسي، الفئات المميّزة، التقييمات، التنقل، روابط الفوتر، صفحات الفئات.
 
 ## 8. Connect a custom domain (optional)
 
