@@ -23,6 +23,11 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# Least-privilege default: read-only workflow GITHUB_TOKEN. Jobs that need write
+# override upward with their own `permissions:` block.
+permissions:
+  contents: read
+
 jobs:
   # Build and push Docker images
   build-images:

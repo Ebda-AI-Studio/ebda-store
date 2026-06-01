@@ -27,6 +27,11 @@ on:
         type: boolean
         default: false
 
+# Least-privilege default: read-only workflow GITHUB_TOKEN. Jobs that need write
+# override upward with their own `permissions:` block.
+permissions:
+  contents: read
+
 jobs:
   verify-isolation:
     # Flipped from ubuntu-latest → self-hosted 2026-05-28: org cloud billing

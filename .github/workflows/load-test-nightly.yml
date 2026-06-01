@@ -30,6 +30,11 @@ on:
         type: boolean
         default: false
 
+# Least-privilege default: read-only workflow GITHUB_TOKEN. Jobs that need write
+# override upward with their own `permissions:` block.
+permissions:
+  contents: read
+
 jobs:
   load-test:
     name: k6 Load Test

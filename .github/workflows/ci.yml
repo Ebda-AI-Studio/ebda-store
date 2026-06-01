@@ -44,6 +44,12 @@ concurrency:
 env:
   NODE_VERSION: '20'
 
+# Least-privilege default: the workflow GITHUB_TOKEN is read-only. No job here
+# needs write (artifact upload uses the runner session token, not GITHUB_TOKEN).
+# A job that ever needs write must override upward with its own `permissions:`.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint

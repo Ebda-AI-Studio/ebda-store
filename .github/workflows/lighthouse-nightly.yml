@@ -10,6 +10,11 @@ on:
         type: boolean
         default: false
 
+# Least-privilege default: read-only workflow GITHUB_TOKEN. Jobs that need write
+# override upward with their own `permissions:` block.
+permissions:
+  contents: read
+
 jobs:
   lighthouse:
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
