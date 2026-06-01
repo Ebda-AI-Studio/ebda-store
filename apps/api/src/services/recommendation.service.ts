@@ -1,5 +1,6 @@
 import { prisma } from '@force/database';
 import { redis } from './redis.service';
+import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
 
 // ==========================================
@@ -469,14 +470,20 @@ class RecommendationService {
     }
 
     fbtCronTimer = setInterval(async () => {
-      logger.info({ storeIds }, '[FBT] Running scheduled recalculation');
-      for (const storeId of storeIds) {
-        try {
-          await this.recalculateFBT(storeId);
-        } catch (err) {
-          logger.error({ err, storeId }, '[FBT] Scheduled recalculation failed');
+      // Leader election: only one replica executes the FBT recalculation per
+      // tick so we don't duplicate Prisma writes across Railway instances.
+      await withLeaderLock('fbt-recalculation', intervalMs, async () => {
+        logger.info({ storeIds }, '[FBT] Running scheduled recalculation');
+        for (const storeId of storeIds) {
+          try {
+            await this.recalculateFBT(storeId);
+          } catch (err) {
+            logger.error({ err, storeId }, '[FBT] Scheduled recalculation failed');
+          }
         }
-      }
+      }).catch(err => {
+        logger.error({ err }, '[FBT] Leader-lock acquisition error');
+      });
     }, intervalMs);
 
     logger.info({ intervalMs }, '[FBT] Cron started');

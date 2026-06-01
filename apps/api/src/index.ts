@@ -8,7 +8,11 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config';
 import { errorHandler } from './middleware/error-handler';
 import { requestLogger } from './middleware/request-logger';
-import { securityHeaders, requestId, sanitizeInput, csrfProtection,
+import {
+  securityHeaders,
+  requestId,
+  sanitizeInput,
+  csrfProtection,
   makeRateLimitStore,
 } from './middleware/security';
 import { authenticate } from './middleware/auth';
@@ -34,6 +38,7 @@ import { sendAlert } from './services/alerts.service';
 import { inngest } from './lib/inngest/client';
 import { inngestFunctions } from './lib/inngest/functions';
 import { serve as inngestServe } from 'inngest/express';
+import { withLeaderLock } from './lib/leader-election';
 import logger from './lib/logger';
 
 // Initialize Sentry before anything else
@@ -73,14 +78,15 @@ socketService.initialize(httpServer);
   // Refresh-token cleanup. Reuse detection requires keeping revoked
   // rows for ~30 days; without periodic deletion the table grows
   // unbounded. Run once at startup, then every 12 hours.
-  AuthService.cleanupRefreshTokens().catch(err =>
-    logger.error({ err }, 'Refresh-token cleanup failed at startup')
-  );
+  // Leader-gated so only one Railway replica runs the deleteMany per tick.
+  withLeaderLock('auth-refresh-token-cleanup', 12 * 60 * 60 * 1000, () =>
+    AuthService.cleanupRefreshTokens().then(() => undefined)
+  ).catch(err => logger.error({ err }, 'Refresh-token cleanup failed at startup'));
   setInterval(
     () => {
-      AuthService.cleanupRefreshTokens().catch(err =>
-        logger.error({ err }, 'Refresh-token cleanup failed')
-      );
+      withLeaderLock('auth-refresh-token-cleanup', 12 * 60 * 60 * 1000, () =>
+        AuthService.cleanupRefreshTokens().then(() => undefined)
+      ).catch(err => logger.error({ err }, 'Refresh-token cleanup failed'));
     },
     12 * 60 * 60 * 1000
   );
