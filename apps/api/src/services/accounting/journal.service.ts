@@ -74,12 +74,16 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
     if (existing) return existing;
   }
 
-  // Reserve the sequence OUTSIDE any interactive transaction. The sequence
-  // service uses an atomic INSERT … ON CONFLICT DO UPDATE … RETURNING — no
-  // long-lived lock. Doing it inside an interactive tx caused a lock convoy
-  // under fan-out (5 webhook retries) and burst-timeouts at the 5s default
-  // interactive-tx limit. See test/integration/accounting/accounting-idempotency.
-  const entryNumber = await nextSequence(input.storeId, 'journal');
+  // Reserve the sequence number using the SAME transaction connection (input.tx)
+  // so that no additional pool connection is needed. Previously nextSequence was
+  // called without a tx, which internally called withRlsBypass and opened a second
+  // connection. Under concurrent fan-out (5 parallel webhook retries) with
+  // connection_limit=5, all 5 outer bypass transactions held the pool connections
+  // and the 5 inner nextSequence→withRlsBypass calls deadlocked waiting for a free
+  // slot. Passing input.tx reuses the already-open bypass connection — zero
+  // additional pool pressure. The sequences table upsert is still atomic because
+  // it's a single INSERT … ON CONFLICT DO UPDATE … RETURNING statement.
+  const entryNumber = await nextSequence(input.storeId, 'journal', input.tx);
 
   const createData: PrismaNs.JournalEntryCreateInput = {
     store: { connect: { id: input.storeId } },
@@ -197,7 +201,9 @@ export async function reverseEntry(
       throw new Error(`JournalEntry ${originalId} is already reversed`);
     }
 
-    const entryNumber = await nextSequence(original.storeId, 'journal');
+    // Pass `t` so nextSequence reuses the same connection (prevents nested
+    // withRlsBypass from exhausting the pool under concurrent reversal calls).
+    const entryNumber = await nextSequence(original.storeId, 'journal', t);
     const reversal = await t.journalEntry.create({
       data: {
         storeId: original.storeId,
