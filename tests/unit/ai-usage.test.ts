@@ -11,6 +11,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockRequest, createMockResponse, createMockNext } from '../setup';
+// Pull requireRole from the mocked rbac module below via a normal ESM import.
+// (A bare require('...src/middleware/rbac') can't resolve the .ts extension in
+// vitest's ESM loader and throws "Cannot find module" — use the hoisted mock.)
+import { requireRole } from '../../apps/api/src/middleware/rbac';
 
 // ── Mocks (must be hoisted before any import that pulls the mocked module) ──
 
@@ -132,7 +136,6 @@ describe('GET /admin/super-admin/ai-usage/summary — route guard', () => {
 
   it('calls next() for super_admin user', () => {
     // Re-import the guard factory from our mock
-    const { requireRole } = require('../../apps/api/src/middleware/rbac');
     const guard = requireRole('super_admin');
 
     const req = createMockRequest({
@@ -148,7 +151,6 @@ describe('GET /admin/super-admin/ai-usage/summary — route guard', () => {
   });
 
   it('returns 403 for store_admin user', () => {
-    const { requireRole } = require('../../apps/api/src/middleware/rbac');
     const guard = requireRole('super_admin');
 
     const req = createMockRequest({
@@ -164,7 +166,6 @@ describe('GET /admin/super-admin/ai-usage/summary — route guard', () => {
   });
 
   it('returns 403 when user is not authenticated', () => {
-    const { requireRole } = require('../../apps/api/src/middleware/rbac');
     const guard = requireRole('super_admin');
 
     const req = createMockRequest({ user: null });

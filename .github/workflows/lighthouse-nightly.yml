@@ -12,7 +12,7 @@ on:
 
 jobs:
   lighthouse:
-    runs-on: ${{ inputs.force_cloud && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
