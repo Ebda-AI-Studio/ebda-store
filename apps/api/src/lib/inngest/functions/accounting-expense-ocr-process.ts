@@ -43,7 +43,10 @@ export const accountingExpenseOcrProcess: InngestFunction.Any = inngest.createFu
     // Feature gate — skip OCR when accounting.expenses is disabled.
     const enabled = await featureService.isFeatureEnabled(storeId, 'accounting.expenses');
     if (!enabled) {
-      logger.info({ storeId }, 'accountingExpenseOcrProcess: accounting.expenses disabled, skipping');
+      logger.info(
+        { storeId },
+        'accountingExpenseOcrProcess: accounting.expenses disabled, skipping'
+      );
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.expenses' };
     }
 

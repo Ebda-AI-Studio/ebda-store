@@ -40,9 +40,15 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
     for (const store of stores) {
       const result = await step.run(`scan-${store.id}`, async () => {
         // Feature gate — reorder suggestions require inventory.purchase_orders.
-        const enabled = await featureService.isFeatureEnabled(store.id, 'inventory.purchase_orders');
+        const enabled = await featureService.isFeatureEnabled(
+          store.id,
+          'inventory.purchase_orders'
+        );
         if (!enabled) {
-          logger.info({ storeId: store.id }, 'stock-reorder-scan: inventory.purchase_orders disabled, skipping');
+          logger.info(
+            { storeId: store.id },
+            'stock-reorder-scan: inventory.purchase_orders disabled, skipping'
+          );
           return { suggested: 0, expiredCount: 0, skipped: true };
         }
         return runReorderScan(store.id);
@@ -81,7 +87,10 @@ export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunct
     // Feature gate — skip when inventory.purchase_orders is disabled.
     const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.purchase_orders');
     if (!enabled) {
-      logger.info({ storeId }, 'stock-reorder-scan-on-demand: inventory.purchase_orders disabled, skipping');
+      logger.info(
+        { storeId },
+        'stock-reorder-scan-on-demand: inventory.purchase_orders disabled, skipping'
+      );
       return { skipped: true, reason: 'feature_disabled', feature: 'inventory.purchase_orders' };
     }
 

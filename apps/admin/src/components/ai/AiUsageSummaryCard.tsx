@@ -123,7 +123,10 @@ function QuotaBar({
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-full rounded-full transition-all ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
@@ -169,9 +172,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
       >
         <div className="flex items-center gap-2">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <span className="text-xs text-muted-foreground">
-            Loading AI quota… / جارٍ التحميل…
-          </span>
+          <span className="text-xs text-muted-foreground">Loading AI quota… / جارٍ التحميل…</span>
         </div>
       </div>
     );
@@ -181,7 +182,9 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
 
   if (error || !summary) {
     return (
-      <div className={`rounded-xl border border-destructive/20 bg-card shadow-sm ${embedded ? 'px-4 py-3' : 'p-6'}`}>
+      <div
+        className={`rounded-xl border border-destructive/20 bg-card shadow-sm ${embedded ? 'px-4 py-3' : 'p-6'}`}
+      >
         <p className="text-xs text-destructive">
           Failed to load AI quota / تعذّر تحميل بيانات الحصة
         </p>
@@ -189,10 +192,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
     );
   }
 
-  const dailyPct = Math.min(
-    100,
-    Math.round((summary.today / Math.max(summary.dailyCap, 1)) * 100)
-  );
+  const dailyPct = Math.min(100, Math.round((summary.today / Math.max(summary.dailyCap, 1)) * 100));
   const monthlyPct = Math.min(
     100,
     Math.round((summary.thisMonth / Math.max(summary.monthlyCap, 1)) * 100)
@@ -261,9 +261,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
           {/* Right: mini stats + sparkline */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                Remaining today / المتبقي اليوم
-              </span>
+              <span className="text-muted-foreground">Remaining today / المتبقي اليوم</span>
               <span
                 className={`font-bold tabular-nums ${remainingWarn ? 'text-destructive' : 'text-foreground'}`}
               >
@@ -290,13 +288,8 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
   return (
     <div className="rounded-xl border bg-card p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-foreground">
-          Quota Usage / استخدام الحصة
-        </h2>
-        <Link
-          href={`/stores/${storeId}/ai-usage`}
-          className="text-xs text-primary hover:underline"
-        >
+        <h2 className="text-base font-semibold text-foreground">Quota Usage / استخدام الحصة</h2>
+        <Link href={`/stores/${storeId}/ai-usage`} className="text-xs text-primary hover:underline">
           View detailed log →
         </Link>
       </div>

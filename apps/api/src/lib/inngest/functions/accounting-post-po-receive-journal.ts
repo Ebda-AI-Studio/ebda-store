@@ -37,7 +37,10 @@ export const accountingPostPoReceiveJournal: InngestFunction.Any = inngest.creat
     // Feature gate — skip GL posting when inventory.purchase_orders is disabled.
     const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.purchase_orders');
     if (!enabled) {
-      logger.info({ storeId, poId }, 'accountingPostPoReceiveJournal: inventory.purchase_orders disabled, skipping');
+      logger.info(
+        { storeId, poId },
+        'accountingPostPoReceiveJournal: inventory.purchase_orders disabled, skipping'
+      );
       return { skipped: true, reason: 'feature_disabled', feature: 'inventory.purchase_orders' };
     }
     await step.run('post-journal', () =>

@@ -10,7 +10,7 @@ import { postOrderPaymentJournal } from '../apps/api/src/services/accounting/pos
 
 async function main() {
   const paid = await withRlsBypass(tx =>
-    tx.order.findMany({ where: { paymentStatus: 'paid' }, select: { id: true, orderNumber: true } }),
+    tx.order.findMany({ where: { paymentStatus: 'paid' }, select: { id: true, orderNumber: true } })
   );
   let ok = 0;
   for (const o of paid) {
@@ -24,4 +24,10 @@ async function main() {
   }
   console.log(`[journal] done. ${ok}/${paid.length} paid orders processed.`);
 }
-main().then(() => prisma.$disconnect()).then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });
+main()
+  .then(() => prisma.$disconnect())
+  .then(() => process.exit(0))
+  .catch(e => {
+    console.error(e);
+    process.exit(1);
+  });

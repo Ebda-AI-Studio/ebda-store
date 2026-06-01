@@ -201,10 +201,7 @@ export const bulkAiProductFaqs: InngestFunction.Any = inngest.createFunction(
           }
         } catch (err) {
           if (isAiQuotaCapError(err)) {
-            logger.warn(
-              { storeId, jobId },
-              'bulk-ai-product-faqs: quota cap hit, aborting sweep'
-            );
+            logger.warn({ storeId, jobId }, 'bulk-ai-product-faqs: quota cap hit, aborting sweep');
             throw err;
           }
           if (errors.length < ERROR_CAP) {

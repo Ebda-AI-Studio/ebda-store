@@ -116,34 +116,34 @@ router.get(
             })
           ),
 
-        // Yesterday funnel snapshot
-        runInTenantContext(storeId, () =>
-          prisma.funnelSnapshot.findFirst({
-            where: { storeId },
-            orderBy: { periodDate: 'desc' },
-          })
-        ),
+          // Yesterday funnel snapshot
+          runInTenantContext(storeId, () =>
+            prisma.funnelSnapshot.findFirst({
+              where: { storeId },
+              orderBy: { periodDate: 'desc' },
+            })
+          ),
 
-        // Top 5 SKUs by revenue (last 7d)
-        runInTenantContext(storeId, () =>
-          prisma.orderItem.groupBy({
-            by: ['productId'],
-            where: {
-              order: {
-                storeId,
-                paymentStatus: 'paid',
-                createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          // Top 5 SKUs by revenue (last 7d)
+          runInTenantContext(storeId, () =>
+            prisma.orderItem.groupBy({
+              by: ['productId'],
+              where: {
+                order: {
+                  storeId,
+                  paymentStatus: 'paid',
+                  createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+                },
               },
-            },
-            _sum: { total: true, quantity: true },
-            orderBy: { _sum: { total: 'desc' } },
-            take: 5,
-          })
-        ),
+              _sum: { total: true, quantity: true },
+              orderBy: { _sum: { total: 'desc' } },
+              take: 5,
+            })
+          ),
 
-        // AI narration (graceful null on failure)
-        generateInsightNarration(storeId, 'segment'),
-      ]);
+          // AI narration (graceful null on failure)
+          generateInsightNarration(storeId, 'segment'),
+        ]);
 
       // Enrich top SKUs with product info
       const productIds = topSkus.map(s => s.productId);

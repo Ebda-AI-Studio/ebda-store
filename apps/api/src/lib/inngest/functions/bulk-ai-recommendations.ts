@@ -94,9 +94,7 @@ async function computeCoPurchasePairs(
   // we expand to both directions in JS below so either product can be the
   // source. COUNT(DISTINCT o.id) so multiple lines of the same product in
   // one order don't inflate the pair count.
-  const rows = await prisma.$queryRaw<
-    Array<{ a_id: string; b_id: string; co_orders: bigint }>
-  >(
+  const rows = await prisma.$queryRaw<Array<{ a_id: string; b_id: string; co_orders: bigint }>>(
     Prisma.sql`
       SELECT a.product_id AS a_id,
              b.product_id AS b_id,

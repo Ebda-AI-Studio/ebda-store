@@ -93,7 +93,9 @@ function PctBar({ pct, warn }: { pct: number; warn?: boolean }) {
           style={{ width: `${Math.min(100, pct)}%` }}
         />
       </div>
-      <span className={`text-xs tabular-nums ${pct >= 90 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+      <span
+        className={`text-xs tabular-nums ${pct >= 90 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+      >
         {pct}%
       </span>
     </div>
@@ -306,9 +308,7 @@ function PlatformAiUsagePageInner() {
 
         {filteredStores.length === 0 ? (
           <div className="px-6 py-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              No stores match the current filters.
-            </p>
+            <p className="text-sm text-muted-foreground">No stores match the current filters.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -326,7 +326,10 @@ function PlatformAiUsagePageInner() {
               </thead>
               <tbody>
                 {filteredStores.map(store => (
-                  <tr key={store.storeId} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                  <tr
+                    key={store.storeId}
+                    className="border-b last:border-0 hover:bg-muted/20 transition-colors"
+                  >
                     <td className="px-4 py-3">
                       <div className="font-medium text-foreground">{store.name}</div>
                       <div className="text-xs text-muted-foreground">{store.slug}</div>

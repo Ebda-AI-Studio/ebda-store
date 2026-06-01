@@ -45,7 +45,10 @@ export const accountingPostOrderJournal: InngestFunction.Any = inngest.createFun
     // Feature gate — skip journal posting when accounting.basic is disabled for the store.
     const accountingEnabled = await featureService.isFeatureEnabled(storeId, 'accounting.basic');
     if (!accountingEnabled) {
-      logger.info({ storeId, orderId }, 'accountingPostOrderJournal: accounting.basic disabled, skipping');
+      logger.info(
+        { storeId, orderId },
+        'accountingPostOrderJournal: accounting.basic disabled, skipping'
+      );
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
     }
     await step.run('post-journal', async () => {

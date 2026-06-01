@@ -43,7 +43,10 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
         // Feature gate — dead-stock analysis requires inventory.basic.
         const enabled = await featureService.isFeatureEnabled(store.id, 'inventory.basic');
         if (!enabled) {
-          logger.info({ storeId: store.id }, 'stock-deadstock-scan: inventory.basic disabled, skipping');
+          logger.info(
+            { storeId: store.id },
+            'stock-deadstock-scan: inventory.basic disabled, skipping'
+          );
           return { flagged: 0, expiredCount: 0, skipped: true };
         }
         return runDeadstockScan(store.id);
@@ -82,7 +85,10 @@ export const stockDeadstockScanOnDemand: InngestFunction.Any = inngest.createFun
     // Feature gate — skip when inventory.basic is disabled.
     const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.basic');
     if (!enabled) {
-      logger.info({ storeId }, 'stock-deadstock-scan-on-demand: inventory.basic disabled, skipping');
+      logger.info(
+        { storeId },
+        'stock-deadstock-scan-on-demand: inventory.basic disabled, skipping'
+      );
       return { skipped: true, reason: 'feature_disabled', feature: 'inventory.basic' };
     }
 

@@ -53,7 +53,9 @@ async function enableFeature(featureKey: string): Promise<void> {
 async function clearFeatureOverride(featureKey: string): Promise<void> {
   await prisma.storeFeature
     .delete({ where: { storeId_featureKey: { storeId: testStoreId, featureKey } } })
-    .catch(() => {/* no-op if doesn't exist */});
+    .catch(() => {
+      /* no-op if doesn't exist */
+    });
 }
 
 function authHeader(token: string) {
@@ -142,7 +144,6 @@ async function assertFeatureDisabled(
 // ─── Tests per feature ───────────────────────────────────────────────────────
 
 describe('Feature Flag Enforcement — API Gate', () => {
-
   // ── coupons ────────────────────────────────────────────────────────────────
 
   describe('coupons', () => {
@@ -164,11 +165,7 @@ describe('Feature Flag Enforcement — API Gate', () => {
 
   describe('returns', () => {
     it('GET /stores/:id/returns/admin/list returns 403 when returns disabled', async () => {
-      await assertFeatureDisabled(
-        'GET',
-        `/stores/${testStoreId}/returns/admin/list`,
-        'returns'
-      );
+      await assertFeatureDisabled('GET', `/stores/${testStoreId}/returns/admin/list`, 'returns');
     });
   });
 
@@ -176,11 +173,7 @@ describe('Feature Flag Enforcement — API Gate', () => {
 
   describe('reviews', () => {
     it('GET /stores/:id/reviews/admin returns 403 when reviews disabled', async () => {
-      await assertFeatureDisabled(
-        'GET',
-        `/stores/${testStoreId}/reviews/admin`,
-        'reviews'
-      );
+      await assertFeatureDisabled('GET', `/stores/${testStoreId}/reviews/admin`, 'reviews');
     });
   });
 
@@ -188,11 +181,7 @@ describe('Feature Flag Enforcement — API Gate', () => {
 
   describe('loyalty', () => {
     it('GET /stores/:id/loyalty/settings returns 403 when loyalty disabled', async () => {
-      await assertFeatureDisabled(
-        'GET',
-        `/stores/${testStoreId}/loyalty/settings`,
-        'loyalty'
-      );
+      await assertFeatureDisabled('GET', `/stores/${testStoreId}/loyalty/settings`, 'loyalty');
     });
   });
 
@@ -212,11 +201,7 @@ describe('Feature Flag Enforcement — API Gate', () => {
 
   describe('affiliate', () => {
     it('GET /stores/:id/affiliates returns 403 when affiliate disabled', async () => {
-      await assertFeatureDisabled(
-        'GET',
-        `/stores/${testStoreId}/affiliates`,
-        'affiliate'
-      );
+      await assertFeatureDisabled('GET', `/stores/${testStoreId}/affiliates`, 'affiliate');
     });
   });
 
@@ -333,11 +318,7 @@ describe('Feature Flag Enforcement — API Gate', () => {
     });
 
     it('GET /stores/:id/suppliers returns 403 when accounting.basic disabled', async () => {
-      await assertFeatureDisabled(
-        'GET',
-        `/stores/${testStoreId}/suppliers`,
-        'accounting.basic'
-      );
+      await assertFeatureDisabled('GET', `/stores/${testStoreId}/suppliers`, 'accounting.basic');
     });
   });
 
@@ -345,11 +326,7 @@ describe('Feature Flag Enforcement — API Gate', () => {
 
   describe('accounting.expenses', () => {
     it('GET /stores/:id/expenses returns 403 when accounting.expenses disabled', async () => {
-      await assertFeatureDisabled(
-        'GET',
-        `/stores/${testStoreId}/expenses`,
-        'accounting.expenses'
-      );
+      await assertFeatureDisabled('GET', `/stores/${testStoreId}/expenses`, 'accounting.expenses');
     });
 
     it('POST /stores/:id/expenses returns 403 when accounting.expenses disabled', async () => {
@@ -420,5 +397,4 @@ describe('Feature Flag Enforcement — API Gate', () => {
       await clearFeatureOverride('coupons');
     });
   });
-
 });

@@ -24,7 +24,13 @@ interface SearchInputProps {
  * component holds the live keystrokes locally and only calls `onSearch` once
  * the debounce settles.
  */
-export function SearchInput({ value, onSearch, placeholder, className, ariaLabel }: SearchInputProps) {
+export function SearchInput({
+  value,
+  onSearch,
+  placeholder,
+  className,
+  ariaLabel,
+}: SearchInputProps) {
   const [localValue, setLocalValue] = useState(value);
   const debounced = useDebouncedValue(localValue, 300);
 

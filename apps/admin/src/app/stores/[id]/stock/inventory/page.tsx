@@ -373,7 +373,9 @@ export default function StockInventoryPage() {
                       <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
                         {p.costPrice == null ? '—' : formatPrice(p.costPrice)}
                       </td>
-                      <td className="px-3 py-2 text-end font-mono text-xs">{formatPrice(p.price)}</td>
+                      <td className="px-3 py-2 text-end font-mono text-xs">
+                        {formatPrice(p.price)}
+                      </td>
                       <td className="px-3 py-2 text-end font-mono text-xs">{p.soldQuantity}</td>
                       <td className="px-3 py-2 text-center text-muted-foreground">
                         {p.allowBackorder ? '✓' : '—'}

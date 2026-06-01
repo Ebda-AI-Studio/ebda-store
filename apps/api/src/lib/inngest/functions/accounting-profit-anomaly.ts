@@ -41,9 +41,15 @@ export const accountingProfitAnomalyCron: InngestFunction.Any = inngest.createFu
     for (const store of stores) {
       const result = await step.run(`anomaly-${store.id}`, async () => {
         // Feature gate — skip stores without accounting.profit_anomaly enabled.
-        const enabled = await featureService.isFeatureEnabled(store.id, 'accounting.profit_anomaly');
+        const enabled = await featureService.isFeatureEnabled(
+          store.id,
+          'accounting.profit_anomaly'
+        );
         if (!enabled) {
-          logger.info({ storeId: store.id }, 'accounting-profit-anomaly: feature disabled, skipping');
+          logger.info(
+            { storeId: store.id },
+            'accounting-profit-anomaly: feature disabled, skipping'
+          );
           return { detected: 0, p0Count: 0, skipped: true };
         }
         return runProfitAnomalyScan(store.id);

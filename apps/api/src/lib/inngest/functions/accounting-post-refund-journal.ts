@@ -36,7 +36,10 @@ export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFu
     // Feature gate — skip reversal when accounting.basic is disabled.
     const accountingEnabled = await featureService.isFeatureEnabled(storeId, 'accounting.basic');
     if (!accountingEnabled) {
-      logger.info({ storeId, orderId }, 'accountingPostRefundJournal: accounting.basic disabled, skipping');
+      logger.info(
+        { storeId, orderId },
+        'accountingPostRefundJournal: accounting.basic disabled, skipping'
+      );
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
     }
     const result = await step.run('reverse-journal', () =>

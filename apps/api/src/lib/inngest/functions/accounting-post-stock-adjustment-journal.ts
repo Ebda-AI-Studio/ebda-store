@@ -36,7 +36,10 @@ export const accountingPostStockAdjustmentJournal: InngestFunction.Any = inngest
     // Feature gate — skip GL posting when inventory.bulk_adjustments is disabled.
     const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.bulk_adjustments');
     if (!enabled) {
-      logger.info({ storeId, adjustmentId }, 'accountingPostStockAdjustmentJournal: inventory.bulk_adjustments disabled, skipping');
+      logger.info(
+        { storeId, adjustmentId },
+        'accountingPostStockAdjustmentJournal: inventory.bulk_adjustments disabled, skipping'
+      );
       return { skipped: true, reason: 'feature_disabled', feature: 'inventory.bulk_adjustments' };
     }
     await step.run('post-journal', () => postStockAdjustmentJournal({ storeId, adjustmentId }));

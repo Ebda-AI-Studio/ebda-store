@@ -16,10 +16,9 @@ interface PageProps {
 async function fetchPost(storeId: string, slug: string): Promise<BlogDetail | null> {
   if (!storeId || storeId === 'demo') return null;
   try {
-    const res = await fetch(
-      `${API_URL}/stores/${storeId}/blog/${encodeURIComponent(slug)}`,
-      { next: { revalidate: 60 } }
-    );
+    const res = await fetch(`${API_URL}/stores/${storeId}/blog/${encodeURIComponent(slug)}`, {
+      next: { revalidate: 60 },
+    });
     if (!res.ok) return null;
     const json = await res.json();
     return (json?.data?.post ?? json?.data ?? null) as BlogDetail | null;

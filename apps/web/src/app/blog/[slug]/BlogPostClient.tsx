@@ -50,7 +50,9 @@ export function BlogPostClient({ post }: { post: BlogDetail | null }) {
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           {!post ? (
             <div className="text-center py-16">
-              <p className="text-foreground/60">{isRtl ? 'المقال غير موجود.' : 'Post not found.'}</p>
+              <p className="text-foreground/60">
+                {isRtl ? 'المقال غير موجود.' : 'Post not found.'}
+              </p>
               <Link
                 href={storeUrl('/blog')}
                 className="mt-3 inline-block text-sm font-semibold text-[hsl(var(--primary))] hover:underline"
