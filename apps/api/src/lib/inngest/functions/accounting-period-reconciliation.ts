@@ -33,9 +33,19 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
     let drifts = 0;
     for (const store of stores) {
       const ops = await step.run(`ops-${store.id}`, () =>
-        prisma.order.aggregate({
-          where: { storeId: store.id, paymentStatus: 'paid', createdAt: { gte: since } },
-          _sum: { total: true },
+        // Cross-tenant cron — Inngest workers run without any HTTP context
+        // so no tenant GUC is set. With FORCE ROW LEVEL SECURITY in place
+        // (migration 20260530000000_force_rls_enforcement) the orders policy
+        // runs for every connection, including `force_app`. Wrapping with
+        // withRlsBypass ensures the aggregate sees ALL rows for this store
+        // regardless of GUC state, while the explicit storeId + paymentStatus
+        // WHERE clause preserves application-level scoping as defense-in-depth.
+        withRlsBypass(async tx => {
+          const result = await tx.order.aggregate({
+            where: { storeId: store.id, paymentStatus: 'paid', createdAt: { gte: since } },
+            _sum: { total: true },
+          });
+          return result;
         })
       );
 
