@@ -34,6 +34,14 @@ jobs:
     name: Create Neon branch from production
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     steps:
+      - name: Ensure jq (self-hosted runner may lack it + can't sudo)
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            mkdir -p "$HOME/.local/bin"
+            curl -fsSL -o "$HOME/.local/bin/jq" https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+            chmod +x "$HOME/.local/bin/jq"
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          fi
       - name: Create branch + prune old snapshots
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
