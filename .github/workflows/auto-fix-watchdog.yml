@@ -38,7 +38,9 @@ jobs:
         run: |
           if ! command -v jq >/dev/null 2>&1; then
             mkdir -p "$HOME/.local/bin"
+            JQ_SHA=5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5
             curl -fsSL -o "$HOME/.local/bin/jq" https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+            echo "$JQ_SHA  $HOME/.local/bin/jq" | sha256sum -c - || { echo "::error::jq checksum mismatch — refusing to execute"; rm -f "$HOME/.local/bin/jq"; exit 1; }
             chmod +x "$HOME/.local/bin/jq"
             echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           fi
