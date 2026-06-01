@@ -1,8 +1,10 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '@force/database';
+import { redis } from './redis.service';
 import logger from '../lib/logger';
 // UiRefreshEvent is defined in lib/socket-broadcast and re-exported; we inline
 // the interface here to avoid a circular dependency
@@ -75,6 +77,35 @@ class SocketService {
       pingTimeout: 60000,
       pingInterval: 25000,
     });
+
+    // Wire the Redis pub/sub adapter so events emitted on one Railway replica
+    // are fanned out to all connected clients across every replica.
+    // Uses two dedicated ioredis connections (pub + sub) duplicated from the
+    // existing client so we don't share a connection that's in subscriber mode.
+    // Falls back gracefully to the in-process adapter when Redis is absent
+    // (local dev without REDIS_URL) — logs a warning so it's visible in logs.
+    const redisClient = redis.getClient();
+    if (redisClient && redis.isAvailable()) {
+      try {
+        // ioredis requires separate pub/sub connections — .duplicate() inherits
+        // the same config (URL, keyPrefix, retry strategy) without copying state.
+        const pubClient = redisClient.duplicate();
+        const subClient = redisClient.duplicate();
+        this.io.adapter(createAdapter(pubClient, subClient));
+        logger.info('[Socket.io] Redis adapter attached (multi-replica safe)');
+      } catch (err) {
+        logger.warn(
+          { err },
+          '[Socket.io] Failed to attach Redis adapter — falling back to in-process'
+        );
+      }
+    } else {
+      logger.warn(
+        '[Socket.io] REDIS_URL not configured — using in-process adapter. ' +
+          'Socket events will NOT propagate across multiple Railway replicas. ' +
+          'Set REDIS_URL to enable horizontal scaling.'
+      );
+    }
 
     // Authentication middleware
     this.io.use(async (socket, next) => {

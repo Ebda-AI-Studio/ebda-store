@@ -13,6 +13,7 @@
 
 import { prisma } from '@force/database';
 import { featureService } from './feature.service';
+import { withLeaderLock } from '../lib/leader-election';
 import logger from '../lib/logger';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -38,15 +39,21 @@ class LoyaltyAutomationService {
 
     logger.info({ intervalMs }, '[LoyaltyAutomation] Starting daily cron');
 
-    // Run once at startup then on each interval
-    this.runDailyAutomation().catch(err => {
-      logger.error({ err }, '[LoyaltyAutomation] Error on initial run');
-    });
+    // Run once at startup (leader-gated) then on each interval.
+    // The withLeaderLock guard ensures only one replica runs the job per tick
+    // even when Railway scales to multiple instances.
+    withLeaderLock('loyalty-automation-daily', intervalMs, () => this.runDailyAutomation()).catch(
+      err => {
+        logger.error({ err }, '[LoyaltyAutomation] Error on initial run');
+      }
+    );
 
     this.intervalHandle = setInterval(() => {
-      this.runDailyAutomation().catch(err => {
-        logger.error({ err }, '[LoyaltyAutomation] Unhandled error in runDailyAutomation()');
-      });
+      withLeaderLock('loyalty-automation-daily', intervalMs, () => this.runDailyAutomation()).catch(
+        err => {
+          logger.error({ err }, '[LoyaltyAutomation] Unhandled error in runDailyAutomation()');
+        }
+      );
     }, intervalMs);
   }
 
