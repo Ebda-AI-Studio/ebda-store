@@ -134,6 +134,26 @@ router.post(
   }
 );
 
+// GET /:storeId/recommendations — admin overview (all FBT pairs for the store)
+// Gated by `upsell_crosssell` so the admin UI can 403-redirect merchants who
+// attempt to navigate directly to /stores/:id/recommendations without the feature.
+router.get(
+  '/:storeId/recommendations',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('upsell_crosssell'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const stats = await recommendationService.getStats(storeId);
+      res.json({ success: true, data: { stats } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /:storeId/recommendations/stats
 router.get(
   '/:storeId/recommendations/stats',
