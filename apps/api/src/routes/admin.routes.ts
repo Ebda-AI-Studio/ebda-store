@@ -1,10 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
+import { config } from '../config';
+import logger from '../lib/logger';
 import {
   prisma,
   withRlsBypass,
@@ -1196,6 +1199,303 @@ router.get(
       });
 
       res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================================
+// Endpoint 1: Cross-tenant order export (streaming cursor CSV)
+//
+// WHY per-chunk bypass: a single long-lived withRlsBypass transaction
+// holds a pooled connection for the entire export duration (potentially
+// minutes for large platforms). This would starve the connection pool
+// and risk hitting the 30s Prisma transaction timeout. Instead, each
+// CHUNK_SIZE page is fetched inside its own short-lived bypass tx,
+// then immediately streamed to the response. The TCP buffer handles
+// back-pressure; the DB connection returns to the pool between chunks.
+//
+// SECURITY: super_admin only. Application-level WHERE filters (storeId,
+// status, paymentStatus, date range) are preserved inside every bypass
+// transaction as defense-in-depth — even with RLS bypassed, the query
+// still only returns what the filter requests.
+// =====================================================================
+
+const EXPORT_CHUNK_SIZE = 250;
+
+/**
+ * Escape a single CSV field value (RFC 4180).
+ */
+function csvField(value: string | number | null | undefined | Date): string {
+  if (value == null) return '';
+  let s = value instanceof Date ? value.toISOString() : String(value);
+  // Neutralize spreadsheet formula triggers (CSV formula injection): a cell
+  // beginning with = + - @ or a control char can execute when opened in Excel/Sheets.
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/**
+ * GET /admin/export/orders
+ *
+ * Streams a cross-tenant order export as CSV using cursor-based pagination.
+ * Each page is fetched inside its own short-lived withRlsBypass transaction
+ * so no single connection is held for the full export duration.
+ *
+ * Query params:
+ *   storeId?       – filter to a single store
+ *   status?        – filter by OrderStatus
+ *   paymentStatus? – filter by OrderPaymentStatus
+ *   from?          – ISO date string (createdAt >=)
+ *   to?            – ISO date string (createdAt <=)
+ */
+router.get(
+  '/export/orders',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, status, paymentStatus, from, to } = req.query;
+
+      const where: Prisma.OrderWhereInput = {};
+      if (storeId) where.storeId = storeId as string;
+      if (status) where.status = status as OrderStatus;
+      if (paymentStatus) where.paymentStatus = paymentStatus as OrderPaymentStatus;
+      if (from || to) {
+        where.createdAt = {};
+        if (from) where.createdAt.gte = new Date(from as string);
+        if (to) where.createdAt.lte = new Date(to as string);
+      }
+
+      const filename = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      // Write CSV header row immediately so the browser shows progress
+      const header =
+        'order_number,store_id,store_name,status,payment_status,total,' +
+        'customer_email,customer_name,shipping_country,shipping_city,' +
+        'shipping_area,created_at\n';
+      res.write(header);
+
+      let cursor: string | undefined;
+      let totalRows = 0;
+
+      // Cursor-based streaming loop: each iteration opens a fresh bypass tx,
+      // fetches one page, streams it to the response, then closes the tx.
+      // This keeps individual transaction lifetimes to <1s even on large exports.
+      while (true) {
+        // Each chunk gets its own withRlsBypass transaction (not one long tx).
+        const rows = await withRlsBypass((tx: Prisma.TransactionClient) =>
+          tx.order.findMany({
+            where,
+            orderBy: { id: 'asc' }, // stable cursor anchor
+            take: EXPORT_CHUNK_SIZE,
+            // Prisma cursor: skip the cursor row itself (skip: 1) on every
+            // page after the first. The `id` field is a UUID primary key so
+            // it uniquely identifies the last-seen row.
+            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+            select: {
+              id: true,
+              orderNumber: true,
+              storeId: true,
+              status: true,
+              paymentStatus: true,
+              total: true,
+              shippingAddress: true,
+              createdAt: true,
+              store: { select: { name: true } },
+              customer: {
+                select: { email: true, firstName: true, lastName: true },
+              },
+            },
+          })
+        );
+
+        if (rows.length === 0) break;
+
+        // Build and flush this chunk to the TCP buffer
+        const chunk = rows
+          .map(o => {
+            const addr = o.shippingAddress as Record<string, string> | null;
+            return [
+              csvField(o.orderNumber),
+              csvField(o.storeId),
+              csvField(o.store?.name),
+              csvField(o.status),
+              csvField(o.paymentStatus),
+              csvField(o.total),
+              csvField(o.customer?.email),
+              csvField(o.customer ? `${o.customer.firstName} ${o.customer.lastName}`.trim() : null),
+              csvField(addr?.country),
+              csvField(addr?.city),
+              csvField(addr?.area),
+              csvField(o.createdAt),
+            ].join(',');
+          })
+          .join('\n');
+
+        res.write(chunk + '\n');
+
+        cursor = rows[rows.length - 1].id;
+        totalRows += rows.length;
+
+        // Finished if we got fewer rows than the page size
+        if (rows.length < EXPORT_CHUNK_SIZE) break;
+      }
+
+      logger.info(
+        { userId: req.user?.userId, totalRows, storeId, status, paymentStatus },
+        'admin: order export completed'
+      );
+
+      await auditLog({
+        action: 'admin.export.orders',
+        userId: req.user!.userId,
+        resourceType: 'order',
+        details: { totalRows, storeId, status, paymentStatus, from, to },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.end();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================================
+// Endpoint 2: Super-admin impersonation
+//
+// Issues a short-lived impersonation access token for the target user.
+// The target user's record lives in the `users` table which has NO RLS
+// policy (users are a global table, not tenant-scoped — see migration
+// 20260404000000_add_rls_policies comment "Tables without store_id").
+// A plain prisma.user.findUnique() works without bypass for that lookup.
+//
+// HOWEVER: the audit_logs write IS RLS-protected (rls_audit_logs_tenant).
+// auditLog() uses prisma.auditLog.create which runs through the proxy.
+// In the /admin context there is no tenant GUC set, so the old nullable-
+// storeId policy allows the insert (store_id IS NULL → allowed). We keep
+// auditLog() as-is — it's already working in other /admin routes.
+//
+// SECURITY: super_admin only. Generates a 1-hour token (not a full
+// 7-day session) and logs the impersonation to the audit trail.
+// The impersonation token carries a `impersonatedBy` field so downstream
+// guards can reject it for high-privilege operations if desired.
+// =====================================================================
+
+const impersonateSchema = z.object({
+  userId: z.string().uuid('userId must be a UUID'),
+});
+
+/**
+ * POST /admin/impersonate
+ *
+ * Returns a short-lived (1h) impersonation access token for the given
+ * userId. The calling super_admin's identity is recorded in the audit log.
+ *
+ * Body: { userId: string }
+ */
+router.post(
+  '/impersonate',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = impersonateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'INVALID_INPUT', message: 'userId must be a valid UUID' });
+        return;
+      }
+      const { userId } = parsed.data;
+
+      // users table has no RLS — plain lookup works under force_app without bypass.
+      // We intentionally leave this as-is: adding withRlsBypass here would be
+      // over-engineering (the policy doesn't exist) and would waste a tx slot.
+      const target = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, role: true, storeId: true, deletedAt: true },
+      });
+
+      if (!target) {
+        res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
+        return;
+      }
+
+      if (target.deletedAt !== null) {
+        res
+          .status(410)
+          .json({ error: 'USER_DELETED', message: 'Cannot impersonate a deleted user' });
+        return;
+      }
+
+      // Prevent impersonating another super_admin (principle of least privilege)
+      if (target.role === 'super_admin') {
+        res.status(403).json({
+          error: 'FORBIDDEN',
+          message: 'Cannot impersonate another super_admin',
+        });
+        return;
+      }
+
+      // Issue a 1-hour impersonation token. Short TTL minimises blast radius
+      // if the token is accidentally exposed. The token payload is identical
+      // to a normal access token so the admin frontend can use it as-is.
+      const impersonationToken = jwt.sign(
+        {
+          userId: target.id,
+          email: target.email,
+          role: target.role,
+          storeId: target.storeId ?? null,
+          // Non-standard claim — allows future guards to detect impersonation
+          impersonatedBy: req.user!.userId,
+        },
+        config.jwtSecret,
+        {
+          algorithm: 'HS256',
+          expiresIn: '1h',
+          issuer: 'force-api',
+          audience: 'force-app',
+          subject: target.id,
+        }
+      );
+
+      // Audit the impersonation. auditLog() creates a row with storeId=null
+      // which the audit_logs nullable policy allows without a GUC.
+      await auditLog({
+        action: 'admin.impersonate',
+        userId: req.user!.userId,
+        resourceType: 'user',
+        resourceId: target.id,
+        details: {
+          targetEmail: target.email,
+          targetRole: target.role,
+          targetStoreId: target.storeId,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      logger.info(
+        { adminId: req.user?.userId, targetId: target.id, targetRole: target.role },
+        'admin: impersonation token issued'
+      );
+
+      res.json({
+        success: true,
+        data: {
+          accessToken: impersonationToken,
+          expiresIn: 3600,
+          targetUser: {
+            id: target.id,
+            email: target.email,
+            role: target.role,
+            storeId: target.storeId,
+          },
+        },
+      });
     } catch (error) {
       next(error);
     }
