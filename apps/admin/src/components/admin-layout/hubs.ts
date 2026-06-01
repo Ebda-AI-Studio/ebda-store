@@ -26,6 +26,10 @@ export type HubLabels = {
   // Sales tabs
   orders: string;
   customers: string;
+  reviews: string;
+  returns: string;
+  coupons: string;
+  loyalty: string;
   // Stock tabs
   stockDashboard: string;
   inventory: string;
@@ -90,10 +94,26 @@ export const HUBS: HubDefinition[] = [
   },
   {
     key: 'sales',
-    urlPrefixes: ['/orders', '/customers', '/sales'],
+    urlPrefixes: [
+      '/orders',
+      '/customers',
+      '/sales',
+      '/reviews',
+      '/returns',
+      '/coupons',
+      '/loyalty',
+    ],
     buildTabs: (storeId, labels) => [
       { label: labels.orders, href: `/stores/${storeId}/orders` },
       { label: labels.customers, href: `/stores/${storeId}/customers` },
+      { label: labels.reviews, href: `/stores/${storeId}/reviews` },
+      { label: labels.returns, href: `/stores/${storeId}/returns` },
+      // Coupons and loyalty are feature-gated at the page level via
+      // useRequireFeature('coupons') / loyalty gating. HubTab has no
+      // per-tab featureKey mechanism so the tab always renders; the page
+      // itself redirects/blocks when the feature is disabled.
+      { label: labels.coupons, href: `/stores/${storeId}/coupons` },
+      { label: labels.loyalty, href: `/stores/${storeId}/loyalty` },
     ],
   },
   {
@@ -177,6 +197,10 @@ export const HUBS: HubDefinition[] = [
       '/language',
       '/template',
       '/pages',
+      // P4-A (audit 2026-06-01): add standalone pages to Settings hub so the
+      // sidebar highlights correctly when a merchant lands on these URLs.
+      '/announcement',
+      '/hero',
     ],
     buildTabs: () => [],
   },
