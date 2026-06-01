@@ -26,6 +26,7 @@ Every manual content task that drains merchant time has an AI auto-fill button:
 - **Write FAQs and how-to guides** for every product page so Google and AI search engines (ChatGPT, Perplexity, Gemini) actually find your store
 - **Detect spam reviews** automatically
 - **Draft owner-responses** to customer reviews in either language
+- **Reorder + dead-stock recommendations** — AI flags which products need restocking and which are dead inventory, so you act before you lose sales or tie up cash
 
 Beyond content, AI powers the **WhatsApp DM ordering bot**: customers message your business number in natural Arabic or English, the bot understands what they want, walks them through your catalog, and hands them a checkout link — all without an agent. Voice notes are transcribed. Product photos are matched against your catalog. Returning customers are greeted by name and offered their last order. All powered by Google Gemini, **included free** in the WhatsApp integration at no per-message or per-AI-call cost.
 
@@ -62,7 +63,7 @@ Most platforms give you a theme picker and call it customization. Force Store gi
 - **Per-section typography** — change font size, weight, family on any page section without touching code
 - **Per-section background colors** — section-by-section, not just global
 - **Brand palette generator** — pick 1-3 seed colors, get a full WCAG-compliant palette suggested automatically
-- **Page builder** — drag-and-drop section ordering, with bilingual editing
+- **Page builder** — drag-and-drop section ordering, with bilingual editing; storefront Navigation links, Footer links, and Category page config are all consolidated inside the Page Builder — one destination for all storefront layout decisions
 - **7 visual toggles** — brand badges on product cards, quick-add buttons, brand story block, trust strip, dividers, mobile floating widget, blog
 - **Per-store custom domain** — your-shop.com, auto-provisioned through our Vercel integration
 - **Per-store branded email** — order confirmations come from your domain, not ours
@@ -80,7 +81,8 @@ Most platforms give you a theme picker and call it customization. Force Store gi
 - Doesn't have a developer on staff and doesn't want to hire one
 - Wants to take orders via WhatsApp DM (not just notifications — actual orders from customers DMing the business number)
 - Cares about WhatsApp order updates because that's how their customers communicate
-- Values built-in inventory, suppliers, purchase orders, basic accounting
+- Values built-in inventory, suppliers, purchase orders, and full accounting (Chart of Accounts, journal, P&L — no QuickBooks needed)
+- Needs per-product discount pricing (percentage or fixed KWD) that shows a live "Was / Now" preview in the admin
 
 **Strong fit:**
 
@@ -112,6 +114,14 @@ Most platforms give you a theme picker and call it customization. Force Store gi
 Force Store is built by **Force AI**, a Kuwait company owned by Ahmad Sharaf. We're a sister company to Force Media Kuwait, the agency that's been building websites and brand identities for Kuwaiti businesses for years. The same team that ships marketing campaigns also ships product code, so the gap between "what we sell" and "what we build" is small.
 
 We're not VC-backed. We don't have a 50-person team. We ship every day, and every merchant on the platform inherits every improvement automatically.
+
+---
+
+## One-click WhatsApp Meta-catalog setup
+
+Connecting a store to WhatsApp's Native Catalog feature normally requires merchants to navigate Meta Business Manager, create a Commerce Catalog, generate a system-user token, and copy multiple IDs. Force Store removes all of that.
+
+From Admin → WhatsApp Bot → Meta Commerce Catalog, click **Provision automatically**. The Force AI backend calls the Meta Graph API on your behalf to create the catalog, assign the long-lived access token, and save everything encrypted — in under 60 seconds. Your product catalog syncs to Meta automatically after that. This is a meaningful differentiator: no other Gulf e-commerce platform offers self-serve Meta catalog provisioning for merchants.
 
 ---
 

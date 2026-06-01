@@ -17,6 +17,16 @@ Your homepage includes a full-width hero banner that supports a single striking 
 
 > 📸 Screenshot: Homepage with Arabic hero banner, brand story block, and trust strip in a minimalist theme
 
+### Product Discount Engine (Starter+)
+
+Set a per-product discount directly on the product edit form. Choose from three modes:
+
+- **None** — no discount; the product shows its base price
+- **Percentage (%)** — e.g. 15% off; the discounted price previews live as you type
+- **Fixed (KWD)** — e.g. 2 KWD off; same live preview
+
+The discounted price is derived and displayed automatically on the storefront as a "Was / Now" strikethrough. The `compareAtPrice` field is no longer a manual entry — it is computed from the active discount so there is no risk of stale markup pricing on your storefront.
+
 ### Product Catalog and Product Pages
 
 Products are organized in a nested category grid — main categories with subcategories underneath, displayed in sizes calibrated for how GCC merchants actually photograph products. On any product page, shoppers can:
@@ -78,7 +88,7 @@ Everything related to what you sell:
 
 - **Products** — Add, edit, or bulk-import products with Arabic and English names, descriptions, images, pricing, and variants. Import via Excel/CSV with Arabic column headers supported.
 - **Categories** — Create a nested category tree. Assign products to multiple categories. A "Best Sellers" virtual category assembles itself automatically from products you mark as bestsellers.
-- **Page Builder** — Control your homepage layout: reorder sections, show/hide sections, and edit each section's headline and subheadline directly. AI can generate section copy for you.
+- **Page Builder** — Control your entire storefront layout from one place: reorder and show/hide homepage sections, edit section headlines and subheadlines, manage your storefront Navigation links, configure Footer links, and set up Category pages — all consolidated inside the Page Builder (not separate settings screens). AI can generate section copy for you.
 - **Blog** — Write and publish posts.
 - **Floating Widget** — Configure the sticky contact button that appears on every storefront page (premium add-on — see Section 7).
 - **AI Tools** — Bulk-fill translations, SEO tags, and content across your entire catalog in one click (covered in detail in Section 3).
@@ -93,27 +103,55 @@ Everything that happens after a customer places an order:
 
 ### Stock (المخزون)
 
-Full inventory management without needing a separate system:
+Full inventory management without needing a separate system. Features are tiered by plan:
 
-- **Inventory Dashboard** — See current stock levels across all products at a glance.
+**Starter plan and above:**
+
+- **Inventory Dashboard** — See current stock levels across all products at a glance. (`inventory.basic`)
 - **Stock Adjustments** — Log any stock movement: received goods, damaged items, corrections.
+- **Deadstock Reports** — See which products haven't moved in a defined period so you can act on them. (AI-powered via Gemini)
+
+**Professional plan and above:**
+
+- **Reorder Alerts** — Set a minimum stock threshold per product; get an automatic email before you run out. (`inventory.stock_alerts`)
+- **Backorders** — Accept orders for out-of-stock products and fulfill them when stock arrives. (`inventory.backorder`)
+- **Reorder AI** — AI-driven reorder suggestions based on sales velocity and current stock levels.
+
+**Enterprise plan only:**
+
+- **Multi-Warehouse** — Track stock counts per warehouse and route orders by proximity or rule. (`inventory.multi_warehouse`)
+- **Barcode Scanning** — Scan barcodes from mobile to receive stock, pick orders, and audit inventory counts. (`inventory.barcode`)
+- **Purchase Orders** — Supplier purchase-order workflow with cost capture, receive-against-PO, and supplier ledger. (`inventory.purchase_orders`)
+- **Bulk Adjustments** — CSV/Excel import for stock reconciliation across hundreds of products at once. (`inventory.bulk_adjustments`)
+
+**Available on all plans:**
+
 - **Suppliers** — Maintain a supplier list linked to your products.
-- **Purchase Orders** — Create purchase orders, track delivery, and automatically update stock on receipt.
-- **Backorders** — Accept orders for out-of-stock products and fulfill them when stock arrives.
-- **Reorder Alerts** — Set a minimum stock threshold per product; get notified before you run out.
-- **Deadstock Reports** — See which products haven't moved in a defined period so you can act on them.
 
 > 📸 Screenshot: Stock dashboard with reorder alerts highlighted in Arabic
 
-### Finance (المالية)
+### Finance (المالية) — Accounting module
 
-Most e-commerce platforms make you connect QuickBooks or Xero for proper accounting. Force Store includes a full Finance hub:
+Most e-commerce platforms make you connect QuickBooks or Xero for proper accounting. Force Store includes a full Finance hub — no third-party integration required.
 
-- **Chart of Accounts** — A real double-entry bookkeeping system organized by account categories.
-- **Journal Entries** — Record any financial event against the right accounts.
-- **Expenses** — Log operating expenses with a two-step approval workflow.
-- **Profit & Loss** — A live P&L report that reflects your actual store activity.
-- **Payment Audit Trail** — Every payment now has an append-only event log: the initial intent, every webhook from Tap / MyFatoorah / Hesabe / UPayments, every refund, every admin action — all preserved with the raw provider payload. If a dispute is raised 6 months later, the full sequence (with proof from the provider) is one click away. Most platforms only show you the latest payment status; we keep the full lineage.
+**Professional plan and above:**
+
+- **Chart of Accounts** — A real double-entry bookkeeping system organized by account categories (54 default accounts seeded on onboarding; fully editable).
+- **Journal Entries** — Double-entry journal auto-posted on every paid order (sales revenue, cost of goods, refunds). Manual journal entry UI for non-order financial events.
+- **Profit & Loss** — A live P&L report that reflects your actual store activity over any date range.
+- **Expense Tracking** — Log operating expenses with category tagging and receipt attachment. Monthly summary by expense category. (`accounting.expenses`)
+- **Invoicing** — Kuwait-compliant invoice generation: tax line, bilingual Arabic/English layout, PDF export. (`accounting.invoicing`)
+
+**Enterprise plan only:**
+
+- **Tax Reports** — VAT/sales-tax export per reporting period with full transaction-level breakdown. (`accounting.tax_reports`)
+- **Multi-Currency** — Track non-KWD transactions with FX rates and automatic KWD conversion at the bookkeeping level. (`accounting.multi_currency`)
+- **Profit Anomaly Watch** — AI-driven margin watcher that flags sales below cost and unusual margin drops vs. baseline. (`accounting.profit_anomaly`)
+- **Bank Reconciliation** — Bank statement import (CSV/OFX) with automated ledger matching and manual override. (`accounting.bank_reconcile`)
+
+**Available on all plans:**
+
+- **Payment Audit Trail** — Every payment has an append-only event log: the initial intent, every webhook from Tap / MyFatoorah / Hesabe / UPayments, every refund, every admin action — all preserved with the raw provider payload. If a dispute is raised 6 months later, the full sequence (with proof from the provider) is one click away. Most platforms only show you the latest payment status; we keep the full lineage.
 
 This is the depth of accounting software typically found in platforms that cost ten times more.
 
@@ -378,23 +416,39 @@ The affiliate program is available as a premium add-on. Affiliates, influencers,
 
 ---
 
-## 11. Premium Add-Ons (الميزات الإضافية)
+## 11. Plan-Gated Features — What Each Tier Unlocks
 
-The following features are available as opt-in additions for stores that want extra capabilities. They require separate activation — ask your Force AI account manager.
+Force Store uses four plan tiers: **Starter**, **Professional**, **Enterprise**, plus a `free` grace state (not sold — only used for lapsed/demo stores). Every tier is a strict superset of the one below it.
 
-### Loyalty Program (برنامج الولاء)
+When a merchant tries to access a feature above their current plan, they see an on-brand **upgrade page** — "Available on the Professional plan and above" — with a prompt to contact their Force AI account manager. There are no silent redirects.
+
+### Loyalty Program — برنامج الولاء (Professional+)
 
 Reward repeat customers automatically. Customers earn points on every purchase and redeem them for discounts on future orders. A loyalty program is one of the most effective tools for increasing repeat purchase rates — typical e-commerce stores see 20–30% of revenue come from repeat buyers once a loyalty program is active.
 
 **Example:** A customer who spends KD 50 earns 500 points. At your configured redemption rate, they spend those points on their next order — bringing them back rather than shopping elsewhere.
 
-### Upsell and Cross-sell (البيع الإضافي والمتقاطع)
+### Push Notifications — الإشعارات الفورية (Professional+)
 
-Show related or upgraded products at key moments in the shopping journey — on the product page and in the cart. You choose which products to pair; the platform handles the display.
+Browser and mobile push notifications let you reach subscribed customers directly on their phone or desktop — without an app and without their email address. Use push to announce new arrivals, flash sales, or back-in-stock alerts.
+
+### Upsell and Cross-sell — البيع الإضافي والمتقاطع (Professional+)
+
+Show related or upgraded products at key moments in the shopping journey — on the product page and in the cart. Powered by co-purchase signal from your actual order data, so recommendations are based on what your customers actually buy together.
 
 **Example:** A customer viewing a 250g coffee bag sees a "You might also like" strip with your 500g bag and your branded mug — increasing average order value without any extra ad spend.
 
-### Floating Widget (الزر العائم)
+### Affiliate Program — برنامج التسويق بالعمولة (Enterprise+)
+
+Let influencers, partners, or loyal customers earn a commission for every order they refer. Each affiliate gets a unique tracking link. You set the commission rate and payout rules. Invite new affiliates directly from the admin with the **Invite** button — sends a branded onboarding email automatically.
+
+**Example:** A Kuwaiti food blogger shares their affiliate link. Every purchase through that link earns the blogger a 10% commission — and you a new customer who came through trusted word-of-mouth.
+
+### SMS Notifications — الرسائل القصيرة (Enterprise+)
+
+Send transactional and promotional SMS messages to customers who opt in. SMS reaches customers who don't have push notifications enabled and don't open emails.
+
+### Floating Widget — الزر العائم (Enterprise+)
 
 A sticky button that sits on every page of your storefront. It collapses to a single circle and expands to show your chosen contact and engagement options: WhatsApp chat, Instagram link, phone number, email, background music toggle, or any custom link. Position, expand direction, button colors, and labels are all configurable.
 
@@ -402,23 +456,9 @@ A sticky button that sits on every page of your storefront. It collapses to a si
 
 > 📸 Screenshot: Floating widget expanded on a storefront page showing WhatsApp and Instagram buttons
 
-### Affiliate Program (برنامج التسويق بالعمولة)
+### WhatsApp Notifications — إشعارات واتساب (add-on, any plan)
 
-Let influencers, partners, or loyal customers earn a commission for every order they refer. Each affiliate gets a unique tracking link. You set the commission rate and payout rules.
-
-**Example:** A Kuwaiti food blogger shares their affiliate link. Every purchase through that link earns the blogger a 10% commission — and you a new customer who came through trusted word-of-mouth.
-
-### WhatsApp Notifications (إشعارات واتساب)
-
-The full WhatsApp integration described in Section 9 is an add-on. It requires an active Force WhatsApp Business Platform account and a connected Meta-approved WABA. The bot intelligence features (natural language ordering, voice, photo matching) are included in the WhatsApp add-on at no extra charge — they run on the free Google Gemini tier.
-
-### SMS Notifications (الرسائل القصيرة)
-
-Send transactional and promotional SMS messages to customers who opt in. SMS reaches customers who don't have push notifications enabled and don't open emails.
-
-### Push Notifications (الإشعارات الفورية)
-
-Covered in Section 6. Requires activation per store.
+The full WhatsApp integration described in Section 9 is an add-on available at any plan tier. It requires an active Force WhatsApp Business Platform account and a connected Meta-approved WABA. The bot intelligence features (natural language ordering, voice, photo matching, returning-customer personalization) are included in the WhatsApp add-on at no extra charge — they run on the free Google Gemini tier.
 
 ---
 

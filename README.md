@@ -100,13 +100,16 @@ force-website-builder/
 ### Platform
 
 - **Multi-tenancy** — Row-Level Security (RLS) via AsyncLocalStorage + Prisma Proxy, automatic tenant scoping on all queries
-- **Feature Toggle Engine** — 21 per-store toggleable features with Redis-cached lookups
+- **Feature Toggle Engine** — 22 parent features + 14 inventory/accounting sub-features across 4 plan tiers (free / starter / professional / enterprise), with Redis-cached lookups; see `packages/shared/src/features.ts` (FEATURE_KEYS_ARRAY) and `packages/shared/src/plan-baselines.ts`
+- **Plan Tier System** — four tiers (free / starter / professional / enterprise) with layered feature baselines; upgrade-marketing gate shows on-brand upsell page for plan-gated features; see `packages/shared/src/plan-baselines.ts`
 - **Custom Domains** — Store owners add custom domains via admin UI; auto-registered on Vercel with SSL
 - **Role-Based Access** — Super Admin (platform-wide), Store Admin (single store), Customer (storefront)
 
 ### Commerce
 
 - **Product Management** — Categories, variants, inventory tracking, image galleries
+- **Product Discount Engine** — Per-product discount dropdown (None / Percentage % / Fixed KWD) with live discounted-price preview; `compareAtPrice` is derived automatically from the active discount
+- **Accounting Module** — Chart of Accounts, double-entry journal entries (auto-posted on paid orders), P&L, expense tracking, invoicing (Professional+); advanced features — tax reports, multi-currency, profit anomaly watch, bank reconciliation — on Enterprise+
 - **Order Lifecycle** — Cart, checkout, payment processing, status transitions with notification triggers
 - **Abandoned Cart Recovery** — Automated recovery flows via WhatsApp/SMS/Push
 - **Upsell & Cross-sell** — Product recommendations engine
@@ -156,8 +159,8 @@ The bot degrades gracefully: if `GEMINI_API_KEY` is unset in WBS, the bot revert
 | Service         | Platform      | URL                                  |
 | --------------- | ------------- | ------------------------------------ |
 | API             | Railway       | `api-production-c058.up.railway.app` |
-| Admin Dashboard | Vercel        | `force-admin-seven.vercel.app`       |
-| Storefront      | Vercel        | `force-web-sigma.vercel.app`         |
+| Admin Dashboard | Vercel        | `app.forcemediakw.com`               |
+| Storefront      | Vercel        | `wadyaljuz.com` (flagship tenant)    |
 | Database        | Neon          | Serverless PostgreSQL                |
 | Redis           | Railway       | Internal network                     |
 | Storage         | Cloudflare R2 | Public bucket via `*.r2.dev`         |
@@ -284,7 +287,11 @@ After init, `npx neonctl@latest projects list`, `npx neonctl@latest branches cre
 - **Admin (`app.forcemediakw.com`)** — uses the unified Force operator brand: orange `#FF6E00` tile + white "FSA" (Force Store Admin) wordmark, shared favicon template with [Force Media CRM](https://github.com/ForceAI-KW/Force-Media-CRM) and [WhatsApp Bulk Sender](https://github.com/ForceAI-KW/whatsapp-broadcaster). Sources: `apps/admin/public/favicon.svg`, generator at `apps/admin/scripts/generate-pwa-icons.mjs`, dynamic manifest at `apps/admin/src/app/manifest.ts`.
 - **Storefront (`store.forcemediakw.com`)** — **per-tenant branding**: each merchant's logo, theme color, and PWA name flow through `apps/web/src/app/manifest.ts` (dynamic, host-resolved) backed by `apps/api/src/services/pwa.service.ts::generateManifest`. Today supports 192 + 512 icons per store; the plan to extend to the full 6-size set via single-source upload + sharp auto-generation lives at `docs/superpowers/plans/2026-05-04-storefront-per-store-pwa-full-sizes.md`.
 
-See also `docs/superpowers/plans/2026-05-04-cost-reduction.md` — Phase 1 urgent: Google AI cap (env-var daily/monthly limits) + Neon compute reduction (FWB project at 97% of free CU-hr cap as of 2026-05-04).
+See also:
+
+- `docs/SCALING.md` — Railway replica readiness, Redis adapter, cron leader-election
+- `docs/business/` — business docs: feature catalog, pricing framework, competitive positioning, pitch deck, FAQ
+- `docs/superpowers/plans/2026-05-04-cost-reduction.md` — Google AI cap (env-var daily/monthly limits) + Neon compute reduction notes
 
 ## License
 

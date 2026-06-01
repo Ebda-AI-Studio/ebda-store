@@ -6,18 +6,20 @@
 
 ## Getting started
 
-### How quickly can I launch my store?
+### How do I get started with Force Store?
 
-**4 hours, end-to-end**, if you have your products + images ready:
+Force Store is a **managed e-commerce service** — there is no self-serve signup. Every client goes through a custom proposal and onboarding process:
 
-1. **15 min** — sign up + pick a theme (5 themes available, all configurable)
-2. **30 min** — set your store name, logo, brand colors, contact info
-3. **2 hours** — import products via CSV OR add them manually with our AI-assist (auto-translate, auto-SEO, auto-categorize)
-4. **30 min** — configure your KNET payment provider (Tap, MyFatoorah, Hesabe, or UPayments) using credentials they provide you
-5. **15 min** — connect your custom domain (e.g. yourshop.com) — automated through our setup wizard
-6. **30 min** — final visual polish + test order
-
-Then you're live. Most merchants we've onboarded are taking real orders the same day.
+1. **Request a proposal** — contact us at [hello@forcemediakw.com](mailto:hello@forcemediakw.com) or via WhatsApp. We'll schedule a 30-minute call to understand your needs.
+2. **Receive and sign a custom proposal** — we send a written proposal within 2-3 business days covering setup fee, monthly fee, and the feature set tailored to your business.
+3. **Onboarding begins** — once you sign and pay the deposit, we handle:
+   - Store provisioning and theme configuration
+   - Brand setup (logo, colors, fonts, hero images)
+   - Catalog import (your Excel/CSV → Force Store products, bilingual)
+   - Payment provider setup (Tap/MyFatoorah/Hesabe/UPayments account connection)
+   - Custom domain provisioning
+   - 1-hour live training session
+4. **Store goes live** — typically 2-4 weeks from contract signing to live store, depending on catalog size and brand readiness.
 
 ### Do I need to be technical?
 
@@ -175,7 +177,10 @@ Probably. The full feature catalog is in [02-feature-catalog.md](02-feature-cata
 - ✅ **Customer reviews** — yes, verified-purchase, with AI spam detection + auto-translation
 - ✅ **Discount codes / coupons** — yes
 - ✅ **Loyalty program** — yes, on Professional+
-- ✅ **Affiliate program** — yes, on Professional+
+- ✅ **Affiliate program** — yes, on Enterprise+
+- ✅ **Product discounts** — yes, per-product discount dropdown (None / Percentage / Fixed KWD) with live price preview; all plans
+- ✅ **Accounting (Chart of Accounts, journal, P&L)** — yes, on Professional+ (basic); advanced features — tax reports, multi-currency, profit anomaly, bank reconcile — on Enterprise+
+- ✅ **Blog** — yes, fully built; blog posts are managed from Admin → Blog and appear in a carousel on the homepage when blog is enabled
 - ✅ **Email marketing** — basic transactional emails yes; campaign builder is on our roadmap
 - ✅ **PWA (installable as app)** — yes
 - ⚠️ **Subscriptions / recurring billing** — not yet
@@ -283,10 +288,11 @@ These are great for static brochure sites but weak for transactional e-commerce 
 
 ### Do you offer onboarding help?
 
-- **Free tier:** docs + email only
-- **Starter:** docs + email + WhatsApp
-- **Professional:** dedicated onboarding call (1 hour, includes catalog migration walkthrough)
-- **Enterprise:** white-glove migration done by our team — you provide the data, we build the store
+Yes — all Force Store clients receive a managed onboarding. The depth scales with contract level:
+
+- **Starter contracts:** docs + email + WhatsApp support; onboarding call included
+- **Professional contracts:** dedicated onboarding call (1 hour, includes catalog migration walkthrough)
+- **Enterprise contracts:** white-glove migration done by our team — you provide the data, we build the store
 
 ### Is there a community / Discord / forum?
 

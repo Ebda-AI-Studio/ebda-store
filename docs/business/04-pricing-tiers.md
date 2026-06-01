@@ -1,6 +1,6 @@
 # Force Store — Proposal Pricing Framework
 
-**Internal document. Last updated: 2026-05-22. Owner: Ahmad Sharaf / Force AI.**
+**Internal document. Last updated: 2026-06-01. Owner: Ahmad Sharaf / Force AI.**
 
 > **There is no public tier list.** Force Store is sold as a **managed e-commerce platform** by Force AI / Force Media. Every client gets a **custom proposal** based on the features they need. Pricing is per-client, not per-tier. This doc holds the inputs you need to write good proposals — cost floors, feature value bands, competitor benchmarks.
 
@@ -66,31 +66,48 @@ What it costs YOU per merchant per month on infrastructure:
 
 **Use this to:** anchor against the competitor the client cites. Most Kuwait merchants compare against Shopify or are evaluating "do I just hire a developer for WooCommerce?" — the agency-managed Force Store sells against both.
 
-### 2c. Feature value bands (what to charge for each feature group in a proposal)
+### 2c. Plan tiers and feature value bands (what to charge for each feature group in a proposal)
 
-The 22-feature `FEATURE_REGISTRY` in `packages/shared/src/features.ts` falls into 4 value bands when building a custom proposal:
+The Force Store plan system defines four tiers — `free` (grace/lapsed state only, not sold), `starter`, `professional`, `enterprise`. The source of truth is `packages/shared/src/plan-baselines.ts`. When building a proposal, use the tier as the starting point, then layer add-ons and white-glove services on top.
 
-#### Band 1 — Always included (always on, no upcharge)
+#### Starter plan — baseline features (always included for any paying client)
 
-- `coupons`, `returns`, `reviews`, `inventory`, `tax`, `pwa`, `seo`, `search_autocomplete`, `marketing_pixels`, `shipping_carriers`, `bulk_operations`, `abandoned_cart`
+`coupons`, `returns`, `reviews`, `tax`, `pwa`, `marketing_pixels`, `shipping_carriers`, `bulk_operations`, `abandoned_cart`, `inventory.basic`
 
-These are platform-default. Every Force Store client gets them. Don't bother itemizing in a proposal — they're table stakes.
+These are table stakes. Every Force Store client gets them. Don't itemize in a proposal — bundle into the platform fee.
 
-#### Band 2 — Premium add-ons (charge separately)
+Also included in every tier at no extra charge:
 
-| Feature              | Value framing                                                                                                        | Recommended proposal price band                         |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `loyalty`            | "Customer loyalty program — points, tiers, rewards"                                                                  | Setup: 100-300 KWD + Monthly: 5-15 KWD                  |
-| `affiliate`          | "Run an affiliate program — let influencers earn % per sale"                                                         | Setup: 100-200 KWD + Monthly: 5-10 KWD                  |
-| `whatsapp`           | "WhatsApp integration: order notifications (4 templates) + customer DM ordering bot + bot analytics + payment links" | Setup: 150-300 KWD + Monthly: 10-25 KWD                 |
-| `sms`                | "Order updates via SMS (Kuwait carriers)"                                                                            | Setup: 50-150 KWD + Monthly: 3-10 KWD + SMS-per-message |
-| `push_notifications` | "Web push to opt-in customers"                                                                                       | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
-| `upsell_crosssell`   | "AI-driven product recommendations + bundles"                                                                        | Setup: 50-100 KWD + Monthly: 3-10 KWD                   |
-| `floating_widget`    | "Sticky WhatsApp/Instagram/music button"                                                                             | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
+- **Product discount engine** — per-product discount dropdown (None / Percentage % / Fixed KWD) with live price preview; replaces manual compare-at-price entry
+- **AI features** — translation, SEO, AEO, category suggestion, FAQ/How-To, review tools, reorder/dead-stock AI (Gemini; platform absorbs cost)
+- **Page Builder** — drag-and-drop sections; Navigation, Footer, and Category config all consolidated here
 
-> **Bot intelligence is included in the `whatsapp` feature at no extra charge.** The natural-language AI (intent classification, voice transcription, product photo matching, returning-customer personalization) runs on the Google Gemini free tier — there is no per-conversation or per-LLM-call cost passed to merchants. Same holds for all other AI features (translation, SEO, category suggestion): the platform absorbs the Gemini free-tier cost.
+#### Professional plan — Starter + the following
 
-These are the **upgrade levers** during a proposal conversation. A merchant wanting WhatsApp + Loyalty + Affiliate adds ~250-500 KWD setup + ~13-35 KWD/month to the base.
+| Feature group                                                       | What to say in the proposal                                                  | Incremental price band vs Starter      |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------- |
+| `loyalty`                                                           | "Customer loyalty program — points, tiers, rewards"                          | Setup: 100-300 KWD + Monthly: 5-15 KWD |
+| `push_notifications`                                                | "Web push to opt-in customers"                                               | Setup: 50-100 KWD + Monthly: 2-8 KWD   |
+| `upsell_crosssell`                                                  | "AI-driven product recommendations + bundles"                                | Setup: 50-100 KWD + Monthly: 3-10 KWD  |
+| `inventory.stock_alerts`                                            | "Auto-email when stock drops below your threshold"                           | Included in Professional               |
+| `inventory.backorder`                                               | "Accept orders for out-of-stock products, queue for fulfillment"             | Included in Professional               |
+| `accounting.basic` + `accounting.expenses` + `accounting.invoicing` | "Full Chart of Accounts, journal, P&L, expenses, Kuwait-compliant invoicing" | Included in Professional               |
+
+#### Enterprise plan — Professional + the following
+
+| Feature group                                                                                                   | What to say in the proposal                                                       | Incremental price band vs Professional                  |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `affiliate`                                                                                                     | "Affiliate program — let influencers earn % per sale, track commissions"          | Setup: 100-200 KWD + Monthly: 5-10 KWD                  |
+| `sms`                                                                                                           | "Order updates via SMS (Kuwait carriers)"                                         | Setup: 50-150 KWD + Monthly: 3-10 KWD + SMS-per-message |
+| `floating_widget`                                                                                               | "Sticky WhatsApp/Instagram/music button on every storefront page"                 | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
+| `inventory.multi_warehouse`, `inventory.barcode`, `inventory.purchase_orders`, `inventory.bulk_adjustments`     | "Full warehouse management, barcode scanning, purchase order workflow"            | Included in Enterprise                                  |
+| `accounting.tax_reports`, `accounting.multi_currency`, `accounting.profit_anomaly`, `accounting.bank_reconcile` | "Advanced accounting: tax reports, multi-currency, profit anomaly AI, bank recon" | Included in Enterprise                                  |
+
+> **`whatsapp` is a separate add-on at any plan tier.** It requires an active Force WhatsApp Business Platform account. Price: Setup 150-300 KWD + Monthly 10-25 KWD. Bot intelligence (Gemini NLU, voice, photo matching, returning-customer personalization) is included in the WhatsApp add-on at no extra charge — the platform absorbs the Gemini free-tier cost.
+
+> **`whatsapp` can be added to any Starter, Professional, or Enterprise client.** It is not baseline-included in any plan; it always requires a per-store activation step.
+
+These are the **upgrade levers** during a proposal conversation. A merchant on Professional wanting WhatsApp + Affiliate (Enterprise) adds ~250-500 KWD setup + ~15-35 KWD/month to the base.
 
 #### Band 3 — White-glove services (your time, billed at agency rates)
 
@@ -242,7 +259,7 @@ Before sending a proposal:
 ## 6. Operational discipline (what you do after the client pays)
 
 1. **Generate the store** — use the super_admin store-creation flow
-2. **Pick a plan tier** — set `Store.plan` to `free` / `starter` / `professional` / `enterprise`. The plan-baseline resolver (see `packages/shared/src/plan-baselines.ts`) automatically enables every feature included in that tier — no manual `StoreFeature` row creation needed for baseline features.
+2. **Pick a plan tier** — set `Store.plan` to `starter` / `professional` / `enterprise` (use `free` only for the grace/lapsed state — it is not a sold tier). The plan-baseline resolver (see `packages/shared/src/plan-baselines.ts`) automatically enables every feature included in that tier — no manual `StoreFeature` row creation needed for baseline features. The upgrade-marketing gate will show an on-brand upsell page to merchants who try to access a feature above their plan.
 3. **Layer overrides only for hybrid deals** — only flip `StoreFeature` rows for features OUTSIDE the chosen plan's baseline (e.g. a starter client who paid for the `whatsapp_bot` add-on). Plan changes never touch override rows, so upgrading or downgrading the store doesn't lose merchant-paid extras.
 4. **Configure payment provider** — set up Tap/MyFatoorah/Hesabe/UPayments credentials per the client's account
 5. **Provision Meta Commerce catalog** — if the client paid for the WhatsApp Native Catalog Bot, click **Provision automatically** in Admin → WhatsApp Bot → MetaCatalogCard. No Meta Business Manager steps required from the client.
