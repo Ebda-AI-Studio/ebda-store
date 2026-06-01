@@ -29,11 +29,12 @@ import {
 // ─── Contact constant ─────────────────────────────────────────────────────────
 
 /**
- * TODO(ahmad): set the real Force AI sales WhatsApp number here.
+ * Force AI sales WhatsApp — same number used on the storefront platform
+ * landing page (apps/web PlatformLanding.tsx: +965 66740311).
  * Format: wa.me/<international-number-without-plus>
  * The message is pre-filled with the store ID and feature name.
  */
-const UPGRADE_CONTACT_BASE = 'https://wa.me/96500000000';
+const UPGRADE_CONTACT_BASE = 'https://wa.me/96566740311';
 
 function buildWhatsAppLink(storeId: string, featureName: string): string {
   const message = `I'd like to upgrade my store (${storeId}) to unlock "${featureName}".`;
