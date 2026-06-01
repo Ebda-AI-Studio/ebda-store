@@ -406,6 +406,20 @@ jobs:
           npm audit --audit-level=high --omit=dev
           echo "::endgroup::"
 
+      - name: Ensure jq (trufflehog needs it; self-hosted runner may lack it + can't sudo)
+        run: |
+          if command -v jq >/dev/null 2>&1; then
+            echo "jq present: $(jq --version)"
+          else
+            echo "jq missing — installing a static binary to a runner-owned PATH dir (no sudo)"
+            mkdir -p "$HOME/.local/bin"
+            curl -fsSL -o "$HOME/.local/bin/jq" \
+              https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+            chmod +x "$HOME/.local/bin/jq"
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+            "$HOME/.local/bin/jq" --version
+          fi
+
       - name: Check for secrets
         uses: trufflesecurity/trufflehog@main
         with:
