@@ -369,10 +369,16 @@ router.get(
 // Public Routes — NO auth required
 // ==========================================
 
-// POST /public/:storeId/push/subscribe
-// Register a push subscription (anonymous users can subscribe)
+// POST /:storeId/push/subscribe
+// Register a push subscription (anonymous users can subscribe).
+//
+// This router is mounted at BOTH /stores (admin) and /public (public).
+// The admin routes above use paths like /:storeId/notifications/…
+// The public push routes below use /:storeId/push/… (no extra /public
+// prefix) so that when mounted at /public, the full URL resolves to
+// /public/:storeId/push/subscribe — matching what the storefront sends.
 router.post(
-  '/public/:storeId/push/subscribe',
+  '/:storeId/push/subscribe',
   requireFeature('push_notifications'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -402,10 +408,10 @@ router.post(
   }
 );
 
-// POST /public/:storeId/push/unsubscribe
+// POST /:storeId/push/unsubscribe
 // Remove a push subscription
 router.post(
-  '/public/:storeId/push/unsubscribe',
+  '/:storeId/push/unsubscribe',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { endpoint } = pushUnsubscribeSchema.parse(req.body);
