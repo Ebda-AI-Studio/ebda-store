@@ -973,6 +973,12 @@ export class AuthService {
       issuer: 'force-api',
       audience: 'force-app',
       subject: payload.userId,
+      // Unique token id. Without it, two refresh tokens minted for the same
+      // user in the same second (login immediately followed by a refresh, or a
+      // fast client) produce a byte-identical JWT -> identical SHA-256 hash ->
+      // duplicate key on refresh_tokens.token (P2002) -> 500. The jti nonce
+      // guarantees every issued token is distinct regardless of timing.
+      jwtid: crypto.randomUUID(),
     });
 
     // Store hashed refresh token in database. The DB row expiry must
