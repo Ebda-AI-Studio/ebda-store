@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { createElement, type ReactNode } from 'react';
+import { useParams } from 'next/navigation';
 import { useFeatures } from './useFeatures';
 import { useAuth } from '../lib/auth';
+import { FeatureUpgradeGate } from '../components/FeatureUpgradeGate';
 
 /**
  * Page-level guard for feature-gated store-admin routes.
@@ -14,38 +15,55 @@ import { useAuth } from '../lib/auth';
  * 1. Reads the feature toggle from `useFeatures()` (which is itself wired
  *    to the per-role endpoint — store_admin sees `/stores/:id/my-features`).
  * 2. Once the toggle has resolved (no longer loading), if the feature is
- *    disabled it redirects to the store dashboard.
+ *    disabled for a store_admin, `gate` will be a <FeatureUpgradeGate>
+ *    marketing element. Each page renders `if (gate) return gate;` after all
+ *    its own hooks so the user sees a polished upsell instead of a silent
+ *    redirect.
  *
- * Use as the first hook in a page component:
+ * Super-admin behavior is unchanged: they always see the real page so they
+ * can configure the feature. They never receive the gate.
  *
- *   useRequireFeature('coupons');
+ * Usage pattern (place AFTER all hooks in the page component):
  *
- * The hook returns the resolved `isEnabled` state in case the page wants
- * to render a placeholder during the redirect frame.
+ *   const { enabled, isLoading, gate } = useRequireFeature('coupons');
+ *   // ... other hooks (useState, useEffect, etc.) ...
+ *   if (gate) return gate;   ← after all hooks
+ *   return <AdminLayout ...>;
+ *
+ * The hook still returns `enabled` and `isLoading` so pages can use them
+ * for their own loading spinners and logic.
  */
 export function useRequireFeature(featureKey: string): {
   enabled: boolean;
   isLoading: boolean;
+  /**
+   * Non-null when the current store_admin does not have access to this
+   * feature. Pages should do `if (gate) return gate;` AFTER all their own
+   * hooks and just before the main JSX return. Null while loading (no
+   * flash) and null for super_admin (always passes through).
+   */
+  gate: ReactNode | null;
 } {
   const params = useParams();
   const storeId = params?.id as string | undefined;
-  const router = useRouter();
   const { isEnabled, isLoading } = useFeatures();
   const { user } = useAuth();
 
   const enabled = isEnabled(featureKey);
 
-  useEffect(() => {
-    if (isLoading) return;
-    if (enabled) return;
-    if (!storeId) return;
-    // Super admin always gets through — they're the one who flips the
-    // feature on, so redirecting them away from a disabled feature
-    // editor would prevent them from ever enabling it. Store admins
-    // still get bounced back to the dashboard.
-    if (user?.role === 'super_admin') return;
-    router.replace(`/stores/${storeId}`);
-  }, [enabled, isLoading, storeId, router, user?.role]);
+  // Super admin always passes through — they configure features, so bouncing
+  // them away from a disabled feature page would prevent them from enabling it.
+  const isSuperAdmin = user?.role === 'super_admin';
 
-  return { enabled, isLoading };
+  // Show nothing (null gate) while features are still loading to avoid
+  // flashing the upsell card for a frame before the real content appears.
+  const showGate = !isLoading && !enabled && !isSuperAdmin && !!storeId;
+
+  // Use createElement so this .ts file (no JSX transform) can return a React
+  // element without needing the .tsx extension.
+  const gate: ReactNode | null = showGate
+    ? createElement(FeatureUpgradeGate, { featureKey, storeId: storeId! })
+    : null;
+
+  return { enabled, isLoading, gate };
 }

@@ -22,8 +22,9 @@ import {
 } from './_components/types';
 
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+
 export default function LoyaltySettingsPage() {
-  useRequireFeature('loyalty');
+  const { gate } = useRequireFeature('loyalty');
 
   const params = useParams();
   const storeId = params.id as string;
@@ -183,6 +184,8 @@ export default function LoyaltySettingsPage() {
 
   const updateSettings = (patch: Partial<LoyaltySettings>) =>
     setSettings(prev => ({ ...prev, ...patch }));
+
+  if (gate) return gate;
 
   return (
     <AdminLayout

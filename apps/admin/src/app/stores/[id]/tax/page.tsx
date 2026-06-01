@@ -19,10 +19,9 @@ import {
 } from './_components/types';
 
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+
 export default function TaxSettingsPage() {
-  // Hide this page when the super_admin disabled the tax feature for
-  // this store. The hook redirects to the store dashboard if disabled.
-  useRequireFeature('tax');
+  const { gate } = useRequireFeature('tax');
 
   const params = useParams();
   const storeId = params.id as string;
@@ -194,6 +193,8 @@ export default function TaxSettingsPage() {
   };
 
   const updateForm = (patch: Partial<RateFormData>) => setFormData(prev => ({ ...prev, ...patch }));
+
+  if (gate) return gate;
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>

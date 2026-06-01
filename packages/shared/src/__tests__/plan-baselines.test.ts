@@ -5,6 +5,7 @@ import {
   PLAN_LABELS,
   getBaselineFeatures,
   isInBaseline,
+  lowestPlanForFeature,
   type StorePlan,
 } from '../plan-baselines';
 import { FEATURE_REGISTRY, type FeatureKey } from '../features';
@@ -134,6 +135,45 @@ describe('PLAN_LABELS', () => {
     for (const plan of STORE_PLANS) {
       expect(PLAN_LABELS[plan].ar.trim().length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('lowestPlanForFeature', () => {
+  // coupons is in free baseline (also starter, professional, enterprise)
+  it('returns "free" for coupons (first plan that includes it)', () => {
+    expect(lowestPlanForFeature('coupons')).toBe('free');
+  });
+
+  // loyalty is first introduced in PROFESSIONAL_ADDITIONS
+  it('returns "professional" for loyalty', () => {
+    expect(lowestPlanForFeature('loyalty')).toBe('professional');
+  });
+
+  // affiliate is first introduced in ENTERPRISE_ADDITIONS
+  it('returns "enterprise" for affiliate', () => {
+    expect(lowestPlanForFeature('affiliate')).toBe('enterprise');
+  });
+
+  // inventory.basic is in STARTER_CORE (and also free baseline)
+  it('returns "free" for inventory.basic (present in free baseline)', () => {
+    // free baseline has inventory.basic per plan-baselines.ts
+    expect(lowestPlanForFeature('inventory.basic')).toBe('free');
+  });
+
+  // inventory.stock_alerts is in PROFESSIONAL_ADDITIONS only
+  it('returns "professional" for inventory.stock_alerts', () => {
+    expect(lowestPlanForFeature('inventory.stock_alerts')).toBe('professional');
+  });
+
+  // abandoned_cart is in STARTER_CORE
+  it('returns "starter" for abandoned_cart', () => {
+    expect(lowestPlanForFeature('abandoned_cart')).toBe('starter');
+  });
+
+  // A feature not in any baseline — use customer_wallet which is hidden/experimental
+  // and intentionally absent from every plan baseline.
+  it('returns null for a feature not in any plan baseline (customer_wallet)', () => {
+    expect(lowestPlanForFeature('customer_wallet')).toBe(null);
   });
 });
 

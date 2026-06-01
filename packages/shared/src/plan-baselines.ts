@@ -109,6 +109,21 @@ export function getBaselineFeatures(plan: StorePlan): FeatureKey[] {
   return [...PLAN_BASELINE[plan]];
 }
 
+/**
+ * Returns the lowest plan (in STORE_PLANS ascending order) whose baseline
+ * includes `key`, or null if no plan baseline covers the feature.
+ *
+ * Used by the upgrade-marketing gate to show "Available on the X plan and above."
+ */
+export function lowestPlanForFeature(key: FeatureKey): StorePlan | null {
+  for (const plan of STORE_PLANS) {
+    if (PLAN_BASELINE[plan].includes(key)) {
+      return plan;
+    }
+  }
+  return null;
+}
+
 /** Convenience: is `key` in the baseline for `plan`? */
 export function isInBaseline(plan: StorePlan, key: FeatureKey): boolean {
   return PLAN_BASELINE[plan].includes(key);

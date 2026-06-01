@@ -91,7 +91,7 @@ function PointsCell({ points }: { points: number }) {
 }
 
 export default function LoyaltyTransactionsPage() {
-  useRequireFeature('loyalty');
+  const { gate } = useRequireFeature('loyalty');
 
   const params = useParams();
   const storeId = params?.id as string;
@@ -146,6 +146,8 @@ export default function LoyaltyTransactionsPage() {
     setPage(1);
     fetchTransactions();
   };
+
+  if (gate) return gate;
 
   return (
     <AdminLayout

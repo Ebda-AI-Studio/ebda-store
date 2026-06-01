@@ -41,9 +41,7 @@ interface AffiliatesEnvelope {
 }
 
 export default function AffiliatesPage() {
-  // Hide this page when the super_admin disabled the affiliate feature for
-  // this store. The hook redirects to the store dashboard if disabled.
-  useRequireFeature('affiliate');
+  const { gate } = useRequireFeature('affiliate');
 
   const params = useParams();
   const storeId = params?.id as string;
@@ -271,6 +269,8 @@ export default function AffiliatesPage() {
       a => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
     );
   }, [affiliates, search]);
+
+  if (gate) return gate;
 
   return (
     <AdminLayout

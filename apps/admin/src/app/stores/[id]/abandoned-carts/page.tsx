@@ -11,9 +11,7 @@ import { useAbandonedCarts } from './_hooks/useAbandonedCarts';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 export default function AbandonedCartsPage() {
-  // Hide this page when the super_admin disabled the abandoned_cart feature for
-  // this store. The hook redirects to the store dashboard if disabled.
-  useRequireFeature('abandoned_cart');
+  const { gate } = useRequireFeature('abandoned_cart');
 
   const params = useParams();
   const storeId = params?.id as string;
@@ -41,6 +39,8 @@ export default function AbandonedCartsPage() {
     storeId,
     enabled: featureEnabled,
   });
+
+  if (gate) return gate;
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>

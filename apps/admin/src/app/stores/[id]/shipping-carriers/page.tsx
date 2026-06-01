@@ -31,9 +31,7 @@ const CARRIER_NAME_KEYS: Record<CarrierKey, string> = {
 };
 
 export default function ShippingCarriersPage() {
-  // Hide this page when the super_admin disabled the shipping_carriers feature for
-  // this store. The hook redirects to the store dashboard if disabled.
-  useRequireFeature('shipping_carriers');
+  const { gate } = useRequireFeature('shipping_carriers');
 
   const params = useParams();
   const storeId = params.id as string;
@@ -290,6 +288,8 @@ export default function ShippingCarriersPage() {
   const shipmentsPages = Math.max(1, Math.ceil(shipmentsTotal / shipmentsLimit));
 
   // ─── Render ─────────────────────────────────────────────────────────────────
+
+  if (gate) return gate;
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>
