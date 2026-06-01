@@ -196,7 +196,28 @@ export default function StoreSettingsPage() {
      *
      * SEO stays in Settings since it's meta-tags + structured data, distinct
      * from page-builder's typography zones.
+     *
+     * Announcement card RE-ADDED 2026-06-01 (P1-B nav-wire fix). The page
+     * edits live content (text + colors) that merchants need to reach without
+     * knowing the /announcement URL directly. Settings card is the lowest-risk
+     * re-entry point matching the existing card shape; the sidebar already
+     * lights up via the /announcement urlPrefix added to the Settings hub.
      */
+    {
+      key: 'announcement',
+      href: `/stores/${storeId}/announcement`,
+      color: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"
+          />
+        </svg>
+      ),
+    },
     {
       key: 'categories',
       href: `/stores/${storeId}/categories`,
