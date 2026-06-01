@@ -15,9 +15,7 @@ import { usePwaSettings } from './_hooks/usePwaSettings';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 export default function PWASettingsPage() {
-  // Hide this page when the super_admin disabled the pwa feature for
-  // this store. The hook redirects to the store dashboard if disabled.
-  useRequireFeature('pwa');
+  const { gate } = useRequireFeature('pwa');
 
   const params = useParams();
   const storeId = params.id as string;
@@ -49,6 +47,8 @@ export default function PWASettingsPage() {
   const handlePopulate = () => {
     populateFromStore(tMessages('populated'));
   };
+
+  if (gate) return gate;
 
   return (
     <AdminLayout

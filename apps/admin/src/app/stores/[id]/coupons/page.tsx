@@ -14,7 +14,7 @@ import { useCoupons } from './_hooks/useCoupons';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 export default function CouponsPage() {
-  useRequireFeature('coupons');
+  const { gate } = useRequireFeature('coupons');
 
   const params = useParams();
   const storeId = params?.id as string;
@@ -99,6 +99,8 @@ export default function CouponsPage() {
       </div>
     );
   }
+
+  if (gate) return gate;
 
   return (
     <AdminLayout

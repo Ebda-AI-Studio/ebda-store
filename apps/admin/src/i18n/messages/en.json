@@ -4295,5 +4295,12 @@
       "heading": "Storefront Navigation",
       "description": "Add, remove, and reorder the links that appear in your storefront header menu. Use relative paths (/products) for store pages or full URLs for external links."
     }
+  },
+  "featureUpgrade": {
+    "lockedBadge": "Locked",
+    "availableOn": "Available on the {plan} plan and above.",
+    "upgradeCta": "Upgrade to {plan}",
+    "contactCta": "Talk to us",
+    "alsoIncluded": "Also included in this plan"
   }
 }

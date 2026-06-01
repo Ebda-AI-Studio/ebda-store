@@ -17,9 +17,7 @@ import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 type StringResolver = (value: string | null) => void;
 
 export default function ReturnsPage() {
-  // Hide this page when the super_admin disabled the returns feature for
-  // this store. The hook redirects to the store dashboard if disabled.
-  useRequireFeature('returns');
+  const { gate } = useRequireFeature('returns');
 
   const params = useParams();
   const storeId = params?.id as string;
@@ -114,6 +112,8 @@ export default function ReturnsPage() {
     const ok = await complete(id);
     if (ok) closeDetails();
   };
+
+  if (gate) return gate;
 
   return (
     <AdminLayout title={tPage('title')} subtitle={tPage('subtitle')}>

@@ -11,9 +11,7 @@ import { useMarketingPixels } from './_hooks/useMarketingPixels';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 export default function MarketingPixelsPage() {
-  // Hide this page when the super_admin disabled the marketing_pixels feature for
-  // this store. The hook redirects to the store dashboard if disabled.
-  useRequireFeature('marketing_pixels');
+  const { gate } = useRequireFeature('marketing_pixels');
 
   const params = useParams();
   const storeId = params?.id as string;
@@ -30,6 +28,8 @@ export default function MarketingPixelsPage() {
       </div>
     );
   }
+
+  if (gate) return gate;
 
   if (!store) {
     return (
