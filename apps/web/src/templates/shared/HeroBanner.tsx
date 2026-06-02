@@ -38,18 +38,23 @@ export function HeroBanner({
   // Mobile-specific source falls back to the desktop image when not set.
   const dedicatedMobileSrc = (isRtl && imageMobileAr) || imageMobile;
   const mobileSrc = dedicatedMobileSrc || desktopSrc;
-  // Mobile hero aspect: 4:3 LANDSCAPE — Ahmad 2026-05-21 directive
-  // "we need a size better than this, mobile hero banner is very small".
-  // Previous 1920/700 (2.74:1) rendered at ~142px on a 390px phone (18%
-  // viewport) — billboard-shaped, too short to read as a proper hero.
-  // 4:3 lands at ~292px (37% viewport) which matches the 50-70vh hero-
-  // section comfort zone industry sources recommend. Still horizontal
-  // (honors the 2026-05-18 "no portrait" directive); just taller.
-  // Merchant sources at the legacy 1920/700 aspect get a blurred
-  // letterbox extension server-side (scripts/rescale-hero-to-4-3.mjs)
-  // so existing content shows uncropped centered with blurred bands
-  // top + bottom filling the new container height.
-  const mobileAspectClass = 'aspect-[4/3]';
+  // Mobile hero aspect: 16:9 LANDSCAPE with a 45vh ceiling.
+  // - 16:9 on 390px phone → 219px (28% of 780px viewport): visible hero
+  //   without consuming the whole screen, so categories below are
+  //   immediately reachable without scrolling past the fold.
+  // - max-h-[45vh] caps the banner on larger phones/tablets where 16:9
+  //   would otherwise push 400-500px, burying categories below the fold.
+  // Previously aspect-[4/3] with no height cap: 390×(3/4)=293px on
+  // small phones = fine, but on a 768px-wide tablet or in landscape it
+  // grew to 576px (tablet) or ~420px (landscape phone) — enough to push
+  // the categories heading below the visible area. The 16:9+45vh combo
+  // matches industry e-commerce norms (Shopify, Woo, Amazon mobile).
+  // Desktop (sm: 640px+) keeps the canonical 1920×700 (2.74:1) aspect
+  // for a full-bleed cinematic banner — unchanged from prior behaviour.
+  // Recommended upload size: 1200×675 (16:9) for mobile-first images;
+  // 1920×700 for desktop hero banners that also need to crop to 16:9 on
+  // mobile (they will center-crop cleanly via object-cover).
+  const mobileAspectClass = 'aspect-[16/9] max-h-[45vh]';
   const text = isRtl ? (headlineAr ?? headline) : (headline ?? headlineAr);
   const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
   const cta = isRtl ? (ctaTextAr ?? ctaText) : (ctaText ?? ctaTextAr);

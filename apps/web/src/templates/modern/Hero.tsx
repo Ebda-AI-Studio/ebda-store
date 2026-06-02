@@ -82,7 +82,7 @@ export default function ModernHero({
     <section className="relative overflow-hidden bg-background">
       <div className="container mx-auto px-4">
         <div
-          className={`grid lg:grid-cols-2 gap-8 lg:gap-14 items-center min-h-[560px] py-16 sm:py-20 lg:py-28 ${isRtl ? 'direction-rtl' : ''}`}
+          className={`grid lg:grid-cols-2 gap-8 lg:gap-14 items-center min-h-[44vh] sm:min-h-[560px] py-12 sm:py-20 lg:py-28 ${isRtl ? 'direction-rtl' : ''}`}
         >
           {/* Content */}
           <div

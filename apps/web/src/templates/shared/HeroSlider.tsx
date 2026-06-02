@@ -76,12 +76,15 @@ export function HeroSlider({
     );
   }
 
-  // Mobile hero is always LANDSCAPE — Ahmad 2026-05-18 directive (see
-  // HeroBanner.tsx for the full rationale). Carousel container aspect
-  // matches the canonical 1920×700 desktop hero on both breakpoints.
-  // Dedicated mobile images are still honored as sources but render in
-  // the same landscape container.
-  const mobileAspectClass = 'aspect-[1920/700]';
+  // Mobile hero aspect: 16:9 with a 45vh ceiling so the banner never
+  // consumes the full viewport and buries the categories section below.
+  // On a 390px phone: 390×(9/16)=219px; capped at 45vh≈380px on tall
+  // phones. Desktop uses the canonical 1920×700 (2.74:1) full-bleed.
+  // Previously was 'aspect-[1920/700]' on BOTH breakpoints — that
+  // rendered the mobile slider at only ~142px (too short, barely visible
+  // as a hero) AND matched the desktop ratio so the transition looked
+  // broken. Fix: use 16:9 + max-h-[45vh] on mobile, 1920/700 on sm+.
+  const mobileAspectClass = 'aspect-[16/9] max-h-[45vh]';
 
   // Touch swipe — 40px threshold, RTL-aware direction.
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -102,7 +105,7 @@ export function HeroSlider({
 
   return (
     <section
-      className="relative w-full"
+      className="relative w-full overflow-hidden"
       onMouseEnter={() => (pausedRef.current = true)}
       onMouseLeave={() => (pausedRef.current = false)}
       onFocus={() => (pausedRef.current = true)}

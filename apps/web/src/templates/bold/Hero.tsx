@@ -28,7 +28,7 @@ export default function BoldHero({
 
   return (
     <section
-      className="relative min-h-[640px] sm:min-h-[720px] md:min-h-screen bg-gray-950 overflow-hidden"
+      className="relative min-h-[50vh] sm:min-h-[640px] md:min-h-screen bg-gray-950 overflow-hidden"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* Full-screen hero image with dark overlay */}
@@ -67,7 +67,7 @@ export default function BoldHero({
       )}
 
       {/* Content */}
-      <div className="relative z-10 container mx-auto px-4 min-h-[640px] sm:min-h-[720px] md:min-h-screen flex flex-col justify-center py-16 sm:py-20 md:py-24">
+      <div className="relative z-10 container mx-auto px-4 min-h-[50vh] sm:min-h-[640px] md:min-h-screen flex flex-col justify-center py-16 sm:py-20 md:py-24">
         <div
           className={`max-w-3xl motion-reduce:animate-none ${isRtl ? 'mr-auto ml-0 text-right' : 'ml-0 text-left'}`}
           style={{ animation: 'boldSlideIn 0.6s ease-out both' }}
