@@ -291,7 +291,16 @@ router.put(
 
 /**
  * GET /admin/users
- * List all users
+ * List platform users (super_admin + store_admin only).
+ *
+ * Customers are store-scoped (storeId != null) and are managed via the
+ * separate GET /admin/customers endpoint. This page is intentionally
+ * platform-only: it shows only users with storeId = null (i.e. admin
+ * accounts that sit in the global namespace).
+ *
+ * If a caller passes ?role=customer the storeId=null filter still applies
+ * so the result is always empty — customers will never appear here regardless
+ * of the role filter passed.
  */
 router.get(
   '/users',
@@ -301,7 +310,9 @@ router.get(
       const { page: pageStr, limit: limitStr, role, search } = req.query;
       const { page, limit, skip } = parsePagination(pageStr, limitStr);
 
-      const where: Prisma.UserWhereInput = {};
+      // Platform users have storeId = null. Customers are store-scoped and
+      // must be managed via GET /admin/customers, not this endpoint.
+      const where: Prisma.UserWhereInput = { storeId: null };
       if (role && role !== 'all') where.role = role as UserRole;
       if (search) {
         where.OR = [

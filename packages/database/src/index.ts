@@ -246,7 +246,17 @@ export async function withTenantContext<T>(
 export async function withRlsBypass<T>(fn: (tx: TenantTx) => Promise<T>): Promise<T> {
   return basePrisma.$transaction(
     async tx => {
+      // 1. app.bypass_rls = 'true': honoured by new-style RLS policies
+      //    (accounting tables + tables updated in 20260602000000_fix_ai_usage_rls_bypass).
       await tx.$executeRaw`SET LOCAL app.bypass_rls = 'true'`;
+      // 2. app.current_store_id = '': resets any stale session-level GUC.
+      //    current_store_id() returns NULLIF('', '') = NULL so old-style
+      //    policies (`current_store_id() IS NULL`) also allow all rows.
+      //    Defense-in-depth: a reused pgbouncer connection may carry a
+      //    previous request's store ID at session scope even after SET LOCAL
+      //    reverts on commit — this explicit reset guarantees the bypass
+      //    path works for both policy generations.
+      await tx.$executeRaw`SET LOCAL app.current_store_id = ''`;
       return fn(tx);
     },
     { maxWait: 10000, timeout: 30000 }

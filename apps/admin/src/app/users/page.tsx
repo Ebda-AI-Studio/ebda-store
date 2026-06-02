@@ -216,7 +216,7 @@ export default function UsersPage() {
             <option value="all">{t('allRoles')}</option>
             <option value="super_admin">{t('roleSuperAdmins')}</option>
             <option value="store_admin">{t('roleStoreAdmins')}</option>
-            <option value="customer">{t('roleCustomers')}</option>
+            {/* customers are store-scoped; they appear in /customers not here */}
           </select>
         </div>
       </div>
