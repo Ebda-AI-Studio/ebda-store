@@ -1,68 +1,69 @@
 name: Runner health check
 
-# Every 15 minutes, query the GitHub Actions API for the self-hosted runner
-# this repo depends on and fire a Telegram alert if it's offline.
+# Every 15 min, query the GitHub Actions API for THIS repo's self-hosted runners
+# (the original + its -2 parallel runner) and fire a Telegram alert if any is
+# offline. Runs on ubuntu-latest by design — a check on the self-hosted box
+# can't detect that box being down.
 #
-# Runs on ubuntu-latest by design — if the self-hosted runner is down, a
-# health check running on the same runner can't detect it.
-#
-# Cron + manual trigger so we can fire on demand to validate the alert path.
+# REQUIRES a PAT: GITHUB_TOKEN CANNOT list self-hosted runners (`administration`
+# is not a GITHUB_TOKEN scope). Mint a fine-grained PAT with **administration:
+# read** on this repo and add it as the repo secret RUNNER_HEALTH_PAT, then
+# `gh workflow enable runner-health-check.yml`.
 on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
-# Need `administration: read` to call /actions/runners. contents:read for
-# the implicit checkout that gh CLI may want. Nothing else.
 permissions:
   contents: read
-  administration: read
 
 jobs:
   check:
-    name: Ping windows-wsl-fwb on GitHub Actions runners API
+    name: Ping self-hosted runners on the GitHub Actions API
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - name: Resolve runner status + alert on offline / missing
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RUNNER_HEALTH_PAT }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
-          # Repo + runner identity passed via env (defense-in-depth: never
-          # interpolate ${{ github.* }} or user-controlled fields directly
-          # into the run script body — see SECURITY.md → "no `${{ github.* }}`
-          # interpolation inside `run:` blocks").
+          # Identity via env (never interpolate ${{ github.* }} into run: bodies).
           GH_REPO: ${{ github.repository }}
-          RUNNER_NAME: windows-wsl-fwb
+          RUNNER_BASE: windows-wsl-fwb
         run: |
           set -euo pipefail
 
-          # gh CLI is preinstalled on ubuntu-latest; uses GH_TOKEN from env.
-          response=$(gh api "repos/${GH_REPO}/actions/runners" 2>&1) || {
-            echo "::error::could not query /actions/runners — check that GITHUB_TOKEN has administration:read"
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::RUNNER_HEALTH_PAT is not set. Mint a fine-grained PAT with administration:read on this repo and add it as the repo secret RUNNER_HEALTH_PAT (GITHUB_TOKEN cannot list self-hosted runners)."
+            exit 1
+          fi
+
+          response=$(gh api "repos/${GH_REPO}/actions/runners" --paginate 2>&1) || {
+            echo "::error::could not query /actions/runners — is RUNNER_HEALTH_PAT scoped administration:read on ${GH_REPO}?"
             echo "$response"
             exit 1
           }
 
-          status=$(echo "$response" | jq -r --arg n "$RUNNER_NAME" \
-            '(.runners[] | select(.name==$n) | .status) // "not-registered"')
-          busy=$(echo "$response" | jq -r --arg n "$RUNNER_NAME" \
-            '(.runners[] | select(.name==$n) | .busy) // "n/a"')
+          # Check BOTH the original runner and its -2 parallel runner.
+          offline=""
+          for n in "$RUNNER_BASE" "${RUNNER_BASE}-2"; do
+            status=$(echo "$response" | jq -r --arg n "$n" \
+              '(.runners[] | select(.name==$n) | .status) // "not-registered"')
+            echo "::notice::${GH_REPO} / ${n} → ${status}"
+            if [ "$status" != "online" ]; then
+              offline="${offline}${offline:+, }${n}=${status}"
+            fi
+          done
 
-          echo "::notice::${GH_REPO} / windows-wsl-fwb → status=${status} busy=${busy}"
+          [ -z "$offline" ] && exit 0
 
-          if [ "$status" = "online" ]; then
-            exit 0
-          fi
-
-          # Offline OR not-registered — alert.
           if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_ALERT_CHAT_ID:-}" ]; then
-            echo "::error::runner status=${status} but TELEGRAM_BOT_TOKEN / TELEGRAM_ALERT_CHAT_ID secrets are not configured — cannot alert"
+            echo "::error::runners offline (${offline}) but TELEGRAM_BOT_TOKEN / TELEGRAM_ALERT_CHAT_ID not configured — cannot alert"
             exit 1
           fi
 
-          text="🔴 [RUNNER OFFLINE] *${GH_REPO}* — runner \`windows-wsl-fwb\` reports *${status}*. The next CI run on this repo will be queued without a runner to pick it up. See https://github.com/${GH_REPO}/settings/actions/runners"
+          text="🔴 [RUNNER OFFLINE] *${GH_REPO}* — ${offline}. Queued CI on this repo will stall. https://github.com/${GH_REPO}/settings/actions/runners"
 
           curl -sS -X POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
@@ -71,9 +72,8 @@ jobs:
             -d disable_web_page_preview=true \
             -d text="$text" \
             | jq -e '.ok == true' >/dev/null \
-            && echo "alert delivered to telegram chat ${TELEGRAM_ALERT_CHAT_ID}" \
+            && echo "alert delivered" \
             || { echo "::error::telegram send failed"; exit 1; }
 
-          # Make the workflow run itself fail-red so the repo's "Actions" tab
-          # surfaces the outage as a status flag, not just a Telegram message.
+          # Fail red so the Actions tab flags the outage too.
           exit 1
