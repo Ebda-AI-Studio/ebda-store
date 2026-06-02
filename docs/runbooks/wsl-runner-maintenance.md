@@ -14,6 +14,9 @@ Force AI self-hosted CI runners healthy and fast. The runners live on the PC
 
 ## Scripts in this folder
 
+> Both scripts are committed here in `docs/runbooks/`. On the runner box they live at
+> `/mnt/c/Users/moze1/projects/force-website-builder/docs/runbooks/` (run them via `wsl -d Ubuntu -- bash "<path>"`).
+
 ### 1. `fix-wsl-runner.sh` — heal the flaky box (run first)
 
 Fixes the recurring CI infra flakes:
@@ -31,11 +34,14 @@ bash fix-wsl-runner.sh          # needs sudo once (your WSL password)
 By default each repo has **one** runner, and a runner runs **one job at a time**
 → a project's CI jobs (lint, typecheck, build, test, e2e) queue up serially, and
 one wedged job blocks the whole pipeline. This registers **N runners per repo**
-(default 3, same labels → no workflow YAML changes) so each project runs up to N
-jobs at once and a single stuck job can't block it.
+(default **2**, same labels → no workflow YAML changes) so each project runs up to N
+jobs at once and a single stuck job can't block it. The box is a **~11 GiB** WSL VM
+(heaviest CI job ≈ 5.4 GiB), so runner #1/repo keeps the full 8G/10G budget and each
+EXTRA runner gets a tighter 3G/6G/2-core cap. `RUNNERS_PER_REPO=3` (×3 repos = 9
+runners) would thrash — bump above 2 only after watching `free -h` during real CI.
 
 ```bash
-bash setup-parallel-runners.sh            # 3 runners per project
+bash setup-parallel-runners.sh            # ensure 2 runners per project
 RUNNERS_PER_REPO=4 bash setup-parallel-runners.sh
 ONLY_REPO=whatsapp-broadcaster bash setup-parallel-runners.sh
 bash setup-parallel-runners.sh --list     # show what's registered
@@ -54,8 +60,9 @@ won't accept new jobs. (This pinned WBS for 3h on 2026-06-01.) Recover on the PC
 
 ```bash
 pkill -9 -f jest 2>/dev/null; pkill -9 -f Runner.Worker 2>/dev/null
+# Service units are actions.runner.ForceAI-KW-<repo>.windows-wsl-<fwb|wbs|crm>.service
 sudo systemctl restart 'actions.runner.*' 2>/dev/null \
-  || (cd ~/actions-runner* && sudo ./svc.sh stop && sudo ./svc.sh start)
+  || (cd ~/runners/fwb && sudo ./svc.sh stop && sudo ./svc.sh start)   # runners live in ~/runners/{fwb,wbs,crm}
 ```
 
 **Meanwhile, route CI to cloud so you're not blocked** (from anywhere with `gh`):
@@ -79,7 +86,7 @@ gh variable set USE_SELF_HOSTED --body true --repo ForceAI-KW/whatsapp-broadcast
 ## Recommended first-time / after-reboot sequence (on the PC, in WSL)
 
 ```bash
-cd ~/Desktop/projects/_runner-maintenance   # if you keep these synced to the PC; else copy them over
+cd ~/projects/force-website-builder/docs/runbooks   # the committed scripts (or /mnt/c/Users/moze1/...)
 bash fix-wsl-runner.sh
 bash setup-parallel-runners.sh
 bash setup-parallel-runners.sh --list
@@ -89,4 +96,6 @@ for r in force-website-builder whatsapp-broadcaster Force-Media-CRM; do
 done
 ```
 
-> Tiers: Neon Pro · Vercel + Railway Hobby ($10 cap) · GitHub Pro (3000 Actions min/mo — cloud fallback is cheap).
+> Tiers: Neon Pro · Vercel + Railway Hobby ($10 cap) · GitHub Pro (3000 Actions min/mo).
+> Cloud fallback (`USE_SELF_HOSTED=false`) is genuinely cheap on these tiers — self-hosted is a
+> cost optimization, not a hard requirement, so prefer flipping to cloud over fighting a sick box.
