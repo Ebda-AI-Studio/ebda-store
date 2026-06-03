@@ -77,34 +77,32 @@ export const IMAGE_STANDARDS = {
     },
   },
   heroMobile: {
-    // 2026-05-18 (Ahmad directive): mobile hero is ALWAYS landscape, not
-    // portrait. Container aspect matches desktop. This entry is the
-    // RECOMMENDED smaller landscape crop merchants can upload to save
-    // mobile bandwidth — but it's optional; the storefront serves the
-    // desktop image down-sampled if no mobile image is uploaded.
-    width: 1080,
-    height: 394,
-    aspect: '~2.74:1',
+    // 2026-06-03 (Ahmad directive): mobile hero is standardized to 16:9
+    // (1200×675). Supersedes the 2026-05-18 "always match desktop aspect"
+    // directive for mobile — mobile aspect is now DECOUPLED from the
+    // per-theme desktop ratio (elegant 2.74:1, modern ~2.73:1, bold ~2.67:1).
+    // The storefront renders the mobile hero at aspect-ratio: 1200/675 with a
+    // max-h-[45vh] ceiling via inline style derived from this entry so the
+    // admin hint and the render can NEVER drift again.
+    // Upload hint: 1200×675 (16:9). If merchant uploads only a desktop image,
+    // the storefront serves it down-scaled and center-crops via object-cover —
+    // the 1920×700 desktop source crops cleanly to 16:9 (loses top/bottom).
+    width: 1200,
+    height: 675,
+    aspect: '16:9',
     formats: ['JPEG', 'WebP'],
+    // Safe zone: text/CTA must stay inside the center 960×540 zone so
+    // bottom-cropping (at max-h-[45vh] on tall phones) never cuts the message.
+    safeZone: { width: 960, height: 540 },
     description:
-      'Hero — mobile-optimized landscape crop (optional). Same aspect as desktop, smaller file.',
-    // Per-theme mobile hero overrides: mirror the desktop ratio change for
-    // modern/bold so the admin hint stays consistent. elegant inherits base.
-    // Ref: docs/superpowers/audits/2026-05-18-per-theme-image-spec-audit.md §Surface 2.
-    templateOverrides: {
-      modern: {
-        width: 1080,
-        height: 400,
-        aspect: '~2.7:1',
-        note: 'Mirrors the 2048×750 desktop ratio (~2.73:1) at mobile scale. Rounds to 400 for clean math.',
-      },
-      bold: {
-        width: 1000,
-        height: 375,
-        aspect: '~2.67:1',
-        note: 'Bold full-bleed mobile. ≤1000 wide cap (design.md mobile-first rule §1 + 04-25 audit LCP constraint). Matches 2.67:1 ratio of desktop 2400×900.',
-      },
-    },
+      'Hero — mobile-optimized 16:9 crop (1200×675). Text/CTA must fit inside center 960×540 safe zone. Falls back to desktop image if not uploaded.',
+    // Per-theme mobile overrides: all themes now share 16:9 at mobile — the
+    // desktop per-theme aspect lock (elegant 2.74:1, modern 2.73:1, bold 2.67:1)
+    // is a DESKTOP-only decision. Removing stale 2026-05-18 overrides that
+    // mirrored the desktop ratio at mobile scale (modern 1080×400, bold 1000×375)
+    // since both are now superseded. elegant/classic/minimal still inherit
+    // the 16:9 base. No overrides needed — all five templates use 16:9 mobile.
+    // Ahmad 2026-06-03: explicitly no templateOverrides for heroMobile.
   },
   bannerDesktop: {
     width: 1920,

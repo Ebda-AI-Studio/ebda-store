@@ -19,10 +19,14 @@ const ASPECT_TARGETS: Record<string, { w: number; h: number }> = {
   '4:3': { w: 1200, h: 900 }, // alternative hero
   '2:3': { w: 800, h: 1200 }, // alternative category
   '2.45:1': { w: 1470, h: 600 }, // wide-cinema hero (legacy)
-  // Canonical hero desktop + mobile (both landscape, same aspect) per
-  // packages/shared/src/types/image-standards.ts / design.md zFloos brief.
-  '1920:700': { w: 1920, h: 700 }, // hero desktop
-  '1080:394': { w: 1080, h: 394 }, // hero mobile (optional smaller crop)
+  // Canonical hero desktop per packages/shared/src/types/image-standards.ts.
+  '1920:700': { w: 1920, h: 700 }, // hero desktop (all themes inherit or override)
+  // Hero mobile 16:9 standard (Ahmad 2026-06-03): supersedes 1080×394.
+  // '1080:394' kept for legacy uploaded assets that may still reference it;
+  // new uploads target '1200:675'. The '16:9' key above (1280×720) is
+  // a close proxy — '1200:675' is the precise key for the new standard.
+  '1200:675': { w: 1200, h: 675 }, // hero mobile 16:9 (canonical from 2026-06-03)
+  '1080:394': { w: 1080, h: 394 }, // hero mobile legacy (superseded — kept for old assets)
 };
 
 /**

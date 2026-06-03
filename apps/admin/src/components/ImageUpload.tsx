@@ -84,7 +84,7 @@ interface ImageUploadProps {
    *   - '3/2'  → legacy hero desktop (recommend 1200×800)
    *   - '3/4'  → legacy portrait crop (DEPRECATED for hero — see
    *     packages/shared/src/types/image-standards.ts heroMobile, now
-   *     landscape 1080×394 per Ahmad 2026-05-18 directive)
+   *     16:9 / 1200×675 per Ahmad 2026-06-03 directive)
    *   - '1/1'  → category tile + product image (recommend 800×800 / 1000×1000)
    *   - 'free' → no aspect lock (default, legacy behavior)
    *

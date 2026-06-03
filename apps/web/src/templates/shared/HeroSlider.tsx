@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { IMAGE_STANDARDS } from '@force/shared';
 import { HeroBanner } from './HeroBanner';
 import type { HeroSliderProps } from '../types';
 
@@ -12,6 +13,13 @@ import type { HeroSliderProps } from '../types';
  * Autoplay pauses while the user holds focus on a dot and on tab visibility
  * change so we don't burn the LCP image budget when the page is hidden.
  */
+
+// Single source of truth: mobile aspect ratio derived from the shared
+// image standard so the storefront render and the admin upload hint
+// can never drift from each other. If IMAGE_STANDARDS.heroMobile changes,
+// both the render and the hint update automatically.
+const HERO_MOBILE = IMAGE_STANDARDS.heroMobile;
+
 export function HeroSlider({
   slides,
   autoplayMs = 5000,
@@ -76,16 +84,10 @@ export function HeroSlider({
     );
   }
 
-  // Mobile hero aspect: 16:9 with a 45vh ceiling so the banner never
-  // consumes the full viewport and buries the categories section below.
-  // On a 390px phone: 390×(9/16)=219px; capped at 45vh≈380px on tall
-  // phones. Desktop uses the canonical 1920×700 (2.74:1) full-bleed.
-  // Previously was 'aspect-[1920/700]' on BOTH breakpoints — that
-  // rendered the mobile slider at only ~142px (too short, barely visible
-  // as a hero) AND matched the desktop ratio so the transition looked
-  // broken. Fix: use 16:9 + max-h-[45vh] on mobile, 1920/700 on sm+.
-  const mobileAspectClass = 'aspect-[16/9] max-h-[45vh]';
-
+  // Mobile hero aspect: derived from IMAGE_STANDARDS.heroMobile (16:9, 1200×675)
+  // via inline style — Tailwind arbitrary classes can't read a runtime value, so
+  // we use style={{ aspectRatio }} + max-h-[45vh] + overflow-hidden from PR #47.
+  // Desktop uses the canonical sm:aspect-[1920/700] (2.74:1) full-bleed.
   // Touch swipe — 40px threshold, RTL-aware direction.
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartXRef.current = e.touches[0]?.clientX ?? null;
@@ -114,7 +116,14 @@ export function HeroSlider({
       onTouchEnd={handleTouchEnd}
       aria-roledescription="carousel"
     >
-      <div className={`relative ${mobileAspectClass} sm:aspect-[1920/700]`}>
+      {/* Mobile: aspect-ratio from the shared heroMobile standard (16:9) + 45vh ceiling.
+          Desktop (sm:): Tailwind aspect-[1920/700] overrides the inline style via the
+          sm: breakpoint class — the inline style has lower specificity than a Tailwind
+          utility once the media query activates. overflow-hidden on the parent clips both. */}
+      <div
+        className="relative max-h-[45vh] overflow-hidden sm:aspect-[1920/700] sm:max-h-none"
+        style={{ aspectRatio: `${HERO_MOBILE.width} / ${HERO_MOBILE.height}` }}
+      >
         {slides.map((slide, i) => (
           <div
             key={i}
