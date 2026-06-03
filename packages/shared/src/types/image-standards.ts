@@ -77,24 +77,24 @@ export const IMAGE_STANDARDS = {
     },
   },
   heroMobile: {
-    // 2026-06-03 (Ahmad directive): mobile hero is 3:2 (1200×800). Supersedes the 2026-05-18 "always match desktop aspect"
+    // 2026-06-03 (Ahmad directive): mobile hero is 4:3 (1200×900). Supersedes the 2026-05-18 "always match desktop aspect"
     // directive for mobile — mobile aspect is now DECOUPLED from the
     // per-theme desktop ratio (elegant 2.74:1, modern ~2.73:1, bold ~2.67:1).
-    // The storefront renders the mobile hero at aspect-ratio: 1200/800 with a
+    // The storefront renders the mobile hero at aspect-ratio: 1200/900 with a
     // max-h-[45vh] ceiling via inline style derived from this entry so the
     // admin hint and the render can NEVER drift again.
-    // Upload hint: 1200×800 (3:2). If merchant uploads only a desktop image,
+    // Upload hint: 1200×900 (4:3). If merchant uploads only a desktop image,
     // the storefront serves it down-scaled and center-crops via object-cover —
     // the 1920×700 desktop source crops cleanly to 16:9 (loses top/bottom).
     width: 1200,
-    height: 800,
-    aspect: '3:2', // taller hero for mobile prominence (testing)
+    height: 900,
+    aspect: '4:3', // taller hero for mobile prominence (testing)
     formats: ['JPEG', 'WebP'],
     // Safe zone: text/CTA must stay inside the center 960×540 zone so
     // bottom-cropping (at max-h-[45vh] on tall phones) never cuts the message.
-    safeZone: { width: 1020, height: 680 },
+    safeZone: { width: 1020, height: 765 },
     description:
-      'Hero — mobile 3:2 crop (1200×800). Tall prominent mobile hero. Text/CTA inside center 1020×680 safe zone. Falls back to desktop image if not uploaded.',
+      'Hero — mobile 4:3 crop (1200×900). Tall prominent mobile hero. Text/CTA inside center 1020×765 safe zone. Falls back to desktop image if not uploaded.',
     // Per-theme mobile overrides: all themes now share 16:9 at mobile — the
     // desktop per-theme aspect lock (elegant 2.74:1, modern 2.73:1, bold 2.67:1)
     // is a DESKTOP-only decision. Removing stale 2026-05-18 overrides that
