@@ -26,7 +26,7 @@ const ASPECT_TARGETS: Record<string, { w: number; h: number }> = {
   // new uploads target '1200:675'. The '16:9' key above (1280×720) is
   // a close proxy — '1200:675' is the precise key for the new standard.
   '1200:675': { w: 1200, h: 675 }, // hero mobile 16:9 (trial)
-  '1200:600': { w: 1200, h: 600 }, // hero mobile 2:1 (canonical from 2026-06-03)
+  '1200:800': { w: 1200, h: 800 }, // hero mobile 3:2 (canonical from 2026-06-03)
   '1080:394': { w: 1080, h: 394 }, // hero mobile legacy (superseded — kept for old assets)
 };
 
