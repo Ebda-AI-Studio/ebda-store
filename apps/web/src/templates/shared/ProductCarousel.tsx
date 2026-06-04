@@ -86,7 +86,9 @@ export function ProductCarousel({
   // inside `lg`/`xl` widths.
   const textSizes = getProductCardTextSizes(cardSize);
   const shape = cardShapeClasses(cardShape);
-  const aspectCls = shape.aspect || cardAspectClass(cardAspect) || 'aspect-square';
+  // Match PecannbeeProductCard + 4/5 theme cards so the same product isn't square
+  // in a carousel but portrait in a category grid (audit: ratio consistency).
+  const aspectCls = shape.aspect || cardAspectClass(cardAspect) || 'aspect-square sm:aspect-[3/4]';
   const scrollRef = useRef<HTMLUListElement>(null);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);

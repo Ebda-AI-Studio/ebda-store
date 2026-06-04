@@ -847,7 +847,7 @@ export default function CheckoutClient() {
 
           <div className="lg:grid lg:grid-cols-12 lg:gap-8">
             {/* Form */}
-            <div className="lg:col-span-7">
+            <div className="lg:col-span-8">
               <form onSubmit={handleSubmit}>
                 {step === 1 && (
                   <div className="rounded-xl border bg-card p-6 shadow-sm">

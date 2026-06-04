@@ -47,7 +47,7 @@ export function OrderSummary({
     isRtl && p.nameAr ? p.nameAr : p.name;
 
   return (
-    <div className="mt-8 lg:col-span-5 lg:mt-0">
+    <div className="mt-8 lg:col-span-4 lg:mt-0">
       <div className="sticky top-24 rounded-xl border bg-card p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-foreground" style={typography?.heading}>
           {t('Order Summary', translations['Order Summary'])}
