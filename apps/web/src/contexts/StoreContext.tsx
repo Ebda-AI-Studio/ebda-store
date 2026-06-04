@@ -179,6 +179,14 @@ const DEFAULT_STORE: StoreData = {
 interface StoreProviderProps {
   children: ReactNode;
   initialStore?: StoreData;
+  /**
+   * Page-builder preview-draft token (resolved server-side in layout.tsx from
+   * the `?_layoutDraft=` param / `force-preview-draft` httpOnly cookie). When
+   * present, the lazy layout fetch requests the DRAFT layout so "preview unsaved
+   * changes" reflects per-page settings (cart / checkout / categories bg +
+   * typography) — not just the homepage. Absent for normal visitors.
+   */
+  previewDraftToken?: string;
 }
 
 /**
@@ -196,7 +204,7 @@ function applyTheme(theme: StoreTheme | undefined): void {
   });
 }
 
-export function StoreProvider({ children, initialStore }: StoreProviderProps) {
+export function StoreProvider({ children, initialStore, previewDraftToken }: StoreProviderProps) {
   // Merge initialStore with defaults to ensure theme is always present
   const mergedInitialStore = initialStore
     ? { ...DEFAULT_STORE, ...initialStore, theme: initialStore.theme || DEFAULT_THEME }
@@ -218,7 +226,12 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
       try {
         // API_URL already includes the /api/v1 prefix (see lib/api.ts) — do not
         // re-append it here or the request 404s on /api/v1/api/v1/...
-        const res = await fetch(`${API_URL}/public/stores/${store.id}/layout`, {
+        // In the page-builder preview iframe, request the DRAFT layout so cart /
+        // checkout / categories reflect unsaved changes like the homepage does.
+        const layoutUrl = previewDraftToken
+          ? `${API_URL}/public/stores/${store.id}/layout?_layoutDraft=${encodeURIComponent(previewDraftToken)}`
+          : `${API_URL}/public/stores/${store.id}/layout`;
+        const res = await fetch(layoutUrl, {
           credentials: 'include',
         });
         if (!res.ok) return;
@@ -234,7 +247,7 @@ export function StoreProvider({ children, initialStore }: StoreProviderProps) {
     return () => {
       cancelled = true;
     };
-  }, [store.id]);
+  }, [store.id, previewDraftToken]);
 
   // Push the store id into the api client BEFORE any child effects run so the
   // first client-side request already carries X-Store-ID. Using an effect

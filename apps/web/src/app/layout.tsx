@@ -697,7 +697,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           Skip to main content
         </a>
-        <StoreProvider initialStore={store}>
+        <StoreProvider initialStore={store} previewDraftToken={draftToken}>
           <LanguageProvider defaultLanguage={resolvedLanguage}>
             <ConsentProvider initialConsent={resolvedConsent}>
               {/* PostHog product analytics — mounted INSIDE ConsentProvider
