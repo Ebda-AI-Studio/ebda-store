@@ -123,6 +123,7 @@ export default function StoreLayoutPage() {
   // save here so the main Save button persists them — no separate save button,
   // no standalone page.
   const navSaveRef = useRef<(() => Promise<boolean>) | null>(null);
+  const utilityBarSaveRef = useRef<(() => Promise<boolean>) | null>(null);
   const footerLinksSaveRef = useRef<(() => Promise<boolean>) | null>(null);
   // Global typography zones — fetched from the same typography endpoint as
   // the standalone /typography page. Populated in fetchData and used as
@@ -247,30 +248,28 @@ export default function StoreLayoutPage() {
             })
           : Promise.resolve({ data: undefined, error: undefined } as const);
 
-      // Navigation + Footer/utility links are owned by embedded editors that
-      // registered a silent saver — fold them into the same parallel batch so
-      // the one Save button persists everything. Resolve to `true` when an
-      // editor isn't mounted/registered.
-      const navPromise = navSaveRef.current ? navSaveRef.current() : Promise.resolve(true);
-      const footerLinksPromise = footerLinksSaveRef.current
-        ? footerLinksSaveRef.current()
-        : Promise.resolve(true);
+      const [layoutResult, typographyResult, themeResult] = await Promise.allSettled([
+        apiPut(`/api/v1/admin/stores/${storeId}/layout`, layout),
+        apiPut(`/api/v1/stores/${storeId}/typography`, {
+          fonts: typographyFonts,
+          zones: globalZones,
+        }),
+        themePromise,
+      ]);
 
-      const [layoutResult, typographyResult, themeResult, navResult, footerLinksResult] =
-        await Promise.allSettled([
-          apiPut(`/api/v1/admin/stores/${storeId}/layout`, layout),
-          apiPut(`/api/v1/stores/${storeId}/typography`, {
-            fonts: typographyFonts,
-            zones: globalZones,
-          }),
-          themePromise,
-          navPromise,
-          footerLinksPromise,
-        ]);
-      // Editors surface their own error toasts on failure; treat a rejected
-      // promise or a `false` resolution as a non-fatal partial failure here.
-      void navResult;
-      void footerLinksResult;
+      // Navigation, the top utility bar, and footer links are owned by embedded
+      // editors that each GET-merge-PUT the store `settings` blob. They write
+      // DIFFERENT keys (navMenu / utilityBar / footerLinks) but to the SAME
+      // object — so they MUST run SEQUENTIALLY, or two parallel read-modify-write
+      // round-trips would clobber each other. Editors surface their own error
+      // toasts; a false/throw here is a non-fatal partial failure.
+      try {
+        if (navSaveRef.current) await navSaveRef.current();
+        if (utilityBarSaveRef.current) await utilityBarSaveRef.current();
+        if (footerLinksSaveRef.current) await footerLinksSaveRef.current();
+      } catch {
+        // Non-fatal — the editor already toasted.
+      }
 
       const layoutFailed =
         layoutResult.status === 'rejected' ||
@@ -1635,6 +1634,24 @@ export default function StoreLayoutPage() {
                 }
               />
 
+              {/* Top utility bar — a thin links strip ABOVE the header (Elegant
+                  + Classic packs). Lives here near the header where it visually
+                  appears, not buried in the footer. Saved by the main Save
+                  button via its own registered saver. */}
+              <SectionCard
+                title="Top utility bar"
+                description="Thin links strip above the main header (Elegant + Classic packs) — track order, language, contact, etc. Disable to hide it entirely."
+                defaultExpanded={false}
+                alwaysOn
+              >
+                <FooterLinksEditor
+                  storeId={storeId}
+                  variant="embedded"
+                  section="utility"
+                  saveRef={utilityBarSaveRef}
+                />
+              </SectionCard>
+
               {/* Navigation — storefront header menu links. Collapsible like
                   every other section; saved by the main Save button via the
                   registered saver (no separate save button, no standalone page). */}
@@ -1656,14 +1673,14 @@ export default function StoreLayoutPage() {
                   Cross-link from the section card so merchants discover both
                   surfaces without a 666-line component absorb (Ahmad audit
                   2026-05-21). */}
-              {/* One Footer card: chrome (background / dividers / spacing /
-                  typography) PLUS the utility bar + footer link columns +
-                  newsletter, folded in as children. Saved by the main Save
-                  button via the registered saver — one card, one save. */}
+              {/* Footer card: chrome (background / dividers / spacing /
+                  typography) PLUS the footer link columns + newsletter, folded
+                  in as children. The top utility bar has its own card near the
+                  header. Saved by the main Save button. */}
               <ExtraSectionCard
                 kind="footer"
                 label="Footer"
-                description="Everything footer: background, dividers, spacing, typography — plus the utility bar above the header, the three footer link columns, and the newsletter signup."
+                description="Everything footer: background, dividers, spacing, typography — plus the three footer link columns and the newsletter signup. (The top utility bar has its own card near the header.)"
                 settings={layout.footer}
                 legacyEnabled={true}
                 onPatch={patch =>
@@ -1690,11 +1707,12 @@ export default function StoreLayoutPage() {
               >
                 <div className="border-t border-border pt-4">
                   <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Footer & utility links
+                    Footer links
                   </h4>
                   <FooterLinksEditor
                     storeId={storeId}
                     variant="embedded"
+                    section="links"
                     saveRef={footerLinksSaveRef}
                   />
                 </div>

@@ -97,6 +97,15 @@ interface FooterLinksEditorProps {
    * utility links alongside everything else. Returns true on success.
    */
   saveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
+  /**
+   * Which part to render + save. The utility bar is a TOP-of-page strip, so the
+   * page-builder mounts it as its own card near the header (`section="utility"`)
+   * and the footer link columns + newsletter in the Footer card
+   * (`section="links"`). Each instance saves ONLY its own keys (preserving the
+   * other via the GET-merge-PUT), so the two cards don't clobber each other —
+   * the main Save runs them sequentially. Default 'all' (standalone page).
+   */
+  section?: 'all' | 'utility' | 'links';
 }
 
 /* ── SectionShell ──────────────────────────────────────────────────────
@@ -291,6 +300,7 @@ export function FooterLinksEditor({
   storeId,
   variant = 'standalone',
   saveRef,
+  section = 'all',
 }: FooterLinksEditorProps) {
   const t = useT('pages.page');
   const { success, error: showError } = useToast();
@@ -368,16 +378,21 @@ export function FooterLinksEditor({
         `/api/v1/stores/${storeId}`
       );
       const currentSettings = (getData?.store?.settings || {}) as StoreSettings;
-      const newSettings = {
-        ...currentSettings,
-        footerLinks: {
+      // Each instance writes ONLY the keys for its section so two cards (utility
+      // near the header, links in the footer) never clobber each other — the
+      // rest is preserved from the fresh GET above.
+      const newSettings: StoreSettings = { ...currentSettings };
+      if (section !== 'utility') {
+        newSettings.footerLinks = {
           shop: shopLinks,
           support: supportLinks,
           company: companyLinks,
           newsletterEnabled,
           // bottomBar removed 2026-05-21 — redundant with Company Links.
-        },
-        utilityBar: {
+        };
+      }
+      if (section !== 'links') {
+        newSettings.utilityBar = {
           enabled: utilityBarEnabled,
           links: utilityLinks
             .filter(link => link.label.trim() && link.href.trim())
@@ -387,8 +402,8 @@ export function FooterLinksEditor({
               href: link.href.trim(),
               enabled: link.enabled,
             })),
-        },
-      };
+        };
+      }
       const { error: saveError } = await apiPut(`/api/v1/stores/${storeId}`, {
         settings: newSettings,
       });
@@ -483,88 +498,97 @@ export function FooterLinksEditor({
 
   return (
     <div className="space-y-5">
-      {/* Section 1 — Utility Bar (top of every page) */}
-      <SectionShell
-        step={1}
-        title={t('utilityBar')}
-        subtitle={t('utilityBarHint')}
-        whereShows={isEmbedded ? undefined : t('utilityBarWhere')}
-        enabled={utilityBarEnabled}
-        onToggle={setUtilityBarEnabled}
-        collapsedWhenDisabled
-        embedded={isEmbedded}
-      >
-        <div className="space-y-3">
-          {utilityLinks.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-2 text-center">{t('emptyLinks')}</p>
-          ) : (
-            utilityLinks.map((link, index) => (
-              <LinkRow
-                key={index}
-                enabled={link.enabled}
-                primaryLabel={t('utilityBarLabelPlaceholder')}
-                primaryValue={link.label}
-                primaryPlaceholder={t('utilityBarLabelPlaceholder')}
-                arabicValue={link.labelAr || ''}
-                arabicPlaceholder={t('utilityBarLabelArPlaceholder')}
-                pathValue={link.href}
-                pathPlaceholder={t('linkPathPlaceholder')}
-                onToggle={v => updateUtilityLink(index, 'enabled', v)}
-                onPrimaryChange={v => updateUtilityLink(index, 'label', v)}
-                onArabicChange={v => updateUtilityLink(index, 'labelAr', v)}
-                onPathChange={v => updateUtilityLink(index, 'href', v)}
-                onRemove={() => removeUtilityLink(index)}
-                removeTitle={t('removeLink')}
-              />
-            ))
-          )}
-          <AddLinkButton label={t('addLink')} onClick={addUtilityLink} />
-        </div>
-      </SectionShell>
+      {/* Section 1 — Utility Bar (top of every page). Rendered alone when
+          section="utility" (its own card near the header). */}
+      {section !== 'links' && (
+        <SectionShell
+          step={1}
+          title={t('utilityBar')}
+          subtitle={t('utilityBarHint')}
+          whereShows={isEmbedded ? undefined : t('utilityBarWhere')}
+          enabled={utilityBarEnabled}
+          onToggle={setUtilityBarEnabled}
+          collapsedWhenDisabled
+          embedded={isEmbedded}
+        >
+          <div className="space-y-3">
+            {utilityLinks.length === 0 ? (
+              <p className="text-muted-foreground text-sm py-2 text-center">{t('emptyLinks')}</p>
+            ) : (
+              utilityLinks.map((link, index) => (
+                <LinkRow
+                  key={index}
+                  enabled={link.enabled}
+                  primaryLabel={t('utilityBarLabelPlaceholder')}
+                  primaryValue={link.label}
+                  primaryPlaceholder={t('utilityBarLabelPlaceholder')}
+                  arabicValue={link.labelAr || ''}
+                  arabicPlaceholder={t('utilityBarLabelArPlaceholder')}
+                  pathValue={link.href}
+                  pathPlaceholder={t('linkPathPlaceholder')}
+                  onToggle={v => updateUtilityLink(index, 'enabled', v)}
+                  onPrimaryChange={v => updateUtilityLink(index, 'label', v)}
+                  onArabicChange={v => updateUtilityLink(index, 'labelAr', v)}
+                  onPathChange={v => updateUtilityLink(index, 'href', v)}
+                  onRemove={() => removeUtilityLink(index)}
+                  removeTitle={t('removeLink')}
+                />
+              ))
+            )}
+            <AddLinkButton label={t('addLink')} onClick={addUtilityLink} />
+          </div>
+        </SectionShell>
+      )}
 
-      {/* Section 2 — Shop links (first footer column) */}
-      <SectionShell
-        step={2}
-        title={t('shopLinks')}
-        subtitle={t('shopLinksHint')}
-        whereShows={isEmbedded ? undefined : t('shopLinksWhere')}
-        embedded={isEmbedded}
-      >
-        {renderLinkList('shop', shopLinks)}
-      </SectionShell>
+      {/* Sections 2–5 — footer link columns + newsletter. Hidden when this
+          instance only renders the utility bar. */}
+      {section !== 'utility' && (
+        <>
+          {/* Section 2 — Shop links (first footer column) */}
+          <SectionShell
+            step={2}
+            title={t('shopLinks')}
+            subtitle={t('shopLinksHint')}
+            whereShows={isEmbedded ? undefined : t('shopLinksWhere')}
+            embedded={isEmbedded}
+          >
+            {renderLinkList('shop', shopLinks)}
+          </SectionShell>
 
-      {/* Section 3 — Support links (second footer column) */}
-      <SectionShell
-        step={3}
-        title={t('supportLinks')}
-        subtitle={t('supportLinksHint')}
-        whereShows={isEmbedded ? undefined : t('supportLinksWhere')}
-        embedded={isEmbedded}
-      >
-        {renderLinkList('support', supportLinks)}
-      </SectionShell>
+          {/* Section 3 — Support links (second footer column) */}
+          <SectionShell
+            step={3}
+            title={t('supportLinks')}
+            subtitle={t('supportLinksHint')}
+            whereShows={isEmbedded ? undefined : t('supportLinksWhere')}
+            embedded={isEmbedded}
+          >
+            {renderLinkList('support', supportLinks)}
+          </SectionShell>
 
-      {/* Section 4 — Company links (third footer column) */}
-      <SectionShell
-        step={4}
-        title={t('companyLinks')}
-        subtitle={t('companyLinksHint')}
-        whereShows={isEmbedded ? undefined : t('companyLinksWhere')}
-        embedded={isEmbedded}
-      >
-        {renderLinkList('company', companyLinks)}
-      </SectionShell>
+          {/* Section 4 — Company links (third footer column) */}
+          <SectionShell
+            step={4}
+            title={t('companyLinks')}
+            subtitle={t('companyLinksHint')}
+            whereShows={isEmbedded ? undefined : t('companyLinksWhere')}
+            embedded={isEmbedded}
+          >
+            {renderLinkList('company', companyLinks)}
+          </SectionShell>
 
-      {/* Section 5 — Newsletter (subscribe form below footer columns) */}
-      <SectionShell
-        step={5}
-        title={t('newsletter')}
-        subtitle={t('newsletterHint')}
-        whereShows={isEmbedded ? undefined : t('newsletterWhere')}
-        enabled={newsletterEnabled}
-        onToggle={setNewsletterEnabled}
-        embedded={isEmbedded}
-      />
+          {/* Section 5 — Newsletter (subscribe form below footer columns) */}
+          <SectionShell
+            step={5}
+            title={t('newsletter')}
+            subtitle={t('newsletterHint')}
+            whereShows={isEmbedded ? undefined : t('newsletterWhere')}
+            enabled={newsletterEnabled}
+            onToggle={setNewsletterEnabled}
+            embedded={isEmbedded}
+          />
+        </>
+      )}
 
       {/* Bottom bar section removed 2026-05-21 — redundant with Company Links. */}
 
