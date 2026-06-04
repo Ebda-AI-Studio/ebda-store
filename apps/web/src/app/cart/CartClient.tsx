@@ -48,7 +48,21 @@ export default function CartClient() {
   const storeUrl = useStoreUrl();
   const { isEnabled } = useFeatures();
   // Standalone Cart-page typography (page-builder → Cart page). Resolved to
-  // inline styles below so they beat the cart line items' Tailwind size classes.
+  // inline styles below so they beat the cart's Tailwind size classes.
+  //   heading     → page title + "Order summary" heading
+  //   subtitle    → secondary labels (items count, subtotal/shipping/total rows)
+  //   productName → line-item names
+  //   productPrice→ every monetary value (item price/total, subtotal, total)
+  const cartHeadingZone = resolveSectionZone(
+    layout?.cartPage?.typography?.heading,
+    undefined,
+    store.theme
+  );
+  const cartLabelZone = resolveSectionZone(
+    layout?.cartPage?.typography?.subtitle,
+    undefined,
+    store.theme
+  );
   const cartNameZone = resolveSectionZone(
     layout?.cartPage?.typography?.productName,
     undefined,
@@ -274,11 +288,14 @@ export default function CartClient() {
             </span>
           </nav>
 
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          <h1
+            className="text-3xl font-bold tracking-tight text-foreground"
+            style={cartZoneStyle(cartHeadingZone)}
+          >
             {t('Shopping Cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
           </h1>
           {cartItems.length > 0 && (
-            <p className="mt-2 text-muted-foreground">
+            <p className="mt-2 text-muted-foreground" style={cartZoneStyle(cartLabelZone)}>
               {cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')}{' '}
               {t('in your cart', '\u0641\u064a \u0633\u0644\u062a\u0643')}
             </p>
@@ -655,7 +672,10 @@ export default function CartClient() {
                       <>
                         {/* Summary Card */}
                         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                          <h2 className="text-lg font-bold text-foreground">
+                          <h2
+                            className="text-lg font-bold text-foreground"
+                            style={cartZoneStyle(cartHeadingZone)}
+                          >
                             {t(
                               'Order Summary',
                               '\u0645\u0644\u062e\u0635 \u0627\u0644\u0637\u0644\u0628'
@@ -735,14 +755,20 @@ export default function CartClient() {
                           {/* Price Breakdown */}
                           <div className="mt-6 space-y-3">
                             <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
+                              <span
+                                className="text-muted-foreground"
+                                style={cartZoneStyle(cartLabelZone)}
+                              >
                                 {t(
                                   'Subtotal',
                                   '\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a'
                                 )}{' '}
                                 ({cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')})
                               </span>
-                              <span className="font-bold text-foreground">
+                              <span
+                                className="font-bold text-foreground"
+                                style={cartZoneStyle(cartPriceZone)}
+                              >
                                 {formatPrice(subtotal)}
                               </span>
                             </div>
@@ -758,15 +784,24 @@ export default function CartClient() {
                               </div>
                             )}
                             <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
+                              <span
+                                className="text-muted-foreground"
+                                style={cartZoneStyle(cartLabelZone)}
+                              >
                                 {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
                               </span>
                               {shipping === 0 ? (
-                                <span className="font-medium text-[hsl(var(--success))]">
+                                <span
+                                  className="font-medium text-[hsl(var(--success))]"
+                                  style={cartZoneStyle(cartLabelZone)}
+                                >
                                   {t('Free', '\u0645\u062c\u0627\u0646\u064a')}
                                 </span>
                               ) : (
-                                <span className="font-medium text-foreground">
+                                <span
+                                  className="font-medium text-foreground"
+                                  style={cartZoneStyle(cartPriceZone)}
+                                >
                                   {formatPrice(shipping)}
                                 </span>
                               )}
@@ -782,10 +817,16 @@ export default function CartClient() {
                             )}
                             <div className="border-t border-border pt-3">
                               <div className="flex justify-between">
-                                <span className="text-lg font-bold text-foreground">
+                                <span
+                                  className="text-lg font-bold text-foreground"
+                                  style={cartZoneStyle(cartHeadingZone)}
+                                >
                                   {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
                                 </span>
-                                <span className="text-xl font-bold text-primary">
+                                <span
+                                  className="text-xl font-bold text-primary"
+                                  style={cartZoneStyle(cartPriceZone)}
+                                >
                                   {formatPrice(total)}
                                 </span>
                               </div>

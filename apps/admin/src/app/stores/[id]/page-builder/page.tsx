@@ -1231,7 +1231,7 @@ export default function StoreLayoutPage() {
                   via the main page-builder save button (no separate save / page). */}
               <SectionCard
                 title="Cart page"
-                description="Background colour and line-item typography (name / price) for the cart page."
+                description="Background colour + typography for the whole cart: headings (Section heading), labels like the items count / subtotal / shipping (Section subtitle), item names (Product name), and every price (Product price)."
                 defaultExpanded={false}
                 alwaysOn
               >
@@ -1251,10 +1251,10 @@ export default function StoreLayoutPage() {
                   theme={storeInfo?.theme}
                 />
                 <SectionTypographyBlock
-                  roles={['productName', 'productPrice']}
+                  roles={['heading', 'subtitle', 'productName', 'productPrice']}
                   typography={layout.cartPage?.typography}
                   globalZones={Object.fromEntries(
-                    (['productName', 'productPrice'] as const).map(r => [
+                    (['heading', 'subtitle', 'productName', 'productPrice'] as const).map(r => [
                       r,
                       globalZones[ROLE_TO_GLOBAL_ZONE[r]],
                     ])
