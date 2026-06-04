@@ -19,12 +19,12 @@ if ! command -v k6 >/dev/null 2>&1; then
   exit 1
 fi
 
-# multi-store-storm uses STORE_IDS (plural); all other scenarios use STORE_ID.
-if [ "$SCENARIO" = "multi-store-storm" ]; then
+# the multi-store storms use STORE_IDS (plural); all other scenarios use STORE_ID.
+if [ "$SCENARIO" = "multi-store-storm" ] || [ "$SCENARIO" = "multi-store-checkout-storm" ]; then
   if [ -z "${STORE_IDS:-}" ]; then
-    echo "STORE_IDS env var is required for multi-store-storm (comma-separated store uuids)." >&2
+    echo "STORE_IDS env var is required for $SCENARIO (comma-separated store uuids)." >&2
     echo "Seed them first: npm run seed:loadtest --workspace @force/database" >&2
-    echo "Then: STORE_IDS=\$(cat loadtests/.loadtest-store-ids.txt) ./run.sh multi-store-storm" >&2
+    echo "Then: STORE_IDS=\$(cat loadtests/.loadtest-store-ids.txt) ./run.sh $SCENARIO" >&2
     exit 1
   fi
 else

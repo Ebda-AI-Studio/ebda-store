@@ -429,6 +429,12 @@ async function cleanup() {
     console.log('  No load-test stores found — nothing to clean up.');
   } else {
     for (const store of stores) {
+      // Orders MUST go first: Order→store is onDelete:Restrict (blocks store
+      // delete) and OrderItem→product is Restrict (blocks product delete).
+      // Deleting the Order cascades its OrderItems + Payments. The checkout
+      // storm scenario creates real COD orders on these stores, so without
+      // this the cleanup FK-fails. Read-only runs simply find zero orders.
+      await prisma.order.deleteMany({ where: { storeId: store.id } });
       // Explicit cascade: products (with images + category links), categories, then store.
       // The FK relations already use onDelete: Cascade for most child tables,
       // but we delete explicitly to be safe and visible.

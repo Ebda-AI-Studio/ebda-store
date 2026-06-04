@@ -43,6 +43,13 @@ if (STORE_ID_LIST.length === 0) {
   throw new Error('STORE_IDS is set but contains no valid UUIDs after parsing.');
 }
 
+// Peak concurrency + hold are overridable so the same scenario runs both a
+// light regression pass (default 100 VUs) and a ceiling-finding storm
+// (STORM_MAX_VUS=400+). Spreading more VUs over more stores dilutes the edge
+// cache and forces the per-tenant RLS transaction onto the shared pool.
+const MAX_VUS = parseInt(__ENV.STORM_MAX_VUS || '100', 10);
+const HOLD = __ENV.STORM_HOLD || '3m';
+
 export const options = {
   scenarios: {
     // Ramp up across all stores — higher VU ceiling than single-store to
@@ -51,8 +58,8 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 1,
       stages: [
-        { duration: '30s', target: 50 }, // warm-up
-        { duration: '3m', target: 100 }, // sustained cross-tenant load
+        { duration: '45s', target: Math.ceil(MAX_VUS / 2) }, // warm-up
+        { duration: HOLD, target: MAX_VUS }, // sustained cross-tenant load
         { duration: '30s', target: 0 }, // ramp-down
       ],
       gracefulRampDown: '15s',

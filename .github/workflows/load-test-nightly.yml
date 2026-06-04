@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       scenario:
-        description: 'Which scenario to run (all | storefront-browse | api-bursts | checkout-flow | multi-store-storm)'
+        description: 'Which scenario to run (all | storefront-browse | api-bursts | checkout-flow | multi-store-storm | multi-store-checkout-storm)'
         required: false
         default: 'all'
       store_ids:
@@ -31,6 +31,10 @@ on:
         default: ''
       base_url:
         description: 'Override BASE_URL (e.g. the staging API base). Falls back to the K6_BASE_URL secret when blank.'
+        required: false
+        default: ''
+      max_vus:
+        description: 'multi-store-storm only: peak VUs (default 100; use 300-500 to find the ceiling)'
         required: false
         default: ''
       force_cloud:
@@ -161,6 +165,7 @@ jobs:
           BASE_URL: ${{ github.event.inputs.base_url != '' && github.event.inputs.base_url || secrets.K6_BASE_URL }}
           STORE_IDS: ${{ github.event.inputs.store_ids }}
           LOAD_TEST_TOKEN: ${{ secrets.K6_BYPASS_TOKEN }}
+          STORM_MAX_VUS: ${{ github.event.inputs.max_vus }}
         run: |
           if [ -z "${STORE_IDS:-}" ]; then
             echo "::error::multi-store-storm requires the store_ids input (comma-separated seeded store UUIDs)"
@@ -170,6 +175,30 @@ jobs:
             --out json=loadtests/results/multi-store-storm-$(date +%Y%m%dT%H%M%S).json \
             --summary-export=loadtests/results/summary-multi-store-storm-$(date +%Y%m%dT%H%M%S).json \
             loadtests/scenarios/multi-store-storm.js
+
+      - name: Run multi-store-checkout-storm (manual only)
+        # Cross-tenant WRITE storm: concurrent COD checkouts across N seeded
+        # stores → uncached order placement + per-tenant RLS transaction. The
+        # real pool-contention test. Writes real orders (staging + disposable
+        # stores only); seed:loadtest:cleanup removes them (orders deleted first).
+        if: >
+          steps.secrets-check.outputs.skip == 'false' &&
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.scenario == 'multi-store-checkout-storm'
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url != '' && github.event.inputs.base_url || secrets.K6_BASE_URL }}
+          STORE_IDS: ${{ github.event.inputs.store_ids }}
+          LOAD_TEST_TOKEN: ${{ secrets.K6_BYPASS_TOKEN }}
+          STORM_MAX_VUS: ${{ github.event.inputs.max_vus }}
+        run: |
+          if [ -z "${STORE_IDS:-}" ]; then
+            echo "::error::multi-store-checkout-storm requires the store_ids input (comma-separated seeded store UUIDs)"
+            exit 1
+          fi
+          k6 run \
+            --out json=loadtests/results/multi-store-checkout-storm-$(date +%Y%m%dT%H%M%S).json \
+            --summary-export=loadtests/results/summary-multi-store-checkout-storm-$(date +%Y%m%dT%H%M%S).json \
+            loadtests/scenarios/multi-store-checkout-storm.js
 
       - name: Push metrics to Axiom
         # Runs even when k6 exits non-zero (threshold breach) so we always record the data point.
