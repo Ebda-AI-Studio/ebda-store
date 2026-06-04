@@ -94,11 +94,17 @@ export function zoneStyle(zone?: ResolvedZone): CSSProperties | undefined {
   if (!zone) return undefined;
   return {
     fontFamily: zone.fontFamily,
+    // Responsive clamp so a large size never breaks mobile.
     fontSize: responsiveFontSize(zone.fontSize),
     fontWeight: zone.fontWeight,
     color: zone.color,
     letterSpacing: zone.letterSpacing,
-    lineHeight: zone.lineHeight,
+    // Ratio safety (mirrors the homepage CSS emitter): when the merchant bumps
+    // the size but doesn't set a line-height, pin an Arabic-friendly 1.6 so the
+    // bigger glyphs (ش / خ / ة with upper diacritics) always have vertical room
+    // and don't clip against a tight default. Merchant-set line-height wins.
+    lineHeight: zone.lineHeight ?? (zone.fontSize ? '1.6' : undefined),
+    textTransform: zone.textTransform as CSSProperties['textTransform'],
     textAlign: zone.textAlign,
   };
 }
