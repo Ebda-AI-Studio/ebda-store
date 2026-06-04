@@ -78,7 +78,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     sectionHeading:
       'text-[22px] sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-foreground leading-[1.1]',
     sectionSeeAll:
-      'text-xl font-semibold text-foreground/70 hover:text-foreground transition-colors duration-300 underline-offset-4 hover:underline',
+      'text-xl font-semibold text-foreground/70 hover:text-foreground transition-colors duration-300',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/5 to-foreground/35',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white drop-shadow-xl leading-[1.05]',
