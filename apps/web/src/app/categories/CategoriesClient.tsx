@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { type Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '@/contexts/StoreContext';
-import { resolveColor } from '@force/shared';
+import { pageSurfaceStyle } from '@/lib/page-surface';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ShopChrome } from '../../components';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
@@ -36,9 +36,7 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
     undefined,
     store.theme
   );
-  const catBgStyle: React.CSSProperties | undefined = layout?.categoriesPage?.bgColor
-    ? { backgroundColor: resolveColor(layout.categoriesPage.bgColor, store.theme) }
-    : undefined;
+  const catBgStyle = pageSurfaceStyle(layout?.categoriesPage?.bgColor, store.theme);
 
   const templateCategories = categories.map(toTemplateCategory);
 

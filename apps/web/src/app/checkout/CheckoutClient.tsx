@@ -11,7 +11,8 @@ import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
-import { isValidEmail, resolveColor } from '@force/shared';
+import { isValidEmail } from '@force/shared';
+import { pageSurfaceStyle } from '@/lib/page-surface';
 import { resolveSectionZone, zoneStyle } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
 
@@ -78,9 +79,7 @@ export default function CheckoutClient() {
     undefined,
     store?.theme
   );
-  const checkoutBgStyle: React.CSSProperties | undefined = layout?.checkoutPage?.bgColor
-    ? { backgroundColor: resolveColor(layout.checkoutPage.bgColor, store?.theme) }
-    : undefined;
+  const checkoutBgStyle = pageSurfaceStyle(layout?.checkoutPage?.bgColor, store?.theme);
   // Inline-style bag handed to the checkout OrderSummary so the merchant's
   // Checkout-page typography reaches its headings / labels / amounts.
   const checkoutTypography = {

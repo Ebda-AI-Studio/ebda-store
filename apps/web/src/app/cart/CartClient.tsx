@@ -13,7 +13,7 @@ import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { CartRecommendations } from '../../components/CartRecommendations';
-import { resolveColor } from '@force/shared';
+import { pageSurfaceStyle } from '@/lib/page-surface';
 import {
   resolveSectionZone,
   responsiveFontSize,
@@ -78,9 +78,7 @@ export default function CartClient() {
     undefined,
     store.theme
   );
-  const cartBgStyle: React.CSSProperties | undefined = layout?.cartPage?.bgColor
-    ? { backgroundColor: resolveColor(layout.cartPage.bgColor, store.theme) }
-    : undefined;
+  const cartBgStyle = pageSurfaceStyle(layout?.cartPage?.bgColor, store.theme);
   // Bag of inline styles handed to the theme CartTable / OrderSummary so the
   // merchant's Cart-page typography reaches the elements the THEME renders
   // (the fallback markup below applies them directly).

@@ -9,7 +9,7 @@ import type {
   FilterSidebarSettings,
   ProductsPageSettings,
 } from '@force/shared';
-import { resolveColor } from '@force/shared';
+import { pageSurfaceStyle } from '@/lib/page-surface';
 import { useToast } from '@force/ui';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
@@ -363,14 +363,7 @@ export default function ProductsClient({
 
   return (
     <ShopChrome>
-      <div
-        className="flex-1"
-        style={
-          productsPage?.bgColor
-            ? { backgroundColor: resolveColor(productsPage.bgColor, store.theme) }
-            : undefined
-        }
-      >
+      <div className="flex-1" style={pageSurfaceStyle(productsPage?.bgColor, store.theme)}>
         {/* data-zone="products" wraps the entire listing — header h1 +
           breadcrumb + filter sidebar (sort, price range, search,
           category chips) + product grid + counter — so the merchant's
@@ -391,7 +384,9 @@ export default function ProductsClient({
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            <span className="text-foreground">{t('Products', translations['Products'])}</span>
+            <span className="text-foreground" style={zoneStyle(plpSubtitleZone)}>
+              {t('Products', translations['Products'])}
+            </span>
           </nav>
 
           {/* Header */}

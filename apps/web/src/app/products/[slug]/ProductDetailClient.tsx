@@ -7,7 +7,7 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { Button, Badge, useToast } from '@force/ui';
 import type { StoreLayoutSettings } from '@force/shared';
-import { resolveColor } from '@force/shared';
+import { pageSurfaceStyle } from '@/lib/page-surface';
 import { resolveSectionZone, zoneStyle } from '../../../templates/shared/section-typography';
 import { api, type Product, type ProductVariant } from '@/lib/api';
 import { getProductPricing } from '@/lib/product-pricing';
@@ -189,9 +189,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const pdpHeadingZone = resolveSectionZone(pdp?.typography?.heading, undefined, store.theme);
   const pdpNameZone = resolveSectionZone(pdp?.typography?.productName, undefined, store.theme);
   const pdpPriceZone = resolveSectionZone(pdp?.typography?.productPrice, undefined, store.theme);
-  const pdpBgStyle: React.CSSProperties | undefined = pdp?.bgColor
-    ? { backgroundColor: resolveColor(pdp.bgColor, store.theme) }
-    : undefined;
+  const pdpBgStyle = pageSurfaceStyle(pdp?.bgColor, store.theme);
 
   useEffect(() => {
     if (!slug) return;
