@@ -447,9 +447,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           </nav>
 
           {/* Product Details */}
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className="grid gap-8 md:grid-cols-12">
             {/* Images */}
-            <div className="space-y-4">
+            <div className="space-y-4 md:col-span-5">
               <div
                 className={`${pdpAspectClass} overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
               >
@@ -513,7 +513,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             </div>
 
             {/* Product Info */}
-            <div>
+            <div className="md:col-span-7">
               <div className="mb-4 flex items-center gap-2">
                 {categoryName && <Badge variant="secondary">{categoryName}</Badge>}
                 {/* Discount badge only when there is a CONCRETE compare-at to

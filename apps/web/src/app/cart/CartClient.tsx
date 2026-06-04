@@ -901,15 +901,30 @@ export default function CartClient() {
                           '\u0646\u0642\u0628\u0644 \u0627\u0644\u062f\u0641\u0639 \u0639\u0628\u0631'
                         )}
                       </p>
-                      <div className="flex items-center justify-center gap-3">
-                        {['KNET', 'Visa', 'Mastercard', 'Apple Pay'].map(method => (
-                          <div
-                            key={method}
-                            className="flex h-8 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground"
-                          >
-                            {method}
-                          </div>
-                        ))}
+                      <div className="flex flex-wrap items-center justify-center gap-3">
+                        {(() => {
+                          // Customer-facing payment METHODS (not gateways). The
+                          // Kuwait default is correct for most stores; a merchant
+                          // can override via settings.acceptedPaymentMethods.
+                          const configured = Array.isArray(
+                            (store?.settings as Record<string, unknown>)?.acceptedPaymentMethods
+                          )
+                            ? ((store!.settings as Record<string, unknown>)
+                                .acceptedPaymentMethods as string[])
+                            : null;
+                          const methods =
+                            configured && configured.length
+                              ? configured
+                              : ['KNET', 'Visa', 'Mastercard', 'Apple Pay'];
+                          return methods.map(method => (
+                            <div
+                              key={method}
+                              className="flex h-8 items-center rounded-md bg-muted px-3 text-xs font-medium text-muted-foreground"
+                            >
+                              {method}
+                            </div>
+                          ));
+                        })()}
                       </div>
                     </div>
 

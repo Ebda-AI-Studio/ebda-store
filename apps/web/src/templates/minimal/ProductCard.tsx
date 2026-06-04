@@ -149,9 +149,12 @@ function MinimalProductCard({
               language. */}
           <div
             className={cn(
-              'hidden lg:flex absolute bottom-0 inset-x-0 items-center justify-center pb-4 pt-12',
+              'flex absolute bottom-0 inset-x-0 items-center justify-center pb-4 pt-12',
               'bg-gradient-to-t from-background/95 via-background/70 to-transparent',
-              'opacity-0 lg:group-hover:opacity-100 transition-opacity duration-500 ease-out'
+              // Mobile: the underlined add-link is always tappable (no hover to
+              // reveal). Desktop: keep the on-hover reveal — "mobile stays pure"
+              // still holds visually, mobile just gains a tap-to-add affordance.
+              'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-500 ease-out'
             )}
             onClick={e => e.preventDefault()}
           >
