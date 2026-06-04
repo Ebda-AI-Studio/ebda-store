@@ -17,7 +17,10 @@ to production; override with `BASE_URL` for staging.
 STORE_ID=<uuid> ./run.sh storefront-browse
 STORE_ID=<uuid> ./run.sh api-bursts
 STORE_ID=<uuid> PRODUCT_SLUG=<slug> ./run.sh checkout-flow
-STORE_ID=<uuid> ./run.sh all   # browse + bursts (skips checkout)
+STORE_ID=<uuid> ./run.sh all   # browse + bursts (skips checkout + multi-store-storm)
+
+# Multi-store storm (requires seeded STORE_IDS — see section below):
+STORE_IDS=$(cat loadtests/.loadtest-store-ids.txt) ./run.sh multi-store-storm
 ```
 
 ## Scenarios
@@ -27,6 +30,58 @@ STORE_ID=<uuid> ./run.sh all   # browse + bursts (skips checkout)
 | `storefront-browse.js` | Public read path: products, categories, detail | Ramp 25 → 50 VUs over 3 min                         |
 | `api-bursts.js`        | Flash-sale spike on the cached list endpoint   | 200 req/s constant for 1 min                        |
 | `checkout-flow.js`     | Guest checkout: cart → add → place             | Ramp 5 → 10 VUs (writes real orders, staging only!) |
+| `multi-store-storm.js` | Cross-tenant concurrent load across N stores   | Ramp 50 → 100 VUs over 4 min (see below)            |
+
+### Multi-store storm
+
+The single-`STORE_ID` scenarios don't exercise **cross-tenant contention** on
+the shared Neon pool or the per-request RLS `runInTenantContext` GUC-set path.
+`multi-store-storm.js` distributes each VU iteration across a random store from
+`STORE_IDS`, producing simultaneous `SET app.current_store_id` + RLS policy
+evaluation from 100 VUs hitting up to 20 different tenants at once.
+
+#### 1. Seed disposable test stores
+
+```bash
+# From repo root (default: 20 stores)
+npm run seed:loadtest --workspace @force/database
+
+# Override store count
+LOADTEST_STORE_COUNT=10 npm run seed:loadtest --workspace @force/database
+```
+
+The seeder is idempotent: re-running it reuses existing `loadtest-store-NNN`
+stores. On completion it writes `loadtests/.loadtest-store-ids.txt` (gitignored)
+with a comma-separated line of store UUIDs.
+
+#### 2. Run the scenario
+
+```bash
+STORE_IDS=$(cat loadtests/.loadtest-store-ids.txt) ./run.sh multi-store-storm
+
+# With rate-limit bypass (recommended for honest measurements — see below):
+STORE_IDS=$(cat loadtests/.loadtest-store-ids.txt) \
+LOAD_TEST_TOKEN=<same-value-as-LOAD_TEST_BYPASS_TOKEN> \
+./run.sh multi-store-storm
+```
+
+#### 3. Clean up after testing
+
+```bash
+npm run seed:loadtest:cleanup --workspace @force/database
+```
+
+This deletes all `loadtest-store-*` stores (and their products/categories) and
+the `loadtest+stores@forcemediakw.com` user. Safe to run multiple times.
+
+#### Env knobs
+
+| Variable               | Default    | Description                                   |
+| ---------------------- | ---------- | --------------------------------------------- |
+| `STORE_IDS`            | (required) | Comma-separated store UUIDs from the seeder   |
+| `BASE_URL`             | production | Override with staging API base URL            |
+| `LOAD_TEST_TOKEN`      | (unset)    | Rate-limiter bypass token (see section below) |
+| `LOADTEST_STORE_COUNT` | `20`       | How many stores to create during seeding      |
 
 ## Targets and thresholds
 

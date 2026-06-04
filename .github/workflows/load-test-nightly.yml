@@ -22,9 +22,17 @@ on:
   workflow_dispatch:
     inputs:
       scenario:
-        description: 'Which scenario to run (all | storefront-browse | api-bursts | checkout-flow)'
+        description: 'Which scenario to run (all | storefront-browse | api-bursts | checkout-flow | multi-store-storm)'
         required: false
         default: 'all'
+      store_ids:
+        description: 'multi-store-storm only: comma-separated seeded store UUIDs (from seed:loadtest)'
+        required: false
+        default: ''
+      base_url:
+        description: 'Override BASE_URL (e.g. the staging API base). Falls back to the K6_BASE_URL secret when blank.'
+        required: false
+        default: ''
       force_cloud:
         description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
         type: boolean
@@ -61,18 +69,28 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install k6
+      # No-sudo install — works on BOTH ubuntu-latest (cloud) and the
+      # self-hosted WSL runner, whose runner user cannot sudo.
+      - name: install k6 (no-sudo, self-hosted + cloud safe)
         if: steps.secrets-check.outputs.skip == 'false'
         run: |
-          sudo gpg -k
-          sudo gpg --no-default-keyring \
-            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
-            --keyserver hkp://keyserver.ubuntu.com:80 \
-            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
-          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
-            | sudo tee /etc/apt/sources.list.d/k6.list
-          sudo apt-get update
-          sudo apt-get install -y k6
+          set -euo pipefail
+          if command -v k6 >/dev/null 2>&1; then
+            echo "k6 already present: $(k6 version)"
+            exit 0
+          fi
+          K6_VER="v2.0.0"
+          ASSET="k6-${K6_VER}-linux-amd64"
+          SHA256="2ae87d976f6cdba17185bdd980d8819a3a98e9092c6f0638cd58272ecefc8b90"
+          TMP="$(mktemp -d)"
+          cd "$TMP"
+          curl -fsSL -o k6.tar.gz "https://github.com/grafana/k6/releases/download/${K6_VER}/${ASSET}.tar.gz"
+          echo "${SHA256}  k6.tar.gz" | sha256sum -c -
+          tar xzf k6.tar.gz
+          mkdir -p "$HOME/.local/bin"
+          install -m 0755 "${ASSET}/k6" "$HOME/.local/bin/k6"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/k6" version
 
       - name: Create results directory
         if: steps.secrets-check.outputs.skip == 'false'
@@ -129,6 +147,29 @@ jobs:
             --out json=loadtests/results/checkout-flow-$(date +%Y%m%dT%H%M%S).json \
             --summary-export=loadtests/results/summary-checkout-flow-$(date +%Y%m%dT%H%M%S).json \
             loadtests/scenarios/checkout-flow.js
+
+      - name: Run multi-store-storm (manual only)
+        # Cross-tenant concurrent load across N seeded stores. Manual-dispatch
+        # only — needs store_ids (seeded via seed:loadtest) that don't exist
+        # until set up. base_url override lets the dispatcher force staging so
+        # this never accidentally hammers production.
+        if: >
+          steps.secrets-check.outputs.skip == 'false' &&
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.scenario == 'multi-store-storm'
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url != '' && github.event.inputs.base_url || secrets.K6_BASE_URL }}
+          STORE_IDS: ${{ github.event.inputs.store_ids }}
+          LOAD_TEST_TOKEN: ${{ secrets.K6_BYPASS_TOKEN }}
+        run: |
+          if [ -z "${STORE_IDS:-}" ]; then
+            echo "::error::multi-store-storm requires the store_ids input (comma-separated seeded store UUIDs)"
+            exit 1
+          fi
+          k6 run \
+            --out json=loadtests/results/multi-store-storm-$(date +%Y%m%dT%H%M%S).json \
+            --summary-export=loadtests/results/summary-multi-store-storm-$(date +%Y%m%dT%H%M%S).json \
+            loadtests/scenarios/multi-store-storm.js
 
       - name: Push metrics to Axiom
         # Runs even when k6 exits non-zero (threshold breach) so we always record the data point.
