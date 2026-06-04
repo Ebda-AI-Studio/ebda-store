@@ -581,10 +581,10 @@ class ApiClient {
     return this.request<{ cart: Cart }>('/public/cart');
   }
 
-  async addToCart(productId: string, quantity = 1) {
+  async addToCart(productId: string, quantity = 1, variantId?: string) {
     return this.request<{ cart: Cart }>('/public/cart/items', {
       method: 'POST',
-      body: JSON.stringify({ productId, quantity }),
+      body: JSON.stringify({ productId, quantity, variantId }),
     });
   }
 

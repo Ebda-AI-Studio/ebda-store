@@ -6,12 +6,13 @@ import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
-import { useStoreUrl } from '../../../contexts/StoreContext';
+import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function RegisterClient() {
   const router = useRouter();
   const storeUrl = useStoreUrl();
+  const { store } = useStore();
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,6 +49,7 @@ export default function RegisterClient() {
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
+        storeId: store?.id,
       });
 
       if (!result.success) {

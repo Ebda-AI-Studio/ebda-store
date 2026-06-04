@@ -59,7 +59,7 @@ export default function LoyaltyClient() {
       setIsLoadingPoints(true);
       setPointsError(null);
       try {
-        const res = await authFetch(`${API_URL}/stores/${storeId}/loyalty/points`);
+        const res = await authFetch(`${API_URL}/public/${storeId}/loyalty/my-points`);
         const json = await res.json();
 
         if (res.status === 404 || json?.error?.code === 'LOYALTY_DISABLED') {
@@ -83,7 +83,7 @@ export default function LoyaltyClient() {
       setIsLoadingHistory(true);
       setHistoryError(null);
       try {
-        const res = await authFetch(`${API_URL}/stores/${storeId}/loyalty/transactions`);
+        const res = await authFetch(`${API_URL}/public/${storeId}/loyalty/my-transactions`);
         const json = await res.json();
 
         if (res.status === 404 || json?.error?.code === 'LOYALTY_DISABLED') {

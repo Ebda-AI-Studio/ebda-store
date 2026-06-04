@@ -7,13 +7,14 @@ import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
 import { useCart } from '../../../contexts/CartContext';
-import { useStoreUrl } from '../../../contexts/StoreContext';
+import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function LoginClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storeUrl = useStoreUrl();
+  const { store } = useStore();
   const { syncCartToBackend } = useCart();
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +30,7 @@ export default function LoginClient() {
     setError('');
 
     try {
-      const result = await api.login(formData.email, formData.password);
+      const result = await api.login(formData.email, formData.password, store?.id);
 
       if (!result.success) {
         throw new Error(result.error?.message || 'Failed to login');

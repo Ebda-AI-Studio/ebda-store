@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
-import { useStoreUrl } from '../../../contexts/StoreContext';
+import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function ForgotPasswordClient() {
   const storeUrl = useStoreUrl();
+  const { store } = useStore();
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -22,7 +23,7 @@ export default function ForgotPasswordClient() {
     setError('');
 
     try {
-      const result = await api.forgotPassword(email);
+      const result = await api.forgotPassword(email, store?.id);
 
       if (!result.success) {
         throw new Error(result.error?.message || 'Failed to send reset email');

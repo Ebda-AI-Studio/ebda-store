@@ -82,7 +82,7 @@ export default function SharedWishlistClient({ userId }: Props) {
   async function addToCart(productId: string) {
     setActionError(null);
     try {
-      const response = await api.post('/cart/items', { productId, quantity: 1 });
+      const response = await api.addToCart(productId, 1);
       if (response.success) {
         router.push(storeUrl('/cart'));
       } else {

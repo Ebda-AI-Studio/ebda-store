@@ -205,7 +205,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       });
 
       try {
-        const res = await api.addToCart(productId, quantity);
+        const res = await api.addToCart(productId, quantity, item.variantId ?? undefined);
         if (res.success && res.data?.cart) {
           setItems((res.data.cart.items as ServerCartItem[]).map(mapServerItem));
         } else {
