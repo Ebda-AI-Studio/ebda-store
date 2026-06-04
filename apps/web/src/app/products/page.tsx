@@ -6,6 +6,7 @@ import {
   resolveLayoutSettings,
   type ProductCardDefaults,
   type FilterSidebarSettings,
+  type ProductsPageSettings,
 } from '@force/shared';
 import { breadcrumbJsonLd, itemList, getSiteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
 interface PlpLayoutSettings {
   productCardDefaults?: ProductCardDefaults;
   filterSidebar?: FilterSidebarSettings;
+  productsPage?: ProductsPageSettings;
 }
 
 /** Fetch the store's layout settings to read `productCardDefaults` and `filterSidebar`. */
@@ -37,6 +39,7 @@ async function fetchPlpLayoutSettings(store: { id: string }): Promise<PlpLayoutS
         ? { ...layout.productCardDefaults }
         : undefined,
       filterSidebar: layout.filterSidebar ? { ...layout.filterSidebar } : undefined,
+      productsPage: layout.productsPage ? { ...layout.productsPage } : undefined,
     };
   } catch {
     return {};
@@ -111,7 +114,7 @@ export default async function ProductsPage({
     fetchInitialData(store, { category }),
     fetchPlpLayoutSettings(store),
   ]);
-  const { productCardDefaults, filterSidebar } = plpLayout;
+  const { productCardDefaults, filterSidebar, productsPage } = plpLayout;
 
   const siteUrl = getSiteUrl(store);
 
@@ -164,6 +167,7 @@ export default async function ProductsPage({
           initialMeta={initialData.meta}
           productCardDefaults={productCardDefaults}
           filterSidebar={filterSidebar}
+          productsPage={productsPage}
         />
       </Suspense>
     </>

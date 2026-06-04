@@ -1143,6 +1143,30 @@ export default function StoreLayoutPage() {
                 />
               </SectionCard>
 
+              {/* Products page */}
+              <SectionCard
+                title="Products page"
+                description="Background colour for the products listing page."
+                defaultExpanded={false}
+                alwaysOn
+              >
+                <ColorField
+                  label="Page background"
+                  value={layout.productsPage?.bgColor}
+                  onChange={v =>
+                    setLayout(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            productsPage: { ...(prev.productsPage ?? {}), bgColor: v },
+                          }
+                        : prev
+                    )
+                  }
+                  theme={storeInfo?.theme}
+                />
+              </SectionCard>
+
               {/* Testimonials */}
               <SectionCard
                 title={t('sections.testimonials.title')}

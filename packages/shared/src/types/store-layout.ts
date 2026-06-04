@@ -405,6 +405,12 @@ export interface FilterSidebarSettings {
   defaultOpen: boolean;
 }
 
+export interface ProductsPageSettings {
+  /** Background colour for the products listing page (token:primary / hex / etc).
+   *  Resolved via resolveColor on the storefront. Undefined = theme default. */
+  bgColor?: string;
+}
+
 export interface TestimonialsSettings
   extends SectionTitleOverride, SectionBgOverride, SectionPaddingMaxWidthVisibility {
   enabled: boolean;
@@ -608,6 +614,8 @@ export interface StoreLayoutSettings {
   sizing: SizingContract;
   /** Defaults applied to all non-homepage product-card surfaces. */
   productCardDefaults?: ProductCardDefaults;
+  /** Products listing page (PLP) settings. Page-builder configurable. */
+  productsPage?: ProductsPageSettings;
   /**
    * Drag-to-reorder data model (page-builder 2026-05-20, scaffolded for v2 ui).
    * When set, HomePageContent renders sections in this order instead of the
@@ -656,6 +664,7 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
     enabled: true,
     defaultOpen: true,
   },
+  productsPage: {},
   testimonials: {
     // Default OFF for new stores. The fake-reviews-illegal posture
     // (KW Law 39/2014: 50K KWD/offense + closure; FTC 2024 rule; EU
@@ -698,6 +707,7 @@ export function resolveLayoutSettings(input: unknown): StoreLayoutSettings {
     newArrivals: { ...DEFAULT_LAYOUT_SETTINGS.newArrivals, ...(raw.newArrivals ?? {}) },
     bestSellers: { ...DEFAULT_LAYOUT_SETTINGS.bestSellers, ...(raw.bestSellers ?? {}) },
     filterSidebar: { ...DEFAULT_LAYOUT_SETTINGS.filterSidebar, ...(raw.filterSidebar ?? {}) },
+    productsPage: { ...DEFAULT_LAYOUT_SETTINGS.productsPage, ...(raw.productsPage ?? {}) },
     testimonials: { ...DEFAULT_LAYOUT_SETTINGS.testimonials, ...(raw.testimonials ?? {}) },
     reviewSection: { ...DEFAULT_LAYOUT_SETTINGS.reviewSection, ...(raw.reviewSection ?? {}) },
     brandStory: raw.brandStory,
