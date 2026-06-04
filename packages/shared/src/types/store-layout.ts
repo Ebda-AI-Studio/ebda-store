@@ -408,10 +408,21 @@ export interface FilterSidebarSettings {
 /** Aspect-ratio choices for the PDP main image. */
 export type PdpImageAspect = 'square' | 'portrait' | 'landscape' | 'wide' | 'ultrawide' | 'auto';
 
+/**
+ * Per-page light/dark surface override for the smart auto-contrast system.
+ *   'auto'  → decide from the background colour's lightness (default)
+ *   'light' → keep the default light palette (dark text) regardless of bg
+ *   'dark'  → force the derived dark palette (light text) regardless of bg
+ * Lets a merchant correct a mid-tone background the auto-detection misjudges.
+ */
+export type PageColorScheme = 'auto' | 'light' | 'dark';
+
 export interface ProductsPageSettings {
   /** Background colour for the products listing page (token:primary / hex / etc).
    *  Resolved via resolveColor on the storefront. Undefined = theme default. */
   bgColor?: string;
+  /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
+  colorScheme?: PageColorScheme;
   /**
    * PLP typography — breadcrumb + secondary text use `subtitle`, the "All
    * Products" H1 uses `heading`. Applied inline so it beats the page's Tailwind
@@ -433,6 +444,8 @@ export interface ProductsPageSettings {
 export interface ProductDetailPageSettings {
   /** Background colour for the product detail page. Undefined = theme default. */
   bgColor?: string;
+  /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
+  colorScheme?: PageColorScheme;
   /** Aspect ratio for the main product image. Undefined / 'auto' = square. */
   imageAspect?: PdpImageAspect;
   /**
@@ -448,6 +461,8 @@ export interface ProductDetailPageSettings {
 export interface CategoriesPageSettings {
   /** Background colour for the categories page. Undefined = theme default. */
   bgColor?: string;
+  /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
+  colorScheme?: PageColorScheme;
   /** Page heading uses `heading`, secondary text uses `subtitle`, category card
    *  labels use `categoryLabel`. Applied inline. */
   typography?: SectionTypographyOverride;
@@ -459,6 +474,8 @@ export interface CategoriesPageSettings {
 export interface CheckoutPageSettings {
   /** Background colour for the checkout page. Undefined = theme default. */
   bgColor?: string;
+  /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
+  colorScheme?: PageColorScheme;
   /** Headings use `heading`, labels use `subtitle`, amounts use `productPrice`. */
   typography?: SectionTypographyOverride;
 }
@@ -473,6 +490,8 @@ export interface CheckoutPageSettings {
 export interface CartPageSettings {
   /** Background colour for the cart page. Resolved via resolveColor. Undefined = theme default. */
   bgColor?: string;
+  /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
+  colorScheme?: PageColorScheme;
   /**
    * Cart typography overrides — applied inline so they win over the theme cart
    * components' own classes. Roles:

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { resolveColor, type StoreTheme } from '@force/shared';
+import { resolveColor, type StoreTheme, type PageColorScheme } from '@force/shared';
 
 /**
  * Smart per-page surface styling.
@@ -98,7 +98,8 @@ const triplet = (h: number, s: number, l: number) =>
  */
 export function pageSurfaceStyle(
   bgColor: string | undefined,
-  theme: StoreTheme | undefined
+  theme: StoreTheme | undefined,
+  scheme: PageColorScheme = 'auto'
 ): CSSProperties | undefined {
   if (!bgColor) return undefined;
   // resolveColor types theme as required; an undefined theme still resolves hex
@@ -108,8 +109,11 @@ export function pageSurfaceStyle(
 
   const style: Record<string, string> = { backgroundColor: resolved };
   const hsl = parseToHsl(resolved);
-  // Unparseable (token without a concrete value, etc.) → just paint the bg.
-  if (!hsl || !isDark(hsl)) return style as CSSProperties;
+  // Decide whether to apply the dark palette: the merchant's manual override
+  // ('light' / 'dark') wins; 'auto' falls back to the background's lightness.
+  // 'dark' needs a parseable colour to derive the palette from.
+  const wantDark = scheme === 'dark' ? !!hsl : scheme === 'light' ? false : !!hsl && isDark(hsl);
+  if (!hsl || !wantDark) return style as CSSProperties;
 
   const { h, s, l } = hsl;
   // Surfaces step up in lightness from the page background so cards lift off it;

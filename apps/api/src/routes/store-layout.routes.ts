@@ -524,6 +524,7 @@ const layoutSchema = z
     productsPage: z
       .object({
         bgColor: colorValue,
+        colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
         typography: sectionTypographyOverride,
         // deprecated — kept for back-compat reads; admin now writes to productDetailPage.
         pdpImageAspect: z
@@ -538,6 +539,7 @@ const layoutSchema = z
     productDetailPage: z
       .object({
         bgColor: colorValue,
+        colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
         imageAspect: z
           .enum(['square', 'portrait', 'landscape', 'wide', 'ultrawide', 'auto'])
           .optional(),
@@ -548,6 +550,7 @@ const layoutSchema = z
     categoriesPage: z
       .object({
         bgColor: colorValue,
+        colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
         typography: sectionTypographyOverride,
       })
       .partial()
@@ -555,6 +558,7 @@ const layoutSchema = z
     checkoutPage: z
       .object({
         bgColor: colorValue,
+        colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
         typography: sectionTypographyOverride,
       })
       .partial()
@@ -564,6 +568,7 @@ const layoutSchema = z
     cartPage: z
       .object({
         bgColor: colorValue,
+        colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
         typography: sectionTypographyOverride,
       })
       .partial()

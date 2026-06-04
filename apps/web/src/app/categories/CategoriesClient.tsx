@@ -36,7 +36,11 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
     undefined,
     store.theme
   );
-  const catBgStyle = pageSurfaceStyle(layout?.categoriesPage?.bgColor, store.theme);
+  const catBgStyle = pageSurfaceStyle(
+    layout?.categoriesPage?.bgColor,
+    store.theme,
+    layout?.categoriesPage?.colorScheme
+  );
 
   const templateCategories = categories.map(toTemplateCategory);
 

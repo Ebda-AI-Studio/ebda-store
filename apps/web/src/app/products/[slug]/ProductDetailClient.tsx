@@ -189,7 +189,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const pdpHeadingZone = resolveSectionZone(pdp?.typography?.heading, undefined, store.theme);
   const pdpNameZone = resolveSectionZone(pdp?.typography?.productName, undefined, store.theme);
   const pdpPriceZone = resolveSectionZone(pdp?.typography?.productPrice, undefined, store.theme);
-  const pdpBgStyle = pageSurfaceStyle(pdp?.bgColor, store.theme);
+  const pdpBgStyle = pageSurfaceStyle(pdp?.bgColor, store.theme, pdp?.colorScheme);
 
   useEffect(() => {
     if (!slug) return;

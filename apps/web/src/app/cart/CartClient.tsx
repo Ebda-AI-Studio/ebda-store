@@ -78,7 +78,11 @@ export default function CartClient() {
     undefined,
     store.theme
   );
-  const cartBgStyle = pageSurfaceStyle(layout?.cartPage?.bgColor, store.theme);
+  const cartBgStyle = pageSurfaceStyle(
+    layout?.cartPage?.bgColor,
+    store.theme,
+    layout?.cartPage?.colorScheme
+  );
   // Bag of inline styles handed to the theme CartTable / OrderSummary so the
   // merchant's Cart-page typography reaches the elements the THEME renders
   // (the fallback markup below applies them directly).

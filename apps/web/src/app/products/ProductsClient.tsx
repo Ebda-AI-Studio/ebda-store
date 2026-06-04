@@ -363,7 +363,10 @@ export default function ProductsClient({
 
   return (
     <ShopChrome>
-      <div className="flex-1" style={pageSurfaceStyle(productsPage?.bgColor, store.theme)}>
+      <div
+        className="flex-1"
+        style={pageSurfaceStyle(productsPage?.bgColor, store.theme, productsPage?.colorScheme)}
+      >
         {/* data-zone="products" wraps the entire listing — header h1 +
           breadcrumb + filter sidebar (sort, price range, search,
           category chips) + product grid + counter — so the merchant's

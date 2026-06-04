@@ -79,7 +79,11 @@ export default function CheckoutClient() {
     undefined,
     store?.theme
   );
-  const checkoutBgStyle = pageSurfaceStyle(layout?.checkoutPage?.bgColor, store?.theme);
+  const checkoutBgStyle = pageSurfaceStyle(
+    layout?.checkoutPage?.bgColor,
+    store?.theme,
+    layout?.checkoutPage?.colorScheme
+  );
   // Inline-style bag handed to the checkout OrderSummary so the merchant's
   // Checkout-page typography reaches its headings / labels / amounts.
   const checkoutTypography = {

@@ -147,10 +147,17 @@ export default function StoreLayoutPage() {
     | 'cartPage';
   const pageDesign = (key: PageDesignKey) => ({
     bgColor: (layout?.[key] as { bgColor?: string } | undefined)?.bgColor,
+    colorScheme:
+      (layout?.[key] as { colorScheme?: 'auto' | 'light' | 'dark' } | undefined)?.colorScheme ??
+      'auto',
     typography: (layout?.[key] as { typography?: SectionTypographyOverride } | undefined)
       ?.typography,
     onBg: (v: string) =>
       setLayout(prev => (prev ? { ...prev, [key]: { ...(prev[key] ?? {}), bgColor: v } } : prev)),
+    onScheme: (v: 'auto' | 'light' | 'dark') =>
+      setLayout(prev =>
+        prev ? { ...prev, [key]: { ...(prev[key] ?? {}), colorScheme: v } } : prev
+      ),
     onChangeRole: (role: SectionTypographyRole, next: Partial<ZoneOverride>) =>
       setLayout(prev => {
         if (!prev) return prev;
@@ -1232,6 +1239,7 @@ export default function StoreLayoutPage() {
                       onChange={pg.onBg}
                       theme={storeInfo?.theme}
                     />
+                    <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
                     <SectionTypographyBlock
                       roles={roles}
                       typography={pg.typography}
@@ -1261,6 +1269,7 @@ export default function StoreLayoutPage() {
                       onChange={pg.onBg}
                       theme={storeInfo?.theme}
                     />
+                    <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
                     <label className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-muted-foreground">
                         Main image aspect
@@ -1325,6 +1334,7 @@ export default function StoreLayoutPage() {
                       onChange={pg.onBg}
                       theme={storeInfo?.theme}
                     />
+                    <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
                     <SectionTypographyBlock
                       roles={roles}
                       typography={pg.typography}
@@ -1354,6 +1364,7 @@ export default function StoreLayoutPage() {
                       onChange={pg.onBg}
                       theme={storeInfo?.theme}
                     />
+                    <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
                     <SectionTypographyBlock
                       roles={roles}
                       typography={pg.typography}
@@ -1388,6 +1399,16 @@ export default function StoreLayoutPage() {
                     )
                   }
                   theme={storeInfo?.theme}
+                />
+                <SchemeSelect
+                  value={layout.cartPage?.colorScheme ?? 'auto'}
+                  onChange={v =>
+                    setLayout(prev =>
+                      prev
+                        ? { ...prev, cartPage: { ...(prev.cartPage ?? {}), colorScheme: v } }
+                        : prev
+                    )
+                  }
                 />
                 <SectionTypographyBlock
                   roles={['heading', 'subtitle', 'productName', 'productPrice', 'productCta']}
@@ -2259,6 +2280,34 @@ function ProductCardControls({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Manual light/dark override for a page's smart auto-contrast. 'auto' decides
+ * from the background lightness; light/dark force it (for mid-tone bgs the auto
+ * detection misjudges). Paired with the page ColorField.
+ */
+function SchemeSelect({
+  value,
+  onChange,
+}: {
+  value: 'auto' | 'light' | 'dark';
+  onChange: (v: 'auto' | 'light' | 'dark') => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-muted-foreground">Text contrast</span>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value as 'auto' | 'light' | 'dark')}
+        className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+      >
+        <option value="auto">Auto (from background)</option>
+        <option value="light">Light surface · dark text</option>
+        <option value="dark">Dark surface · light text</option>
+      </select>
+    </label>
   );
 }
 
