@@ -8,7 +8,13 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { ShopChrome } from '../../components';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { toTemplateCategory } from '../../templates/adapters';
-import { resolveSectionZone, zoneStyle } from '../../templates/shared/section-typography';
+import {
+  resolveSectionZone,
+  zoneStyle,
+  scaleZone,
+  pageTextScale,
+  pageDensityStyle,
+} from '../../templates/shared/section-typography';
 
 interface CategoriesClientProps {
   categories: Category[];
@@ -41,16 +47,18 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
     store.theme,
     layout?.categoriesPage?.colorScheme
   );
+  const catScale = pageTextScale(layout?.categoriesPage?.textScale);
+  const catDensity = pageDensityStyle(layout?.categoriesPage?.density);
 
   const templateCategories = categories.map(toTemplateCategory);
 
   return (
     <ShopChrome>
       <div className="flex-1" style={catBgStyle}>
-        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={catDensity}>
           {categories.length === 0 ? (
             <div className="text-center py-12">
-              <h1 className="text-3xl font-bold mb-4" style={zoneStyle(catHeadingZone)}>
+              <h1 className="text-3xl font-bold mb-4" style={zoneStyle(catHeadingZone, catScale)}>
                 {t('Shop by Category', 'تسوق حسب الفئة')}
               </h1>
               <p className="text-muted-foreground mb-4">
@@ -67,8 +75,8 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
               titleAr="تسوق حسب الفئة"
               isRtl={isRtl}
               urlPrefix={urlPrefix}
-              headingZone={catHeadingZone}
-              categoryLabelZone={catLabelZone}
+              headingZone={scaleZone(catHeadingZone, catScale)}
+              categoryLabelZone={scaleZone(catLabelZone, catScale)}
             />
           ) : (
             // Skeleton while template loads.

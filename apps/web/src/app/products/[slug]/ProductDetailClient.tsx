@@ -8,7 +8,12 @@ import dynamic from 'next/dynamic';
 import { Button, Badge, useToast } from '@force/ui';
 import type { StoreLayoutSettings } from '@force/shared';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { resolveSectionZone, zoneStyle } from '../../../templates/shared/section-typography';
+import {
+  resolveSectionZone,
+  zoneStyle,
+  pageTextScale,
+  pageDensityStyle,
+} from '../../../templates/shared/section-typography';
 import { api, type Product, type ProductVariant } from '@/lib/api';
 import { getProductPricing } from '@/lib/product-pricing';
 import { useCart } from '../../../contexts/CartContext';
@@ -187,6 +192,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     return 'aspect-square'; // 'square' or fallback
   })();
   const pdpHeadingZone = resolveSectionZone(pdp?.typography?.heading, undefined, store.theme);
+  const pdpScale = pageTextScale(pdp?.textScale);
+  const pdpDensity = pageDensityStyle(pdp?.density);
   const pdpNameZone = resolveSectionZone(pdp?.typography?.productName, undefined, store.theme);
   const pdpPriceZone = resolveSectionZone(pdp?.typography?.productPrice, undefined, store.theme);
   const pdpBgStyle = pageSurfaceStyle(pdp?.bgColor, store.theme, pdp?.colorScheme);
@@ -405,7 +412,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
           the merchant's "Products" typography zone. The flex-1 wrapper
           carries the per-store product-detail page background. */}
       <div className="flex-1" style={pdpBgStyle}>
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" data-zone="products">
+        <div
+          className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
+          style={pdpDensity}
+          data-zone="products"
+        >
           {/* Breadcrumb */}
           <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
             <Link href={storeUrl('/')} className="hover:text-primary">
@@ -521,7 +532,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               <h1
                 className="text-3xl font-bold text-foreground"
                 data-zone="productName"
-                style={zoneStyle(pdpNameZone)}
+                style={zoneStyle(pdpNameZone, pdpScale)}
               >
                 {displayName}
               </h1>
@@ -530,7 +541,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               <div
                 className="mt-4 flex items-baseline gap-3"
                 data-zone="productPrice"
-                style={zoneStyle(pdpPriceZone)}
+                style={zoneStyle(pdpPriceZone, pdpScale)}
               >
                 <span className="text-3xl font-bold text-primary">
                   {pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
@@ -692,7 +703,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             <div className="mt-16">
               <h2
                 className="text-2xl font-bold text-foreground mb-6"
-                style={zoneStyle(pdpHeadingZone)}
+                style={zoneStyle(pdpHeadingZone, pdpScale)}
               >
                 {t('Related Products', 'منتجات ذات صلة')}
               </h2>

@@ -20,7 +20,12 @@ import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../templates/adapters';
 import { PecannbeeProductCard } from '../../templates/shared/PecannbeeProductCard';
 import { gridGapClass } from '../../templates/shared/card-size';
-import { resolveSectionZone, zoneStyle } from '../../templates/shared/section-typography';
+import {
+  resolveSectionZone,
+  zoneStyle,
+  pageTextScale,
+  pageDensityStyle,
+} from '../../templates/shared/section-typography';
 import { ProductListItem } from './ProductListItem';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
@@ -174,6 +179,8 @@ export default function ProductsClient({
     undefined,
     store.theme
   );
+  const plpScale = pageTextScale(productsPage?.textScale);
+  const plpDensity = pageDensityStyle(productsPage?.density);
 
   // Cart-id → quantity is consumed by ProductListItem (list view). The grid
   // view's PecannbeeProductCard handles its own optimistic add state.
@@ -374,12 +381,13 @@ export default function ProductsClient({
           element on this page in one shot. */}
         <div
           className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
+          style={plpDensity}
           data-zone="products"
         >
           {/* Breadcrumb */}
           <nav
             className="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
-            style={zoneStyle(plpSubtitleZone)}
+            style={zoneStyle(plpSubtitleZone, plpScale)}
           >
             <Link href="/" className="transition-colors hover:text-primary">
               {t('Home', translations['Home'])}
@@ -387,7 +395,7 @@ export default function ProductsClient({
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            <span className="text-foreground" style={zoneStyle(plpSubtitleZone)}>
+            <span className="text-foreground" style={zoneStyle(plpSubtitleZone, plpScale)}>
               {t('Products', translations['Products'])}
             </span>
           </nav>
@@ -396,11 +404,11 @@ export default function ProductsClient({
           <div className="mb-8">
             <h1
               className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
-              style={zoneStyle(plpHeadingZone)}
+              style={zoneStyle(plpHeadingZone, plpScale)}
             >
               {t('All Products', translations['All Products'])}
             </h1>
-            <p className="mt-2 text-muted-foreground" style={zoneStyle(plpSubtitleZone)}>
+            <p className="mt-2 text-muted-foreground" style={zoneStyle(plpSubtitleZone, plpScale)}>
               {t(
                 'Browse our collection of premium products',
                 '\u062a\u0635\u0641\u062d \u0645\u062c\u0645\u0648\u0639\u062a\u0646\u0627 \u0645\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0645\u0645\u064a\u0632\u0629'

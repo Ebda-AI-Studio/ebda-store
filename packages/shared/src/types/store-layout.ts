@@ -417,12 +417,33 @@ export type PdpImageAspect = 'square' | 'portrait' | 'landscape' | 'wide' | 'ult
  */
 export type PageColorScheme = 'auto' | 'light' | 'dark';
 
+/**
+ * Per-page spacing density. Scales the page's vertical padding + rhythm so the
+ * merchant gets a tighter or airier page without hand-tuning every gap.
+ *   'compact'  → tighter vertical spacing
+ *   'normal'   → default (no change)
+ *   'spacious' → airier vertical spacing
+ */
+export type PageDensity = 'compact' | 'normal' | 'spacious';
+
+/**
+ * Per-page text-size scale. One dial that scales all of the page's typography
+ * controls together (heading / subtitle / name / price / label / cta) instead
+ * of editing each zone's font size individually.
+ *   'sm' → 0.9×   'normal' → 1×   'lg' → 1.15×   'xl' → 1.3×
+ */
+export type PageTextScale = 'sm' | 'normal' | 'lg' | 'xl';
+
 export interface ProductsPageSettings {
   /** Background colour for the products listing page (token:primary / hex / etc).
    *  Resolved via resolveColor on the storefront. Undefined = theme default. */
   bgColor?: string;
   /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
   colorScheme?: PageColorScheme;
+  /** Spacing density — scales the page's vertical padding. Default 'normal'. */
+  density?: PageDensity;
+  /** Text-size scale — scales all of this page's typography controls. Default 'normal'. */
+  textScale?: PageTextScale;
   /**
    * PLP typography — breadcrumb + secondary text use `subtitle`, the "All
    * Products" H1 uses `heading`. Applied inline so it beats the page's Tailwind
@@ -446,6 +467,10 @@ export interface ProductDetailPageSettings {
   bgColor?: string;
   /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
   colorScheme?: PageColorScheme;
+  /** Spacing density — scales the page's vertical padding. Default 'normal'. */
+  density?: PageDensity;
+  /** Text-size scale — scales all of this page's typography controls. Default 'normal'. */
+  textScale?: PageTextScale;
   /** Aspect ratio for the main product image. Undefined / 'auto' = square. */
   imageAspect?: PdpImageAspect;
   /**
@@ -463,6 +488,10 @@ export interface CategoriesPageSettings {
   bgColor?: string;
   /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
   colorScheme?: PageColorScheme;
+  /** Spacing density — scales the page's vertical padding. Default 'normal'. */
+  density?: PageDensity;
+  /** Text-size scale — scales all of this page's typography controls. Default 'normal'. */
+  textScale?: PageTextScale;
   /** Page heading uses `heading`, secondary text uses `subtitle`, category card
    *  labels use `categoryLabel`. Applied inline. */
   typography?: SectionTypographyOverride;
@@ -476,6 +505,10 @@ export interface CheckoutPageSettings {
   bgColor?: string;
   /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
   colorScheme?: PageColorScheme;
+  /** Spacing density — scales the page's vertical padding. Default 'normal'. */
+  density?: PageDensity;
+  /** Text-size scale — scales all of this page's typography controls. Default 'normal'. */
+  textScale?: PageTextScale;
   /** Headings use `heading`, labels use `subtitle`, amounts use `productPrice`. */
   typography?: SectionTypographyOverride;
 }
@@ -492,6 +525,10 @@ export interface CartPageSettings {
   bgColor?: string;
   /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
   colorScheme?: PageColorScheme;
+  /** Spacing density — scales the page's vertical padding. Default 'normal'. */
+  density?: PageDensity;
+  /** Text-size scale — scales all of this page's typography controls. Default 'normal'. */
+  textScale?: PageTextScale;
   /**
    * Cart typography overrides — applied inline so they win over the theme cart
    * components' own classes. Roles:

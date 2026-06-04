@@ -90,12 +90,25 @@ export function responsiveFontSize(size: string | undefined): string | undefined
  * per-page typography (used by the cart + the per-page design controls). Returns
  * undefined when the zone is empty so callers can spread it safely.
  */
-export function zoneStyle(zone?: ResolvedZone): CSSProperties | undefined {
+/** Multiply a px font-size by the page text-scale before the responsive clamp.
+ *  Non-px sizes pass through unscaled (can't safely multiply em/rem here). */
+function scalePx(size: string | undefined, scale: number): string | undefined {
+  if (!size || scale === 1) return size;
+  const m = size.match(/^([\d.]+)px$/);
+  if (!m) return size;
+  return `${(parseFloat(m[1]) * scale).toFixed(2)}px`;
+}
+
+/**
+ * @param scale per-page text-size multiplier (see pageTextScale). 1 = unchanged.
+ */
+export function zoneStyle(zone?: ResolvedZone, scale = 1): CSSProperties | undefined {
   if (!zone) return undefined;
   return {
     fontFamily: zone.fontFamily,
-    // Responsive clamp so a large size never breaks mobile.
-    fontSize: responsiveFontSize(zone.fontSize),
+    // Scale by the page text dial, then responsive-clamp so a large size never
+    // breaks mobile.
+    fontSize: responsiveFontSize(scalePx(zone.fontSize, scale)),
     fontWeight: zone.fontWeight,
     color: zone.color,
     letterSpacing: zone.letterSpacing,
@@ -107,4 +120,29 @@ export function zoneStyle(zone?: ResolvedZone): CSSProperties | undefined {
     textTransform: zone.textTransform as CSSProperties['textTransform'],
     textAlign: zone.textAlign,
   };
+}
+
+/** Map a per-page text-scale dial to a numeric multiplier. */
+export function pageTextScale(scale: 'sm' | 'normal' | 'lg' | 'xl' | undefined): number {
+  return scale === 'sm' ? 0.9 : scale === 'lg' ? 1.15 : scale === 'xl' ? 1.3 : 1;
+}
+
+/** Return a copy of a zone with its px font-size multiplied by `scale`. Used
+ *  when a zone is forwarded into a theme component that applies it itself
+ *  (cart CartTable/OrderSummary, category cards) rather than via zoneStyle(). */
+export function scaleZone(zone: ResolvedZone | undefined, scale: number): ResolvedZone | undefined {
+  if (!zone || scale === 1) return zone;
+  return { ...zone, fontSize: scalePx(zone.fontSize, scale) };
+}
+
+/**
+ * Per-page spacing density → inline padding override for the page container.
+ * 'normal'/undefined returns undefined so the element's default py- class wins.
+ */
+export function pageDensityStyle(
+  density: 'compact' | 'normal' | 'spacious' | undefined
+): CSSProperties | undefined {
+  if (density === 'compact') return { paddingTop: '1rem', paddingBottom: '1rem' };
+  if (density === 'spacious') return { paddingTop: '3.5rem', paddingBottom: '3.5rem' };
+  return undefined;
 }

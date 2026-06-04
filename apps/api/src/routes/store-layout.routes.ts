@@ -525,6 +525,8 @@ const layoutSchema = z
       .object({
         bgColor: colorValue,
         colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
+        density: z.enum(['compact', 'normal', 'spacious']).optional(),
+        textScale: z.enum(['sm', 'normal', 'lg', 'xl']).optional(),
         typography: sectionTypographyOverride,
         // deprecated — kept for back-compat reads; admin now writes to productDetailPage.
         pdpImageAspect: z
@@ -540,6 +542,8 @@ const layoutSchema = z
       .object({
         bgColor: colorValue,
         colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
+        density: z.enum(['compact', 'normal', 'spacious']).optional(),
+        textScale: z.enum(['sm', 'normal', 'lg', 'xl']).optional(),
         imageAspect: z
           .enum(['square', 'portrait', 'landscape', 'wide', 'ultrawide', 'auto'])
           .optional(),
@@ -551,6 +555,8 @@ const layoutSchema = z
       .object({
         bgColor: colorValue,
         colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
+        density: z.enum(['compact', 'normal', 'spacious']).optional(),
+        textScale: z.enum(['sm', 'normal', 'lg', 'xl']).optional(),
         typography: sectionTypographyOverride,
       })
       .partial()
@@ -559,6 +565,8 @@ const layoutSchema = z
       .object({
         bgColor: colorValue,
         colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
+        density: z.enum(['compact', 'normal', 'spacious']).optional(),
+        textScale: z.enum(['sm', 'normal', 'lg', 'xl']).optional(),
         typography: sectionTypographyOverride,
       })
       .partial()
@@ -569,6 +577,8 @@ const layoutSchema = z
       .object({
         bgColor: colorValue,
         colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
+        density: z.enum(['compact', 'normal', 'spacious']).optional(),
+        textScale: z.enum(['sm', 'normal', 'lg', 'xl']).optional(),
         typography: sectionTypographyOverride,
       })
       .partial()

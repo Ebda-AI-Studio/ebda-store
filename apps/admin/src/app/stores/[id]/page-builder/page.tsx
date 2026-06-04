@@ -150,6 +150,12 @@ export default function StoreLayoutPage() {
     colorScheme:
       (layout?.[key] as { colorScheme?: 'auto' | 'light' | 'dark' } | undefined)?.colorScheme ??
       'auto',
+    density:
+      (layout?.[key] as { density?: 'compact' | 'normal' | 'spacious' } | undefined)?.density ??
+      'normal',
+    textScale:
+      (layout?.[key] as { textScale?: 'sm' | 'normal' | 'lg' | 'xl' } | undefined)?.textScale ??
+      'normal',
     typography: (layout?.[key] as { typography?: SectionTypographyOverride } | undefined)
       ?.typography,
     onBg: (v: string) =>
@@ -158,6 +164,10 @@ export default function StoreLayoutPage() {
       setLayout(prev =>
         prev ? { ...prev, [key]: { ...(prev[key] ?? {}), colorScheme: v } } : prev
       ),
+    onDensity: (v: 'compact' | 'normal' | 'spacious') =>
+      setLayout(prev => (prev ? { ...prev, [key]: { ...(prev[key] ?? {}), density: v } } : prev)),
+    onTextScale: (v: 'sm' | 'normal' | 'lg' | 'xl') =>
+      setLayout(prev => (prev ? { ...prev, [key]: { ...(prev[key] ?? {}), textScale: v } } : prev)),
     onChangeRole: (role: SectionTypographyRole, next: Partial<ZoneOverride>) =>
       setLayout(prev => {
         if (!prev) return prev;
@@ -1240,6 +1250,8 @@ export default function StoreLayoutPage() {
                       theme={storeInfo?.theme}
                     />
                     <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
+                    <DensitySelect value={pg.density} onChange={pg.onDensity} />
+                    <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
                     <SectionTypographyBlock
                       roles={roles}
                       typography={pg.typography}
@@ -1270,6 +1282,8 @@ export default function StoreLayoutPage() {
                       theme={storeInfo?.theme}
                     />
                     <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
+                    <DensitySelect value={pg.density} onChange={pg.onDensity} />
+                    <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
                     <label className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-muted-foreground">
                         Main image aspect
@@ -1335,6 +1349,8 @@ export default function StoreLayoutPage() {
                       theme={storeInfo?.theme}
                     />
                     <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
+                    <DensitySelect value={pg.density} onChange={pg.onDensity} />
+                    <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
                     <SectionTypographyBlock
                       roles={roles}
                       typography={pg.typography}
@@ -1365,6 +1381,8 @@ export default function StoreLayoutPage() {
                       theme={storeInfo?.theme}
                     />
                     <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
+                    <DensitySelect value={pg.density} onChange={pg.onDensity} />
+                    <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
                     <SectionTypographyBlock
                       roles={roles}
                       typography={pg.typography}
@@ -1406,6 +1424,24 @@ export default function StoreLayoutPage() {
                     setLayout(prev =>
                       prev
                         ? { ...prev, cartPage: { ...(prev.cartPage ?? {}), colorScheme: v } }
+                        : prev
+                    )
+                  }
+                />
+                <DensitySelect
+                  value={layout.cartPage?.density ?? 'normal'}
+                  onChange={v =>
+                    setLayout(prev =>
+                      prev ? { ...prev, cartPage: { ...(prev.cartPage ?? {}), density: v } } : prev
+                    )
+                  }
+                />
+                <TextScaleSelect
+                  value={layout.cartPage?.textScale ?? 'normal'}
+                  onChange={v =>
+                    setLayout(prev =>
+                      prev
+                        ? { ...prev, cartPage: { ...(prev.cartPage ?? {}), textScale: v } }
                         : prev
                     )
                   }
@@ -2306,6 +2342,55 @@ function SchemeSelect({
         <option value="auto">Auto (from background)</option>
         <option value="light">Light surface · dark text</option>
         <option value="dark">Dark surface · light text</option>
+      </select>
+    </label>
+  );
+}
+
+/** Per-page spacing density — scales the page's vertical padding. */
+function DensitySelect({
+  value,
+  onChange,
+}: {
+  value: 'compact' | 'normal' | 'spacious';
+  onChange: (v: 'compact' | 'normal' | 'spacious') => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-muted-foreground">Spacing density</span>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value as 'compact' | 'normal' | 'spacious')}
+        className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+      >
+        <option value="compact">Compact</option>
+        <option value="normal">Normal</option>
+        <option value="spacious">Spacious</option>
+      </select>
+    </label>
+  );
+}
+
+/** Per-page text-size scale — bumps all the page's typography controls together. */
+function TextScaleSelect({
+  value,
+  onChange,
+}: {
+  value: 'sm' | 'normal' | 'lg' | 'xl';
+  onChange: (v: 'sm' | 'normal' | 'lg' | 'xl') => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-muted-foreground">Text size</span>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value as 'sm' | 'normal' | 'lg' | 'xl')}
+        className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+      >
+        <option value="sm">Small</option>
+        <option value="normal">Normal</option>
+        <option value="lg">Large</option>
+        <option value="xl">Extra large</option>
       </select>
     </label>
   );

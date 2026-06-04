@@ -16,24 +16,10 @@ import { CartRecommendations } from '../../components/CartRecommendations';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import {
   resolveSectionZone,
-  responsiveFontSize,
-  type ResolvedZone,
+  zoneStyle,
+  pageTextScale,
+  pageDensityStyle,
 } from '../../templates/shared/section-typography';
-
-/** Map a resolved cart-typography zone to an inline style. Inline wins over the
- *  hardcoded Tailwind size classes on the cart line items, so the merchant's
- *  standalone Cart-page typography actually applies. */
-function cartZoneStyle(z?: ResolvedZone): React.CSSProperties | undefined {
-  if (!z) return undefined;
-  return {
-    fontFamily: z.fontFamily,
-    fontSize: responsiveFontSize(z.fontSize),
-    fontWeight: z.fontWeight,
-    color: z.color,
-    letterSpacing: z.letterSpacing,
-    lineHeight: z.lineHeight,
-  };
-}
 
 export default function CartClient() {
   const {
@@ -83,6 +69,11 @@ export default function CartClient() {
     store.theme,
     layout?.cartPage?.colorScheme
   );
+  const cartScale = pageTextScale(layout?.cartPage?.textScale);
+  const cartDensity = pageDensityStyle(layout?.cartPage?.density);
+  // Scale-aware cart zone → inline style (closes over the page text dial). Inline
+  // wins over the theme cart components' Tailwind size classes.
+  const cartZoneStyle = (z?: Parameters<typeof zoneStyle>[0]) => zoneStyle(z, cartScale);
   // Bag of inline styles handed to the theme CartTable / OrderSummary so the
   // merchant's Cart-page typography reaches the elements the THEME renders
   // (the fallback markup below applies them directly).
@@ -286,7 +277,7 @@ export default function CartClient() {
   return (
     <ShopChrome>
       <div className="flex-1" style={cartBgStyle}>
-        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={cartDensity}>
           {/* Breadcrumb */}
           <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
             <Link href={storeUrl('/')} className="transition-colors hover:text-primary">

@@ -13,7 +13,12 @@ import { api } from '../../lib/api';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
 import { isValidEmail } from '@force/shared';
 import { pageSurfaceStyle } from '@/lib/page-surface';
-import { resolveSectionZone, zoneStyle } from '../../templates/shared/section-typography';
+import {
+  resolveSectionZone,
+  zoneStyle,
+  pageTextScale,
+  pageDensityStyle,
+} from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
 
 // Lazy-load the payment step component (includes PaymentIcons SVGs)
@@ -79,6 +84,8 @@ export default function CheckoutClient() {
     undefined,
     store?.theme
   );
+  const checkoutScale = pageTextScale(layout?.checkoutPage?.textScale);
+  const checkoutDensity = pageDensityStyle(layout?.checkoutPage?.density);
   const checkoutBgStyle = pageSurfaceStyle(
     layout?.checkoutPage?.bgColor,
     store?.theme,
@@ -87,9 +94,9 @@ export default function CheckoutClient() {
   // Inline-style bag handed to the checkout OrderSummary so the merchant's
   // Checkout-page typography reaches its headings / labels / amounts.
   const checkoutTypography = {
-    heading: zoneStyle(checkoutHeadingZone),
-    label: zoneStyle(checkoutLabelZone),
-    price: zoneStyle(checkoutPriceZone),
+    heading: zoneStyle(checkoutHeadingZone, checkoutScale),
+    label: zoneStyle(checkoutLabelZone, checkoutScale),
+    price: zoneStyle(checkoutPriceZone, checkoutScale),
   };
   // Optional override for the minimal-chrome label on /checkout. Store
   // owners can rename or clear the "Secure Checkout" text via
@@ -786,7 +793,7 @@ export default function CheckoutClient() {
   return (
     <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
       <div className="flex-1" style={checkoutBgStyle}>
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={checkoutDensity}>
           {/* Progress Steps */}
           <div className="mb-8">
             <div className="flex items-center justify-center">
@@ -846,7 +853,7 @@ export default function CheckoutClient() {
                   <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <h2
                       className="text-lg font-semibold text-foreground"
-                      style={zoneStyle(checkoutHeadingZone)}
+                      style={zoneStyle(checkoutHeadingZone, checkoutScale)}
                     >
                       {t(
                         'Shipping Information',
