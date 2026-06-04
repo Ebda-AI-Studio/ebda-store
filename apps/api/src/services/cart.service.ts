@@ -1,6 +1,7 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
+import { retryOnWriteConflict } from '../lib/db-retry';
 
 export class CartService {
   static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
@@ -96,59 +97,74 @@ export class CartService {
     // inventory check before either has written. Note: the definitive inventory
     // lock happens at order creation time (SELECT ... FOR UPDATE in order.service),
     // but this transaction reduces the window for overselling at cart level.
-    await prisma.$transaction(
-      async tx => {
-        // Verify product exists and is active
-        const product = await tx.product.findFirst({
-          where: { id: productId, storeId, status: 'active' },
-        });
+    //
+    // Serializable isolation aborts conflicting transactions with P2034 under
+    // concurrency (e.g. many shoppers adding the same hot product at once). The
+    // retry wrapper turns those transient conflicts into a brief backoff+retry
+    // instead of a 500 — without it a load test surfaced ~18% failures on a hot
+    // product. Business errors (INSUFFICIENT_INVENTORY, NOT_FOUND) are not P2034
+    // so they propagate immediately and are never retried.
+    await retryOnWriteConflict(
+      () =>
+        prisma.$transaction(
+          async tx => {
+            // Verify product exists and is active
+            const product = await tx.product.findFirst({
+              where: { id: productId, storeId, status: 'active' },
+            });
 
-        if (!product) {
-          throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
-        }
+            if (!product) {
+              throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
+            }
 
-        // Check if item already exists
-        const existingItem = await tx.cartItem.findFirst({
-          where: { cartId: cart.id, productId },
-        });
+            // Check if item already exists
+            const existingItem = await tx.cartItem.findFirst({
+              where: { cartId: cart.id, productId },
+            });
 
-        // effectiveAllowBackorder: the per-product flag is only honoured when
-        // the store-level inventory.backorder feature is enabled.
-        const effectiveAllowBackorder = backorderFeatureEnabled && product.allowBackorder;
+            // effectiveAllowBackorder: the per-product flag is only honoured when
+            // the store-level inventory.backorder feature is enabled.
+            const effectiveAllowBackorder = backorderFeatureEnabled && product.allowBackorder;
 
-        if (existingItem) {
-          const newQuantity = existingItem.quantity + quantity;
+            if (existingItem) {
+              const newQuantity = existingItem.quantity + quantity;
 
-          if (
-            product.trackInventory &&
-            product.inventory < newQuantity &&
-            !effectiveAllowBackorder
-          ) {
-            throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
+              if (
+                product.trackInventory &&
+                product.inventory < newQuantity &&
+                !effectiveAllowBackorder
+              ) {
+                throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
+              }
+
+              await tx.cartItem.update({
+                where: { id: existingItem.id },
+                data: { quantity: newQuantity },
+              });
+            } else {
+              // Check inventory for new item
+              if (
+                product.trackInventory &&
+                product.inventory < quantity &&
+                !effectiveAllowBackorder
+              ) {
+                throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
+              }
+
+              await tx.cartItem.create({
+                data: {
+                  cartId: cart.id,
+                  productId,
+                  quantity,
+                },
+              });
+            }
+          },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           }
-
-          await tx.cartItem.update({
-            where: { id: existingItem.id },
-            data: { quantity: newQuantity },
-          });
-        } else {
-          // Check inventory for new item
-          if (product.trackInventory && product.inventory < quantity && !effectiveAllowBackorder) {
-            throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
-          }
-
-          await tx.cartItem.create({
-            data: {
-              cartId: cart.id,
-              productId,
-              quantity,
-            },
-          });
-        }
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      }
+        ),
+      { label: 'cart.addItem' }
     );
 
     // Track activity for abandonment detection
@@ -185,49 +201,53 @@ export class CartService {
     });
     const productById = new Map(products.map(p => [p.id, p]));
 
-    await prisma.$transaction(
-      async tx => {
-        const existingItems = await tx.cartItem.findMany({
-          where: { cartId: cart.id, productId: { in: productIds } },
-        });
-        const existingByProduct = new Map(existingItems.map(i => [i.productId, i]));
-
-        for (const item of items) {
-          const product = productById.get(item.productId);
-          if (!product) continue;
-
-          const existing = existingByProduct.get(item.productId);
-          const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
-
-          // effectiveAllowBackorder: per-product flag only honoured when the
-          // store-level inventory.backorder feature is enabled.
-          const effectiveAllowBackorder = backorderFeatureEnabled && product.allowBackorder;
-
-          if (
-            product.trackInventory &&
-            product.inventory < targetQuantity &&
-            !effectiveAllowBackorder
-          ) {
-            throw new AppError(
-              400,
-              'INSUFFICIENT_INVENTORY',
-              `Not enough inventory for product ${item.productId}`
-            );
-          }
-
-          if (existing) {
-            await tx.cartItem.update({
-              where: { id: existing.id },
-              data: { quantity: targetQuantity },
+    await retryOnWriteConflict(
+      () =>
+        prisma.$transaction(
+          async tx => {
+            const existingItems = await tx.cartItem.findMany({
+              where: { cartId: cart.id, productId: { in: productIds } },
             });
-          } else {
-            await tx.cartItem.create({
-              data: { cartId: cart.id, productId: item.productId, quantity: item.quantity },
-            });
-          }
-        }
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+            const existingByProduct = new Map(existingItems.map(i => [i.productId, i]));
+
+            for (const item of items) {
+              const product = productById.get(item.productId);
+              if (!product) continue;
+
+              const existing = existingByProduct.get(item.productId);
+              const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
+
+              // effectiveAllowBackorder: per-product flag only honoured when the
+              // store-level inventory.backorder feature is enabled.
+              const effectiveAllowBackorder = backorderFeatureEnabled && product.allowBackorder;
+
+              if (
+                product.trackInventory &&
+                product.inventory < targetQuantity &&
+                !effectiveAllowBackorder
+              ) {
+                throw new AppError(
+                  400,
+                  'INSUFFICIENT_INVENTORY',
+                  `Not enough inventory for product ${item.productId}`
+                );
+              }
+
+              if (existing) {
+                await tx.cartItem.update({
+                  where: { id: existing.id },
+                  data: { quantity: targetQuantity },
+                });
+              } else {
+                await tx.cartItem.create({
+                  data: { cartId: cart.id, productId: item.productId, quantity: item.quantity },
+                });
+              }
+            }
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+        ),
+      { label: 'cart.addItems' }
     );
 
     await prisma.cart.update({
