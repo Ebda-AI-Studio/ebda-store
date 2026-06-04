@@ -170,7 +170,7 @@ export function SectionHeading({
           on the end edge. Mobile-first — on narrow viewports seeAll drops below
           the heading block instead of overlapping the centered title. */}
       <div className="relative">
-        <div className="flex flex-col items-stretch gap-1.5 sm:gap-2">
+        <div className="flex flex-col items-stretch gap-2">
           {kickerText && (
             // Editorial section divider — two hairline rules flanking the
             // kicker text (Ahmad 2026-05-17). The flanking lines can be
@@ -201,7 +201,7 @@ export function SectionHeading({
                 />
               )}
               <span
-                className="text-base font-semibold uppercase tracking-[0.18em] text-foreground/70"
+                className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/70"
                 data-zone="sectionKicker"
                 style={{
                   fontFamily: kickerZone?.fontFamily,

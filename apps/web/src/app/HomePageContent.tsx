@@ -374,7 +374,7 @@ export function HomePageContent({
             {layout.categories.enabled && templateCategories.length > 0 && (
               <section
                 data-section="categories"
-                className="bg-[hsl(var(--bg-page))] pt-12 pb-14 sm:pt-16 sm:pb-16 lg:pt-20 lg:pb-20"
+                className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
                 style={sectionBgStyle(layout.categories.bgColor, store.theme)}
               >
                 {(() => {
@@ -479,7 +479,7 @@ export function HomePageContent({
             {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
               <section
                 data-section="newArrivals"
-                className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20"
+                className="bg-[hsl(var(--bg-section-alt))] py-12 sm:py-16 lg:py-20"
                 style={sectionBgStyle(layout.newArrivals.bgColor, store.theme)}
               >
                 {T.ProductCarousel ? (
@@ -562,7 +562,7 @@ export function HomePageContent({
             {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
               <section
                 data-section="bestSellers"
-                className="bg-[hsl(var(--bg-page))] py-14 sm:py-16 lg:py-20"
+                className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
                 style={sectionBgStyle(layout.bestSellers.bgColor, store.theme)}
               >
                 {T.ProductCarousel ? (
@@ -690,7 +690,7 @@ export function HomePageContent({
             {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
               <section
                 data-section="testimonials"
-                className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-20"
+                className="bg-[hsl(var(--bg-section-alt))] py-12 sm:py-16 lg:py-20"
                 style={sectionBgStyle(layout.testimonials.bgColor, store.theme)}
               >
                 <T.TestimonialRow
@@ -781,7 +781,7 @@ export function HomePageContent({
               )}
               <section
                 data-section={`extra:${extra.id}`}
-                className="bg-[hsl(var(--bg-page))] py-14 sm:py-16 lg:py-20"
+                className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
                 style={sectionBgStyle(extra.bgColor, store.theme)}
               >
                 <T.ProductCarousel
@@ -831,7 +831,7 @@ export function HomePageContent({
       {!layout.newArrivals.enabled &&
         !layout.bestSellers.enabled &&
         templateProducts.length > 0 && (
-          <section className="bg-[hsl(var(--bg-section-alt))] py-14 sm:py-16 lg:py-24">
+          <section className="bg-[hsl(var(--bg-section-alt))] py-12 sm:py-16 lg:py-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <T.ProductGrid
                 products={templateProducts}

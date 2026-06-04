@@ -75,9 +75,9 @@ export function productSizeClass(size: CardSize | undefined): string {
 export function gridGapClass(gap: CardGap | undefined): string {
   switch (gap) {
     case 'tight':
-      return 'gap-1.5 sm:gap-2';
+      return 'gap-2 sm:gap-3';
     case 'loose':
-      return 'gap-5 sm:gap-6';
+      return 'gap-4 sm:gap-6';
     case 'xloose':
       return 'gap-8 sm:gap-10';
     case 'normal':

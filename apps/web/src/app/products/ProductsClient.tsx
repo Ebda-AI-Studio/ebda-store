@@ -570,7 +570,7 @@ export default function ProductsClient({
                 from the `pack` prop (see templates/shared/pack-styles.ts). */}
               {!isLoading && !error && viewMode === 'grid' && (
                 <div
-                  className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-4 sm:gap-5 lg:gap-6'}`}
+                  className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`}
                   dir={language === 'ar' ? 'rtl' : 'ltr'}
                 >
                   {products.map(p => (
