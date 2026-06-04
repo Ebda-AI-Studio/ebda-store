@@ -86,6 +86,7 @@ function SearchContent() {
       {
         id: product.id,
         name: product.name,
+        nameAr: product.nameAr ?? undefined,
         price: product.price,
         slug: product.slug,
         image: product.images?.[0]?.url,

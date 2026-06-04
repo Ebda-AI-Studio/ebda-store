@@ -286,6 +286,7 @@ export default function ProductsClient({
     addItem({
       id: product.id,
       name: product.name,
+      nameAr: product.nameAr ?? undefined,
       price: product.price,
       slug: product.slug,
       image: product.images?.[0]?.url,
@@ -612,6 +613,7 @@ export default function ProductsClient({
                         addItem({
                           id: found.id,
                           name: found.name,
+                          nameAr: found.nameAr ?? undefined,
                           price: found.price,
                           slug: found.slug,
                           image: found.images?.[0]?.url,

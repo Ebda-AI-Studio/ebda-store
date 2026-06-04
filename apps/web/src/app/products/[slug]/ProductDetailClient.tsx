@@ -285,6 +285,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       {
         id: product.id,
         name: product.name,
+        nameAr: product.nameAr ?? undefined,
         // Use variant price when a variant is selected
         price: selectedVariant ? selectedVariant.price : product.price,
         slug: product.slug,
