@@ -48,7 +48,7 @@ export default function BoldOrderSummary({
           >
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
-          <dd className="font-black text-foreground" style={typography?.price}>
+          <dd className="font-black text-foreground tabular-nums" style={typography?.price}>
             {fmt(subtotal)}
           </dd>
         </div>
@@ -57,7 +57,7 @@ export default function BoldOrderSummary({
             <dt className="font-bold uppercase tracking-wider" style={typography?.label}>
               {discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}
             </dt>
-            <dd className="font-black" style={typography?.price}>
+            <dd className="font-black tabular-nums" style={typography?.price}>
               −{fmt(discount)}
             </dd>
           </div>
@@ -69,7 +69,7 @@ export default function BoldOrderSummary({
           >
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
-          <dd className="font-black text-foreground" style={typography?.price}>
+          <dd className="font-black text-foreground tabular-nums" style={typography?.price}>
             {freeShipping ? (
               <span className="text-success">{isRtl ? 'مجاني' : 'FREE'}</span>
             ) : (
@@ -85,7 +85,7 @@ export default function BoldOrderSummary({
             >
               {isRtl ? 'الضريبة' : 'Tax'}
             </dt>
-            <dd className="font-black text-foreground" style={typography?.price}>
+            <dd className="font-black text-foreground tabular-nums" style={typography?.price}>
               {fmt(tax)}
             </dd>
           </div>
@@ -98,7 +98,7 @@ export default function BoldOrderSummary({
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
           <dd
-            className="text-2xl font-black tracking-tight text-foreground"
+            className="text-2xl font-black tracking-tight text-foreground tabular-nums"
             style={typography?.price}
           >
             {fmt(total)}

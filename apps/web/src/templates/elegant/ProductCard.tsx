@@ -266,7 +266,7 @@ function ElegantProductCard({
             isRtl={isRtl}
             size="sm"
             showDiscount={false}
-            className="justify-center text-muted-foreground font-light"
+            className="justify-center text-muted-foreground font-light tabular-nums"
           />
           <TaxInclusiveLabel className="block text-[10px] tracking-[0.2em] uppercase text-muted-foreground/60" />
         </div>

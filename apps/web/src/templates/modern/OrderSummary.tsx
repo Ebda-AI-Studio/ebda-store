@@ -45,14 +45,14 @@ export default function ModernOrderSummary({
           <dt className="text-muted-foreground" style={typography?.label}>
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
-          <dd className="font-medium text-foreground" style={typography?.price}>
+          <dd className="font-medium text-foreground tabular-nums" style={typography?.price}>
             {fmt(subtotal)}
           </dd>
         </div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-success">
             <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
-            <dd className="font-medium" style={typography?.price}>
+            <dd className="font-medium tabular-nums" style={typography?.price}>
               −{fmt(discount)}
             </dd>
           </div>
@@ -61,7 +61,7 @@ export default function ModernOrderSummary({
           <dt className="text-muted-foreground" style={typography?.label}>
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
-          <dd className="font-medium text-foreground" style={typography?.price}>
+          <dd className="font-medium text-foreground tabular-nums" style={typography?.price}>
             {freeShipping ? (
               <span className="text-success">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
@@ -74,7 +74,7 @@ export default function ModernOrderSummary({
             <dt className="text-muted-foreground" style={typography?.label}>
               {isRtl ? 'الضريبة' : 'Tax'}
             </dt>
-            <dd className="font-medium text-foreground" style={typography?.price}>
+            <dd className="font-medium text-foreground tabular-nums" style={typography?.price}>
               {fmt(tax)}
             </dd>
           </div>
@@ -83,7 +83,7 @@ export default function ModernOrderSummary({
           <dt className="text-base font-semibold text-foreground" style={typography?.heading}>
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
-          <dd className="text-xl font-bold text-primary" style={typography?.price}>
+          <dd className="text-xl font-bold text-primary tabular-nums" style={typography?.price}>
             {fmt(total)}
           </dd>
         </div>

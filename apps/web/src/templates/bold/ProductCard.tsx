@@ -195,7 +195,7 @@ function BoldProductCard({
             isRtl={isRtl}
             size="lg"
             showDiscount={false}
-            className="font-black"
+            className="font-black tabular-nums"
           />
           <TaxInclusiveLabel className="block text-xs uppercase tracking-wide text-muted-foreground" />
         </div>

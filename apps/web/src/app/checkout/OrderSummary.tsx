@@ -149,7 +149,7 @@ export function OrderSummary({
             <span className="text-muted-foreground" style={typography?.label}>
               {t('Subtotal', translations['Subtotal'])}
             </span>
-            <span className="font-medium" style={typography?.price}>
+            <span className="font-medium tabular-nums" style={typography?.price}>
               {formatPrice(subtotal)}
             </span>
           </div>
@@ -158,7 +158,10 @@ export function OrderSummary({
               <span className="text-[hsl(var(--success))]" style={typography?.label}>
                 {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
               </span>
-              <span className="font-medium text-[hsl(var(--success))]" style={typography?.price}>
+              <span
+                className="font-medium text-[hsl(var(--success))] tabular-nums"
+                style={typography?.price}
+              >
                 -{formatPrice(discount)}
               </span>
             </div>
@@ -168,7 +171,7 @@ export function OrderSummary({
               {t('Shipping', translations['Shipping'])}
             </span>
             <span
-              className={`font-medium ${freeShipping ? 'text-[hsl(var(--success))]' : ''}`}
+              className={`font-medium tabular-nums ${freeShipping ? 'text-[hsl(var(--success))]' : ''}`}
               style={typography?.price}
             >
               {freeShipping
@@ -185,7 +188,7 @@ export function OrderSummary({
             <span className="text-lg font-semibold text-foreground" style={typography?.heading}>
               {t('Total', translations['Total'])}
             </span>
-            <span className="text-lg font-bold text-primary" style={typography?.price}>
+            <span className="text-lg font-bold text-primary tabular-nums" style={typography?.price}>
               {formatPrice(total)}
             </span>
           </div>

@@ -35,21 +35,23 @@ export default function MinimalOrderSummary({
           <dt className="text-muted-foreground" style={typography?.label}>
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
-          <dd className="text-foreground" style={typography?.price}>
+          <dd className="text-foreground tabular-nums" style={typography?.price}>
             {fmt(subtotal)}
           </dd>
         </div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-success">
             <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
-            <dd style={typography?.price}>−{fmt(discount)}</dd>
+            <dd className="tabular-nums" style={typography?.price}>
+              −{fmt(discount)}
+            </dd>
           </div>
         )}
         <div className="flex items-center justify-between">
           <dt className="text-muted-foreground" style={typography?.label}>
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
-          <dd className="text-foreground" style={typography?.price}>
+          <dd className="text-foreground tabular-nums" style={typography?.price}>
             {freeShipping ? (
               <span className="text-success">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
@@ -62,7 +64,7 @@ export default function MinimalOrderSummary({
             <dt className="text-muted-foreground" style={typography?.label}>
               {isRtl ? 'الضريبة' : 'Tax'}
             </dt>
-            <dd className="text-foreground" style={typography?.price}>
+            <dd className="text-foreground tabular-nums" style={typography?.price}>
               {fmt(tax)}
             </dd>
           </div>
@@ -71,7 +73,7 @@ export default function MinimalOrderSummary({
           <dt className="text-foreground" style={typography?.heading}>
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
-          <dd className="text-lg text-foreground" style={typography?.price}>
+          <dd className="text-lg text-foreground tabular-nums" style={typography?.price}>
             {fmt(total)}
           </dd>
         </div>

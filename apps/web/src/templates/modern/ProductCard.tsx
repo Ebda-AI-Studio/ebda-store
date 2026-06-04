@@ -257,7 +257,7 @@ function ModernProductCard({
             {isRtl && product.nameAr ? product.nameAr : product.name}
           </h3>
 
-          <div className="mt-auto pt-1">
+          <div className="mt-auto pt-1 tabular-nums">
             <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
               <meta itemProp="priceCurrency" content={currency} />
               <meta itemProp="price" content={String(product.price / 1000)} />

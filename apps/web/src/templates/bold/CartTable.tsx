@@ -55,7 +55,7 @@ export default function BoldCartTable({
                     {displayName}
                   </Link>
                   <p
-                    className="mt-1 text-sm font-bold uppercase tracking-wider text-primary"
+                    className="mt-1 text-sm font-bold uppercase tracking-wider text-primary tabular-nums"
                     style={typography?.price}
                   >
                     {format(item.price)}
@@ -100,7 +100,7 @@ export default function BoldCartTable({
                   </button>
                 </div>
                 <p
-                  className="text-base font-black uppercase tracking-tight text-foreground"
+                  className="text-base font-black uppercase tracking-tight text-foreground tabular-nums"
                   style={typography?.price}
                 >
                   {format(item.price * item.quantity)}

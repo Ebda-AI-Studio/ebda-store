@@ -45,7 +45,7 @@ export default function ElegantOrderSummary({
           <dt className="tracking-wide text-muted-foreground" style={typography?.label}>
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
-          <dd className="tracking-wide text-foreground" style={typography?.price}>
+          <dd className="tracking-wide text-foreground tabular-nums" style={typography?.price}>
             {fmt(subtotal)}
           </dd>
         </div>
@@ -54,7 +54,7 @@ export default function ElegantOrderSummary({
             <dt className="tracking-wide" style={typography?.label}>
               {discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}
             </dt>
-            <dd className="tracking-wide" style={typography?.price}>
+            <dd className="tracking-wide tabular-nums" style={typography?.price}>
               −{fmt(discount)}
             </dd>
           </div>
@@ -63,7 +63,7 @@ export default function ElegantOrderSummary({
           <dt className="tracking-wide text-muted-foreground" style={typography?.label}>
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
-          <dd className="tracking-wide text-foreground" style={typography?.price}>
+          <dd className="tracking-wide text-foreground tabular-nums" style={typography?.price}>
             {freeShipping ? (
               <span className="text-success uppercase tracking-[0.2em] text-xs">
                 {isRtl ? 'مجاني' : 'Complimentary'}
@@ -78,7 +78,7 @@ export default function ElegantOrderSummary({
             <dt className="tracking-wide text-muted-foreground" style={typography?.label}>
               {isRtl ? 'الضريبة' : 'Tax'}
             </dt>
-            <dd className="tracking-wide text-foreground" style={typography?.price}>
+            <dd className="tracking-wide text-foreground tabular-nums" style={typography?.price}>
               {fmt(tax)}
             </dd>
           </div>
@@ -91,7 +91,7 @@ export default function ElegantOrderSummary({
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
           <dd
-            className="text-xl font-light tracking-wide text-foreground"
+            className="text-xl font-light tracking-wide text-foreground tabular-nums"
             style={typography?.price}
           >
             {fmt(total)}

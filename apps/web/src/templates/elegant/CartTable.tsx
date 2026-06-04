@@ -55,7 +55,7 @@ export default function ElegantCartTable({
                     {displayName}
                   </Link>
                   <p
-                    className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground"
+                    className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums"
                     style={typography?.price}
                   >
                     {format(item.price)}
@@ -98,7 +98,7 @@ export default function ElegantCartTable({
                   </button>
                 </div>
                 <p
-                  className="text-sm font-light tracking-wide text-foreground"
+                  className="text-sm font-light tracking-wide text-foreground tabular-nums"
                   style={typography?.price}
                 >
                   {format(item.price * item.quantity)}

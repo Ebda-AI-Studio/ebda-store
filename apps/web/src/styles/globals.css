@@ -927,3 +927,10 @@
     filter: brightness(1.05);
   }
 }
+
+/* Prices render with tabular figures so digit widths don't jitter or
+   misalign on quantity / promo updates (UI/UX audit P0). Covers every
+   price tagged data-zone="productPrice" — shared cards, PDP, cart. */
+[data-zone='productPrice'] {
+  font-variant-numeric: tabular-nums;
+}

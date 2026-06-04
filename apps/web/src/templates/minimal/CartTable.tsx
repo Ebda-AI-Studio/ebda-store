@@ -53,7 +53,10 @@ export default function MinimalCartTable({
                 >
                   {displayName}
                 </Link>
-                <p className="mt-1 text-sm text-muted-foreground" style={typography?.price}>
+                <p
+                  className="mt-1 text-sm text-muted-foreground tabular-nums"
+                  style={typography?.price}
+                >
                   {format(item.price)}
                 </p>
               </div>
@@ -94,7 +97,7 @@ export default function MinimalCartTable({
                     {isRtl ? 'إزالة' : 'Remove'}
                   </button>
                 </div>
-                <p className="text-sm text-foreground" style={typography?.price}>
+                <p className="text-sm text-foreground tabular-nums" style={typography?.price}>
                   {format(item.price * item.quantity)}
                 </p>
               </div>

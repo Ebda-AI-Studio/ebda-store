@@ -61,7 +61,10 @@ export default function ClassicCartTable({
                   >
                     {displayName}
                   </Link>
-                  <p className="mt-1 text-sm text-muted-foreground" style={typography?.price}>
+                  <p
+                    className="mt-1 text-sm text-muted-foreground tabular-nums"
+                    style={typography?.price}
+                  >
                     {format(item.price)}
                   </p>
                 </div>
@@ -101,7 +104,7 @@ export default function ClassicCartTable({
                   </button>
                 </div>
                 <p
-                  className="text-base font-semibold tracking-tight text-foreground"
+                  className="text-base font-semibold tracking-tight text-foreground tabular-nums"
                   style={typography?.price}
                 >
                   {format(item.price * item.quantity)}

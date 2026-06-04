@@ -45,21 +45,23 @@ export default function ClassicOrderSummary({
           <dt className="text-muted-foreground" style={typography?.label}>
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
-          <dd className="tracking-tight text-foreground" style={typography?.price}>
+          <dd className="tracking-tight text-foreground tabular-nums" style={typography?.price}>
             {fmt(subtotal)}
           </dd>
         </div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-success">
             <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
-            <dd style={typography?.price}>−{fmt(discount)}</dd>
+            <dd className="tabular-nums" style={typography?.price}>
+              −{fmt(discount)}
+            </dd>
           </div>
         )}
         <div className="flex items-center justify-between">
           <dt className="text-muted-foreground" style={typography?.label}>
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
-          <dd className="tracking-tight text-foreground" style={typography?.price}>
+          <dd className="tracking-tight text-foreground tabular-nums" style={typography?.price}>
             {freeShipping ? (
               <span className="text-success uppercase text-xs">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
@@ -72,7 +74,7 @@ export default function ClassicOrderSummary({
             <dt className="text-muted-foreground" style={typography?.label}>
               {isRtl ? 'الضريبة' : 'Tax'}
             </dt>
-            <dd className="tracking-tight text-foreground" style={typography?.price}>
+            <dd className="tracking-tight text-foreground tabular-nums" style={typography?.price}>
               {fmt(tax)}
             </dd>
           </div>
@@ -85,7 +87,7 @@ export default function ClassicOrderSummary({
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
           <dd
-            className="text-lg font-semibold tracking-tight text-foreground"
+            className="text-lg font-semibold tracking-tight text-foreground tabular-nums"
             style={typography?.price}
           >
             {fmt(total)}

@@ -203,7 +203,7 @@ function MinimalProductCard({
             isRtl={isRtl}
             size="sm"
             showDiscount={false}
-            className="text-[11px] tracking-wide font-light text-muted-foreground"
+            className="text-[11px] tracking-wide font-light text-muted-foreground tabular-nums"
           />
           {/* Discount indicator — minimal pack stays chrome-free, so use a
             short uppercase 'sale' label inline rather than a badge box. */}

@@ -198,7 +198,7 @@ function ClassicProductCard({
             isRtl={isRtl}
             size="sm"
             showDiscount={false}
-            className="justify-center font-serif text-muted-foreground"
+            className="justify-center font-serif text-muted-foreground tabular-nums"
           />
           <TaxInclusiveLabel className="mt-1 block font-serif text-xs text-muted-foreground/70" />
         </div>

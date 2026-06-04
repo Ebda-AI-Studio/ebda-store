@@ -70,7 +70,10 @@ export default function ModernCartTable({
                 >
                   {displayName}
                 </Link>
-                <p className="mt-1 text-sm font-medium text-primary" style={typography?.price}>
+                <p
+                  className="mt-1 text-sm font-medium text-primary tabular-nums"
+                  style={typography?.price}
+                >
                   {format(item.price)}
                 </p>
               </div>
@@ -120,7 +123,7 @@ export default function ModernCartTable({
 
                 <div className="flex items-center gap-4">
                   <p
-                    className="text-sm font-bold text-foreground sm:text-base"
+                    className="text-sm font-bold text-foreground sm:text-base tabular-nums"
                     style={typography?.price}
                   >
                     {format(lineTotal)}
