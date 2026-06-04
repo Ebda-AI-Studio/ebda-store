@@ -213,6 +213,34 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 });
 
 // Remove item from wishlist
+// DELETE /product/:productId — remove by product id (PDP toggle only knows the
+// productId, not the wishlist-item id). Idempotent: deletes any of the user's
+// wishlist items for this product. Defined before /:itemId (different segment
+// count, but explicit ordering avoids ambiguity).
+router.delete(
+  '/product/:productId',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = customerUserId(req);
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+        });
+        return;
+      }
+      const { productId } = req.params;
+      await prisma.wishlistItem.deleteMany({
+        where: { productId, wishlist: { userId } },
+      });
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 router.delete('/:itemId', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = customerUserId(req);

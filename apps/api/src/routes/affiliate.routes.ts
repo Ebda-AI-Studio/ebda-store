@@ -442,7 +442,7 @@ router.get(
 
 // POST /public/:storeId/affiliates/apply
 router.post(
-  '/public/:storeId/affiliates/apply',
+  '/:storeId/affiliates/apply',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = applySchema.parse(req.body);
@@ -456,7 +456,7 @@ router.post(
 
 // GET /public/:storeId/affiliates/track?ref=CODE
 router.get(
-  '/public/:storeId/affiliates/track',
+  '/:storeId/affiliates/track',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

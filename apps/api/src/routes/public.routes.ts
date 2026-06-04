@@ -269,6 +269,34 @@ router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next
   }
 });
 
+// POST /cart/sync - bulk-merge a guest cart into the session cart (post-login
+// migration). Mirrors POST /cart/items but takes an array; uses the existing
+// CartService.addItems. Without this the storefront's guest->login cart
+// migration hit a 404 and silently lost the cart.
+const syncCartSchema = z.object({
+  items: z
+    .array(z.object({ productId: z.string().uuid(), quantity: z.number().int().min(1) }))
+    .max(100),
+});
+router.post('/cart/sync', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sessionId = req.headers['x-session-id'] as string;
+    if (!sessionId) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+      });
+      return;
+    }
+    const { items } = syncCartSchema.parse(req.body);
+    const storeId = await getStoreIdFromRequest(req);
+    const cart = await CartService.addItems(storeId, sessionId, items);
+    res.json({ success: true, data: { cart } });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PUT /cart/items/:itemId - Update cart item
 router.put(
   '/cart/items/:itemId',

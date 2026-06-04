@@ -1293,6 +1293,7 @@ interface ShipmentHistoryEntry {
  */
 router.get(
   '/:storeId/orders/:orderId/timeline',
+  authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;

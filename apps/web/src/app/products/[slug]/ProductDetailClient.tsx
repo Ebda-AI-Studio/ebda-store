@@ -254,7 +254,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     setIsTogglingWishlist(true);
     try {
       if (isWishlisted) {
-        await api.delete(`/wishlist/${product.id}`);
+        await api.delete(`/wishlist/product/${product.id}`);
         setIsWishlisted(false);
         toastSuccess('Removed from wishlist', `${product.name} removed from your wishlist`);
       } else {
