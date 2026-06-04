@@ -5,8 +5,59 @@ import {
   DEFAULT_DIVIDER_SETTINGS,
   resolveColor,
   type DividerSettings,
+  type SectionDividers,
   type StoreTheme,
 } from '@force/shared';
+
+/** The five divider slots a section can render, in storefront top-to-bottom order. */
+const DIVIDER_SLOTS = ['above', 'kicker', 'title', 'subtitle', 'belowHeading'] as const;
+type DividerSlotKey = (typeof DIVIDER_SLOTS)[number];
+
+/** True when a slot carries an explicit merchant style pick (vs. just `enabled`). */
+export function hasExplicitDividerPick(slot: Partial<DividerSettings> | undefined): boolean {
+  return (
+    !!slot && (slot.color !== undefined || !!slot.customColor || !!slot.thickness || !!slot.style)
+  );
+}
+
+/**
+ * Resolve the effective settings for ONE divider slot within a section.
+ *
+ * The page-builder admin exposes a SINGLE shared colour/style control per
+ * section that is meant to apply to every enabled slot ("the styling below
+ * applies to all enabled slots so they stay visually consistent"). The admin
+ * only fans that style onto slots that already exist, so a slot enabled AFTER
+ * the colour was picked gets saved as `{ enabled: true }` only. Slots that
+ * default OFF — "Around title", "Above this section", "Below heading" — commonly
+ * miss the fan-out while "Around subtitle" (default ON) keeps the pick. The
+ * result was the missing slots rendering the default foreground hairline instead
+ * of the merchant's colour (Ahmad 2026-06-04: "do not take the color i picked").
+ *
+ * This makes every slot inherit the section's shared pick when it has none of
+ * its own — honouring the admin's intent AND repairing already-saved stores
+ * without a re-save. The slot's own `enabled` (and any own style fields) always
+ * win; the shared pick's `enabled` is never leaked.
+ */
+export function resolveSlotDividerSettings(
+  dividers: SectionDividers | undefined,
+  slot: DividerSlotKey
+): Partial<DividerSettings> | undefined {
+  const own = dividers?.[slot];
+  if (!own || hasExplicitDividerPick(own)) return own;
+  const shared = DIVIDER_SLOTS.map(k => dividers?.[k]).find(hasExplicitDividerPick);
+  if (!shared) return own;
+  // Inherit the shared pick's STYLE only (never its `enabled`); the slot's own
+  // fields — including its `enabled` — always win.
+  const inherited: Partial<DividerSettings> = {
+    style: shared.style,
+    thickness: shared.thickness,
+    width: shared.width,
+    color: shared.color,
+    customColor: shared.customColor,
+    spacing: shared.spacing,
+  };
+  return { ...inherited, ...own };
+}
 
 interface SectionDividerProps {
   /**

@@ -9,7 +9,7 @@ import { ShopChrome } from '../components';
 import { BrandStoryBlock } from '../templates/shared/BrandStoryBlock';
 import { TrustStrip } from '../templates/shared/TrustStrip';
 import { HomeBlogCarousel } from '../templates/shared/HomeBlogCarousel';
-import { SectionDivider } from '../templates/shared/SectionDivider';
+import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/SectionDivider';
 import { toTemplateProduct, toTemplateCategory } from '../templates/adapters';
 import { getHomepageTemplate } from '../lib/serverTemplate';
 import type { TemplateId, StoreLayoutSettings } from '@force/shared';
@@ -366,7 +366,9 @@ export function HomePageContent({
           <>
             {/* Per-section `above` divider (opt-in) — renders before categories. */}
             {layout.categories.dividers?.above?.enabled && (
-              <SectionDivider settings={layout.categories.dividers.above} />
+              <SectionDivider
+                settings={resolveSlotDividerSettings(layout.categories.dividers, 'above')}
+              />
             )}
             {layout.categories.enabled && templateCategories.length > 0 && (
               <section
@@ -458,7 +460,7 @@ export function HomePageContent({
         const newArrivalsJSX = (
           <>
             <SectionDivider
-              settings={layout.newArrivals.dividers?.above}
+              settings={resolveSlotDividerSettings(layout.newArrivals.dividers, 'above')}
               hideForExplicitBg={!!(layout.categories.bgColor || layout.newArrivals.bgColor)}
             />
             {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
@@ -541,7 +543,7 @@ export function HomePageContent({
         const bestSellersJSX = (
           <>
             <SectionDivider
-              settings={layout.bestSellers.dividers?.above}
+              settings={resolveSlotDividerSettings(layout.bestSellers.dividers, 'above')}
               hideForExplicitBg={!!(layout.newArrivals.bgColor || layout.bestSellers.bgColor)}
             />
             {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
@@ -621,7 +623,7 @@ export function HomePageContent({
           (layout.brandStory?.enabled ?? store.theme?.showBrandStory !== false) ? (
             <>
               <SectionDivider
-                settings={layout.brandStory?.dividers?.above}
+                settings={resolveSlotDividerSettings(layout.brandStory?.dividers, 'above')}
                 hideForExplicitBg={!!(layout.bestSellers.bgColor || layout.brandStory?.bgColor)}
               />
               <BrandStoryBlock
@@ -638,7 +640,7 @@ export function HomePageContent({
           (layout.blogCarousel?.enabled ?? store.blogEnabled !== false) ? (
             <>
               <SectionDivider
-                settings={layout.blogCarousel?.dividers?.above}
+                settings={resolveSlotDividerSettings(layout.blogCarousel?.dividers, 'above')}
                 hideForExplicitBg={!!layout.blogCarousel?.bgColor}
               />
               <HomeBlogCarousel />
@@ -653,7 +655,7 @@ export function HomePageContent({
           (layout.trustStrip?.enabled ?? store.theme?.showTrustStrip !== false) ? (
             <>
               <SectionDivider
-                settings={layout.trustStrip?.dividers?.above}
+                settings={resolveSlotDividerSettings(layout.trustStrip?.dividers, 'above')}
                 hideForExplicitBg={!!layout.trustStrip?.bgColor}
               />
               <TrustStrip settings={layout.trustStrip} />
@@ -669,7 +671,7 @@ export function HomePageContent({
         const testimonialsJSX = (
           <>
             <SectionDivider
-              settings={layout.testimonials.dividers?.above}
+              settings={resolveSlotDividerSettings(layout.testimonials.dividers, 'above')}
               hideForExplicitBg={!!layout.testimonials.bgColor}
             />
             {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
@@ -761,7 +763,9 @@ export function HomePageContent({
           if (!T.ProductCarousel) return null;
           return (
             <React.Fragment key={`extra:${extra.id}`}>
-              {extra.dividers?.above?.enabled && <SectionDivider settings={extra.dividers.above} />}
+              {extra.dividers?.above?.enabled && (
+                <SectionDivider settings={resolveSlotDividerSettings(extra.dividers, 'above')} />
+              )}
               <section
                 data-section={`extra:${extra.id}`}
                 className="bg-[hsl(var(--bg-page))] py-14 sm:py-16 lg:py-20"

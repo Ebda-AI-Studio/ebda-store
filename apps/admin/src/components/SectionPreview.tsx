@@ -205,6 +205,37 @@ export function SectionPreview({
   const subtitleAlign = subtitleZone?.textAlign ?? 'center';
   const titleShowLines = dividers?.title?.enabled === true && headingAlign === 'center';
 
+  // Mirror the storefront SectionHeading shared-pick fallback (2026-06-04): the
+  // admin's single shared colour/style control is meant to apply to every
+  // enabled slot, but a slot enabled after the colour was picked can be saved
+  // as `{ enabled: true }` only. Resolve one shared pick and let each slot
+  // inherit it (without leaking its `enabled`) so the preview paints the same
+  // colour the storefront does — otherwise the title hairlines previewed grey.
+  const dividerStylePick = [
+    dividers?.above,
+    dividers?.kicker,
+    dividers?.title,
+    dividers?.subtitle,
+    dividers?.belowHeading,
+  ].find(s => s && (s.color !== undefined || s.customColor || s.thickness || s.style));
+  const withSharedStyle = (
+    slot: Partial<DividerSettings> | undefined
+  ): Partial<DividerSettings> | undefined => {
+    if (!slot || !dividerStylePick || slot === dividerStylePick) return slot;
+    const hasOwn =
+      slot.color !== undefined || !!slot.customColor || !!slot.thickness || !!slot.style;
+    if (hasOwn) return slot;
+    return {
+      style: dividerStylePick.style,
+      thickness: dividerStylePick.thickness,
+      width: dividerStylePick.width,
+      color: dividerStylePick.color,
+      customColor: dividerStylePick.customColor,
+      spacing: dividerStylePick.spacing,
+      ...slot,
+    };
+  };
+
   const titleDisplayText = titleText || `${label} heading`;
   const kickerDisplayText = kickerText || 'EXPLORE';
   const subtitleDisplayText = subtitleText || 'Curated picks';
@@ -214,7 +245,11 @@ export function SectionPreview({
       {/* `above` divider — renders OUTSIDE the bg-colored section, mirroring
           how HomePageContent positions <SectionDivider> between sections. */}
       {dividers?.above?.enabled === true && (
-        <PreviewHorizontalDivider settings={dividers.above} theme={theme} autoFg={autoFg} />
+        <PreviewHorizontalDivider
+          settings={withSharedStyle(dividers.above) ?? dividers.above}
+          theme={theme}
+          autoFg={autoFg}
+        />
       )}
       <div className="p-4" style={{ backgroundColor: resolvedBg }}>
         {/* Kicker — flanked by hairlines when dividers.kicker.enabled */}
@@ -230,7 +265,7 @@ export function SectionPreview({
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
             }}
-            settings={dividers?.kicker}
+            settings={withSharedStyle(dividers?.kicker)}
             theme={theme}
             autoFg={autoFg}
           />
@@ -247,7 +282,7 @@ export function SectionPreview({
                 fontWeight: headingZone?.fontWeight,
                 fontSize: '12px',
               }}
-              settings={dividers?.title}
+              settings={withSharedStyle(dividers?.title)}
               theme={theme}
               autoFg={autoFg}
             />
@@ -277,7 +312,7 @@ export function SectionPreview({
                 fontSize: '9px',
                 opacity: 0.85,
               }}
-              settings={dividers?.subtitle}
+              settings={withSharedStyle(dividers?.subtitle)}
               theme={theme}
               autoFg={autoFg}
             />
@@ -286,7 +321,7 @@ export function SectionPreview({
         {/* belowHeading divider — between heading block and product grid */}
         {dividers?.belowHeading?.enabled === true && (
           <PreviewHorizontalDivider
-            settings={dividers.belowHeading}
+            settings={withSharedStyle(dividers.belowHeading) ?? dividers.belowHeading}
             theme={theme}
             autoFg={autoFg}
           />

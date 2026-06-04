@@ -3624,10 +3624,35 @@ function SectionDividersBlock({
   // existing styling fields. When OFF, mark explicit `enabled: false` so the
   // storefront doesn't fall back to the legacy boolean.
   function setSlot(slot: 'above' | 'kicker' | 'title' | 'subtitle' | 'belowHeading', on: boolean) {
+    // When ENABLING a slot, seed it with the section's shared divider styling
+    // (colour / style / thickness / width / spacing) so a slot turned ON after
+    // the colour was picked still inherits it. Without this, "Around title"
+    // (default OFF) was saved as `{ enabled: true }` only and the storefront
+    // rendered the default foreground hairline instead of the merchant's colour
+    // — the exact "around title do not take the color i picked" report
+    // (Ahmad 2026-06-04). The storefront also has a render-time fallback for
+    // already-saved stores; this keeps newly-saved data self-consistent.
+    const styleSrc = on
+      ? (dividers.above ??
+        dividers.kicker ??
+        dividers.title ??
+        dividers.subtitle ??
+        dividers.belowHeading)
+      : undefined;
+    const styleSeed: Partial<import('@force/shared').DividerSettings> = styleSrc
+      ? {
+          style: styleSrc.style,
+          thickness: styleSrc.thickness,
+          width: styleSrc.width,
+          color: styleSrc.color,
+          customColor: styleSrc.customColor,
+          spacing: styleSrc.spacing,
+        }
+      : {};
     onPatch({
       dividers: {
         ...dividers,
-        [slot]: { ...(dividers[slot] ?? {}), enabled: on },
+        [slot]: { ...styleSeed, ...(dividers[slot] ?? {}), enabled: on },
       },
     });
   }

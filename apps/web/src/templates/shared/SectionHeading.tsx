@@ -7,7 +7,12 @@ import { DEFAULT_DIVIDER_SETTINGS } from '@force/shared';
 import { getPackStyles } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
 import { responsiveFontSize } from './section-typography';
-import { SectionDivider, resolveDividerColor } from './SectionDivider';
+import {
+  SectionDivider,
+  resolveDividerColor,
+  resolveSlotDividerSettings,
+  hasExplicitDividerPick,
+} from './SectionDivider';
 import { useStore } from '../../contexts/StoreContext';
 
 interface SectionHeadingProps {
@@ -102,20 +107,26 @@ export function SectionHeading({
   // When the merchant left settings at default (`color: 'auto'` and no other
   // overrides), keep the legacy `bg-foreground/30` editorial-hairline class so
   // existing stores see zero visual change.
-  const flankingLineStyle = (slot: Partial<DividerSettings> | undefined) => {
-    const explicitPick =
-      slot && (slot.color !== undefined || slot.customColor || slot.thickness || slot.style);
-    if (!explicitPick) return undefined;
-    const merged: DividerSettings = { ...DEFAULT_DIVIDER_SETTINGS, ...slot };
+  //
+  // 2026-06-04: a slot enabled AFTER the merchant picked the section's shared
+  // colour gets saved as `{ enabled: true }` only, so it rendered the default
+  // foreground hairline instead of the picked colour (Ahmad: "around title do
+  // not take the color i picked … I want them as the subtitle does"). The
+  // canonical fix lives in `resolveSlotDividerSettings` — every slot inherits
+  // the section's shared pick when it has none of its own. See SectionDivider.
+  const flankingLineStyle = (slotKey: 'kicker' | 'title' | 'subtitle') => {
+    const effective = resolveSlotDividerSettings(dividers, slotKey);
+    if (!hasExplicitDividerPick(effective)) return undefined;
+    const merged: DividerSettings = { ...DEFAULT_DIVIDER_SETTINGS, ...effective };
     const color = resolveDividerColor(merged, store.theme);
     return {
       backgroundColor: color,
       height: `${merged.thickness ?? 1}px`,
     } as React.CSSProperties;
   };
-  const kickerLineStyle = flankingLineStyle(dividers?.kicker);
-  const titleLineStyle = flankingLineStyle(dividers?.title);
-  const subtitleLineStyle = flankingLineStyle(dividers?.subtitle);
+  const kickerLineStyle = flankingLineStyle('kicker');
+  const titleLineStyle = flankingLineStyle('title');
+  const subtitleLineStyle = flankingLineStyle('subtitle');
   // Tailwind fallback class — used only when the merchant didn't pick.
   const FLANK_DEFAULT_CLS = 'h-px bg-foreground/30';
   const flankBaseCls = 'flex-1 max-w-[140px] sm:max-w-[200px]';
@@ -375,7 +386,9 @@ export function SectionHeading({
       {/* belowHeading divider — between this heading block and the section
           content (products / categories grid). Full DividerSettings shape;
           renders as a SectionDivider <hr>. Default OFF — merchant opts in. */}
-      {dividers?.belowHeading?.enabled && <SectionDivider settings={dividers.belowHeading} />}
+      {dividers?.belowHeading?.enabled && (
+        <SectionDivider settings={resolveSlotDividerSettings(dividers, 'belowHeading')} />
+      )}
     </div>
   );
 }

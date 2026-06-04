@@ -7,7 +7,7 @@ import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
 import { BottomTabBar } from '../templates/shared/BottomTabBar';
 import { FloatingWidget } from '../templates/shared/FloatingWidget';
-import { SectionDivider } from '../templates/shared/SectionDivider';
+import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/SectionDivider';
 import type { FloatingWidgetConfig } from '@force/shared';
 import { resolveColor } from '@force/shared';
 import type { StoreLayoutSettings } from '@force/shared';
@@ -281,7 +281,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
       {/* Footer divider (per-section opt-in) — renders between the last
           page section and the footer. Honors `layout.footer.dividers.above`. */}
       {layout?.footer?.dividers?.above?.enabled && (
-        <SectionDivider settings={layout.footer.dividers.above} />
+        <SectionDivider settings={resolveSlotDividerSettings(layout.footer.dividers, 'above')} />
       )}
       {/* Footer wrapper carries data-zone for typography emitter targeting.
           Background override is NOT applied here — the theme's <footer>
