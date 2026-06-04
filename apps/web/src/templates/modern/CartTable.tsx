@@ -17,6 +17,7 @@ export default function ModernCartTable({
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
+  typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -65,10 +66,13 @@ export default function ModernCartTable({
                 <Link
                   href={`${urlPrefix}/products/${item.slug}`}
                   className="line-clamp-2 font-semibold text-foreground hover:text-primary transition-colors"
+                  style={typography?.name}
                 >
                   {displayName}
                 </Link>
-                <p className="mt-1 text-sm font-medium text-primary">{format(item.price)}</p>
+                <p className="mt-1 text-sm font-medium text-primary" style={typography?.price}>
+                  {format(item.price)}
+                </p>
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -79,6 +83,7 @@ export default function ModernCartTable({
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     disabled={item.quantity <= 1}
                     aria-label={isRtl ? 'تقليل الكمية' : 'Decrease quantity'}
+                    style={typography?.cta}
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -89,7 +94,10 @@ export default function ModernCartTable({
                       />
                     </svg>
                   </button>
-                  <span className="min-w-[2ch] text-center text-sm font-semibold">
+                  <span
+                    className="min-w-[2ch] text-center text-sm font-semibold"
+                    style={typography?.cta}
+                  >
                     {item.quantity}
                   </span>
                   <button
@@ -97,6 +105,7 @@ export default function ModernCartTable({
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     aria-label={isRtl ? 'زيادة الكمية' : 'Increase quantity'}
+                    style={typography?.cta}
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -110,7 +119,10 @@ export default function ModernCartTable({
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <p className="text-sm font-bold text-foreground sm:text-base">
+                  <p
+                    className="text-sm font-bold text-foreground sm:text-base"
+                    style={typography?.price}
+                  >
                     {format(lineTotal)}
                   </p>
                   <button
@@ -118,6 +130,7 @@ export default function ModernCartTable({
                     onClick={() => onRemove?.(item.id)}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
                     aria-label={isRtl ? 'إزالة' : 'Remove'}
+                    style={typography?.cta}
                   >
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path

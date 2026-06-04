@@ -21,6 +21,7 @@ export default function ClassicOrderSummary({
   onCtaClick,
   ctaDisabled,
   ctaLoading,
+  typography,
 }: OrderSummaryProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -33,23 +34,32 @@ export default function ClassicOrderSummary({
       className="border border-border bg-background p-6"
       aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}
     >
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+      <h2
+        className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+        style={typography?.heading}
+      >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="mt-6 space-y-4 text-sm" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground">{isRtl ? 'المجموع الفرعي' : 'Subtotal'}</dt>
-          <dd className="tracking-tight text-foreground">{fmt(subtotal)}</dd>
+          <dt className="text-muted-foreground" style={typography?.label}>
+            {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
+          </dt>
+          <dd className="tracking-tight text-foreground" style={typography?.price}>
+            {fmt(subtotal)}
+          </dd>
         </div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-success">
-            <dt>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
-            <dd>−{fmt(discount)}</dd>
+            <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
+            <dd style={typography?.price}>−{fmt(discount)}</dd>
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground">{isRtl ? 'الشحن' : 'Shipping'}</dt>
-          <dd className="tracking-tight text-foreground">
+          <dt className="text-muted-foreground" style={typography?.label}>
+            {isRtl ? 'الشحن' : 'Shipping'}
+          </dt>
+          <dd className="tracking-tight text-foreground" style={typography?.price}>
             {freeShipping ? (
               <span className="text-success uppercase text-xs">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
@@ -59,15 +69,27 @@ export default function ClassicOrderSummary({
         </div>
         {tax > 0 && (
           <div className="flex items-center justify-between">
-            <dt className="text-muted-foreground">{isRtl ? 'الضريبة' : 'Tax'}</dt>
-            <dd className="tracking-tight text-foreground">{fmt(tax)}</dd>
+            <dt className="text-muted-foreground" style={typography?.label}>
+              {isRtl ? 'الضريبة' : 'Tax'}
+            </dt>
+            <dd className="tracking-tight text-foreground" style={typography?.price}>
+              {fmt(tax)}
+            </dd>
           </div>
         )}
         <div className="mt-6 flex items-baseline justify-between border-t border-border pt-6">
-          <dt className="text-xs font-semibold uppercase tracking-widest text-foreground">
+          <dt
+            className="text-xs font-semibold uppercase tracking-widest text-foreground"
+            style={typography?.heading}
+          >
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
-          <dd className="text-lg font-semibold tracking-tight text-foreground">{fmt(total)}</dd>
+          <dd
+            className="text-lg font-semibold tracking-tight text-foreground"
+            style={typography?.price}
+          >
+            {fmt(total)}
+          </dd>
         </div>
       </dl>
       {children && <div className="mt-6">{children}</div>}
@@ -77,6 +99,7 @@ export default function ClassicOrderSummary({
             href={ctaHref}
             className="mt-6 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-serif font-semibold uppercase tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             aria-disabled={ctaDisabled}
+            style={typography?.cta}
           >
             {ctaText}
           </Link>
@@ -86,6 +109,7 @@ export default function ClassicOrderSummary({
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
             className="mt-6 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-serif font-semibold uppercase tracking-[0.22em] text-background hover:bg-foreground/85 disabled:opacity-50 transition-colors duration-500 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            style={typography?.cta}
           >
             {ctaLoading ? (isRtl ? 'جارٍ...' : 'Processing...') : ctaText}
           </button>

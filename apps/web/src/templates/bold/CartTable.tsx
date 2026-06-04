@@ -17,6 +17,7 @@ export default function BoldCartTable({
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
+  typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -49,10 +50,14 @@ export default function BoldCartTable({
                   <Link
                     href={`${urlPrefix}/products/${item.slug}`}
                     className="font-black uppercase tracking-tight text-foreground hover:text-primary line-clamp-2"
+                    style={typography?.name}
                   >
                     {displayName}
                   </Link>
-                  <p className="mt-1 text-sm font-bold uppercase tracking-wider text-primary">
+                  <p
+                    className="mt-1 text-sm font-bold uppercase tracking-wider text-primary"
+                    style={typography?.price}
+                  >
                     {format(item.price)}
                   </p>
                 </div>
@@ -61,6 +66,7 @@ export default function BoldCartTable({
                   onClick={() => onRemove?.(item.id)}
                   className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background text-2xl font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
+                  style={typography?.cta}
                 >
                   ×
                 </button>
@@ -73,10 +79,14 @@ export default function BoldCartTable({
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
+                    style={typography?.cta}
                   >
                     −
                   </button>
-                  <span className="border-x-2 border-foreground w-10 text-center text-sm font-black">
+                  <span
+                    className="border-x-2 border-foreground w-10 text-center text-sm font-black"
+                    style={typography?.cta}
+                  >
                     {item.quantity}
                   </span>
                   <button
@@ -84,11 +94,15 @@ export default function BoldCartTable({
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
+                    style={typography?.cta}
                   >
                     +
                   </button>
                 </div>
-                <p className="text-base font-black uppercase tracking-tight text-foreground">
+                <p
+                  className="text-base font-black uppercase tracking-tight text-foreground"
+                  style={typography?.price}
+                >
                   {format(item.price * item.quantity)}
                 </p>
               </div>

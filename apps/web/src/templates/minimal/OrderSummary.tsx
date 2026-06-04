@@ -21,6 +21,7 @@ export default function MinimalOrderSummary({
   onCtaClick,
   ctaDisabled,
   ctaLoading,
+  typography,
 }: OrderSummaryProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -31,18 +32,24 @@ export default function MinimalOrderSummary({
     <aside dir={isRtl ? 'rtl' : 'ltr'} aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}>
       <dl className="space-y-4 text-sm" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground">{isRtl ? 'المجموع الفرعي' : 'Subtotal'}</dt>
-          <dd className="text-foreground">{fmt(subtotal)}</dd>
+          <dt className="text-muted-foreground" style={typography?.label}>
+            {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
+          </dt>
+          <dd className="text-foreground" style={typography?.price}>
+            {fmt(subtotal)}
+          </dd>
         </div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-success">
-            <dt>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
-            <dd>−{fmt(discount)}</dd>
+            <dt style={typography?.label}>{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
+            <dd style={typography?.price}>−{fmt(discount)}</dd>
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground">{isRtl ? 'الشحن' : 'Shipping'}</dt>
-          <dd className="text-foreground">
+          <dt className="text-muted-foreground" style={typography?.label}>
+            {isRtl ? 'الشحن' : 'Shipping'}
+          </dt>
+          <dd className="text-foreground" style={typography?.price}>
             {freeShipping ? (
               <span className="text-success">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
@@ -52,13 +59,21 @@ export default function MinimalOrderSummary({
         </div>
         {tax > 0 && (
           <div className="flex items-center justify-between">
-            <dt className="text-muted-foreground">{isRtl ? 'الضريبة' : 'Tax'}</dt>
-            <dd className="text-foreground">{fmt(tax)}</dd>
+            <dt className="text-muted-foreground" style={typography?.label}>
+              {isRtl ? 'الضريبة' : 'Tax'}
+            </dt>
+            <dd className="text-foreground" style={typography?.price}>
+              {fmt(tax)}
+            </dd>
           </div>
         )}
         <div className="flex items-baseline justify-between border-t border-border pt-5">
-          <dt className="text-foreground">{isRtl ? 'الإجمالي' : 'Total'}</dt>
-          <dd className="text-lg text-foreground">{fmt(total)}</dd>
+          <dt className="text-foreground" style={typography?.heading}>
+            {isRtl ? 'الإجمالي' : 'Total'}
+          </dt>
+          <dd className="text-lg text-foreground" style={typography?.price}>
+            {fmt(total)}
+          </dd>
         </div>
       </dl>
       {children && <div className="mt-6">{children}</div>}
@@ -68,6 +83,7 @@ export default function MinimalOrderSummary({
             href={ctaHref}
             className="mt-8 block border-b border-foreground pb-1 text-sm text-foreground hover:border-foreground/40 hover:text-foreground/70 transition-colors duration-500 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
             aria-disabled={ctaDisabled}
+            style={typography?.cta}
           >
             {ctaText} →
           </Link>
@@ -77,6 +93,7 @@ export default function MinimalOrderSummary({
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
             className="mt-8 block w-fit border-b border-foreground pb-1 text-sm text-foreground hover:border-foreground/40 hover:text-foreground/70 transition-colors duration-500 ease-out disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
+            style={typography?.cta}
           >
             {ctaLoading ? '···' : `${ctaText} →`}
           </button>

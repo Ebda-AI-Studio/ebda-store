@@ -17,6 +17,7 @@ export default function ElegantCartTable({
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
+  typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -49,10 +50,14 @@ export default function ElegantCartTable({
                   <Link
                     href={`${urlPrefix}/products/${item.slug}`}
                     className="text-base font-light tracking-wide text-foreground hover:text-primary"
+                    style={typography?.name}
                   >
                     {displayName}
                   </Link>
-                  <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  <p
+                    className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground"
+                    style={typography?.price}
+                  >
                     {format(item.price)}
                   </p>
                 </div>
@@ -61,6 +66,7 @@ export default function ElegantCartTable({
                   onClick={() => onRemove?.(item.id)}
                   className="inline-flex min-h-[44px] items-center text-sm uppercase tracking-[0.2em] text-muted-foreground hover:text-destructive underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
+                  style={typography?.cta}
                 >
                   {isRtl ? 'إزالة' : 'Remove'}
                 </button>
@@ -76,7 +82,10 @@ export default function ElegantCartTable({
                   >
                     −
                   </button>
-                  <span className="min-w-[2ch] text-center font-light tracking-wide">
+                  <span
+                    className="min-w-[2ch] text-center font-light tracking-wide"
+                    style={typography?.cta}
+                  >
                     {item.quantity}
                   </span>
                   <button
@@ -88,7 +97,10 @@ export default function ElegantCartTable({
                     +
                   </button>
                 </div>
-                <p className="text-sm font-light tracking-wide text-foreground">
+                <p
+                  className="text-sm font-light tracking-wide text-foreground"
+                  style={typography?.price}
+                >
                   {format(item.price * item.quantity)}
                 </p>
               </div>

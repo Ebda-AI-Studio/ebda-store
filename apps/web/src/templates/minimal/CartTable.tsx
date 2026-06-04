@@ -17,6 +17,7 @@ export default function MinimalCartTable({
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
+  typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -48,10 +49,13 @@ export default function MinimalCartTable({
                 <Link
                   href={`${urlPrefix}/products/${item.slug}`}
                   className="text-sm font-medium text-foreground hover:text-primary"
+                  style={typography?.name}
                 >
                   {displayName}
                 </Link>
-                <p className="mt-1 text-sm text-muted-foreground">{format(item.price)}</p>
+                <p className="mt-1 text-sm text-muted-foreground" style={typography?.price}>
+                  {format(item.price)}
+                </p>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-3 text-muted-foreground">
@@ -61,15 +65,22 @@ export default function MinimalCartTable({
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="inline-flex h-11 w-11 items-center justify-center hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
+                    style={typography?.cta}
                   >
                     −
                   </button>
-                  <span className="min-w-[1.5ch] text-center text-foreground">{item.quantity}</span>
+                  <span
+                    className="min-w-[1.5ch] text-center text-foreground"
+                    style={typography?.cta}
+                  >
+                    {item.quantity}
+                  </span>
                   <button
                     type="button"
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="inline-flex h-11 w-11 items-center justify-center hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
+                    style={typography?.cta}
                   >
                     +
                   </button>
@@ -78,11 +89,14 @@ export default function MinimalCartTable({
                     onClick={() => onRemove?.(item.id)}
                     className="ms-4 inline-flex min-h-[44px] items-center text-sm hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
                     aria-label={isRtl ? 'إزالة' : 'Remove'}
+                    style={typography?.cta}
                   >
                     {isRtl ? 'إزالة' : 'Remove'}
                   </button>
                 </div>
-                <p className="text-sm text-foreground">{format(item.price * item.quantity)}</p>
+                <p className="text-sm text-foreground" style={typography?.price}>
+                  {format(item.price * item.quantity)}
+                </p>
               </div>
             </div>
           </div>

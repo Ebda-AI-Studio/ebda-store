@@ -1,6 +1,26 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { ResolvedZone } from './shared/section-typography';
 import type { CardFrameSize, CardFrameWidth } from '@force/shared';
+
+/**
+ * Resolved per-store cart typography, passed from CartClient into the theme
+ * CartTable / OrderSummary so the merchant's "Cart page" typography actually
+ * reaches the elements the theme renders. Each value is an inline style (or
+ * undefined) — apply with `style={typography?.name}` etc. Inline beats the
+ * theme's own Tailwind size classes.
+ */
+export interface CartTypography {
+  /** Page title, "Order summary", Total. */
+  heading?: CSSProperties;
+  /** Labels — items count, subtotal / shipping rows. */
+  label?: CSSProperties;
+  /** Line-item names. */
+  name?: CSSProperties;
+  /** Every monetary value. */
+  price?: CSSProperties;
+  /** Buttons + links — remove, continue, apply, checkout. */
+  cta?: CSSProperties;
+}
 
 /**
  * Product data for template components
@@ -702,6 +722,8 @@ export interface CartTableProps {
   /** Called with the *new* quantity (clamped by the template to >= 1). */
   onUpdateQuantity?: (itemId: string, quantity: number) => void;
   onRemove?: (itemId: string) => void;
+  /** Per-store cart typography (page-builder → Cart page). Optional. */
+  typography?: CartTypography;
 }
 
 /**
@@ -731,6 +753,8 @@ export interface OrderSummaryProps {
   onCtaClick?: () => void;
   ctaDisabled?: boolean;
   ctaLoading?: boolean;
+  /** Per-store cart typography (page-builder → Cart page). Optional. */
+  typography?: CartTypography;
 }
 
 /**

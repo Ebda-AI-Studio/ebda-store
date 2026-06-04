@@ -21,6 +21,7 @@ export default function ElegantOrderSummary({
   onCtaClick,
   ctaDisabled,
   ctaLoading,
+  typography,
 }: OrderSummaryProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -33,25 +34,36 @@ export default function ElegantOrderSummary({
       className="border-t border-foreground/20 pt-8"
       aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}
     >
-      <h2 className="text-xs font-light uppercase tracking-[0.3em] text-muted-foreground">
+      <h2
+        className="text-xs font-light uppercase tracking-[0.3em] text-muted-foreground"
+        style={typography?.heading}
+      >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="mt-8 space-y-5 text-sm font-light" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="tracking-wide text-muted-foreground">
+          <dt className="tracking-wide text-muted-foreground" style={typography?.label}>
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
-          <dd className="tracking-wide text-foreground">{fmt(subtotal)}</dd>
+          <dd className="tracking-wide text-foreground" style={typography?.price}>
+            {fmt(subtotal)}
+          </dd>
         </div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-success">
-            <dt className="tracking-wide">{discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}</dt>
-            <dd className="tracking-wide">−{fmt(discount)}</dd>
+            <dt className="tracking-wide" style={typography?.label}>
+              {discountLabel ?? (isRtl ? 'الخصم' : 'Discount')}
+            </dt>
+            <dd className="tracking-wide" style={typography?.price}>
+              −{fmt(discount)}
+            </dd>
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="tracking-wide text-muted-foreground">{isRtl ? 'الشحن' : 'Shipping'}</dt>
-          <dd className="tracking-wide text-foreground">
+          <dt className="tracking-wide text-muted-foreground" style={typography?.label}>
+            {isRtl ? 'الشحن' : 'Shipping'}
+          </dt>
+          <dd className="tracking-wide text-foreground" style={typography?.price}>
             {freeShipping ? (
               <span className="text-success uppercase tracking-[0.2em] text-xs">
                 {isRtl ? 'مجاني' : 'Complimentary'}
@@ -63,15 +75,27 @@ export default function ElegantOrderSummary({
         </div>
         {tax > 0 && (
           <div className="flex items-center justify-between">
-            <dt className="tracking-wide text-muted-foreground">{isRtl ? 'الضريبة' : 'Tax'}</dt>
-            <dd className="tracking-wide text-foreground">{fmt(tax)}</dd>
+            <dt className="tracking-wide text-muted-foreground" style={typography?.label}>
+              {isRtl ? 'الضريبة' : 'Tax'}
+            </dt>
+            <dd className="tracking-wide text-foreground" style={typography?.price}>
+              {fmt(tax)}
+            </dd>
           </div>
         )}
         <div className="mt-8 flex items-baseline justify-between border-t border-foreground/20 pt-8">
-          <dt className="text-xs font-light uppercase tracking-[0.3em] text-foreground">
+          <dt
+            className="text-xs font-light uppercase tracking-[0.3em] text-foreground"
+            style={typography?.heading}
+          >
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
-          <dd className="text-xl font-light tracking-wide text-foreground">{fmt(total)}</dd>
+          <dd
+            className="text-xl font-light tracking-wide text-foreground"
+            style={typography?.price}
+          >
+            {fmt(total)}
+          </dd>
         </div>
       </dl>
       {children && <div className="mt-8">{children}</div>}
@@ -81,6 +105,7 @@ export default function ElegantOrderSummary({
             href={ctaHref}
             className="mt-8 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-medium uppercase tracking-[0.3em] text-background hover:bg-foreground/85 transition-colors duration-700 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             aria-disabled={ctaDisabled}
+            style={typography?.cta}
           >
             {ctaText}
           </Link>
@@ -90,6 +115,7 @@ export default function ElegantOrderSummary({
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
             className="mt-8 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-medium uppercase tracking-[0.3em] text-background hover:bg-foreground/85 disabled:opacity-40 transition-colors duration-700 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
+            style={typography?.cta}
           >
             {ctaLoading ? '···' : ctaText}
           </button>

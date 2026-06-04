@@ -17,6 +17,7 @@ export default function ClassicCartTable({
   urlPrefix = '',
   onUpdateQuantity,
   onRemove,
+  typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -56,16 +57,20 @@ export default function ClassicCartTable({
                   <Link
                     href={`${urlPrefix}/products/${item.slug}`}
                     className="font-medium text-foreground hover:text-primary tracking-tight"
+                    style={typography?.name}
                   >
                     {displayName}
                   </Link>
-                  <p className="mt-1 text-sm text-muted-foreground">{format(item.price)}</p>
+                  <p className="mt-1 text-sm text-muted-foreground" style={typography?.price}>
+                    {format(item.price)}
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
                   className="inline-flex min-h-[44px] items-center text-base uppercase tracking-widest text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
+                  style={typography?.cta}
                 >
                   {isRtl ? 'إزالة' : 'Remove'}
                 </button>
@@ -78,20 +83,27 @@ export default function ClassicCartTable({
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                     className="h-11 w-11 text-muted-foreground hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
+                    style={typography?.cta}
                   >
                     −
                   </button>
-                  <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
+                  <span className="w-10 text-center text-sm font-medium" style={typography?.cta}>
+                    {item.quantity}
+                  </span>
                   <button
                     type="button"
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
                     className="h-11 w-11 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
+                    style={typography?.cta}
                   >
                     +
                   </button>
                 </div>
-                <p className="text-base font-semibold tracking-tight text-foreground">
+                <p
+                  className="text-base font-semibold tracking-tight text-foreground"
+                  style={typography?.price}
+                >
                   {format(item.price * item.quantity)}
                 </p>
               </div>

@@ -73,9 +73,24 @@ export default function CartClient() {
     undefined,
     store.theme
   );
+  const cartCtaZone = resolveSectionZone(
+    layout?.cartPage?.typography?.productCta,
+    undefined,
+    store.theme
+  );
   const cartBgStyle: React.CSSProperties | undefined = layout?.cartPage?.bgColor
     ? { backgroundColor: resolveColor(layout.cartPage.bgColor, store.theme) }
     : undefined;
+  // Bag of inline styles handed to the theme CartTable / OrderSummary so the
+  // merchant's Cart-page typography reaches the elements the THEME renders
+  // (the fallback markup below applies them directly).
+  const cartTypography = {
+    heading: cartZoneStyle(cartHeadingZone),
+    label: cartZoneStyle(cartLabelZone),
+    name: cartZoneStyle(cartNameZone),
+    price: cartZoneStyle(cartPriceZone),
+    cta: cartZoneStyle(cartCtaZone),
+  };
   const { language, t } = useLanguage();
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
@@ -405,6 +420,7 @@ export default function CartClient() {
                       urlPrefix={storeUrl('')}
                       onUpdateQuantity={handleUpdateQuantity}
                       onRemove={handleRemoveItem}
+                      typography={cartTypography}
                     />
                   ) : (
                     <div className="space-y-4">
@@ -610,6 +626,7 @@ export default function CartClient() {
                         ctaLabel="Proceed to Checkout"
                         ctaLabelAr="المتابعة للدفع"
                         ctaHref={storeUrl('/checkout')}
+                        typography={cartTypography}
                       >
                         {isEnabled('coupons') && (
                           <div>
