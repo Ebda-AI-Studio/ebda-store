@@ -4,6 +4,12 @@ import { memo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ProductCardProps } from '../types';
+import {
+  productSizeClass,
+  cardFrameClass,
+  cardFrameWidthClass,
+  cardFrameSizeClass,
+} from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
@@ -36,9 +42,10 @@ function ModernProductCard({
   onRemoveFromWishlist,
   urlPrefix = '',
   showCardFrame,
-  cardFrameStyle: _cardFrameStyle,
-  cardFrameWidth: _cardFrameWidth,
-  cardFrameSize: _cardFrameSize,
+  cardSize,
+  cardFrameStyle,
+  cardFrameWidth,
+  cardFrameSize,
   cardFrameColor,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
@@ -68,6 +75,9 @@ function ModernProductCard({
     await onAddToCart?.(productId);
   };
 
+  const frameCls =
+    `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
+
   return (
     <article
       itemScope
@@ -76,7 +86,7 @@ function ModernProductCard({
       // max-w cap matches PecannbeeProductCard so theme grids (PDP related
       // products, category pages) render at the same size as the main
       // listings. Ahmad 2026-05-16 design.md baseline.
-      className="w-full md:max-w-[200px] mx-auto"
+      className={`w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
       style={
         showCardFrame && cardFrameColor && store.theme
           ? { borderColor: resolveColor(cardFrameColor, store.theme) }

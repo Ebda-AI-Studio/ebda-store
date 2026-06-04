@@ -607,7 +607,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       // thickness + offset for fine control. Decoration colour follows
       // the same text-context substitution as color above.
       const td = sanitizeFontValue(cfg.textDecoration);
-      if (td) decls.push(`text-decoration:${td}`);
+      // `none` is a deliberate "force off" — emit it !important so it beats a
+      // pack class like `hover:underline` (modern seeAll) and any inherited
+      // decoration. Other values stay normal-weight so inline/per-section
+      // overrides can still win. (Ahmad 2026-06-04: "no decoration force off".)
+      if (td) decls.push(`text-decoration:${td}${td === 'none' ? ' !important' : ''}`);
       const tdc = sanitizeFontValue(cfg.textDecorationColor);
       if (tdc) decls.push(`text-decoration-color:${resolveColorValue(tdc, 'text')}`);
       const tdt = sanitizeFontValue(cfg.textDecorationThickness);
