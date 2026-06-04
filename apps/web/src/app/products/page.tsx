@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
+import { getPreviewDraftToken, publicLayoutUrl } from '../../lib/preview-draft';
 import {
   resolveLayoutSettings,
   type ProductCardDefaults,
@@ -28,9 +29,11 @@ interface PlpLayoutSettings {
 async function fetchPlpLayoutSettings(store: { id: string }): Promise<PlpLayoutSettings> {
   if (!store.id || store.id === 'demo') return {};
   try {
-    const res = await fetch(`${API_URL}/public/stores/${store.id}/layout`, {
-      next: { revalidate: 60 },
-    });
+    const draftToken = await getPreviewDraftToken();
+    const res = await fetch(
+      publicLayoutUrl(API_URL, store.id, draftToken),
+      draftToken ? { cache: 'no-store' } : { next: { revalidate: 60 } }
+    );
     if (!res.ok) return {};
     const json = await res.json();
     const layout = resolveLayoutSettings(json?.data?.layout ?? {});

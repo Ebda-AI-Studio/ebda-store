@@ -396,29 +396,147 @@ export default function ProductsClient({
             {/* Sidebar Filters — hidden when merchant sets filterSidebar.enabled = false.
               defaultOpen drives the initial collapsed/open state on desktop. */}
             {filterSidebar?.enabled !== false && (
-              <ProductsFilterSidebar
-                search={search}
-                categoryFilter={categoryFilter}
-                categories={categories}
-                meta={meta}
-                language={language}
-                onSearchChange={setSearch}
-                onCategoryChange={setCategoryFilter}
-                onClearAll={handleClearAll}
-                onSearchSubmit={handleSearch}
-                sortBy={sortBy}
-                sortOptions={sortOptions.map(o => ({ value: o.value, label: o.label }))}
-                onSortChange={setSortBy}
-                priceMin={priceMin}
-                priceMax={priceMax}
-                priceFloor={0}
-                priceCeil={100}
-                onPriceChange={(min, max) => {
-                  setPriceMin(min);
-                  setPriceMax(max);
-                }}
-                defaultOpen={filterSidebar?.defaultOpen}
-              />
+              <div className="flex shrink-0 flex-col gap-4 lg:w-72">
+                <ProductsFilterSidebar
+                  search={search}
+                  categoryFilter={categoryFilter}
+                  categories={categories}
+                  meta={meta}
+                  language={language}
+                  onSearchChange={setSearch}
+                  onCategoryChange={setCategoryFilter}
+                  onClearAll={handleClearAll}
+                  onSearchSubmit={handleSearch}
+                  sortBy={sortBy}
+                  sortOptions={sortOptions.map(o => ({ value: o.value, label: o.label }))}
+                  onSortChange={setSortBy}
+                  priceMin={priceMin}
+                  priceMax={priceMax}
+                  priceFloor={0}
+                  priceCeil={100}
+                  onPriceChange={(min, max) => {
+                    setPriceMin(min);
+                    setPriceMax(max);
+                  }}
+                  defaultOpen={filterSidebar?.defaultOpen}
+                />
+                <div className="flex flex-col items-stretch gap-3 rounded-xl bg-muted/30 p-4">
+                  <p className="text-sm text-muted-foreground">
+                    {isLoading ? (
+                      t('Loading...', translations['Loading...'])
+                    ) : (
+                      <>
+                        {t('Showing', 'عرض')}{' '}
+                        <span className="font-medium text-foreground">{products.length}</span>{' '}
+                        {meta ? t(`of ${meta.total}`, `من ${meta.total}`) : ''}{' '}
+                        {t('products', 'منتجات')}
+                      </>
+                    )}
+                  </p>
+                  <div className="flex w-full flex-col items-stretch gap-3">
+                    {/* Per-page — shoppers can see more products on a single
+                    page instead of paginating. Allow-list capped at 96.
+                    Persisted to localStorage. min-w-[6rem] reserves room
+                    for any value 12/24/48/96. */}
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 text-sm font-medium text-foreground">
+                        {t('Show:', 'عرض:')}
+                      </span>
+                      <Select
+                        value={String(perPage)}
+                        onChange={e => {
+                          const next = Number(e.target.value);
+                          if (PER_PAGE_OPTIONS.includes(next)) {
+                            setPerPage(next);
+                            if (typeof window !== 'undefined') {
+                              window.localStorage.setItem('plp-per-page', String(next));
+                            }
+                          }
+                        }}
+                        options={PER_PAGE_OPTIONS.map(n => ({
+                          value: String(n),
+                          label: String(n),
+                        }))}
+                        className="h-11 min-w-[6rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+
+                    {/* Sort — min-w-[12rem] keeps room for the longest Arabic
+                    label without truncation. */}
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 text-sm font-medium text-foreground">
+                        {t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
+                      </span>
+                      <Select
+                        value={sortBy}
+                        onChange={e => setSortBy(e.target.value)}
+                        options={sortOptions.map(option => ({
+                          value: option.value,
+                          label: option.label,
+                        }))}
+                        className="h-11 min-w-[12rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+
+                    {/* View Mode */}
+                    <div className="hidden items-center gap-1 rounded-lg border border-border bg-background p-1 sm:flex">
+                      <button
+                        type="button"
+                        aria-pressed={viewMode === 'grid'}
+                        onClick={() => setViewMode('grid')}
+                        aria-label={t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
+                        className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                          />
+                        </svg>
+                        <span className="sr-only">
+                          {t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={viewMode === 'list'}
+                        onClick={() => setViewMode('list')}
+                        aria-label={t(
+                          'List view',
+                          '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629'
+                        )}
+                        className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                          />
+                        </svg>
+                        <span className="sr-only">
+                          {t('List view', '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629')}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Products Grid */}
@@ -430,120 +548,6 @@ export default function ProductsClient({
                 wraps its <select> in a w-full div which made the older
                 lg:flex-row layout fight itself — always-stacked sidesteps
                 the wrapper issue entirely. */}
-              <div className="mb-6 flex flex-col items-stretch gap-3 rounded-xl bg-muted/30 p-4">
-                <p className="text-sm text-muted-foreground">
-                  {isLoading ? (
-                    t('Loading...', translations['Loading...'])
-                  ) : (
-                    <>
-                      {t('Showing', 'عرض')}{' '}
-                      <span className="font-medium text-foreground">{products.length}</span>{' '}
-                      {meta ? t(`of ${meta.total}`, `من ${meta.total}`) : ''}{' '}
-                      {t('products', 'منتجات')}
-                    </>
-                  )}
-                </p>
-                <div className="flex w-full flex-col items-stretch gap-3">
-                  {/* Per-page — shoppers can see more products on a single
-                    page instead of paginating. Allow-list capped at 96.
-                    Persisted to localStorage. min-w-[6rem] reserves room
-                    for any value 12/24/48/96. */}
-                  <div className="flex items-center gap-2">
-                    <span className="shrink-0 text-sm font-medium text-foreground">
-                      {t('Show:', 'عرض:')}
-                    </span>
-                    <Select
-                      value={String(perPage)}
-                      onChange={e => {
-                        const next = Number(e.target.value);
-                        if (PER_PAGE_OPTIONS.includes(next)) {
-                          setPerPage(next);
-                          if (typeof window !== 'undefined') {
-                            window.localStorage.setItem('plp-per-page', String(next));
-                          }
-                        }
-                      }}
-                      options={PER_PAGE_OPTIONS.map(n => ({ value: String(n), label: String(n) }))}
-                      className="h-11 min-w-[6rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-
-                  {/* Sort — min-w-[12rem] keeps room for the longest Arabic
-                    label without truncation. */}
-                  <div className="flex items-center gap-2">
-                    <span className="shrink-0 text-sm font-medium text-foreground">
-                      {t('Sort by:', '\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:')}
-                    </span>
-                    <Select
-                      value={sortBy}
-                      onChange={e => setSortBy(e.target.value)}
-                      options={sortOptions.map(option => ({
-                        value: option.value,
-                        label: option.label,
-                      }))}
-                      className="h-11 min-w-[12rem] flex-1 rounded-lg border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-
-                  {/* View Mode */}
-                  <div className="hidden items-center gap-1 rounded-lg border border-border bg-background p-1 sm:flex">
-                    <button
-                      type="button"
-                      aria-pressed={viewMode === 'grid'}
-                      onClick={() => setViewMode('grid')}
-                      aria-label={t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
-                      className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-                        />
-                      </svg>
-                      <span className="sr-only">
-                        {t('Grid view', '\u0639\u0631\u0636 \u0634\u0628\u0643\u064a')}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={viewMode === 'list'}
-                      onClick={() => setViewMode('list')}
-                      aria-label={t(
-                        'List view',
-                        '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629'
-                      )}
-                      className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                        />
-                      </svg>
-                      <span className="sr-only">
-                        {t('List view', '\u0639\u0631\u0636 \u0642\u0627\u0626\u0645\u0629')}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
               {/* Error State */}
               {error && (
                 <div

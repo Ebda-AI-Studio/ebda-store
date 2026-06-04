@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { getPreviewDraftToken, publicLayoutUrl } from '../../../lib/preview-draft';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
@@ -21,9 +22,11 @@ import ProductDetailClient from './ProductDetailClient';
 async function fetchLayoutSettings(storeId: string): Promise<StoreLayoutSettings> {
   if (!storeId || storeId === 'demo') return resolveLayoutSettings({});
   try {
-    const res = await fetch(`${API_URL}/public/stores/${storeId}/layout`, {
-      next: { revalidate: 60 },
-    });
+    const draftToken = await getPreviewDraftToken();
+    const res = await fetch(
+      publicLayoutUrl(API_URL, storeId, draftToken),
+      draftToken ? { cache: 'no-store' } : { next: { revalidate: 60 } }
+    );
     if (!res.ok) return resolveLayoutSettings({});
     const json = await res.json();
     return resolveLayoutSettings(json?.data?.layout ?? {});
