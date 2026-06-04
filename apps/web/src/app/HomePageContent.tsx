@@ -374,7 +374,7 @@ export function HomePageContent({
             {layout.categories.enabled && templateCategories.length > 0 && (
               <section
                 data-section="categories"
-                className="bg-[hsl(var(--bg-page))] pt-6 pb-14 sm:pt-8 sm:pb-16 lg:pt-10 lg:pb-20"
+                className="bg-[hsl(var(--bg-page))] pt-12 pb-14 sm:pt-16 sm:pb-16 lg:pt-20 lg:pb-20"
                 style={sectionBgStyle(layout.categories.bgColor, store.theme)}
               >
                 {(() => {
