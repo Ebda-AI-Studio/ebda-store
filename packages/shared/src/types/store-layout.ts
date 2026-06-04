@@ -260,7 +260,7 @@ export type CardFrameSize = 'compact' | 'normal' | 'comfortable' | 'spacious';
  *   portrait: 3:4 — taller, fashion / lookbook
  *   landscape: 4:3 — wider, lifestyle / banner-y
  */
-export type CardAspect = 'theme' | 'square' | 'portrait' | 'landscape';
+export type CardAspect = 'theme' | 'square' | 'portrait' | 'landscape' | 'wide' | 'ultrawide';
 
 /**
  * Generic per-store CARD GAP — the spacing between cards in a grid /

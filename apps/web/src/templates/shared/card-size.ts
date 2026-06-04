@@ -228,6 +228,10 @@ export function cardAspectClass(aspect: CardAspect | undefined): string {
       return 'aspect-[3/4]';
     case 'landscape':
       return 'aspect-[4/3]';
+    case 'wide':
+      return 'aspect-[3/2]';
+    case 'ultrawide':
+      return 'aspect-[16/9]';
     case 'theme':
     default:
       return '';

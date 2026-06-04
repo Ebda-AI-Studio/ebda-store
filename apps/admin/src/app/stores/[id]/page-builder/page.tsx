@@ -691,7 +691,9 @@ export default function StoreLayoutPage() {
                             | 'theme'
                             | 'square'
                             | 'portrait'
-                            | 'landscape',
+                            | 'landscape'
+                            | 'wide'
+                            | 'ultrawide',
                         }))
                       }
                       className="rounded-lg border border-border bg-card px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -700,6 +702,8 @@ export default function StoreLayoutPage() {
                       <option value="square">Square 1:1 (800×800)</option>
                       <option value="portrait">Portrait 3:4 (600×800)</option>
                       <option value="landscape">Landscape 4:3 (800×600)</option>
+                      <option value="wide">Wide 3:2 (900×600)</option>
+                      <option value="ultrawide">Ultra-wide 16:9 (960×540)</option>
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
@@ -1847,7 +1851,7 @@ interface SectionCardProps {
  */
 type CardControlsValues = {
   cardSize?: 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  cardAspect?: 'theme' | 'square' | 'portrait' | 'landscape';
+  cardAspect?: 'theme' | 'square' | 'portrait' | 'landscape' | 'wide' | 'ultrawide';
   cardShape?:
     | 'theme'
     | 'circle'
@@ -1910,6 +1914,8 @@ function ProductCardControls({
             <option value="square">Square 1:1 (800×800)</option>
             <option value="portrait">Portrait 3:4 (600×800)</option>
             <option value="landscape">Landscape 4:3 (800×600)</option>
+            <option value="wide">Wide 3:2 (900×600)</option>
+            <option value="ultrawide">Ultra-wide 16:9 (960×540)</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
