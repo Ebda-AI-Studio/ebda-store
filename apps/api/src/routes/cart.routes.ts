@@ -16,6 +16,7 @@ const router = Router({ mergeParams: true });
 const addToCartSchema = z.object({
   productId: z.string().uuid(),
   quantity: z.number().int().min(1).default(1),
+  variantId: z.string().uuid().optional(),
 });
 
 const bulkSyncSchema = z.object({
@@ -24,6 +25,7 @@ const bulkSyncSchema = z.object({
       z.object({
         productId: z.string().uuid(),
         quantity: z.number().int().min(1),
+        variantId: z.string().uuid().optional(),
       })
     )
     .max(100),
@@ -73,7 +75,8 @@ router.post('/items', async (req: Request, res: Response, next: NextFunction) =>
       sessionId,
       data.productId,
       data.quantity,
-      customerId
+      customerId,
+      data.variantId
     );
 
     res.status(201).json({

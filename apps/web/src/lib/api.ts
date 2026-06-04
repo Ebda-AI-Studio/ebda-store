@@ -588,7 +588,7 @@ class ApiClient {
     });
   }
 
-  async syncCart(items: Array<{ productId: string; quantity: number }>) {
+  async syncCart(items: Array<{ productId: string; quantity: number; variantId?: string }>) {
     return this.request<{ cart: Cart }>('/public/cart/sync', {
       method: 'POST',
       body: JSON.stringify({ items }),

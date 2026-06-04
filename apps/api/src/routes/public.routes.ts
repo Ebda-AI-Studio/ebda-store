@@ -256,9 +256,16 @@ router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next
       return;
     }
 
-    const { productId, quantity } = addCartItemSchema.parse(req.body);
+    const { productId, quantity, variantId } = addCartItemSchema.parse(req.body);
     const storeId = await getStoreIdFromRequest(req);
-    const cart = await CartService.addItem(storeId, sessionId, productId, quantity);
+    const cart = await CartService.addItem(
+      storeId,
+      sessionId,
+      productId,
+      quantity,
+      undefined,
+      variantId
+    );
 
     res.json({
       success: true,
@@ -275,7 +282,13 @@ router.post('/cart/items', cartLimiter, async (req: Request, res: Response, next
 // migration hit a 404 and silently lost the cart.
 const syncCartSchema = z.object({
   items: z
-    .array(z.object({ productId: z.string().uuid(), quantity: z.number().int().min(1) }))
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        quantity: z.number().int().min(1),
+        variantId: z.string().uuid().optional(),
+      })
+    )
     .max(100),
 });
 router.post('/cart/sync', cartLimiter, async (req: Request, res: Response, next: NextFunction) => {

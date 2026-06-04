@@ -177,6 +177,7 @@ describe('CartService', () => {
         data: {
           cartId: mockCart.id,
           productId: 'prod-123',
+          variantId: null,
           quantity: 2,
         },
       });

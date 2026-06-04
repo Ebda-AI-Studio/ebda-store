@@ -138,6 +138,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             .map(i => ({
               productId: (i.productId || i.id) as string,
               quantity: i.quantity,
+              variantId: i.variantId,
             }));
           if (syncPayload.length > 0) {
             await api.syncCart(syncPayload);

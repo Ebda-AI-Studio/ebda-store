@@ -78,7 +78,8 @@ export class CartService {
     sessionId: string,
     productId: string,
     quantity: number = 1,
-    customerId?: string
+    customerId?: string,
+    variantId?: string
   ) {
     // Get or create cart first (outside transaction since getOrCreate has its own retry logic)
     const cart = await this.getOrCreate(storeId, sessionId, customerId);
@@ -117,21 +118,38 @@ export class CartService {
               throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
             }
 
-            // Check if item already exists
-            const existingItem = await tx.cartItem.findFirst({
-              where: { cartId: cart.id, productId },
-            });
+            // Resolve the chosen variant — it must belong to this product and
+            // be active. Variant stock + backorder override the product values,
+            // and the line is keyed by (cartId, productId, variantId) so each
+            // variant is its own row (order.service already reads variantId).
+            let variant: { id: string; inventory: number; allowBackorder: boolean } | null = null;
+            if (variantId) {
+              variant = await tx.productVariant.findFirst({
+                where: { id: variantId, productId, isActive: true },
+                select: { id: true, inventory: true, allowBackorder: true },
+              });
+              if (!variant) {
+                throw new AppError(404, 'NOT_FOUND', 'Variant not found or unavailable');
+              }
+            }
 
-            // effectiveAllowBackorder: the per-product flag is only honoured when
-            // the store-level inventory.backorder feature is enabled.
-            const effectiveAllowBackorder = backorderFeatureEnabled && product.allowBackorder;
+            const availableInventory = variant ? variant.inventory : product.inventory;
+            const effectiveAllowBackorder =
+              backorderFeatureEnabled &&
+              (variant ? variant.allowBackorder : product.allowBackorder);
+
+            // Same product+variant line if it already exists (null variantId for
+            // base-product lines merges only with other base-product lines).
+            const existingItem = await tx.cartItem.findFirst({
+              where: { cartId: cart.id, productId, variantId: variantId ?? null },
+            });
 
             if (existingItem) {
               const newQuantity = existingItem.quantity + quantity;
 
               if (
                 product.trackInventory &&
-                product.inventory < newQuantity &&
+                availableInventory < newQuantity &&
                 !effectiveAllowBackorder
               ) {
                 throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
@@ -142,10 +160,9 @@ export class CartService {
                 data: { quantity: newQuantity },
               });
             } else {
-              // Check inventory for new item
               if (
                 product.trackInventory &&
-                product.inventory < quantity &&
+                availableInventory < quantity &&
                 !effectiveAllowBackorder
               ) {
                 throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
@@ -155,6 +172,7 @@ export class CartService {
                 data: {
                   cartId: cart.id,
                   productId,
+                  variantId: variantId ?? null,
                   quantity,
                 },
               });
@@ -179,7 +197,7 @@ export class CartService {
   static async addItems(
     storeId: string,
     sessionId: string,
-    items: Array<{ productId: string; quantity: number }>,
+    items: Array<{ productId: string; quantity: number; variantId?: string }>,
     customerId?: string
   ) {
     const cart = await this.getOrCreate(storeId, sessionId, customerId);
@@ -201,6 +219,19 @@ export class CartService {
     });
     const productById = new Map(products.map(p => [p.id, p]));
 
+    // Resolve any chosen variants up front (must belong to one of these products
+    // and be active). Variant stock/backorder override the product values.
+    const variantIds = items.map(i => i.variantId).filter((v): v is string => !!v);
+    const variants = variantIds.length
+      ? await prisma.productVariant.findMany({
+          where: { id: { in: variantIds }, productId: { in: productIds }, isActive: true },
+          select: { id: true, inventory: true, allowBackorder: true },
+        })
+      : [];
+    const variantById = new Map(variants.map(v => [v.id, v]));
+    const lineKey = (productId: string, variantId?: string | null) =>
+      `${productId}::${variantId ?? ''}`;
+
     await retryOnWriteConflict(
       () =>
         prisma.$transaction(
@@ -208,22 +239,29 @@ export class CartService {
             const existingItems = await tx.cartItem.findMany({
               where: { cartId: cart.id, productId: { in: productIds } },
             });
-            const existingByProduct = new Map(existingItems.map(i => [i.productId, i]));
+            const existingByLine = new Map(
+              existingItems.map(i => [lineKey(i.productId, i.variantId), i])
+            );
 
             for (const item of items) {
               const product = productById.get(item.productId);
               if (!product) continue;
+              // A chosen-but-invalid variant is skipped, not silently dropped to
+              // the base product (which would be the wrong cart line).
+              if (item.variantId && !variantById.has(item.variantId)) continue;
+              const variant = item.variantId ? variantById.get(item.variantId)! : null;
 
-              const existing = existingByProduct.get(item.productId);
+              const existing = existingByLine.get(lineKey(item.productId, item.variantId));
               const targetQuantity = (existing?.quantity ?? 0) + item.quantity;
 
-              // effectiveAllowBackorder: per-product flag only honoured when the
-              // store-level inventory.backorder feature is enabled.
-              const effectiveAllowBackorder = backorderFeatureEnabled && product.allowBackorder;
+              const availableInventory = variant ? variant.inventory : product.inventory;
+              const effectiveAllowBackorder =
+                backorderFeatureEnabled &&
+                (variant ? variant.allowBackorder : product.allowBackorder);
 
               if (
                 product.trackInventory &&
-                product.inventory < targetQuantity &&
+                availableInventory < targetQuantity &&
                 !effectiveAllowBackorder
               ) {
                 throw new AppError(
@@ -240,7 +278,12 @@ export class CartService {
                 });
               } else {
                 await tx.cartItem.create({
-                  data: { cartId: cart.id, productId: item.productId, quantity: item.quantity },
+                  data: {
+                    cartId: cart.id,
+                    productId: item.productId,
+                    variantId: item.variantId ?? null,
+                    quantity: item.quantity,
+                  },
                 });
               }
             }
