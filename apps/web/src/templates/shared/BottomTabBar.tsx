@@ -14,9 +14,10 @@ import { useStoreUrl } from '../../contexts/StoreContext';
  *
  * Visibility:
  *  - Mobile-only (`md:hidden`) — desktop has the top header.
- *  - Hidden on PDP routes (`/products/<slug>`) where a page-level sticky
- *    add-to-cart bar lives. Without this guard both bars would stack
- *    and crowd thumb territory on small phones.
+ *  - Shown on PDP too — the cart MUST stay reachable on mobile (the header
+ *    cart icon is `hidden md:inline-flex`, so the tab bar is the ONLY mobile
+ *    cart entry point). There is no page-level sticky add-to-cart bar on the
+ *    PDP, so nothing stacks. (Re-add a PDP guard only if a sticky bar lands.)
  *  - Hidden on /checkout + /auth — those flows use MinimalChrome and
  *    shouldn't pull users back into shopping mid-purchase.
  *
@@ -36,11 +37,13 @@ export function BottomTabBar() {
   const storeUrl = useStoreUrl();
   const pathname = usePathname() ?? '/';
 
-  // PDP + checkout + auth routes hide the bar to avoid stacking
-  // bottom-fixed UI. The pathname includes the store slug prefix on
-  // path-based multi-tenant URLs, so match the trailing segment(s).
+  // checkout + auth + order-detail routes hide the bar (MinimalChrome flows;
+  // don't pull users back into shopping mid-purchase). PDP is NOT hidden — on
+  // mobile the tab bar is the cart's only entry point (header cart is
+  // desktop-only). The pathname includes the store slug prefix on path-based
+  // multi-tenant URLs, so match the trailing segment(s).
   const lowered = pathname.toLowerCase();
-  const hideOn = ['/products/', '/checkout', '/auth/', '/account/order'];
+  const hideOn = ['/checkout', '/auth/', '/account/order'];
   if (hideOn.some(p => lowered.includes(p))) return null;
 
   const tabs: Array<{
