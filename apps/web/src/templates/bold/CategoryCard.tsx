@@ -14,10 +14,12 @@ export default function BoldCategoryCard({
   cardShape,
   urlPrefix = '',
   categoryLabelZone,
+  captionPosition,
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  const isOverlay = captionPosition === 'overlay';
   // Named shape overrides bold's brutalist default aspect-square sm:aspect-[3/4]
   // + rounded-3xl. Falls back to bold defaults.
   const shape = cardShapeClasses(cardShape);
@@ -53,33 +55,35 @@ export default function BoldCategoryCard({
           </div>
         )}
 
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
-
-        {/* Content */}
-        <div className="absolute inset-x-0 bottom-0 p-6">
-          <h3
-            className="text-2xl font-black uppercase text-white mb-2 tracking-tight group-hover:text-primary transition-colors duration-200"
-            data-zone="categoryLabel"
-            style={{
-              fontFamily: categoryLabelZone?.fontFamily,
-              fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
-              fontWeight: categoryLabelZone?.fontWeight,
-              color: categoryLabelZone?.color,
-              letterSpacing: categoryLabelZone?.letterSpacing,
-              lineHeight: categoryLabelZone?.lineHeight,
-              textTransform:
-                categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
-            }}
-          >
-            {displayName}
-          </h3>
-          {category.productCount !== undefined && (
-            <p className="text-white/75 font-bold uppercase tracking-[0.05em] text-sm">
-              {category.productCount} {isRtl ? 'منتج' : 'items'}
-            </p>
-          )}
-        </div>
+        {/* Gradient Overlay + Content — only in overlay mode */}
+        {isOverlay && (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 p-6">
+              <h3
+                className="text-2xl font-black uppercase text-white mb-2 tracking-tight group-hover:text-primary transition-colors duration-200"
+                data-zone="categoryLabel"
+                style={{
+                  fontFamily: categoryLabelZone?.fontFamily,
+                  fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
+                  fontWeight: categoryLabelZone?.fontWeight,
+                  color: categoryLabelZone?.color,
+                  letterSpacing: categoryLabelZone?.letterSpacing,
+                  lineHeight: categoryLabelZone?.lineHeight,
+                  textTransform:
+                    categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+                }}
+              >
+                {displayName}
+              </h3>
+              {category.productCount !== undefined && (
+                <p className="text-white/75 font-bold uppercase tracking-[0.05em] text-sm">
+                  {category.productCount} {isRtl ? 'منتج' : 'items'}
+                </p>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Arrow */}
         <div
@@ -101,6 +105,25 @@ export default function BoldCategoryCard({
           </svg>
         </div>
       </div>
+
+      {/* Below-image label — only when NOT in overlay mode */}
+      {!isOverlay && (
+        <h3
+          className="mt-3 text-center text-base font-black uppercase text-foreground tracking-tight"
+          data-zone="categoryLabel"
+          style={{
+            fontFamily: categoryLabelZone?.fontFamily,
+            fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
+            fontWeight: categoryLabelZone?.fontWeight,
+            color: categoryLabelZone?.color,
+            letterSpacing: categoryLabelZone?.letterSpacing,
+            lineHeight: categoryLabelZone?.lineHeight,
+            textTransform: categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+          }}
+        >
+          {displayName}
+        </h3>
+      )}
     </Link>
   );
 }

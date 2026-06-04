@@ -473,6 +473,10 @@ export interface CategoryStripProps {
   seeAllZone?: ResolvedZone;
   /** Category label text typography override (text below each card image). */
   categoryLabelZone?: ResolvedZone;
+  /** Caption placement for this render: 'below' (label under image) or
+   *  'overlay' (label over the image bottom with a gradient scrim). Resolved
+   *  per breakpoint by HomePageContent. Default 'below'. */
+  captionPosition?: import('@force/shared').CategoriesCaption;
 }
 
 /**
@@ -599,6 +603,10 @@ export interface CategoryCardProps {
   urlPrefix?: string;
   /** Category label text typography override forwarded from CategoryGrid/CategoryStrip. */
   categoryLabelZone?: ResolvedZone;
+  /** Caption placement for this render: 'below' (label under image) or
+   *  'overlay' (label over the image bottom with a gradient scrim). Resolved
+   *  per breakpoint by HomePageContent. Default 'below'. */
+  captionPosition?: import('@force/shared').CategoriesCaption;
 }
 
 /**
@@ -659,6 +667,10 @@ export interface CategoryGridProps {
   seeAllHref?: string;
   /** Category label text typography override (text below each card image). */
   categoryLabelZone?: ResolvedZone;
+  /** Caption placement for this render: 'below' (label under image) or
+   *  'overlay' (label over the image bottom with a gradient scrim). Resolved
+   *  per breakpoint by HomePageContent. Default 'below'. */
+  captionPosition?: import('@force/shared').CategoriesCaption;
 }
 
 /**

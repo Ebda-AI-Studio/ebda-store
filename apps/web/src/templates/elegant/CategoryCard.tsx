@@ -14,10 +14,12 @@ export default function ElegantCategoryCard({
   cardShape,
   urlPrefix = '',
   categoryLabelZone,
+  captionPosition,
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  const isOverlay = captionPosition === 'overlay';
   // Named shape overrides elegant's default aspect-square sm:aspect-[2/3]
   // + rounded-md (added 2026-05-16). Falls back to elegant defaults.
   const shape = cardShapeClasses(cardShape);
@@ -61,34 +63,58 @@ export default function ElegantCategoryCard({
             {isRtl ? 'عرض' : 'View'}
           </span>
         </div>
+
+        {isOverlay && (
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent px-3 pb-3 pt-10 text-center">
+            <h3
+              className="text-white drop-shadow-sm line-clamp-1 text-sm sm:text-base font-semibold"
+              data-zone="categoryLabel"
+              style={{
+                fontFamily: categoryLabelZone?.fontFamily,
+                fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
+                fontWeight: categoryLabelZone?.fontWeight,
+                color: categoryLabelZone?.color,
+                letterSpacing: categoryLabelZone?.letterSpacing,
+                lineHeight: categoryLabelZone?.lineHeight,
+                textTransform:
+                  categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+              }}
+            >
+              {displayName}
+            </h3>
+          </div>
+        )}
       </div>
 
       {/* Title — always centered. Caption text reads cleanly under a
           centered category card regardless of language direction; mixing
           text-center with RTL/LTR aligns to a side which fights the
           centered image above. */}
-      <div className="text-center">
-        <h3
-          className="text-base font-light text-foreground tracking-[-0.005em] group-hover:text-foreground/70 transition-colors duration-700"
-          data-zone="categoryLabel"
-          style={{
-            fontFamily: categoryLabelZone?.fontFamily,
-            fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
-            fontWeight: categoryLabelZone?.fontWeight,
-            color: categoryLabelZone?.color,
-            letterSpacing: categoryLabelZone?.letterSpacing,
-            lineHeight: categoryLabelZone?.lineHeight,
-            textTransform: categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
-          }}
-        >
-          {displayName}
-        </h3>
-        {category.productCount !== undefined && (
-          <p className="text-[11px] text-muted-foreground/80 mt-2 tracking-[0.22em] uppercase">
-            {category.productCount} {isRtl ? 'قطعة' : 'pieces'}
-          </p>
-        )}
-      </div>
+      {!isOverlay && (
+        <div className="text-center">
+          <h3
+            className="text-base font-light text-foreground tracking-[-0.005em] group-hover:text-foreground/70 transition-colors duration-700"
+            data-zone="categoryLabel"
+            style={{
+              fontFamily: categoryLabelZone?.fontFamily,
+              fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
+              fontWeight: categoryLabelZone?.fontWeight,
+              color: categoryLabelZone?.color,
+              letterSpacing: categoryLabelZone?.letterSpacing,
+              lineHeight: categoryLabelZone?.lineHeight,
+              textTransform:
+                categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+            }}
+          >
+            {displayName}
+          </h3>
+          {category.productCount !== undefined && (
+            <p className="text-[11px] text-muted-foreground/80 mt-2 tracking-[0.22em] uppercase">
+              {category.productCount} {isRtl ? 'قطعة' : 'pieces'}
+            </p>
+          )}
+        </div>
+      )}
     </Link>
   );
 }

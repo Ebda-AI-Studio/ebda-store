@@ -27,10 +27,12 @@ export default function ModernCategoryCard({
   showHover = true,
   urlPrefix = '',
   categoryLabelZone,
+  captionPosition,
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  const isOverlay = captionPosition === 'overlay';
   const shape = cardShapeClasses(cardShape);
   const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
   // No aspect override → keep the modern theme's default: square on
@@ -63,8 +65,29 @@ export default function ModernCategoryCard({
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-primary/8 to-muted" />
         )}
+
+        {isOverlay && showLabel !== false && (
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent px-3 pb-3 pt-10 text-center">
+            <h3
+              className="text-white drop-shadow-sm line-clamp-1 text-sm sm:text-base font-semibold"
+              data-zone="categoryLabel"
+              style={{
+                fontFamily: categoryLabelZone?.fontFamily,
+                fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
+                fontWeight: categoryLabelZone?.fontWeight,
+                color: categoryLabelZone?.color,
+                letterSpacing: categoryLabelZone?.letterSpacing,
+                lineHeight: categoryLabelZone?.lineHeight,
+                textTransform:
+                  categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+              }}
+            >
+              {displayName}
+            </h3>
+          </div>
+        )}
       </div>
-      {showLabel && (
+      {!isOverlay && showLabel && (
         <p
           className="mt-2 text-center text-sm md:text-base font-medium text-foreground line-clamp-1"
           data-zone="categoryLabel"

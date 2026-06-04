@@ -414,22 +414,24 @@ export function HomePageContent({
                     seeAllZone: categoriesSeeAllZone,
                     categoryLabelZone: categoriesLabelZone,
                   };
-                  const renderGrid = (vis?: string) => (
+                  type Caption = typeof layout.categories.captionPosition;
+                  const renderGrid = (caption: Caption, vis?: string) => (
                     <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${vis ?? ''}`}>
                       <T.CategoryGrid
                         {...common}
+                        captionPosition={caption}
                         mobileColumns={layout.categories.mobileColumns}
                         desktopColumns={layout.categories.desktopColumns}
                       />
                     </div>
                   );
-                  const renderStrip = (vis?: string) =>
+                  const renderStrip = (caption: Caption, vis?: string) =>
                     T.CategoryStrip ? (
                       <div className={vis}>
-                        <T.CategoryStrip {...common} pack={templateId} />
+                        <T.CategoryStrip {...common} captionPosition={caption} pack={templateId} />
                       </div>
                     ) : (
-                      renderGrid(vis)
+                      renderGrid(caption, vis)
                     );
                   const kindFor = (lay: typeof layout.categories.layout) =>
                     lay === 'horizontal' && T.CategoryStrip ? 'strip' : 'grid';
@@ -437,13 +439,20 @@ export function HomePageContent({
                   const mobileKind = kindFor(
                     layout.categories.layoutMobile ?? layout.categories.layout
                   );
-                  const renderKind = (kind: 'strip' | 'grid', vis?: string) =>
-                    kind === 'strip' ? renderStrip(vis) : renderGrid(vis);
-                  if (desktopKind === mobileKind) return renderKind(desktopKind);
+                  const desktopCaption = layout.categories.captionPosition;
+                  const mobileCaption =
+                    layout.categories.captionPositionMobile ?? layout.categories.captionPosition;
+                  const renderKind = (kind: 'strip' | 'grid', caption: Caption, vis?: string) =>
+                    kind === 'strip' ? renderStrip(caption, vis) : renderGrid(caption, vis);
+                  // Render once when desktop + mobile resolve to the SAME layout AND
+                  // caption; otherwise render both trees + toggle with md: so each
+                  // breakpoint gets its own layout + caption independently.
+                  if (desktopKind === mobileKind && desktopCaption === mobileCaption)
+                    return renderKind(desktopKind, desktopCaption);
                   return (
                     <>
-                      {renderKind(mobileKind, 'md:hidden')}
-                      {renderKind(desktopKind, 'hidden md:block')}
+                      {renderKind(mobileKind, mobileCaption, 'md:hidden')}
+                      {renderKind(desktopKind, desktopCaption, 'hidden md:block')}
                     </>
                   );
                 })()}

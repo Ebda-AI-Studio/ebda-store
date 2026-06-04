@@ -14,10 +14,12 @@ export default function ClassicCategoryCard({
   cardShape,
   urlPrefix = '',
   categoryLabelZone,
+  captionPosition,
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  const isOverlay = captionPosition === 'overlay';
   // Named shape overrides classic's default aspect-square sm:aspect-[3/4]
   // + rounded-sm (added 2026-05-16). Falls back to classic defaults.
   const shape = cardShapeClasses(cardShape);
@@ -55,36 +57,62 @@ export default function ClassicCategoryCard({
 
         {/* Subtle hover overlay */}
         <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/5 transition-colors duration-500" />
+
+        {isOverlay && (
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent px-3 pb-3 pt-10 text-center">
+            <h3
+              className="text-white drop-shadow-sm line-clamp-1 text-sm sm:text-base font-semibold"
+              data-zone="categoryLabel"
+              style={{
+                fontFamily: categoryLabelZone?.fontFamily,
+                fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
+                fontWeight: categoryLabelZone?.fontWeight,
+                color: categoryLabelZone?.color,
+                letterSpacing: categoryLabelZone?.letterSpacing,
+                lineHeight: categoryLabelZone?.lineHeight,
+                textTransform:
+                  categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+              }}
+            >
+              {displayName}
+            </h3>
+          </div>
+        )}
       </div>
 
-      {/* Title - Serif typography */}
-      <h3
-        className="text-lg font-serif text-foreground group-hover:text-primary transition-colors duration-500 mb-2 tracking-tight"
-        data-zone="categoryLabel"
-        style={{
-          fontFamily: categoryLabelZone?.fontFamily,
-          fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
-          fontWeight: categoryLabelZone?.fontWeight,
-          color: categoryLabelZone?.color,
-          letterSpacing: categoryLabelZone?.letterSpacing,
-          lineHeight: categoryLabelZone?.lineHeight,
-          textTransform: categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
-        }}
-      >
-        {displayName}
-      </h3>
+      {!isOverlay && (
+        <>
+          {/* Title - Serif typography */}
+          <h3
+            className="text-lg font-serif text-foreground group-hover:text-primary transition-colors duration-500 mb-2 tracking-tight"
+            data-zone="categoryLabel"
+            style={{
+              fontFamily: categoryLabelZone?.fontFamily,
+              fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
+              fontWeight: categoryLabelZone?.fontWeight,
+              color: categoryLabelZone?.color,
+              letterSpacing: categoryLabelZone?.letterSpacing,
+              lineHeight: categoryLabelZone?.lineHeight,
+              textTransform:
+                categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+            }}
+          >
+            {displayName}
+          </h3>
 
-      {/* Product count */}
-      {category.productCount !== undefined && (
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          {isRtl ? `${category.productCount} قطعة` : `${category.productCount} pieces`}
-        </p>
+          {/* Product count */}
+          {category.productCount !== undefined && (
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              {isRtl ? `${category.productCount} قطعة` : `${category.productCount} pieces`}
+            </p>
+          )}
+
+          {/* Underline animation */}
+          <div className="mt-4 flex justify-center">
+            <div className="w-0 h-px bg-primary group-hover:w-12 transition-all duration-500" />
+          </div>
+        </>
       )}
-
-      {/* Underline animation */}
-      <div className="mt-4 flex justify-center">
-        <div className="w-0 h-px bg-primary group-hover:w-12 transition-all duration-500" />
-      </div>
     </Link>
   );
 }

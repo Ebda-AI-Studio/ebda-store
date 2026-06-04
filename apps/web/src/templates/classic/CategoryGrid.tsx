@@ -34,6 +34,7 @@ export default function ClassicCategoryGrid({
   cardSize,
   cardAspect,
   cardShape,
+  captionPosition,
   cardGap,
   showLabel,
   showHover,
@@ -97,6 +98,7 @@ export default function ClassicCategoryGrid({
                   cardSize={cardSize}
                   cardAspect={cardAspect}
                   cardShape={cardShape}
+                  captionPosition={captionPosition}
                   showLabel={showLabel}
                   showHover={showHover}
                   category={category}
@@ -110,6 +112,7 @@ export default function ClassicCategoryGrid({
                 cardSize={cardSize}
                 cardAspect={cardAspect}
                 cardShape={cardShape}
+                captionPosition={captionPosition}
                 showLabel={showLabel}
                 showHover={showHover}
                 key={category.id}

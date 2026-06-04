@@ -59,10 +59,12 @@ export function CategoryStrip({
   seeAllZone,
   categoryLabelZone,
   dividers,
+  captionPosition,
 }: CategoryStripProps) {
   // Hooks must be called unconditionally (before any early return).
   const { store } = useStore();
   const styles = getPackStyles(pack);
+  const isOverlay = captionPosition === 'overlay';
   if (categories.length === 0) return null;
   const sizeCap = categorySizeClass(cardSize);
   const shape = cardShapeClasses(cardShape);
@@ -143,8 +145,29 @@ export function CategoryStrip({
                         </svg>
                       </div>
                     )}
+
+                    {isOverlay && showLabel !== false && (
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent px-3 pb-3 pt-10 text-center">
+                        <h3
+                          className="text-white drop-shadow-sm line-clamp-1 text-sm sm:text-base font-semibold"
+                          data-zone="categoryLabel"
+                          style={{
+                            fontFamily: categoryLabelZone?.fontFamily,
+                            fontSize: responsiveFontSize(categoryLabelZone?.fontSize),
+                            fontWeight: categoryLabelZone?.fontWeight,
+                            color: categoryLabelZone?.color,
+                            letterSpacing: categoryLabelZone?.letterSpacing,
+                            lineHeight: categoryLabelZone?.lineHeight,
+                            textTransform:
+                              categoryLabelZone?.textTransform as React.CSSProperties['textTransform'],
+                          }}
+                        >
+                          {name}
+                        </h3>
+                      </div>
+                    )}
                   </div>
-                  {showLabel && (
+                  {!isOverlay && showLabel && (
                     <p
                       className={`mt-5 text-center line-clamp-2 ${styles.categoryCaption}`}
                       data-zone="categoryLabel"
