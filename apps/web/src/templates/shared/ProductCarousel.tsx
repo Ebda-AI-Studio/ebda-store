@@ -253,7 +253,7 @@ export function ProductCarousel({
             className={`-mx-4 flex snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-4 scroll-smooth`}
             style={{ scrollbarWidth: 'thin' }}
           >
-            {products.map(product => {
+            {products.map((product, i) => {
               const name = isRtl ? (product.nameAr ?? product.name) : product.name;
               const href = `${urlPrefix}/products/${product.slug}`;
               const img = product.images?.[0]?.url;
@@ -320,6 +320,7 @@ export function ProductCarousel({
                               src={img}
                               alt={name}
                               fill
+                              priority={i < 4}
                               sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
                               // Only fade out on hover when there's a second
                               // image to crossfade IN. Without this guard,

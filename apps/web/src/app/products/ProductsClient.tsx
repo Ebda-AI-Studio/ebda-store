@@ -573,9 +573,12 @@ export default function ProductsClient({
                   className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 ${productCardDefaults?.cardGap ? gridGapClass(productCardDefaults.cardGap) : 'gap-3 sm:gap-4 lg:gap-6'}`}
                   dir={language === 'ar' ? 'rtl' : 'ltr'}
                 >
-                  {products.map(p => (
+                  {products.map((p, i) => (
                     <PecannbeeProductCard
                       key={p.id}
+                      // First row(s) are above the fold — eager-load + preload
+                      // their images to improve LCP (audit). Rest stay lazy.
+                      priority={i < 6}
                       // productCardDefaults override the "md" fallback when set.
                       // Per-section overrides don't apply on PLP; only the global
                       // defaults slot applies here (Sprint 4, 2026-05-18).

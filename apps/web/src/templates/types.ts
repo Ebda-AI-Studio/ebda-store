@@ -533,6 +533,9 @@ export interface ProductCardProps {
   product: TemplateProduct;
   isRtl?: boolean;
   currency?: string;
+  /** When true, the card's primary image eager-loads + preloads (priority) for
+   *  above-the-fold slots to improve LCP. Off (lazy) by default. */
+  priority?: boolean;
   /** Current quantity in cart (for showing badge) */
   quantityInCart?: number;
   onAddToCart?: (productId: string) => Promise<void> | void;

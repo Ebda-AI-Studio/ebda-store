@@ -47,6 +47,7 @@ function ModernProductCard({
   cardFrameWidth,
   cardFrameSize,
   cardFrameColor,
+  priority = false,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -110,7 +111,7 @@ function ModernProductCard({
                 className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700 ease-out"
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                loading="lazy"
+                priority={priority}
               />
               {/* Second image on hover */}
               {product.images[1]?.url && (

@@ -47,6 +47,7 @@ function MinimalProductCard({
   cardFrameWidth,
   cardFrameSize,
   cardFrameColor,
+  priority,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -118,7 +119,7 @@ function MinimalProductCard({
               className="w-full h-full object-cover group-hover:opacity-85 transition-opacity duration-700 ease-out"
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              loading="lazy"
+              priority={priority}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">

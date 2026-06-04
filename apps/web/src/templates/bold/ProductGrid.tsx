@@ -48,7 +48,7 @@ export default function BoldProductGrid({
 
         {/* Products Grid */}
         <div className={`grid ${gridCols} gap-3 md:gap-4`}>
-          {products.map(product => (
+          {products.map((product, i) => (
             <ProductCard
               key={product.id}
               product={product}
@@ -59,6 +59,7 @@ export default function BoldProductGrid({
               isInCompare={compareIds?.has(product.id) ?? false}
               onToggleCompare={onToggleCompare}
               onRemoveFromWishlist={onRemoveFromWishlist}
+              priority={i < 6}
             />
           ))}
         </div>

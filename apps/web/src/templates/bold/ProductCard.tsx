@@ -46,6 +46,7 @@ function BoldProductCard({
   cardFrameWidth,
   cardFrameSize,
   cardFrameColor,
+  priority,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -110,7 +111,7 @@ function BoldProductCard({
               )}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              loading="lazy"
+              priority={priority}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">

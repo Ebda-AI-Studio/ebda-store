@@ -76,6 +76,7 @@ function PecannbeeProductCardImpl({
   productNameZone,
   productPriceZone,
   productCtaZone,
+  priority,
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -167,6 +168,7 @@ function PecannbeeProductCardImpl({
                 src={img}
                 alt={product.images?.[0]?.alt ?? name}
                 fill
+                priority={priority}
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
                 className={`object-cover transition-opacity duration-500 ${
                   showHover !== false && product.images?.[1]?.url ? 'group-hover/img:opacity-0' : ''
