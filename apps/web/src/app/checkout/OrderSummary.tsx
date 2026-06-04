@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { Button, Input } from '@force/ui';
+import type { CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
 import type { CheckoutCartItem, Coupon } from './types';
@@ -19,6 +20,8 @@ interface OrderSummaryProps {
   onApplyCoupon: () => void;
   onRemoveCoupon: () => void;
   couponError: string;
+  /** Per-store checkout typography (page-builder → Checkout page). */
+  typography?: { heading?: CSSProperties; label?: CSSProperties; price?: CSSProperties };
 }
 
 export function OrderSummary({
@@ -34,6 +37,7 @@ export function OrderSummary({
   onApplyCoupon,
   onRemoveCoupon,
   couponError,
+  typography,
 }: OrderSummaryProps) {
   const { t, isRtl } = useLanguage();
   // Localised product name on the order summary line — checkout +
@@ -45,7 +49,7 @@ export function OrderSummary({
   return (
     <div className="mt-8 lg:col-span-5 lg:mt-0">
       <div className="sticky top-24 rounded-xl border bg-card p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-foreground">
+        <h2 className="text-lg font-semibold text-foreground" style={typography?.heading}>
           {t('Order Summary', translations['Order Summary'])}
         </h2>
 
@@ -142,22 +146,31 @@ export function OrderSummary({
         {/* Totals */}
         <div className="mt-6 space-y-3 border-t pt-6">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">{t('Subtotal', translations['Subtotal'])}</span>
-            <span className="font-medium">{formatPrice(subtotal)}</span>
+            <span className="text-muted-foreground" style={typography?.label}>
+              {t('Subtotal', translations['Subtotal'])}
+            </span>
+            <span className="font-medium" style={typography?.price}>
+              {formatPrice(subtotal)}
+            </span>
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-[hsl(var(--success))]">
+              <span className="text-[hsl(var(--success))]" style={typography?.label}>
                 {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
               </span>
-              <span className="font-medium text-[hsl(var(--success))]">
+              <span className="font-medium text-[hsl(var(--success))]" style={typography?.price}>
                 -{formatPrice(discount)}
               </span>
             </div>
           )}
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">{t('Shipping', translations['Shipping'])}</span>
-            <span className={`font-medium ${freeShipping ? 'text-[hsl(var(--success))]' : ''}`}>
+            <span className="text-muted-foreground" style={typography?.label}>
+              {t('Shipping', translations['Shipping'])}
+            </span>
+            <span
+              className={`font-medium ${freeShipping ? 'text-[hsl(var(--success))]' : ''}`}
+              style={typography?.price}
+            >
               {freeShipping
                 ? t('Free', translations['Free'])
                 : shipping > 0
@@ -169,10 +182,12 @@ export function OrderSummary({
             </span>
           </div>
           <div className="flex justify-between border-t pt-3">
-            <span className="text-lg font-semibold text-foreground">
+            <span className="text-lg font-semibold text-foreground" style={typography?.heading}>
               {t('Total', translations['Total'])}
             </span>
-            <span className="text-lg font-bold text-primary">{formatPrice(total)}</span>
+            <span className="text-lg font-bold text-primary" style={typography?.price}>
+              {formatPrice(total)}
+            </span>
           </div>
         </div>
       </div>

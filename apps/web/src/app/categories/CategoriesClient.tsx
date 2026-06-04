@@ -28,6 +28,14 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
     undefined,
     store.theme
   );
+  // Category card labels — the theme CategoryGrid/CategoryCard already accept
+  // a categoryLabelZone (built for the homepage block); feed it the per-page
+  // categoryLabel override so the grid labels follow the Categories-page control.
+  const catLabelZone = resolveSectionZone(
+    layout?.categoriesPage?.typography?.categoryLabel,
+    undefined,
+    store.theme
+  );
   const catBgStyle: React.CSSProperties | undefined = layout?.categoriesPage?.bgColor
     ? { backgroundColor: resolveColor(layout.categoriesPage.bgColor, store.theme) }
     : undefined;
@@ -57,6 +65,8 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
               titleAr="تسوق حسب الفئة"
               isRtl={isRtl}
               urlPrefix={urlPrefix}
+              headingZone={catHeadingZone}
+              categoryLabelZone={catLabelZone}
             />
           ) : (
             // Skeleton while template loads.

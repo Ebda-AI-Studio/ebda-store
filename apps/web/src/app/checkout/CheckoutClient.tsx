@@ -68,9 +68,26 @@ export default function CheckoutClient() {
     undefined,
     store?.theme
   );
+  const checkoutLabelZone = resolveSectionZone(
+    layout?.checkoutPage?.typography?.subtitle,
+    undefined,
+    store?.theme
+  );
+  const checkoutPriceZone = resolveSectionZone(
+    layout?.checkoutPage?.typography?.productPrice,
+    undefined,
+    store?.theme
+  );
   const checkoutBgStyle: React.CSSProperties | undefined = layout?.checkoutPage?.bgColor
     ? { backgroundColor: resolveColor(layout.checkoutPage.bgColor, store?.theme) }
     : undefined;
+  // Inline-style bag handed to the checkout OrderSummary so the merchant's
+  // Checkout-page typography reaches its headings / labels / amounts.
+  const checkoutTypography = {
+    heading: zoneStyle(checkoutHeadingZone),
+    label: zoneStyle(checkoutLabelZone),
+    price: zoneStyle(checkoutPriceZone),
+  };
   // Optional override for the minimal-chrome label on /checkout. Store
   // owners can rename or clear the "Secure Checkout" text via
   // store.settings.checkoutLabel / .checkoutLabelAr without code changes.
@@ -1076,6 +1093,7 @@ export default function CheckoutClient() {
               onApplyCoupon={handleApplyCoupon}
               onRemoveCoupon={removeCoupon}
               couponError={couponError}
+              typography={checkoutTypography}
             />
           </div>
         </div>
