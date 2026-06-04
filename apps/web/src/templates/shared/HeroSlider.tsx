@@ -84,10 +84,11 @@ export function HeroSlider({
     );
   }
 
-  // Mobile hero aspect: derived from IMAGE_STANDARDS.heroMobile (16:9, 1200×675)
-  // via inline style — Tailwind arbitrary classes can't read a runtime value, so
-  // we use style={{ aspectRatio }} + max-h-[45vh] + overflow-hidden from PR #47.
-  // Desktop uses the canonical sm:aspect-[1920/700] (2.74:1) full-bleed.
+  // Mobile hero aspect: derived from IMAGE_STANDARDS.heroMobile, supplied as a
+  // CSS custom property consumed by `aspect-[var(--hero-m-aspect)]`. Desktop
+  // uses the canonical sm:aspect-[1920/700] (2.74:1) full-bleed. See the JSX
+  // comment + HeroBanner.tsx for why this is NOT an inline aspectRatio (inline
+  // styles beat responsive classes — the desktop override silently never won).
   // Touch swipe — 40px threshold, RTL-aware direction.
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartXRef.current = e.touches[0]?.clientX ?? null;
@@ -116,13 +117,17 @@ export function HeroSlider({
       onTouchEnd={handleTouchEnd}
       aria-roledescription="carousel"
     >
-      {/* Mobile: aspect-ratio from the shared heroMobile standard (16:9) + 45vh ceiling.
-          Desktop (sm:): Tailwind aspect-[1920/700] overrides the inline style via the
-          sm: breakpoint class — the inline style has lower specificity than a Tailwind
-          utility once the media query activates. overflow-hidden on the parent clips both. */}
+      {/* Mobile: aspect-[var(--hero-m-aspect)] (value from style) + 45vh ceiling.
+          Desktop (sm:): sm:aspect-[1920/700] overrides it via the breakpoint — both
+          are classes, so the later sm: utility wins (an inline aspectRatio would NOT
+          be overridable). overflow-hidden on the parent clips both. */}
       <div
-        className="relative max-h-[45vh] overflow-hidden sm:aspect-[1920/700] sm:max-h-none"
-        style={{ aspectRatio: `${HERO_MOBILE.width} / ${HERO_MOBILE.height}` }}
+        className="relative aspect-[var(--hero-m-aspect)] max-h-[45vh] overflow-hidden sm:aspect-[1920/700] sm:max-h-none"
+        style={
+          {
+            '--hero-m-aspect': `${HERO_MOBILE.width} / ${HERO_MOBILE.height}`,
+          } as React.CSSProperties
+        }
       >
         {slides.map((slide, i) => (
           <div

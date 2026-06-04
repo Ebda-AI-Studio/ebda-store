@@ -218,14 +218,22 @@ export function SectionPreview({
     dividers?.subtitle,
     dividers?.belowHeading,
   ].find(s => s && (s.color !== undefined || s.customColor || s.thickness || s.style));
+  // A slot with customColor but no `color` mode is custom by intent (the admin
+  // only writes customColor via the custom ColorField). Without this, color
+  // falls back to 'foreground' and the preview ignores the pick — same trap
+  // fixed on the storefront in SectionDivider.resolveSlotDividerSettings.
+  const normalizeCustom = (
+    s: Partial<DividerSettings> | undefined
+  ): Partial<DividerSettings> | undefined =>
+    s && s.customColor && s.color === undefined ? { ...s, color: 'custom' } : s;
   const withSharedStyle = (
     slot: Partial<DividerSettings> | undefined
   ): Partial<DividerSettings> | undefined => {
-    if (!slot || !dividerStylePick || slot === dividerStylePick) return slot;
+    if (!slot || !dividerStylePick || slot === dividerStylePick) return normalizeCustom(slot);
     const hasOwn =
       slot.color !== undefined || !!slot.customColor || !!slot.thickness || !!slot.style;
-    if (hasOwn) return slot;
-    return {
+    if (hasOwn) return normalizeCustom(slot);
+    return normalizeCustom({
       style: dividerStylePick.style,
       thickness: dividerStylePick.thickness,
       width: dividerStylePick.width,
@@ -233,7 +241,7 @@ export function SectionPreview({
       customColor: dividerStylePick.customColor,
       spacing: dividerStylePick.spacing,
       ...slot,
-    };
+    });
   };
 
   const titleDisplayText = titleText || `${label} heading`;

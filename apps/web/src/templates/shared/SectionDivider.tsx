@@ -21,6 +21,28 @@ export function hasExplicitDividerPick(slot: Partial<DividerSettings> | undefine
 }
 
 /**
+ * A slot with `customColor` set but no `color` mode is custom by intent — the
+ * admin only ever writes `customColor` through the custom ColorField, which is
+ * gated behind selecting "Custom". When `color` is left undefined it falls back
+ * to DEFAULT_DIVIDER_SETTINGS.color ('foreground'), and resolveDividerColor then
+ * IGNORES customColor (it only reads it in the `color: 'custom'` branch) — so the
+ * merchant's pick silently rendered as the grey foreground hairline. Verified
+ * live FWB 2026-06-04: categories title divider saved as
+ * `{ enabled: true, customColor: 'token:card' }` rendered foreground/0.30.
+ * Normalising customColor → custom here fixes it for every consumer without a
+ * re-save and without resurrecting a stale customColor (a slot that has no
+ * customColor is untouched).
+ */
+function normalizeCustomColorMode(
+  slot: Partial<DividerSettings> | undefined
+): Partial<DividerSettings> | undefined {
+  if (slot && slot.customColor && slot.color === undefined) {
+    return { ...slot, color: 'custom' };
+  }
+  return slot;
+}
+
+/**
  * Resolve the effective settings for ONE divider slot within a section.
  *
  * The page-builder admin exposes a SINGLE shared colour/style control per
@@ -43,7 +65,8 @@ export function resolveSlotDividerSettings(
   slot: DividerSlotKey
 ): Partial<DividerSettings> | undefined {
   const own = dividers?.[slot];
-  if (!own || hasExplicitDividerPick(own)) return own;
+  if (!own) return own;
+  if (hasExplicitDividerPick(own)) return normalizeCustomColorMode(own);
   const shared = DIVIDER_SLOTS.map(k => dividers?.[k]).find(hasExplicitDividerPick);
   if (!shared) return own;
   // Inherit the shared pick's STYLE only (never its `enabled`); the slot's own
@@ -56,7 +79,7 @@ export function resolveSlotDividerSettings(
     customColor: shared.customColor,
     spacing: shared.spacing,
   };
-  return { ...inherited, ...own };
+  return normalizeCustomColorMode({ ...inherited, ...own });
 }
 
 interface SectionDividerProps {

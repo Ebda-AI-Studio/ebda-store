@@ -48,15 +48,24 @@ export function HeroBanner({
   const dedicatedMobileSrc = (isRtl && imageMobileAr) || imageMobile;
   const mobileSrc = dedicatedMobileSrc || desktopSrc;
 
-  // Mobile hero aspect: derived from IMAGE_STANDARDS.heroMobile (16:9, 1200×675)
-  // via inline style so Tailwind can't hard-code a ratio that drifts from the
-  // shared standard. max-h-[45vh] caps the banner on larger phones/tablets so
-  // categories below remain visible without scrolling past the fold.
-  // Desktop (sm: 640px+) keeps the canonical 1920×700 (2.74:1) aspect —
-  // unchanged from prior behaviour; only the mobile breakpoint uses 16:9.
-  // Upload hint: 1200×675 for dedicated mobile images; 1920×700 desktop images
-  // will center-crop cleanly via object-cover.
-  const mobileAspectStyle = { aspectRatio: `${HERO_MOBILE.width} / ${HERO_MOBILE.height}` };
+  // Mobile hero aspect: derived from IMAGE_STANDARDS.heroMobile via a CSS
+  // CUSTOM PROPERTY consumed by the `aspect-[var(--hero-m-aspect)]` class, so
+  // the shared standard still drives it WITHOUT drifting AND the desktop
+  // `sm:aspect-[1920/700]` class can override it on ≥640px.
+  //
+  // 2026-06-04: this was previously an inline `style={{ aspectRatio }}`, which
+  // ALWAYS beats a Tailwind class regardless of media query — inline styles
+  // win the cascade. So `sm:aspect-[1920/700]` never applied and the DESKTOP
+  // banner was stuck at whatever mobile aspect was last set (the live A/B
+  // mobile-aspect tests #49–#52 leaked onto desktop — "mobile banner showing
+  // on desktop", Ahmad). A custom property is just a value, not an
+  // aspect-ratio declaration, so the responsive class override works normally.
+  // max-h-[45vh] caps the banner on larger phones/tablets so categories below
+  // remain visible. Upload hint: heroMobile for dedicated mobile images;
+  // 1920×700 desktop images center-crop cleanly via object-cover.
+  const mobileAspectStyle = {
+    '--hero-m-aspect': `${HERO_MOBILE.width} / ${HERO_MOBILE.height}`,
+  } as React.CSSProperties;
 
   const text = isRtl ? (headlineAr ?? headline) : (headline ?? headlineAr);
   const subtitleText = isRtl ? (subtitleAr ?? subtitle) : (subtitle ?? subtitleAr);
@@ -72,16 +81,15 @@ export function HeroBanner({
   // Full-bleed mode (default, pre-existing behavior): edge-to-edge,
   // object-cover. Both modes share the same aspect ratio wrappers.
   const containerBaseClass = isFramed
-    ? 'relative w-full overflow-hidden rounded-2xl bg-muted max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none'
-    : 'relative w-full overflow-hidden bg-muted max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none';
+    ? 'relative w-full overflow-hidden rounded-2xl bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none'
+    : 'relative w-full overflow-hidden bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none';
   const imageObjectClass = isFramed ? 'object-contain' : 'object-cover';
 
   const heroSection = (
-    // Mobile: aspectRatio from inline style (derived from heroMobile standard) + 45vh ceiling.
-    // Desktop (sm:): Tailwind sm:aspect-[1920/700] activates via media query — the inline
-    // aspectRatio is overridden by the sm: class on modern browsers (class wins over
-    // inline style when specificity is equal and the media query is active). sm:max-h-none
-    // removes the mobile ceiling. overflow-hidden on the outer section clips both.
+    // Mobile: aspect-[var(--hero-m-aspect)] (value supplied via style) + 45vh ceiling.
+    // Desktop (sm:): sm:aspect-[1920/700] overrides the base class via media query —
+    // both are classes now, so the later sm: utility wins (no inline-style override
+    // trap). sm:max-h-none removes the mobile ceiling. overflow-hidden clips both.
     <section className={containerBaseClass} style={mobileAspectStyle} dir={isRtl ? 'rtl' : 'ltr'}>
       {desktopSrc && (
         <picture>
