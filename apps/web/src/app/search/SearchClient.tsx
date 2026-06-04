@@ -201,7 +201,10 @@ function SearchContent() {
     <ShopChrome>
       {/* Search results are still product listings — same typography
           zone as /products. */}
-      <div className="container mx-auto px-4 py-8 flex-1" data-zone="products">
+      <div
+        className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
+        data-zone="products"
+      >
         <h1 className="text-3xl font-bold mb-6">
           {t(
             'Search Products',
@@ -519,7 +522,7 @@ function SearchFallback() {
   const { t } = useLanguage();
   return (
     <ShopChrome>
-      <div className="container mx-auto px-4 py-8 flex-1">
+      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="text-3xl font-bold mb-8">{t('Search', translations['Search'])}</h1>
         <div className="animate-pulse bg-muted h-12 max-w-2xl rounded-lg" />
       </div>
