@@ -365,7 +365,7 @@ export function SectionHeading({
         {seeAllHref && (
           <Link
             href={seeAllHref}
-            className={`mt-2 block text-end shrink-0 sm:absolute sm:end-0 sm:bottom-0 sm:mt-0 ${styles.sectionSeeAll}`}
+            className={`mt-2 block w-full text-end ${styles.sectionSeeAll}`}
             data-zone="sectionSeeAll"
             data-cta="link"
             style={{
@@ -377,6 +377,7 @@ export function SectionHeading({
               lineHeight: seeAllZone?.lineHeight,
               textTransform: seeAllZone?.textTransform as React.CSSProperties['textTransform'],
               textDecoration: seeAllZone?.textDecoration,
+              textAlign: seeAllZone?.textAlign as React.CSSProperties['textAlign'],
             }}
           >
             {isRtl ? 'عرض الكل' : 'See all'}

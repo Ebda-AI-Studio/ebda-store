@@ -409,7 +409,9 @@ export function ProductCarousel({
                           merchant turns 'Show label' off in admin
                           (cardless / image-only product strips). */}
                       {showLabel && (
-                        <div className={`p-3 sm:p-4 space-y-2 ${styles.productCardBody ?? ''}`}>
+                        <div
+                          className={`${textSizes.pad} space-y-2 ${styles.productCardBody ?? ''}`}
+                        >
                           <p
                             className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}
                             data-zone="productName"

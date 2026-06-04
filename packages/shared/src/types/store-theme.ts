@@ -502,32 +502,68 @@ export function getProductCardTextSizes(cardSize: ProductCardSize | undefined): 
   name: string;
   price: string;
   cta: string;
+  /** Body padding — scales with the card so a small card has a tight body. */
+  pad: string;
+  /** Gap between body rows — scales with the card. */
+  gap: string;
+  /** Add-to-cart button height + horizontal padding — scales with the card so
+   *  the CTA shrinks/grows in lock-step instead of staying a fixed size. */
+  btn: string;
 } {
+  // Single source of truth: ONE cardSize drives fonts + button + body spacing
+  // together (Ahmad 2026-06-04 "one change drives the whole thing"). cta is the
+  // button TEXT size; btn is its box (height + padding). pad/gap are the body.
   switch (cardSize) {
     case 'xxs':
-      // Ultra-compact tile — drop below the 16px floor only at this size
-      // since the card itself is so narrow (~90-110px) that 16px is too
-      // wide. Name at 10px mobile / 12px desktop; price matches.
+      // Ultra-compact tile (~90-110px) — sub-16px fonts + a tiny CTA.
       return {
         name: 'text-[10px] sm:text-xs',
         price: 'text-[11px] sm:text-xs',
         cta: 'text-[10px] sm:text-xs',
+        pad: 'p-1.5',
+        gap: 'gap-1',
+        btn: 'min-h-7 px-2 py-1',
       };
     case 'xs':
     case 'sm':
-      // Compact density — floor at 16px, no desktop step-up. Identity
-      // carries via pack-style flavor (weight, tracking).
-      return { name: 'text-base', price: 'text-base', cta: 'text-sm' };
+      // Compact density — floor at 16px, no desktop step-up.
+      return {
+        name: 'text-base',
+        price: 'text-base',
+        cta: 'text-sm',
+        pad: 'p-2 sm:p-2.5',
+        gap: 'gap-1.5',
+        btn: 'min-h-9 px-3 py-1.5',
+      };
     case 'lg':
-      return { name: 'text-lg', price: 'text-lg sm:text-xl', cta: 'text-sm sm:text-base' };
+      return {
+        name: 'text-lg',
+        price: 'text-lg sm:text-xl',
+        cta: 'text-sm sm:text-base',
+        pad: 'p-4 sm:p-5',
+        gap: 'gap-2.5',
+        btn: 'min-h-11 px-5 py-2.5',
+      };
     case 'xl':
-      return { name: 'text-lg sm:text-xl', price: 'text-xl sm:text-2xl', cta: 'text-base' };
+      return {
+        name: 'text-lg sm:text-xl',
+        price: 'text-xl sm:text-2xl',
+        cta: 'text-base',
+        pad: 'p-5 sm:p-6',
+        gap: 'gap-3',
+        btn: 'min-h-12 px-6 py-3',
+      };
     case 'md':
     default:
-      // Default — 16px mobile, 18px from sm breakpoint. Matches the
-      // ratio the references (Pecannbee, SMEJ) use for their standard
-      // ~200px product cards.
-      return { name: 'text-base sm:text-lg', price: 'text-base sm:text-lg', cta: 'text-sm' };
+      // Default — 16px mobile, 18px from sm breakpoint; ~200px card.
+      return {
+        name: 'text-base sm:text-lg',
+        price: 'text-base sm:text-lg',
+        cta: 'text-sm',
+        pad: 'p-3 sm:p-4',
+        gap: 'gap-2',
+        btn: 'min-h-10 px-4 py-2',
+      };
   }
 }
 

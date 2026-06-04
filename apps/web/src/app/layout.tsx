@@ -585,6 +585,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       }
       const ls = sanitizeFontValue(cfg.letterSpacing);
       if (ls) decls.push(`letter-spacing:${ls}`);
+      const ta = sanitizeFontValue(cfg.textAlign);
+      if (ta) decls.push(`text-align:${ta}`);
       const color = sanitizeFontValue(cfg.color);
       if (color) decls.push(`color:${resolveColorValue(color, 'text')}`);
 

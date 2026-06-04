@@ -259,7 +259,9 @@ function PecannbeeProductCardImpl({
           and dropped the min-h-[3em] name reservation so the card shrinks
           to whatever the actual content needs. Net effect: ~20-30px shorter
           per card on mobile, denser grid feel matches the pecannbee target. */}
-      <div className={`flex flex-1 flex-col gap-2 p-3 sm:p-4 ${styles.productCardBody ?? ''}`}>
+      <div
+        className={`flex flex-1 flex-col ${textSizes.gap} ${textSizes.pad} ${styles.productCardBody ?? ''}`}
+      >
         {/* showLabel gates the entire name + price + tax block. When false the
             card shows image + CTA only — useful for icon-style catalog grids
             where the merchant wants a minimal card. Defaults to visible (undefined
@@ -340,7 +342,7 @@ function PecannbeeProductCardImpl({
           <Link
             href={href}
             prefetch={false}
-            className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta}`}
+            className={`mt-auto inline-flex w-full items-center justify-center gap-2 ${textSizes.btn} ${textSizes.cta} ${styles.productCardCta}`}
             data-cta="button"
             style={{
               fontFamily: productCtaZone?.fontFamily,
