@@ -24,6 +24,17 @@ interface ProductsFilterSidebarProps {
   sortBy?: string;
   sortOptions?: SortOption[];
   onSortChange?: (value: string) => void;
+  /**
+   * Results summary + per-page control rendered INSIDE the filter panel (top
+   * of body), so the shopper sees "showing X of Y" + "Show: N" when they open
+   * the filters — instead of a separate bar above the grid. All optional; the
+   * block hides when resultCount / onPerPageChange aren't provided.
+   */
+  resultCount?: number;
+  isLoading?: boolean;
+  perPage?: number;
+  perPageOptions?: readonly number[];
+  onPerPageChange?: (value: number) => void;
   /** Price range state in MAJOR currency units (KD, USD…), not fils. */
   priceMin?: number;
   priceMax?: number;
@@ -58,6 +69,11 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     sortBy,
     sortOptions,
     onSortChange,
+    resultCount,
+    isLoading,
+    perPage,
+    perPageOptions,
+    onPerPageChange,
     priceMin,
     priceMax,
     priceFloor,
@@ -117,6 +133,48 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
   // between the desktop sidebar and the mobile sheet.
   const renderBody = (mobile: boolean) => (
     <>
+      {/* Results summary + per-page — shown at the top of the filter panel so
+          it's visible the moment the shopper opens the filters. */}
+      {(resultCount !== undefined || onPerPageChange) && (
+        <div className="space-y-3 border-b border-border pb-4">
+          {resultCount !== undefined && (
+            <p className="text-sm text-muted-foreground">
+              {isLoading ? (
+                t('Loading...', translations['Loading...'])
+              ) : (
+                <>
+                  {t('Showing', 'عرض')}{' '}
+                  <span className="font-medium text-foreground">{resultCount}</span>{' '}
+                  {meta ? t(`of ${meta.total}`, `من ${meta.total}`) : ''} {t('products', 'منتجات')}
+                </>
+              )}
+            </p>
+          )}
+          {onPerPageChange && perPageOptions && perPage !== undefined && (
+            <div>
+              <label
+                htmlFor={`products-perpage-${mobile ? 'm' : 'd'}`}
+                className="mb-2 block text-base lg:text-lg font-medium text-foreground"
+              >
+                {t('Show:', 'عرض:')}
+              </label>
+              <select
+                id={`products-perpage-${mobile ? 'm' : 'd'}`}
+                value={String(perPage)}
+                onChange={e => onPerPageChange(Number(e.target.value))}
+                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-base text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
+              >
+                {perPageOptions.map(n => (
+                  <option key={n} value={String(n)}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
       {sortOptions && onSortChange && (
         <div>
           <label

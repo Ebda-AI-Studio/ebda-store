@@ -414,10 +414,30 @@ export interface ProductsPageSettings {
    *   'square'    → aspect-square (1:1) — default
    *   'portrait'  → aspect-[3/4] — taller, fashion / lookbook
    *   'landscape' → aspect-[4/3] — wider, lifestyle
+   *   'wide'      → aspect-[3/2] — shorter landscape
+   *   'ultrawide' → aspect-[16/9] — cinematic banner crop
    *   'auto'      → keep current default (same as undefined)
    * Admin-controlled via page-builder → Products page section.
    */
-  pdpImageAspect?: 'square' | 'portrait' | 'landscape' | 'auto';
+  pdpImageAspect?: 'square' | 'portrait' | 'landscape' | 'wide' | 'ultrawide' | 'auto';
+}
+
+/**
+ * Standalone typography + background control for the CART page. Independent
+ * of `productCardDefaults` (which drives product *cards*) and of the global
+ * typography zones. The storefront applies these as INLINE styles on the cart
+ * line item name / price, so they reliably win over the hardcoded Tailwind
+ * size classes on those elements. Admin-controlled via page-builder → Cart page.
+ */
+export interface CartPageSettings {
+  /** Background colour for the cart page. Resolved via resolveColor. Undefined = theme default. */
+  bgColor?: string;
+  /**
+   * Cart typography overrides. Uses the `productName` (line item name) and
+   * `productPrice` (line item price + total) roles so it can reuse the shared
+   * SectionTypographyBlock admin control + resolveSectionZone storefront path.
+   */
+  typography?: SectionTypographyOverride;
 }
 
 export interface TestimonialsSettings
@@ -625,6 +645,8 @@ export interface StoreLayoutSettings {
   productCardDefaults?: ProductCardDefaults;
   /** Products listing page (PLP) settings. Page-builder configurable. */
   productsPage?: ProductsPageSettings;
+  /** Cart page settings (standalone background + typography). Page-builder configurable. */
+  cartPage?: CartPageSettings;
   /**
    * Drag-to-reorder data model (page-builder 2026-05-20, scaffolded for v2 ui).
    * When set, HomePageContent renders sections in this order instead of the
@@ -674,6 +696,7 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
     defaultOpen: true,
   },
   productsPage: {},
+  cartPage: {},
   testimonials: {
     // Default OFF for new stores. The fake-reviews-illegal posture
     // (KW Law 39/2014: 50K KWD/offense + closure; FTC 2024 rule; EU
@@ -717,6 +740,7 @@ export function resolveLayoutSettings(input: unknown): StoreLayoutSettings {
     bestSellers: { ...DEFAULT_LAYOUT_SETTINGS.bestSellers, ...(raw.bestSellers ?? {}) },
     filterSidebar: { ...DEFAULT_LAYOUT_SETTINGS.filterSidebar, ...(raw.filterSidebar ?? {}) },
     productsPage: { ...DEFAULT_LAYOUT_SETTINGS.productsPage, ...(raw.productsPage ?? {}) },
+    cartPage: { ...DEFAULT_LAYOUT_SETTINGS.cartPage, ...(raw.cartPage ?? {}) },
     testimonials: { ...DEFAULT_LAYOUT_SETTINGS.testimonials, ...(raw.testimonials ?? {}) },
     reviewSection: { ...DEFAULT_LAYOUT_SETTINGS.reviewSection, ...(raw.reviewSection ?? {}) },
     brandStory: raw.brandStory,

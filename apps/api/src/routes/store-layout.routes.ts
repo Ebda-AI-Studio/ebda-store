@@ -517,6 +517,28 @@ const layoutSchema = z
       })
       .partial()
       .optional(),
+    // Products listing/detail page settings. Must be listed here or the
+    // top-level object (no .passthrough()) silently strips it on every PUT —
+    // the "bg colour saved but not showing" bug. Keep in sync with
+    // ProductsPageSettings in packages/shared.
+    productsPage: z
+      .object({
+        bgColor: colorValue,
+        pdpImageAspect: z
+          .enum(['square', 'portrait', 'landscape', 'wide', 'ultrawide', 'auto'])
+          .optional(),
+      })
+      .partial()
+      .optional(),
+    // Standalone cart-page settings (background + typography). Same strip trap
+    // applies — list it explicitly. Keep in sync with CartPageSettings.
+    cartPage: z
+      .object({
+        bgColor: colorValue,
+        typography: sectionTypographyOverride,
+      })
+      .partial()
+      .optional(),
   })
   // Allow partial bodies so the admin UI can patch a single section without
   // re-sending every field. We re-merge with the existing JSON before save.

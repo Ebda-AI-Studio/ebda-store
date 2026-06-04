@@ -178,6 +178,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     if (!v || v === 'auto') return 'aspect-square';
     if (v === 'portrait') return 'aspect-[3/4]';
     if (v === 'landscape') return 'aspect-[4/3]';
+    if (v === 'wide') return 'aspect-[3/2]';
+    if (v === 'ultrawide') return 'aspect-[16/9]';
     return 'aspect-square'; // 'square' or fallback
   })();
 

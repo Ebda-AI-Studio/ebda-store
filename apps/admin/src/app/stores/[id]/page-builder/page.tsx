@@ -1186,7 +1186,9 @@ export default function StoreLayoutPage() {
                                   | 'auto'
                                   | 'square'
                                   | 'portrait'
-                                  | 'landscape',
+                                  | 'landscape'
+                                  | 'wide'
+                                  | 'ultrawide',
                               },
                             }
                           : prev
@@ -1198,8 +1200,80 @@ export default function StoreLayoutPage() {
                     <option value="square">Square (1:1)</option>
                     <option value="portrait">Portrait (3:4)</option>
                     <option value="landscape">Landscape (4:3)</option>
+                    <option value="wide">Wide (3:2)</option>
+                    <option value="ultrawide">Ultra-wide (16:9)</option>
                   </select>
                 </label>
+              </SectionCard>
+
+              {/* Cart page — standalone background + typography control. Saved
+                  via the main page-builder save button (no separate save / page). */}
+              <SectionCard
+                title="Cart page"
+                description="Background colour and line-item typography (name / price) for the cart page."
+                defaultExpanded={false}
+                alwaysOn
+              >
+                <ColorField
+                  label="Page background"
+                  value={layout.cartPage?.bgColor}
+                  onChange={v =>
+                    setLayout(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            cartPage: { ...(prev.cartPage ?? {}), bgColor: v },
+                          }
+                        : prev
+                    )
+                  }
+                  theme={storeInfo?.theme}
+                />
+                <SectionTypographyBlock
+                  roles={['productName', 'productPrice']}
+                  typography={layout.cartPage?.typography}
+                  globalZones={Object.fromEntries(
+                    (['productName', 'productPrice'] as const).map(r => [
+                      r,
+                      globalZones[ROLE_TO_GLOBAL_ZONE[r]],
+                    ])
+                  )}
+                  onChangeRole={(role, next) =>
+                    setLayout(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            cartPage: {
+                              ...(prev.cartPage ?? {}),
+                              typography: {
+                                ...(prev.cartPage?.typography ?? {}),
+                                [role]: {
+                                  ...(prev.cartPage?.typography?.[
+                                    role as keyof SectionTypographyOverride
+                                  ] ?? {}),
+                                  ...next,
+                                },
+                              },
+                            },
+                          }
+                        : prev
+                    )
+                  }
+                  onResetRole={role =>
+                    setLayout(prev => {
+                      if (!prev) return prev;
+                      const rest = {
+                        ...(prev.cartPage?.typography ?? {}),
+                      } as SectionTypographyOverride;
+                      delete rest[role as keyof SectionTypographyOverride];
+                      return {
+                        ...prev,
+                        cartPage: { ...(prev.cartPage ?? {}), typography: rest },
+                      };
+                    })
+                  }
+                  theme={storeInfo?.theme}
+                />
               </SectionCard>
 
               {/* Testimonials */}
