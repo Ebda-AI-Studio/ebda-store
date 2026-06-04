@@ -171,6 +171,16 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // Issue 2: pass productCardDefaults to all card surfaces on this page.
   const productCardDefaults = resolvedLayout?.productCardDefaults;
 
+  // pdpImageAspect: translate the merchant's choice to a Tailwind aspect class.
+  // 'auto' / undefined → keep the original aspect-square default.
+  const pdpAspectClass = (() => {
+    const v = resolvedLayout?.productsPage?.pdpImageAspect;
+    if (!v || v === 'auto') return 'aspect-square';
+    if (v === 'portrait') return 'aspect-[3/4]';
+    if (v === 'landscape') return 'aspect-[4/3]';
+    return 'aspect-square'; // 'square' or fallback
+  })();
+
   useEffect(() => {
     if (!slug) return;
 
@@ -414,7 +424,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Images */}
           <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10">
+            <div
+              className={`${pdpAspectClass} overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
+            >
               {images[selectedImage]?.url ? (
                 <Image
                   src={images[selectedImage].url}
@@ -489,10 +501,12 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               {product.status === 'draft' && <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>}
             </div>
 
-            <h1 className="text-3xl font-bold text-foreground">{displayName}</h1>
+            <h1 className="text-3xl font-bold text-foreground" data-zone="productName">
+              {displayName}
+            </h1>
 
             {/* Price */}
-            <div className="mt-4 flex items-baseline gap-3">
+            <div className="mt-4 flex items-baseline gap-3" data-zone="productPrice">
               <span className="text-3xl font-bold text-primary">
                 {pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
                   ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`

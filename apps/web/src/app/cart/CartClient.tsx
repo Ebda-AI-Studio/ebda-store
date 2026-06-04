@@ -401,10 +401,16 @@ export default function CartClient() {
                                   {item.category}
                                 </span>
                               )}
-                              <h3 className="mt-0.5 font-semibold text-foreground">
+                              <h3
+                                className="mt-0.5 text-base font-semibold text-foreground sm:text-lg"
+                                data-zone="productName"
+                              >
                                 {language === 'ar' && item.nameAr ? item.nameAr : item.name}
                               </h3>
-                              <p className="mt-1 text-sm text-muted-foreground">
+                              <p
+                                className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
+                                data-zone="productPrice"
+                              >
                                 {formatPrice(item.price)}{' '}
                                 {t('each', '\u0644\u0644\u0648\u0627\u062d\u062f')}
                               </p>
@@ -432,14 +438,14 @@ export default function CartClient() {
 
                           <div className="mt-auto flex items-center justify-between pt-2">
                             {/* Quantity Selector */}
-                            <div className="flex items-center rounded-xl border border-border bg-background">
+                            <div className="inline-flex items-center overflow-hidden rounded-md border border-border">
                               <button
                                 onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
                                 disabled={item.quantity <= 1}
                                 className={`flex h-11 w-11 items-center justify-center transition-colors ${
                                   item.quantity <= 1
-                                    ? 'text-muted-foreground/40 cursor-not-allowed'
-                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
+                                    ? 'cursor-not-allowed text-muted-foreground/40'
+                                    : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
                                 }`}
                                 aria-label="Decrease quantity"
                               >
@@ -457,7 +463,7 @@ export default function CartClient() {
                                   />
                                 </svg>
                               </button>
-                              <span className="w-10 text-center text-sm font-semibold text-foreground">
+                              <span className="w-10 border-x border-border text-center text-sm font-semibold text-foreground">
                                 {item.quantity}
                               </span>
                               <button
@@ -465,8 +471,8 @@ export default function CartClient() {
                                 disabled={item.quantity >= 10}
                                 className={`flex h-11 w-11 items-center justify-center transition-colors ${
                                   item.quantity >= 10
-                                    ? 'text-muted-foreground/40 cursor-not-allowed'
-                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer'
+                                    ? 'cursor-not-allowed text-muted-foreground/40'
+                                    : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
                                 }`}
                                 aria-label="Increase quantity"
                               >
@@ -487,7 +493,10 @@ export default function CartClient() {
                             </div>
 
                             {/* Item Total */}
-                            <p className="text-lg font-bold text-primary">
+                            <p
+                              className="text-base font-bold text-primary sm:text-lg"
+                              data-zone="productPrice"
+                            >
                               {formatPrice(item.price * item.quantity)}
                             </p>
                           </div>
@@ -684,7 +693,7 @@ export default function CartClient() {
                               )}{' '}
                               ({cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')})
                             </span>
-                            <span className="font-medium text-foreground">
+                            <span className="font-bold text-foreground">
                               {formatPrice(subtotal)}
                             </span>
                           </div>

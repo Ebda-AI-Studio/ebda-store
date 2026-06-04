@@ -409,6 +409,15 @@ export interface ProductsPageSettings {
   /** Background colour for the products listing page (token:primary / hex / etc).
    *  Resolved via resolveColor on the storefront. Undefined = theme default. */
   bgColor?: string;
+  /**
+   * Aspect ratio for the main product image on the detail page (PDP).
+   *   'square'    → aspect-square (1:1) — default
+   *   'portrait'  → aspect-[3/4] — taller, fashion / lookbook
+   *   'landscape' → aspect-[4/3] — wider, lifestyle
+   *   'auto'      → keep current default (same as undefined)
+   * Admin-controlled via page-builder → Products page section.
+   */
+  pdpImageAspect?: 'square' | 'portrait' | 'landscape' | 'auto';
 }
 
 export interface TestimonialsSettings

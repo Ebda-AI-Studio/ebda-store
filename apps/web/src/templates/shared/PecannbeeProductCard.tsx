@@ -274,7 +274,7 @@ function PecannbeeProductCardImpl({
               <p
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}
+                className={`line-clamp-2 font-semibold ${textSizes.name} ${styles.productCardName}`}
                 style={{
                   textWrap: 'balance',
                   fontFamily: productNameZone?.fontFamily,
@@ -304,7 +304,7 @@ function PecannbeeProductCardImpl({
                 <meta itemProp="price" content={String(product.price / 1000)} />
                 <span
                   data-zone="productPrice"
-                  className={`${textSizes.price} ${styles.productCardPrice}`}
+                  className={`font-bold ${textSizes.price} ${styles.productCardPrice}`}
                   style={{
                     fontFamily: productPriceZone?.fontFamily,
                     fontSize: responsiveFontSize(productPriceZone?.fontSize),

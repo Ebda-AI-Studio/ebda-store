@@ -1146,7 +1146,7 @@ export default function StoreLayoutPage() {
               {/* Products page */}
               <SectionCard
                 title="Products page"
-                description="Background colour for the products listing page."
+                description="Background colour and product detail image aspect for the products pages."
                 defaultExpanded={false}
                 alwaysOn
               >
@@ -1165,6 +1165,37 @@ export default function StoreLayoutPage() {
                   }
                   theme={storeInfo?.theme}
                 />
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Product detail image aspect
+                  </span>
+                  <select
+                    value={layout.productsPage?.pdpImageAspect ?? 'auto'}
+                    onChange={e =>
+                      setLayout(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              productsPage: {
+                                ...(prev.productsPage ?? {}),
+                                pdpImageAspect: e.target.value as
+                                  | 'auto'
+                                  | 'square'
+                                  | 'portrait'
+                                  | 'landscape',
+                              },
+                            }
+                          : prev
+                      )
+                    }
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="auto">Auto (square)</option>
+                    <option value="square">Square (1:1)</option>
+                    <option value="portrait">Portrait (3:4)</option>
+                    <option value="landscape">Landscape (4:3)</option>
+                  </select>
+                </label>
               </SectionCard>
 
               {/* Testimonials */}
