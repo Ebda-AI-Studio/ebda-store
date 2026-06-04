@@ -194,7 +194,7 @@ export function ProductCarousel({
           {canScrollPrev && (
             <button
               type="button"
-              aria-label={isRtl ? 'التالي' : 'Previous'}
+              aria-label={isRtl ? 'السابق' : 'Previous'}
               onClick={() => scrollByOneCard('prev')}
               className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-all duration-300 ease-out cursor-pointer start-2"
             >
@@ -218,7 +218,7 @@ export function ProductCarousel({
           {canScrollNext && (
             <button
               type="button"
-              aria-label={isRtl ? 'السابق' : 'Next'}
+              aria-label={isRtl ? 'التالي' : 'Next'}
               onClick={() => scrollByOneCard('next')}
               className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-all duration-300 ease-out cursor-pointer end-2"
             >

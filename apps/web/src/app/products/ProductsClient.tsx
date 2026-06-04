@@ -557,8 +557,8 @@ export default function ProductsClient({
 
               {/* Loading State */}
               {isLoading && (
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                  {[...Array(6)].map((_, i) => (
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 lg:gap-6 xl:grid-cols-5 2xl:grid-cols-6">
+                  {[...Array(12)].map((_, i) => (
                     <ProductSkeleton key={i} />
                   ))}
                 </div>
@@ -662,10 +662,7 @@ export default function ProductsClient({
                   </p>
                   <button
                     type="button"
-                    onClick={() => {
-                      setSearch('');
-                      setCategoryFilter('');
-                    }}
+                    onClick={handleClearAll}
                     className="mt-4 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
                   >
                     {t(

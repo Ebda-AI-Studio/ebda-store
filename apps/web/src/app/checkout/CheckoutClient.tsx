@@ -823,7 +823,7 @@ export default function CheckoutClient() {
                   )}
                 </div>
                 <span
-                  className={`ml-2 text-sm font-medium transition-colors ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'} ${step > 1 ? 'group-hover:text-primary' : ''}`}
+                  className={`ms-2 text-sm font-medium transition-colors ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'} ${step > 1 ? 'group-hover:text-primary' : ''}`}
                 >
                   {t('Shipping', translations['Shipping'])}
                 </span>
@@ -837,7 +837,7 @@ export default function CheckoutClient() {
                   2
                 </div>
                 <span
-                  className={`ml-2 text-sm font-medium ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}
+                  className={`ms-2 text-sm font-medium ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}
                 >
                   {t('Payment', '\u0627\u0644\u062f\u0641\u0639')}
                 </span>

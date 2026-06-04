@@ -179,7 +179,7 @@ function ModernProductCard({
               <button
                 onClick={handleWishlist}
                 className={cn(
-                  'w-9 h-9 rounded-full flex items-center justify-center shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out cursor-pointer backdrop-blur-sm',
+                  'h-11 w-11 rounded-full flex items-center justify-center shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out cursor-pointer backdrop-blur-sm',
                   isWishlisted
                     ? 'bg-destructive text-destructive-foreground scale-[1.05]'
                     : 'bg-white/95 text-foreground hover:bg-white hover:scale-[1.05]'
