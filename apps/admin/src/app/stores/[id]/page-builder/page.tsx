@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import {
   DndContext,
@@ -119,6 +119,11 @@ export default function StoreLayoutPage() {
   // i don't want this".
   const [pendingThemeUpdates, setPendingThemeUpdates] = useState<ThemeUpdates>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Embedded editors (Navigation, Footer & utility links) register a silent
+  // save here so the main Save button persists them — no separate save button,
+  // no standalone page.
+  const navSaveRef = useRef<(() => Promise<boolean>) | null>(null);
+  const footerLinksSaveRef = useRef<(() => Promise<boolean>) | null>(null);
   // Global typography zones — fetched from the same typography endpoint as
   // the standalone /typography page. Populated in fetchData and used as
   // (a) placeholder "inherit" hints in per-section ZoneEditors and
@@ -199,14 +204,30 @@ export default function StoreLayoutPage() {
             })
           : Promise.resolve({ data: undefined, error: undefined } as const);
 
-      const [layoutResult, typographyResult, themeResult] = await Promise.allSettled([
-        apiPut(`/api/v1/admin/stores/${storeId}/layout`, layout),
-        apiPut(`/api/v1/stores/${storeId}/typography`, {
-          fonts: typographyFonts,
-          zones: globalZones,
-        }),
-        themePromise,
-      ]);
+      // Navigation + Footer/utility links are owned by embedded editors that
+      // registered a silent saver — fold them into the same parallel batch so
+      // the one Save button persists everything. Resolve to `true` when an
+      // editor isn't mounted/registered.
+      const navPromise = navSaveRef.current ? navSaveRef.current() : Promise.resolve(true);
+      const footerLinksPromise = footerLinksSaveRef.current
+        ? footerLinksSaveRef.current()
+        : Promise.resolve(true);
+
+      const [layoutResult, typographyResult, themeResult, navResult, footerLinksResult] =
+        await Promise.allSettled([
+          apiPut(`/api/v1/admin/stores/${storeId}/layout`, layout),
+          apiPut(`/api/v1/stores/${storeId}/typography`, {
+            fonts: typographyFonts,
+            zones: globalZones,
+          }),
+          themePromise,
+          navPromise,
+          footerLinksPromise,
+        ]);
+      // Editors surface their own error toasts on failure; treat a rejected
+      // promise or a `false` resolution as a non-fatal partial failure here.
+      void navResult;
+      void footerLinksResult;
 
       const layoutFailed =
         layoutResult.status === 'rejected' ||
@@ -1475,33 +1496,17 @@ export default function StoreLayoutPage() {
                 }
               />
 
-              {/* Navigation — storefront header menu links.
-                  Embedded here so merchants can edit links without leaving
-                  the page-builder. Same NavMenuEditor renders on the
-                  standalone /navigation page (variant="standalone").
-                  Owns its own state + Save button (independent of
-                  page-builder Save). */}
-              <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="text-base font-semibold text-foreground">
-                      Storefront Navigation
-                    </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Header menu links — add, remove, and reorder items. Use relative paths (
-                      <code className="rounded bg-muted px-1 text-xs">/products</code>) for store
-                      pages or full URLs for external links.
-                    </p>
-                  </div>
-                  <a
-                    href={`/stores/${storeId}/navigation`}
-                    className="shrink-0 text-xs font-medium text-primary hover:underline"
-                  >
-                    Open standalone ↗
-                  </a>
-                </div>
-                <NavMenuEditor storeId={storeId} variant="embedded" />
-              </div>
+              {/* Navigation — storefront header menu links. Collapsible like
+                  every other section; saved by the main Save button via the
+                  registered saver (no separate save button, no standalone page). */}
+              <SectionCard
+                title="Storefront Navigation"
+                description="Header menu links — add, remove, and reorder items. Use relative paths (/products) for store pages or full URLs for external links."
+                defaultExpanded={false}
+                alwaysOn
+              >
+                <NavMenuEditor storeId={storeId} variant="embedded" saveRef={navSaveRef} />
+              </SectionCard>
 
               {/* Footer — bg, dividers, padding + typography zones
                   (footer / afterFooter). Folded the platform-wide typography
@@ -1540,29 +1545,21 @@ export default function StoreLayoutPage() {
                   })
                 }
               />
-              {/* Embedded footer links editor — same FooterLinksEditor
-                  component that renders at /pages. Editor owns its own
-                  state + Save (independent of page-builder Save). Card
-                  chrome stays subtle so it doesn't double-frame the
-                  numbered sections inside. */}
-              <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-                <div className="mb-5 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="text-base font-semibold text-foreground">Footer & utility</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Utility bar above the header + the three footer link columns + newsletter
-                      signup, all in one place.
-                    </p>
-                  </div>
-                  <a
-                    href={`/stores/${storeId}/pages`}
-                    className="shrink-0 text-xs font-medium text-primary hover:underline"
-                  >
-                    Open standalone ↗
-                  </a>
-                </div>
-                <FooterLinksEditor storeId={storeId} variant="embedded" />
-              </div>
+              {/* Footer & utility links — collapsible like every other section;
+                  saved by the main Save button via the registered saver (no
+                  separate save button, no standalone page). */}
+              <SectionCard
+                title="Footer & utility"
+                description="Utility bar above the header + the three footer link columns + newsletter signup, all in one place."
+                defaultExpanded={false}
+                alwaysOn
+              >
+                <FooterLinksEditor
+                  storeId={storeId}
+                  variant="embedded"
+                  saveRef={footerLinksSaveRef}
+                />
+              </SectionCard>
 
               {/* Extra duplicated product carousels (section duplication 2026-05-20).
                   Renders one card per entry + a "+ add carousel" button at the

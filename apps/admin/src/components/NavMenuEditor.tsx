@@ -54,9 +54,16 @@ function sanitize(value: unknown): NavItem[] {
 interface NavMenuEditorProps {
   storeId: string;
   variant: 'standalone' | 'embedded';
+  /**
+   * When provided, the editor registers a silent save here and HIDES its own
+   * Save button — so the Page Builder's main Save button persists the nav menu
+   * alongside everything else. Returns true on success (or when there's nothing
+   * valid to save, so it never blocks the unified save).
+   */
+  saveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
 }
 
-export function NavMenuEditor({ storeId, variant }: NavMenuEditorProps) {
+export function NavMenuEditor({ storeId, variant, saveRef }: NavMenuEditorProps) {
   const toast = useToast();
   const t = useT('navigation.page');
 
@@ -109,7 +116,7 @@ export function NavMenuEditor({ storeId, variant }: NavMenuEditorProps) {
     setItems(DEFAULT_MENU);
   }
 
-  async function handleSave() {
+  async function handleSave(opts?: { silent?: boolean }): Promise<boolean> {
     const cleaned = items
       .map(it => ({
         label: it.label.trim(),
@@ -119,8 +126,10 @@ export function NavMenuEditor({ storeId, variant }: NavMenuEditorProps) {
       .filter(it => it.label && it.href);
 
     if (cleaned.length === 0) {
+      // Silent (unified) save must not block on an empty menu — just skip.
+      if (opts?.silent) return true;
       toast.error(t('toastAtLeastOne'), t('toastAtLeastOneBody'));
-      return;
+      return false;
     }
 
     setIsSaving(true);
@@ -131,10 +140,14 @@ export function NavMenuEditor({ storeId, variant }: NavMenuEditorProps) {
 
     if (error) {
       toast.error(t('toastFailedSave'), error.message);
-      return;
+      return false;
     }
-    toast.success(t('toastSaved'), t('toastSavedBody'));
+    if (!opts?.silent) toast.success(t('toastSaved'), t('toastSavedBody'));
+    return true;
   }
+
+  // Register a silent save for the Page Builder's main Save button.
+  if (saveRef) saveRef.current = () => handleSave({ silent: true });
 
   const isEmbedded = variant === 'embedded';
 
@@ -242,9 +255,17 @@ export function NavMenuEditor({ storeId, variant }: NavMenuEditorProps) {
           {t('resetDefault')}
         </Button>
         <div className="flex-1" />
-        <Button onClick={handleSave} isLoading={isSaving} size={isEmbedded ? 'sm' : 'default'}>
-          {t('saveNav')}
-        </Button>
+        {/* Hidden when the Page Builder owns saving (saveRef provided) — the
+            main Save button persists the nav menu via the registered saver. */}
+        {!saveRef && (
+          <Button
+            onClick={() => handleSave()}
+            isLoading={isSaving}
+            size={isEmbedded ? 'sm' : 'default'}
+          >
+            {t('saveNav')}
+          </Button>
+        )}
       </div>
     </div>
   );

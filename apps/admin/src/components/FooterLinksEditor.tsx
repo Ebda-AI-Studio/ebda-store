@@ -91,6 +91,12 @@ interface FooterLinksEditorProps {
    *  (the page-builder card already provides context). 'standalone'
    *  shows the full editor as it appears at /pages. */
   variant?: 'standalone' | 'embedded';
+  /**
+   * When provided, the editor registers a silent save here and HIDES its own
+   * Save button — so the Page Builder's main Save button persists footer +
+   * utility links alongside everything else. Returns true on success.
+   */
+  saveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
 }
 
 /* ── SectionShell ──────────────────────────────────────────────────────
@@ -281,7 +287,11 @@ function AddLinkButton({ label, onClick }: { label: string; onClick: () => void 
   );
 }
 
-export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLinksEditorProps) {
+export function FooterLinksEditor({
+  storeId,
+  variant = 'standalone',
+  saveRef,
+}: FooterLinksEditorProps) {
   const t = useT('pages.page');
   const { success, error: showError } = useToast();
   const isEmbedded = variant === 'embedded';
@@ -348,7 +358,10 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
     };
   }, [storeId]);
 
-  async function handleSave() {
+  async function handleSave(opts?: { silent?: boolean }): Promise<boolean> {
+    // A unified (silent) save fired before this editor finished loading would
+    // persist DEFAULT links over the merchant's real ones — skip until loaded.
+    if (opts?.silent && isLoading) return true;
     setIsSaving(true);
     try {
       const { data: getData } = await apiGet<{ store: { settings: StoreSettings } }>(
@@ -380,16 +393,21 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
         settings: newSettings,
       });
       if (!saveError) {
-        success(t('toastSavedTitle'), t('toastSavedBody'));
-      } else {
-        showError(t('toastErrorTitle'), saveError.message || t('toastFailedSave'));
+        if (!opts?.silent) success(t('toastSavedTitle'), t('toastSavedBody'));
+        return true;
       }
+      showError(t('toastErrorTitle'), saveError.message || t('toastFailedSave'));
+      return false;
     } catch {
       showError(t('toastErrorTitle'), t('toastFailedSaveLinks'));
+      return false;
     } finally {
       setIsSaving(false);
     }
   }
+
+  // Register a silent save for the Page Builder's main Save button.
+  if (saveRef) saveRef.current = () => handleSave({ silent: true });
 
   function getSetter(section: 'shop' | 'support' | 'company') {
     if (section === 'shop') return setShopLinks;
@@ -555,22 +573,27 @@ export function FooterLinksEditor({ storeId, variant = 'standalone' }: FooterLin
           sticky chrome when embedded. Pinned position inside the
           standalone /pages variant comes from the page-level sticky
           footer there, not from this component. */}
-      <div className="sticky bottom-0 -mx-1 mt-2 flex items-center justify-end gap-3 rounded-xl border border-border/60 bg-card/95 px-4 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
-        <p className="text-xs text-muted-foreground hidden sm:block">
-          {t('saveHintEmpty') || 'Changes apply after Save.'}
-        </p>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isSaving}
-          className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
-        >
-          {isSaving && (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          )}
-          {isSaving ? t('saving') : t('saveChanges')}
-        </button>
-      </div>
+      {/* Hidden when the Page Builder owns saving (saveRef provided) — the
+          main Save button persists footer + utility links via the registered
+          saver. Otherwise the standalone editor keeps its own sticky save. */}
+      {!saveRef && (
+        <div className="sticky bottom-0 -mx-1 mt-2 flex items-center justify-end gap-3 rounded-xl border border-border/60 bg-card/95 px-4 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
+          <p className="text-xs text-muted-foreground hidden sm:block">
+            {t('saveHintEmpty') || 'Changes apply after Save.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => handleSave()}
+            disabled={isSaving}
+            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
+          >
+            {isSaving && (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            )}
+            {isSaving ? t('saving') : t('saveChanges')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
