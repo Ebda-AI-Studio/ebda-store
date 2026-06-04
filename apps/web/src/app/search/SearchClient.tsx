@@ -108,6 +108,10 @@ function SearchContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Filters (category + sort) stay hidden behind the Filters button — they
+  // only appear after the shopper opens them, once search results are up.
+  // Start open when a category filter was deep-linked so it's visible.
+  const [showFilters, setShowFilters] = useState(Boolean(committedCategory));
 
   // Fetch categories once on mount (non-critical)
   useEffect(() => {
@@ -234,8 +238,60 @@ function SearchContent() {
             guards the Arabic label width. 2026-05-16 ahmad standing rule:
             'apply mobile's fix to desktop' \u2014 toolbar UX is identical
             regardless of viewport. */}
-        {(categories.length > 0 || committedQuery) && (
-          <div className="mb-6 max-w-2xl mx-auto rounded-xl bg-muted/30 p-4 flex flex-col gap-3">
+        {/* Filters toggle — only appears once a search has been run (results
+            are up). Tapping it reveals the category + sort controls. */}
+        {committedQuery && (
+          <div className="mb-4 max-w-2xl mx-auto">
+            <button
+              type="button"
+              onClick={() => setShowFilters(v => !v)}
+              aria-expanded={showFilters}
+              aria-controls="search-filters"
+              className="flex h-11 w-full items-center justify-between rounded-xl border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <span className="inline-flex items-center gap-2">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                  />
+                </svg>
+                {t('Filters', 'الفلاتر')}
+                {categoryFilter && (
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">1</span>
+                )}
+              </span>
+              <svg
+                className={`h-4 w-4 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {committedQuery && showFilters && (
+          <div
+            id="search-filters"
+            className="mb-6 max-w-2xl mx-auto rounded-xl bg-muted/30 p-4 flex flex-col gap-3"
+          >
             {categories.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="shrink-0 text-sm font-medium text-foreground">
