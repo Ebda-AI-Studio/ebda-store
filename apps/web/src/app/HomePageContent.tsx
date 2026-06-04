@@ -376,74 +376,77 @@ export function HomePageContent({
                 className="bg-[hsl(var(--bg-page))] pt-6 pb-14 sm:pt-8 sm:pb-16 lg:pt-10 lg:pb-20"
                 style={sectionBgStyle(layout.categories.bgColor, store.theme)}
               >
-                {layout.categories.layout === 'horizontal' && T.CategoryStrip ? (
-                  <T.CategoryStrip
-                    categories={templateCategories}
-                    title={categoriesTitle}
-                    titleAr={categoriesTitleAr}
-                    kicker={layout.categories.kicker}
-                    kickerAr={layout.categories.kickerAr}
-                    subtitle={layout.categories.subtitle}
-                    subtitleAr={layout.categories.subtitleAr}
-                    showKickerLines={layout.categories.showKickerLines}
-                    showSubtitleLines={layout.categories.showSubtitleLines}
-                    dividers={layout.categories.dividers}
-                    seeAllHref={storeUrl('/products')}
-                    isRtl={isRtl}
-                    pack={templateId}
-                    cardSize={layout.categories.cardSize}
-                    cardAspect={layout.categories.cardAspect}
-                    cardShape={layout.categories.cardShape}
-                    cardGap={layout.categories.cardGap}
-                    showLabel={layout.categories.showLabel}
-                    showHover={layout.categories.showHover}
-                    showCardFrame={layout.categories.showCardFrame}
-                    cardFrameStyle={layout.categories.cardFrameStyle}
-                    cardFrameWidth={layout.categories.cardFrameWidth}
-                    cardFrameSize={layout.categories.cardFrameSize}
-                    cardFrameColor={layout.categories.cardFrameColor}
-                    headingZone={categoriesHeadingZone}
-                    kickerZone={categoriesKickerZone}
-                    subtitleZone={categoriesSubtitleZone}
-                    seeAllZone={categoriesSeeAllZone}
-                    categoryLabelZone={categoriesLabelZone}
-                  />
-                ) : (
-                  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <T.CategoryGrid
-                      categories={templateCategories}
-                      title={categoriesTitle}
-                      titleAr={categoriesTitleAr}
-                      kicker={layout.categories.kicker}
-                      kickerAr={layout.categories.kickerAr}
-                      subtitle={layout.categories.subtitle}
-                      subtitleAr={layout.categories.subtitleAr}
-                      showKickerLines={layout.categories.showKickerLines}
-                      showSubtitleLines={layout.categories.showSubtitleLines}
-                      dividers={layout.categories.dividers}
-                      cardSize={layout.categories.cardSize}
-                      cardAspect={layout.categories.cardAspect}
-                      cardShape={layout.categories.cardShape}
-                      cardGap={layout.categories.cardGap}
-                      showLabel={layout.categories.showLabel}
-                      showHover={layout.categories.showHover}
-                      showCardFrame={layout.categories.showCardFrame}
-                      cardFrameStyle={layout.categories.cardFrameStyle}
-                      cardFrameWidth={layout.categories.cardFrameWidth}
-                      cardFrameSize={layout.categories.cardFrameSize}
-                      cardFrameColor={layout.categories.cardFrameColor}
-                      mobileColumns={layout.categories.mobileColumns}
-                      desktopColumns={layout.categories.desktopColumns}
-                      isRtl={isRtl}
-                      seeAllHref={storeUrl('/products')}
-                      headingZone={categoriesHeadingZone}
-                      kickerZone={categoriesKickerZone}
-                      subtitleZone={categoriesSubtitleZone}
-                      seeAllZone={categoriesSeeAllZone}
-                      categoryLabelZone={categoriesLabelZone}
-                    />
-                  </div>
-                )}
+                {(() => {
+                  // Desktop + mobile layout are INDEPENDENT (Ahmad 2026-06-04):
+                  // `layout` is the desktop choice, `layoutMobile` the mobile one
+                  // (falls back to desktop when unset). When both resolve to the
+                  // same kind we render ONE component (zero change for existing
+                  // stores); when they differ we render both and toggle with
+                  // md: visibility so e.g. mobile=grid + desktop=horizontal works.
+                  // md (768px) is the platform mobile/desktop boundary.
+                  const common = {
+                    categories: templateCategories,
+                    title: categoriesTitle,
+                    titleAr: categoriesTitleAr,
+                    kicker: layout.categories.kicker,
+                    kickerAr: layout.categories.kickerAr,
+                    subtitle: layout.categories.subtitle,
+                    subtitleAr: layout.categories.subtitleAr,
+                    showKickerLines: layout.categories.showKickerLines,
+                    showSubtitleLines: layout.categories.showSubtitleLines,
+                    dividers: layout.categories.dividers,
+                    seeAllHref: storeUrl('/products'),
+                    isRtl,
+                    cardSize: layout.categories.cardSize,
+                    cardAspect: layout.categories.cardAspect,
+                    cardShape: layout.categories.cardShape,
+                    cardGap: layout.categories.cardGap,
+                    showLabel: layout.categories.showLabel,
+                    showHover: layout.categories.showHover,
+                    showCardFrame: layout.categories.showCardFrame,
+                    cardFrameStyle: layout.categories.cardFrameStyle,
+                    cardFrameWidth: layout.categories.cardFrameWidth,
+                    cardFrameSize: layout.categories.cardFrameSize,
+                    cardFrameColor: layout.categories.cardFrameColor,
+                    headingZone: categoriesHeadingZone,
+                    kickerZone: categoriesKickerZone,
+                    subtitleZone: categoriesSubtitleZone,
+                    seeAllZone: categoriesSeeAllZone,
+                    categoryLabelZone: categoriesLabelZone,
+                  };
+                  const renderGrid = (vis?: string) => (
+                    <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${vis ?? ''}`}>
+                      <T.CategoryGrid
+                        {...common}
+                        mobileColumns={layout.categories.mobileColumns}
+                        desktopColumns={layout.categories.desktopColumns}
+                      />
+                    </div>
+                  );
+                  const renderStrip = (vis?: string) =>
+                    T.CategoryStrip ? (
+                      <div className={vis}>
+                        <T.CategoryStrip {...common} pack={templateId} />
+                      </div>
+                    ) : (
+                      renderGrid(vis)
+                    );
+                  const kindFor = (lay: typeof layout.categories.layout) =>
+                    lay === 'horizontal' && T.CategoryStrip ? 'strip' : 'grid';
+                  const desktopKind = kindFor(layout.categories.layout);
+                  const mobileKind = kindFor(
+                    layout.categories.layoutMobile ?? layout.categories.layout
+                  );
+                  const renderKind = (kind: 'strip' | 'grid', vis?: string) =>
+                    kind === 'strip' ? renderStrip(vis) : renderGrid(vis);
+                  if (desktopKind === mobileKind) return renderKind(desktopKind);
+                  return (
+                    <>
+                      {renderKind(mobileKind, 'md:hidden')}
+                      {renderKind(desktopKind, 'hidden md:block')}
+                    </>
+                  );
+                })()}
               </section>
             )}
           </>
