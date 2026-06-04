@@ -134,6 +134,49 @@ export default function StoreLayoutPage() {
   // when only the zones are edited from this page.
   const [typographyFonts, setTypographyFonts] = useState<unknown[]>([]);
 
+  // DRY handlers for the per-page "design" cards (Products list / Product detail
+  // / Categories / Checkout / Cart). Each page settings object has the same
+  // `{ bgColor?, typography? }` shape, so one set of handlers keyed by the
+  // layout field name drives the ColorField + SectionTypographyBlock for all.
+  type PageDesignKey =
+    | 'productsPage'
+    | 'productDetailPage'
+    | 'categoriesPage'
+    | 'checkoutPage'
+    | 'cartPage';
+  const pageDesign = (key: PageDesignKey) => ({
+    bgColor: (layout?.[key] as { bgColor?: string } | undefined)?.bgColor,
+    typography: (layout?.[key] as { typography?: SectionTypographyOverride } | undefined)
+      ?.typography,
+    onBg: (v: string) =>
+      setLayout(prev => (prev ? { ...prev, [key]: { ...(prev[key] ?? {}), bgColor: v } } : prev)),
+    onChangeRole: (role: SectionTypographyRole, next: Partial<ZoneOverride>) =>
+      setLayout(prev => {
+        if (!prev) return prev;
+        const cur = (prev[key] ?? {}) as { typography?: SectionTypographyOverride };
+        return {
+          ...prev,
+          [key]: {
+            ...cur,
+            typography: {
+              ...(cur.typography ?? {}),
+              [role]: { ...(cur.typography?.[role] ?? {}), ...next },
+            },
+          },
+        };
+      }),
+    onResetRole: (role: SectionTypographyRole) =>
+      setLayout(prev => {
+        if (!prev) return prev;
+        const cur = (prev[key] ?? {}) as { typography?: SectionTypographyOverride };
+        const rest = { ...(cur.typography ?? {}) } as SectionTypographyOverride;
+        delete rest[role];
+        return { ...prev, [key]: { ...cur, typography: rest } };
+      }),
+    globalZonesFor: (roles: ReadonlyArray<SectionTypographyRole>) =>
+      Object.fromEntries(roles.map(r => [r, globalZones[ROLE_TO_GLOBAL_ZONE[r]]])),
+  });
+
   const fetchData = useCallback(async () => {
     if (!storeId) return;
     setIsLoading(true);
@@ -1168,70 +1211,167 @@ export default function StoreLayoutPage() {
                 />
               </SectionCard>
 
-              {/* Products page */}
-              <SectionCard
-                title="Products page"
-                description="Background colour and product detail image aspect for the products pages."
-                defaultExpanded={false}
-                alwaysOn
-              >
-                <ColorField
-                  label="Page background"
-                  value={layout.productsPage?.bgColor}
-                  onChange={v =>
-                    setLayout(prev =>
-                      prev
-                        ? {
-                            ...prev,
-                            productsPage: { ...(prev.productsPage ?? {}), bgColor: v },
-                          }
-                        : prev
-                    )
-                  }
-                  theme={storeInfo?.theme}
-                />
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Product detail image aspect
-                  </span>
-                  <select
-                    value={layout.productsPage?.pdpImageAspect ?? 'auto'}
-                    onChange={e =>
-                      setLayout(prev =>
-                        prev
-                          ? {
-                              ...prev,
-                              productsPage: {
-                                ...(prev.productsPage ?? {}),
-                                pdpImageAspect: e.target.value as
-                                  | 'auto'
-                                  | 'square'
-                                  | 'portrait'
-                                  | 'landscape'
-                                  | 'wide'
-                                  | 'ultrawide',
-                              },
-                            }
-                          : prev
-                      )
-                    }
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              {/* ── Page design: one card per storefront page (background +
+                  typography). Each uses the shared pageDesign() handlers so they
+                  behave identically. "Product cards (everywhere)" below is the
+                  separate cross-page CARD styling. ── */}
+
+              {/* Products list page (/products) */}
+              {(() => {
+                const pg = pageDesign('productsPage');
+                const roles = ['heading', 'subtitle'] as const;
+                return (
+                  <SectionCard
+                    title="Products list page"
+                    description="The /products listing page — background + heading/subtitle typography. (Card styling is in 'Product cards' below.)"
+                    defaultExpanded={false}
+                    alwaysOn
                   >
-                    <option value="auto">Auto (square)</option>
-                    <option value="square">Square (1:1)</option>
-                    <option value="portrait">Portrait (3:4)</option>
-                    <option value="landscape">Landscape (4:3)</option>
-                    <option value="wide">Wide (3:2)</option>
-                    <option value="ultrawide">Ultra-wide (16:9)</option>
-                  </select>
-                </label>
-              </SectionCard>
+                    <ColorField
+                      label="Page background"
+                      value={pg.bgColor}
+                      onChange={pg.onBg}
+                      theme={storeInfo?.theme}
+                    />
+                    <SectionTypographyBlock
+                      roles={roles}
+                      typography={pg.typography}
+                      globalZones={pg.globalZonesFor(roles)}
+                      onChangeRole={pg.onChangeRole}
+                      onResetRole={pg.onResetRole}
+                      theme={storeInfo?.theme}
+                    />
+                  </SectionCard>
+                );
+              })()}
+
+              {/* Product detail page (/products/[slug]) */}
+              {(() => {
+                const pg = pageDesign('productDetailPage');
+                const roles = ['heading', 'productName', 'productPrice'] as const;
+                return (
+                  <SectionCard
+                    title="Product detail page"
+                    description="The single-product page — background, main image shape, and product name / price / heading typography."
+                    defaultExpanded={false}
+                    alwaysOn
+                  >
+                    <ColorField
+                      label="Page background"
+                      value={pg.bgColor}
+                      onChange={pg.onBg}
+                      theme={storeInfo?.theme}
+                    />
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Main image aspect
+                      </span>
+                      <select
+                        value={layout.productDetailPage?.imageAspect ?? 'auto'}
+                        onChange={e =>
+                          setLayout(prev =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  productDetailPage: {
+                                    ...(prev.productDetailPage ?? {}),
+                                    imageAspect: e.target.value as
+                                      | 'auto'
+                                      | 'square'
+                                      | 'portrait'
+                                      | 'landscape'
+                                      | 'wide'
+                                      | 'ultrawide',
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="auto">Auto (square)</option>
+                        <option value="square">Square (1:1)</option>
+                        <option value="portrait">Portrait (3:4)</option>
+                        <option value="landscape">Landscape (4:3)</option>
+                        <option value="wide">Wide (3:2)</option>
+                        <option value="ultrawide">Ultra-wide (16:9)</option>
+                      </select>
+                    </label>
+                    <SectionTypographyBlock
+                      roles={roles}
+                      typography={pg.typography}
+                      globalZones={pg.globalZonesFor(roles)}
+                      onChangeRole={pg.onChangeRole}
+                      onResetRole={pg.onResetRole}
+                      theme={storeInfo?.theme}
+                    />
+                  </SectionCard>
+                );
+              })()}
+
+              {/* Categories page (/categories) */}
+              {(() => {
+                const pg = pageDesign('categoriesPage');
+                const roles = ['heading', 'subtitle', 'categoryLabel'] as const;
+                return (
+                  <SectionCard
+                    title="Categories page"
+                    description="The /categories listing page — background + heading / subtitle / category-label typography."
+                    defaultExpanded={false}
+                    alwaysOn
+                  >
+                    <ColorField
+                      label="Page background"
+                      value={pg.bgColor}
+                      onChange={pg.onBg}
+                      theme={storeInfo?.theme}
+                    />
+                    <SectionTypographyBlock
+                      roles={roles}
+                      typography={pg.typography}
+                      globalZones={pg.globalZonesFor(roles)}
+                      onChangeRole={pg.onChangeRole}
+                      onResetRole={pg.onResetRole}
+                      theme={storeInfo?.theme}
+                    />
+                  </SectionCard>
+                );
+              })()}
+
+              {/* Checkout / payment page (/checkout) */}
+              {(() => {
+                const pg = pageDesign('checkoutPage');
+                const roles = ['heading', 'subtitle', 'productPrice'] as const;
+                return (
+                  <SectionCard
+                    title="Checkout page"
+                    description="The checkout / payment page — background + heading / label / amount typography."
+                    defaultExpanded={false}
+                    alwaysOn
+                  >
+                    <ColorField
+                      label="Page background"
+                      value={pg.bgColor}
+                      onChange={pg.onBg}
+                      theme={storeInfo?.theme}
+                    />
+                    <SectionTypographyBlock
+                      roles={roles}
+                      typography={pg.typography}
+                      globalZones={pg.globalZonesFor(roles)}
+                      onChangeRole={pg.onChangeRole}
+                      onResetRole={pg.onResetRole}
+                      theme={storeInfo?.theme}
+                    />
+                  </SectionCard>
+                );
+              })()}
 
               {/* Cart page — standalone background + typography control. Saved
                   via the main page-builder save button (no separate save / page). */}
               <SectionCard
                 title="Cart page"
-                description="Background colour + typography for the whole cart: headings (Section heading), labels like the items count / subtotal / shipping (Section subtitle), item names (Product name), and every price (Product price)."
+                description="Background colour + typography for the whole cart: headings (Section heading), labels — items count / subtotal / shipping (Section subtitle), item names (Product name), every price (Product price), and buttons/links — remove / continue / apply / checkout (Product CTA)."
                 defaultExpanded={false}
                 alwaysOn
               >
@@ -1251,13 +1391,12 @@ export default function StoreLayoutPage() {
                   theme={storeInfo?.theme}
                 />
                 <SectionTypographyBlock
-                  roles={['heading', 'subtitle', 'productName', 'productPrice']}
+                  roles={['heading', 'subtitle', 'productName', 'productPrice', 'productCta']}
                   typography={layout.cartPage?.typography}
                   globalZones={Object.fromEntries(
-                    (['heading', 'subtitle', 'productName', 'productPrice'] as const).map(r => [
-                      r,
-                      globalZones[ROLE_TO_GLOBAL_ZONE[r]],
-                    ])
+                    (
+                      ['heading', 'subtitle', 'productName', 'productPrice', 'productCta'] as const
+                    ).map(r => [r, globalZones[ROLE_TO_GLOBAL_ZONE[r]]])
                   )}
                   onChangeRole={(role, next) =>
                     setLayout(prev =>
@@ -1517,10 +1656,14 @@ export default function StoreLayoutPage() {
                   Cross-link from the section card so merchants discover both
                   surfaces without a 666-line component absorb (Ahmad audit
                   2026-05-21). */}
+              {/* One Footer card: chrome (background / dividers / spacing /
+                  typography) PLUS the utility bar + footer link columns +
+                  newsletter, folded in as children. Saved by the main Save
+                  button via the registered saver — one card, one save. */}
               <ExtraSectionCard
                 kind="footer"
                 label="Footer"
-                description="Footer chrome — background, dividers, spacing, typography. Manage the actual footer LINKS (shop/support/company/utility bar) on the Footer Links page."
+                description="Everything footer: background, dividers, spacing, typography — plus the utility bar above the header, the three footer link columns, and the newsletter signup."
                 settings={layout.footer}
                 legacyEnabled={true}
                 onPatch={patch =>
@@ -1544,22 +1687,18 @@ export default function StoreLayoutPage() {
                     return cp;
                   })
                 }
-              />
-              {/* Footer & utility links — collapsible like every other section;
-                  saved by the main Save button via the registered saver (no
-                  separate save button, no standalone page). */}
-              <SectionCard
-                title="Footer & utility"
-                description="Utility bar above the header + the three footer link columns + newsletter signup, all in one place."
-                defaultExpanded={false}
-                alwaysOn
               >
-                <FooterLinksEditor
-                  storeId={storeId}
-                  variant="embedded"
-                  saveRef={footerLinksSaveRef}
-                />
-              </SectionCard>
+                <div className="border-t border-border pt-4">
+                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Footer & utility links
+                  </h4>
+                  <FooterLinksEditor
+                    storeId={storeId}
+                    variant="embedded"
+                    saveRef={footerLinksSaveRef}
+                  />
+                </div>
+              </ExtraSectionCard>
 
               {/* Extra duplicated product carousels (section duplication 2026-05-20).
                   Renders one card per entry + a "+ add carousel" button at the
@@ -1631,8 +1770,8 @@ export default function StoreLayoutPage() {
                   homepage carousels. Per-section settings above override
                   these for homepage new-arrivals + best-sellers. */}
               <SectionCard
-                title="Product card defaults"
-                description="Applied to the catalog, category, search, and any product surface outside the homepage. Per-section settings above override these for the homepage carousels."
+                title="Product cards (everywhere)"
+                description="Styling for the product CARD tiles — size, frame, aspect, and name/price/button fonts — wherever they appear (listing, category, search, carousels). This is the card itself, not a page; page backgrounds & headings are in the page cards above."
                 alwaysOn
                 defaultExpanded={false}
               >
@@ -3501,6 +3640,7 @@ function ExtraSectionCard({
   globalZones,
   onZonePatch,
   onZoneReset,
+  children,
 }: {
   kind: 'brandStory' | 'trustStrip' | 'blogCarousel' | 'announcement' | 'header' | 'footer';
   label: string;
@@ -3533,6 +3673,9 @@ function ExtraSectionCard({
   globalZones?: Record<string, import('@force/shared').ZoneOverride>;
   onZonePatch?: (zoneKey: string, next: Partial<import('@force/shared').ZoneOverride>) => void;
   onZoneReset?: (zoneKey: string) => void;
+  /** Extra content rendered at the bottom of the card body — used to fold the
+   *  Footer links editor into the same Footer card (one card, one Save). */
+  children?: React.ReactNode;
 }) {
   const enabled = settings?.enabled ?? legacyEnabled;
   // KickerSubtitleValues shape used by SectionDividersBlock — these sections
@@ -3654,6 +3797,7 @@ function ExtraSectionCard({
           hideCards
           theme={theme}
         />
+        {children}
       </div>
     </SectionCard>
   );

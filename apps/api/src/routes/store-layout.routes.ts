@@ -524,9 +524,38 @@ const layoutSchema = z
     productsPage: z
       .object({
         bgColor: colorValue,
+        typography: sectionTypographyOverride,
+        // deprecated — kept for back-compat reads; admin now writes to productDetailPage.
         pdpImageAspect: z
           .enum(['square', 'portrait', 'landscape', 'wide', 'ultrawide', 'auto'])
           .optional(),
+      })
+      .partial()
+      .optional(),
+    // Per-page background + typography. Each must be listed or the top-level
+    // object (no .passthrough()) strips it on PUT. Keep in sync with the
+    // *PageSettings interfaces in packages/shared.
+    productDetailPage: z
+      .object({
+        bgColor: colorValue,
+        imageAspect: z
+          .enum(['square', 'portrait', 'landscape', 'wide', 'ultrawide', 'auto'])
+          .optional(),
+        typography: sectionTypographyOverride,
+      })
+      .partial()
+      .optional(),
+    categoriesPage: z
+      .object({
+        bgColor: colorValue,
+        typography: sectionTypographyOverride,
+      })
+      .partial()
+      .optional(),
+    checkoutPage: z
+      .object({
+        bgColor: colorValue,
+        typography: sectionTypographyOverride,
       })
       .partial()
       .optional(),

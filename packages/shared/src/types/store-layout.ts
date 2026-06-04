@@ -405,21 +405,62 @@ export interface FilterSidebarSettings {
   defaultOpen: boolean;
 }
 
+/** Aspect-ratio choices for the PDP main image. */
+export type PdpImageAspect = 'square' | 'portrait' | 'landscape' | 'wide' | 'ultrawide' | 'auto';
+
 export interface ProductsPageSettings {
   /** Background colour for the products listing page (token:primary / hex / etc).
    *  Resolved via resolveColor on the storefront. Undefined = theme default. */
   bgColor?: string;
   /**
-   * Aspect ratio for the main product image on the detail page (PDP).
-   *   'square'    → aspect-square (1:1) — default
-   *   'portrait'  → aspect-[3/4] — taller, fashion / lookbook
-   *   'landscape' → aspect-[4/3] — wider, lifestyle
-   *   'wide'      → aspect-[3/2] — shorter landscape
-   *   'ultrawide' → aspect-[16/9] — cinematic banner crop
-   *   'auto'      → keep current default (same as undefined)
-   * Admin-controlled via page-builder → Products page section.
+   * PLP typography — breadcrumb + secondary text use `subtitle`, the "All
+   * Products" H1 uses `heading`. Applied inline so it beats the page's Tailwind
+   * size classes. Reuses the shared SectionTypographyBlock admin control.
    */
-  pdpImageAspect?: 'square' | 'portrait' | 'landscape' | 'wide' | 'ultrawide' | 'auto';
+  typography?: SectionTypographyOverride;
+  /**
+   * @deprecated Moved to ProductDetailPageSettings.imageAspect. Kept readable
+   * for back-compat; the admin now writes the aspect to `productDetailPage`.
+   */
+  pdpImageAspect?: PdpImageAspect;
+}
+
+/**
+ * Standalone background + typography for the PRODUCT DETAIL page (PDP). Split
+ * out of ProductsPageSettings so "Products list" and "Product detail" are two
+ * clearly-separate cards in the page-builder.
+ */
+export interface ProductDetailPageSettings {
+  /** Background colour for the product detail page. Undefined = theme default. */
+  bgColor?: string;
+  /** Aspect ratio for the main product image. Undefined / 'auto' = square. */
+  imageAspect?: PdpImageAspect;
+  /**
+   * PDP typography — product name uses `productName`, price uses `productPrice`,
+   * section headings (e.g. description / related) use `heading`. Applied inline.
+   */
+  typography?: SectionTypographyOverride;
+}
+
+/**
+ * Standalone background + typography for the CATEGORIES listing page.
+ */
+export interface CategoriesPageSettings {
+  /** Background colour for the categories page. Undefined = theme default. */
+  bgColor?: string;
+  /** Page heading uses `heading`, secondary text uses `subtitle`, category card
+   *  labels use `categoryLabel`. Applied inline. */
+  typography?: SectionTypographyOverride;
+}
+
+/**
+ * Standalone background + typography for the CHECKOUT / payment page.
+ */
+export interface CheckoutPageSettings {
+  /** Background colour for the checkout page. Undefined = theme default. */
+  bgColor?: string;
+  /** Headings use `heading`, labels use `subtitle`, amounts use `productPrice`. */
+  typography?: SectionTypographyOverride;
 }
 
 /**
@@ -433,9 +474,13 @@ export interface CartPageSettings {
   /** Background colour for the cart page. Resolved via resolveColor. Undefined = theme default. */
   bgColor?: string;
   /**
-   * Cart typography overrides. Uses the `productName` (line item name) and
-   * `productPrice` (line item price + total) roles so it can reuse the shared
-   * SectionTypographyBlock admin control + resolveSectionZone storefront path.
+   * Cart typography overrides — applied inline so they win over the theme cart
+   * components' own classes. Roles:
+   *   heading      → page title, "Order summary", Total
+   *   subtitle     → labels (items count, subtotal / shipping rows)
+   *   productName  → line-item names
+   *   productPrice → every monetary value
+   *   productCta   → buttons + links (remove, continue shopping, apply, checkout)
    */
   typography?: SectionTypographyOverride;
 }
@@ -645,6 +690,12 @@ export interface StoreLayoutSettings {
   productCardDefaults?: ProductCardDefaults;
   /** Products listing page (PLP) settings. Page-builder configurable. */
   productsPage?: ProductsPageSettings;
+  /** Product detail page (PDP) — background, image aspect, typography. */
+  productDetailPage?: ProductDetailPageSettings;
+  /** Categories listing page — background + typography. */
+  categoriesPage?: CategoriesPageSettings;
+  /** Checkout / payment page — background + typography. */
+  checkoutPage?: CheckoutPageSettings;
   /** Cart page settings (standalone background + typography). Page-builder configurable. */
   cartPage?: CartPageSettings;
   /**
@@ -696,6 +747,9 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
     defaultOpen: true,
   },
   productsPage: {},
+  productDetailPage: {},
+  categoriesPage: {},
+  checkoutPage: {},
   cartPage: {},
   testimonials: {
     // Default OFF for new stores. The fake-reviews-illegal posture
@@ -740,6 +794,12 @@ export function resolveLayoutSettings(input: unknown): StoreLayoutSettings {
     bestSellers: { ...DEFAULT_LAYOUT_SETTINGS.bestSellers, ...(raw.bestSellers ?? {}) },
     filterSidebar: { ...DEFAULT_LAYOUT_SETTINGS.filterSidebar, ...(raw.filterSidebar ?? {}) },
     productsPage: { ...DEFAULT_LAYOUT_SETTINGS.productsPage, ...(raw.productsPage ?? {}) },
+    productDetailPage: {
+      ...DEFAULT_LAYOUT_SETTINGS.productDetailPage,
+      ...(raw.productDetailPage ?? {}),
+    },
+    categoriesPage: { ...DEFAULT_LAYOUT_SETTINGS.categoriesPage, ...(raw.categoriesPage ?? {}) },
+    checkoutPage: { ...DEFAULT_LAYOUT_SETTINGS.checkoutPage, ...(raw.checkoutPage ?? {}) },
     cartPage: { ...DEFAULT_LAYOUT_SETTINGS.cartPage, ...(raw.cartPage ?? {}) },
     testimonials: { ...DEFAULT_LAYOUT_SETTINGS.testimonials, ...(raw.testimonials ?? {}) },
     reviewSection: { ...DEFAULT_LAYOUT_SETTINGS.reviewSection, ...(raw.reviewSection ?? {}) },

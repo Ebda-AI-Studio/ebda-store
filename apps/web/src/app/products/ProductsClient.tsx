@@ -20,7 +20,7 @@ import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../templates/adapters';
 import { PecannbeeProductCard } from '../../templates/shared/PecannbeeProductCard';
 import { gridGapClass } from '../../templates/shared/card-size';
-import { resolveSectionZone } from '../../templates/shared/section-typography';
+import { resolveSectionZone, zoneStyle } from '../../templates/shared/section-typography';
 import { ProductListItem } from './ProductListItem';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
@@ -159,6 +159,18 @@ export default function ProductsClient({
   );
   const plpProductCtaZone = resolveSectionZone(
     productCardDefaults?.typography?.productCta,
+    undefined,
+    store.theme
+  );
+
+  // Products-list page typography (page-builder → Products list page).
+  const plpHeadingZone = resolveSectionZone(
+    productsPage?.typography?.heading,
+    undefined,
+    store.theme
+  );
+  const plpSubtitleZone = resolveSectionZone(
+    productsPage?.typography?.subtitle,
     undefined,
     store.theme
   );
@@ -369,7 +381,10 @@ export default function ProductsClient({
           data-zone="products"
         >
           {/* Breadcrumb */}
-          <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
+          <nav
+            className="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
+            style={zoneStyle(plpSubtitleZone)}
+          >
             <Link href="/" className="transition-colors hover:text-primary">
               {t('Home', translations['Home'])}
             </Link>
@@ -381,10 +396,13 @@ export default function ProductsClient({
 
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            <h1
+              className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
+              style={zoneStyle(plpHeadingZone)}
+            >
               {t('All Products', translations['All Products'])}
             </h1>
-            <p className="mt-2 text-muted-foreground">
+            <p className="mt-2 text-muted-foreground" style={zoneStyle(plpSubtitleZone)}>
               {t(
                 'Browse our collection of premium products',
                 '\u062a\u0635\u0641\u062d \u0645\u062c\u0645\u0648\u0639\u062a\u0646\u0627 \u0645\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0645\u0645\u064a\u0632\u0629'

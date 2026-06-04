@@ -1,5 +1,6 @@
 import { resolveColor } from '@force/shared';
 import type { ZoneOverride, StoreTheme } from '@force/shared';
+import type { CSSProperties } from 'react';
 
 export interface ResolvedZone {
   fontFamily?: string;
@@ -81,4 +82,23 @@ export function responsiveFontSize(size: string | undefined): string | undefined
   const slope = (value - mobileFloor) / (768 - 360);
   const intercept = mobileFloor - slope * 360;
   return `clamp(${mobileFloor.toFixed(2)}px, calc(${intercept.toFixed(2)}px + ${(slope * 100).toFixed(3)}vw), ${value}px)`;
+}
+
+/**
+ * Convert a resolved zone to an inline style object. Inline wins over the
+ * element's own Tailwind size classes — the reliable way to apply a merchant's
+ * per-page typography (used by the cart + the per-page design controls). Returns
+ * undefined when the zone is empty so callers can spread it safely.
+ */
+export function zoneStyle(zone?: ResolvedZone): CSSProperties | undefined {
+  if (!zone) return undefined;
+  return {
+    fontFamily: zone.fontFamily,
+    fontSize: responsiveFontSize(zone.fontSize),
+    fontWeight: zone.fontWeight,
+    color: zone.color,
+    letterSpacing: zone.letterSpacing,
+    lineHeight: zone.lineHeight,
+    textAlign: zone.textAlign,
+  };
 }

@@ -11,7 +11,8 @@ import { useCart } from '../../contexts/CartContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
-import { isValidEmail } from '@force/shared';
+import { isValidEmail, resolveColor } from '@force/shared';
+import { resolveSectionZone, zoneStyle } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
 
 // Lazy-load the payment step component (includes PaymentIcons SVGs)
@@ -60,7 +61,16 @@ const KUWAIT_AREAS = [
 
 export default function CheckoutClient() {
   const router = useRouter();
-  const { store } = useStore();
+  const { store, layout } = useStore();
+  // Checkout page design (page-builder → Checkout page).
+  const checkoutHeadingZone = resolveSectionZone(
+    layout?.checkoutPage?.typography?.heading,
+    undefined,
+    store?.theme
+  );
+  const checkoutBgStyle: React.CSSProperties | undefined = layout?.checkoutPage?.bgColor
+    ? { backgroundColor: resolveColor(layout.checkoutPage.bgColor, store?.theme) }
+    : undefined;
   // Optional override for the minimal-chrome label on /checkout. Store
   // owners can rename or clear the "Secure Checkout" text via
   // store.settings.checkoutLabel / .checkoutLabelAr without code changes.
@@ -755,314 +765,319 @@ export default function CheckoutClient() {
 
   return (
     <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-center">
-            {/* Step 1: Shipping -- clickable when user is on step 2 (completed step) */}
-            <button
-              type="button"
-              onClick={() => {
-                if (step > 1) setStep(1);
-              }}
-              disabled={step <= 1}
-              className={`flex items-center ${step > 1 ? 'cursor-pointer group' : 'cursor-default'}`}
-            >
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${step >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'} ${step > 1 ? 'group-hover:bg-primary/80' : ''}`}
+      <div className="flex-1" style={checkoutBgStyle}>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          {/* Progress Steps */}
+          <div className="mb-8">
+            <div className="flex items-center justify-center">
+              {/* Step 1: Shipping -- clickable when user is on step 2 (completed step) */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (step > 1) setStep(1);
+                }}
+                disabled={step <= 1}
+                className={`flex items-center ${step > 1 ? 'cursor-pointer group' : 'cursor-default'}`}
               >
-                {step > 1 ? (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                ) : (
-                  1
-                )}
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${step >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'} ${step > 1 ? 'group-hover:bg-primary/80' : ''}`}
+                >
+                  {step > 1 ? (
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  ) : (
+                    1
+                  )}
+                </div>
+                <span
+                  className={`ml-2 text-sm font-medium transition-colors ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'} ${step > 1 ? 'group-hover:text-primary' : ''}`}
+                >
+                  {t('Shipping', translations['Shipping'])}
+                </span>
+              </button>
+              <div className={`mx-4 h-0.5 w-16 ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
+              {/* Step 2: Payment -- current or future step, not clickable */}
+              <div className="flex items-center">
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}
+                >
+                  2
+                </div>
+                <span
+                  className={`ml-2 text-sm font-medium ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}
+                >
+                  {t('Payment', '\u0627\u0644\u062f\u0641\u0639')}
+                </span>
               </div>
-              <span
-                className={`ml-2 text-sm font-medium transition-colors ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'} ${step > 1 ? 'group-hover:text-primary' : ''}`}
-              >
-                {t('Shipping', translations['Shipping'])}
-              </span>
-            </button>
-            <div className={`mx-4 h-0.5 w-16 ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
-            {/* Step 2: Payment -- current or future step, not clickable */}
-            <div className="flex items-center">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}
-              >
-                2
-              </div>
-              <span
-                className={`ml-2 text-sm font-medium ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}
-              >
-                {t('Payment', '\u0627\u0644\u062f\u0641\u0639')}
-              </span>
             </div>
           </div>
-        </div>
 
-        <div className="lg:grid lg:grid-cols-12 lg:gap-8">
-          {/* Form */}
-          <div className="lg:col-span-7">
-            <form onSubmit={handleSubmit}>
-              {step === 1 && (
-                <div className="rounded-xl border bg-card p-6 shadow-sm">
-                  <h2 className="text-lg font-semibold text-foreground">
-                    {t(
-                      'Shipping Information',
-                      '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0634\u062d\u0646'
-                    )}
-                  </h2>
-
-                  <div className="mt-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div data-error={!!formErrors.firstName}>
-                        <Input
-                          label={t(
-                            'First name',
-                            '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644'
-                          )}
-                          autoComplete="given-name"
-                          value={formData.firstName}
-                          onChange={e => updateField('firstName', e.target.value)}
-                          aria-invalid={formErrors.firstName ? true : undefined}
-                          className={
-                            formErrors.firstName
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
-                        />
-                        {formErrors.firstName && (
-                          <p role="alert" className="mt-1 text-sm text-destructive">
-                            {formErrors.firstName}
-                          </p>
-                        )}
-                      </div>
-                      <div data-error={!!formErrors.lastName}>
-                        <Input
-                          label={t(
-                            'Last name',
-                            '\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0626\u0644\u0629'
-                          )}
-                          autoComplete="family-name"
-                          value={formData.lastName}
-                          onChange={e => updateField('lastName', e.target.value)}
-                          aria-invalid={formErrors.lastName ? true : undefined}
-                          className={
-                            formErrors.lastName
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
-                        />
-                        {formErrors.lastName && (
-                          <p role="alert" className="mt-1 text-sm text-destructive">
-                            {formErrors.lastName}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div data-error={!!formErrors.phone}>
-                      <Input
-                        label={t('Phone', translations['Phone'])}
-                        type="tel"
-                        autoComplete="tel"
-                        inputMode="tel"
-                        placeholder="+965 XXXX XXXX"
-                        value={formData.phone}
-                        onChange={e => updateField('phone', e.target.value)}
-                        aria-invalid={formErrors.phone ? true : undefined}
-                        className={
-                          formErrors.phone
-                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                            : ''
-                        }
-                      />
-                      {formErrors.phone && (
-                        <p role="alert" className="mt-1 text-sm text-destructive">
-                          {formErrors.phone}
-                        </p>
-                      )}
-                    </div>
-
-                    <div data-error={!!formErrors.email}>
-                      <Input
-                        label={t(
-                          'Email (optional)',
-                          '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
-                        )}
-                        type="email"
-                        autoComplete="email"
-                        inputMode="email"
-                        value={formData.email}
-                        onChange={e => updateField('email', e.target.value)}
-                        aria-invalid={formErrors.email ? true : undefined}
-                        className={
-                          formErrors.email
-                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                            : ''
-                        }
-                      />
-                      {formErrors.email && (
-                        <p role="alert" className="mt-1 text-sm text-destructive">
-                          {formErrors.email}
-                        </p>
-                      )}
-                    </div>
-
-                    <div data-error={!!formErrors.area}>
-                      <Select
-                        label={t(
-                          'Delivery Area',
-                          '\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u062a\u0648\u0635\u064a\u0644'
-                        )}
-                        value={formData.area}
-                        onChange={e => updateField('area', e.target.value)}
-                        aria-invalid={formErrors.area ? true : undefined}
-                        options={[
-                          {
-                            value: '',
-                            label: t(
-                              'Select area...',
-                              '\u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0646\u0637\u0642\u0629...'
-                            ),
-                          },
-                          ...KUWAIT_AREAS.map(a => ({
-                            value: a.en,
-                            label: language === 'ar' ? `${a.ar} / ${a.en}` : `${a.en} / ${a.ar}`,
-                          })),
-                        ]}
-                        className={
-                          formErrors.area
-                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                            : ''
-                        }
-                      />
-                      {formErrors.area && (
-                        <p role="alert" className="mt-1 text-sm text-destructive">
-                          {formErrors.area}
-                        </p>
-                      )}
-                    </div>
-
-                    <div data-error={!!formErrors.address}>
-                      <Input
-                        label={t(
-                          'Block & Street',
-                          '\u0627\u0644\u0642\u0637\u0639\u0629 \u0648\u0627\u0644\u0634\u0627\u0631\u0639'
-                        )}
-                        autoComplete="street-address"
-                        value={formData.address}
-                        onChange={e => updateField('address', e.target.value)}
-                        aria-invalid={formErrors.address ? true : undefined}
-                        className={
-                          formErrors.address
-                            ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                            : ''
-                        }
-                      />
-                      {formErrors.address && (
-                        <p role="alert" className="mt-1 text-sm text-destructive">
-                          {formErrors.address}
-                        </p>
-                      )}
-                    </div>
-
-                    <Input
-                      label={t(
-                        'Building / House / Apartment',
-                        '\u0627\u0644\u0645\u0628\u0646\u0649 / \u0627\u0644\u0645\u0646\u0632\u0644 / \u0627\u0644\u0634\u0642\u0629'
-                      )}
-                      autoComplete="address-line2"
-                      value={formData.apartment}
-                      onChange={e => updateField('apartment', e.target.value)}
-                    />
-
-                    <div>
-                      <label
-                        htmlFor="order-notes"
-                        className="block text-sm font-medium text-foreground mb-1"
-                      >
-                        {t(
-                          'Order Notes (optional)',
-                          '\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u0637\u0644\u0628 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
-                        )}
-                      </label>
-                      <textarea
-                        id="order-notes"
-                        value={formData.notes}
-                        onChange={e => updateField('notes', e.target.value)}
-                        rows={3}
-                        // text-base on mobile prevents iOS Safari from
-                        // auto-zooming when this textarea receives focus
-                        // (any field <16px triggers it, won't auto-unzoom).
-                        // sm:text-sm restores the denser desktop appearance.
-                        className="min-h-24 w-full rounded-lg border border-border bg-background px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        placeholder={t(
-                          'Any special delivery instructions...',
-                          '\u0623\u064a \u062a\u0639\u0644\u064a\u0645\u0627\u062a \u062e\u0627\u0635\u0629 \u0644\u0644\u062a\u0648\u0635\u064a\u0644...'
-                        )}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <Link
-                      href={storeUrl('/cart')}
-                      className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
+          <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+            {/* Form */}
+            <div className="lg:col-span-7">
+              <form onSubmit={handleSubmit}>
+                {step === 1 && (
+                  <div className="rounded-xl border bg-card p-6 shadow-sm">
+                    <h2
+                      className="text-lg font-semibold text-foreground"
+                      style={zoneStyle(checkoutHeadingZone)}
                     >
-                      {language === 'ar'
-                        ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629 \u2192'
-                        : '\u2190 Return to cart'}
-                    </Link>
-                    <Button type="submit" className="w-full sm:w-auto" size="lg">
                       {t(
-                        'Continue to Payment',
-                        '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
+                        'Shipping Information',
+                        '\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0634\u062d\u0646'
                       )}
-                    </Button>
+                    </h2>
+
+                    <div className="mt-6 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div data-error={!!formErrors.firstName}>
+                          <Input
+                            label={t(
+                              'First name',
+                              '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644'
+                            )}
+                            autoComplete="given-name"
+                            value={formData.firstName}
+                            onChange={e => updateField('firstName', e.target.value)}
+                            aria-invalid={formErrors.firstName ? true : undefined}
+                            className={
+                              formErrors.firstName
+                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                                : ''
+                            }
+                          />
+                          {formErrors.firstName && (
+                            <p role="alert" className="mt-1 text-sm text-destructive">
+                              {formErrors.firstName}
+                            </p>
+                          )}
+                        </div>
+                        <div data-error={!!formErrors.lastName}>
+                          <Input
+                            label={t(
+                              'Last name',
+                              '\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0626\u0644\u0629'
+                            )}
+                            autoComplete="family-name"
+                            value={formData.lastName}
+                            onChange={e => updateField('lastName', e.target.value)}
+                            aria-invalid={formErrors.lastName ? true : undefined}
+                            className={
+                              formErrors.lastName
+                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                                : ''
+                            }
+                          />
+                          {formErrors.lastName && (
+                            <p role="alert" className="mt-1 text-sm text-destructive">
+                              {formErrors.lastName}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div data-error={!!formErrors.phone}>
+                        <Input
+                          label={t('Phone', translations['Phone'])}
+                          type="tel"
+                          autoComplete="tel"
+                          inputMode="tel"
+                          placeholder="+965 XXXX XXXX"
+                          value={formData.phone}
+                          onChange={e => updateField('phone', e.target.value)}
+                          aria-invalid={formErrors.phone ? true : undefined}
+                          className={
+                            formErrors.phone
+                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                              : ''
+                          }
+                        />
+                        {formErrors.phone && (
+                          <p role="alert" className="mt-1 text-sm text-destructive">
+                            {formErrors.phone}
+                          </p>
+                        )}
+                      </div>
+
+                      <div data-error={!!formErrors.email}>
+                        <Input
+                          label={t(
+                            'Email (optional)',
+                            '\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
+                          )}
+                          type="email"
+                          autoComplete="email"
+                          inputMode="email"
+                          value={formData.email}
+                          onChange={e => updateField('email', e.target.value)}
+                          aria-invalid={formErrors.email ? true : undefined}
+                          className={
+                            formErrors.email
+                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                              : ''
+                          }
+                        />
+                        {formErrors.email && (
+                          <p role="alert" className="mt-1 text-sm text-destructive">
+                            {formErrors.email}
+                          </p>
+                        )}
+                      </div>
+
+                      <div data-error={!!formErrors.area}>
+                        <Select
+                          label={t(
+                            'Delivery Area',
+                            '\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u062a\u0648\u0635\u064a\u0644'
+                          )}
+                          value={formData.area}
+                          onChange={e => updateField('area', e.target.value)}
+                          aria-invalid={formErrors.area ? true : undefined}
+                          options={[
+                            {
+                              value: '',
+                              label: t(
+                                'Select area...',
+                                '\u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0646\u0637\u0642\u0629...'
+                              ),
+                            },
+                            ...KUWAIT_AREAS.map(a => ({
+                              value: a.en,
+                              label: language === 'ar' ? `${a.ar} / ${a.en}` : `${a.en} / ${a.ar}`,
+                            })),
+                          ]}
+                          className={
+                            formErrors.area
+                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                              : ''
+                          }
+                        />
+                        {formErrors.area && (
+                          <p role="alert" className="mt-1 text-sm text-destructive">
+                            {formErrors.area}
+                          </p>
+                        )}
+                      </div>
+
+                      <div data-error={!!formErrors.address}>
+                        <Input
+                          label={t(
+                            'Block & Street',
+                            '\u0627\u0644\u0642\u0637\u0639\u0629 \u0648\u0627\u0644\u0634\u0627\u0631\u0639'
+                          )}
+                          autoComplete="street-address"
+                          value={formData.address}
+                          onChange={e => updateField('address', e.target.value)}
+                          aria-invalid={formErrors.address ? true : undefined}
+                          className={
+                            formErrors.address
+                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                              : ''
+                          }
+                        />
+                        {formErrors.address && (
+                          <p role="alert" className="mt-1 text-sm text-destructive">
+                            {formErrors.address}
+                          </p>
+                        )}
+                      </div>
+
+                      <Input
+                        label={t(
+                          'Building / House / Apartment',
+                          '\u0627\u0644\u0645\u0628\u0646\u0649 / \u0627\u0644\u0645\u0646\u0632\u0644 / \u0627\u0644\u0634\u0642\u0629'
+                        )}
+                        autoComplete="address-line2"
+                        value={formData.apartment}
+                        onChange={e => updateField('apartment', e.target.value)}
+                      />
+
+                      <div>
+                        <label
+                          htmlFor="order-notes"
+                          className="block text-sm font-medium text-foreground mb-1"
+                        >
+                          {t(
+                            'Order Notes (optional)',
+                            '\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u0637\u0644\u0628 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
+                          )}
+                        </label>
+                        <textarea
+                          id="order-notes"
+                          value={formData.notes}
+                          onChange={e => updateField('notes', e.target.value)}
+                          rows={3}
+                          // text-base on mobile prevents iOS Safari from
+                          // auto-zooming when this textarea receives focus
+                          // (any field <16px triggers it, won't auto-unzoom).
+                          // sm:text-sm restores the denser desktop appearance.
+                          className="min-h-24 w-full rounded-lg border border-border bg-background px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          placeholder={t(
+                            'Any special delivery instructions...',
+                            '\u0623\u064a \u062a\u0639\u0644\u064a\u0645\u0627\u062a \u062e\u0627\u0635\u0629 \u0644\u0644\u062a\u0648\u0635\u064a\u0644...'
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                      <Link
+                        href={storeUrl('/cart')}
+                        className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
+                      >
+                        {language === 'ar'
+                          ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629 \u2192'
+                          : '\u2190 Return to cart'}
+                      </Link>
+                      <Button type="submit" className="w-full sm:w-auto" size="lg">
+                        {t(
+                          'Continue to Payment',
+                          '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {step === 2 && (
-                <PaymentStep
-                  checkoutError={checkoutError}
-                  onClearError={() => setCheckoutError(null)}
-                  formData={formData}
-                  onEditShipping={() => setStep(1)}
-                  paymentProviders={paymentProviders}
-                  selectedProvider={selectedProvider}
-                  onSelectProvider={setSelectedProvider}
-                  isProcessing={isProcessing}
-                  total={total}
-                  formatPrice={formatPrice}
-                />
-              )}
-            </form>
+                {step === 2 && (
+                  <PaymentStep
+                    checkoutError={checkoutError}
+                    onClearError={() => setCheckoutError(null)}
+                    formData={formData}
+                    onEditShipping={() => setStep(1)}
+                    paymentProviders={paymentProviders}
+                    selectedProvider={selectedProvider}
+                    onSelectProvider={setSelectedProvider}
+                    isProcessing={isProcessing}
+                    total={total}
+                    formatPrice={formatPrice}
+                  />
+                )}
+              </form>
+            </div>
+
+            {/* Order Summary */}
+            <OrderSummary
+              items={cart.items}
+              subtotal={subtotal}
+              discount={discount}
+              shipping={shipping}
+              total={total}
+              freeShipping={freeShipping}
+              couponCode={couponCode}
+              onCouponCodeChange={setCouponCode}
+              appliedCoupon={appliedCoupon}
+              onApplyCoupon={handleApplyCoupon}
+              onRemoveCoupon={removeCoupon}
+              couponError={couponError}
+            />
           </div>
-
-          {/* Order Summary */}
-          <OrderSummary
-            items={cart.items}
-            subtotal={subtotal}
-            discount={discount}
-            shipping={shipping}
-            total={total}
-            freeShipping={freeShipping}
-            couponCode={couponCode}
-            onCouponCodeChange={setCouponCode}
-            appliedCoupon={appliedCoupon}
-            onApplyCoupon={handleApplyCoupon}
-            onRemoveCoupon={removeCoupon}
-            couponError={couponError}
-          />
         </div>
       </div>
     </MinimalChrome>
