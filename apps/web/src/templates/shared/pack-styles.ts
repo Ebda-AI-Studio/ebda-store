@@ -76,7 +76,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardCta:
       'whitespace-nowrap rounded-2xl bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-300 ease-out min-h-[44px]',
     sectionHeading:
-      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-foreground leading-[1.1]',
+      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
       'text-xl font-semibold text-foreground/70 hover:text-foreground transition-colors duration-300',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/5 to-foreground/35',
@@ -100,7 +100,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardCta:
       'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-sm font-serif uppercase tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out min-h-[44px]',
     sectionHeading:
-      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-normal tracking-tight text-foreground leading-[1.1]',
+      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-normal tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
       'text-xl font-serif uppercase tracking-[0.22em] text-foreground/70 hover:text-foreground transition-colors duration-500',
     heroOverlay: 'bg-gradient-to-b from-foreground/10 via-foreground/15 to-foreground/40',
@@ -137,7 +137,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardCta:
       'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-sm font-medium uppercase tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
     sectionHeading:
-      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-tight text-foreground leading-[1.1]',
+      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
       'text-xl font-extralight uppercase tracking-[0.28em] text-muted-foreground hover:text-foreground transition-colors duration-500',
     heroOverlay: 'bg-gradient-to-b from-transparent via-transparent to-foreground/30',
@@ -161,7 +161,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardCta:
       'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-200 ease-out min-h-[44px]',
     sectionHeading:
-      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black uppercase tracking-tight text-foreground leading-[1.1]',
+      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black uppercase tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
       'text-xl font-black uppercase tracking-[0.18em] text-foreground hover:text-primary transition-colors duration-200',
     heroOverlay: 'bg-gradient-to-b from-foreground/20 via-foreground/30 to-foreground/65',
@@ -190,7 +190,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardCta:
       'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium uppercase tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
     sectionHeading:
-      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1]',
+      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
       'text-xl font-light uppercase tracking-[0.32em] text-foreground/60 hover:text-foreground transition-colors duration-700',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/10 to-foreground/30',
