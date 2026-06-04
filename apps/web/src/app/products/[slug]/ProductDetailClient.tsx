@@ -557,7 +557,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
 
               {product.description && (
-                <p className="mt-6 text-muted-foreground leading-relaxed">{product.description}</p>
+                <p className="mt-6 max-w-prose text-muted-foreground leading-relaxed">
+                  {product.description}
+                </p>
               )}
 
               {/* Variant Selector */}

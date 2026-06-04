@@ -934,3 +934,31 @@
 [data-zone='productPrice'] {
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Phase C interaction polish (UI/UX audit P2) ─────────────────────────── */
+
+/* Snappier taps: remove the 300ms double-tap-zoom delay on interactive
+   elements and set an intentional, subtle tap-highlight instead of the OS
+   default grey flash. */
+button,
+a,
+label,
+summary,
+input,
+select,
+textarea,
+[role='button'] {
+  touch-action: manipulation;
+}
+html {
+  -webkit-tap-highlight-color: hsl(var(--primary) / 0.12);
+}
+
+/* Zero-specificity focus-visible baseline — guarantees a visible keyboard
+   focus ring on any interactive element that doesn't already define its own.
+   `:where()` has 0 specificity, so a component's own focus-visible:ring-*
+   always wins; this only fills the gaps. */
+:where(button, a, [role='button'], input, select, textarea, summary):focus-visible {
+  outline: 2px solid hsl(var(--primary) / 0.6);
+  outline-offset: 2px;
+}
