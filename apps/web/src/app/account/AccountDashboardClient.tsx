@@ -13,11 +13,20 @@ export default function AccountDashboardClient() {
   const { store } = useStore();
   const { t, language } = useLanguage();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [wishlistCount, setWishlistCount] = useState(0);
+  const [addressCount, setAddressCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
+    // Wishlist count — real data from the wishlist API (was hardcoded 0).
+    api
+      .get<{ items: unknown[] }>('/wishlist')
+      .then(r => {
+        if (r.success && Array.isArray(r.data?.items)) setWishlistCount(r.data.items.length);
+      })
+      .catch(() => undefined);
   }, []);
 
   async function fetchOrders() {
@@ -26,6 +35,16 @@ export default function AccountDashboardClient() {
       const result = await api.getOrders();
       if (result.success && result.data) {
         setRecentOrders(result.data.orders.slice(0, 3));
+        // "Saved Addresses" has no dedicated store yet — derive a real count
+        // from the distinct shipping addresses the customer has actually used
+        // (was hardcoded 0).
+        const seen = new Set(
+          result.data.orders
+            .map(o => o.shippingAddress)
+            .filter(Boolean)
+            .map(a => JSON.stringify(a))
+        );
+        setAddressCount(seen.size);
       } else if (result.error) {
         setError(result.error.message || 'Failed to load orders');
       }
@@ -157,7 +176,7 @@ export default function AccountDashboardClient() {
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">0</p>
+              <p className="text-2xl font-bold text-foreground tabular-nums">{addressCount}</p>
               <p className="text-sm text-muted-foreground">
                 {t(
                   'Saved Addresses',
@@ -186,7 +205,7 @@ export default function AccountDashboardClient() {
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">0</p>
+              <p className="text-2xl font-bold text-foreground tabular-nums">{wishlistCount}</p>
               <p className="text-sm text-muted-foreground">
                 {t(
                   'Wishlist Items',
