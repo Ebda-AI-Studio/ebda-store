@@ -5,8 +5,7 @@ import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
 import { API_URL } from '@/lib/api';
-import { PecannbeeProductCard } from '../templates/shared/PecannbeeProductCard';
-import { gridGapClass } from '../templates/shared/card-size';
+import { ProductCarousel } from '../templates/shared/ProductCarousel';
 
 interface RecommendedProduct {
   id: string;
@@ -27,7 +26,7 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
   const [products, setProducts] = useState<RecommendedProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { addItem, items: cartItems } = useCart();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const { store, layout } = useStore();
   const storeUrl = useStoreUrl();
   const templateId = useStoreTemplate();
@@ -107,51 +106,40 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
 
   return (
     <div className="mt-16">
-      <h2 className="text-2xl font-bold text-foreground mb-6">
-        {t('You Might Also Like', 'قد يعجبك أيضاً')}
-      </h2>
-      {/* Issue 2 fix (2026-05-28): PecannbeeProductCard honours per-store
-          productCardDefaults (frame, size, shape) the same as PLP/carousels.
-          Eliminates the T.ProductGrid 4th render path on the PDP. */}
-      <div
-        className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 ${
-          productCardDefaults?.cardGap
-            ? gridGapClass(productCardDefaults.cardGap)
-            : 'gap-3 sm:gap-4'
-        }`}
-        dir={isRtl ? 'rtl' : 'ltr'}
-      >
-        {products.map(p => (
-          <PecannbeeProductCard
-            key={p.id}
-            product={{
-              id: p.id,
-              name: p.name,
-              nameAr: p.nameAr,
-              slug: p.slug,
-              price: p.price,
-              compareAtPrice: p.compareAtPrice,
-              images: p.images,
-              inStock: true,
-            }}
-            isRtl={isRtl}
-            currency={store.currency}
-            pack={templateId}
-            cardSize={productCardDefaults?.cardSize ?? 'md'}
-            cardAspect={productCardDefaults?.cardAspect}
-            cardShape={productCardDefaults?.cardShape}
-            showCardFrame={productCardDefaults?.showCardFrame}
-            cardFrameStyle={productCardDefaults?.cardFrameStyle}
-            cardFrameWidth={productCardDefaults?.cardFrameWidth}
-            cardFrameSize={productCardDefaults?.cardFrameSize}
-            cardFrameColor={productCardDefaults?.cardFrameColor}
-            showLabel={productCardDefaults?.showLabel}
-            showHover={productCardDefaults?.showHover}
-            urlPrefix={storeUrl('')}
-            onAddToCart={handleAddToCart}
-          />
-        ))}
-      </div>
+      {/* Compact horizontal carousel (was a 4-col grid of full-size cards).
+          A "you might also like" strip sits BELOW the homepage section scale:
+          heading capped at 20px, cards forced compact (xs). Reuses the canonical
+          ProductCarousel so per-store frame/shape settings still apply. */}
+      <ProductCarousel
+        products={products.map(p => ({
+          id: p.id,
+          name: p.name,
+          nameAr: p.nameAr,
+          slug: p.slug,
+          price: p.price,
+          compareAtPrice: p.compareAtPrice,
+          images: p.images,
+          inStock: true,
+        }))}
+        title="You Might Also Like"
+        titleAr="قد يعجبك أيضاً"
+        headingZone={{ fontSize: '20px' }}
+        isRtl={isRtl}
+        currency={store.currency}
+        pack={templateId}
+        cardSize="xs"
+        cardAspect={productCardDefaults?.cardAspect}
+        cardShape={productCardDefaults?.cardShape}
+        showCardFrame={productCardDefaults?.showCardFrame}
+        cardFrameStyle={productCardDefaults?.cardFrameStyle}
+        cardFrameWidth={productCardDefaults?.cardFrameWidth}
+        cardFrameSize={productCardDefaults?.cardFrameSize}
+        cardFrameColor={productCardDefaults?.cardFrameColor}
+        showLabel={productCardDefaults?.showLabel}
+        showHover={productCardDefaults?.showHover}
+        urlPrefix={storeUrl('')}
+        onAddToCart={handleAddToCart}
+      />
     </div>
   );
 }
