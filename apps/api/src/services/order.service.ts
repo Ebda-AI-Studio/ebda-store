@@ -7,6 +7,12 @@ import { EmailService } from './email.service';
 import { socketService } from './socket.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { featureService } from './feature.service';
+import {
+  decrementProductInventory,
+  forceDecrementProductInventory,
+  decrementVariantInventory,
+  forceDecrementVariantInventory,
+} from './inventory-decrement';
 import { inngest } from '../lib/inngest/client';
 import { shippingCarrierService } from './shipping-carrier.service';
 import { ShippingService } from './shipping.service';
@@ -265,14 +271,14 @@ export class OrderService {
 
     // Create order in transaction.
     //
-    // DB-006: Inventory is validated with a row-level lock (SELECT ... FOR UPDATE)
-    // *inside* the transaction so that two concurrent checkouts cannot both read
-    // the same stale inventory count and both succeed when only one unit remains.
+    // DB-006: Inventory is guarded by an atomic conditional decrement
+    // (`UPDATE … WHERE inventory >= qty`) *inside* the transaction so that two
+    // concurrent checkouts cannot both succeed when only one unit remains — the
+    // losing writer's UPDATE affects 0 rows. This replaced an earlier
+    // SELECT … FOR UPDATE that held the row lock across the whole transaction
+    // and serialized every checkout on a hot SKU (see
+    // docs/superpowers/plans/2026-06-05-checkout-concurrency-scaling.md).
     const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-      // Lock and re-validate inventory for each tracked item before decrementing.
-      // FOR UPDATE prevents any concurrent transaction from reading or updating
-      // the same Product row until this transaction commits or rolls back.
-      //
       // backorderedItems collects items where the pre-decrement inventory was
       // insufficient and the inventory.backorder feature is enabled — these get
       // a BackorderLine row created after the order is persisted (further down
@@ -281,63 +287,74 @@ export class OrderService {
       const backorderedItems: Array<{ productId: string; variantId?: string; quantity: number }> =
         [];
 
+      // Atomic check + decrement per tracked item. A conditional
+      // `UPDATE … WHERE inventory >= qty` does the oversell guard AND the
+      // decrement in ONE statement, so there is no SELECT … FOR UPDATE held
+      // across the rest of this multi-step order transaction (which under a
+      // single-SKU flash-sale storm serialized every checkout on the row lock).
+      // A losing concurrent writer sees 0 rows affected → INSUFFICIENT_INVENTORY
+      // (or backorder), never an oversell. Variant items decrement the variant
+      // (authoritative check) AND the parent product (unconditional), matching
+      // prior behavior; the InventoryHistory row tracks the PRODUCT stock, so we
+      // capture the accurate product pre/post stock per line for the ledger.
+      const stockChanges = new Map<string, { previousStock: number; newStock: number }>();
       for (const item of cart.items) {
-        if (item.product.trackInventory) {
-          if ((item as { variantId?: string }).variantId) {
-            // Variant-level lock
-            const [lockedVariant] = await tx.$queryRaw<
-              Array<{ inventory: number; allow_backorder: boolean }>
-            >`
-              SELECT inventory, allow_backorder FROM public.product_variants
-              WHERE id = ${(item as { variantId: string }).variantId}
-              FOR UPDATE
-            `;
-            if (!lockedVariant || lockedVariant.inventory < item.quantity) {
-              // Backorder is only accepted when BOTH the store-level feature flag
-              // AND the per-product flag are enabled. Without this second check
-              // a merchant who disables the feature still has their per-product
-              // allowBackorder flags set to true, so orders would silently
-              // generate BackorderLine rows — the billing/enforcement gap.
-              if (!backorderFeatureEnabled || !lockedVariant?.allow_backorder) {
-                throw new AppError(
-                  400,
-                  'INSUFFICIENT_INVENTORY',
-                  `Not enough inventory for ${item.product.name} (variant)`
-                );
-              }
-              // Backorder accepted — track for BackorderLine creation below
-              backorderedItems.push({
-                productId: item.productId,
-                variantId: (item as { variantId: string }).variantId,
-                quantity: item.quantity,
-              });
-            }
-          } else {
-            // Product-level lock
-            const [lockedProduct] = await tx.$queryRaw<
-              Array<{ inventory: number; allow_backorder: boolean }>
-            >`
-              SELECT inventory, allow_backorder FROM public.products
-              WHERE id = ${item.productId}
-              FOR UPDATE
-            `;
-            if (!lockedProduct || lockedProduct.inventory < item.quantity) {
-              // Same dual-check: store feature flag AND per-product flag.
-              if (!backorderFeatureEnabled || !lockedProduct?.allow_backorder) {
-                throw new AppError(
-                  400,
-                  'INSUFFICIENT_INVENTORY',
-                  `Not enough inventory for ${item.product.name}`
-                );
-              }
-              // Backorder accepted — track for BackorderLine creation below
-              backorderedItems.push({
-                productId: item.productId,
-                variantId: undefined,
-                quantity: item.quantity,
-              });
-            }
+        if (!item.product.trackInventory) continue;
+        const qty = item.quantity;
+        const variantId = (item as { variantId?: string }).variantId;
+        const lineKey = `${item.productId}::${variantId ?? ''}`;
+
+        let res = variantId
+          ? await decrementVariantInventory(tx, variantId, qty)
+          : await decrementProductInventory(tx, item.productId, qty);
+
+        if (!res.ok) {
+          // Insufficient stock — accept ONLY when BOTH the store feature flag
+          // and the per-product/variant allowBackorder flag are set (the same
+          // dual-check as before: a disabled feature must never silently
+          // backorder just because the per-product flag is on). Fetched fresh
+          // to match the prior FOR UPDATE behavior, only on the rare miss path.
+          const perFlag = variantId
+            ? (
+                await tx.productVariant.findUnique({
+                  where: { id: variantId },
+                  select: { allowBackorder: true },
+                })
+              )?.allowBackorder
+            : (
+                await tx.product.findUnique({
+                  where: { id: item.productId },
+                  select: { allowBackorder: true },
+                })
+              )?.allowBackorder;
+          if (!backorderFeatureEnabled || !perFlag) {
+            throw new AppError(
+              400,
+              'INSUFFICIENT_INVENTORY',
+              `Not enough inventory for ${item.product.name}${variantId ? ' (variant)' : ''}`
+            );
           }
+          // Backorder accepted — force the decrement (may go negative) + track
+          // for BackorderLine creation below.
+          res = variantId
+            ? await forceDecrementVariantInventory(tx, variantId, qty)
+            : await forceDecrementProductInventory(tx, item.productId, qty);
+          backorderedItems.push({ productId: item.productId, variantId, quantity: qty });
+        }
+
+        // Variant sale also decrements the parent product.inventory
+        // (unconditional, matching prior behavior); ledger tracks PRODUCT stock.
+        if (variantId) {
+          const prod = await forceDecrementProductInventory(tx, item.productId, qty);
+          stockChanges.set(lineKey, {
+            previousStock: prod.previousStock,
+            newStock: prod.newStock,
+          });
+        } else {
+          stockChanges.set(lineKey, {
+            previousStock: res.previousStock,
+            newStock: res.newStock,
+          });
         }
       }
 
@@ -407,40 +424,27 @@ export class OrderService {
         },
       });
 
-      // Decrement inventory and record history (rows already locked above)
+      // Record inventory history. The decrement already happened atomically in
+      // the loop above (stockChanges holds the accurate pre/post PRODUCT stock
+      // per line); here we only write the ledger, atomic with the order via the
+      // same transaction, using newOrder.id as the reference (DB-010).
       for (const item of cart.items) {
-        if (item.product.trackInventory) {
-          // The locked row gives us the accurate pre-decrement stock
-          const previousStock = item.product.inventory;
-
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { inventory: { decrement: item.quantity } },
-          });
-          // Also decrement variant inventory if applicable
-          if ((item as { variantId?: string }).variantId) {
-            await tx.productVariant.update({
-              where: { id: (item as { variantId: string }).variantId },
-              data: { inventory: { decrement: item.quantity } },
-            });
-          }
-
-          // DB-010: Record inventory history inside the transaction so the
-          // previousStock value is accurate (from the locked row) and the
-          // history record is atomic with the inventory decrement.
-          await tx.inventoryHistory.create({
-            data: {
-              productId: item.productId,
-              storeId,
-              type: 'sale',
-              quantity: -item.quantity,
-              previousStock,
-              newStock: Math.max(0, previousStock - item.quantity),
-              reason: 'Sold via order',
-              reference: newOrder.id,
-            },
-          });
-        }
+        if (!item.product.trackInventory) continue;
+        const variantId = (item as { variantId?: string }).variantId;
+        const sc = stockChanges.get(`${item.productId}::${variantId ?? ''}`);
+        if (!sc) continue;
+        await tx.inventoryHistory.create({
+          data: {
+            productId: item.productId,
+            storeId,
+            type: 'sale',
+            quantity: -item.quantity,
+            previousStock: sc.previousStock,
+            newStock: sc.newStock,
+            reason: 'Sold via order',
+            reference: newOrder.id,
+          },
+        });
       }
 
       // Create BackorderLine rows and mark OrderItems as cost-deferred for any

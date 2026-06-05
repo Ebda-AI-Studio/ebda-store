@@ -355,16 +355,25 @@ describe('OrderService', () => {
         ],
       } as any);
 
-      // Inventory is now checked inside $transaction with SELECT FOR UPDATE
+      // Inventory is guarded by an atomic conditional decrement
+      // (`UPDATE … WHERE inventory >= qty RETURNING`). A losing/insufficient
+      // write affects 0 rows → $queryRaw resolves to [] → ok=false. With
+      // backorder disallowed (findUnique → allowBackorder:false) it throws.
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
         if (typeof fn === 'function') {
           return fn({
             order: { create: vi.fn() },
-            product: { update: vi.fn() },
-            productVariant: { update: vi.fn() },
+            product: {
+              update: vi.fn(),
+              findUnique: vi.fn().mockResolvedValue({ allowBackorder: false }),
+            },
+            productVariant: {
+              update: vi.fn(),
+              findUnique: vi.fn().mockResolvedValue({ allowBackorder: false }),
+            },
             cartItem: { deleteMany: vi.fn() },
             inventoryHistory: { create: vi.fn() },
-            $queryRaw: vi.fn().mockResolvedValue([{ inventory: 10 }]),
+            $queryRaw: vi.fn().mockResolvedValue([]),
           } as any);
         }
         return fn;
