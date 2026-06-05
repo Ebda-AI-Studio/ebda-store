@@ -15,6 +15,7 @@ import { pickMetaDescription } from '../lib/seo/meta-description';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
+import { ScrollToTop } from '../components/ScrollToTop';
 import { PushNotificationPrompt } from '../components/PushNotificationPrompt';
 import { OneSignalStorefrontInit } from '../components/OneSignalStorefrontInit';
 import { TypographyProbe } from '../components/TypographyProbe';
@@ -691,6 +692,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         // rendered after ShopChrome by the providers. Ahmad 2026-05-17 evening.
         className={`${plusJakarta.variable} ${ibmPlexArabic.variable} font-sans antialiased bg-background text-foreground overflow-x-hidden pb-32 md:pb-0`}
       >
+        {/* Reset scroll to top on every route change — the body is the scroll
+            container (overflow-x-hidden), so Next's window-targeted scroll
+            restoration alone leaves pages loading mid-page. */}
+        <ScrollToTop />
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:bg-white focus:text-black focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg focus:text-sm focus:font-medium"
