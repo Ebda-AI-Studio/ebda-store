@@ -20,6 +20,8 @@ export {
 export type { ColorValue, ColorToken, Rgb } from './color';
 export { lightenColor, darkenColor, generateSectionPalette } from './color';
 export type { PaletteSeeds, SectionPaletteEntry, SectionKey, PalettePattern } from './color';
+// Brand engine — palette → contrast-safe storefront CSS vars
+export { deriveBrandRoles } from './brand-roles';
 
 /**
  * Format a price value as a localised currency string.

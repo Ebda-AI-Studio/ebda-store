@@ -11,6 +11,7 @@ import {
   BORDER_RADIUS_MAP,
   FONT_FAMILY_MAP,
   resolveBackgroundPreset,
+  deriveBrandRoles,
 } from '@force/shared';
 
 /**
@@ -50,6 +51,11 @@ function themeToCssVars(theme: StoreTheme): Record<string, string> {
     // Sprint 1 section-rhythm tokens — see shared store-theme.ts.
     '--bg-page': bg.bgPage,
     '--bg-section-alt': bg.bgSectionAlt,
+    // Brand engine (2026-06-05) — contrast-safe overrides for the 4 brand
+    // color/foreground pairs. MUST match the shared themeToCssVars so this
+    // client mirror agrees with the SSR-emitted vars (no flash). Stored
+    // readable foregrounds (wadyaljuz) pass through verbatim.
+    ...deriveBrandRoles(theme),
   };
 }
 

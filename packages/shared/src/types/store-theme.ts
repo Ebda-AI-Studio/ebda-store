@@ -1,5 +1,10 @@
 // Store Template & Theme Types
 
+// Brand engine — contrast-safe foreground derivation for the 4 brand pairs.
+// Value import is safe: brand-roles.ts → color.ts both import StoreTheme
+// type-only, so there is no runtime circular dependency back to this file.
+import { deriveBrandRoles } from '../utils/brand-roles';
+
 /**
  * Available store templates
  */
@@ -617,6 +622,14 @@ export function themeToCssVars(theme: StoreTheme): Record<string, string> {
     // and the alternation visually flattens to a single surface.
     '--bg-page': bg.bgPage,
     '--bg-section-alt': bg.bgSectionAlt,
+
+    // Brand engine (2026-06-05) — overrides the 4 brand color/foreground
+    // pairs (primary/secondary/accent/card) with CONTRAST-SAFE foregrounds.
+    // A stored foreground that reads fine on its surface is kept verbatim
+    // (so configured stores — wadyaljuz — are pixel-identical); a missing or
+    // unreadable foreground is replaced via pickReadableForeground(surface).
+    // Spread LAST so it wins over the raw values above. See utils/brand-roles.ts.
+    ...deriveBrandRoles(theme),
   };
 }
 
