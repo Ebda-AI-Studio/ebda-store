@@ -9,10 +9,12 @@ import {
   cardFrameClass,
   cardFrameWidthClass,
   cardFrameSizeClass,
+  cardAspectClass,
+  cardShapeClasses,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor } from '@force/shared';
+import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -43,6 +45,9 @@ function ClassicProductCard({
   onRemoveFromWishlist,
   showCardFrame,
   cardSize,
+  cardAspect,
+  cardShape,
+  showLabel,
   cardFrameStyle,
   cardFrameWidth,
   cardFrameSize,
@@ -55,6 +60,15 @@ function ClassicProductCard({
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
   };
+
+  // PC-1/PC-2: derive name/price sizes and body padding from the canonical
+  // helper so a single cardSize drives the whole card (2026-06-05).
+  const textSizes = getProductCardTextSizes(cardSize);
+
+  // PC-3: aspect override — cardShape named preset wins, then cardAspect enum,
+  // then theme default (mobile square / desktop portrait).
+  const shape = cardShapeClasses(cardShape);
+  const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
 
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
@@ -80,10 +94,11 @@ function ClassicProductCard({
         prefetch={false}
         className="group block cursor-pointer"
       >
-        {/* Image container — mobile 1:1 (square reads better in 2-up
-            grocery grids), desktop 3:4 portrait (per design.md canonical
-            product image 600×800). Clean border. */}
-        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-3">
+        {/* Image container — PC-3: aspect driven by cardShape/cardAspect;
+            falls back to mobile-square / desktop-portrait theme default. */}
+        <div
+          className={`relative overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-3 ${aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+        >
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
@@ -175,34 +190,36 @@ function ClassicProductCard({
           <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
         </div>
 
-        {/* Product info */}
-        <div
-          className={`text-center flex flex-col gap-2 p-3 sm:p-4 ${isRtl ? 'direction-rtl' : ''}`}
-        >
-          <h3
-            id={`prod-${product.id}-name`}
-            data-zone="productName"
-            className="font-serif text-sm md:text-base text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight"
-            itemProp="name"
+        {/* Product info — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
+        {showLabel !== false && (
+          <div
+            className={`text-center flex flex-col gap-2 ${textSizes.pad} ${isRtl ? 'direction-rtl' : ''}`}
           >
-            {isRtl && product.nameAr ? product.nameAr : product.name}
-          </h3>
-          <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
-            <meta itemProp="priceCurrency" content={currency} />
-            <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
-          </span>
-          <Price
-            price={pricing.displayPrice}
-            compareAtPrice={pricing.displayCompare ?? undefined}
-            fromPrefix={pricing.mode === 'fromMin'}
-            currency={currency}
-            isRtl={isRtl}
-            size="sm"
-            showDiscount={false}
-            className="justify-center font-serif text-muted-foreground tabular-nums"
-          />
-          <TaxInclusiveLabel className="mt-1 block font-serif text-xs text-muted-foreground/70" />
-        </div>
+            <h3
+              id={`prod-${product.id}-name`}
+              data-zone="productName"
+              className={`font-serif ${textSizes.name} text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight`}
+              itemProp="name"
+            >
+              {isRtl && product.nameAr ? product.nameAr : product.name}
+            </h3>
+            <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
+              <meta itemProp="priceCurrency" content={currency} />
+              <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
+            </span>
+            <Price
+              price={pricing.displayPrice}
+              compareAtPrice={pricing.displayCompare ?? undefined}
+              fromPrefix={pricing.mode === 'fromMin'}
+              currency={currency}
+              isRtl={isRtl}
+              size="sm"
+              showDiscount={false}
+              className={`justify-center font-serif text-muted-foreground tabular-nums ${textSizes.price}`}
+            />
+            <TaxInclusiveLabel className="mt-1 block font-serif text-xs text-muted-foreground/70" />
+          </div>
+        )}
       </Link>
     </article>
   );

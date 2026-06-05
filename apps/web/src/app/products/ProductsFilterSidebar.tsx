@@ -136,15 +136,17 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       {/* Results summary + per-page — shown at the top of the filter panel so
           it's visible the moment the shopper opens the filters. */}
       {(resultCount !== undefined || onPerPageChange) && (
-        <div className="space-y-3 border-b border-primary/25 pb-4">
+        <div className="space-y-3 border-b border-[hsl(var(--primary-foreground)/0.2)] pb-4">
           {resultCount !== undefined && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[hsl(var(--primary-foreground)/0.8)]">
               {isLoading ? (
                 t('Loading...', translations['Loading...'])
               ) : (
                 <>
                   {t('Showing', 'عرض')}{' '}
-                  <span className="font-medium text-foreground">{resultCount}</span>{' '}
+                  <span className="font-medium text-[hsl(var(--primary-foreground))]">
+                    {resultCount}
+                  </span>{' '}
                   {meta ? t(`of ${meta.total}`, `من ${meta.total}`) : ''} {t('products', 'منتجات')}
                 </>
               )}
@@ -154,7 +156,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             <div>
               <label
                 htmlFor={`products-perpage-${mobile ? 'm' : 'd'}`}
-                className="mb-2 block text-base lg:text-lg font-medium text-foreground"
+                className="mb-2 block text-base lg:text-lg font-medium text-[hsl(var(--primary-foreground))]"
               >
                 {t('Show:', 'عرض:')}
               </label>
@@ -179,7 +181,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         <div>
           <label
             htmlFor={`products-sort-${mobile ? 'm' : 'd'}`}
-            className="mb-2 block text-base lg:text-lg font-medium text-foreground"
+            className="mb-2 block text-base lg:text-lg font-medium text-[hsl(var(--primary-foreground))]"
           >
             {t('Sort by', 'ترتيب')}
           </label>
@@ -199,13 +201,13 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       )}
 
       <div className="flex items-center justify-between">
-        <h3 className="text-sm lg:text-base font-semibold text-foreground">
+        <h3 className="text-sm lg:text-base font-semibold text-[hsl(var(--primary-foreground))]">
           {t('Filters', 'فلاتر')}
         </h3>
         <button
           type="button"
           onClick={onClearAll}
-          className="text-xs lg:text-sm font-medium text-primary hover:underline"
+          className="text-xs lg:text-sm font-medium text-[hsl(var(--primary-foreground))] underline opacity-80 hover:opacity-100"
         >
           {t('Remove filters', 'إزالة الفلاتر')}
         </button>
@@ -217,11 +219,11 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         priceMin !== undefined &&
         priceMax !== undefined && (
           <div>
-            <h3 className="mb-3 text-lg font-medium text-foreground">
+            <h3 className="mb-3 text-lg font-medium text-[hsl(var(--primary-foreground))]">
               {t('Price range', 'مجال السعر')}
             </h3>
             <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs lg:text-sm text-muted-foreground">
+              <div className="flex items-center justify-between text-xs lg:text-sm text-[hsl(var(--primary-foreground)/0.8)]">
                 <span>
                   {priceMin.toFixed(3)} {t('KWD', 'د.ك')}
                 </span>
@@ -229,7 +231,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                   {priceMax.toFixed(3)} {t('KWD', 'د.ك')}
                 </span>
               </div>
-              <div className="relative h-1.5 rounded-full bg-muted">
+              <div className="relative h-1.5 rounded-full bg-[hsl(var(--primary-foreground)/0.25)]">
                 <div
                   className="absolute h-full rounded-full bg-primary"
                   style={{
@@ -277,13 +279,13 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       <form onSubmit={mobile ? closeAfter(onSearchSubmit) : onSearchSubmit}>
         <label
           htmlFor={`products-search-${mobile ? 'm' : 'd'}`}
-          className="mb-2 block text-base lg:text-lg font-medium text-foreground"
+          className="mb-2 block text-base lg:text-lg font-medium text-[hsl(var(--primary-foreground))]"
         >
           {t('Search', translations['Search'])}
         </label>
         <div className="search-box">
           <svg
-            className="h-5 w-5 text-muted-foreground"
+            className="h-5 w-5 text-[hsl(var(--primary-foreground)/0.6)]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -308,7 +310,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       </form>
 
       <div>
-        <h3 className="mb-3 text-lg font-medium text-foreground">
+        <h3 className="mb-3 text-lg font-medium text-[hsl(var(--primary-foreground))]">
           {t('Categories', translations['Categories'])}
         </h3>
         <div className="space-y-2">
@@ -318,15 +320,17 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             aria-pressed={!categoryFilter}
             className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition-all ${
               !categoryFilter
-                ? 'bg-primary text-white shadow-md shadow-primary/25'
-                : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                ? 'bg-[hsl(var(--primary-foreground)/0.2)] text-[hsl(var(--primary-foreground))] font-semibold'
+                : 'bg-[hsl(var(--primary-foreground)/0.08)] text-[hsl(var(--primary-foreground)/0.75)] hover:bg-[hsl(var(--primary-foreground)/0.15)] hover:text-[hsl(var(--primary-foreground))]'
             }`}
           >
             <span>{t('All', 'الكل')}</span>
             {meta && (
               <span
                 className={`rounded-full px-2 py-0.5 text-xs ${
-                  !categoryFilter ? 'bg-white/20' : 'bg-background'
+                  !categoryFilter
+                    ? 'bg-[hsl(var(--primary-foreground)/0.2)]'
+                    : 'bg-[hsl(var(--primary-foreground)/0.12)]'
                 }`}
               >
                 {meta.total}
@@ -345,15 +349,17 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                 aria-pressed={categoryFilter === cat.slug}
                 className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-base lg:text-lg transition-all ${
                   categoryFilter === cat.slug
-                    ? 'bg-primary text-white shadow-md shadow-primary/25'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                    ? 'bg-[hsl(var(--primary-foreground)/0.2)] text-[hsl(var(--primary-foreground))] font-semibold'
+                    : 'bg-[hsl(var(--primary-foreground)/0.08)] text-[hsl(var(--primary-foreground)/0.75)] hover:bg-[hsl(var(--primary-foreground)/0.15)] hover:text-[hsl(var(--primary-foreground))]'
                 }`}
               >
                 <span>{language === 'ar' && cat.nameAr ? cat.nameAr : cat.name}</span>
                 {cat.productCount !== undefined && (
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
-                      categoryFilter === cat.slug ? 'bg-white/20' : 'bg-background'
+                      categoryFilter === cat.slug
+                        ? 'bg-[hsl(var(--primary-foreground)/0.2)]'
+                        : 'bg-[hsl(var(--primary-foreground)/0.12)]'
                     }`}
                   >
                     {cat.productCount}
@@ -370,7 +376,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         <button
           type="button"
           onClick={onClearAll}
-          className="w-full rounded-xl border border-primary/30 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:border-primary/50"
+          className="w-full rounded-xl border border-[hsl(var(--primary-foreground)/0.3)] py-2.5 text-sm text-[hsl(var(--primary-foreground)/0.8)] transition-colors hover:bg-[hsl(var(--primary-foreground)/0.1)] hover:border-[hsl(var(--primary-foreground)/0.5)]"
         >
           {t('Clear All Filters', 'مسح جميع الفلاتر')}
         </button>
@@ -384,14 +390,17 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // independently of the broader "Products" zone — sort dropdown,
     // search input, price range labels, category chips, mobile sheet
     // trigger, the lot.
-    <aside className="w-full shrink-0 lg:w-64" data-zone="filters">
+    <aside
+      className="w-full shrink-0 lg:w-64 lg:rounded-2xl lg:p-4 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+      data-zone="filters"
+    >
       {/* Mobile trigger — opens the bottom-sheet. */}
       <button
         type="button"
         onClick={() => setIsOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-xl border border-primary/30 bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted hover:border-primary/50"
+        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-xl border border-[hsl(var(--primary-foreground)/0.4)] bg-[hsl(var(--primary-foreground)/0.1)] px-4 text-sm font-medium text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary-foreground)/0.2)] hover:border-[hsl(var(--primary-foreground)/0.6)]"
       >
         <span className="inline-flex items-center gap-2">
           <svg
@@ -490,7 +499,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
           onClick={() => setIsDesktopExpanded(v => !v)}
           aria-expanded={isDesktopExpanded}
           aria-controls="products-filter-panel-body"
-          className="mb-4 flex w-full items-center justify-between text-sm font-semibold text-foreground hover:text-primary transition-colors"
+          className="mb-4 flex w-full items-center justify-between text-sm font-semibold text-[hsl(var(--primary-foreground))] hover:text-[hsl(var(--primary-foreground)/0.7)] transition-colors"
         >
           <span className="inline-flex items-center gap-2">
             <svg

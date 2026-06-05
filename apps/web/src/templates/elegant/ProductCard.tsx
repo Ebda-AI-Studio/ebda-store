@@ -9,10 +9,12 @@ import {
   cardFrameClass,
   cardFrameWidthClass,
   cardFrameSizeClass,
+  cardAspectClass,
+  cardShapeClasses,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor } from '@force/shared';
+import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -43,6 +45,10 @@ function ElegantProductCard({
   onRemoveFromWishlist,
   showCardFrame,
   cardSize,
+  cardAspect,
+  cardShape,
+  showLabel,
+  showHover,
   cardFrameStyle,
   cardFrameWidth,
   cardFrameSize,
@@ -54,6 +60,15 @@ function ElegantProductCard({
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
+
+  // PC-1/PC-2: derive name/price sizes and body padding from the canonical
+  // helper so a single cardSize drives the whole card (2026-06-05).
+  const textSizes = getProductCardTextSizes(cardSize);
+
+  // PC-3: aspect override — cardShape named preset wins, then cardAspect enum,
+  // then theme default (mobile square / desktop portrait).
+  const shape = cardShapeClasses(cardShape);
+  const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
 
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
@@ -100,11 +115,11 @@ function ElegantProductCard({
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Image — fashion portrait ratio.
-            Mobile-tame: aspect-square (1:1) on phones so 2-up grocery
-            grids don't push each card past 450px tall (especially with
-            the no-image fallback, which paints a huge empty area).
-            Original 3/4 portrait restored on sm+ where there's room. */}
-        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-gray-50 mb-3">
+            PC-3: aspect driven by cardShape/cardAspect; falls back to
+            mobile-square / desktop-portrait theme default. */}
+        <div
+          className={`relative overflow-hidden bg-gray-50 mb-3 ${aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+        >
           {/* Platform-level OOS ribbon (red, prominent) — same visual
               across every theme, see templates/shared/ProductCardCta.tsx */}
           <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
@@ -133,14 +148,14 @@ function ElegantProductCard({
                   isHovered ? 'brightness-95 scale-[1.02]' : 'brightness-100 scale-100'
                 )}
                 style={{
-                  opacity: isHovered && product.images[1]?.url ? 0 : 1,
+                  opacity: isHovered && showHover !== false && product.images[1]?.url ? 0 : 1,
                   transition: 'opacity 500ms, filter 500ms, transform 500ms',
                 }}
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 priority={priority}
               />
-              {product.images[1]?.url && (
+              {showHover !== false && product.images[1]?.url && (
                 <Image
                   src={product.images[1].url}
                   alt={isRtl && product.nameAr ? product.nameAr : product.name}
@@ -245,32 +260,35 @@ function ElegantProductCard({
           </div>
         </div>
 
-        {/* Content — refined, centered */}
-        <div className="text-center flex flex-col gap-2 p-3 sm:p-4">
-          <h3
-            id={`prod-${product.id}-name`}
-            data-zone="productName"
-            className="text-xs tracking-[0.15em] uppercase text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1"
-            itemProp="name"
-          >
-            {isRtl && product.nameAr ? product.nameAr : product.name}
-          </h3>
-          <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
-            <meta itemProp="priceCurrency" content={currency} />
-            <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
-          </span>
-          <Price
-            price={pricing.displayPrice}
-            compareAtPrice={pricing.displayCompare ?? undefined}
-            fromPrefix={pricing.mode === 'fromMin'}
-            currency={currency}
-            isRtl={isRtl}
-            size="sm"
-            showDiscount={false}
-            className="justify-center text-muted-foreground font-light tabular-nums"
-          />
-          <TaxInclusiveLabel className="block text-[10px] tracking-[0.2em] uppercase text-muted-foreground/60" />
-        </div>
+        {/* Content — refined, centered.
+            PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
+        {showLabel !== false && (
+          <div className={`text-center flex flex-col gap-2 ${textSizes.pad}`}>
+            <h3
+              id={`prod-${product.id}-name`}
+              data-zone="productName"
+              className={`${textSizes.name} tracking-[0.15em] uppercase text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1`}
+              itemProp="name"
+            >
+              {isRtl && product.nameAr ? product.nameAr : product.name}
+            </h3>
+            <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
+              <meta itemProp="priceCurrency" content={currency} />
+              <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
+            </span>
+            <Price
+              price={pricing.displayPrice}
+              compareAtPrice={pricing.displayCompare ?? undefined}
+              fromPrefix={pricing.mode === 'fromMin'}
+              currency={currency}
+              isRtl={isRtl}
+              size="sm"
+              showDiscount={false}
+              className={`justify-center text-muted-foreground font-light tabular-nums ${textSizes.price}`}
+            />
+            <TaxInclusiveLabel className="block text-[10px] tracking-[0.2em] uppercase text-muted-foreground/60" />
+          </div>
+        )}
       </Link>
     </article>
   );

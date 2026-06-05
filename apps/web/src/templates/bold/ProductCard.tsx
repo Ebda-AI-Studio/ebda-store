@@ -9,10 +9,12 @@ import {
   cardFrameClass,
   cardFrameWidthClass,
   cardFrameSizeClass,
+  cardAspectClass,
+  cardShapeClasses,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor } from '@force/shared';
+import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
@@ -42,6 +44,9 @@ function BoldProductCard({
   onRemoveFromWishlist,
   showCardFrame,
   cardSize,
+  cardAspect,
+  cardShape,
+  showLabel,
   cardFrameStyle,
   cardFrameWidth,
   cardFrameSize,
@@ -52,6 +57,15 @@ function BoldProductCard({
   const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isHovered, setIsHovered] = useState(false);
+
+  // PC-1/PC-2: derive name/price sizes and body padding from the canonical
+  // helper so a single cardSize drives the whole card (2026-06-05).
+  const textSizes = getProductCardTextSizes(cardSize);
+
+  // PC-3: aspect override — cardShape named preset wins, then cardAspect enum,
+  // then bold theme default (aspect-square per brand identity).
+  const shape = cardShapeClasses(cardShape);
+  const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
 
   const discount = calculateDiscount(product.price, product.compareAtPrice);
 
@@ -81,8 +95,9 @@ function BoldProductCard({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Image */}
-        <div className="relative aspect-square overflow-hidden bg-muted">
+        {/* Image — PC-3: aspect driven by cardShape/cardAspect; bold theme
+            default stays aspect-square to preserve the streetwear brand identity. */}
+        <div className={`relative overflow-hidden bg-muted ${aspectOverride || 'aspect-square'}`}>
           {/* Platform-level OOS ribbon (red, prominent) — same visual
               across every theme (2026-05-16). */}
           <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
@@ -175,31 +190,33 @@ function BoldProductCard({
           </div>
         </div>
 
-        {/* Content — tightened p-5 → p-3 sm:p-4 (2026-05-16 size reduction). */}
-        <div className="flex flex-col gap-2 p-3 sm:p-4">
-          <h3
-            id={`prod-${product.id}-name`}
-            data-zone="productName"
-            className="font-black text-base uppercase tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200"
-            itemProp="name"
-          >
-            {isRtl && product.nameAr ? product.nameAr : product.name}
-          </h3>
-          <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
-            <meta itemProp="priceCurrency" content={currency} />
-            <meta itemProp="price" content={String(product.price / 1000)} />
-          </span>
-          <Price
-            price={product.price}
-            compareAtPrice={product.compareAtPrice}
-            currency={currency}
-            isRtl={isRtl}
-            size="lg"
-            showDiscount={false}
-            className="font-black tabular-nums"
-          />
-          <TaxInclusiveLabel className="block text-xs uppercase tracking-wide text-muted-foreground" />
-        </div>
+        {/* Content — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
+        {showLabel !== false && (
+          <div className={`flex flex-col gap-2 ${textSizes.pad}`}>
+            <h3
+              id={`prod-${product.id}-name`}
+              data-zone="productName"
+              className={`font-black ${textSizes.name} uppercase tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200`}
+              itemProp="name"
+            >
+              {isRtl && product.nameAr ? product.nameAr : product.name}
+            </h3>
+            <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
+              <meta itemProp="priceCurrency" content={currency} />
+              <meta itemProp="price" content={String(product.price / 1000)} />
+            </span>
+            <Price
+              price={product.price}
+              compareAtPrice={product.compareAtPrice}
+              currency={currency}
+              isRtl={isRtl}
+              size="lg"
+              showDiscount={false}
+              className={`font-black tabular-nums ${textSizes.price}`}
+            />
+            <TaxInclusiveLabel className="block text-xs uppercase tracking-wide text-muted-foreground" />
+          </div>
+        )}
       </Link>
     </article>
   );

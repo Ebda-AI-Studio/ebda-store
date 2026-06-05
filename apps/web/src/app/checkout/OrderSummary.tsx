@@ -100,7 +100,11 @@ export function OrderSummary({
         {/* Coupon */}
         <div className="mt-6 border-t pt-6">
           {appliedCoupon ? (
-            <div className="flex items-center justify-between bg-[hsl(var(--success))]/10 p-3 rounded-lg">
+            // data-zone="cta" wires this block into the per-store typography CSS emitter
+            <div
+              data-zone="cta"
+              className="flex items-center justify-between bg-[hsl(var(--success))]/10 p-3 sm:p-4 rounded-lg"
+            >
               <div>
                 <span className="text-sm font-medium text-[hsl(var(--success))]">
                   {appliedCoupon.code}

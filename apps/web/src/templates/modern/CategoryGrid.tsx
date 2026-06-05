@@ -48,6 +48,7 @@ export default function ModernCategoryGrid({
   subtitleZone,
   seeAllZone,
   categoryLabelZone,
+  sectionBgColor,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -93,6 +94,7 @@ export default function ModernCategoryGrid({
         kickerZone={kickerZone}
         subtitleZone={subtitleZone}
         seeAllZone={seeAllZone}
+        sectionBgColor={sectionBgColor}
       />
       <div
         className={`grid ${gridGapClass(cardGap)} ${gridColsClass(cappedMobile, cappedDesktop)}`}

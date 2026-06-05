@@ -73,6 +73,21 @@ export function HeroBanner({
   const showOverlay = !!(text || subtitleText || cta);
   const styles = getPackStyles(pack);
 
+  // Resolve hero headline color at runtime so it is never hardcoded to white.
+  // Priority order:
+  //   1. Merchant typography-zone override (headingZone?.color) — explicit pick wins.
+  //   2. pickReadableForeground against white — the hero background is always an
+  //      image so there is no solid-color bg to analyse. We default the analysis
+  //      bg to '#ffffff' which returns '#000000', but that would be wrong on a
+  //      dark photo. For image heroes the safe default is '#ffffff' (white on imagery
+  //      is the industry convention; the gradient overlay in heroOverlay adds further
+  //      scrim). We therefore skip the luminance check for image heroes and just
+  //      use '#ffffff' as the fallback, matching the original text-white intent.
+  //
+  // NOTE: if a future caller ever passes a solid bgColor prop we can switch to
+  //       pickReadableForeground(resolveColor(bgColor, theme) ?? '#000000') here.
+  const heroColor: string = headingZone?.color ?? '#ffffff';
+
   // Framed mode (Ahmad 2026-05-17 night): merchant uploaded an image
   // they want shown in FULL without crop. Sit the hero inside a
   // max-w-7xl container with horizontal padding + rounded-2xl frame +
@@ -125,7 +140,10 @@ export function HeroBanner({
                   fontFamily: headingZone?.fontFamily,
                   fontSize: responsiveFontSize(headingZone?.fontSize),
                   fontWeight: headingZone?.fontWeight,
-                  color: headingZone?.color,
+                  // heroColor is always defined: merchant pick OR '#ffffff' fallback.
+                  // This replaces the removed `text-white` in heroHeadline pack-styles
+                  // so every theme still gets a legible color without a hardcoded class.
+                  color: heroColor,
                   letterSpacing: headingZone?.letterSpacing,
                   lineHeight: headingZone?.lineHeight,
                   textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],

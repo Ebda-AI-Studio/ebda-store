@@ -9,10 +9,12 @@ import {
   cardFrameClass,
   cardFrameWidthClass,
   cardFrameSizeClass,
+  cardAspectClass,
+  cardShapeClasses,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor } from '@force/shared';
+import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
 import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
@@ -43,6 +45,10 @@ function ModernProductCard({
   urlPrefix = '',
   showCardFrame,
   cardSize,
+  cardAspect,
+  cardShape,
+  showLabel,
+  showHover,
   cardFrameStyle,
   cardFrameWidth,
   cardFrameSize,
@@ -55,13 +61,21 @@ function ModernProductCard({
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
+  // PC-1/PC-2: derive name/price sizes and body padding from the canonical
+  // helper so a single cardSize drives the whole card (2026-06-05).
+  const textSizes = getProductCardTextSizes(cardSize);
+
+  // PC-3: aspect override — cardShape named preset wins, then cardAspect enum,
+  // then theme default (mobile square / desktop portrait).
+  const shape = cardShapeClasses(cardShape);
+  const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
+
   const discount = calculateDiscount(product.price, product.compareAtPrice);
   // Localized name for alt text + display. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
   const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
 
   if (process.env.NODE_ENV !== 'production' && !product.images?.[0]?.url) {
-    // eslint-disable-next-line no-console
     console.warn(`[ProductCard] Missing image for product "${product.name}" (id: ${product.id})`);
   }
 
@@ -102,7 +116,9 @@ function ModernProductCard({
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Image Container */}
-        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted">
+        <div
+          className={`relative overflow-hidden bg-muted ${aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+        >
           {product.images?.[0]?.url ? (
             <>
               <Image
@@ -114,7 +130,7 @@ function ModernProductCard({
                 priority={priority}
               />
               {/* Second image on hover */}
-              {product.images[1]?.url && (
+              {showHover !== false && product.images[1]?.url && (
                 <Image
                   src={product.images[1].url}
                   alt={product.images[1].alt || displayName}
@@ -235,10 +251,9 @@ function ModernProductCard({
           </div>
         </div>
 
-        {/* Content — tightened p-5→p-3 sm:p-4 + gap-2.5→gap-2 per ahmad
-            2026-05-16 'products are too big as ui'. Modern theme card
-            chrome was the heaviest of the 5 packs. */}
-        <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1">
+        {/* Content — PC-2: pad driven by textSizes.pad from getProductCardTextSizes.
+            PC-1: name and price sizes driven by textSizes.name / textSizes.price. */}
+        <div className={`${textSizes.pad} flex flex-col gap-2 flex-1`}>
           {product.rating !== undefined && (
             <Rating
               value={product.rating}
@@ -249,30 +264,35 @@ function ModernProductCard({
             />
           )}
 
-          <h3
-            id={`prod-${product.id}-name`}
-            data-zone="productName"
-            className={`font-semibold text-sm text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 leading-snug tracking-tight ${isRtl ? 'text-right' : ''}`}
-            itemProp="name"
-          >
-            {isRtl && product.nameAr ? product.nameAr : product.name}
-          </h3>
+          {showLabel !== false && (
+            <>
+              <h3
+                id={`prod-${product.id}-name`}
+                data-zone="productName"
+                className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 leading-snug tracking-tight ${isRtl ? 'text-right' : ''}`}
+                itemProp="name"
+              >
+                {isRtl && product.nameAr ? product.nameAr : product.name}
+              </h3>
 
-          <div className="mt-auto pt-1 tabular-nums">
-            <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
-              <meta itemProp="priceCurrency" content={currency} />
-              <meta itemProp="price" content={String(product.price / 1000)} />
-            </span>
-            <Price
-              price={product.price}
-              compareAtPrice={product.compareAtPrice}
-              currency={currency}
-              isRtl={isRtl}
-              size="md"
-              showDiscount={false}
-            />
-            <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
-          </div>
+              <div className="mt-auto pt-1 tabular-nums">
+                <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
+                  <meta itemProp="priceCurrency" content={currency} />
+                  <meta itemProp="price" content={String(product.price / 1000)} />
+                </span>
+                <Price
+                  price={product.price}
+                  compareAtPrice={product.compareAtPrice}
+                  currency={currency}
+                  isRtl={isRtl}
+                  size="md"
+                  showDiscount={false}
+                  className={textSizes.price}
+                />
+                <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+              </div>
+            </>
+          )}
         </div>
       </Link>
     </article>

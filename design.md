@@ -66,6 +66,8 @@ opts up via admin if their brand needs heading prominence.
 
 **Anti-pattern**: shrinking a font BELOW the table to recreate "this theme uses tiny text" feel. The themes diverge on weight + tracking, NEVER on main-text size. The pre-2026-05-16 state where minimal used text-xs (12px) for product name was a legibility regression hidden as "design choice".
 
+**PDP name ≥ price invariant (2026-06-05):** On the product detail page, the name h1 MUST render at a size ≥ the price. Both are zone-driven (`data-zone="productName"` / `data-zone="productPrice"` with `zoneStyle()`). Hardcoded Tailwind size classes (`text-3xl`, `text-2xl`) on either element are forbidden — they win specificity over the inline `fontSize` from `zoneStyle()` and silently no-op merchant overrides. The canonical implementation puts `data-zone` + `style={zoneStyle(...)}` DIRECTLY on the `<h1>` and `<span>` (not on a parent wrapper), so the zone is the sole size source. Mirrors the card-level NAME-vs-PRICE rule above; applies to PDP only (cards use `getProductCardTextSizes(cardSize)`).
+
 ---
 
 ## Image asset standards (canonical designer brief — 2026-05-17 night)

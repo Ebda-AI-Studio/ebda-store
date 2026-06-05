@@ -1,4 +1,4 @@
-import { resolveColor } from '@force/shared';
+import { resolveColor, pickReadableForeground } from '@force/shared';
 import type { ZoneOverride, StoreTheme } from '@force/shared';
 import type { CSSProperties } from 'react';
 
@@ -22,13 +22,23 @@ export interface ResolvedZone {
  *
  * Color values (hex OR 'token:<name>') are resolved against the live theme
  * here so the consumer always gets a real CSS color string.
+ *
+ * @param sectionBgColor - The resolved background color of the section wrapper.
+ *   When provided AND no explicit heading color is set by the merchant, the
+ *   foreground is auto-inverted via `pickReadableForeground` so the heading is
+ *   always readable on tinted / light-colored section backgrounds (Anchor B fix,
+ *   PDP-4 / YML-1). Pass the raw merchant value (e.g. "token:primary" or "#fff");
+ *   it is resolved internally. Do NOT re-add a CSS --section-fg cascade — invert
+ *   at render time here instead (audit recommendation, 2026-06-05).
  */
 export function resolveSectionZone(
   sectionOverride: ZoneOverride | undefined,
   globalZone: ZoneOverride | undefined,
-  theme: StoreTheme
+  theme: StoreTheme,
+  sectionBgColor?: string
 ): ResolvedZone | undefined {
-  if (!sectionOverride && !globalZone) return undefined;
+  const hasAnyInput = !!(sectionOverride || globalZone || sectionBgColor);
+  if (!hasAnyInput) return undefined;
 
   const merged: ResolvedZone = {};
   const pick = <K extends keyof ZoneOverride>(key: K) => {
@@ -47,10 +57,22 @@ export function resolveSectionZone(
   pick('textDecoration');
   pick('textAlign');
 
-  // Color goes through resolveColor so token: refs work at the override level too.
+  // Color resolution strategy (Anchor B):
+  // 1. Merchant-set explicit color always wins (preserves existing behavior).
+  // 2. When no explicit color is set AND a section background is provided,
+  //    auto-invert via pickReadableForeground so the heading never goes
+  //    white-on-white or dark-on-dark on tinted sections.
+  // 3. No explicit color + no section bg → leave color undefined so CSS
+  //    inherits the theme default (text-foreground).
   const rawColor = sectionOverride?.color ?? globalZone?.color;
   if (rawColor) {
+    // Explicit merchant pick — resolve token refs and use verbatim.
     merged.color = resolveColor(rawColor, theme);
+  } else if (sectionBgColor) {
+    // No explicit pick: auto-invert against the section background.
+    const resolvedBg = resolveColor(sectionBgColor, theme);
+    const autoColor = pickReadableForeground(resolvedBg) ?? '#000000';
+    merged.color = autoColor;
   }
 
   return Object.keys(merged).length ? merged : undefined;
@@ -66,6 +88,14 @@ export function resolveSectionZone(
  *   - non-px unit (em / rem / % / vw)
  *   - already ≤16px (already mobile-safe)
  *
+ * Rejects Tailwind arbitrary-value bracket syntax (`text-[Npx]`) — those
+ * bypass the 4-step scale (12/14/16/18/22px), win specificity over the
+ * per-store CSS emitter, and silently no-op merchant overrides (PC-4 fix,
+ * 2026-06-05). Allowed inputs: px / rem / em / % values, or documented
+ * token names (text-xs / text-sm / text-base / text-lg / text-xl / text-2xl).
+ * Bracket syntax is returned as undefined so the element falls back to its
+ * Tailwind class instead of injecting an invalid inline style.
+ *
  * Verified 2026-05-20 against wadyaljuz: global sectionTitle.fontSize="22px"
  * → clamp(15.40px, calc(8.82px + 1.716vw), 22px) → renders 15.4px on 360px
  * mobile, 22px on tablet+. Was previously 22px on every viewport, which
@@ -73,6 +103,9 @@ export function resolveSectionZone(
  */
 export function responsiveFontSize(size: string | undefined): string | undefined {
   if (!size) return undefined;
+  // PC-4: reject Tailwind arbitrary bracket syntax (text-[20px], text-[1.2rem], etc.).
+  // These must NOT be passed as inline styles — they're Tailwind classes.
+  if (/text-\[/.test(size)) return undefined;
   const match = size.match(/^([\d.]+)px$/);
   if (!match) return size; // non-px unit — return as-is
   const value = parseFloat(match[1]);

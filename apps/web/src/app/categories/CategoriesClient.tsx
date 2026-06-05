@@ -77,6 +77,11 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
               urlPrefix={urlPrefix}
               headingZone={scaleZone(catHeadingZone, catScale)}
               categoryLabelZone={scaleZone(catLabelZone, catScale)}
+              showCardFrame={layout?.categories?.showCardFrame}
+              cardFrameStyle={layout?.categories?.cardFrameStyle}
+              cardFrameWidth={layout?.categories?.cardFrameWidth}
+              cardFrameSize={layout?.categories?.cardFrameSize}
+              cardFrameColor={layout?.categories?.cardFrameColor}
             />
           ) : (
             // Skeleton while template loads.

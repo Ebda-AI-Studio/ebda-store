@@ -183,12 +183,16 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const pdp = resolvedLayout?.productDetailPage;
   const pdpAspectClass = (() => {
     const v = pdp?.imageAspect ?? resolvedLayout?.productsPage?.pdpImageAspect;
-    if (!v || v === 'auto') return 'aspect-square';
+    // Default to 3:4 portrait (canonical product image spec per design.md).
+    // Explicit 'square' or 'auto' (legacy) use square mode; all other values map
+    // to their named aspect. This matches the 600×800 Image dimensions below.
+    if (v === 'square') return 'aspect-square';
+    if (!v || v === 'auto') return 'aspect-[3/4]';
     if (v === 'portrait') return 'aspect-[3/4]';
     if (v === 'landscape') return 'aspect-[4/3]';
     if (v === 'wide') return 'aspect-[3/2]';
     if (v === 'ultrawide') return 'aspect-[16/9]';
-    return 'aspect-square'; // 'square' or fallback
+    return 'aspect-[3/4]'; // safe fallback
   })();
   const pdpHeadingZone = resolveSectionZone(pdp?.typography?.heading, undefined, store.theme);
   // Related strip ("You May Also Like") sits below the homepage section-heading
@@ -455,16 +459,16 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             {/* Images */}
             <div className="space-y-4 md:col-span-5">
               <div
-                className={`${pdpAspectClass} overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
+                className={`${pdpAspectClass} max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
               >
                 {images[selectedImage]?.url ? (
                   <Image
                     src={images[selectedImage].url}
                     alt={images[selectedImage].alt || displayName}
-                    width={800}
+                    width={600}
                     height={800}
                     className="h-full w-full object-cover"
-                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 40vw, 32vw"
                     priority
                   />
                 ) : (
@@ -533,8 +537,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 )}
               </div>
 
+              {/* PDP NAME-vs-PRICE rule: name carries the zone that drives size; price
+                  mirrors the zone on its own span (not the parent div) so the Tailwind
+                  size class on the child cannot win over the parent's inline fontSize.
+                  Hardcoded text-3xl / text-2xl removed — size is purely zone-driven.
+                  See design.md § "PDP name ≥ price invariant". */}
               <h1
-                className="text-3xl font-bold text-foreground"
+                className="font-bold text-foreground"
                 data-zone="productName"
                 style={zoneStyle(pdpNameZone, pdpScale)}
               >
@@ -542,12 +551,12 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               </h1>
 
               {/* Price */}
-              <div
-                className="mt-4 flex items-baseline gap-3"
-                data-zone="productPrice"
-                style={zoneStyle(pdpPriceZone, pdpScale)}
-              >
-                <span className="text-2xl font-bold text-primary">
+              <div className="mt-4 flex items-baseline gap-3">
+                <span
+                  className="font-bold text-primary"
+                  data-zone="productPrice"
+                  style={zoneStyle(pdpPriceZone, pdpScale)}
+                >
                   {pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
                     ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
                     : formatPrice(displayPrice)}

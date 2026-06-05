@@ -414,6 +414,7 @@ export function HomePageContent({
                     subtitleZone: categoriesSubtitleZone,
                     seeAllZone: categoriesSeeAllZone,
                     categoryLabelZone: categoriesLabelZone,
+                    sectionBgColor: layout.categories.bgColor,
                   };
                   type Caption = typeof layout.categories.captionPosition;
                   const renderGrid = (caption: Caption, vis?: string) => (
@@ -525,6 +526,7 @@ export function HomePageContent({
                     productNameZone={newArrivalsProductNameZone}
                     productPriceZone={newArrivalsProductPriceZone}
                     productCtaZone={newArrivalsProductCtaZone}
+                    sectionBgColor={layout.newArrivals.bgColor}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -608,6 +610,7 @@ export function HomePageContent({
                     productNameZone={bestSellersProductNameZone}
                     productPriceZone={bestSellersProductPriceZone}
                     productCtaZone={bestSellersProductCtaZone}
+                    sectionBgColor={layout.bestSellers.bgColor}
                   />
                 ) : (
                   <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -703,6 +706,7 @@ export function HomePageContent({
                   kickerZone={testimonialsKickerZone}
                   subtitleZone={testimonialsSubtitleZone}
                   dividers={layout.testimonials.dividers}
+                  sectionBgColor={layout.testimonials.bgColor}
                 />
               </section>
             )}
@@ -810,6 +814,7 @@ export function HomePageContent({
                   cardFrameWidth={extra.cardFrameWidth}
                   cardFrameSize={extra.cardFrameSize}
                   cardFrameColor={extra.cardFrameColor}
+                  sectionBgColor={extra.bgColor}
                 />
               </section>
             </React.Fragment>

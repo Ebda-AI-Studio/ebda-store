@@ -72,6 +72,7 @@ export function ProductCarousel({
   productPriceZone,
   productCtaZone,
   dividers,
+  sectionBgColor,
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
   const sizeCap = productSizeClass(cardSize);
@@ -180,6 +181,7 @@ export function ProductCarousel({
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
           seeAllZone={seeAllZone}
+          sectionBgColor={sectionBgColor}
         />
         <div
           className="relative"

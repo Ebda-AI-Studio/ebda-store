@@ -9,10 +9,12 @@ import {
   cardFrameClass,
   cardFrameWidthClass,
   cardFrameSizeClass,
+  cardAspectClass,
+  cardShapeClasses,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
-import { resolveColor } from '@force/shared';
+import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price } from '@force/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
@@ -43,6 +45,9 @@ function MinimalProductCard({
   onRemoveFromWishlist,
   showCardFrame,
   cardSize,
+  cardAspect,
+  cardShape,
+  showLabel,
   cardFrameStyle,
   cardFrameWidth,
   cardFrameSize,
@@ -52,6 +57,16 @@ function MinimalProductCard({
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
+
+  // PC-1/PC-2: derive name/price sizes and body padding from the canonical
+  // helper so a single cardSize drives the whole card (2026-06-05).
+  const textSizes = getProductCardTextSizes(cardSize);
+
+  // PC-3: aspect override — cardShape named preset wins, then cardAspect enum,
+  // then theme default (mobile square / desktop portrait).
+  const shape = cardShapeClasses(cardShape);
+  const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
+
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
@@ -78,8 +93,11 @@ function MinimalProductCard({
         prefetch={false}
         className="group block cursor-pointer"
       >
-        {/* Image — no border, no shadow, subtle opacity on hover */}
-        <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden bg-muted/30 mb-3">
+        {/* Image — PC-3: aspect driven by cardShape/cardAspect; falls back to
+            mobile-square / desktop-portrait theme default. */}
+        <div
+          className={`relative overflow-hidden bg-muted/30 mb-3 ${aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+        >
           {/* Platform-level OOS ribbon — minimal pack stays chrome-free
               elsewhere, but the OOS state needs unambiguous communication
               regardless of pack philosophy (2026-05-16). */}
@@ -185,39 +203,43 @@ function MinimalProductCard({
           </div>
         </div>
 
-        {/* Text — name + price, ultra-minimal */}
-        <div className={`flex flex-col gap-2 p-3 sm:p-4 ${isRtl ? 'text-right' : 'text-left'}`}>
-          <h3
-            id={`prod-${product.id}-name`}
-            data-zone="productName"
-            className="text-xs tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug"
-            itemProp="name"
+        {/* Text — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
+        {showLabel !== false && (
+          <div
+            className={`flex flex-col gap-2 ${textSizes.pad} ${isRtl ? 'text-right' : 'text-left'}`}
           >
-            {isRtl && product.nameAr ? product.nameAr : product.name}
-          </h3>
-          <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
-            <meta itemProp="priceCurrency" content={currency} />
-            <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
-          </span>
-          <Price
-            price={pricing.displayPrice}
-            compareAtPrice={pricing.displayCompare ?? undefined}
-            fromPrefix={pricing.mode === 'fromMin'}
-            currency={currency}
-            isRtl={isRtl}
-            size="sm"
-            showDiscount={false}
-            className="text-[11px] tracking-wide font-light text-muted-foreground tabular-nums"
-          />
-          {/* Discount indicator — minimal pack stays chrome-free, so use a
-            short uppercase 'sale' label inline rather than a badge box. */}
-          {hasSale && (
-            <p className="text-[10px] tracking-[0.25em] uppercase text-foreground/80">
-              {isRtl ? 'تخفيض' : 'Sale'}
-            </p>
-          )}
-          <TaxInclusiveLabel className="block text-[10px] tracking-wide font-light text-muted-foreground/70" />
-        </div>
+            <h3
+              id={`prod-${product.id}-name`}
+              data-zone="productName"
+              className={`${textSizes.name} tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug`}
+              itemProp="name"
+            >
+              {isRtl && product.nameAr ? product.nameAr : product.name}
+            </h3>
+            <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
+              <meta itemProp="priceCurrency" content={currency} />
+              <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
+            </span>
+            <Price
+              price={pricing.displayPrice}
+              compareAtPrice={pricing.displayCompare ?? undefined}
+              fromPrefix={pricing.mode === 'fromMin'}
+              currency={currency}
+              isRtl={isRtl}
+              size="sm"
+              showDiscount={false}
+              className={`${textSizes.price} tracking-wide font-light text-muted-foreground tabular-nums`}
+            />
+            {/* Discount indicator — minimal pack stays chrome-free, so use a
+              short uppercase 'sale' label inline rather than a badge box. */}
+            {hasSale && (
+              <p className="text-[10px] tracking-[0.25em] uppercase text-foreground/80">
+                {isRtl ? 'تخفيض' : 'Sale'}
+              </p>
+            )}
+            <TaxInclusiveLabel className="block text-[10px] tracking-wide font-light text-muted-foreground/70" />
+          </div>
+        )}
       </Link>
     </article>
   );

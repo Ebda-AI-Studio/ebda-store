@@ -54,6 +54,7 @@ export default function MinimalCategoryGrid({
   subtitleZone,
   seeAllZone,
   categoryLabelZone,
+  sectionBgColor,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -79,6 +80,7 @@ export default function MinimalCategoryGrid({
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
           seeAllZone={seeAllZone}
+          sectionBgColor={sectionBgColor}
         />
         {/* Grid - Simple 4 columns */}
         <div

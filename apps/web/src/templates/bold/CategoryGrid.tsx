@@ -54,6 +54,7 @@ export default function BoldCategoryGrid({
   subtitleZone,
   seeAllZone,
   categoryLabelZone,
+  sectionBgColor,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -86,6 +87,7 @@ export default function BoldCategoryGrid({
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
           seeAllZone={seeAllZone}
+          sectionBgColor={sectionBgColor}
         />
         {/* Grid - Staggered layout for dynamism */}
         <div

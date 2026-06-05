@@ -52,6 +52,7 @@ export default function ClassicCategoryGrid({
   subtitleZone,
   seeAllZone,
   categoryLabelZone,
+  sectionBgColor,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -77,6 +78,7 @@ export default function ClassicCategoryGrid({
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
           seeAllZone={seeAllZone}
+          sectionBgColor={sectionBgColor}
         />
         {/* Grid - 4 columns on desktop for elegant spacing */}
         <div

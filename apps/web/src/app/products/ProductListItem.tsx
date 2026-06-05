@@ -87,14 +87,16 @@ export function ProductListItem({
               {displayCategory}
             </p>
           )}
-          <h3 className="mt-1 text-lg font-semibold text-foreground">{displayName}</h3>
+          <h3 className="mt-1 text-lg font-semibold text-foreground" data-zone="productName">
+            {displayName}
+          </h3>
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {pricing.mode === 'fromMin' && (
               <span className="text-xs text-muted-foreground">{t('From', 'ابتداءً من')}</span>
             )}
-            <span className="text-xl font-bold text-primary tabular-nums">
+            <span className="text-xl font-bold text-primary tabular-nums" data-zone="productPrice">
               {formatPrice(pricing.displayPrice)}
             </span>
             {pricing.displayCompare && pricing.displayCompare > pricing.displayPrice && (

@@ -439,6 +439,14 @@ export interface ProductCarouselProps {
   productPriceZone?: ResolvedZone;
   /** Product CTA button text typography override (Add to cart / View). */
   productCtaZone?: ResolvedZone;
+  /**
+   * The resolved background color of the section that wraps this carousel
+   * (e.g. `layout.newArrivals.bgColor`). Forwarded to `SectionHeading` so the
+   * heading auto-inverts via `pickReadableForeground` when the merchant has not
+   * set an explicit heading color (Anchor B fix — PDP-4 / YML-1, 2026-06-05).
+   * Pass the raw value (hex OR 'token:<name>').
+   */
+  sectionBgColor?: string;
 }
 
 /**
@@ -524,6 +532,13 @@ export interface TestimonialRowProps {
   subtitleZone?: ResolvedZone;
   /** Per-section divider settings — see SectionDividers. */
   dividers?: import('@force/shared').SectionDividers;
+  /**
+   * The resolved background color of the testimonials section wrapper
+   * (e.g. `layout.testimonials.bgColor`). Forwarded to `SectionHeading` so
+   * the heading auto-inverts when no explicit color is set (Anchor B fix,
+   * 2026-06-05). Pass the raw value (hex OR 'token:<name>').
+   */
+  sectionBgColor?: string;
 }
 
 /**
@@ -694,6 +709,14 @@ export interface CategoryGridProps {
    *  'overlay' (label over the image bottom with a gradient scrim). Resolved
    *  per breakpoint by HomePageContent. Default 'below'. */
   captionPosition?: import('@force/shared').CategoriesCaption;
+  /**
+   * The resolved background color of the section that wraps this grid
+   * (e.g. `layout.categories.bgColor`). Forwarded to `SectionHeading` so the
+   * heading auto-inverts via `pickReadableForeground` when the merchant has not
+   * set an explicit heading color (Anchor B fix — PDP-4 / YML-1, 2026-06-05).
+   * Pass the raw value (hex OR 'token:<name>').
+   */
+  sectionBgColor?: string;
 }
 
 /**

@@ -191,11 +191,29 @@ export function ZoneEditor({
             type="text"
             value={values.fontSize ?? ''}
             onChange={e => handleSize('fontSize', e.target.value)}
+            onBlur={e => {
+              // PC-4: reject Tailwind arbitrary bracket syntax (text-[20px] etc.)
+              // on blur so the merchant sees inline feedback immediately.
+              // Allowed: px / rem / em / % values, or Tailwind named tokens
+              // (text-xs / text-sm / text-base / text-lg / text-xl / text-2xl).
+              // The canonical 4-step scale is: 12px / 14px / 16px / 18px / 22px.
+              // Bracket syntax bypasses the scale + wins specificity over the
+              // per-store CSS emitter, silently no-oping merchant overrides.
+              const v = normaliseSizeValue(e.target.value);
+              if (v && /text-\[/.test(v)) {
+                onChange({ fontSize: '' });
+                alert(
+                  'Arbitrary Tailwind sizes (text-[…]) are not allowed.\n' +
+                    'Use a px value (e.g. 12px / 14px / 16px / 18px / 22px) or\n' +
+                    'a named token: text-xs / text-sm / text-base / text-lg / text-xl / text-2xl.'
+                );
+              }
+            }}
             placeholder={ph('fontSize') === 'inherit' ? 'e.g. 16px or 1rem' : ph('fontSize')}
             className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-base sm:text-sm"
           />
           <span className="text-[11px] text-muted-foreground/80">
-            Bare number auto-converts to px (16 → 16px).
+            Bare number auto-converts to px (16 → 16px). Allowed: 12 / 14 / 16 / 18 / 22px.
           </span>
         </label>
 

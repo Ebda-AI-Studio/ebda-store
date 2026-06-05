@@ -52,6 +52,7 @@ export default function ElegantCategoryGrid({
   subtitleZone,
   seeAllZone,
   categoryLabelZone,
+  sectionBgColor,
 }: CategoryGridProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -77,6 +78,7 @@ export default function ElegantCategoryGrid({
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
           seeAllZone={seeAllZone}
+          sectionBgColor={sectionBgColor}
         />
         <div
           className={`grid ${gridGapClass(cardGap)} ${gridColsClass(mobileColumns, desktopColumns)}`}

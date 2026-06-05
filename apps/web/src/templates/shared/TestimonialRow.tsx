@@ -22,6 +22,7 @@ export function TestimonialRow({
   kickerZone,
   subtitleZone,
   dividers,
+  sectionBgColor,
 }: TestimonialRowProps) {
   if (testimonials.length === 0) return null;
   const styles = getPackStyles(pack);
@@ -38,6 +39,7 @@ export function TestimonialRow({
           kickerZone={kickerZone}
           subtitleZone={subtitleZone}
           dividers={dividers}
+          sectionBgColor={sectionBgColor}
         />
         <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3 lg:gap-9">
           {testimonials.slice(0, 6).map(t => (

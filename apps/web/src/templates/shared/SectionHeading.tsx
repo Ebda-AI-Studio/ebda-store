@@ -3,7 +3,7 @@
 import type React from 'react';
 import Link from 'next/link';
 import type { TemplateId, SectionDividers, DividerSettings } from '@force/shared';
-import { DEFAULT_DIVIDER_SETTINGS } from '@force/shared';
+import { DEFAULT_DIVIDER_SETTINGS, resolveColor, pickReadableForeground } from '@force/shared';
 import { getPackStyles } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
 import { responsiveFontSize } from './section-typography';
@@ -62,6 +62,21 @@ interface SectionHeadingProps {
   subtitleZone?: ResolvedZone;
   /** Typography override for the "See all →" link at the row end. */
   seeAllZone?: ResolvedZone;
+  /**
+   * The resolved background color of the section that contains this heading
+   * (e.g. the value from `sectionBgStyle`). When provided and the merchant
+   * has NOT set an explicit heading color, the h2 color is auto-inverted via
+   * `pickReadableForeground` so it is always readable on tinted backgrounds
+   * (Anchor B fix — PDP-4 / YML-1, 2026-06-05).
+   *
+   * Pass the raw merchant value (hex OR 'token:<name>'); it is resolved here.
+   * Preserve existing behavior: when headingZone already has an explicit color
+   * set, this prop is ignored.
+   *
+   * Do NOT re-introduce a CSS --section-fg cascade — invert at render time
+   * in this component instead (audit recommendation).
+   */
+  sectionBgColor?: string;
 }
 
 /**
@@ -86,12 +101,34 @@ export function SectionHeading({
   subtitleZone,
   seeAllZone,
   dividers,
+  sectionBgColor,
 }: SectionHeadingProps) {
   // Per-section dividers override the legacy showKickerLines / showSubtitleLines
   // booleans when present. When the new `dividers.{kicker,title,subtitle}` is
   // undefined, fall back to the deprecated boolean props so existing stores
   // keep their current look.
   const { store } = useStore();
+
+  // Anchor B (PDP-4 / YML-1): auto-invert heading color against the section bg.
+  // When the merchant has set an explicit headingZone.color, use it verbatim
+  // (preserves existing behavior). When no explicit color is set AND a section
+  // background is provided, compute a WCAG-AA foreground via pickReadableForeground
+  // so the h2 is always readable on tinted/light sections.
+  // Do NOT use a CSS --section-fg cascade — invert at render time here instead
+  // (audit recommendation 2026-06-05).
+  const resolvedHeadingColor: string | undefined = headingZone?.color
+    ? headingZone.color
+    : sectionBgColor
+      ? (pickReadableForeground(resolveColor(sectionBgColor, store.theme)) ?? '#000000')
+      : undefined;
+
+  // Same logic for subtitle: when it has no explicit color and a section bg is
+  // provided, auto-invert so the tagline is also readable.
+  const resolvedSubtitleColor: string | undefined = subtitleZone?.color
+    ? subtitleZone.color
+    : sectionBgColor
+      ? (pickReadableForeground(resolveColor(sectionBgColor, store.theme)) ?? '#000000')
+      : undefined;
   const kickerLinesEnabled = dividers?.kicker?.enabled ?? showKickerLines !== false;
   const titleLinesEnabled = dividers?.title?.enabled === true;
   const subtitleLinesEnabled = dividers?.subtitle?.enabled ?? showSubtitleLines !== false;
@@ -257,7 +294,9 @@ export function SectionHeading({
                     fontFamily: headingZone?.fontFamily,
                     fontSize: responsiveFontSize(headingZone?.fontSize),
                     fontWeight: headingZone?.fontWeight,
-                    color: headingZone?.color,
+                    // resolvedHeadingColor: explicit merchant pick wins; falls back
+                    // to auto-invert against sectionBgColor when no explicit color.
+                    color: resolvedHeadingColor,
                     letterSpacing: headingZone?.letterSpacing,
                     lineHeight: headingZone?.lineHeight,
                     textTransform:
@@ -287,7 +326,9 @@ export function SectionHeading({
                   fontFamily: headingZone?.fontFamily,
                   fontSize: responsiveFontSize(headingZone?.fontSize),
                   fontWeight: headingZone?.fontWeight,
-                  color: headingZone?.color,
+                  // resolvedHeadingColor: explicit merchant pick wins; falls back
+                  // to auto-invert against sectionBgColor when no explicit color.
+                  color: resolvedHeadingColor,
                   letterSpacing: headingZone?.letterSpacing,
                   lineHeight: headingZone?.lineHeight,
                   textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],
@@ -339,7 +380,9 @@ export function SectionHeading({
                   fontFamily: subtitleZone?.fontFamily,
                   fontSize: responsiveFontSize(subtitleZone?.fontSize),
                   fontWeight: subtitleZone?.fontWeight,
-                  color: subtitleZone?.color,
+                  // resolvedSubtitleColor: explicit merchant pick wins; falls back
+                  // to auto-invert against sectionBgColor so subtitle is readable.
+                  color: resolvedSubtitleColor,
                   letterSpacing: subtitleZone?.letterSpacing,
                   lineHeight: subtitleZone?.lineHeight,
                   textTransform:
