@@ -12,6 +12,13 @@ interface RetryOpts {
   retries?: number; // max retry attempts after the first try (default 4)
   baseDelayMs?: number; // base backoff unit (default 20ms)
   label?: string; // for logging which call retried
+  // Extra Prisma error codes to treat as transient + retry. Used by the cart
+  // add paths, which run at Read Committed (not Serializable): a concurrent add
+  // of the same line to the SAME cart loses the (cartId, productId, variantId)
+  // unique race as P2002 — retrying the whole tx lets the re-run see the
+  // winner's row and merge the quantity instead of 500ing. Only pass codes that
+  // a transaction RE-RUN can actually resolve.
+  extraRetryCodes?: string[];
 }
 
 /**
@@ -43,7 +50,10 @@ export async function retryOnWriteConflict<T>(
         typeof err === 'object' && err !== null && 'code' in err
           ? (err as { code?: unknown }).code
           : undefined;
-      if (typeof code === 'string' && RETRYABLE_CODES.has(code) && attempt < retries) {
+      const retryable =
+        typeof code === 'string' &&
+        (RETRYABLE_CODES.has(code) || (opts.extraRetryCodes?.includes(code) ?? false));
+      if (retryable && attempt < retries) {
         attempt++;
         // Exponential backoff with jitter so concurrent retriers de-synchronise
         // instead of colliding again on the same tick.

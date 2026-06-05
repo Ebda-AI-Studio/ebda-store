@@ -168,21 +168,27 @@ export class CartService {
                 throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
               }
 
+              // A concurrent add of the same line to the SAME cart can lose the
+              // (cartId, productId, variantId) unique race → P2002. Under
+              // Serializable that surfaced as P2034 and was retried; under Read
+              // Committed it's P2002, so the retry wrapper below is told to retry
+              // P2002 too — on the re-run findFirst sees the winner's row and the
+              // existing-branch above merges the quantity.
               await tx.cartItem.create({
-                data: {
-                  cartId: cart.id,
-                  productId,
-                  variantId: variantId ?? null,
-                  quantity,
-                },
+                data: { cartId: cart.id, productId, variantId: variantId ?? null, quantity },
               });
             }
           },
           {
-            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            // Advisory cart-level check only — the authoritative inventory lock
+            // is the atomic decrement at order creation (order.service). Read
+            // Committed avoids the spurious P2034 storm where concurrent adds of
+            // the SAME product (each writing its OWN cart row) conflicted purely
+            // because they read the same product.inventory row under Serializable.
+            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
           }
         ),
-      { label: 'cart.addItem' }
+      { label: 'cart.addItem', extraRetryCodes: ['P2002'] }
     );
 
     // Track activity for abandonment detection
@@ -277,6 +283,8 @@ export class CartService {
                   data: { quantity: targetQuantity },
                 });
               } else {
+                // Same-cart unique race → P2002, retried at the tx level (see
+                // addItem + the extraRetryCodes below).
                 await tx.cartItem.create({
                   data: {
                     cartId: cart.id,
@@ -288,9 +296,9 @@ export class CartService {
               }
             }
           },
-          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+          { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }
         ),
-      { label: 'cart.addItems' }
+      { label: 'cart.addItems', extraRetryCodes: ['P2002'] }
     );
 
     await prisma.cart.update({
