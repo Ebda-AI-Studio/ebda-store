@@ -84,14 +84,14 @@ export default function ElegantCategoryGrid({
           className={`grid ${gridGapClass(cardGap)} ${gridColsClass(mobileColumns, desktopColumns)}`}
         >
           {categories.map(category => {
-            const frame = cardFrameClass(showCardFrame, cardFrameStyle);
+            const frame = cardFrameClass(showCardFrame ?? true, cardFrameStyle);
             return frame ? (
               <div
                 key={category.id}
                 className={`${frame} ${cardFrameWidthClass(cardFrameWidth)} ${cardFrameSizeClass(cardFrameSize)} ${categorySizeClass(cardSize)} mx-auto w-full`}
                 style={
-                  cardFrameColor && store.theme
-                    ? { borderColor: resolveColor(cardFrameColor, store.theme) }
+                  store.theme
+                    ? { borderColor: resolveColor(cardFrameColor ?? 'token:primary', store.theme) }
                     : undefined
                 }
               >

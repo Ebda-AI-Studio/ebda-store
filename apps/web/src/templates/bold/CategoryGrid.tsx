@@ -95,14 +95,14 @@ export default function BoldCategoryGrid({
         >
           {categories.map((category, index) => {
             const stagger = index % 2 === 1 ? 'lg:translate-y-8' : '';
-            const frame = cardFrameClass(showCardFrame, cardFrameStyle);
+            const frame = cardFrameClass(showCardFrame ?? true, cardFrameStyle);
             return (
               <div
                 key={category.id}
                 className={`${stagger} ${frame} ${frame ? cardFrameWidthClass(cardFrameWidth) : ''} ${frame ? cardFrameSizeClass(cardFrameSize) : ''} ${frame ? `${categorySizeClass(cardSize)} mx-auto w-full` : ''}`.trim()}
                 style={
-                  frame && cardFrameColor && store.theme
-                    ? { borderColor: resolveColor(cardFrameColor, store.theme) }
+                  frame && store.theme
+                    ? { borderColor: resolveColor(cardFrameColor ?? 'token:primary', store.theme) }
                     : undefined
                 }
               >

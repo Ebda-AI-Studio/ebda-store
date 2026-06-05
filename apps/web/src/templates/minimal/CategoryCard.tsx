@@ -35,9 +35,7 @@ export default function MinimalCategoryCard({
       {/* Image — clean square with subtle rounding. Minimal identity
           keeps the radius small (`rounded-md`) so corners read crisp
           rather than soft. Named cardShape overrides both aspect + radius. */}
-      <div
-        className={`relative ${aspectClass} bg-muted/30 overflow-hidden ${radiusClass} border border-[hsl(var(--primary))] mb-3`}
-      >
+      <div className={`relative ${aspectClass} bg-muted/30 overflow-hidden ${radiusClass} mb-3`}>
         {category.image ? (
           <img
             src={category.image}

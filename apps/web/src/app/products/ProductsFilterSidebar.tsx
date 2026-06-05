@@ -108,13 +108,22 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
   // filterSidebar.defaultOpen setting (defaults to open when unset).
   const [isDesktopExpanded, setIsDesktopExpanded] = useState(defaultOpen !== false);
 
-  // Lock background scroll while the bottom-sheet is open.
+  // Lock background scroll while the bottom-sheet is open. `overflow: hidden`
+  // alone does NOT stop mobile pull-to-refresh — a downward drag near the top
+  // still reloads the page (the "scroll the whole page and refresh it" bug).
+  // `overscroll-behavior: none` on the root element kills the pull-to-refresh +
+  // scroll-chaining so taps/drags inside the open sheet can't refresh the page.
   useEffect(() => {
     if (!isOpen) return;
-    const original = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const body = document.body;
+    const root = document.documentElement;
+    const prevOverflow = body.style.overflow;
+    const prevOverscroll = root.style.overscrollBehavior;
+    body.style.overflow = 'hidden';
+    root.style.overscrollBehavior = 'none';
     return () => {
-      document.body.style.overflow = original;
+      body.style.overflow = prevOverflow;
+      root.style.overscrollBehavior = prevOverscroll;
     };
   }, [isOpen]);
 
@@ -391,7 +400,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // search input, price range labels, category chips, mobile sheet
     // trigger, the lot.
     <aside
-      className="w-full shrink-0 lg:w-64 lg:rounded-2xl lg:p-4 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+      className="w-full shrink-0 lg:w-64 lg:rounded-2xl lg:overflow-hidden lg:p-4 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
       data-zone="filters"
     >
       {/* Mobile trigger — opens the bottom-sheet. */}

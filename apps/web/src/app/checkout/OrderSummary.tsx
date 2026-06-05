@@ -86,7 +86,7 @@ export function OrderSummary({
                 </span>
               </div>
               <div className="flex flex-1 flex-col">
-                <h3 className="text-sm font-medium text-foreground">
+                <h3 className="text-base font-semibold text-foreground">
                   {productLabel(item.product)}
                 </h3>
                 <p className="mt-auto text-sm font-medium text-muted-foreground">

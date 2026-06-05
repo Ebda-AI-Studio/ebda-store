@@ -465,7 +465,7 @@ export default function CartClient() {
                                   </span>
                                 )}
                                 <h3
-                                  className="mt-0.5 text-base font-semibold text-foreground sm:text-lg"
+                                  className="mt-0.5 text-lg font-bold text-foreground sm:text-xl"
                                   data-zone="productName"
                                   style={cartZoneStyle(cartNameZone)}
                                 >
