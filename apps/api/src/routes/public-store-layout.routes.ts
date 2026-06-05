@@ -8,6 +8,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '@force/database';
 import { resolveLayoutSettings } from '@force/shared';
+import type { TemplateId } from '@force/shared';
 import { redis } from '../services/redis.service';
 
 const router = Router();
@@ -15,6 +16,22 @@ const router = Router();
 router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
+
+    // Load store once (template + layoutSettings) so both the draft and
+    // committed paths resolve against the store's template baseline without
+    // a second round-trip.
+    const store = await prisma.store.findFirst({
+      where: { id: storeId, status: 'active' },
+      select: { layoutSettings: true, template: true },
+    });
+    if (!store) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Store not found' },
+      });
+      return;
+    }
+    const templateId = store.template as TemplateId;
 
     // Real-time preview path (Ahmad 2026-05-20): when the merchant clicks
     // "Preview unsaved changes" in admin page-builder, the storefront iframe
@@ -37,7 +54,7 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
           draft && typeof draft === 'object' && ('layout' in draft || 'typography' in draft)
             ? (draft as { layout?: unknown; typography?: unknown; theme?: unknown })
             : { layout: draft, typography: undefined, theme: undefined };
-        const layout = resolveLayoutSettings(draftBundle.layout);
+        const layout = resolveLayoutSettings(draftBundle.layout, templateId);
         res.setHeader('Cache-Control', 'private, no-store');
         res.json({
           success: true,
@@ -54,18 +71,7 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
       // so the preview at least shows the saved state rather than a 404.
     }
 
-    const store = await prisma.store.findFirst({
-      where: { id: storeId, status: 'active' },
-      select: { layoutSettings: true },
-    });
-    if (!store) {
-      res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Store not found' },
-      });
-      return;
-    }
-    const layout = resolveLayoutSettings(store.layoutSettings);
+    const layout = resolveLayoutSettings(store.layoutSettings, templateId);
     // Cache lightly at the edge — layout settings change rarely
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120');
     res.json({ success: true, data: { layout } });

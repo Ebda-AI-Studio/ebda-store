@@ -103,6 +103,11 @@ async function cloneInto(
       slug,
       domain: null, // path-slug access on platform domains; attach a subdomain later if wanted
       template: tpl.template,
+      // Brand Engine Phase 2: inherit the per-template layout baseline instead
+      // of copying wadyaljuz's (elegant) layout. The copied `theme` (brand
+      // colors) stays, so the Phase-1 engine paints every demo from one
+      // palette while each demo shows its own template's layout identity.
+      layoutSettings: {},
       status: 'active',
     },
   });

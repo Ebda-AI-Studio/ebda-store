@@ -6,6 +6,9 @@ export * from './store-theme';
 // Store Layout Settings (Pecannbee-style flow toggles)
 export * from './store-layout';
 
+// Per-template branded layout baselines (Brand Engine Phase 2)
+export * from './template-baselines';
+
 // Per-store typography overrides
 export * from './typography';
 

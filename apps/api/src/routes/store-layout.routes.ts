@@ -11,6 +11,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
 import { resolveLayoutSettings } from '@force/shared';
+import type { TemplateId } from '@force/shared';
 import { authenticate } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -601,9 +602,12 @@ router.get(
       const { storeId } = req.params;
       const store = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { layoutSettings: true },
+        select: { layoutSettings: true, template: true },
       });
-      const layout = resolveLayoutSettings(store?.layoutSettings ?? {});
+      const layout = resolveLayoutSettings(
+        store?.layoutSettings ?? {},
+        store?.template as TemplateId | undefined
+      );
       res.json({ success: true, data: { layout } });
     } catch (error) {
       next(error);
@@ -630,13 +634,17 @@ router.put(
 
       const current = await prisma.store.findUnique({
         where: { id: storeId },
-        select: { layoutSettings: true },
+        select: { layoutSettings: true, template: true },
       });
       const previousLayout = current?.layoutSettings ?? {};
-      const merged = resolveLayoutSettings({
-        ...resolveLayoutSettings(previousLayout),
-        ...patch,
-      });
+      const currentTemplate = current?.template as TemplateId | undefined;
+      const merged = resolveLayoutSettings(
+        {
+          ...resolveLayoutSettings(previousLayout, currentTemplate),
+          ...patch,
+        },
+        currentTemplate
+      );
 
       await prisma.store.update({
         where: { id: storeId },

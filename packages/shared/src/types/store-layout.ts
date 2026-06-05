@@ -13,6 +13,9 @@
  * filter sidebar on PLP, testimonials.
  */
 
+import type { TemplateId } from './store-theme';
+import { getTemplateBaseline } from './template-baselines';
+
 export type HeroMode = 'single' | 'slider';
 
 /**
@@ -835,39 +838,72 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
 };
 
 /**
- * Merge a partial / unknown blob from JSONB with the packaged defaults.
- * Tolerant of missing keys, malformed values, and unknown extras (forward
- * compatible).
+ * Merge a partial / unknown blob from JSONB with the packaged defaults (or
+ * the per-template baseline when `templateId` is supplied).
+ *
+ * Precedence: saved raw value > template baseline > DEFAULT_LAYOUT_SETTINGS.
+ * Omitting `templateId` reproduces the legacy behavior exactly (base =
+ * DEFAULT_LAYOUT_SETTINGS, optional keys undefined when not saved).
  */
-export function resolveLayoutSettings(input: unknown): StoreLayoutSettings {
-  if (!input || typeof input !== 'object') return DEFAULT_LAYOUT_SETTINGS;
+export function resolveLayoutSettings(
+  input: unknown,
+  templateId?: TemplateId
+): StoreLayoutSettings {
+  const base = templateId ? getTemplateBaseline(templateId) : DEFAULT_LAYOUT_SETTINGS;
+  if (!input || typeof input !== 'object') return base;
   const raw = input as Partial<StoreLayoutSettings>;
 
   return {
-    hero: { ...DEFAULT_LAYOUT_SETTINGS.hero, ...(raw.hero ?? {}) },
-    categories: { ...DEFAULT_LAYOUT_SETTINGS.categories, ...(raw.categories ?? {}) },
-    newArrivals: { ...DEFAULT_LAYOUT_SETTINGS.newArrivals, ...(raw.newArrivals ?? {}) },
-    bestSellers: { ...DEFAULT_LAYOUT_SETTINGS.bestSellers, ...(raw.bestSellers ?? {}) },
-    filterSidebar: { ...DEFAULT_LAYOUT_SETTINGS.filterSidebar, ...(raw.filterSidebar ?? {}) },
-    productsPage: { ...DEFAULT_LAYOUT_SETTINGS.productsPage, ...(raw.productsPage ?? {}) },
+    hero: { ...base.hero, ...(raw.hero ?? {}) },
+    categories: { ...base.categories, ...(raw.categories ?? {}) },
+    newArrivals: { ...base.newArrivals, ...(raw.newArrivals ?? {}) },
+    bestSellers: { ...base.bestSellers, ...(raw.bestSellers ?? {}) },
+    filterSidebar: { ...base.filterSidebar, ...(raw.filterSidebar ?? {}) },
+    productsPage: { ...base.productsPage, ...(raw.productsPage ?? {}) },
     productDetailPage: {
-      ...DEFAULT_LAYOUT_SETTINGS.productDetailPage,
+      ...base.productDetailPage,
       ...(raw.productDetailPage ?? {}),
     },
-    categoriesPage: { ...DEFAULT_LAYOUT_SETTINGS.categoriesPage, ...(raw.categoriesPage ?? {}) },
-    checkoutPage: { ...DEFAULT_LAYOUT_SETTINGS.checkoutPage, ...(raw.checkoutPage ?? {}) },
-    cartPage: { ...DEFAULT_LAYOUT_SETTINGS.cartPage, ...(raw.cartPage ?? {}) },
-    testimonials: { ...DEFAULT_LAYOUT_SETTINGS.testimonials, ...(raw.testimonials ?? {}) },
-    reviewSection: { ...DEFAULT_LAYOUT_SETTINGS.reviewSection, ...(raw.reviewSection ?? {}) },
-    brandStory: raw.brandStory,
-    trustStrip: raw.trustStrip,
-    blogCarousel: raw.blogCarousel,
-    announcement: raw.announcement,
-    header: raw.header,
-    footer: raw.footer,
-    extraCarousels: raw.extraCarousels,
-    sizing: { ...DEFAULT_LAYOUT_SETTINGS.sizing, ...(raw.sizing ?? {}) },
-    productCardDefaults: { ...(raw.productCardDefaults ?? {}) },
-    sectionOrder: raw.sectionOrder,
+    categoriesPage: { ...base.categoriesPage, ...(raw.categoriesPage ?? {}) },
+    checkoutPage: { ...base.checkoutPage, ...(raw.checkoutPage ?? {}) },
+    cartPage: { ...base.cartPage, ...(raw.cartPage ?? {}) },
+    testimonials: { ...base.testimonials, ...(raw.testimonials ?? {}) },
+    reviewSection: { ...base.reviewSection, ...(raw.reviewSection ?? {}) },
+    // Optional sections: saved wins, else inherit the (template) base.
+    // Use conditional spread so undefined values are omitted entirely from the
+    // result — this preserves the legacy behavior where DEFAULT_LAYOUT_SETTINGS
+    // has no optional keys at all (absent ≠ undefined for toEqual comparisons).
+    ...((raw.brandStory ?? base.brandStory)
+      ? { brandStory: raw.brandStory ?? base.brandStory }
+      : {}),
+    ...((raw.trustStrip ?? base.trustStrip)
+      ? { trustStrip: raw.trustStrip ?? base.trustStrip }
+      : {}),
+    ...((raw.blogCarousel ?? base.blogCarousel)
+      ? { blogCarousel: raw.blogCarousel ?? base.blogCarousel }
+      : {}),
+    ...((raw.announcement ?? base.announcement)
+      ? { announcement: raw.announcement ?? base.announcement }
+      : {}),
+    ...((raw.header ?? base.header) ? { header: raw.header ?? base.header } : {}),
+    ...((raw.footer ?? base.footer) ? { footer: raw.footer ?? base.footer } : {}),
+    ...((raw.extraCarousels ?? base.extraCarousels)
+      ? { extraCarousels: raw.extraCarousels ?? base.extraCarousels }
+      : {}),
+    sizing: { ...base.sizing, ...(raw.sizing ?? {}) },
+    ...(Object.keys({ ...(base.productCardDefaults ?? {}), ...(raw.productCardDefaults ?? {}) })
+      .length > 0 ||
+    base.productCardDefaults ||
+    raw.productCardDefaults
+      ? {
+          productCardDefaults: {
+            ...(base.productCardDefaults ?? {}),
+            ...(raw.productCardDefaults ?? {}),
+          },
+        }
+      : {}),
+    ...((raw.sectionOrder ?? base.sectionOrder)
+      ? { sectionOrder: raw.sectionOrder ?? base.sectionOrder }
+      : {}),
   };
 }

@@ -206,6 +206,22 @@ Merchants don't need to type `---- text ----`; the platform draws the lines.
 tokens were stripped from `productCardName` / `productCardPrice` — flavor only
 (weight/tracking/color/family). Sizes come from the cardSize-aware helper.
 
+**Per-template branded baseline (Brand Engine Phase 2, 2026-06-05):** a store
+with empty `layoutSettings` inherits its template's polished, fully-tokenized
+baseline via `resolveLayoutSettings(saved, store.template)`. Baselines live in
+`packages/shared/src/types/template-baselines.ts`: `BASE_BRANDED_LAYOUT` (the
+calibrated `elegant` base, extracted from wadyaljuz with content stripped) +
+`TEMPLATE_IDENTITIES` (per-template size/frame/column/aspect deltas on the
+shared mechanical scale) → `TEMPLATE_LAYOUT_BASELINES`. Colors are `token:*`
+only (the Phase-1 engine paints them contrast-safe). Saved values always win the
+merge, so wadyaljuz (full saved layout) is unchanged; palora (empty layout)
+adopts the minimal baseline by design. Demos (`demo-<template>`, via
+`clone-demo-stores.ts`) carry wadyaljuz's brand colors + empty layout → one
+palette, distinct identity per template. wadyaljuz immutability gate:
+`packages/database/scripts/verify-baseline-nodrift.mjs` (read-only). The API
+layout routes thread `store.template` into the resolver; omitting `templateId`
+reproduces the legacy global-default behavior.
+
 **Mobile chrome**: `BottomTabBar` (Home / Wishlist / Cart / Search) mounts
 in `ShopChrome`, hidden on PDP/checkout/auth. Header cart icon + mobile search
 bar hidden via `hidden md:inline-flex` in all 5 theme headers to avoid
