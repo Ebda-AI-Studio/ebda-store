@@ -22,17 +22,17 @@ role to it.
 
 ### 1a. Typographic scale — Major Third (1.25)
 
-| Step | px | Tailwind | Storefront role |
-|---|---|---|---|
-| caption | 10 | `text-[10px]` | badges, tax labels (only allowed arbitrary size) |
-| label | 12 | `text-xs` | kicker chip, footer nav heads |
-| small | 14 | `text-sm` | CTAs, meta, announcement bar |
-| **body** | **16** | `text-base` | product names, prices, descriptions ← BASE/floor |
-| lead | 20 | `text-xl` | subtitles, feature copy |
-| h3 | 24 | `text-2xl` | transactional page H1, sub-sections |
-| h2 | 30 | `text-3xl` | PLP/PDP/Cart H1, section heading (sm+) |
-| h1 | 36 | `text-4xl` | hero mobile, section heading (desktop) |
-| display | 48–72 | `text-5xl…7xl` | hero (sm→lg); bold pack may go `text-8xl` |
+| Step     | px     | Tailwind       | Storefront role                                  |
+| -------- | ------ | -------------- | ------------------------------------------------ |
+| caption  | 10     | `text-[10px]`  | badges, tax labels (only allowed arbitrary size) |
+| label    | 12     | `text-xs`      | kicker chip, footer nav heads                    |
+| small    | 14     | `text-sm`      | CTAs, meta, announcement bar                     |
+| **body** | **16** | `text-base`    | product names, prices, descriptions ← BASE/floor |
+| lead     | 20     | `text-xl`      | subtitles, feature copy                          |
+| h3       | 24     | `text-2xl`     | transactional page H1, sub-sections              |
+| h2       | 30     | `text-3xl`     | PLP/PDP/Cart H1, section heading (sm+)           |
+| h1       | 36     | `text-4xl`     | hero mobile, section heading (desktop)           |
+| display  | 48–72  | `text-5xl…7xl` | hero (sm→lg); bold pack may go `text-8xl`        |
 
 **Kill the `text-[22px]` phantom step** (all 5 packs, `pack-styles.ts`) → `text-2xl`.
 **16px is a hard floor** for any real content text. Body line-height 1.5–1.75; headings
@@ -58,6 +58,7 @@ tighter but **never below 1.1 for Arabic** (bold's `leading-[0.9/0.95]` clips gl
 ## 2. Cross-cutting P0 / P1 (beyond ratios)
 
 **P0 — fix first**
+
 - **`tabular-nums` is used NOWHERE.** Every price/total across cart, checkout, PDP, cards
   jitters and misaligns on quantity/promo updates. Add `font-variant-numeric: tabular-nums`
   to all monetary text. (Highest-frequency, whole-funnel.)
@@ -67,6 +68,7 @@ tighter but **never below 1.1 for Arabic** (bold's `leading-[0.9/0.95]` clips gl
   — can push an incomplete SKU into the cart.
 
 **P1 — high impact**
+
 - **Mobile inline search hard-hidden on all 5 themes** (`*/Header.tsx` `data-zone="mobile-search"` `hidden`).
 - **No `priority` on above-fold product images** (all 7 card components) → CLS on PLP + carousels.
 - **Carousel prev/next `aria-label` inverted in RTL** (`ProductCarousel.tsx:195`).
@@ -81,6 +83,7 @@ tighter but **never below 1.1 for Arabic** (bold's `leading-[0.9/0.95]` clips gl
 - **Uncapped prose** (PDP description, BrandStory) — add `max-w-prose` (65–75ch).
 
 **P2**
+
 - `text-wrap: balance`/`pretty` on headings (widows).
 - `touch-action: manipulation` + intentional tap-highlight on interactive elements.
 - Heading-order + focus-visible consistency sweep.

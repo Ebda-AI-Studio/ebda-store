@@ -51,7 +51,8 @@ async function findSource() {
   const store = await prisma.store.findFirst({
     where: { OR: [{ domain: SOURCE_DOMAIN }, { slug: SOURCE_SLUG }], deletedAt: null },
   });
-  if (!store) throw new Error(`Source store not found (domain=${SOURCE_DOMAIN} / slug=${SOURCE_SLUG})`);
+  if (!store)
+    throw new Error(`Source store not found (domain=${SOURCE_DOMAIN} / slug=${SOURCE_SLUG})`);
   return store;
 }
 
@@ -71,7 +72,10 @@ async function deleteDemoStores() {
   }
 }
 
-async function cloneInto(source: Awaited<ReturnType<typeof findSource>>, tpl: (typeof TEMPLATES)[number]) {
+async function cloneInto(
+  source: Awaited<ReturnType<typeof findSource>>,
+  tpl: (typeof TEMPLATES)[number]
+) {
   const slug = demoSlug(tpl.template);
 
   // Build the new Store row from the source's scalar fields (findFirst returns
@@ -93,7 +97,9 @@ async function cloneInto(source: Awaited<ReturnType<typeof findSource>>, tpl: (t
     data: {
       ...scalars,
       name: `${source.name} — ${tpl.label}`,
-      nameAr: source.nameAr ? `${source.nameAr} — ${tpl.labelAr}` : `${source.name} — ${tpl.labelAr}`,
+      nameAr: source.nameAr
+        ? `${source.nameAr} — ${tpl.labelAr}`
+        : `${source.name} — ${tpl.labelAr}`,
       slug,
       domain: null, // path-slug access on platform domains; attach a subdomain later if wanted
       template: tpl.template,
