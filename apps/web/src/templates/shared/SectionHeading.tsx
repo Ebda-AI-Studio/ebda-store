@@ -333,7 +333,7 @@ export function SectionHeading({
                 />
               )}
               <p
-                className="text-xl text-muted-foreground max-w-2xl"
+                className="text-base text-muted-foreground max-w-2xl text-pretty"
                 data-zone="sectionSubtitle"
                 style={{
                   fontFamily: subtitleZone?.fontFamily,

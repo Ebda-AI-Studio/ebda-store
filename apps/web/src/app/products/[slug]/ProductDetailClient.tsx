@@ -191,6 +191,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     return 'aspect-square'; // 'square' or fallback
   })();
   const pdpHeadingZone = resolveSectionZone(pdp?.typography?.heading, undefined, store.theme);
+  // Related strip ("You May Also Like") sits below the homepage section-heading
+  // scale: cap it at ~20px (text-xl) unless the merchant set a PDP heading zone.
+  const relatedHeadingZone = pdpHeadingZone?.fontSize
+    ? pdpHeadingZone
+    : { ...(pdpHeadingZone || {}), fontSize: '20px' };
   const pdpScale = pageTextScale(pdp?.textScale);
   const pdpDensity = pageDensityStyle(pdp?.density);
   const pdpNameZone = resolveSectionZone(pdp?.typography?.productName, undefined, store.theme);
@@ -710,11 +715,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 products={relatedProducts.map(toTemplateProduct)}
                 title="You May Also Like"
                 titleAr="قد يعجبك أيضاً"
-                headingZone={pdpHeadingZone}
+                headingZone={relatedHeadingZone}
                 isRtl={language === 'ar'}
                 currency={store.currency}
                 pack={templateId}
-                cardSize="sm"
+                cardSize="xs"
                 cardAspect={productCardDefaults?.cardAspect}
                 cardShape={productCardDefaults?.cardShape}
                 showCardFrame={productCardDefaults?.showCardFrame}

@@ -45,7 +45,7 @@ export function ProductListItem({
             compareAtPrice is filtered out by getProductPricing for
             variant products. */}
         {(pricing.displayCompare || pricing.hasVariantDiscount) && (
-          <span className="absolute left-2 top-2 rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+          <span className="absolute left-2 top-2 rounded-full bg-destructive px-2 py-0.5 text-xs font-bold uppercase text-white">
             {t('Sale', 'تخفيض')}
           </span>
         )}
@@ -94,7 +94,7 @@ export function ProductListItem({
             {pricing.mode === 'fromMin' && (
               <span className="text-xs text-muted-foreground">{t('From', 'ابتداءً من')}</span>
             )}
-            <span className="text-xl font-bold text-primary">
+            <span className="text-xl font-bold text-primary tabular-nums">
               {formatPrice(pricing.displayPrice)}
             </span>
             {pricing.displayCompare && pricing.displayCompare > pricing.displayPrice && (

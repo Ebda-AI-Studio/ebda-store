@@ -517,9 +517,9 @@ export function getProductCardTextSizes(cardSize: ProductCardSize | undefined): 
     case 'xxs':
       // Ultra-compact tile (~90-110px) — sub-16px fonts + a tiny CTA.
       return {
-        name: 'text-[10px] sm:text-xs',
-        price: 'text-[11px] sm:text-xs',
-        cta: 'text-[10px] sm:text-xs',
+        name: 'text-xs',
+        price: 'text-xs',
+        cta: 'text-xs',
         pad: 'p-1.5',
         gap: 'gap-1',
         btn: 'min-h-7 px-2 py-1',

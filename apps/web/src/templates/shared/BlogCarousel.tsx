@@ -44,7 +44,7 @@ export function BlogCarousel({ posts }: BlogCarouselProps) {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-end justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--accent-soft))]">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[hsl(var(--accent-soft))]">
               {isRtl ? 'مقالات' : 'Stories'}
             </p>
             <h2 className="mt-1 text-2xl sm:text-3xl font-bold text-foreground tracking-tight">

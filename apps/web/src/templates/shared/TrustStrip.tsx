@@ -83,15 +83,15 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
       iconWrapHorizontal: 'h-7 w-7 sm:h-8 sm:w-8',
       iconSvgVertical: 'h-4 w-4',
       iconSvgHorizontal: 'h-3.5 w-3.5 sm:h-4 sm:w-4',
-      title: 'text-[10px] sm:text-xs font-bold text-foreground',
-      sub: 'text-[10px] text-foreground/65 max-w-[20ch]',
+      title: 'text-xs font-bold text-foreground',
+      sub: 'text-xs text-foreground/65 max-w-[20ch]',
     },
     md: {
       iconWrapVertical: 'h-12 w-12',
       iconWrapHorizontal: 'h-9 w-9 sm:h-12 sm:w-12',
       iconSvgVertical: 'h-6 w-6',
       iconSvgHorizontal: 'h-4 w-4 sm:h-6 sm:w-6',
-      title: 'text-[11px] sm:text-sm font-bold text-foreground',
+      title: 'text-xs sm:text-sm font-bold text-foreground',
       sub: 'text-xs text-foreground/65 max-w-[20ch]',
     },
     lg: {

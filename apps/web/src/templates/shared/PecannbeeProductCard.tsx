@@ -238,7 +238,7 @@ function PecannbeeProductCardImpl({
           <OutOfStockRibbon inStock={inStock} isRtl={isRtl} />
           {showNewBadge && (
             <span
-              className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
+              className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
               aria-label={isRtl ? 'منتج جديد' : 'New product'}
             >
               {isRtl ? 'جديد' : 'NEW'}
@@ -249,7 +249,7 @@ function PecannbeeProductCardImpl({
           <BrandPill hidden={!inStock || showNewBadge} />
           {/* Sale chip top-END when in stock */}
           {inStock && onSale && (
-            <span className="absolute top-3 end-3 z-10 rounded-full bg-foreground/90 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
+            <span className="absolute top-3 end-3 z-10 rounded-full bg-foreground/90 px-2.5 py-1 text-xs font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
               -{discountPct}%
             </span>
           )}
@@ -308,7 +308,7 @@ function PecannbeeProductCardImpl({
                 <meta itemProp="price" content={String(product.price / 1000)} />
                 <span
                   data-zone="productPrice"
-                  className={`font-bold ${textSizes.price} ${styles.productCardPrice}`}
+                  className={`font-bold tabular-nums ${textSizes.price} ${styles.productCardPrice}`}
                   style={{
                     fontFamily: productPriceZone?.fontFamily,
                     fontSize: responsiveFontSize(productPriceZone?.fontSize),

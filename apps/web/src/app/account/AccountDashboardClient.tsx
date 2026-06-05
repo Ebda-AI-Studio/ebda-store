@@ -141,7 +141,9 @@ export default function AccountDashboardClient() {
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">{recentOrders.length}</p>
+              <p className="text-2xl font-bold text-foreground tabular-nums">
+                {recentOrders.length}
+              </p>
               <p className="text-sm text-muted-foreground">
                 {t(
                   'Total Orders',
@@ -249,7 +251,9 @@ export default function AccountDashboardClient() {
                   >
                     {order.status}
                   </span>
-                  <p className="mt-1 font-medium text-foreground">{formatPrice(order.total)}</p>
+                  <p className="mt-1 font-medium text-foreground tabular-nums">
+                    {formatPrice(order.total)}
+                  </p>
                 </div>
               </div>
             ))}
