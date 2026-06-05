@@ -400,7 +400,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // search input, price range labels, category chips, mobile sheet
     // trigger, the lot.
     <aside
-      className="w-full shrink-0 lg:w-64 lg:rounded-2xl lg:overflow-hidden lg:p-4 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+      className="w-full shrink-0 lg:w-64 lg:rounded-2xl lg:overflow-hidden lg:p-4 lg:bg-[hsl(var(--primary))] lg:text-[hsl(var(--primary-foreground))]"
       data-zone="filters"
     >
       {/* Mobile trigger — opens the bottom-sheet. */}
@@ -409,7 +409,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         onClick={() => setIsOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-xl border border-[hsl(var(--primary-foreground)/0.4)] bg-[hsl(var(--primary-foreground)/0.1)] px-4 text-sm font-medium text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary-foreground)/0.2)] hover:border-[hsl(var(--primary-foreground)/0.6)]"
+        className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-xl bg-[hsl(var(--primary))] px-4 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/0.9)]"
       >
         <span className="inline-flex items-center gap-2">
           <svg
@@ -428,7 +428,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
           </svg>
           {t('Filters', 'الفلاتر')}
           {activeFilterCount > 0 && (
-            <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">
+            <span className="rounded-full bg-[hsl(var(--primary-foreground))] px-2 py-0.5 text-xs font-bold text-[hsl(var(--primary))]">
               {activeFilterCount}
             </span>
           )}
