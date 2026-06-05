@@ -4,7 +4,7 @@
 
 The Modern template is the friendly, contemporary default of the Force storefront family — a soft, approachable surface language built on rounded corners, gentle elevation, and a single warm gradient lift on the hero. It suits general-purpose retail (lifestyle, electronics, home goods, food, casual fashion) where the goal is conversion clarity rather than editorial mood. Cards lift on hover (`hover:-translate-y-0.5`), images zoom subtly (`group-hover:scale-105`), and the brand accent (Force Orange by default) appears as a soft halo behind the hero image, on the gradient headline text, and as a glowing CTA shadow (`shadow-primary/20`).
 
-Surfaces are predominantly `bg-background` and `bg-card` with translucent `border-border/60` hairlines. The header uses `bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg` so it visually sits on top of content without dominating it. The footer flips to `bg-gray-950 text-gray-300` to ground the page, with social tiles on `bg-white/8` and the brand color reserved for the newsletter CTA. Motion is consistent and bouncy: `transition-all duration-300`, the staggered grid fade-in (`fadeUp` keyframe with `--i` delay), and the `cartPulse` 700ms scale on cart count change.
+Surfaces are predominantly `bg-background` and `bg-card` with translucent `border-border/60` hairlines. The header uses `bg-background/85 backdrop-blur-lg` (theme-token, not hardcoded white/slate) so it sits on top of content and always matches the store's surface colour — no clash when the OS prefers dark mode. The footer flips to `bg-gray-950 text-gray-300` to ground the page, with social tiles on `bg-white/8` and the brand color reserved for the newsletter CTA. Motion is consistent and bouncy: `transition-all duration-300`, the staggered grid fade-in (`fadeUp` keyframe with `--i` delay), and the `cartPulse` 700ms scale on cart count change.
 
 **Key Characteristics:**
 
@@ -199,7 +199,7 @@ Modern uses `@force/ui`'s `ProductBadge` with default styling — `rounded-full`
 
 ### Navigation
 
-- Sticky, translucent: `sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-border/60`
+- Sticky, translucent: `sticky top-0 z-50 bg-background/85 backdrop-blur-lg border-b border-border/60`
 - Adds `shadow-sm` once `window.scrollY > 8` (state-driven, not CSS-only)
 - Links: `px-3 py-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-muted rounded-lg transition-colors duration-200`
 - Logo height: `h-14 max-h-14 w-auto`

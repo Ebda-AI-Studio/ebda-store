@@ -56,7 +56,7 @@ export default function ModernHeader({
   return (
     <>
       <header
-        className={`sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-border/60 transition-shadow duration-200 ${isScrolled ? 'shadow-sm' : 'shadow-none'}`}
+        className={`sticky top-0 z-50 bg-background/85 backdrop-blur-lg border-b border-border/60 transition-shadow duration-200 ${isScrolled ? 'shadow-sm' : 'shadow-none'}`}
       >
         <div className="container mx-auto px-4">
           {/* Row 1: hamburger | logo | actions — pecannbee mobile layout.
