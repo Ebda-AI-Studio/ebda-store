@@ -3,7 +3,12 @@
 import type React from 'react';
 import Link from 'next/link';
 import type { TemplateId, SectionDividers, DividerSettings } from '@force/shared';
-import { DEFAULT_DIVIDER_SETTINGS, resolveColor, pickReadableForeground } from '@force/shared';
+import {
+  DEFAULT_DIVIDER_SETTINGS,
+  resolveColor,
+  pickReadableForeground,
+  contrastRatio,
+} from '@force/shared';
 import { getPackStyles } from './pack-styles';
 import type { ResolvedZone } from './section-typography';
 import { responsiveFontSize } from './section-typography';
@@ -109,26 +114,34 @@ export function SectionHeading({
   // keep their current look.
   const { store } = useStore();
 
-  // Anchor B (PDP-4 / YML-1): auto-invert heading color against the section bg.
-  // When the merchant has set an explicit headingZone.color, use it verbatim
-  // (preserves existing behavior). When no explicit color is set AND a section
-  // background is provided, compute a WCAG-AA foreground via pickReadableForeground
-  // so the h2 is always readable on tinted/light sections.
-  // Do NOT use a CSS --section-fg cascade — invert at render time here instead
-  // (audit recommendation 2026-06-05).
-  const resolvedHeadingColor: string | undefined = headingZone?.color
-    ? headingZone.color
-    : sectionBgColor
-      ? (pickReadableForeground(resolveColor(sectionBgColor, store.theme)) ?? '#000000')
-      : undefined;
-
-  // Same logic for subtitle: when it has no explicit color and a section bg is
-  // provided, auto-invert so the tagline is also readable.
-  const resolvedSubtitleColor: string | undefined = subtitleZone?.color
-    ? subtitleZone.color
-    : sectionBgColor
-      ? (pickReadableForeground(resolveColor(sectionBgColor, store.theme)) ?? '#000000')
-      : undefined;
+  // Anchor B (PDP-4 / YML-1): GUARANTEE a readable heading color — invert at
+  // render time, never via a CSS --section-fg cascade (audit 2026-06-05).
+  //
+  // The background is the section bg when provided, else the page (#ffffff).
+  // A saved/explicit color is honoured ONLY when it actually reads against that
+  // bg (contrast >= 2:1, see floor note below). If it doesn't — e.g. a
+  // stale white/light heading color on a white page (the wadyaljuz "قد يعجبك
+  // أيضاً" white-on-white bug) — we override with pickReadableForeground so the
+  // heading is never invisible. This keeps a deliberate light-on-dark pick
+  // (white on a brand-colored section reads fine) while self-correcting the
+  // unreadable ones. The mechanical rule: the heading is ALWAYS legible.
+  const resolvedBg: string = resolveColor(sectionBgColor, store.theme) ?? '#ffffff';
+  const ensureReadable = (zoneColor: string | undefined): string | undefined => {
+    const auto = pickReadableForeground(resolvedBg) ?? '#000000';
+    if (!zoneColor) return sectionBgColor ? auto : undefined; // no bg context → inherit (page CSS), but...
+    const concrete = resolveColor(zoneColor, store.theme) ?? zoneColor;
+    // 2:1 floor: decisively kills invisible text (white-on-white = 1:1, light
+    // grey ~1.5:1) while preserving a deliberate brand pick (e.g. Force orange
+    // on white ≈ 2.9:1 stays). Above the floor we trust the merchant's choice.
+    return contrastRatio(resolvedBg, concrete) >= 2 ? zoneColor : auto;
+  };
+  // When there is no explicit color AND no section bg, fall back to a guaranteed
+  // dark default rather than inheriting (which on a white page can resolve to an
+  // invisible light zone color via the emitted per-store CSS).
+  const resolvedHeadingColor: string | undefined =
+    ensureReadable(headingZone?.color) ?? pickReadableForeground(resolvedBg) ?? '#000000';
+  const resolvedSubtitleColor: string | undefined =
+    ensureReadable(subtitleZone?.color) ?? pickReadableForeground(resolvedBg) ?? '#000000';
   const kickerLinesEnabled = dividers?.kicker?.enabled ?? showKickerLines !== false;
   const titleLinesEnabled = dividers?.title?.enabled === true;
   const subtitleLinesEnabled = dividers?.subtitle?.enabled ?? showSubtitleLines !== false;
