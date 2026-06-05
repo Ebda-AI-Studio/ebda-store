@@ -35,7 +35,7 @@ export default function ClassicOrderSummary({
       aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}
     >
       <h2
-        className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+        className="text-sm font-semibold uppercase tracking-widest text-muted-foreground"
         style={typography?.heading}
       >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
@@ -81,7 +81,7 @@ export default function ClassicOrderSummary({
         )}
         <div className="mt-6 flex items-baseline justify-between border-t border-border pt-6">
           <dt
-            className="text-xs font-semibold uppercase tracking-widest text-foreground"
+            className="text-sm font-semibold uppercase tracking-widest text-foreground"
             style={typography?.heading}
           >
             {isRtl ? 'الإجمالي' : 'Total'}

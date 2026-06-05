@@ -35,7 +35,7 @@ export default function ElegantOrderSummary({
       aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}
     >
       <h2
-        className="text-xs font-light uppercase tracking-[0.3em] text-muted-foreground"
+        className="text-sm font-light uppercase tracking-[0.3em] text-muted-foreground"
         style={typography?.heading}
       >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
@@ -85,7 +85,7 @@ export default function ElegantOrderSummary({
         )}
         <div className="mt-8 flex items-baseline justify-between border-t border-foreground/20 pt-8">
           <dt
-            className="text-xs font-light uppercase tracking-[0.3em] text-foreground"
+            className="text-sm font-light uppercase tracking-[0.3em] text-foreground"
             style={typography?.heading}
           >
             {isRtl ? 'الإجمالي' : 'Total'}

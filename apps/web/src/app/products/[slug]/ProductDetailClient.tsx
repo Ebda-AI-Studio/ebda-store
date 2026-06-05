@@ -25,8 +25,7 @@ import { trackViewContent, trackAddToCart } from '../../../components/MarketingP
 import { VariantSelector } from '../../../components/VariantSelector';
 import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../../templates/adapters';
-import { PecannbeeProductCard } from '../../../templates/shared/PecannbeeProductCard';
-import { gridGapClass } from '../../../templates/shared/card-size';
+import { ProductCarousel } from '../../../templates/shared/ProductCarousel';
 import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 import { SpecTable } from '../../../templates/shared/SpecTable';
@@ -543,13 +542,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 data-zone="productPrice"
                 style={zoneStyle(pdpPriceZone, pdpScale)}
               >
-                <span className="text-3xl font-bold text-primary">
+                <span className="text-2xl font-bold text-primary">
                   {pricing.mode === 'range' && minVariantPrice !== null && maxVariantPrice !== null
                     ? `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
                     : formatPrice(displayPrice)}
                 </span>
                 {pricing.mode === 'single' && displayCompare && displayCompare > displayPrice && (
-                  <span className="text-xl text-muted-foreground line-through">
+                  <span className="text-lg text-muted-foreground line-through">
                     {formatPrice(displayCompare)}
                   </span>
                 )}
@@ -697,59 +696,48 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             </>
           )}
 
-          {/* Related Products — uses PecannbeeProductCard (same canonical card
-            as PLP / search) so per-store productCardDefaults (frame, size,
-            shape) are honoured here too. Eliminates the T.ProductGrid 4th
-            render path on the PDP per the standing platform rule. */}
+          {/* Related Products — compact ProductCarousel (canonical card via
+            getPackStyles) so per-store productCardDefaults (frame, size, shape)
+            are honoured here too. Eliminates the T.ProductGrid 4th render path
+            on the PDP per the standing platform rule. */}
           {relatedProducts.length > 0 && !templateLoading && (
             <div className="mt-16">
-              <h2
-                className="text-2xl font-bold text-foreground mb-6"
-                style={zoneStyle(pdpHeadingZone, pdpScale)}
-              >
-                {t('Related Products', 'منتجات ذات صلة')}
-              </h2>
-              <div
-                className={`grid grid-cols-2 sm:grid-cols-3 ${
-                  productCardDefaults?.cardGap
-                    ? gridGapClass(productCardDefaults.cardGap)
-                    : 'gap-3 sm:gap-4'
-                }`}
-                dir={language === 'ar' ? 'rtl' : 'ltr'}
-              >
-                {relatedProducts.map(p => (
-                  <PecannbeeProductCard
-                    key={p.id}
-                    product={toTemplateProduct(p)}
-                    isRtl={language === 'ar'}
-                    currency={store.currency}
-                    pack={templateId}
-                    cardSize={productCardDefaults?.cardSize ?? 'md'}
-                    cardAspect={productCardDefaults?.cardAspect}
-                    cardShape={productCardDefaults?.cardShape}
-                    showCardFrame={productCardDefaults?.showCardFrame}
-                    cardFrameStyle={productCardDefaults?.cardFrameStyle}
-                    cardFrameWidth={productCardDefaults?.cardFrameWidth}
-                    cardFrameSize={productCardDefaults?.cardFrameSize}
-                    cardFrameColor={productCardDefaults?.cardFrameColor}
-                    showLabel={productCardDefaults?.showLabel}
-                    showHover={productCardDefaults?.showHover}
-                    urlPrefix={storeUrl('')}
-                    onAddToCart={async productId => {
-                      const found = relatedProducts.find(x => x.id === productId);
-                      if (found)
-                        addItem({
-                          id: found.id,
-                          name: found.name,
-                          price: found.price,
-                          slug: found.slug,
-                          image: found.images?.[0]?.url,
-                          category: found.categories?.[0]?.category?.name,
-                        });
-                    }}
-                  />
-                ))}
-              </div>
+              {/* Compact horizontal carousel (was a 2/3-col grid of full-size
+                  cards). Reuses the canonical ProductCarousel so the related
+                  strip is smaller + scrollable + matches the homepage strips,
+                  and honours the per-store PDP heading typography zone. */}
+              <ProductCarousel
+                products={relatedProducts.map(toTemplateProduct)}
+                title="You May Also Like"
+                titleAr="قد يعجبك أيضاً"
+                headingZone={pdpHeadingZone}
+                isRtl={language === 'ar'}
+                currency={store.currency}
+                pack={templateId}
+                cardSize="sm"
+                cardAspect={productCardDefaults?.cardAspect}
+                cardShape={productCardDefaults?.cardShape}
+                showCardFrame={productCardDefaults?.showCardFrame}
+                cardFrameStyle={productCardDefaults?.cardFrameStyle}
+                cardFrameWidth={productCardDefaults?.cardFrameWidth}
+                cardFrameSize={productCardDefaults?.cardFrameSize}
+                cardFrameColor={productCardDefaults?.cardFrameColor}
+                showLabel={productCardDefaults?.showLabel}
+                showHover={productCardDefaults?.showHover}
+                urlPrefix={storeUrl('')}
+                onAddToCart={async productId => {
+                  const found = relatedProducts.find(x => x.id === productId);
+                  if (found)
+                    addItem({
+                      id: found.id,
+                      name: found.name,
+                      price: found.price,
+                      slug: found.slug,
+                      image: found.images?.[0]?.url,
+                      category: found.categories?.[0]?.category?.name,
+                    });
+                }}
+              />
             </div>
           )}
         </div>

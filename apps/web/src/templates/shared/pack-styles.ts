@@ -59,7 +59,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // (4) sectionHeading font-bold→font-semibold (introduces mid-weight
     // hierarchy), (5) heroCta rounded-full→rounded-2xl + brand fill (matches
     // in-page cards). See design.md "Theme 1 — Modern" persona spec.
-    card: 'rounded-2xl border border-border/60 bg-card hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.18)] hover:border-foreground/15 hover:-translate-y-0.5 transition-all duration-500 ease-out',
+    card: 'rounded-2xl border border-primary/15 bg-card hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.18)] hover:border-primary/35 hover:-translate-y-0.5 transition-all duration-500 ease-out',
     categoryFrame:
       'rounded-2xl bg-muted shadow-[0_10px_30px_-18px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.14)] transition-shadow duration-700 ease-out',
     categoryCaption: 'text-base sm:text-lg font-semibold text-foreground tracking-tight',
@@ -90,7 +90,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
   },
   classic: {
     // Sharp corners, solid borders, slow restrained hovers (500ms).
-    card: 'border border-border bg-card hover:border-foreground/40 hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.18)] transition-all duration-500 ease-out',
+    card: 'border border-primary/25 bg-card hover:border-primary/55 hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.18)] transition-all duration-500 ease-out',
     categoryFrame:
       'rounded-sm border border-border bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out',
     categoryCaption: 'text-base sm:text-lg font-serif font-normal text-foreground tracking-tight',
@@ -124,7 +124,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // images). See design.md "Theme 3 — Minimal" persona spec.
     // No-chrome philosophy: NO border, NO radius, NO shadow on cards. Page
     // bg shows through. CTA is an underlined link, never a button frame.
-    card: 'bg-transparent',
+    card: 'border border-primary/15 bg-transparent hover:border-primary/30 transition-colors duration-500 ease-out',
     categoryFrame: 'bg-transparent',
     // Minimal's identity is whitespace + tiny tracking + ULTRA-light weight.
     // Main text still hits 16px floor for legibility (Ahmad standing rule).
@@ -152,7 +152,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // Brutalist core preserved: 2px borders + offset shadow on hover.
     // Offset shadow tinted to foreground (token-driven) so it adapts to
     // light/dark theme — not a flat black drop. Bold's voice keeps 200ms.
-    card: 'border-2 border-foreground bg-card hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-all duration-200 ease-out',
+    card: 'border-2 border-primary bg-card hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--primary)/0.92)] transition-all duration-200 ease-out',
     categoryFrame:
       'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-200 ease-out',
     categoryCaption: 'text-base font-black uppercase tracking-[0.05em] text-foreground',
@@ -175,7 +175,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
   elegant: {
     // Hairline borders only — `border-foreground/10` to /20. Strict 200–500
     // weight range. Long 500–700ms transitions for unhurried hovers.
-    card: 'border border-foreground/10 bg-card hover:border-foreground/25 transition-colors duration-700 ease-out',
+    card: 'border border-primary/20 bg-card hover:border-primary/40 transition-colors duration-700 ease-out',
     categoryFrame:
       'rounded-md border border-foreground/10 bg-muted group-hover:border-foreground/25 transition-colors duration-700 ease-out',
     // Elegant's identity is hairline weight + wide tracking — but main
