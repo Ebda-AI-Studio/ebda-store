@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
@@ -36,6 +38,13 @@ export function BottomTabBar() {
   const { itemCount } = useCart();
   const storeUrl = useStoreUrl();
   const pathname = usePathname() ?? '/';
+  // Render into <body> via a portal. `position: fixed` is relative to the
+  // nearest ancestor with a transform/filter/will-change/contain — and the
+  // storefront page wrappers animate sections (transform), which was trapping
+  // this bar mid-screen on mobile instead of pinning it to the viewport bottom
+  // (reported 2026-06-05). Portaling to body escapes any such containing block.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // checkout + auth + order-detail routes hide the bar (MinimalChrome flows;
   // don't pull users back into shopping mid-purchase). PDP is NOT hidden — on
@@ -127,7 +136,7 @@ export function BottomTabBar() {
     return lowered.includes(href.toLowerCase().replace(/\/$/, ''));
   };
 
-  return (
+  const bar = (
     <nav
       aria-label={isRtl ? 'شريط التنقل' : 'Bottom navigation'}
       dir={isRtl ? 'rtl' : 'ltr'}
@@ -167,4 +176,8 @@ export function BottomTabBar() {
       </ul>
     </nav>
   );
+
+  // Portal to body so no transformed ancestor can trap the fixed positioning.
+  if (!mounted) return null;
+  return createPortal(bar, document.body);
 }

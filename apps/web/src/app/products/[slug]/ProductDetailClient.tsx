@@ -459,7 +459,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             {/* Images */}
             <div className="space-y-4 md:col-span-5">
               <div
-                className={`${pdpAspectClass} max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
+                className={`${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
               >
                 {images[selectedImage]?.url ? (
                   <Image
