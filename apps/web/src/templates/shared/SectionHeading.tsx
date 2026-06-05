@@ -367,7 +367,11 @@ export function SectionHeading({
             href={seeAllHref}
             className={`mt-2 block w-full text-end ${styles.sectionSeeAll}`}
             data-zone="sectionSeeAll"
-            data-cta="link"
+            // The data-cta="link" hover effect is a from-center underline (a
+            // background-gradient line, NOT text-decoration). A merchant who set
+            // the See-all zone's text decoration to "none" means "no underline" —
+            // honour that by dropping data-cta so the hover line doesn't fire.
+            data-cta={seeAllZone?.textDecoration === 'none' ? undefined : 'link'}
             style={{
               fontFamily: seeAllZone?.fontFamily,
               fontSize: responsiveFontSize(seeAllZone?.fontSize),
