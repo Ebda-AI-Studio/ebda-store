@@ -112,21 +112,25 @@ export function resolveSectionZone(
 export function guardedCtaColor(
   zoneColor: string | undefined,
   packCtaClass: string,
-  theme: StoreTheme,
-  sectionBgColor?: string
+  theme: StoreTheme
 ): string | undefined {
   if (!zoneColor) return undefined;
+  // Only guard FILLED buttons — those with a solid bg token in the pack class
+  // (classic/bold → bg-foreground, modern → bg-primary). Their text sits on a
+  // known, solid surface, so we can reliably detect dark-on-dark and drop the
+  // override (letting the pack's text-* class win).
+  //
+  // For a TRANSPARENT / unknown button (minimal/elegant → bg-transparent) the
+  // text sits on the CARD surface, NOT the section — so guessing the bg from
+  // the section background is wrong (it forced white text onto a white card =
+  // white-on-white, 2026-06-06 regression). Leave those colors as the pack
+  // intends (text-foreground, readable on the card).
   const m = packCtaClass.match(
     /\bbg-(primary|foreground|secondary|accent|card|muted|background)\b/
   );
-  const bg = m
-    ? resolveColor(`token:${m[1]}`, theme)
-    : sectionBgColor
-      ? resolveColor(sectionBgColor, theme)
-      : undefined;
-  if (bg && contrastRatio(bg, zoneColor) < 3) {
-    return m ? undefined : (pickReadableForeground(bg) ?? undefined);
-  }
+  if (!m) return zoneColor;
+  const bg = resolveColor(`token:${m[1]}`, theme);
+  if (bg && contrastRatio(bg, zoneColor) < 3) return undefined;
   return zoneColor;
 }
 

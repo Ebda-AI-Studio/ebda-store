@@ -483,8 +483,7 @@ export function ProductCarousel({
                         color: guardedCtaColor(
                           productCtaZone?.color,
                           styles.productCardCta,
-                          store.theme,
-                          sectionBgColor
+                          store.theme
                         ),
                         letterSpacing: productCtaZone?.letterSpacing,
                         lineHeight: productCtaZone?.lineHeight,
