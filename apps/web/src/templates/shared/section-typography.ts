@@ -1,4 +1,4 @@
-import { resolveColor, pickReadableForeground } from '@force/shared';
+import { resolveColor, pickReadableForeground, contrastRatio } from '@force/shared';
 import type { ZoneOverride, StoreTheme } from '@force/shared';
 import type { CSSProperties } from 'react';
 
@@ -66,8 +66,20 @@ export function resolveSectionZone(
   //    inherits the theme default (text-foreground).
   const rawColor = sectionOverride?.color ?? globalZone?.color;
   if (rawColor) {
-    // Explicit merchant pick — resolve token refs and use verbatim.
-    merged.color = resolveColor(rawColor, theme);
+    // Explicit pick — resolve token refs. CONTRAST GUARD (2026-06-06): a color
+    // tuned for one section bg (e.g. a baseline `token:card` white meant for a
+    // dark section) becomes invisible when the same baseline renders on a light
+    // surface in a different template. So when a section bg is known and the
+    // explicit color fails the 3:1 floor against it, override with a readable
+    // foreground. Colors that already read fine (wadyaljuz) are kept verbatim,
+    // so configured stores are unchanged. Mirrors SectionHeading.ensureReadable.
+    const resolved = resolveColor(rawColor, theme);
+    const resolvedBg = sectionBgColor ? resolveColor(sectionBgColor, theme) : undefined;
+    if (resolved && resolvedBg && contrastRatio(resolvedBg, resolved) < 3) {
+      merged.color = pickReadableForeground(resolvedBg) ?? resolved;
+    } else {
+      merged.color = resolved;
+    }
   } else if (sectionBgColor) {
     // No explicit pick: auto-invert against the section background.
     const resolvedBg = resolveColor(sectionBgColor, theme);

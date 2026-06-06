@@ -28,8 +28,46 @@
  */
 
 import { PrismaClient, type StoreTemplate } from '@prisma/client';
+import { TEMPLATE_LAYOUT_BASELINES } from '@force/shared';
 
 const prisma = new PrismaClient();
+
+/**
+ * Build a demo store's layout: the per-template baseline (STYLE — sizes,
+ * frames, columns, section colors, typography) with the source store's CONTENT
+ * (hero slides + category copy) injected on top. Without real hero slides the
+ * storefront falls through to the deprecated legacy <Hero> (which renders a
+ * cropped, boxed image in some templates — the classic-demo bug), so demos MUST
+ * carry slides to render the proper full-bleed HeroSlider. Section copy makes
+ * the homepage read as a real store instead of a bare shell.
+ */
+function buildDemoLayout(sourceLayout: unknown, template: StoreTemplate): Record<string, unknown> {
+  const base =
+    (TEMPLATE_LAYOUT_BASELINES as Record<string, Record<string, unknown>>)[template] ?? {};
+  const src = (sourceLayout && typeof sourceLayout === 'object' ? sourceLayout : {}) as Record<
+    string,
+    Record<string, unknown>
+  >;
+  const baseHero = (base.hero ?? {}) as Record<string, unknown>;
+  const baseCats = (base.categories ?? {}) as Record<string, unknown>;
+  const srcHero = (src.hero ?? {}) as Record<string, unknown>;
+  const srcCats = (src.categories ?? {}) as Record<string, unknown>;
+  return {
+    ...base,
+    // Inject CONTENT (slides) onto the template's hero STYLE → real full-bleed banner.
+    hero: { ...baseHero, slides: srcHero.slides ?? [] },
+    // Inject category heading copy onto the template's categories STYLE.
+    categories: {
+      ...baseCats,
+      title: srcCats.title,
+      titleAr: srcCats.titleAr,
+      subtitle: srcCats.subtitle,
+      subtitleAr: srcCats.subtitleAr,
+      kicker: srcCats.kicker,
+      kickerAr: srcCats.kickerAr,
+    },
+  };
+}
 
 const IS_CLEANUP = process.argv.includes('--cleanup');
 
@@ -103,11 +141,12 @@ async function cloneInto(
       slug,
       domain: null, // path-slug access on platform domains; attach a subdomain later if wanted
       template: tpl.template,
-      // Brand Engine Phase 2: inherit the per-template layout baseline instead
-      // of copying wadyaljuz's (elegant) layout. The copied `theme` (brand
-      // colors) stays, so the Phase-1 engine paints every demo from one
-      // palette while each demo shows its own template's layout identity.
-      layoutSettings: {},
+      // Brand Engine Phase 2: per-template baseline STYLE + wadyaljuz CONTENT
+      // (hero slides + category copy) so each demo shows its template's layout
+      // identity AND renders a real full-bleed hero (not the cropped legacy
+      // fallback) on real-looking content. Copied `theme` (brand colors) stays,
+      // so the Phase-1 engine paints every demo from one palette.
+      layoutSettings: buildDemoLayout(source.layoutSettings, tpl.template),
       status: 'active',
     },
   });
