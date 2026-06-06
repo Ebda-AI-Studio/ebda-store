@@ -6,6 +6,7 @@ import type {
   CardGap,
   CardShape,
   CardAspect,
+  CategoriesCaption,
   SizingContract,
 } from './store-layout';
 import { DEFAULT_LAYOUT_SETTINGS } from './store-layout';
@@ -134,6 +135,13 @@ export interface TemplateIdentity {
   cardShape: CardShape;
   productAspect: CardAspect; // newArrivals/bestSellers cardAspect
   productImageAspect: SizingContract['productImageAspect'];
+  // Category-card identity — kept SEPARATE from the product cardShape so each
+  // template's category grid reads distinctly (circle / square / overlay / …)
+  // without turning product cards into circles. Amplified 2026-06-06 so the
+  // demos + every store on a template show a genuinely different category look.
+  categoryShape: CardShape;
+  categoryCaption: CategoriesCaption; // 'below' | 'overlay'
+  categoryShowFrame: boolean;
 }
 
 // Structured-clone-free deep clone good enough for plain JSON layout objects.
@@ -156,7 +164,10 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
   b.categories.cardFrameWidth = identity.frameWidth;
   b.categories.cardFrameSize = identity.frameSize;
   b.categories.cardGap = identity.cardGap;
-  b.categories.cardShape = identity.cardShape;
+  // Category-specific identity (distinct from product cardShape).
+  b.categories.cardShape = identity.categoryShape;
+  b.categories.captionPosition = identity.categoryCaption;
+  b.categories.showCardFrame = identity.categoryShowFrame;
 
   for (const carousel of [b.newArrivals, b.bestSellers]) {
     carousel.cardSize = identity.productCardSize;
@@ -180,6 +191,7 @@ export function buildTemplateBaseline(identity: TemplateIdentity): StoreLayoutSe
 
 /** Per-template identities. elegant = the calibrated base (no delta). */
 export const TEMPLATE_IDENTITIES: Record<Exclude<TemplateId, 'elegant'>, TemplateIdentity> = {
+  // Modern — clean airy grid: rounded-square category tiles, caption below, framed.
   modern: {
     productCardSize: 'sm',
     categoryCardSize: 'xs',
@@ -191,7 +203,11 @@ export const TEMPLATE_IDENTITIES: Record<Exclude<TemplateId, 'elegant'>, Templat
     cardShape: 'rounded-square',
     productAspect: 'square',
     productImageAspect: '1:1',
+    categoryShape: 'rounded-square',
+    categoryCaption: 'below',
+    categoryShowFrame: true,
   },
+  // Classic — heritage/boutique: CIRCLE category bubbles, caption below, no frame.
   classic: {
     productCardSize: 'md',
     categoryCardSize: 'sm',
@@ -199,11 +215,15 @@ export const TEMPLATE_IDENTITIES: Record<Exclude<TemplateId, 'elegant'>, Templat
     frameSize: 'comfortable',
     cardGap: 'normal',
     desktopColumns: 3,
-    mobileColumns: 2,
+    mobileColumns: 3,
     cardShape: 'soft',
     productAspect: 'portrait',
     productImageAspect: '3:4',
+    categoryShape: 'circle',
+    categoryCaption: 'below',
+    categoryShowFrame: false,
   },
+  // Minimal — stark catalog: bare SQUARE tiles, no frame, caption below.
   minimal: {
     productCardSize: 'sm',
     categoryCardSize: 'xs',
@@ -211,14 +231,18 @@ export const TEMPLATE_IDENTITIES: Record<Exclude<TemplateId, 'elegant'>, Templat
     frameSize: 'spacious',
     cardGap: 'loose',
     desktopColumns: 4,
-    mobileColumns: 2,
+    mobileColumns: 3,
     cardShape: 'square',
     productAspect: 'square',
     productImageAspect: '1:1',
+    categoryShape: 'square',
+    categoryCaption: 'below',
+    categoryShowFrame: false,
   },
+  // Bold — editorial poster: large 2-up tiles, caption OVERLAY on the image.
   bold: {
     productCardSize: 'lg',
-    categoryCardSize: 'md',
+    categoryCardSize: 'lg',
     frameWidth: 'thick',
     frameSize: 'compact',
     cardGap: 'tight',
@@ -227,6 +251,9 @@ export const TEMPLATE_IDENTITIES: Record<Exclude<TemplateId, 'elegant'>, Templat
     cardShape: 'rounded-square',
     productAspect: 'square',
     productImageAspect: '1:1',
+    categoryShape: 'rounded-square',
+    categoryCaption: 'overlay',
+    categoryShowFrame: false,
   },
 };
 

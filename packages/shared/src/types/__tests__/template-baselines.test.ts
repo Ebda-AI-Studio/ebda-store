@@ -58,6 +58,9 @@ const boldIdentity: TemplateIdentity = {
   cardShape: 'rounded-square',
   productAspect: 'square',
   productImageAspect: '1:1',
+  categoryShape: 'rounded-square',
+  categoryCaption: 'overlay',
+  categoryShowFrame: false,
 };
 
 describe('buildTemplateBaseline', () => {
@@ -71,6 +74,15 @@ describe('buildTemplateBaseline', () => {
     expect(b.newArrivals.cardFrameWidth).toBe('thick');
     expect(b.newArrivals.cardAspect).toBe('square');
     expect(b.sizing.productImageAspect).toBe('1:1');
+  });
+
+  it('applies category identity (shape/caption/frame) separately from product shape', () => {
+    const b = buildTemplateBaseline(boldIdentity);
+    expect(b.categories.captionPosition).toBe('overlay');
+    expect(b.categories.showCardFrame).toBe(false);
+    // category shape is independent of the product cardShape
+    expect(b.categories.cardShape).toBe('rounded-square');
+    expect(b.newArrivals.cardShape).toBe('rounded-square');
   });
 
   it('does not mutate BASE_BRANDED_LAYOUT', () => {

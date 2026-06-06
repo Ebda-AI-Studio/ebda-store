@@ -28,45 +28,43 @@
  */
 
 import { PrismaClient, type StoreTemplate } from '@prisma/client';
-import { TEMPLATE_LAYOUT_BASELINES } from '@force/shared';
 
 const prisma = new PrismaClient();
 
 /**
- * Build a demo store's layout: the per-template baseline (STYLE — sizes,
- * frames, columns, section colors, typography) with the source store's CONTENT
- * (hero slides + category copy) injected on top. Without real hero slides the
- * storefront falls through to the deprecated legacy <Hero> (which renders a
- * cropped, boxed image in some templates — the classic-demo bug), so demos MUST
- * carry slides to render the proper full-bleed HeroSlider. Section copy makes
- * the homepage read as a real store instead of a bare shell.
+ * Build a demo store's layout: ONLY the source store's CONTENT (hero slides +
+ * category copy). Everything else (sizes, frames, columns, shapes, captions,
+ * section colors, typography) is left UNSET so the demo INHERITS its template's
+ * baseline live via `resolveLayoutSettings(saved, template)`.
+ *
+ * Why content-only (2026-06-06): if the demo stored the full baseline, later
+ * baseline tweaks (e.g. amplified per-template category styling) wouldn't reach
+ * the demo without a full catalog reseed. Storing only content lets every
+ * future baseline change apply to the demos with zero reseed. The hero MUST
+ * still carry real slides — without them the storefront falls through to the
+ * deprecated legacy <Hero> (cropped/boxed image in some templates).
+ *
+ * `template` is unused now but kept for signature stability / future use.
  */
-function buildDemoLayout(sourceLayout: unknown, template: StoreTemplate): Record<string, unknown> {
-  const base =
-    (TEMPLATE_LAYOUT_BASELINES as Record<string, Record<string, unknown>>)[template] ?? {};
+function buildDemoLayout(sourceLayout: unknown, _template: StoreTemplate): Record<string, unknown> {
   const src = (sourceLayout && typeof sourceLayout === 'object' ? sourceLayout : {}) as Record<
     string,
     Record<string, unknown>
   >;
-  const baseHero = (base.hero ?? {}) as Record<string, unknown>;
-  const baseCats = (base.categories ?? {}) as Record<string, unknown>;
   const srcHero = (src.hero ?? {}) as Record<string, unknown>;
   const srcCats = (src.categories ?? {}) as Record<string, unknown>;
-  return {
-    ...base,
-    // Inject CONTENT (slides) onto the template's hero STYLE → real full-bleed banner.
-    hero: { ...baseHero, slides: srcHero.slides ?? [] },
-    // Inject category heading copy onto the template's categories STYLE.
-    categories: {
-      ...baseCats,
-      title: srcCats.title,
-      titleAr: srcCats.titleAr,
-      subtitle: srcCats.subtitle,
-      subtitleAr: srcCats.subtitleAr,
-      kicker: srcCats.kicker,
-      kickerAr: srcCats.kickerAr,
-    },
-  };
+  const layout: Record<string, unknown> = {};
+  // Hero content (slides) only — style inherited from the template baseline.
+  if (Array.isArray(srcHero.slides) && srcHero.slides.length > 0) {
+    layout.hero = { slides: srcHero.slides };
+  }
+  // Category heading copy only — shape/columns/caption inherited from baseline.
+  const catCopy: Record<string, unknown> = {};
+  for (const k of ['title', 'titleAr', 'subtitle', 'subtitleAr', 'kicker', 'kickerAr'] as const) {
+    if (srcCats[k] != null) catCopy[k] = srcCats[k];
+  }
+  if (Object.keys(catCopy).length > 0) layout.categories = catCopy;
+  return layout;
 }
 
 const IS_CLEANUP = process.argv.includes('--cleanup');
