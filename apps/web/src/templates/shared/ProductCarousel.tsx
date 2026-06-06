@@ -20,7 +20,7 @@ import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { getProductCardTextSizes, resolveColor } from '@force/shared';
 import type { ProductCarouselProps } from '../types';
-import { responsiveFontSize } from './section-typography';
+import { responsiveFontSize, guardedCtaColor } from './section-typography';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -473,11 +473,19 @@ export function ProductCarousel({
                         so all three CTA variants (View / OOS / Add to cart)
                         reflect the merchant's productCta typography override. */}
                     {(() => {
+                      // Contrast-guard the CTA color against the button's own bg so a
+                      // baseline/zone color (e.g. token:foreground) can't render
+                      // dark-on-dark on a filled button. See guardedCtaColor.
                       const ctaStyle: React.CSSProperties = {
                         fontFamily: productCtaZone?.fontFamily,
                         fontSize: responsiveFontSize(productCtaZone?.fontSize),
                         fontWeight: productCtaZone?.fontWeight,
-                        color: productCtaZone?.color,
+                        color: guardedCtaColor(
+                          productCtaZone?.color,
+                          styles.productCardCta,
+                          store.theme,
+                          sectionBgColor
+                        ),
                         letterSpacing: productCtaZone?.letterSpacing,
                         lineHeight: productCtaZone?.lineHeight,
                         textTransform:

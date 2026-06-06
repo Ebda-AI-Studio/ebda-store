@@ -19,7 +19,7 @@ import {
   cardShapeClasses,
 } from './card-size';
 import { productCardPropsEqual } from './product-card-memo';
-import { responsiveFontSize } from './section-typography';
+import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
@@ -350,7 +350,7 @@ function PecannbeeProductCardImpl({
               fontFamily: productCtaZone?.fontFamily,
               fontSize: responsiveFontSize(productCtaZone?.fontSize),
               fontWeight: productCtaZone?.fontWeight,
-              color: productCtaZone?.color,
+              color: guardedCtaColor(productCtaZone?.color, styles.productCardCta, store.theme),
               letterSpacing: productCtaZone?.letterSpacing,
               lineHeight: productCtaZone?.lineHeight,
               textTransform: productCtaZone?.textTransform as React.CSSProperties['textTransform'],
@@ -369,7 +369,7 @@ function PecannbeeProductCardImpl({
               fontFamily: productCtaZone?.fontFamily,
               fontSize: responsiveFontSize(productCtaZone?.fontSize),
               fontWeight: productCtaZone?.fontWeight,
-              color: productCtaZone?.color,
+              color: guardedCtaColor(productCtaZone?.color, styles.productCardCta, store.theme),
               letterSpacing: productCtaZone?.letterSpacing,
               lineHeight: productCtaZone?.lineHeight,
               textTransform: productCtaZone?.textTransform as React.CSSProperties['textTransform'],

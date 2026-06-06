@@ -91,6 +91,46 @@ export function resolveSectionZone(
 }
 
 /**
+ * The product-card CTA ("Add to cart" / "View") text color, contrast-guarded
+ * against the BUTTON's own background (2026-06-06).
+ *
+ * Each pack's `productCardCta` class sets the button background (classic/bold →
+ * `bg-foreground`, modern → `bg-primary`, minimal/elegant → `bg-transparent`)
+ * AND a matching readable `text-*` color. But an inline productCta zone color
+ * overrides that text color — so a color tuned elsewhere (e.g. the baseline
+ * `token:foreground`) renders dark-on-dark on a filled dark button.
+ *
+ * This returns the zone color when it reads ≥3:1 against the button bg (so a
+ * deliberate, readable pick — including wadyaljuz's — is kept), and `undefined`
+ * when it fails, letting the pack's designed `text-*` class win. When the button
+ * bg is transparent/unknown it guards against the section bg instead and, if
+ * still unreadable, returns a guaranteed-readable foreground.
+ *
+ * @param zoneColor  already-resolved color from `resolveSectionZone` (or undefined)
+ * @param packCtaClass the pack's `productCardCta` class string
+ */
+export function guardedCtaColor(
+  zoneColor: string | undefined,
+  packCtaClass: string,
+  theme: StoreTheme,
+  sectionBgColor?: string
+): string | undefined {
+  if (!zoneColor) return undefined;
+  const m = packCtaClass.match(
+    /\bbg-(primary|foreground|secondary|accent|card|muted|background)\b/
+  );
+  const bg = m
+    ? resolveColor(`token:${m[1]}`, theme)
+    : sectionBgColor
+      ? resolveColor(sectionBgColor, theme)
+      : undefined;
+  if (bg && contrastRatio(bg, zoneColor) < 3) {
+    return m ? undefined : (pickReadableForeground(bg) ?? undefined);
+  }
+  return zoneColor;
+}
+
+/**
  * Wrap a merchant-set px fontSize with a responsive `clamp()` so it scales
  * gracefully on narrow mobile. Mobile floor = max(70% of merchant value, 14px).
  * At ≥768px viewport, renders at the merchant value. Linear interp in between.
