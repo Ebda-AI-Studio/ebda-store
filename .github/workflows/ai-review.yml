@@ -9,21 +9,34 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
   ai-review:
     name: Claude PR review
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          # Checkout (and therefore the auto-fix push) uses the PAT when present,
+          # so the fix commit RE-TRIGGERS CI + a fresh review. Falls back to the
+          # default token (no re-trigger; auto-fix stays dormant) when unset.
+          token: ${{ secrets.AI_FIX_PAT || secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Detect prior auto-fix on HEAD (loop guard)
+        id: head
+        run: |
+          if git log -1 --pretty=%s | grep -q '\[ai-fix\]'; then
+            echo "is_ai_fix=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_ai_fix=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Build review input (instructions + diff)
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -54,11 +67,36 @@ jobs:
             --allowedTools "Read,Grep,Glob" \
             < /tmp/review-input.md > /tmp/claude-out.json
           cat /tmp/claude-out.json
-      - name: Parse, comment, gate
+      - name: Parse, comment, decide
+        id: review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           CLAUDE_OUTPUT: /tmp/claude-out.json
+          AI_FIX_ENABLED: ${{ secrets.AI_FIX_PAT != '' }}
+          HEAD_IS_AI_FIX: ${{ steps.head.outputs.is_ai_fix }}
         run: node .github/ai-review/review.mjs
+      - name: AI auto-fix critical findings (push re-triggers review)
+        if: steps.review.outputs.should_fix == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "force-ai-reviewer"
+          git config user.email "ahmed0montaser@gmail.com"
+          FINDINGS="$(cat /tmp/ai-fix-findings.json)"
+          claude -p "You are fixing ONLY these critical findings from a pull-request review. Make the minimal, correct change in the named files. Do NOT refactor or touch unrelated code. Do NOT weaken or delete tests to hide the issue. Findings JSON:
+          $FINDINGS" \
+            --allowedTools "Read,Grep,Glob,Edit,Write" \
+            --model claude-opus-4-8 \
+            --output-format json > /tmp/fix-out.json || true
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Auto-fix produced no changes — leaving the PR red for human review."
+            exit 1
+          fi
+          git add -A
+          git commit -m "fix: address AI-review critical findings [ai-fix]"
+          git push origin HEAD:"$PR_HEAD_REF"
+          echo "Auto-fix pushed; a fresh review run will validate it."

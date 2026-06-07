@@ -1,8 +1,12 @@
 // Consumes headless `claude -p --output-format json` output, parses the strict
-// finding contract, posts inline PR comments, exits 1 only on a critical finding.
+// finding contract, posts inline PR comments, then decides the gate:
+//   - no criticals                 -> exit 0 (pass)
+//   - criticals + auto-fix enabled -> stage findings + set should_fix, exit 0
+//                                     (a later workflow step pushes the fix)
+//   - criticals + cannot auto-fix  -> exit 1 (block for human)
 // Fails OPEN (exit 0) on every infra/parse/network error so a flaky run never
 // falsely blocks a merge.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 
 const {
   GITHUB_TOKEN,
@@ -10,6 +14,9 @@ const {
   PR_NUMBER,
   HEAD_SHA,
   CLAUDE_OUTPUT = '/tmp/claude-out.json',
+  AI_FIX_ENABLED = 'false', // 'true' only when the AI_FIX_PAT secret is present
+  HEAD_IS_AI_FIX = 'false', // 'true' when HEAD is already an [ai-fix] commit
+  GITHUB_OUTPUT,
 } = process.env;
 
 if (!GITHUB_TOKEN) {
@@ -18,7 +25,7 @@ if (!GITHUB_TOKEN) {
 }
 const repoParts = (GITHUB_REPOSITORY || '').split('/');
 if (repoParts.length !== 2) {
-  console.error('GITHUB_REPOSITORY missing/malformed — skipping review (fail-open).');
+  console.error('GITHUB_REPOSITORY missing/malformed — skipping (fail-open).');
   process.exit(0);
 }
 const [owner, repo] = repoParts;
@@ -71,57 +78,76 @@ async function gh(method, path, body) {
   return r;
 }
 
-const SEV_EMOJI = { critical: '🔴', warning: '🟡', info: '🔵' };
+const SEV = { critical: '🔴', warning: '🟡', info: '🔵' };
 const comments = findings
   .filter((f) => f.file && f.line)
   .map((f) => ({
     path: f.file,
     line: f.line,
     side: 'RIGHT',
-    body: `${SEV_EMOJI[f.severity] || ''} **${String(f.severity).toUpperCase()} · ${f.category}** (Claude)\n\n${f.comment}`,
+    body: `${SEV[f.severity] || ''} **${String(f.severity).toUpperCase()} · ${f.category}** (Claude)\n\n${f.comment}`,
   }));
-
-const findingsList = findings
+const list = findings
   .map(
     (f) =>
-      `- ${SEV_EMOJI[f.severity] || ''} **${String(f.severity).toUpperCase()}** \`${f.file || '?'}:${f.line || '?'}\` (${f.category}) — ${f.comment}`
+      `- ${SEV[f.severity] || ''} **${String(f.severity).toUpperCase()}** \`${f.file || '?'}:${f.line || '?'}\` (${f.category}) — ${f.comment}`
   )
   .join('\n');
 
-const summaryBody =
+const willFix =
+  critical.length > 0 && AI_FIX_ENABLED === 'true' && HEAD_IS_AI_FIX !== 'true';
+
+const summary =
   `### 🤖 Claude PR review\n\n${result.summary || ''}\n\n` +
   `- 🔴 critical: ${critical.length}\n` +
   `- 🟡 warning: ${findings.filter((f) => f.severity === 'warning').length}\n` +
   `- 🔵 info: ${findings.filter((f) => f.severity === 'info').length}\n\n` +
   (critical.length
-    ? '**Blocked until the critical findings are resolved or explicitly waived.**'
+    ? willFix
+      ? '**Critical findings detected — pushing an automated fix; a fresh review will validate it.**'
+      : HEAD_IS_AI_FIX === 'true'
+        ? '**Critical findings remain after an automated fix — blocked for human review.**'
+        : '**Blocked until the critical findings are resolved or explicitly waived.**'
     : 'No critical findings — warnings/info are advisory only.');
 
-// Inline review must reference the head commit. If a line isn't in the diff,
-// GitHub 422s the whole review → fall back to a plain issue comment that still
-// lists every finding so nothing is lost. All network/API errors fail-open.
 try {
-  const reviewResp = await gh(
+  const rv = await gh(
     'POST',
     `/repos/${owner}/${repo}/pulls/${PR_NUMBER}/reviews`,
-    { commit_id: HEAD_SHA, event: 'COMMENT', body: summaryBody, comments }
+    { commit_id: HEAD_SHA, event: 'COMMENT', body: summary, comments }
   );
-  if (!reviewResp.ok) {
+  if (!rv.ok) {
     await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, {
       body:
-        summaryBody +
-        (findingsList
-          ? `\n\n_(inline anchoring failed; findings listed below)_\n\n${findingsList}`
-          : ''),
+        summary +
+        (list ? `\n\n_(inline anchoring failed; findings below)_\n\n${list}` : ''),
     });
   }
 } catch (e) {
   console.error('GitHub API call failed (non-fatal, fail-open):', e.message);
 }
 
-// 4. Gate
-if (critical.length > 0) {
-  console.error(`${critical.length} critical finding(s) — failing the check.`);
-  process.exit(1);
+// 4. Gate / hand-off
+if (critical.length === 0) {
+  console.log('AI review passed (no critical findings).');
+  process.exit(0);
 }
-console.log('AI review passed (no critical findings).');
+
+if (willFix) {
+  try {
+    writeFileSync('/tmp/ai-fix-findings.json', JSON.stringify(critical, null, 2));
+    if (GITHUB_OUTPUT) appendFileSync(GITHUB_OUTPUT, 'should_fix=true\n');
+    console.log(
+      `${critical.length} critical finding(s) — handing off to the auto-fix step.`
+    );
+    process.exit(0);
+  } catch (e) {
+    console.error('Could not stage auto-fix hand-off:', e.message);
+    process.exit(1);
+  }
+}
+
+console.error(
+  `${critical.length} critical finding(s) — blocking (auto-fix disabled or already attempted on this HEAD).`
+);
+process.exit(1);
