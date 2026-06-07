@@ -144,9 +144,10 @@ describe('fillProductFields', () => {
   it('hand-back-to-AI: clearing the lock lets a single field regenerate', async () => {
     // Simulate the reset-field endpoint: drop value + provenance, then refill
     // only that field.
+    // Ensure product has a name for translation to work from
     await prisma.product.update({
       where: { id: productId },
-      data: { nameAr: null, aiFieldSources: {} },
+      data: { name: 'Blue Ceramic Mug', nameAr: null, aiFieldSources: {} },
     });
 
     await fillProductFields(storeId, productId, { op: 'create', onlyFields: ['nameAr'] });
