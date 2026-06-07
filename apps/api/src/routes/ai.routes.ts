@@ -16,6 +16,8 @@ import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
 import { generateProductFaqs } from '../lib/ai/product-faq-generator';
 import { prisma } from '@force/database';
+import { AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
+import { fillProductFields } from '../services/ai-autofill.service';
 
 const router = Router({ mergeParams: true });
 
@@ -1651,5 +1653,57 @@ router.get('/results/meta-aeo', async (req: Request, res: Response, next: NextFu
     next(e);
   }
 });
+
+// =====================================================================
+// AI-first autofill — hand a single field BACK to the AI.
+// POST /stores/:storeId/ai/products/:productId/ai/reset-field
+// Clears the field + its provenance lock, then regenerates ONLY that
+// field via the autofill core. Used by the admin product editor's
+// "✨ Switch to AI" button next to each human-owned AI-writable field.
+// =====================================================================
+
+router.post(
+  '/products/:productId/ai/reset-field',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId } = req.params;
+      const { field } = req.body as { field?: string };
+      if (!field || !AI_AUTOFILL_FIELD_NAMES.includes(field)) {
+        res.status(400).json({ success: false, error: { code: 'BAD_FIELD' } });
+        return;
+      }
+
+      const product = await prisma.product.findFirst({ where: { id: productId, storeId } });
+      if (!product) {
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
+        return;
+      }
+
+      // Drop the provenance lock for this field + clear the value, so the
+      // autofill core treats it as an empty gap and regenerates it.
+      const sources = { ...((product.aiFieldSources as Record<string, string>) ?? {}) };
+      delete sources[field];
+      await prisma.product.update({
+        where: { id: productId, storeId },
+        data: { [field]: null, aiFieldSources: sources },
+      });
+
+      await fillProductFields(storeId, productId, { op: 'create', onlyFields: [field] });
+
+      const updated = await prisma.product.findFirst({ where: { id: productId, storeId } });
+      res.json({
+        success: true,
+        data: {
+          field,
+          value: (updated as Record<string, unknown> | null)?.[field] ?? null,
+          source: 'ai',
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 export default router;

@@ -36,6 +36,9 @@ import { accountingProfitAnomalyCron } from './accounting-profit-anomaly';
 import { accountingExpenseOcrProcess } from './accounting-expense-ocr-process';
 import { analyticsDailyRollupCron, analyticsRollupOnDemand } from './analytics-daily-rollup';
 import { productMetaSyncFn, productMetaSyncDeleteFn } from './product-meta-sync';
+import { aiAutofillProduct } from './ai-autofill-product';
+import { aiAutofillCleanup } from './ai-autofill-cleanup';
+import { aiAutofillSweep } from './ai-autofill-sweep';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -88,4 +91,10 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // Phase A: product → Meta Catalog sync (native catalog bot)
   productMetaSyncFn,
   productMetaSyncDeleteFn,
+  // AI-first autofill: fills product fields + kicks recommendations on create
+  aiAutofillProduct,
+  // AI-first autofill: purges recommendation graph rows on product delete
+  aiAutofillCleanup,
+  // AI-first autofill: 3-day leader-locked catalogue sweep with order-driven recos
+  aiAutofillSweep,
 ];

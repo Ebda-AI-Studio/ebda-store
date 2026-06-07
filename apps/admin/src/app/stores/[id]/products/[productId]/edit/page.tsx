@@ -22,6 +22,7 @@ import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPost, apiPut } from '../../../../../../lib/api';
 import { EditSidebar } from './_components/EditSidebar';
 import { ProductFaqSection } from './_components/ProductFaqSection';
+import { AiFieldBadge } from './_components/AiFieldBadge';
 
 interface Product {
   id: string;
@@ -46,6 +47,8 @@ interface Product {
   categories: { categoryId: string; category: { id: string; name: string } }[];
   images: { id: string; url: string; alt?: string; position: number }[];
   store: { id: string; name: string; slug: string };
+  /** AI-first autofill provenance map over the AI-writable fields. */
+  aiFieldSources?: Record<string, 'ai' | 'human'>;
 }
 
 interface Category {
@@ -65,6 +68,10 @@ export default function EditProductPage() {
   const tStatusOptions = useT('products.edit.statusOptions');
 
   const [product, setProduct] = useState<Product | null>(null);
+  // Local mirror of the product's AI-provenance map. Kept in state so the
+  // "✨ Switch to AI" hand-back flips a field's chip to "✨ AI" live without
+  // a reload.
+  const [aiSources, setAiSources] = useState<Record<string, 'ai' | 'human'>>({});
   const [categories, setCategories] = useState<Category[]>([]);
   /** Template of the store — used to show per-theme recommended upload sizes. */
   const [storeTemplate, setStoreTemplate] = useState<TemplateId | undefined>();
@@ -166,6 +173,7 @@ export default function EditProductPage() {
           return;
         }
         setProduct(p);
+        setAiSources(((p as Product).aiFieldSources as Record<string, 'ai' | 'human'>) ?? {});
 
         if (p.images?.length) {
           setImages(
@@ -236,6 +244,14 @@ export default function EditProductPage() {
 
   const updateField = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Hand-back-to-AI callback: the API has already regenerated + saved the
+  // field, so write the fresh value into the form and flip its provenance
+  // chip to "✨ AI" locally.
+  const handleAiReset = (field: string, value: string | null) => {
+    updateField(field, value ?? '');
+    setAiSources(prev => ({ ...prev, [field]: 'ai' }));
   };
 
   async function generateSeo(mode: 'fill-empty' | 'overwrite') {
@@ -509,14 +525,25 @@ export default function EditProductPage() {
                   placeholder={tFields('namePlaceholder')}
                   required
                 />
-                <Input
-                  label={tFields('nameAr')}
-                  value={formData.nameAr}
-                  onChange={e => updateField('nameAr', e.target.value)}
-                  placeholder={tFields('nameArPlaceholder')}
-                  lang="ar"
-                  dir="rtl"
-                />
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldBadge
+                      field="nameAr"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <Input
+                    label={tFields('nameAr')}
+                    value={formData.nameAr}
+                    onChange={e => updateField('nameAr', e.target.value)}
+                    placeholder={tFields('nameArPlaceholder')}
+                    lang="ar"
+                    dir="rtl"
+                  />
+                </div>
                 <Textarea
                   label={tFields('description')}
                   value={formData.description}
@@ -524,15 +551,26 @@ export default function EditProductPage() {
                   placeholder={tFields('descriptionPlaceholder')}
                   rows={4}
                 />
-                <Textarea
-                  label={tFields('descriptionAr')}
-                  value={formData.descriptionAr}
-                  onChange={e => updateField('descriptionAr', e.target.value)}
-                  placeholder={tFields('descriptionArPlaceholder')}
-                  rows={4}
-                  lang="ar"
-                  dir="rtl"
-                />
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldBadge
+                      field="descriptionAr"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <Textarea
+                    label={tFields('descriptionAr')}
+                    value={formData.descriptionAr}
+                    onChange={e => updateField('descriptionAr', e.target.value)}
+                    placeholder={tFields('descriptionArPlaceholder')}
+                    rows={4}
+                    lang="ar"
+                    dir="rtl"
+                  />
+                </div>
               </div>
             </div>
 
@@ -744,36 +782,80 @@ export default function EditProductPage() {
               </div>
               {seoMessage && <p className="mb-3 text-xs text-muted-foreground">{seoMessage}</p>}
               <div className="grid gap-4 sm:grid-cols-2">
-                <Input
-                  label={`Meta title (${formData.metaTitle.length}/60)`}
-                  value={formData.metaTitle}
-                  onChange={e => updateField('metaTitle', e.target.value)}
-                  maxLength={70}
-                />
-                <Input
-                  label={`Meta title AR (${formData.metaTitleAr.length}/60)`}
-                  value={formData.metaTitleAr}
-                  onChange={e => updateField('metaTitleAr', e.target.value)}
-                  maxLength={70}
-                  lang="ar"
-                  dir="rtl"
-                />
-                <Textarea
-                  label={`Meta description (${formData.metaDescription.length}/160)`}
-                  value={formData.metaDescription}
-                  onChange={e => updateField('metaDescription', e.target.value)}
-                  maxLength={180}
-                  rows={3}
-                />
-                <Textarea
-                  label={`Meta description AR (${formData.metaDescriptionAr.length}/160)`}
-                  value={formData.metaDescriptionAr}
-                  onChange={e => updateField('metaDescriptionAr', e.target.value)}
-                  maxLength={180}
-                  rows={3}
-                  lang="ar"
-                  dir="rtl"
-                />
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldBadge
+                      field="metaTitle"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <Input
+                    label={`Meta title (${formData.metaTitle.length}/60)`}
+                    value={formData.metaTitle}
+                    onChange={e => updateField('metaTitle', e.target.value)}
+                    maxLength={70}
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldBadge
+                      field="metaTitleAr"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <Input
+                    label={`Meta title AR (${formData.metaTitleAr.length}/60)`}
+                    value={formData.metaTitleAr}
+                    onChange={e => updateField('metaTitleAr', e.target.value)}
+                    maxLength={70}
+                    lang="ar"
+                    dir="rtl"
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldBadge
+                      field="metaDescription"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <Textarea
+                    label={`Meta description (${formData.metaDescription.length}/160)`}
+                    value={formData.metaDescription}
+                    onChange={e => updateField('metaDescription', e.target.value)}
+                    maxLength={180}
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldBadge
+                      field="metaDescriptionAr"
+                      sources={aiSources}
+                      storeId={storeId}
+                      productId={product?.id}
+                      onReset={handleAiReset}
+                    />
+                  </div>
+                  <Textarea
+                    label={`Meta description AR (${formData.metaDescriptionAr.length}/160)`}
+                    value={formData.metaDescriptionAr}
+                    onChange={e => updateField('metaDescriptionAr', e.target.value)}
+                    maxLength={180}
+                    rows={3}
+                    lang="ar"
+                    dir="rtl"
+                  />
+                </div>
               </div>
               <div className="col-span-2 border-t border-border pt-4 mt-1">
                 <p className="text-xs text-muted-foreground mb-3">

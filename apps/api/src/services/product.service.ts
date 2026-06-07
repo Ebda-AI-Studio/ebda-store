@@ -1,11 +1,12 @@
 import { prisma, Prisma, ProductStatus, OrderStatus, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
-import { slugify } from '@force/shared';
+import { slugify, AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { inngest } from '../lib/inngest/client';
+import { stampHumanEdits } from './ai-autofill.service';
 
 /**
  * Compute availability flags for a product (and its variants) based on
@@ -332,11 +333,17 @@ export class ProductService {
       slug = `${baseSlug}-${suffix}`;
     }
 
+    // Any AI-writable field the merchant filled in AT CREATE TIME is their own
+    // — stamp it 'human' so the autofill engine never overwrites it. Fields
+    // left empty get no entry and remain fillable by the engine.
+    const aiFieldSources = stampHumanEdits({}, {}, data as unknown as Record<string, unknown>);
+
     const product = await prisma.product.create({
       data: {
         storeId,
         name: data.name,
         nameAr: data.nameAr,
+        aiFieldSources,
         slug,
         description: data.description,
         descriptionAr: data.descriptionAr,
@@ -384,7 +391,10 @@ export class ProductService {
     // Fire product.upserted for Meta Catalog sync (Phase A — native catalog bot).
     // Fire-and-forget: catalog sync failure must never block the product save.
     void inngest
-      .send({ name: 'product.upserted' as any, data: { storeId, productId: product.id } })
+      .send({
+        name: 'product.upserted' as any,
+        data: { storeId, productId: product.id, op: 'create', changedFields: [] },
+      })
       .catch(err =>
         logger.warn({ err, productId: product.id }, '[product.create] inngest send failed')
       );
@@ -417,6 +427,26 @@ export class ProductService {
     // what disappeared.
     const previousImageUrls = product.images?.map(i => i.url) ?? [];
     const nextImageUrls = data.images?.map(i => i.url) ?? previousImageUrls;
+
+    // Which fields relevant to AI autofill changed in this PATCH? Include BOTH
+    // the AI-writable fields themselves AND their English source fields
+    // (`name`/`description`) — when a merchant renames a product the derived
+    // Arabic/SEO fields must refresh, and that's keyed off the source changing,
+    // not the derived field. Omitting the sources left the refresh path dead.
+    const autofillRelevantFields = [...AI_AUTOFILL_FIELD_NAMES, 'name', 'description'];
+    const changedFields = autofillRelevantFields.filter(
+      f =>
+        f in (data as Record<string, unknown>) &&
+        ((data as Record<string, unknown>)[f] ?? '') !==
+          ((product as Record<string, unknown>)[f] ?? '')
+    );
+    // Stamp human ownership on the fields they changed so the AI engine never
+    // overwrites them.
+    const nextSources = stampHumanEdits(
+      (product.aiFieldSources as Record<string, 'ai' | 'human'>) ?? {},
+      product as Record<string, unknown>,
+      data as Record<string, unknown>
+    );
 
     // Wrap image/category replacement and product update in a transaction
     // so that a failure mid-way does not leave orphaned or missing relations.
@@ -492,6 +522,7 @@ export class ProductService {
           ...(data.metaDescriptionAeoAr !== undefined
             ? { metaDescriptionAeoAr: data.metaDescriptionAeoAr }
             : {}),
+          aiFieldSources: nextSources,
         },
         include: {
           images: { orderBy: { position: 'asc' } },
@@ -504,7 +535,10 @@ export class ProductService {
 
     // Fire product.upserted for Meta Catalog sync. Fire-and-forget.
     void inngest
-      .send({ name: 'product.upserted' as any, data: { storeId, productId } })
+      .send({
+        name: 'product.upserted' as any,
+        data: { storeId, productId, op: 'update', changedFields },
+      })
       .catch(err => logger.warn({ err, productId }, '[product.update] inngest send failed'));
 
     // Fire-and-forget R2 cleanup for any image URL that disappeared

@@ -78,6 +78,49 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
   );
 }
 
+/**
+ * Fetches the store theme and surfaces the aiAutopilot flag as a small
+ * status chip on the Branding card. aiAutopilot defaults ON (undefined = ON),
+ * so the chip reflects the active state without requiring a separate API call
+ * — it piggybacks on the same /api/v1/stores/:id endpoint that useBranding uses.
+ */
+function AiAutopilotChip({ storeId }: { storeId: string }) {
+  const [autopilot, setAutopilot] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!storeId) return;
+    apiGet<{ store: { theme?: Record<string, unknown> } }>(`/api/v1/stores/${storeId}`)
+      .then(({ data }) => {
+        if (data?.store) {
+          // Default ON: undefined means ON per the aiAutopilot feature contract
+          setAutopilot(data.store.theme?.aiAutopilot !== false);
+        }
+      })
+      .catch(() => {
+        // Silent — chip won't render on error
+      });
+  }, [storeId]);
+
+  if (autopilot === null) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      <span
+        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+          autopilot
+            ? 'bg-primary/5 text-primary border-primary/20 dark:bg-primary/10 dark:border-primary/30'
+            : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+        }`}
+      >
+        ✨ AI Autopilot: <strong>{autopilot ? 'ON' : 'OFF'}</strong>
+        <span className="sr-only" dir="rtl">
+          {autopilot ? 'الطيار الذكي: تشغيل' : 'الطيار الذكي: إيقاف'}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 interface SettingsCard {
   /** Translation key under `settings.cards` (e.g. `branding`). */
   key: string;
@@ -430,6 +473,7 @@ export default function StoreSettingsPage() {
                     <p className="mt-1 text-sm text-muted-foreground leading-snug">
                       {tCards(`${card.key}.description`)}
                     </p>
+                    {card.key === 'branding' && <AiAutopilotChip storeId={storeId} />}
                     {card.key === 'whatsapp' && <WhatsAppStatusInline storeId={storeId} />}
                   </div>
                 </Link>

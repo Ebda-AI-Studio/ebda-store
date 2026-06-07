@@ -21,6 +21,10 @@ export * from './image-standards';
 // `Store.settings.floatingWidget`).
 export * from './floating-widget';
 
+// AI autofill field registry — which Product fields the engine manages,
+// their source dependencies, and provenance helpers.
+export * from './ai-autofill';
+
 // API Response Types
 export interface ApiResponse<T = unknown> {
   success: boolean;

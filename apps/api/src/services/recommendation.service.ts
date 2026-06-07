@@ -522,6 +522,12 @@ class RecommendationService {
     await redis.delete(`recommendations:product:${storeId}:${productId}`);
   }
 
+  // Public wrapper so Inngest cleanup functions can invalidate a product's
+  // recommendation cache without accessing the private method directly.
+  async invalidateProductCache(storeId: string, productId: string) {
+    await this.invalidateCache(storeId, productId);
+  }
+
   private async invalidateStoreCache(storeId: string) {
     // Best-effort: individual product caches expire within 5 min anyway.
     // If Redis client is available, use scan to remove all matching keys.
