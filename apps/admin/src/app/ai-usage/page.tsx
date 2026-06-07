@@ -144,14 +144,18 @@ function PlatformAiUsagePageInner() {
   const fetchData = useCallback(async () => {
     setError(false);
     try {
-      const { data: payload, error: apiError } = await apiGet<{ data: SummaryResponse }>(
+      // apiGet already unwraps the API's `{ success, data }` envelope, so
+      // `payload` IS the SummaryResponse — do NOT read `payload.data` (that
+      // double-unwrap was always undefined → the page showed "Failed to load"
+      // on every successful response).
+      const { data: payload, error: apiError } = await apiGet<SummaryResponse>(
         '/api/v1/admin/super-admin/ai-usage/summary'
       );
-      if (apiError || !payload?.data) {
+      if (apiError || !payload) {
         setError(true);
         return;
       }
-      setData(payload.data);
+      setData(payload);
     } catch {
       setError(true);
     } finally {

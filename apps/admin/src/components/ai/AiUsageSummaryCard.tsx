@@ -143,14 +143,17 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
     if (!storeId) return;
     setError(false);
     try {
-      const { data, error: apiError } = await apiGet<{ data: AiUsageSummary }>(
+      // apiGet already unwraps the API's `{ success, data }` envelope, so
+      // `data` IS the AiUsageSummary — reading `data.data` double-unwrapped to
+      // undefined and forced the error state on every successful response.
+      const { data, error: apiError } = await apiGet<AiUsageSummary>(
         `/api/v1/stores/${storeId}/ai/usage/summary`
       );
-      if (apiError || !data?.data) {
+      if (apiError || !data) {
         setError(true);
         return;
       }
-      setSummary(data.data);
+      setSummary(data);
     } catch {
       setError(true);
     } finally {
