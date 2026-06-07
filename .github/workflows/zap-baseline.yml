@@ -1,0 +1,38 @@
+name: ZAP Baseline DAST
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'URL to scan (defaults to repo ZAP_TARGET var)'
+        required: false
+        type: string
+      force_cloud:
+        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  zap:
+    name: ZAP baseline
+    # Stays dormant until a ZAP_TARGET repo variable (or dispatch input) is set,
+    # so scheduled runs don't fail before a staging/preview URL is configured.
+    if: ${{ github.event.inputs.target != '' || vars.ZAP_TARGET != '' }}
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: ${{ github.event.inputs.target || vars.ZAP_TARGET }}
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -I'
+          allow_issue_writing: true
+          fail_action: true

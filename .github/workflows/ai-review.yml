@@ -1,0 +1,64 @@
+name: AI Review
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ai-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    name: Claude PR review
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build review input (instructions + diff)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          {
+            cat .github/ai-review/prompt.md
+            echo
+            echo "PR unified diff follows. Review per the contract above and respond with ONLY the JSON object."
+            echo
+            git diff "$BASE_SHA...$HEAD_SHA" -- . \
+              ':(exclude)**/package-lock.json' ':(exclude)**/*.lock' \
+              ':(exclude)**/dist/**' ':(exclude)**/.next/**' ':(exclude)**/*.snap' \
+              | python3 -c "import sys; d=sys.stdin.buffer.read(200000); i=d.rfind(b'\n'); sys.stdout.buffer.write(d if i<0 else d[:i+1])"
+          } > /tmp/review-input.md
+      - name: Run Claude review (subscription OAuth)
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "CLAUDE_CODE_OAUTH_TOKEN not set — skipping AI review (set the secret to enable)."
+            printf '%s' '{"result":"{\"summary\":\"AI review skipped: CLAUDE_CODE_OAUTH_TOKEN not configured.\",\"findings\":[]}"}' > /tmp/claude-out.json
+            exit 0
+          fi
+          npm install -g @anthropic-ai/claude-code
+          claude -p --output-format json \
+            --model claude-opus-4-8 \
+            --allowedTools "Read,Grep,Glob" \
+            < /tmp/review-input.md > /tmp/claude-out.json
+          cat /tmp/claude-out.json
+      - name: Parse, comment, gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CLAUDE_OUTPUT: /tmp/claude-out.json
+        run: node .github/ai-review/review.mjs

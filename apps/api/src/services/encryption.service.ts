@@ -45,7 +45,7 @@ class EncryptionService {
     // Derive unique key for this encryption using salt
     const derivedKey = crypto.pbkdf2Sync(key, salt, 10000, 32, 'sha256');
 
-    const cipher = crypto.createCipheriv(ALGORITHM, derivedKey, iv);
+    const cipher = crypto.createCipheriv(ALGORITHM, derivedKey, iv, { authTagLength: 16 });
 
     let encrypted = cipher.update(plaintext, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -80,7 +80,7 @@ class EncryptionService {
       // Derive the same key using the salt
       const derivedKey = crypto.pbkdf2Sync(key, salt, 10000, 32, 'sha256');
 
-      const decipher = crypto.createDecipheriv(ALGORITHM, derivedKey, iv);
+      const decipher = crypto.createDecipheriv(ALGORITHM, derivedKey, iv, { authTagLength: 16 });
       decipher.setAuthTag(authTag);
 
       let decrypted = decipher.update(encrypted);
