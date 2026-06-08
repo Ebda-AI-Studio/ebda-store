@@ -22,10 +22,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
-          # Checkout (and therefore the auto-fix push) uses the PAT when present,
-          # so the fix commit RE-TRIGGERS CI + a fresh review. Falls back to the
-          # default token (no re-trigger; auto-fix stays dormant) when unset.
-          token: ${{ secrets.AI_FIX_PAT || secrets.GITHUB_TOKEN }}
+          # Checkout uses the default GITHUB_TOKEN so a missing/expired AI_FIX_PAT
+          # can NEVER block the review. The auto-fix step pushes with the PAT
+          # explicitly (that push re-triggers CI + a fresh review).
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -82,7 +81,9 @@ jobs:
         if: steps.review.outputs.should_fix == 'true'
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          AI_FIX_PAT: ${{ secrets.AI_FIX_PAT }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          GH_REPO: ${{ github.repository }}
         run: |
           git config user.name "force-ai-reviewer"
           git config user.email "ahmed0montaser@gmail.com"
@@ -98,5 +99,5 @@ jobs:
           fi
           git add -A
           git commit -m "fix: address AI-review critical findings [ai-fix]"
-          git push origin HEAD:"$PR_HEAD_REF"
+          git push "https://x-access-token:${AI_FIX_PAT}@github.com/${GH_REPO}.git" "HEAD:${PR_HEAD_REF}"
           echo "Auto-fix pushed; a fresh review run will validate it."
