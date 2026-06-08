@@ -187,7 +187,9 @@ jobs:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: force_test
         ports:
-          - 5432:5432
+          # Dynamic host port: Docker assigns a random available port so
+          # parallel jobs on the same self-hosted runner never collide on 5432.
+          - 5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -196,7 +198,8 @@ jobs:
       redis:
         image: redis:7-alpine
         ports:
-          - 6379:6379
+          # Dynamic host port: same reasoning as postgres above.
+          - 6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -226,14 +229,14 @@ jobs:
       - name: Run database migrations
         run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/force_test
-          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
 
       - name: Seed test data
         run: npm run db:seed --if-present
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/force_test
-          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           ADMIN_PASSWORD: test-admin-password-ci
           ADMIN_EMAIL: admin@forcemedia.com
 
@@ -259,9 +262,9 @@ jobs:
           exit 1
         env:
           PORT: '4000'
-          DATABASE_URL: postgresql://test:test@localhost:5432/force_test
-          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
-          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
           NODE_ENV: test
@@ -274,9 +277,9 @@ jobs:
           # setup-e2e.ts uses this in preference to DATABASE_URL so integration
           # tests run against ep-spring-dew (staging), never ep-falling-meadow (prod).
           # The secret is set via: gh secret set TEST_DATABASE_URL --repo ForceAI-KW/force-website-builder
-          DATABASE_URL: postgresql://test:test@localhost:5432/force_test
-          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
-          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
           NODE_ENV: test
@@ -312,7 +315,9 @@ jobs:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: force_test
         ports:
-          - 5432:5432
+          # Dynamic host port: Docker assigns a random available port so
+          # parallel jobs on the same self-hosted runner never collide on 5432.
+          - 5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -321,7 +326,8 @@ jobs:
       redis:
         image: redis:7-alpine
         ports:
-          - 6379:6379
+          # Dynamic host port: same reasoning as postgres above.
+          - 6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -351,15 +357,15 @@ jobs:
       - name: Run database migrations
         run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/force_test
-          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
 
       - name: Run E2E tests
         run: npm run test:e2e
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/force_test
-          DIRECT_URL: postgresql://test:test@localhost:5432/force_test
-          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
           ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
           NODE_ENV: test
