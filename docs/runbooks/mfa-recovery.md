@@ -78,7 +78,7 @@ If it reports `0 row(s)` the email address is wrong — double-check before assu
 Regardless of which option was used, advise the user to:
 
 1. Log in with email + password (no TOTP required until they re-enroll).
-2. Go to **Account → Security → Enable 2FA** and enroll a new authenticator.
+2. Go to **Account → Security → Enable 2FA** and enroll a new authenticator. The enrollment page is reachable from the **Security & 2FA** shield icon in the sidebar footer (next to the logout button). Any protected route that returns `403 MFA_SETUP_REQUIRED` will also auto-redirect there.
 3. Save the new backup codes in a secure location (password manager, printed paper in a safe).
 
 ---

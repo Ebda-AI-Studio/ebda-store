@@ -1,0 +1,24 @@
+# Gitleaks config — extends the built-in ruleset, then allowlists known
+# CI-ONLY test secrets by their literal value (NOT by commit fingerprint).
+#
+# Why this exists: the test secrets below live in committed history (CI env
+# blocks in .github/workflows/*.yml + test fixtures). A .gitleaksignore entry
+# is `<commit>:<file>:<rule>:<line>` — pinned to a commit SHA, so it STOPS
+# matching the moment that secret's commit gets a new SHA (every squash-merge).
+# That made gitleaks re-flag the same test key on every PR. Matching the literal
+# value here is commit-independent, so it holds across merges/rebases forever.
+#
+# RULE: only add PROVEN CI-only/test values here — never silence a real secret.
+# Real production secrets are injected via GitHub repository secrets at runtime
+# and never appear as literals in the tree.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "CI-only test secrets (not real credentials)"
+regexTarget = "line"
+regexes = [
+  '''test-encryption-key-for-ci-32chars''',
+  '''test-jwt-secret-for-ci-only-32chars''',
+]

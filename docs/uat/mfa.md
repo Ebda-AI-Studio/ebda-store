@@ -107,6 +107,8 @@ Related plan: `docs/superpowers/plans/2026-06-08-mfa-and-token-revocation.md`
 - [ ] Log in (no TOTP challenge yet — MFA not set up).
 - [ ] Attempt to access a protected admin resource (e.g. `GET /admin/stores`).
 - [ ] Confirm a `403 MFA_SETUP_REQUIRED` response.
+- [ ] Confirm the admin app **auto-redirects** to `/account/security` (the enrollment page) — no manual URL entry required.
+- [ ] Confirm the **Security & 2FA** shield icon is visible in the sidebar footer next to the logout button and links to `/account/security`.
 - [ ] Enroll MFA via `POST /auth/mfa/enroll/begin` + `POST /auth/mfa/enroll/verify`.
 - [ ] Retry the protected resource — confirm `200`.
 

@@ -140,6 +140,17 @@ export async function apiRequest<T = unknown>(
     }
 
     if (!response.ok) {
+      // A super-admin who hasn't enrolled in 2FA gets 403 MFA_SETUP_REQUIRED on
+      // every protected route. Send them straight to the enrollment page instead
+      // of surfacing a dead "failed to load" error. The /account/security page
+      // only calls non-gated routes (/auth/me, /auth/mfa/*) so this can't loop.
+      if (
+        typeof window !== 'undefined' &&
+        data.error?.code === 'MFA_SETUP_REQUIRED' &&
+        window.location.pathname !== '/account/security'
+      ) {
+        window.location.assign('/account/security');
+      }
       return {
         data: null,
         error: {
