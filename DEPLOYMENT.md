@@ -2,20 +2,19 @@
 
 > **2026-05-22 update:** prior versions of this doc described a Cloudflare Pages + Supabase topology that was never the production state. The canonical production stack is below. The old doc misled incident responders during the 2026-05-22 audit (P1-7).
 
-## Local CI gate (active while GitHub Actions billing is suspended)
+## CI gate
 
-GitHub Actions is currently blocked by a billing issue. Until billing resumes, this project uses a **local pre-push gate** instead:
+This project runs two complementary gates:
 
-- `.husky/pre-push` runs lint + 3x typecheck (api/admin/web) + unit tests (497 tests) on every `git push`
-- Failures BLOCK the push — the gate exits non-zero and git aborts
-- Successful pushes still trigger Railway auto-deploy (Railway's GitHub integration runs independently of GitHub Actions)
+**Server-side (GitHub Actions):** `.github/workflows/ci.yml` runs lint + typecheck + unit tests + integration tests on every push and PR. GitHub Actions billing was suspended briefly in early 2026 but has been active since 2026-05-22.
+
+**Local pre-push gate:** `.husky/pre-push` runs lint + 3x typecheck (api/admin/web) + unit tests (497 tests) on every `git push`, blocking the push on failure. This catches most issues locally before burning runner minutes.
+
 - `TEST_DATABASE_URL` is set to a safe placeholder in the hook so `vitest setup-e2e.ts` prod-guard passes cleanly; unit tests mock Prisma and make no real DB calls
 
-**Test gate scope:** lint + 3x typecheck + 497 unit tests (~4s)
+**Test gate scope (local):** lint + 3x typecheck + 497 unit tests (~4s)
 
 To run the full gate manually: `bash scripts/safe-deploy.sh`
-
-When GitHub Actions billing is restored, the existing `.github/workflows/ci.yml` will run server-side gates again. The pre-push hook stays as a fast local-first gate.
 
 ---
 
@@ -23,7 +22,7 @@ When GitHub Actions billing is restored, the existing `.github/workflows/ci.yml`
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                       VERCEL Pro ($20/mo)                        │
+│                       VERCEL Hobby (free)                        │
 │  ┌──────────────────────────┐  ┌──────────────────────────┐      │
 │  │  force-admin (Next 16)   │  │  force-web (Next 16)     │      │
 │  │  app.forcemediakw.com    │  │  store.forcemediakw.com  │      │
@@ -46,8 +45,8 @@ When GitHub Actions billing is restored, the existing `.github/workflows/ci.yml`
 ┌──────────────────────────┐  ┌─────────────────┐  ┌──────────────┐
 │ NEON Launch (~$17-150/mo) │  │ CLOUDFLARE R2   │  │ INNGEST CLOUD│
 │ PostgreSQL serverless     │  │ (per-tenant     │  │ 30 functions │
-│ 79 models, RLS-backed     │  │  media storage) │  │              │
-│ per-commit snapshot brs   │  │  *.r2.dev       │  │              │
+│ 83 models, RLS-backed     │  │  media storage) │  │              │
+│ daily local pg_dump       │  │  *.r2.dev       │  │              │
 └──────────────────────────┘  └─────────────────┘  └──────────────┘
 
 Estimated Monthly Cost (current scale): ~$26/mo
@@ -91,9 +90,9 @@ NODE_ENV=production
 API_PORT=4000
 API_HOST=0.0.0.0
 
-# Database (from Supabase)
-DATABASE_URL=postgres://postgres.xxx:password@aws-0-region.pooler.supabase.com:6543/postgres?pgbouncer=true
-DIRECT_URL=postgres://postgres.xxx:password@aws-0-region.pooler.supabase.com:5432/postgres
+# Database (Neon Postgres)
+DATABASE_URL=postgres://neondb_owner:password@ep-xxx-pooler.ap-southeast-1.aws.neon.tech/neondb?pgbouncer=true&connect_timeout=15
+DIRECT_URL=postgres://neondb_owner:password@ep-xxx.ap-southeast-1.aws.neon.tech/neondb
 
 # Authentication
 JWT_SECRET=<generate-64-char-secret>
@@ -133,65 +132,11 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 ---
 
-## Step 2: Cloudflare Pages Setup (Web & Admin)
+## Step 2: Vercel Setup (Web & Admin)
 
-> ⚠️ **STALE — see top of doc.** Production storefront + admin run on **Vercel Pro**, not Cloudflare Pages. Project names: `force-admin` (app.forcemediakw.com) and `force-web` (store.forcemediakw.com + per-tenant custom domains). Vercel domain provisioning is automated via `apps/api/src/services/vercel-domain.service.ts`. The instructions below predate the 2026-05-17 Vercel migration and should not be followed.
+> ⚠️ **NOTE:** Production storefront + admin run on **Vercel Hobby**, not Cloudflare Pages. Project names: `force-admin` (app.forcemediakw.com) and `force-web` (store.forcemediakw.com + per-tenant custom domains). Vercel domain provisioning is automated via `apps/api/src/services/vercel-domain.service.ts`.
 
-### 2.1 Create Cloudflare Account
-
-1. Go to [dash.cloudflare.com](https://dash.cloudflare.com)
-2. Sign up or login
-
-### 2.2 Create Pages Project - Web App
-
-1. Go to **Workers & Pages** → **Create**
-2. Select **Pages** → **Connect to Git**
-3. Select your GitHub repo: `ForceAI-KW/force-website-builder`
-
-Configure build settings:
-
-| Setting                | Value           |
-| ---------------------- | --------------- |
-| Project name           | `force-web`     |
-| Production branch      | `main`          |
-| Framework preset       | `Next.js`       |
-| Root directory         | `apps/web`      |
-| Build command          | `npm run build` |
-| Build output directory | `.next`         |
-
-### 2.3 Add Environment Variables - Web
-
-In Settings → Environment Variables:
-
-```
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api/v1
-NEXT_PUBLIC_APP_NAME=Your Store Name
-NEXT_PUBLIC_APP_URL=https://store.yourdomain.com
-```
-
-### 2.4 Create Pages Project - Admin App
-
-Repeat steps 2.2-2.3 with:
-
-| Setting        | Value         |
-| -------------- | ------------- |
-| Project name   | `force-admin` |
-| Root directory | `apps/admin`  |
-
-Environment Variables:
-
-```
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api/v1
-NEXT_PUBLIC_APP_NAME=Force Admin
-NEXT_PUBLIC_APP_URL=https://admin.yourdomain.com
-```
-
-### 2.5 Add Custom Domains
-
-1. Go to project → Custom domains
-2. Add `store.yourdomain.com` for web
-3. Add `admin.yourdomain.com` for admin
-4. Cloudflare will auto-configure SSL
+Both apps deploy automatically via Vercel's GitHub integration on push to `main`. No manual steps needed — connect the repo in the Vercel dashboard, set the root directory for each app (`apps/admin` and `apps/web`), and add the env vars from §1.4. Vercel provisions TLS automatically for all custom domains.
 
 ---
 
@@ -235,37 +180,16 @@ Add CORS rules:
 
 ---
 
-## Step 4: Supabase Configuration
+## Step 4: Neon Postgres
 
-> ⚠️ **STALE — see top of doc.** Production DB is **Neon Postgres** (serverless, per-commit snapshot branches via `.github/workflows/neon-snapshot.yml`), not Supabase. RLS is implemented via `runInTenantContext` AsyncLocalStorage + 52 ENABLE ROW LEVEL SECURITY tables. Migration was completed pre-2026-05-01. Do not follow the Supabase setup steps below.
+> ⚠️ **NOTE:** Production DB is **Neon Postgres** (serverless), not Supabase. RLS is implemented via `runInTenantContext` AsyncLocalStorage + 83 ENABLE ROW LEVEL SECURITY tables.
 
-### 4.1 Upgrade to Pro Plan
+Use the connection strings from your Neon project dashboard:
 
-1. Go to [supabase.com/dashboard](https://supabase.com/dashboard)
-2. Select your project
-3. Go to Settings → Billing
-4. Upgrade to Pro ($25/mo)
+- `DATABASE_URL` — pooled URL (PgBouncer, port 5432, `?pgbouncer=true`)
+- `DIRECT_URL` — direct (non-pooled) URL required for Prisma migrations
 
-### 4.2 Add Compute Add-on
-
-For 10 stores with 1M customers:
-
-1. Go to Settings → Add-ons
-2. Select **Medium** compute ($50/mo)
-   - 2 CPU cores
-   - 4 GB RAM
-
-### 4.3 Enable Connection Pooling
-
-1. Go to Settings → Database
-2. Copy the **Pooler** connection string (port 6543)
-3. Use this for `DATABASE_URL`
-4. Use direct connection (port 5432) for `DIRECT_URL`
-
-### 4.4 Configure Backups
-
-Pro plan includes daily backups. Verify in:
-Settings → Database → Backups
+Backups: daily local `pg_dump` runs on the developer Mac at 3:30am via launchd (`com.forceai.neon-backup`). 30-day rotation at `~/Desktop/projects/_backups/force-website-builder/`. See `docs/ROLLBACK.md` §C for the restore procedure.
 
 ---
 
@@ -273,12 +197,14 @@ Settings → Database → Backups
 
 Add these records to your domain:
 
-| Type  | Name  | Value                                | Proxy |
-| ----- | ----- | ------------------------------------ | ----- |
-| CNAME | store | force-web.pages.dev                  | Yes   |
-| CNAME | admin | force-admin.pages.dev                | Yes   |
-| CNAME | api   | your-app.up.railway.app              | No    |
-| CNAME | cdn   | your-bucket.r2.cloudflarestorage.com | Yes   |
+| Type  | Name  | Value                                | Notes                                      |
+| ----- | ----- | ------------------------------------ | ------------------------------------------ |
+| CNAME | store | cname.vercel-dns.com                 | Vercel (storefront) — Vercel adds SSL      |
+| CNAME | app   | cname.vercel-dns.com                 | Vercel (admin) — Vercel adds SSL           |
+| CNAME | api   | your-app.up.railway.app              | Railway API — no proxy                     |
+| CNAME | cdn   | pub-xxx.r2.dev                       | Cloudflare R2 public bucket (`*.r2.dev`)   |
+
+Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/services/vercel-domain.service.ts` — merchants add their domain in the admin UI and the API calls the Vercel API automatically.
 
 ---
 
@@ -293,9 +219,9 @@ Add these records to your domain:
 
 ### Monitoring
 
-- [ ] Set up Sentry for error tracking
+- [ ] Set up Sentry for error tracking (SENTRY_DSN on Railway + NEXT_PUBLIC_SENTRY_DSN_ADMIN/WEB on Vercel)
 - [ ] Enable Railway metrics alerts
-- [ ] Configure Supabase alerts
+- [ ] Confirm Neon compute usage alerts are configured in the Neon dashboard
 
 ### Payment Providers
 
@@ -320,10 +246,10 @@ Add these records to your domain:
 git push origin main
 ```
 
-### Deploy Web/Admin (Cloudflare)
+### Deploy Web/Admin (Vercel)
 
 ```bash
-# Cloudflare auto-deploys on git push
+# Vercel auto-deploys on git push via GitHub integration
 git push origin main
 ```
 
@@ -344,11 +270,13 @@ npx prisma migrate deploy
 2. Find previous working deployment
 3. Click "Rollback"
 
-### Cloudflare Pages
+### Vercel (Web & Admin)
 
-1. Go to Deployments
-2. Find previous deployment
-3. Click "..." → "Rollback to this deploy"
+1. Go to https://vercel.com/ahmad-sharafs-projects/force-admin/deployments (or force-web)
+2. Find previous successful deployment
+3. Click "..." → **Promote to Production**
+
+See `docs/ROLLBACK.md` §A for the full fast-path procedure.
 
 ### Database
 
@@ -392,12 +320,12 @@ See `docs/audits/2026-05-22-comprehensive-saas-audit.md` §6 for the authoritati
 
 | Service                                     | Plan         | Monthly Cost   |
 | ------------------------------------------- | ------------ | -------------- |
-| Vercel (admin + web)                        | Pro (1 seat) | $20            |
+| Vercel (admin + web)                        | Hobby        | $0             |
 | Railway (API + Redis)                       | Hobby        | ~$6-16         |
 | Neon Postgres                               | Launch       | $0-17 (today)  |
 | Cloudflare R2                               | Free tier    | $0             |
 | Inngest, OneSignal, Sentry, R2, Gemini, etc | Free tiers   | $0             |
-| **Total at current scale**                  |              | **~$26-36/mo** |
+| **Total at current scale**                  |              | **~$6-33/mo**  |
 
 ---
 

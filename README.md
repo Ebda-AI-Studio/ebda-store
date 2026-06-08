@@ -67,14 +67,20 @@ Major capabilities added across this session (commit SHAs for reference):
 | **API**             | Express.js 4 + TypeScript                             |
 | **Admin Dashboard** | Next.js 16 (App Router)                               |
 | **Storefront**      | Next.js 16 (App Router)                               |
-| **Database**        | Neon PostgreSQL (serverless) + Prisma ORM (51 models) |
+| **Database**        | Neon PostgreSQL (serverless) + Prisma ORM (83 models) |
 | **Cache & Queues**  | Redis                                                 |
 | **Storage**         | Cloudflare R2 (S3-compatible)                         |
 | **Real-time**       | Socket.io (WebSocket notifications)                   |
 | **Auth**            | Custom JWT (HTTP-only cookies, cross-origin)          |
 | **Validation**      | Zod                                                   |
 | **UI**              | Tailwind CSS + shared component library (@force/ui)   |
-| **Testing**         | Vitest (332+ tests)                                   |
+| **Async Jobs**      | Inngest (30+ functions, cloud-hosted step functions)  |
+| **Push**            | OneSignal + Web Push (VAPID dual-stack)               |
+| **Email**           | Resend (transactional)                                |
+| **Error Tracking**  | Sentry (three projects: api / admin / web)            |
+| **Logging**         | Pino + Axiom drain (30-day retention)                 |
+| **Analytics**       | PostHog (storefront + admin)                          |
+| **Testing**         | Vitest (497+ tests)                                   |
 
 ## Project Structure
 
@@ -204,7 +210,9 @@ For managing the production Neon DB from your machine (preview branches, snapsho
 npx neonctl@latest init   # one-time per machine — opens browser, signs into the project's Neon account
 ```
 
-After init, `npx neonctl@latest projects list`, `npx neonctl@latest branches create`, etc. work directly. The per-commit Neon snapshots in `.github/workflows/neon-snapshot.yml` use the same credentials via the `NEON_API_KEY` repo secret.
+After init, `npx neonctl@latest projects list`, `npx neonctl@latest branches create`, etc. work directly.
+
+> **DR note (2026-06-08):** Per-commit Neon snapshot branches (`neon-snapshot.yml`) are **retired** — they were accumulating branch cost without auto-pruning. DB backups are now taken via daily local `pg_dump` (launchd `com.forceai.neon-backup` on the dev Mac, retention 30 days at `~/Desktop/projects/_backups/force-website-builder/`). See `docs/ROLLBACK.md` §C for the restore procedure.
 
 ### Environment Variables
 

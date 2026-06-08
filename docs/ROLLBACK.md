@@ -1,6 +1,6 @@
 # Production rollback — Force Website Builder
 
-This monorepo deploys to **3 platforms simultaneously**: Vercel admin (`app.forcemediakw.com`) + Vercel storefront (`store.forcemediakw.com` + per-tenant custom domains) + Railway API. Plus **Neon Postgres** (51 models, RLS via AsyncLocalStorage) and **Cloudflare R2** for assets.
+This monorepo deploys to **3 platforms simultaneously**: Vercel admin (`app.forcemediakw.com`) + Vercel storefront (`store.forcemediakw.com` + per-tenant custom domains) + Railway API. Plus **Neon Postgres** (83 models, RLS via AsyncLocalStorage) and **Cloudflare R2** for assets.
 
 ## Three rollback paths
 
@@ -43,7 +43,9 @@ Effect:
 - Inngest functions auto-redeploy on next API boot
 - OneSignal apps unchanged (no rebuild)
 
-### C. Migration rollback (Neon snapshot restore)
+### C. Migration rollback (local pg_dump restore)
+
+> **DR policy (2026-06-08):** Per-commit Neon snapshot branches (`neon-snapshot.yml`) are **retired** — they were accumulating branch cost without auto-pruning. DR is now daily local `pg_dump` runs on the developer Mac (launchd `com.forceai.neon-backup`, 3:30am daily, 30-day retention at `~/Desktop/projects/_backups/force-website-builder/`). The `neon-snapshot.yml` workflow is disabled.
 
 FWB uses **hand-written migrations** at `packages/database/prisma/migrations/<TS>_<name>/migration.sql`. Since commit `decd870` (2026-05-12), migrations apply automatically via Railway's `preDeployCommand` on every deploy — see "Migration auto-apply check" below. So by the time you notice an issue, the migration is already live.
 
@@ -74,31 +76,38 @@ FWB uses **hand-written migrations** at `packages/database/prisma/migrations/<TS
 
 Per existing project memory, the project uses `force_app` role for prod (RLS enforced) + `neondb_owner` for migrations (RLS bypass). This doesn't affect rollback mechanics; just be aware which role is touching what.
 
-#### Find the right snapshot
+#### Find the right backup
 
-Every push to main creates a Neon branch named `prod-<short-sha>` via `.github/workflows/neon-snapshot.yml`. To find the snapshot from BEFORE the bad commit:
+Backups are stored at `~/Desktop/projects/_backups/force-website-builder/` on the developer Mac, one dump per day, 30-day rotation. Find the dump from before the bad commit:
 
 ```bash
-git log --oneline -5  # the previous good <sha> is the one you want
-# matching Neon branch: prod-<that-short-sha>
+ls -lt ~/Desktop/projects/_backups/force-website-builder/
+# pick the dump timestamped before the bad deploy
 ```
 
-Or list snapshots in https://console.neon.tech → force-website-builder → Branches.
+#### Restore from local pg_dump
 
-#### Restore main
+```bash
+# 1. Create a restore-target Neon branch from production (so production is untouched during restore)
+npx neonctl@latest branches create --name restore-candidate --parent production
 
-In the Neon dashboard:
+# 2. Get the direct connection string for the restore branch
+npx neonctl@latest cs restore-candidate --role-name neondb_owner
 
-1. Open the production branch (default `production`)
-2. Click **Restore** → choose `prod-<good-sha>` as source
-3. Confirm
+# 3. Restore the dump (pg_restore for custom format, psql for plain SQL)
+pg_restore -d "<restore-branch-direct-url>" \
+  ~/Desktop/projects/_backups/force-website-builder/<chosen-dump>.dump
 
-⚠️ **Restore is destructive to writes since the bad migration:** orders placed, products edited, store settings changed, R2 uploads referenced from new schema rows — all lost on restore. For FWB this means **per-tenant data loss across multiple stores**. Coordinate with the Force team before doing this.
+# 4. Verify the restore branch looks correct, then swap production to it in the Neon console
+#    Neon console → Branches → production → Reset from branch → restore-candidate
+```
 
-If write data must be preserved:
+⚠️ **Restore is destructive to writes since the backup:** orders placed, products edited, store settings changed, R2 uploads referenced from new schema rows — all lost on restore. For FWB this means **per-tenant data loss across multiple stores**. Coordinate with the Force team before doing this.
+
+If write data since the backup must be preserved:
 
 1. `pg_dump --table=<critical-tables> --data-only` from the broken DB
-2. Restore the snapshot
+2. Restore the earlier snapshot
 3. Re-insert the dumped rows (manually translate any column changes)
 
 #### R2 cleanup if applicable
@@ -125,15 +134,6 @@ git log --all --diff-filter=A --name-only --pretty='%h | %aI | %s' -- packages/d
 git diff HEAD~1 HEAD --name-only -- packages/database/prisma/migrations/
 ```
 
-Neon branches list at https://console.neon.tech is the parallel "what state did prod have at each commit" view.
-
 ## Tenant-isolation gotcha
 
 The RLS-via-AsyncLocalStorage pattern (`runInTenantContext`) sets `app.current_store_id` per request. If the migration changed RLS policy itself (added/removed policies, changed predicates), restoring the DB to a pre-policy state can leave the active code expecting NEW policy behavior. Always verify the RLS policy state after restore by impersonating a tenant and probing a controlled subset of rows.
-
-## Setup (one-time)
-
-- `.github/workflows/neon-snapshot.yml` runs on push to main
-- Repo secrets: `NEON_API_KEY`, `NEON_PROJECT_ID`
-- Auto-prunes to last 9 `prod-*` branches
-- Add via: Repo Settings → Secrets and variables → Actions
