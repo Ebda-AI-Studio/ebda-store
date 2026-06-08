@@ -20,14 +20,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install Semgrep
-        run: pip install semgrep
       - name: Semgrep scan (block on ERROR severity)
+        # Install semgrep into a venv off the runner's SYSTEM python3 — works on
+        # cloud (ubuntu-latest) AND the self-hosted Ubuntu 26.04 box, which
+        # actions/setup-python@v5 cannot provision (no prebuilt 3.12 for 26.04).
         run: |
-          semgrep scan \
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/semgrep-venv"
+          "$RUNNER_TEMP/semgrep-venv/bin/pip" install --quiet --upgrade semgrep
+          "$RUNNER_TEMP/semgrep-venv/bin/semgrep" scan \
             --config p/default \
             --config p/owasp-top-ten \
             --config p/javascript \
