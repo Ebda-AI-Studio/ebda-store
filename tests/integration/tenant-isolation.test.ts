@@ -133,3 +133,116 @@ describe('cross-tenant isolation (integration)', () => {
     expect(found?.id).toBe(orderB);
   });
 });
+
+// Coverage for the 2026-06-09 "complete FORCE coverage" migration
+// (20260609000000_complete_force_rls_coverage). Proves the newly-protected
+// tables enforce isolation as the `force_app` role. We use raw SQL counts
+// through runAsTenantRole so the policy is evaluated even on the CI superuser
+// connection (the policies are scoped TO force_app + FORCE'd).
+//
+// Representative coverage:
+//   * payments         — CHILD table, tenancy via EXISTS through orders.store_id;
+//                        also read contextless by the payment webhook (must NOT
+//                        be 0-rowed when no GUC is set)
+//   * bulk_import_jobs — DIRECT store_id table, hybrid policy
+async function countAs(
+  storeId: string,
+  sql: string,
+  bypass = false,
+  noContext = false
+): Promise<number> {
+  return prisma.$transaction(
+    async tx => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE force_app`);
+      if (bypass) {
+        await tx.$executeRawUnsafe(`SET LOCAL app.bypass_rls = 'true'`);
+        await tx.$executeRawUnsafe(`SET LOCAL app.current_store_id = ''`);
+      } else if (!noContext) {
+        await tx.$executeRawUnsafe(
+          `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
+        );
+      }
+      const rows = (await tx.$queryRawUnsafe(sql)) as Array<{ n: bigint | number }>;
+      return Number(rows[0]?.n ?? 0);
+    },
+    { maxWait: 10000, timeout: 30000 }
+  );
+}
+
+describe('complete FORCE RLS coverage (integration)', () => {
+  let bulkJobB = '';
+  let paymentB = '';
+
+  beforeAll(async () => {
+    // Seed rows on store B via RLS bypass (cross-tenant write path).
+    await withRlsBypass(async tx => {
+      const bj = `${TEST_PREFIX}bj-${Date.now()}`;
+      const pay = `${TEST_PREFIX}pay-${Date.now()}`;
+      await tx.$executeRawUnsafe(
+        `INSERT INTO public.bulk_import_jobs (id, store_id, csv_data, created_at, updated_at)
+         VALUES ('${bj}', '${storeB}', '', now(), now())`
+      );
+      await tx.$executeRawUnsafe(
+        `INSERT INTO public.payments (id, order_id, amount, currency, provider, status, created_at, updated_at)
+         VALUES ('${pay}', '${orderB}', 10, 'KWD', 'cod', 'pending', now(), now())`
+      );
+      bulkJobB = bj;
+      paymentB = pay;
+    });
+  });
+
+  afterAll(async () => {
+    await withRlsBypass(async tx => {
+      await tx.$executeRawUnsafe(
+        `DELETE FROM public.bulk_import_jobs WHERE id LIKE '${TEST_PREFIX}bj-%'`
+      );
+      await tx.$executeRawUnsafe(`DELETE FROM public.payments WHERE id LIKE '${TEST_PREFIX}pay-%'`);
+    });
+  });
+
+  it('store A context cannot see store B payments (child via orders)', async () => {
+    const n = await countAs(
+      storeA,
+      `SELECT count(*)::int n FROM payments WHERE id = '${paymentB}'`
+    );
+    expect(n).toBe(0);
+  });
+
+  it('store B context CAN see its own payments (control)', async () => {
+    const n = await countAs(
+      storeB,
+      `SELECT count(*)::int n FROM payments WHERE id = '${paymentB}'`
+    );
+    expect(n).toBe(1);
+  });
+
+  it('store A context cannot see store B bulk_import_jobs (direct store_id)', async () => {
+    const n = await countAs(
+      storeA,
+      `SELECT count(*)::int n FROM bulk_import_jobs WHERE id = '${bulkJobB}'`
+    );
+    expect(n).toBe(0);
+  });
+
+  it('bypass sees the store B payment (cross-tenant path works)', async () => {
+    const n = await countAs(
+      storeB,
+      `SELECT count(*)::int n FROM payments WHERE id = '${paymentB}'`,
+      /* bypass */ true
+    );
+    expect(n).toBe(1);
+  });
+
+  it('contextless read (payment webhook) still sees payments — NOT 0-rowed', async () => {
+    // The /api/v1/webhooks path reads payments without a tenant GUC and without
+    // withRlsBypass. The hybrid policy's `current_store_id() IS NULL` escape
+    // must keep these rows visible, or live payment confirmation breaks.
+    const n = await countAs(
+      storeB,
+      `SELECT count(*)::int n FROM payments WHERE id = '${paymentB}'`,
+      /* bypass */ false,
+      /* noContext */ true
+    );
+    expect(n).toBe(1);
+  });
+});

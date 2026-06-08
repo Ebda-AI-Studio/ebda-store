@@ -197,12 +197,12 @@ Backups: daily local `pg_dump` runs on the developer Mac at 3:30am via launchd (
 
 Add these records to your domain:
 
-| Type  | Name  | Value                                | Notes                                      |
-| ----- | ----- | ------------------------------------ | ------------------------------------------ |
-| CNAME | store | cname.vercel-dns.com                 | Vercel (storefront) — Vercel adds SSL      |
-| CNAME | app   | cname.vercel-dns.com                 | Vercel (admin) — Vercel adds SSL           |
-| CNAME | api   | your-app.up.railway.app              | Railway API — no proxy                     |
-| CNAME | cdn   | pub-xxx.r2.dev                       | Cloudflare R2 public bucket (`*.r2.dev`)   |
+| Type  | Name  | Value                   | Notes                                    |
+| ----- | ----- | ----------------------- | ---------------------------------------- |
+| CNAME | store | cname.vercel-dns.com    | Vercel (storefront) — Vercel adds SSL    |
+| CNAME | app   | cname.vercel-dns.com    | Vercel (admin) — Vercel adds SSL         |
+| CNAME | api   | your-app.up.railway.app | Railway API — no proxy                   |
+| CNAME | cdn   | pub-xxx.r2.dev          | Cloudflare R2 public bucket (`*.r2.dev`) |
 
 Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/services/vercel-domain.service.ts` — merchants add their domain in the admin UI and the API calls the Vercel API automatically.
 
@@ -318,14 +318,14 @@ Estimated effort: ~4h focused session.
 
 See `docs/audits/2026-05-22-comprehensive-saas-audit.md` §6 for the authoritative per-service forecast (idle / 10k MAU / 100k MAU scenarios). Snapshot of current scale:
 
-| Service                                     | Plan         | Monthly Cost   |
-| ------------------------------------------- | ------------ | -------------- |
-| Vercel (admin + web)                        | Hobby        | $0             |
-| Railway (API + Redis)                       | Hobby        | ~$6-16         |
-| Neon Postgres                               | Launch       | $0-17 (today)  |
-| Cloudflare R2                               | Free tier    | $0             |
-| Inngest, OneSignal, Sentry, R2, Gemini, etc | Free tiers   | $0             |
-| **Total at current scale**                  |              | **~$6-33/mo**  |
+| Service                                     | Plan       | Monthly Cost  |
+| ------------------------------------------- | ---------- | ------------- |
+| Vercel (admin + web)                        | Hobby      | $0            |
+| Railway (API + Redis)                       | Hobby      | ~$6-16        |
+| Neon Postgres                               | Launch     | $0-17 (today) |
+| Cloudflare R2                               | Free tier  | $0            |
+| Inngest, OneSignal, Sentry, R2, Gemini, etc | Free tiers | $0            |
+| **Total at current scale**                  |            | **~$6-33/mo** |
 
 ---
 

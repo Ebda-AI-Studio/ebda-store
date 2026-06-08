@@ -16,7 +16,31 @@ Tenant isolation is enforced at the **database layer** with PostgreSQL Row-Level
 - Super-admin / cross-tenant operations use an explicit bypass (`runWithBypassRls`) that sets `app.bypass_rls`.
 - UUID format is validated before being interpolated into `SET LOCAL`.
 
-Migrations: `packages/database/prisma/migrations/*_rls_*` (`add_rls_policies`, `rls_for_8_missing_tables`, `force_rls_enforcement`, `fix_ai_usage_rls_bypass`).
+Migrations: `packages/database/prisma/migrations/*_rls_*` (`add_rls_policies`, `rls_for_8_missing_tables`, `force_rls_enforcement`, `fix_ai_usage_rls_bypass`, `complete_force_rls_coverage`).
+
+## Complete FORCE coverage (2026-06-09)
+
+A coverage audit found that, of the public tables, only a subset had RLS `ENABLE`'d and fewer were `FORCE`'d. `ENABLE`-without-`FORCE` is acceptable for the live app _today_ (it connects as the non-owner `force_app` role, for which `ENABLE` already applies) but it is NOT defense-in-depth: any owner/superuser connection (a stray `psql`, a Neon owner query, a future role change) skips non-`FORCE`'d RLS entirely. Migration `20260609000000_complete_force_rls_coverage` closes the gap:
+
+- **Newly protected (had NO RLS):** 16 tenant tables — 4 with a direct `store_id` (`affiliate_events`, `bulk_import_jobs`, `payment_events`, `whatsapp_templates`) and 12 child tables isolated through a parent FK via an `EXISTS` join (`cart_items`→carts, `order_items`/`payments`→orders, `return_items`→returns, `wishlist_items`→wishlists, `product_images`/`product_options`/`product_categories`/`product_tags`/`product_variants`→products, plus 2-hop `product_option_values`→options→products and `product_variant_options`→variants→products).
+- **Newly FORCE'd (were ENABLE-only):** the remaining tenant tables — including the 4 that the earlier `force_rls_enforcement` migration _missed because it listed non-existent table names_ (`anomalies`→`profit_anomalies`, `dead_stock_flags`→`deadstock_flags`, `inventory_logs`→`inventory_history`, `notifications` [no such table]).
+- **Intentionally LEFT without tenant RLS (documented in the migration):**
+  - _User/identity-scoped, isolated at the auth layer not the store boundary_ — `users` (store_id is NULL for admins; auth lookups are contextless), `addresses`, `customer_addresses`, `refresh_tokens`, `verification_tokens`, `onesignal_subscriptions`. A store predicate here would 0-row auth. Same precedent the codebase set for `onesignal_subscriptions` in `rls_for_8_missing_tables`.
+  - _Global / tenant-root_ — `stores` (resolved by slug/domain in `store-access.ts` _before_ any tenant GUC is set — a store predicate would break store resolution + login; the migration also `DISABLE`s the inert FORCE the prior migration left on it), `system_settings` (platform-global config, no store_id).
+
+### Policy idiom — hybrid (superset of both historical generations)
+
+FWB accumulated two policy shapes: the **old** `current_store_id() IS NULL OR store_id = current_store_id()` and the **new** `store_id = current_setting('app.current_store_id', true) OR current_setting('app.bypass_rls', true) = 'true'`. `withRlsBypass()` sets BOTH `app.bypass_rls='true'` AND `app.current_store_id=''`, so it satisfies both. New policies use the **hybrid** predicate so they are safe across every access pattern:
+
+```
+current_store_id() IS NULL                          -- no tenant ctx (webhook, super-admin)
+OR current_setting('app.bypass_rls', true) = 'true' -- explicit bypass (Inngest/cron)
+OR store_id = current_store_id()                    -- tenant match
+```
+
+**Contextless-read caveat (load-bearing):** the payment webhook at `/api/v1/webhooks` reads/updates `orders` and `payments` _without_ a `:storeId` and _without_ `withRlsBypass` — it relies on the old idiom's "context unset ⇒ allow" escape (`current_store_id()` is NULL when the GUC is unset). The hybrid predicate's first branch preserves this, so adding FORCE'd RLS to `payments` does NOT 0-row live payment confirmation. The regression test `tests/integration/tenant-isolation.test.ts` ("contextless read (payment webhook) still sees payments") guards this property.
+
+> **Role-scoping note:** all FWB policies are `FOR ALL TO force_app`, so a table _owner_/superuser still bypasses them even under FORCE. This is intentional — prod connects as `force_app`. The integration test issues `SET LOCAL ROLE force_app` to exercise the policies on the CI superuser connection.
 
 ## Consequences
 
