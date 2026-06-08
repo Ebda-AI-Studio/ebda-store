@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
+import mfaRoutes from './mfa.routes';
 import storeRoutes from './store.routes';
 import blogRoutes from './blog.routes';
 import productRoutes from './product.routes';
@@ -58,6 +59,10 @@ const router = Router();
 router.use('/public', publicRoutes);
 router.use('/public', publicStoreLayoutRoutes);
 router.use('/auth', authRoutes);
+// MFA sub-routes: enroll/begin, enroll/verify, verify (challenge), disable.
+// Mounted under /auth/mfa so the full path is /api/v1/auth/mfa/*.
+// Must come AFTER auth routes and BEFORE any catch-all.
+router.use('/auth/mfa', mfaRoutes);
 
 // Payment routes
 router.use('/payments', paymentRoutes);

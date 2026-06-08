@@ -51,6 +51,14 @@ model User {
   updatedAt     DateTime   @updatedAt @map("updated_at")
   deletedAt     DateTime?  @map("deleted_at") // Soft delete support
 
+  // 2FA / MFA
+  mfaEnabled     Boolean   @default(false) @map("mfa_enabled")
+  mfaSecret      String?   @map("mfa_secret")
+  mfaBackupCodes String[]  @default([]) @map("mfa_backup_codes")
+  mfaEnrolledAt  DateTime? @map("mfa_enrolled_at")
+  // session revocation
+  tokenVersion   Int       @default(0) @map("token_version")
+
   // Relations
   authStore              Store?                  @relation("StoreCustomers", fields: [storeId], references: [id], onDelete: Cascade)
   stores                 Store[]

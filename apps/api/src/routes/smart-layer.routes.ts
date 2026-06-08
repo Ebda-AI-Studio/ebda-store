@@ -21,6 +21,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, runInTenantContext } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { createPoFromSuggestion } from '../services/accounting/purchase-order.service';
 import { createClearanceCouponFromFlag } from '../services/accounting/deadstock-scan.service';
@@ -48,6 +49,7 @@ const reorderListSchema = paginationSchema.extend({
 router.get(
   '/:storeId/stock/reorder-suggestions',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -89,6 +91,7 @@ router.get(
 router.post(
   '/:storeId/stock/reorder-suggestions/:id/accept',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -108,6 +111,7 @@ router.post(
 router.post(
   '/:storeId/stock/reorder-suggestions/:id/dismiss',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -138,6 +142,7 @@ const deadstockListSchema = paginationSchema.extend({
 router.get(
   '/:storeId/stock/deadstock-flags',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -178,6 +183,7 @@ router.get(
 router.post(
   '/:storeId/stock/deadstock-flags/:id/clearance',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -197,6 +203,7 @@ router.post(
 router.post(
   '/:storeId/stock/deadstock-flags/:id/dismiss',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -228,6 +235,7 @@ const anomalyListSchema = paginationSchema.extend({
 router.get(
   '/:storeId/finance/anomalies',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -267,6 +275,7 @@ router.get(
 router.post(
   '/:storeId/finance/anomalies/:id/acknowledge',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -293,6 +302,7 @@ router.post(
 router.post(
   '/:storeId/stock/reorder-scan/run-now',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -313,6 +323,7 @@ router.post(
 router.post(
   '/:storeId/stock/deadstock-scan/run-now',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {

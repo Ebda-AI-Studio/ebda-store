@@ -239,7 +239,15 @@ async function seedSuperAdmin() {
   });
 
   if (existingAdmin) {
-    console.log('Super admin already exists, skipping...');
+    console.log('Super admin already exists, ensuring mfaEnabled=true...');
+    // Ensure the existing admin has mfaEnabled=true so integration tests can
+    // access MFA-gated routes (requireMfaEnrolled middleware checks this flag).
+    if (!existingAdmin.mfaEnabled) {
+      return prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: { mfaEnabled: true },
+      });
+    }
     return existingAdmin;
   }
 
@@ -252,6 +260,11 @@ async function seedSuperAdmin() {
       role: 'super_admin',
       emailVerified: true,
       language: 'en',
+      // MFA gate (requireMfaEnrolled) blocks super_admin on all protected routes
+      // unless mfaEnabled=true. The seeded CI admin must pass through so that
+      // integration tests (api.test, feature-flag-enforcement, lifecycle-events)
+      // can access /stores and /admin/stores endpoints without 403 MFA_SETUP_REQUIRED.
+      mfaEnabled: true,
     },
   });
 

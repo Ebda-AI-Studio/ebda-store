@@ -9,12 +9,15 @@ import express from 'express';
 import { prisma } from '@force/database';
 import storeRoutes from '@api/routes/store.routes';
 import authRoutes from '@api/routes/auth.routes';
+import mfaRoutes from '@api/routes/mfa.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { authenticate } from '@api/middleware/auth';
+import { createSuperAdminWithMfa, loginAsSuperAdmin } from './helpers/mfa-login';
 
 const app = express();
 app.use(express.json());
 app.use('/auth', authRoutes);
+app.use('/auth/mfa', mfaRoutes);
 app.use('/stores', authenticate, storeRoutes);
 app.use(errorHandler);
 
@@ -41,21 +44,16 @@ let storeAdminId: string | null = null;
 
 describe('Store Management', () => {
   beforeAll(async () => {
-    // Create super admin user directly in database
+    // Create super admin user — MFA pre-enrolled so requireMfaEnrolled passes
     const hashedPassword = await import('bcryptjs').then(bcrypt =>
       bcrypt.hash(superAdminUser.password, 12)
     );
 
-    const superAdmin = await prisma.user.create({
-      data: {
-        email: superAdminUser.email,
-        passwordHash: hashedPassword,
-        firstName: superAdminUser.firstName,
-        lastName: superAdminUser.lastName,
-        role: 'super_admin',
-        status: 'active',
-        emailVerified: true,
-      },
+    const superAdmin = await createSuperAdminWithMfa({
+      email: superAdminUser.email,
+      passwordHash: hashedPassword,
+      firstName: superAdminUser.firstName,
+      lastName: superAdminUser.lastName,
     });
     superAdminId = superAdmin.id;
 
@@ -76,12 +74,8 @@ describe('Store Management', () => {
     });
     storeAdminId = storeAdmin.id;
 
-    // Login both users
-    const superAdminLogin = await request(app).post('/auth/login').send({
-      email: superAdminUser.email,
-      password: superAdminUser.password,
-    });
-    superAdminToken = superAdminLogin.body.data?.accessToken;
+    // Login super admin — completes MFA challenge automatically
+    superAdminToken = await loginAsSuperAdmin(app, superAdminUser.email, superAdminUser.password);
 
     const storeAdminLogin = await request(app).post('/auth/login').send({
       email: storeAdminUser.email,

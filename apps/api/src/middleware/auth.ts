@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { AppError } from './error-handler';
+import { redis } from '../services/redis.service';
+import { prisma } from '@force/database';
 
 export interface AuthPayload {
   userId: string;
@@ -16,6 +18,8 @@ export interface AuthPayload {
    * still work as before until they expire.
    */
   storeId?: string | null;
+  /** Token version stamped at issue time. Used for bulk revocation. */
+  tv?: number;
 }
 
 declare module 'express-serve-static-core' {
@@ -44,11 +48,15 @@ function extractToken(req: Request): string | undefined {
   return undefined;
 }
 
-export function authenticate(req: Request, _res: Response, next: NextFunction): void {
+export async function authenticate(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
   const token = extractToken(req);
 
   if (!token) {
-    throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+    return next(new AppError(401, 'UNAUTHORIZED', 'Authentication required'));
   }
 
   try {
@@ -60,14 +68,54 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
 
     // Reject refresh tokens used as access tokens
     if (payload.type === 'refresh') {
-      throw new AppError(401, 'TOKEN_INVALID', 'Refresh tokens cannot be used for authentication');
+      return next(
+        new AppError(401, 'TOKEN_INVALID', 'Refresh tokens cannot be used for authentication')
+      );
+    }
+
+    // Belt-and-suspenders: reject any token that carries a non-access purpose
+    // claim. Real access tokens have no `purpose` field. MFA challenge tokens
+    // carry purpose:'mfa' and are audience:'force-mfa-challenge' so jwt.verify
+    // above already rejects them via audience mismatch — but this guard closes
+    // the window in case the audience check is ever weakened or bypassed.
+    if ((payload as any).purpose && (payload as any).purpose !== 'access') {
+      return next(new AppError(401, 'TOKEN_INVALID', 'Token cannot be used for authentication'));
+    }
+
+    // --- Revocation check 1: per-token JTI denylist ---
+    // jwt.verify decoded the header+payload; re-use jwt.decode here (no
+    // re-verify cost) just to extract jti cleanly from the raw token.
+    const decoded = jwt.decode(token) as { jti?: string } | null;
+    if (decoded?.jti && (await redis.isJtiDenied(decoded.jti))) {
+      return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
+    }
+
+    // --- Revocation check 2: per-user token-version (bulk revocation) ---
+    // Read tv from Redis cache; fall back to DB + repopulate cache on miss.
+    const cachedTv = await redis.getUserTokenVersion(payload.userId);
+    let currentTv: number;
+    if (cachedTv === null) {
+      const u = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { tokenVersion: true },
+      });
+      currentTv = u?.tokenVersion ?? 0;
+      await redis.setUserTokenVersion(payload.userId, currentTv);
+    } else {
+      currentTv = cachedTv;
+    }
+    if ((payload.tv ?? 0) < currentTv) {
+      return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
     }
 
     req.user = payload;
+    // Expose the jti on the request so downstream middleware (e.g. logout)
+    // can denylist this specific token without re-decoding.
+    (req as any).tokenJti = decoded?.jti;
     next();
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token');
+    if (err instanceof AppError) return next(err);
+    return next(new AppError(401, 'TOKEN_INVALID', 'Invalid or expired token'));
   }
 }
 

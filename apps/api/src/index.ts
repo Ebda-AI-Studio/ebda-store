@@ -249,6 +249,12 @@ app.use(
     //      - polling endpoints don't trigger expensive work (Gemini calls
     //        happen inside Inngest, not in the GET handler)
     skip: req => {
+      // Bypass 0: test environment. Integration test suites issue many
+      // POST/PUT/DELETE mutations in a short window; the global mutation cap
+      // would fire mid-suite and cascade all subsequent tests to 429. The
+      // per-endpoint authLimiter already skips for test env — the global
+      // limiter follows the same convention.
+      if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') return true;
       // Bypass 1: load test
       const expected = process.env.LOAD_TEST_BYPASS_TOKEN;
       if (expected) {

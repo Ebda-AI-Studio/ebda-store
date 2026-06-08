@@ -18,13 +18,16 @@ import orderRoutes from '@api/routes/order.routes';
 import couponRoutes from '@api/routes/coupon.routes';
 import publicRoutes from '@api/routes/public.routes';
 import authRoutes from '@api/routes/auth.routes';
+import mfaRoutes from '@api/routes/mfa.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { authenticate } from '@api/middleware/auth';
 import bcrypt from 'bcryptjs';
+import { createSuperAdminWithMfa, loginAsSuperAdmin } from './helpers/mfa-login';
 
 const app = express();
 app.use(express.json());
 app.use('/auth', authRoutes);
+app.use('/auth/mfa', mfaRoutes);
 app.use('/public', publicRoutes);
 app.use('/', couponRoutes);
 const storeRouter = Router({ mergeParams: true });
@@ -45,18 +48,14 @@ const TEST_SESSION_ID = `test-session-${Date.now()}`;
 
 describe('Checkout Flow', () => {
   beforeAll(async () => {
-    // Create test user
+    // Create test user with MFA pre-enrolled — super_admin now requires MFA
     const hashedPassword = await bcrypt.hash('Test123!@#', 12);
 
-    const user = await prisma.user.create({
-      data: {
-        email: `checkout-test-${Date.now()}@example.com`,
-        passwordHash: hashedPassword,
-        firstName: 'Checkout',
-        lastName: 'Tester',
-        role: 'super_admin',
-        emailVerified: true,
-      },
+    const user = await createSuperAdminWithMfa({
+      email: `checkout-test-${Date.now()}@example.com`,
+      passwordHash: hashedPassword,
+      firstName: 'Checkout',
+      lastName: 'Tester',
     });
     testUserId = user.id;
 
@@ -109,12 +108,8 @@ describe('Checkout Flow', () => {
     });
     testCustomerId = customer.id;
 
-    // Login
-    const loginRes = await request(app).post('/auth/login').send({
-      email: user.email,
-      password: 'Test123!@#',
-    });
-    authToken = loginRes.body.data?.accessToken;
+    // Login — completes MFA challenge automatically
+    authToken = await loginAsSuperAdmin(app, user.email, 'Test123!@#');
   });
 
   afterAll(async () => {

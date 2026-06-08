@@ -224,6 +224,80 @@ class RedisService {
   }
 
   // ==========================================
+  // JWT Revocation (JTI denylist + per-user token version)
+  // ==========================================
+
+  async denyJti(jti: string, ttlSeconds: number): Promise<void> {
+    const c = this.getClient();
+    if (!c) return; // fail-open
+    await c.setex(`jti:deny:${jti}`, Math.max(1, Math.ceil(ttlSeconds)), '1');
+  }
+
+  async isJtiDenied(jti: string): Promise<boolean> {
+    const c = this.getClient();
+    if (!c) return false;
+    return (await c.exists(`jti:deny:${jti}`)) === 1;
+  }
+
+  async setUserTokenVersion(userId: string, version: number): Promise<void> {
+    const c = this.getClient();
+    if (!c) return;
+    await c.set(`user:tv:${userId}`, String(version));
+  }
+
+  async getUserTokenVersion(userId: string): Promise<number | null> {
+    const c = this.getClient();
+    if (!c) return null;
+    const v = await c.get(`user:tv:${userId}`);
+    return v === null ? null : Number(v);
+  }
+
+  // ==========================================
+  // MFA Verify — per-challenge attempt counter (H2)
+  // Keyed by challenge token jti so each login attempt has its own limit.
+  // ==========================================
+
+  /**
+   * Increment the failed-attempt counter for an MFA challenge.
+   * Returns the new count. Fail-open: returns 0 if Redis is unavailable
+   * (the upstream caller treats 0 as "no lockout yet").
+   */
+  async incrementMfaAttempt(jti: string, ttlSeconds: number): Promise<number> {
+    const c = this.getClient();
+    if (!c) return 0; // fail-open
+    const key = `mfa:verify:attempts:${jti}`;
+    const multi = c.multi();
+    multi.incr(key);
+    // Always refresh TTL so the window matches the challenge lifetime.
+    multi.expire(key, ttlSeconds);
+    const results = await multi.exec();
+    return (results?.[0]?.[1] as number) ?? 0;
+  }
+
+  /**
+   * Immediately invalidate an MFA challenge by setting its attempt counter
+   * to a value above the max. Used after a lockout to prevent replay.
+   */
+  async lockMfaChallenge(jti: string, ttlSeconds: number): Promise<void> {
+    const c = this.getClient();
+    if (!c) return;
+    // Set to a sentinel value well above any reasonable max to ensure the
+    // key is present and the next read sees it as locked.
+    await c.setex(`mfa:verify:attempts:${jti}`, ttlSeconds, '999');
+  }
+
+  /**
+   * Check current MFA attempt count for a challenge jti.
+   * Returns 0 if Redis is unavailable (fail-open).
+   */
+  async getMfaAttempts(jti: string): Promise<number> {
+    const c = this.getClient();
+    if (!c) return 0;
+    const v = await c.get(`mfa:verify:attempts:${jti}`);
+    return v === null ? 0 : Number(v);
+  }
+
+  // ==========================================
   // Health Check
   // ==========================================
 

@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { PagesService } from '../services/pages.service';
 
@@ -77,6 +78,7 @@ const upsertSchema = z.object({
 router.get(
   '/stores/:storeId/pages',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -96,6 +98,7 @@ router.get(
 router.get(
   '/stores/:storeId/pages/:slug',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -120,6 +123,7 @@ router.get(
 router.put(
   '/stores/:storeId/pages/:slug',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -142,6 +146,7 @@ router.put(
 router.delete(
   '/stores/:storeId/pages/:slug',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {

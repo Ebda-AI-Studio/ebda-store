@@ -10,8 +10,10 @@ import { prisma } from '@force/database';
 import orderRoutes from '@api/routes/order.routes';
 import webhookRoutes from '@api/routes/webhook.routes';
 import authRoutes from '@api/routes/auth.routes';
+import mfaRoutes from '@api/routes/mfa.routes';
 import { CartService } from '@api/services/cart.service';
 import { errorHandler } from '@api/middleware/error-handler';
+import { createSuperAdminWithMfa, loginAsSuperAdmin } from './helpers/mfa-login';
 
 // Order routes expect mergeParams so req.params.storeId is accessible inside the router.
 // Mount under /stores/:storeId/orders matching the production route shape.
@@ -19,6 +21,7 @@ const app = express();
 app.use('/webhooks', express.raw({ type: '*/*' }), webhookRoutes);
 app.use(express.json());
 app.use('/auth', authRoutes);
+app.use('/auth/mfa', mfaRoutes);
 const storeRouter = Router({ mergeParams: true });
 storeRouter.use('/:storeId/orders', orderRoutes);
 app.use('/stores', storeRouter);
@@ -35,19 +38,14 @@ const TEST_SESSION_ID = `test-session-${Date.now()}`;
 
 describe('Order Flow', () => {
   beforeAll(async () => {
-    // Create test user
+    // Create test user with MFA pre-enrolled — super_admin now requires MFA
     const hashedPassword = await import('bcryptjs').then(bcrypt => bcrypt.hash('Test123!@#', 12));
 
-    const user = await prisma.user.create({
-      data: {
-        email: `order-test-${Date.now()}@example.com`,
-        passwordHash: hashedPassword,
-        firstName: 'Order',
-        lastName: 'Tester',
-        role: 'super_admin',
-        status: 'active',
-        emailVerified: true,
-      },
+    const user = await createSuperAdminWithMfa({
+      email: `order-test-${Date.now()}@example.com`,
+      passwordHash: hashedPassword,
+      firstName: 'Order',
+      lastName: 'Tester',
     });
     testUserId = user.id;
 
@@ -75,12 +73,8 @@ describe('Order Flow', () => {
     });
     testProductId = product.id;
 
-    // Login
-    const loginRes = await request(app).post('/auth/login').send({
-      email: user.email,
-      password: 'Test123!@#',
-    });
-    authToken = loginRes.body.data?.accessToken;
+    // Login — completes MFA challenge automatically
+    authToken = await loginAsSuperAdmin(app, user.email, 'Test123!@#');
   });
 
   afterAll(async () => {

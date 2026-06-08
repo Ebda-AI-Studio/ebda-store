@@ -1,10 +1,12 @@
 import { Router, Request, Response, NextFunction, CookieOptions } from 'express';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
 import { config } from '../config';
 import { authenticate } from '../middleware/auth';
 import { AuthService } from '../services/auth.service';
 import { authLimiter, auditLog, generateCsrfToken } from '../middleware/security';
+import { redis } from '../services/redis.service';
 
 const router = Router();
 
@@ -198,6 +200,13 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
     const data = loginSchema.parse(req.body);
     const result = await AuthService.login(data.email, data.password, req.ip, data.storeId ?? null);
 
+    // MFA challenge: return the challenge token without issuing a real session.
+    // The client must POST /auth/mfa/verify with the challengeToken + TOTP code.
+    if ((result as any).mfaRequired) {
+      res.json({ success: true, data: result });
+      return;
+    }
+
     // Generate CSRF token for session
     const sessionId = req.headers['x-session-id'] as string;
     let csrfToken: string | undefined;
@@ -274,12 +283,39 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
 });
 
 // POST /auth/logout
+// Optional-auth: we denylist the access-token jti when a valid Bearer token
+// is present, but NEVER 401 the logout itself — clients with an already-expired
+// or missing token must still be able to clear their session cookie.
 router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refreshToken } = req.body;
 
     if (refreshToken) {
       await AuthService.logout(refreshToken);
+    }
+
+    // Attempt to extract + denylist the access-token jti.
+    // Fail-open: any verification error (expired, missing, malformed) is
+    // silently swallowed so the logout always succeeds.
+    try {
+      const authHeader = req.headers.authorization;
+      const cookieToken = req.cookies?.token as string | undefined;
+      const rawToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : cookieToken;
+
+      if (rawToken) {
+        const payload = jwt.verify(rawToken, config.jwtSecret, {
+          algorithms: ['HS256'],
+          issuer: 'force-api',
+          audience: 'force-app',
+        }) as { jti?: string; exp?: number };
+
+        if (payload.jti) {
+          const remainingTtl = payload.exp ? payload.exp - Math.floor(Date.now() / 1000) : 60;
+          await redis.denyJti(payload.jti, Math.max(1, remainingTtl));
+        }
+      }
+    } catch {
+      // token invalid / expired — skip denylist, still clear cookie below
     }
 
     // Clear the HTTP-only auth cookie
@@ -293,6 +329,27 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
     next(error);
   }
 });
+
+// POST /auth/logout-all
+// Bumps tokenVersion so every outstanding access token issued before this
+// call is rejected by the auth middleware on next use. Also revokes all
+// refresh tokens so session rotation can't re-issue new access tokens.
+router.post(
+  '/logout-all',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await AuthService.revokeAllSessions(req.user!.userId);
+      clearTokenCookie(res);
+      res.json({
+        success: true,
+        data: { message: 'All sessions revoked' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // GET /auth/me
 router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {

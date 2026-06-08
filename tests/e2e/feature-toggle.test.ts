@@ -11,8 +11,10 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
 import featureRoutes from '@api/routes/feature.routes';
 import authRoutes from '@api/routes/auth.routes';
+import mfaRoutes from '@api/routes/mfa.routes';
 import { errorHandler } from '@api/middleware/error-handler';
 import { FEATURE_KEYS_ARRAY, PLAN_BASELINE } from '@force/shared';
+import { createSuperAdminWithMfa, loginAsSuperAdmin } from './helpers/mfa-login';
 
 // ==========================================
 // App Setup
@@ -22,6 +24,7 @@ import { FEATURE_KEYS_ARRAY, PLAN_BASELINE } from '@force/shared';
 const app = express();
 app.use(express.json());
 app.use('/auth', authRoutes);
+app.use('/auth/mfa', mfaRoutes);
 app.use('/admin', featureRoutes);
 app.use('/stores', featureRoutes);
 app.use(errorHandler);
@@ -58,16 +61,12 @@ describe('Feature Toggle Engine', () => {
   beforeAll(async () => {
     const hashedPassword = await bcrypt.hash(superAdminUser.password, 12);
 
-    // Create super admin
-    const superAdmin = await prisma.user.create({
-      data: {
-        email: superAdminUser.email,
-        passwordHash: hashedPassword,
-        firstName: superAdminUser.firstName,
-        lastName: superAdminUser.lastName,
-        role: 'super_admin',
-        status: 'active',
-      },
+    // Create super admin — MFA pre-enrolled so requireMfaEnrolled passes
+    const superAdmin = await createSuperAdminWithMfa({
+      email: superAdminUser.email,
+      passwordHash: hashedPassword,
+      firstName: superAdminUser.firstName,
+      lastName: superAdminUser.lastName,
     });
     superAdminId = superAdmin.id;
 
@@ -95,12 +94,8 @@ describe('Feature Toggle Engine', () => {
     });
     storeId = store.id;
 
-    // Login both users
-    const superAdminLogin = await request(app).post('/auth/login').send({
-      email: superAdminUser.email,
-      password: superAdminUser.password,
-    });
-    superAdminToken = superAdminLogin.body.data?.accessToken;
+    // Login super admin — completes MFA challenge automatically
+    superAdminToken = await loginAsSuperAdmin(app, superAdminUser.email, superAdminUser.password);
 
     // Generate store admin JWT directly (avoids login route issues in test env)
     // The authenticate middleware verifies JWT with JWT_SECRET, which is set in tests/setup.ts

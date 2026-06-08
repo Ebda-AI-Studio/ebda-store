@@ -561,6 +561,47 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 
 ---
 
+## Two-factor auth & session revocation
+
+Added in `feat/mfa-and-token-revocation` (2026-06-08). No new environment variables are required — the feature reuses two vars that must already be set:
+
+| Env var          | Used for                                           | Already required?                                                        |
+| ---------------- | -------------------------------------------------- | ------------------------------------------------------------------------ |
+| `ENCRYPTION_KEY` | AES-256-GCM encryption of the per-user TOTP secret | Yes — crashes at boot without it                                         |
+| `REDIS_URL`      | jti denylist + tokenVersion cache                  | Yes — auth revocation degrades gracefully when Redis is down (fail-open) |
+
+### Rollout safety notes
+
+**No forced logout on deploy.** `tokenVersion` defaults to `0` and existing access tokens carry no `tv` claim. The middleware treats a missing `tv` as `tv=0`, which equals the current `tokenVersion` (also `0`) — so existing sessions continue to work. Users are not signed out when this code ships.
+
+**Ship the super-admin enforcement gate AFTER you have enrolled yourself.** Task 9 (`requireMfaEnrolled`) returns `403 MFA_SETUP_REQUIRED` for any `super_admin` whose `mfaEnabled` is `false`. If you deploy the gate before enrolling your own account, you will 403 yourself on every protected admin route. Safe sequence:
+
+1. Deploy Tasks 1–8 + 10–11 (enrollment routes available, gate not yet enforced).
+2. Enroll your own `super_admin` account via **Account → Security → Enable 2FA**.
+3. Save the 10 backup codes in a secure location.
+4. Deploy Task 9 (enforcement gate).
+
+**Redis-down behavior is fail-open.** If Redis is unavailable:
+
+- `isJtiDenied()` returns `false` → a logged-out token is temporarily accepted.
+- `getUserTokenVersion()` returns `null` → the middleware falls back to a DB read for the current `tokenVersion`, so kill-all revocation still works (but adds a DB round-trip per request until Redis recovers).
+
+This is a deliberate tradeoff: locking every user out during a Redis outage is worse than a brief revocation bypass window. Pair with the existing Redis uptime monitor in UptimeRobot.
+
+### Recovery
+
+If a super-admin loses their authenticator and backup codes, use the CLI reset script as a last resort:
+
+```bash
+# Production — provide the non-pooled DIRECT_URL
+DIRECT_URL="postgresql://..." npx tsx scripts/mfa-reset.ts user@example.com
+# Expected: MFA reset for user@example.com: 1 row(s)
+```
+
+The script clears MFA fields and increments `tokenVersion`, forcing re-login on all devices. Full procedure: `docs/runbooks/mfa-recovery.md`.
+
+---
+
 ## Service Worker: pre-registration pattern (commit `91d735cf`)
 
 Chromium 133+ emits a deprecation warning when a service worker script adds

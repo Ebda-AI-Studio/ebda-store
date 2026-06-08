@@ -16,6 +16,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, runInTenantContext } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import {
@@ -39,6 +40,7 @@ const router = Router({ mergeParams: true });
 router.get(
   '/:storeId/finance/accounts',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -71,6 +73,7 @@ const listQuerySchema = z.object({
 router.get(
   '/:storeId/finance/journal',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -128,6 +131,7 @@ router.get(
 router.get(
   '/:storeId/finance/journal/:entryId',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -182,6 +186,7 @@ const manualEntrySchema = z.object({
 router.post(
   '/:storeId/finance/journal',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -229,6 +234,7 @@ router.post(
 router.post(
   '/:storeId/finance/accounts/seed',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -264,6 +270,7 @@ const createChildSchema = z.object({
 router.post(
   '/:storeId/finance/accounts',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -294,6 +301,7 @@ const setActiveSchema = z.object({ isActive: z.boolean() });
 router.patch(
   '/:storeId/finance/accounts/:accountId/active',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -323,6 +331,7 @@ router.patch(
 router.get(
   '/:storeId/finance/reports/trial-balance',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -348,6 +357,7 @@ router.get(
 router.get(
   '/:storeId/finance/reports/pnl',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -402,6 +412,7 @@ router.get(
 router.get(
   '/:storeId/finance/reports/balance-sheet',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -453,6 +464,7 @@ router.get(
 router.get(
   '/:storeId/finance/dashboard',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -512,6 +524,7 @@ router.get(
 router.get(
   '/:storeId/finance/reports/trial-balance.xlsx',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -552,6 +565,7 @@ router.get(
 router.get(
   '/:storeId/finance/reports/pnl.xlsx',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
@@ -613,6 +627,7 @@ router.get(
 router.get(
   '/:storeId/finance/reports/balance-sheet.xlsx',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),

@@ -18,6 +18,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, runInTenantContext, RfmSegment } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { generateInsightNarration } from '../services/accounting/insights-narration.service';
 import { inngest } from '../lib/inngest/client';
@@ -66,6 +67,7 @@ const SEGMENT_ACTIONS: Record<RfmSegment, { en: string; ar: string }> = {
 router.get(
   '/:storeId/insights/dashboard',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -247,6 +249,7 @@ router.get(
 router.get(
   '/:storeId/insights/cohorts',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -287,6 +290,7 @@ const funnelQuerySchema = z.object({
 router.get(
   '/:storeId/insights/funnel',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -326,6 +330,7 @@ router.get(
 router.get(
   '/:storeId/insights/segments',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -375,6 +380,7 @@ const productsQuerySchema = z.object({
 router.get(
   '/:storeId/insights/products',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -445,6 +451,7 @@ router.get(
 router.get(
   '/:storeId/insights/customers/rfm-batch',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -472,6 +479,7 @@ router.get(
 router.get(
   '/:storeId/insights/customers/:customerId/rfm',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -505,6 +513,7 @@ router.get(
 router.post(
   '/:storeId/insights/rollup/run-now',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {

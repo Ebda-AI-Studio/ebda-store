@@ -12,11 +12,17 @@ interface User {
   role: 'super_admin' | 'store_admin' | 'customer';
 }
 
+export interface MfaChallenge {
+  mfaRequired: true;
+  challengeToken: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void | MfaChallenge>;
+  completeMfaLogin: (challengeToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<boolean>;
 }
@@ -118,7 +124,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [isLoading, user, pathname, router]);
 
-  async function login(email: string, password: string) {
+  /** Shared token-storage logic used by both normal login and MFA completion. */
+  function storeSession(data: {
+    user: User;
+    accessToken?: string;
+    refreshToken: string;
+    csrfToken?: string;
+  }) {
+    if (data.accessToken) {
+      localStorage.setItem('accessToken', data.accessToken);
+    }
+    localStorage.setItem('refreshToken', data.refreshToken);
+    if (data.csrfToken) {
+      localStorage.setItem('csrfToken', data.csrfToken);
+    }
+    // Set session indicator cookie so middleware can gate admin pages.
+    // 30 days matches the API access-token JWT lifetime.
+    document.cookie = 'force-session=1; path=/; max-age=' + 30 * 24 * 60 * 60 + '; SameSite=Lax';
+    setUser(data.user);
+  }
+
+  async function login(email: string, password: string): Promise<void | MfaChallenge> {
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       credentials: 'include',
@@ -137,6 +163,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error?.message || 'Login failed');
     }
 
+    // MFA challenge: API returns { mfaRequired: true, challengeToken } instead
+    // of tokens. Surface this to the login page so it can show the code-entry step.
+    if (data.data?.mfaRequired) {
+      return { mfaRequired: true, challengeToken: data.data.challengeToken } as MfaChallenge;
+    }
+
     // Check if user is admin
     if (data.data.user.role !== 'super_admin' && data.data.user.role !== 'store_admin') {
       throw new Error('Access denied. Admin privileges required.');
@@ -147,18 +179,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // different parent domain than the admin) so cookie-only auth
     // doesn't survive PWA backgrounding. lib/api.ts sends this token
     // as `Authorization: Bearer` on every request.
-    if (data.data.accessToken) {
-      localStorage.setItem('accessToken', data.data.accessToken);
+    storeSession(data.data);
+    router.push('/');
+  }
+
+  async function completeMfaLogin(challengeToken: string, code: string): Promise<void> {
+    const response = await fetch(`${API_URL}/auth/mfa/verify`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeToken, code }),
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error('Server returned an invalid response. Please try again.');
     }
-    localStorage.setItem('refreshToken', data.data.refreshToken);
-    // Store CSRF token for state-changing requests
-    if (data.data.csrfToken) {
-      localStorage.setItem('csrfToken', data.data.csrfToken);
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Verification failed');
     }
-    // Set session indicator cookie so middleware can gate admin pages.
-    // 30 days matches the API access-token JWT lifetime.
-    document.cookie = 'force-session=1; path=/; max-age=' + 30 * 24 * 60 * 60 + '; SameSite=Lax';
-    setUser(data.data.user);
+
+    if (data.data.user.role !== 'super_admin' && data.data.user.role !== 'store_admin') {
+      throw new Error('Access denied. Admin privileges required.');
+    }
+
+    storeSession(data.data);
     router.push('/');
   }
 
@@ -194,6 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
+        completeMfaLogin,
         logout,
         refreshToken,
       }}

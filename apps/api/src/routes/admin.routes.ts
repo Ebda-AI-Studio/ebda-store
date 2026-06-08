@@ -1,8 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
@@ -27,6 +29,13 @@ const router = Router();
 // frontend can serve a tenant. Those routes apply ownership filtering at
 // the service layer (see ownerId scoping below).
 router.use(authenticate);
+
+// MFA enrollment gate: super_admin users MUST have MFA enabled to access
+// any admin route. store_admin and other roles pass through (opt-in).
+// Placed after authenticate (req.user is set) but before all route handlers.
+// Auth/MFA enroll routes are on a separate router (/auth, /auth/mfa) and
+// never reach this middleware, so enrollment is always reachable.
+router.use(requireMfaEnrolled);
 
 // Helper: enforce ownership when a store_admin is the caller. Super admins
 // pass through unscoped. Returns the userId to filter by, or undefined
@@ -1393,7 +1402,7 @@ router.get(
 // auditLog() as-is — it's already working in other /admin routes.
 //
 // SECURITY: super_admin only. Generates a 1-hour token (not a full
-// 7-day session) and logs the impersonation to the audit trail.
+// 30-day session) and logs the impersonation to the audit trail.
 // The impersonation token carries a `impersonatedBy` field so downstream
 // guards can reject it for high-privilege operations if desired.
 // =====================================================================
@@ -1427,7 +1436,14 @@ router.post(
       // over-engineering (the policy doesn't exist) and would waste a tx slot.
       const target = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, email: true, role: true, storeId: true, deletedAt: true },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          storeId: true,
+          deletedAt: true,
+          tokenVersion: true,
+        },
       });
 
       if (!target) {
@@ -1452,14 +1468,18 @@ router.post(
       }
 
       // Issue a 1-hour impersonation token. Short TTL minimises blast radius
-      // if the token is accidentally exposed. The token payload is identical
-      // to a normal access token so the admin frontend can use it as-is.
+      // if the token is accidentally exposed. The token carries tv + jti so
+      // it is revocable via the JTI denylist and per-user tokenVersion check,
+      // exactly like a normal access token (H1 fix).
       const impersonationToken = jwt.sign(
         {
           userId: target.id,
           email: target.email,
           role: target.role,
           storeId: target.storeId ?? null,
+          // Token version at issue time: lets revokeAllSessions() / logout-all
+          // invalidate impersonation tokens in the same sweep as real sessions.
+          tv: target.tokenVersion,
           // Non-standard claim — allows future guards to detect impersonation
           impersonatedBy: req.user!.userId,
         },
@@ -1470,6 +1490,9 @@ router.post(
           issuer: 'force-api',
           audience: 'force-app',
           subject: target.id,
+          // Unique jti so this token can be individually revoked via the
+          // JTI denylist (e.g. if the impersonation session must be ended early).
+          jwtid: crypto.randomUUID(),
         }
       );
 

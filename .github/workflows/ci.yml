@@ -266,7 +266,7 @@ jobs:
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
-          ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
+          ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
           INNGEST_DRY_RUN: 'true'
 
@@ -281,7 +281,7 @@ jobs:
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
-          ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
+          ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
           # Suppress inngest.send() network calls — dev server is not running in CI.
           # The client.ts no-op path activates when this is 'true' OR NODE_ENV=test.
@@ -367,7 +367,7 @@ jobs:
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
           JWT_SECRET: test-jwt-secret-for-ci-only-32chars
-          ENCRYPTION_KEY: test-encryption-key-for-ci-32ch
+          ENCRYPTION_KEY: test-encryption-key-for-ci-32chars
           NODE_ENV: test
           # Suppress inngest.send() network calls — dev server is not running in CI.
           INNGEST_DRY_RUN: 'true'

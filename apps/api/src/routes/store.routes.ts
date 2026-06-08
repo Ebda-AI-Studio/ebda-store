@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { Prisma, prisma, StoreStatus } from '@force/database';
 import { StoreService } from '../services/store.service';
@@ -274,6 +275,7 @@ const floatingWidgetSchema = z
 router.get(
   '/',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -299,6 +301,7 @@ router.get(
 router.get(
   '/:id',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -321,6 +324,7 @@ router.get(
 router.get(
   '/:id/stats',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -391,6 +395,7 @@ router.get(
 router.post(
   '/',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -415,6 +420,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -443,6 +449,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -475,6 +482,7 @@ router.delete(
 router.patch(
   '/:id/status',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -532,6 +540,7 @@ router.patch(
 router.put(
   '/:id/template',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -563,6 +572,7 @@ router.put(
 router.put(
   '/:id/theme',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -586,6 +596,7 @@ router.put(
 router.put(
   '/:id/branding',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -609,6 +620,7 @@ router.put(
 router.put(
   '/:id/social',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -632,6 +644,7 @@ router.put(
 router.put(
   '/:id/contact',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -655,6 +668,7 @@ router.put(
 router.get(
   '/:id/announcement',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -677,6 +691,7 @@ router.get(
 router.put(
   '/:id/announcement',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -705,6 +720,7 @@ router.put(
 router.put(
   '/:id/floating-widget',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -731,6 +747,7 @@ router.put(
 router.get(
   '/:id/seo',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -764,6 +781,7 @@ router.get(
 router.put(
   '/:id/seo',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -787,6 +805,7 @@ router.put(
 router.put(
   '/:id/marketing-pixels',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('marketing_pixels'),
@@ -816,6 +835,7 @@ router.put(
 router.get(
   '/:id/domain',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -921,6 +941,7 @@ router.get(
 router.put(
   '/:id/domain',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1125,6 +1146,7 @@ router.put(
 router.post(
   '/:id/email-sender/provision',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1144,6 +1166,7 @@ router.post(
 router.post(
   '/:id/email-sender/verify',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1170,6 +1193,7 @@ const faqSchema = z.object({
 router.get(
   '/:id/faqs',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1188,6 +1212,7 @@ router.get(
 router.post(
   '/:id/faqs',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1216,6 +1241,7 @@ router.post(
 router.put(
   '/:id/faqs/:faqId',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1247,6 +1273,7 @@ router.put(
 router.delete(
   '/:id/faqs/:faqId',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1286,6 +1313,7 @@ const howtoSchema = z.object({
 router.get(
   '/:id/howtos',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1304,6 +1332,7 @@ router.get(
 router.post(
   '/:id/howtos',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1334,6 +1363,7 @@ router.post(
 router.put(
   '/:id/howtos/:howtoId',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1373,6 +1403,7 @@ router.put(
 router.delete(
   '/:id/howtos/:howtoId',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {

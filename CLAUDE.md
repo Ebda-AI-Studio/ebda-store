@@ -283,7 +283,7 @@ authenticate → authorize('store_admin', 'super_admin') → requireStoreAccess 
 - Use `authorize()` for role checks, NOT `requireRole()` — standardized across all routes
 - Every endpoint with a storeId param MUST have `requireStoreAccess` (prevents cross-store access)
 - Public endpoints (no auth) should NOT have `requireStoreAccess`
-- JWT access tokens last 7 days — stale role requires re-login
+- JWT access tokens last 30 days — stale role requires re-login
 
 ## Code Standards
 

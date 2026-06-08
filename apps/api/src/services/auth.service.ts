@@ -7,6 +7,7 @@ import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { accountLockout } from './account-lockout.service';
 import logger from '../lib/logger';
+import { redis } from './redis.service';
 
 interface TokenPayload {
   userId: string;
@@ -14,6 +15,8 @@ interface TokenPayload {
   role: string;
   /** Tenant scope for customer accounts; NULL for platform admins. */
   storeId: string | null;
+  /** Token version for bulk revocation. Bumped on logout-all / password change. */
+  tv?: number;
 }
 
 interface AuthTokens {
@@ -439,12 +442,72 @@ export class AuthService {
     // Successful login - reset lockout
     await accountLockout.recordSuccessfulLogin(lockoutKey, ip);
 
-    // Generate tokens
+    // If MFA is enabled and a TOTP secret is configured, return a short-lived
+    // challenge token instead of a full session. The client must verify the
+    // TOTP code via /auth/mfa/verify to exchange it for a real session.
+    // Guard: mfaEnabled without mfaSecret is an inconsistent state (should
+    // not occur in production — /enroll/verify always sets both atomically).
+    // Treat it as "not yet fully enrolled" so login still issues a session;
+    // the requireMfaEnrolled middleware will use the mfaEnabled flag to gate
+    // access until a real TOTP secret is confirmed.
+    if (user.mfaEnabled && user.mfaSecret) {
+      // Stamp a jti on the challenge token so /auth/mfa/verify can maintain
+      // a per-challenge attempt counter in Redis (H2 brute-force guard).
+      const challengeToken = jwt.sign({ userId: user.id, purpose: 'mfa' }, config.jwtSecret, {
+        algorithm: 'HS256',
+        expiresIn: '5m',
+        issuer: 'force-api',
+        // Distinct audience so this token is NEVER accepted by the authenticate
+        // middleware (which requires audience:'force-app'). Belt-and-suspenders
+        // against token-confusion attacks where the challenge is used as a
+        // real access token before the second factor is verified.
+        audience: 'force-mfa-challenge',
+        // Unique id — lets /auth/mfa/verify key a per-challenge Redis counter
+        // so failed attempts are isolated per login attempt, not per IP.
+        jwtid: crypto.randomUUID(),
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return { mfaRequired: true, challengeToken } as any;
+    }
+
+    return this.issueSessionFor(user);
+  }
+
+  /**
+   * Issue a full session (access + refresh tokens) for an already-authenticated
+   * user. Extracted from `login()` so MFA-verify can reuse the same token-issue
+   * and response-shape logic without duplicating the cookie/payload construction.
+   *
+   * Returns the same shape as a normal login response: `{ user, accessToken, refreshToken }`.
+   */
+  static async issueSessionFor(user: {
+    id: string;
+    email: string;
+    storeId: string | null;
+    firstName: string;
+    lastName: string;
+    role: string;
+    emailVerified: boolean;
+    tokenVersion: number;
+  }): Promise<{
+    user: {
+      id: string;
+      email: string;
+      storeId: string | null;
+      firstName: string;
+      lastName: string;
+      role: string;
+      emailVerified: boolean;
+    };
+    accessToken: string;
+    refreshToken: string;
+  }> {
     const tokens = await this.generateTokens({
       userId: user.id,
       email: user.email,
       role: user.role,
       storeId: user.storeId,
+      tv: user.tokenVersion,
     });
 
     return {
@@ -518,11 +581,16 @@ export class AuthService {
     // back-link. Then mark the old token as rotated. Order matters: if
     // generateTokens fails after we've already revoked the old token,
     // the user is logged out without a replacement.
+    // L4 fix: pass the live tokenVersion so refreshed access tokens carry
+    // the current tv and are not spuriously rejected by the tv check in
+    // authenticate() when the user's tokenVersion has been bumped since
+    // the original access token was issued.
     const newTokens = await this.generateTokens({
       userId: storedToken.user.id,
       email: storedToken.user.email,
       role: storedToken.user.role,
       storeId: storedToken.user.storeId,
+      tv: storedToken.user.tokenVersion,
     });
 
     const newHash = crypto.createHash('sha256').update(newTokens.refreshToken).digest('hex');
@@ -671,6 +739,37 @@ export class AuthService {
     await prisma.refreshToken.updateMany({
       where: { userId, revokedAt: null, NOT: { token: { startsWith: 'reset:' } } },
       data: { revokedAt: new Date(), revokedReason: 'password_changed' },
+    });
+
+    // Bump tokenVersion so all outstanding access tokens (which carry the
+    // old tv claim) are rejected by the auth middleware on next use.
+    await AuthService.revokeAllSessions(userId);
+  }
+
+  /**
+   * Increment tokenVersion in DB + cache, and revoke all active refresh
+   * tokens for the user. Any issued access token carrying an older `tv`
+   * claim will be rejected by the authenticate middleware on next request.
+   * Fail-open: if Redis is unavailable, the DB increment is still written
+   * and the next authenticate call will re-populate the cache from DB.
+   */
+  static async revokeAllSessions(userId: string): Promise<void> {
+    // Atomically increment tokenVersion and read the new value.
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+      select: { tokenVersion: true },
+    });
+
+    // Warm the Redis cache with the new version so the middleware sees it
+    // immediately without a DB round-trip on the next request.
+    await redis.setUserTokenVersion(userId, updated.tokenVersion);
+
+    // Revoke all live refresh tokens — prevents session resumption via
+    // token rotation even before the access token's tv is checked.
+    await prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: 'revoke_all' },
     });
   }
 
@@ -951,14 +1050,18 @@ export class AuthService {
   }
 
   private static async generateTokens(payload: TokenPayload): Promise<AuthTokens> {
-    // Generate access token
-    const accessToken = jwt.sign(payload, config.jwtSecret, {
+    // Generate access token — stamped with a unique jti (for per-token
+    // revocation via the JTI denylist) and a tv (token version, for
+    // bulk revocation on logout-all / password change).
+    const accessJti = crypto.randomUUID();
+    const accessToken = jwt.sign({ ...payload, tv: payload.tv ?? 0 }, config.jwtSecret, {
       algorithm: 'HS256',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expiresIn: config.jwtExpiresIn as any,
       issuer: 'force-api',
       audience: 'force-app',
       subject: payload.userId,
+      jwtid: accessJti,
     });
 
     // Generate refresh token. Long-lived (1 year) so the admin PWA on

@@ -3592,7 +3592,17 @@
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
       "statActiveStores": "Active Stores",
       "statProducts": "Products",
-      "statOrders": "Orders"
+      "statOrders": "Orders",
+      "mfaRequired": "Verification Required",
+      "mfaSubtitle": "Enter the 6-digit code from your authenticator app",
+      "mfaCode": "Verification code",
+      "mfaCodePlaceholder": "000000",
+      "mfaVerify": "Verify",
+      "mfaVerifying": "Verifying…",
+      "mfaBackupLink": "Use a backup code instead",
+      "mfaBackupSubtitle": "Enter one of your saved backup codes",
+      "mfaTotpLink": "Use authenticator app instead",
+      "mfaInvalid": "Invalid or expired code. Please try again."
     }
   },
   "users": {
@@ -4302,5 +4312,45 @@
     "upgradeCta": "Upgrade to {plan}",
     "contactCta": "Talk to us",
     "alsoIncluded": "Also included in this plan"
+  },
+  "account": {
+    "security": {
+      "title": "Security",
+      "subtitle": "Manage two-factor authentication for your account",
+      "mfaBanner": "Two-factor authentication is required for super-admin accounts. Set it up now to continue using the platform.",
+      "mfaBannerCta": "Set up 2FA",
+      "statusEnabled": "Two-factor authentication is enabled",
+      "statusDisabled": "Two-factor authentication is not enabled",
+      "enableTitle": "Enable two-factor authentication",
+      "enableDescription": "Protect your account by requiring a verification code in addition to your password.",
+      "beginButton": "Set up 2FA",
+      "reEnrollButton": "Re-enroll (change authenticator app)",
+      "scanTitle": "Scan the QR code",
+      "scanDescription": "Open your authenticator app and scan this QR code, or enter the setup key manually.",
+      "manualKey": "Manual setup key",
+      "codeLabel": "Verification code",
+      "codePlaceholder": "000000",
+      "verifyButton": "Verify and enable",
+      "verifying": "Verifying…",
+      "currentCodeLabel": "Current verification code (required to change authenticator)",
+      "backupCodesTitle": "Save your backup codes",
+      "backupCodesDescription": "Save these one-time backup codes in a safe place. Each code can only be used once. If you lose access to your authenticator app, you can use these to sign in.",
+      "copyCodesButton": "Copy all codes",
+      "codeCopied": "Copied!",
+      "savedButton": "I have saved these codes",
+      "disableTitle": "Disable two-factor authentication",
+      "disableDescription": "You will need to enter your current verification code to disable 2FA.",
+      "disableButton": "Disable 2FA",
+      "disabling": "Disabling…",
+      "disableConfirmTitle": "Disable two-factor authentication?",
+      "disableConfirmDescription": "This will remove the extra security layer from your account. You can re-enable it at any time.",
+      "loading": "Loading…",
+      "errorLoading": "Failed to load security settings",
+      "errorBegin": "Failed to start enrollment. Please try again.",
+      "errorVerify": "Invalid code. Please check your authenticator app and try again.",
+      "errorDisable": "Invalid code. Please try again.",
+      "successEnabled": "2FA has been enabled for your account.",
+      "successDisabled": "2FA has been disabled."
+    }
   }
 }

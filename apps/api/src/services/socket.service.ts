@@ -27,6 +27,8 @@ interface AuthPayload {
   userId: string;
   email: string;
   role: string;
+  tv?: number;
+  purpose?: string;
 }
 
 interface NotificationPayload {
@@ -124,9 +126,60 @@ class SocketService {
           return next(new Error('Authentication required'));
         }
 
+        // M1 fix: verify with full issuer + audience constraints so MFA
+        // challenge tokens (audience:'force-mfa-challenge') and refresh tokens
+        // (type:'refresh') are rejected. Previously the socket auth accepted
+        // any JWT signed with our secret regardless of purpose/audience.
         const payload = jwt.verify(token, config.jwtSecret, {
           algorithms: ['HS256'],
-        }) as AuthPayload;
+          issuer: 'force-api',
+          audience: 'force-app',
+        }) as AuthPayload & { jti?: string };
+
+        // Belt-and-suspenders: reject tokens carrying a non-access purpose claim.
+        // Real access tokens have no `purpose` field.
+        if (payload.purpose && payload.purpose !== 'access') {
+          return next(new Error('Invalid token purpose'));
+        }
+
+        // M1 fix: apply the same revocation checks as the HTTP authenticate
+        // middleware. Fail-open on Redis unavailability (same as authenticate).
+        //
+        // Check 1: per-token JTI denylist
+        if (payload.jti) {
+          try {
+            const denied = await redis.isJtiDenied(payload.jti);
+            if (denied) {
+              return next(new Error('Token has been revoked'));
+            }
+          } catch {
+            // fail-open: Redis down → allow connection
+          }
+        }
+
+        // Check 2: per-user token version (bulk revocation on logout-all /
+        // password change). Read from Redis cache; fall back to DB on miss.
+        try {
+          const cachedTv = await redis.getUserTokenVersion(payload.userId);
+          let currentTv: number;
+          if (cachedTv === null) {
+            const u = await prisma.user.findUnique({
+              where: { id: payload.userId },
+              select: { tokenVersion: true },
+            });
+            currentTv = u?.tokenVersion ?? 0;
+            // Warm the cache so subsequent connections skip the DB lookup.
+            await redis.setUserTokenVersion(payload.userId, currentTv);
+          } else {
+            currentTv = cachedTv;
+          }
+          if ((payload.tv ?? 0) < currentTv) {
+            return next(new Error('Token has been revoked'));
+          }
+        } catch {
+          // fail-open: DB/Redis unavailable → allow connection
+        }
+
         socket.data.user = payload;
         next();
       } catch {

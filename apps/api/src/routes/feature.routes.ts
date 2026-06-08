@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { prisma } from '@force/database';
 import { featureKeySchema, featureUpdatesSchema, FEATURE_REGISTRY } from '@force/shared';
@@ -21,6 +22,7 @@ const router = Router();
 router.get(
   '/stores/:id/features',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -83,6 +85,7 @@ router.get(
 router.put(
   '/stores/:id/features',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -131,6 +134,7 @@ router.put(
 router.put(
   '/stores/:id/features/:featureKey',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -192,6 +196,7 @@ router.put(
 router.delete(
   '/stores/:id/features/:featureKey',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -239,6 +244,7 @@ router.delete(
 router.delete(
   '/stores/:id/features',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -277,6 +283,7 @@ router.delete(
 router.put(
   '/stores/:id/plan',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -341,6 +348,7 @@ router.put(
 router.get(
   '/:storeId/my-features',
   authenticate,
+  requireMfaEnrolled,
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

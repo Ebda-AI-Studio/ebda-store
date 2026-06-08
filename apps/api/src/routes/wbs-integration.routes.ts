@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { prisma } from '@force/database';
 import { authenticate } from '../middleware/auth';
 import { authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { encryption } from '../services/encryption.service';
 import { wbsBridgeService, WbsUnauthorizedError } from '../services/wbs-bridge.service';
@@ -140,6 +141,7 @@ function maskApiKey(encryptedKey: string | null | undefined): string {
 router.get(
   '/:id/integrations/wbs',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -279,6 +281,7 @@ router.get(
 router.put(
   '/:id/integrations/wbs',
   authenticate,
+  requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -705,6 +708,7 @@ router.put(
 router.post(
   '/:id/integrations/wbs/provision-meta-catalog',
   authenticate,
+  requireMfaEnrolled,
   authorize('super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
