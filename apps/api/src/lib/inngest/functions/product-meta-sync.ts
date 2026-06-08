@@ -47,7 +47,16 @@ export const productMetaSync = async ({
 
     const store = await prisma.store.findUnique({
       where: { id: storeId },
-      select: { metaCatalogId: true, settings: true },
+      select: {
+        metaCatalogId: true,
+        settings: true,
+        // For the Meta catalog feed fields (link / brand / currency) — FWB owns
+        // the storefront-URL truth; WBS just maps what we send.
+        name: true,
+        slug: true,
+        domain: true,
+        currency: true,
+      },
     });
 
     if (!store?.metaCatalogId) {
@@ -63,26 +72,42 @@ export const productMetaSync = async ({
       return { skipped: true, reason: 'no-wbs-url' };
     }
 
-    // For upsert: include the product payload so WBS doesn't need to call back
+    // For upsert: include the product payload so WBS doesn't need to call back.
+    // Enrich with the Meta feed fields WBS can't derive on its own:
+    //   - link     : the product's storefront URL (custom domain, else platform/slug)
+    //   - brand    : the store name
+    //   - currency : lives on the Store, not the Product
     let productPayload: Record<string, unknown> | null = null;
     if (action === 'upsert') {
-      // Note: currency lives on the Store, not the Product. WBS reads
-      // currency from the store config separately (via wa-ordering settings).
-      productPayload = await prisma.product.findUnique({
+      const product = await prisma.product.findUnique({
         where: { id: productId },
         select: {
           id: true,
           name: true,
           nameAr: true,
+          slug: true,
           price: true,
           description: true,
           images: { select: { url: true }, orderBy: { position: 'asc' }, take: 1 },
           status: true,
         },
       });
+      if (product) {
+        const storeBase = store.domain
+          ? `https://${store.domain}`
+          : `https://store.forcemediakw.com/${store.slug}`;
+        productPayload = {
+          ...product,
+          link: `${storeBase}/products/${product.slug}`,
+          brand: store.name,
+          currency: store.currency,
+        };
+      }
     }
 
-    const res = await fetch(`${wbsBase}/api/internal/inngest-receiver`, {
+    // WBS mounts external routes at /api/v1/external (server.js), so the
+    // receiver lives at /api/v1/external/internal/inngest-receiver.
+    const res = await fetch(`${wbsBase}/api/v1/external/internal/inngest-receiver`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

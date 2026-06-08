@@ -73,6 +73,10 @@ describe('productMetaSync', () => {
         findUnique: vi.fn().mockResolvedValue({
           metaCatalogId: 'cat123',
           settings: { wbsBaseUrl: 'http://wbs:3001' },
+          name: 'Wady Aljuz',
+          slug: 'wady-aljuz',
+          domain: 'wadyaljuz.com',
+          currency: 'KWD',
         }),
       },
       product: {
@@ -80,10 +84,10 @@ describe('productMetaSync', () => {
           id: 'prod1',
           name: 'Test Product',
           nameAr: null,
+          slug: 'test-product',
           price: 1000,
-          currency: 'KWD',
           description: null,
-          images: [],
+          images: [{ url: 'https://img/p.jpg' }],
           status: 'active',
         }),
       },
@@ -92,12 +96,19 @@ describe('productMetaSync', () => {
     const result = await productMetaSync({ event, step, prisma: mockPrisma as any });
     expect(result.skipped).toBe(false);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://wbs:3001/api/internal/inngest-receiver',
+      'http://wbs:3001/api/v1/external/internal/inngest-receiver',
       expect.objectContaining({
         method: 'POST',
         body: expect.stringContaining('"action":"upsert"'),
       })
     );
+    // payload enriched with the Meta feed fields WBS can't derive
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.product).toMatchObject({
+      link: 'https://wadyaljuz.com/products/test-product',
+      brand: 'Wady Aljuz',
+      currency: 'KWD',
+    });
   });
 
   it('calls WBS receiver for delete action without fetching product', async () => {
@@ -120,7 +131,7 @@ describe('productMetaSync', () => {
     // Product should NOT be fetched for delete
     expect(mockPrisma.product.findUnique).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://wbs:3001/api/internal/inngest-receiver',
+      'http://wbs:3001/api/v1/external/internal/inngest-receiver',
       expect.objectContaining({
         body: expect.stringContaining('"action":"delete"'),
       })
