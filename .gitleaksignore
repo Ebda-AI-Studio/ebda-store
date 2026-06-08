@@ -15,3 +15,10 @@ d6d35fa6dd3b1a3b2a6b72bbabb1cdfcc478e1fb:docs/apps-script-gmail-to-telegram.gs:g
 c8e3b3ba15048ba4c9c9d741d902698ef06a3355:.github/workflows/ci.yml:generic-api-key:210
 768cc5e9298be4b497cc0a181731e0b480086e25:.github/workflows/ci.yml:generic-api-key:159
 768cc5e9298be4b497cc0a181731e0b480086e25:.github/workflows/ci.yml:generic-api-key:215
+
+# CI-only test secrets hardcoded in ci.yml (literal "test-encryption-key-for-ci-32ch")
+# — false positives, not real keys. TODO: move to generated test setup (see memory
+# feedback-test-secret-in-setup-not-ci-yaml) so they don't need allowlisting.
+8a6629ddf256b0b33eb530abb1bc2dd062b5259f:.github/workflows/ci.yml:generic-api-key:266
+8a6629ddf256b0b33eb530abb1bc2dd062b5259f:.github/workflows/ci.yml:generic-api-key:281
+8a6629ddf256b0b33eb530abb1bc2dd062b5259f:.github/workflows/ci.yml:generic-api-key:364
