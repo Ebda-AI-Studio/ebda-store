@@ -65,7 +65,7 @@ export function SidebarHeader({
                 src="/logo.svg"
                 alt={tb('forceMediaAlt')}
                 width={20}
-                height={15}
+                height={17}
                 className="brightness-0 invert"
                 unoptimized
               />
