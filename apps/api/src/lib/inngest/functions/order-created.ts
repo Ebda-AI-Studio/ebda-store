@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { EmailService, type OrderEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
@@ -40,17 +40,23 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    const order = await step.run('load-order', async () => {
-      const row = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: {
-          customer: true,
-          items: true,
-        },
-      });
-      if (!row) throw new Error(`Order ${orderId} not found`);
-      return row;
-    });
+    // FORCE RLS (migration complete_force_rls_coverage) filters orders to 0 rows
+    // unless the tenant GUC is set. Inngest jobs run OUTSIDE the HTTP request, so
+    // there is no tenant-context middleware here — set it explicitly from the
+    // event's storeId, or this findUnique returns null and the fanout dies.
+    const order = await step.run('load-order', async () =>
+      runInTenantContext(storeId, async () => {
+        const row = await prisma.order.findUnique({
+          where: { id: orderId },
+          include: {
+            customer: true,
+            items: true,
+          },
+        });
+        if (!row) throw new Error(`Order ${orderId} not found`);
+        return row;
+      })
+    );
 
     // Buyer's locale: prefer event payload (set at enqueue time), then
     // the persisted Order.locale, then fall through to store default.
@@ -91,12 +97,14 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     };
 
     const store = await step.run('load-store', () =>
-      prisma.store
-        .findUnique({
-          where: { id: storeId },
-          select: { name: true, wbsTemplates: true },
-        })
-        .catch(() => null)
+      runInTenantContext(storeId, () =>
+        prisma.store
+          .findUnique({
+            where: { id: storeId },
+            select: { name: true, wbsTemplates: true },
+          })
+          .catch(() => null)
+      )
     );
 
     // Origin-aware notification routing: orders that originated on

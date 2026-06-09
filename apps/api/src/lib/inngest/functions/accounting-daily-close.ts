@@ -20,11 +20,14 @@ export const accountingDailyClose: InngestFunction.Any = inngest.createFunction(
     triggers: [{ cron: '0 22 * * *' }],
   },
   async ({ step }) => {
+    // FORCE RLS: cross-tenant cron — use withRlsBypass to enumerate stores.
     const stores = await step.run('list-stores-with-accounting', () =>
-      prisma.store.findMany({
-        where: { accountingEnabled: true, deletedAt: null },
-        select: { id: true, name: true, slug: true },
-      })
+      withRlsBypass(tx =>
+        tx.store.findMany({
+          where: { accountingEnabled: true, deletedAt: null },
+          select: { id: true, name: true, slug: true },
+        })
+      )
     );
 
     let drifts = 0;

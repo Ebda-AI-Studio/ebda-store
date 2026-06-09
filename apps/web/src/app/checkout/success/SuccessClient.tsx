@@ -13,10 +13,23 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
 import { formatDate } from '@/lib/format-date';
 
+// Payment verification outcome that drives the truthful headline/icon.
+//   verifying → we're asking the API to confirm with the gateway
+//   paid      → provider confirmed PAID
+//   pending   → provider hasn't reported a final status yet (KNET delay)
+//   failed    → provider reported failed/expired/cancelled
+//   cod       → cash on delivery (no gateway to verify)
+//   unknown   → verify couldn't run (no orderId / network) — neutral copy
+type PaymentState = 'verifying' | 'paid' | 'pending' | 'failed' | 'cod' | 'unknown';
+
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams?.get('orderId');
   const isCod = searchParams?.get('cod') === '1';
+  // MyFatoorah appends its PaymentId to the success URL on return; the
+  // casing varies (`paymentId` vs `Id`). Forward it to the API for the
+  // audit trail — authorization rides on the order UUID, not this value.
+  const returnPaymentId = searchParams?.get('paymentId') || searchParams?.get('Id') || undefined;
   const storeUrl = useStoreUrl();
   const { store } = useStore();
   const { clearCart } = useCart();
@@ -24,6 +37,8 @@ function SuccessContent() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [, setIsLoading] = useState(true);
+  const [paymentState, setPaymentState] = useState<PaymentState>(isCod ? 'cod' : 'verifying');
+  const [pixelFired, setPixelFired] = useState(false);
 
   useEffect(() => {
     // Clear cart on successful checkout
@@ -33,73 +48,145 @@ function SuccessContent() {
   useEffect(() => {
     if (!orderId) {
       setIsLoading(false);
+      setPaymentState(prev => (prev === 'cod' ? 'cod' : 'unknown'));
       return;
     }
 
-    async function fetchOrder() {
+    let cancelled = false;
+
+    async function run() {
+      // For online payments, verify-on-return FIRST so the page tells the
+      // truth (paid vs pending vs failed) instead of always claiming
+      // "confirmed". This is the reliable confirmation path — it also
+      // triggers the same server-side fanout (email/push/accounting) the
+      // missed webhook would have. Idempotent + safe to call on reload.
+      if (!isCod) {
+        try {
+          const verify = await api.verifyOrderPayment(orderId!, returnPaymentId);
+          if (!cancelled && verify.success && verify.data) {
+            const s = verify.data.paymentStatus;
+            setPaymentState(s === 'paid' ? 'paid' : s === 'failed' ? 'failed' : 'pending');
+          } else if (!cancelled) {
+            setPaymentState('pending');
+          }
+        } catch {
+          // Verification network error — show pending (truthful: we don't
+          // know yet). The webhook backup + the customer's order page will
+          // still reflect the real status once it settles.
+          if (!cancelled) setPaymentState('pending');
+        }
+      }
+
       try {
         const result = await api.getOrder(orderId!);
-        if (result.success && result.data) {
+        if (!cancelled && result.success && result.data) {
           const fetchedOrder = result.data.order;
           setOrder(fetchedOrder);
 
-          // Fire Purchase pixel event with real order data
-          trackPurchase({
-            orderId: fetchedOrder.id,
-            contentIds: fetchedOrder.items.map(item => item.productId),
-            numItems: fetchedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
-            value: fetchedOrder.total / 1000,
-            currency: 'KWD',
-          });
+          // Only fire the Purchase pixel for a CONFIRMED sale — COD orders
+          // (committed) or online orders the provider reported paid. Don't
+          // attribute revenue for a pending/failed gateway return.
+          const confirmed = isCod || fetchedOrder.paymentStatus === 'paid';
+          if (confirmed && !pixelFired) {
+            setPixelFired(true);
+            trackPurchase({
+              orderId: fetchedOrder.id,
+              contentIds: fetchedOrder.items.map(item => item.productId),
+              numItems: fetchedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
+              value: fetchedOrder.total / 1000,
+              currency: 'KWD',
+            });
+          }
         }
       } catch {
         // Non-critical - page still works without order details
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
 
-    fetchOrder();
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
+
+  // Truthful headline + sub-copy per verified state.
+  const heading =
+    paymentState === 'failed'
+      ? t('Payment not completed', 'لم يكتمل الدفع')
+      : paymentState === 'pending'
+        ? t('Confirming your payment…', 'جاري تأكيد الدفع…')
+        : t('Thank you for your order!', 'شكراً لطلبك!');
+
+  const subCopy =
+    paymentState === 'failed'
+      ? t(
+          'We could not confirm your payment. If you were charged, it will be reconciled shortly — otherwise please try again.',
+          'لم نتمكن من تأكيد الدفع. إذا تم خصم المبلغ فسيتم تسويته قريباً، وإلا يرجى المحاولة مرة أخرى.'
+        )
+      : paymentState === 'pending'
+        ? t(
+            'Your payment is being confirmed. This page will update, or check your order status shortly.',
+            'جاري تأكيد دفعتك. ستتحدث هذه الصفحة، أو تحقق من حالة طلبك بعد قليل.'
+          )
+        : isCod
+          ? t(
+              'Your order has been placed. Please have the payment ready when your order is delivered.',
+              'تم تقديم طلبك. يرجى تجهيز المبلغ عند استلام الطلب.'
+            )
+          : t(
+              'Your payment is confirmed and your order will be shipped soon.',
+              'تم تأكيد دفعتك وسيتم شحن طلبك قريباً.'
+            );
 
   return (
     <MinimalChrome>
       <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
-          {/* Success Icon */}
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--success))]/20">
-            <svg
-              className="h-10 w-10 text-[hsl(var(--success))]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
+          {/* Status icon \u2014 reflects the VERIFIED payment state, not an
+              unconditional checkmark. */}
+          {paymentState === 'verifying' || paymentState === 'pending' ? (
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--warning))]/15">
+              <div className="h-9 w-9 animate-spin rounded-full border-4 border-[hsl(var(--warning))] border-t-transparent" />
+            </div>
+          ) : paymentState === 'failed' ? (
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--destructive,0_84%_60%))]/15">
+              <svg
+                className="h-10 w-10 text-[hsl(var(--destructive,0_84%_60%))]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </div>
+          ) : (
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--success))]/20">
+              <svg
+                className="h-10 w-10 text-[hsl(var(--success))]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+          )}
 
-          <h1 className="mt-6 text-3xl font-bold text-foreground">
-            {t(
-              'Thank you for your order!',
-              '\u0634\u0643\u0631\u0627\u064b \u0644\u0637\u0644\u0628\u0643!'
-            )}
-          </h1>
-          <p className="mt-2 text-lg text-muted-foreground">
-            {isCod
-              ? t(
-                  'Your order has been placed. Please have the payment ready when your order is delivered.',
-                  '\u062a\u0645 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628\u0643. \u064a\u0631\u062c\u0649 \u062a\u062c\u0647\u064a\u0632 \u0627\u0644\u0645\u0628\u0644\u063a \u0639\u0646\u062f \u0627\u0633\u062a\u0644\u0627\u0645 \u0627\u0644\u0637\u0644\u0628.'
-                )
-              : t(
-                  'Your order has been confirmed and will be shipped soon.',
-                  '\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u0637\u0644\u0628\u0643 \u0648\u0633\u064a\u062a\u0645 \u0634\u062d\u0646\u0647 \u0642\u0631\u064a\u0628\u0627\u064b.'
-                )}
-          </p>
+          <h1 className="mt-6 text-3xl font-bold text-foreground">{heading}</h1>
+          <p className="mt-2 text-lg text-muted-foreground">{subCopy}</p>
 
           {isCod && (
             <div className="mt-4 rounded-lg border border-[hsl(var(--warning))]/30 bg-[hsl(var(--warning))]/10 px-4 py-3">
@@ -261,14 +348,25 @@ function SuccessContent() {
           </div>
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
-            <Link href={storeUrl('/products')}>
-              <Button size="lg">
-                {t(
-                  'Continue Shopping',
-                  '\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
-                )}
-              </Button>
-            </Link>
+            {paymentState === 'failed' && orderId ? (
+              <Link href={storeUrl(`/checkout?orderId=${orderId}`)}>
+                <Button size="lg">
+                  {t(
+                    'Try payment again',
+                    '\u0625\u0639\u0627\u062f\u0629 \u0645\u062d\u0627\u0648\u0644\u0629 \u0627\u0644\u062f\u0641\u0639'
+                  )}
+                </Button>
+              </Link>
+            ) : (
+              <Link href={storeUrl('/products')}>
+                <Button size="lg">
+                  {t(
+                    'Continue Shopping',
+                    '\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062a\u0633\u0648\u0642'
+                  )}
+                </Button>
+              </Link>
+            )}
             <Link href={storeUrl('/account/orders')}>
               <Button size="lg" variant="outline">
                 {t(

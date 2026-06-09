@@ -23,6 +23,9 @@ import { setEdgeCache } from '../lib/edge-cache';
 import { stripMarketingPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { verifyReviewToken } from '../lib/review-token';
 import { inngest } from '../lib/inngest/client';
+import { PaymentService } from '../services/payment-providers/payment.factory';
+import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
+import type { PaymentProvider } from '../services/payment-providers/types';
 
 const router = Router();
 
@@ -529,6 +532,192 @@ router.get(
         success: true,
         data: { order },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /orders/:id/verify-payment — GUEST-SAFE verify-on-return.
+//
+// THE PRIMARY payment-confirmation path. MyFatoorah's webhook is
+// configured account-level in their portal and does NOT fire per
+// invoice for FWB, so the storefront success page must actively ask
+// the provider "is this invoice paid?" on return and reconcile our DB.
+// The webhook path remains as a backup (when a store DOES wire the
+// portal webhook).
+//
+// AUTHZ (guest-safe, IDOR-resistant — most buyers are not logged in):
+//   1. The orderId in the path is a v4 UUID handed back from
+//      /public/orders moments ago — practically unguessable. Same trust
+//      model as GET /public/orders/:id and /payments/create.
+//   2. customerId guard: signed-in customers may only verify their own
+//      order; for guest orders (customerId === null) possession of the
+//      UUID is the credential. An admin/customer cookie that doesn't
+//      own the order is rejected (mirrors GET /orders/:id exactly).
+//   3. The mark-paid transition is ONLY driven by the provider's own
+//      GetPaymentStatus answer for THIS order's stored invoice/
+//      transaction id. A caller cannot fabricate "paid" — even if they
+//      somehow guessed a UUID, the order only flips to paid when
+//      MyFatoorah independently reports that invoice as Paid. The
+//      optional `paymentId` from the redirect URL is recorded for the
+//      audit trail but is never trusted as proof of payment on its own.
+//
+// IDEMPOTENT: safe to call on every page load / retry. The shared
+// confirmPaymentFromProviderStatus helper only writes + fans out on a
+// real transition, so a later webhook (or a second verify) is a no-op.
+const verifyPaymentSchema = z.object({
+  // MyFatoorah appends ?paymentId=<id> (sometimes ?Id=) to the success
+  // URL. Optional + recorded for audit only — authorization rides on the
+  // order UUID + the provider's status answer, not on this value.
+  paymentId: z.string().trim().min(1).max(128).optional(),
+});
+
+router.post(
+  '/orders/:id/verify-payment',
+  optionalAuthenticate,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const body = verifyPaymentSchema.parse(req.body ?? {});
+      const storeId = await getStoreIdFromRequest(req);
+
+      const order = await prisma.order.findFirst({
+        where: { id, storeId, deletedAt: null },
+        select: {
+          id: true,
+          storeId: true,
+          customerId: true,
+          paymentStatus: true,
+          locale: true,
+          payments: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              id: true,
+              status: true,
+              provider: true,
+              transactionId: true,
+              metadata: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Order not found' },
+        });
+        return;
+      }
+
+      // Same ownership guard as GET /orders/:id.
+      const isCustomer = req.user?.role === 'customer';
+      if (isCustomer) {
+        if (order.customerId !== req.user!.userId) {
+          res.status(403).json({
+            success: false,
+            error: { code: 'FORBIDDEN', message: 'Not authorized to verify this order' },
+          });
+          return;
+        }
+      } else if (order.customerId !== null) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Not authorized to verify this order' },
+        });
+        return;
+      }
+
+      const payment = order.payments[0];
+
+      // Already paid → idempotent success. Don't bother re-asking the
+      // provider; the webhook (or an earlier verify) already reconciled.
+      if (order.paymentStatus === 'paid') {
+        res.json({
+          success: true,
+          data: { paymentStatus: 'paid', providerStatus: 'completed', statusChanged: false },
+        });
+        return;
+      }
+
+      // COD orders have a cod_pending payment and never an online provider
+      // transaction — there's nothing to verify against a gateway.
+      if (!payment || !payment.transactionId || payment.provider === 'cod') {
+        res.json({
+          success: true,
+          data: {
+            paymentStatus: order.paymentStatus === 'failed' ? 'failed' : 'unpaid',
+            providerStatus: 'pending',
+            statusChanged: false,
+          },
+        });
+        return;
+      }
+
+      // Ask the provider directly. PaymentService resolves the provider +
+      // per-store credentials from the stored payment row. We key on OUR
+      // stored transactionId (the invoice id), which is the authoritative
+      // link to this order — not the redirect's paymentId.
+      //
+      // Fail-soft: a provider/network blip here must NOT 500 the success
+      // page. Return a truthful "pending" so the customer sees "confirming…"
+      // and the webhook backup (or a later reload) reconciles. The order
+      // stays unpaid until we actually get a Paid answer — never optimistic.
+      let status;
+      try {
+        status = await PaymentService.getPaymentStatus(
+          payment.transactionId,
+          payment.provider as PaymentProvider,
+          storeId
+        );
+      } catch (err) {
+        logger.warn(
+          { err, orderId: order.id, storeId },
+          '[VERIFY-ON-RETURN] provider getPaymentStatus failed — returning pending'
+        );
+        res.json({
+          success: true,
+          data: { paymentStatus: 'unpaid', providerStatus: 'pending', statusChanged: false },
+        });
+        return;
+      }
+
+      const result = await confirmPaymentFromProviderStatus({
+        payment: {
+          id: payment.id,
+          status: payment.status,
+          provider: payment.provider,
+          metadata: {
+            ...((payment.metadata as object) || {}),
+            ...(body.paymentId ? { returnPaymentId: body.paymentId } : {}),
+          },
+        },
+        order: {
+          id: order.id,
+          storeId: order.storeId,
+          paymentStatus: order.paymentStatus,
+          locale: order.locale,
+        },
+        providerStatus: status,
+        source: 'guest_verify',
+        triggeredByUserId: req.user?.role === 'customer' ? req.user.userId : null,
+      });
+
+      logger.info(
+        {
+          orderId: order.id,
+          storeId,
+          providerStatus: result.providerStatus,
+          paymentStatus: result.paymentStatus,
+          statusChanged: result.statusChanged,
+        },
+        '[VERIFY-ON-RETURN] guest payment verification'
+      );
+
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

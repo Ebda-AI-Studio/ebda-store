@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { EmailService, type OrderRefundEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
@@ -41,17 +41,21 @@ export const orderRefunded: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    const order = await step.run('load-order', async () => {
-      const row = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: {
-          customer: true,
-          payments: { orderBy: { createdAt: 'desc' } },
-        },
-      });
-      if (!row) throw new Error(`Order ${orderId} not found`);
-      return row;
-    });
+    // FORCE RLS: Inngest jobs run outside HTTP — no tenant context middleware.
+    // Wrap every prisma call in runInTenantContext(storeId) so RLS filters correctly.
+    const order = await step.run('load-order', () =>
+      runInTenantContext(storeId, async () => {
+        const row = await prisma.order.findUnique({
+          where: { id: orderId },
+          include: {
+            customer: true,
+            payments: { orderBy: { createdAt: 'desc' } },
+          },
+        });
+        if (!row) throw new Error(`Order ${orderId} not found`);
+        return row;
+      })
+    );
 
     // Refund amount: prefer the latest payment's refundedAmount (set by
     // payment.factory.refund), fall back to order total for status-button
@@ -91,7 +95,11 @@ export const orderRefunded: InngestFunction.Any = inngest.createFunction(
     };
 
     const store = await step.run('load-store', () =>
-      prisma.store.findUnique({ where: { id: storeId }, select: { name: true } }).catch(() => null)
+      runInTenantContext(storeId, () =>
+        prisma.store
+          .findUnique({ where: { id: storeId }, select: { name: true } })
+          .catch(() => null)
+      )
     );
 
     await Promise.allSettled([

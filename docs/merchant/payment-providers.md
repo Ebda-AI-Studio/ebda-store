@@ -185,9 +185,18 @@ A merchant configuring a different store's credentials can't intercept anyone el
 
 ---
 
+## How a paid order is confirmed (two paths)
+
+Force Store confirms an online payment via **two** independent paths, so a single misconfigured webhook can't leave a paid order stuck:
+
+1. **Verify-on-return (primary).** The moment the customer returns to the order-success page after paying, Force Store asks the provider directly "is this invoice paid?" and — if yes — marks the order paid and fires all your notifications (email + admin push + WhatsApp). This works even when the provider's webhook isn't configured. The success page then shows the truthful status: **paid**, **confirming…**, or **payment not completed** (with a "Try payment again" button).
+2. **Webhook (backup).** If you've pasted the webhook URL into your provider portal, the provider also pushes the status to us. This is the safety net — and it's idempotent with path (1), so the customer/admin never get duplicate notifications.
+
+طريقتان مستقلتان لتأكيد الدفع: (1) **التحقق عند العودة** — بمجرد رجوع العميل لصفحة نجاح الطلب نسأل المزوّد مباشرة إن كان الدفع تمّ، ونؤكد الطلب ونرسل الإشعارات؛ (2) **الويب هوك** كخط احتياطي. الطريقتان لا تُكرّران الإشعارات.
+
 ## What if a webhook fails?
 
-If Force Store can't reach your payment provider (or vice versa), the order stays in `payment_status=pending` until the webhook eventually arrives. Most providers retry automatically for 24h.
+With verify-on-return above, a missed webhook usually no longer leaves an order stuck — the success page already confirmed it. If a customer closes the browser at exactly the wrong moment AND the webhook is unconfigured, the order can still sit at `payment_status=pending`. Most providers also retry the webhook automatically for 24h.
 
 If the order is stuck in `pending` for >1 hour:
 

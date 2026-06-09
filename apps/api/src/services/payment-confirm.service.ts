@@ -1,0 +1,204 @@
+/**
+ * payment-confirm.service.ts
+ *
+ * Single source of truth for "the provider told us this invoice is PAID
+ * (or failed) — reconcile our Order + Payment rows and run the
+ * post-payment fanout exactly once".
+ *
+ * Three callers reach the same provider-status → DB-state transition:
+ *   1. The webhook handler (`PaymentService.handleWebhook`) — the canonical
+ *      push path. It keeps its own inline logic because it also handles
+ *      refunds, HMAC verification, and route-level idempotency.
+ *   2. The admin "Refresh payment" button
+ *      (`POST /stores/:storeId/orders/:orderId/refresh-payment-status`).
+ *   3. The GUEST verify-on-return endpoint
+ *      (`POST /public/orders/:orderId/verify-payment`) — the reliable
+ *      primary confirmation path, because MyFatoorah's webhook is
+ *      configured account-level in their portal and never fires per-invoice.
+ *
+ * Callers (2) and (3) both call `confirmPaymentFromProviderStatus`, so the
+ * pull-side reconciliation logic lives in ONE place.
+ *
+ * IDEMPOTENCY (money code — mandatory): the function is safe to call
+ * repeatedly for the same payment. It compares the provider-reported
+ * status against the order's CURRENT `paymentStatus` and only writes +
+ * fans out on a real transition. A later webhook landing AFTER a verify
+ * call (or two concurrent verify calls) is a no-op the second time — the
+ * `order/created` Inngest event (which itself has concurrency-keyed
+ * idempotency) is only enqueued on the first transition into `paid`.
+ */
+
+import { prisma } from '@force/database';
+import type { PaymentStatus } from '@force/database';
+import { inngest } from '../lib/inngest/client';
+import logger from '../lib/logger';
+import { recordPaymentEvent } from './payment-event.service';
+import type { PaymentStatusResponse } from './payment-providers/types';
+
+export type ConfirmSource = 'admin_refresh' | 'guest_verify';
+
+export interface ConfirmPaymentInput {
+  /** The Payment row to reconcile (must carry a transactionId). */
+  payment: {
+    id: string;
+    status: string;
+    provider: string;
+    metadata: unknown;
+  };
+  /** The Order the payment belongs to. */
+  order: {
+    id: string;
+    storeId: string;
+    paymentStatus: string;
+    locale?: string | null;
+  };
+  /** The status the provider just reported (from getPaymentStatus). */
+  providerStatus: PaymentStatusResponse;
+  /** Who/what triggered this reconciliation — drives the audit metadata. */
+  source: ConfirmSource;
+  /** Admin user id when source === 'admin_refresh'; null for guest. */
+  triggeredByUserId?: string | null;
+}
+
+export interface ConfirmPaymentResult {
+  /** Normalised order paymentStatus after reconciliation. */
+  paymentStatus: 'paid' | 'failed' | 'unpaid';
+  /** Raw provider status ('completed' | 'failed' | 'expired' | 'pending' | ...). */
+  providerStatus: string;
+  /** True when this call performed a real state transition + fanout. */
+  statusChanged: boolean;
+}
+
+/**
+ * Reconcile an order against a freshly-fetched provider payment status.
+ *
+ * Mirrors the webhook handler's state machine:
+ *   completed              → order.status=confirmed, paymentStatus=paid + order/created fanout
+ *   failed | expired       → order.paymentStatus=failed (no fanout)
+ *   cancelled              → treated as failed
+ *   pending | processing   → no change
+ */
+export async function confirmPaymentFromProviderStatus(
+  input: ConfirmPaymentInput
+): Promise<ConfirmPaymentResult> {
+  const { payment, order, providerStatus, source, triggeredByUserId = null } = input;
+  const status = providerStatus.status;
+
+  // Determine whether this is a genuine transition vs a redundant call.
+  // We compare against the ORDER's current paymentStatus (the durable
+  // signal a customer/merchant sees) so a duplicate verify or a webhook
+  // that arrives after a verify is a no-op the second time. This is the
+  // idempotency guard for the pull-side paths.
+  const statusChanged =
+    status === 'completed'
+      ? order.paymentStatus !== 'paid'
+      : status === 'failed' || status === 'expired' || status === 'cancelled'
+        ? order.paymentStatus !== 'failed'
+        : false;
+
+  if (status === 'completed') {
+    if (!statusChanged) {
+      // Already paid — nothing to do. Never re-fire the fanout.
+      return { paymentStatus: 'paid', providerStatus: status, statusChanged: false };
+    }
+
+    await prisma.$transaction([
+      prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'completed',
+          paidAt: providerStatus.paidAt ?? new Date(),
+          metadata: {
+            ...((payment.metadata as object) || {}),
+            confirmedVia: source,
+            ...(triggeredByUserId ? { confirmedBy: triggeredByUserId } : {}),
+            confirmedAt: new Date().toISOString(),
+          },
+        },
+      }),
+      prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'confirmed', paymentStatus: 'paid' },
+      }),
+    ]);
+
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      storeId: order.storeId,
+      orderId: order.id,
+      // Admin refresh is an explicit human action; guest verify-on-return is
+      // a pull-side settlement reconciliation (we asked the provider, not the
+      // provider pushing to us) — categorise accordingly. The `source` detail
+      // disambiguates within each bucket.
+      eventType: source === 'admin_refresh' ? 'admin_action' : 'reconciliation',
+      fromStatus: payment.status as PaymentStatus,
+      toStatus: 'completed',
+      provider: payment.provider,
+      triggeredByUserId,
+      details: { source, reason: 'provider_status_confirmed_paid', providerStatus: status },
+    });
+
+    // Fire the SAME post-payment fanout the webhook handler does so
+    // notifications (email + admin push + WhatsApp) + accounting + loyalty
+    // catch up on the missed webhook. The Inngest function is
+    // concurrency-keyed per store with its own idempotency, so even if a
+    // delayed webhook ALSO enqueues order/created, it won't double-send.
+    inngest
+      .send({
+        name: 'order/created',
+        data: {
+          orderId: order.id,
+          storeId: order.storeId,
+          paymentMethod: payment.provider,
+          locale: order.locale ?? undefined,
+        },
+      })
+      .catch((err: unknown) =>
+        logger.error(
+          { err, orderId: order.id, source },
+          '[PAYMENT CONFIRM] Failed to enqueue post-payment order/created'
+        )
+      );
+
+    return { paymentStatus: 'paid', providerStatus: status, statusChanged: true };
+  }
+
+  if (status === 'failed' || status === 'expired' || status === 'cancelled') {
+    if (!statusChanged) {
+      return { paymentStatus: 'failed', providerStatus: status, statusChanged: false };
+    }
+
+    await prisma.$transaction([
+      prisma.payment.update({
+        where: { id: payment.id },
+        data: { status },
+      }),
+      prisma.order.update({
+        where: { id: order.id },
+        data: { paymentStatus: 'failed' },
+      }),
+    ]);
+
+    await recordPaymentEvent({
+      paymentId: payment.id,
+      storeId: order.storeId,
+      orderId: order.id,
+      eventType: source === 'admin_refresh' ? 'admin_action' : 'reconciliation',
+      fromStatus: payment.status as PaymentStatus,
+      toStatus: status,
+      provider: payment.provider,
+      triggeredByUserId,
+      details: { source, reason: 'provider_status_confirmed_failed', providerStatus: status },
+    });
+
+    return { paymentStatus: 'failed', providerStatus: status, statusChanged: true };
+  }
+
+  // pending / processing / unknown — no change. The customer can refresh
+  // again; the merchant's Refresh button remains the manual backstop.
+  return {
+    paymentStatus: order.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+    providerStatus: status,
+    statusChanged: false,
+  };
+}

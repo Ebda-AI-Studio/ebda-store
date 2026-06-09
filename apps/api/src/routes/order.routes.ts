@@ -12,6 +12,7 @@ import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { recordPaymentEvent } from '../services/payment-event.service';
+import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.service';
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
 import type { Currency } from '../services/payment-providers/types';
@@ -596,92 +597,27 @@ router.post(
         storeId
       );
 
-      const statusChanged =
-        status.status === 'completed'
-          ? order.paymentStatus !== 'paid'
-          : status.status === 'failed' ||
-              status.status === 'expired' ||
-              status.status === 'cancelled'
-            ? order.paymentStatus !== 'failed'
-            : false;
-
-      if (status.status === 'completed') {
-        await prisma.$transaction([
-          prisma.payment.update({
-            where: { id: payment.id },
-            data: {
-              status: 'completed',
-              paidAt: status.paidAt ?? new Date(),
-              metadata: {
-                ...((payment.metadata as object) || {}),
-                refreshedManually: true,
-                refreshedBy: user.userId,
-                refreshedAt: new Date().toISOString(),
-              },
-            },
-          }),
-          prisma.order.update({
-            where: { id: order.id },
-            data: { status: 'confirmed', paymentStatus: 'paid' },
-          }),
-        ]);
-
-        await recordPaymentEvent({
-          paymentId: payment.id,
-          storeId: order.storeId,
-          orderId: order.id,
-          eventType: 'admin_action',
-          fromStatus: payment.status,
-          toStatus: 'completed',
+      // Reconcile via the shared idempotent helper — the SAME routine the
+      // guest verify-on-return endpoint uses, so manual refresh + webhook +
+      // verify-on-return all transition state identically and only fan out
+      // once. (single source of truth — `payment-confirm.service.ts`)
+      const { statusChanged } = await confirmPaymentFromProviderStatus({
+        payment: {
+          id: payment.id,
+          status: payment.status,
           provider: payment.provider,
-          triggeredByUserId: user.userId,
-          details: { reason: 'manual_refresh', providerStatus: status.status },
-        });
-
-        // Fire the same post-payment fanout the webhook handler does so
-        // notifications + analytics catch up on the missed webhook event.
-        if (statusChanged) {
-          inngest
-            .send({
-              name: 'order/created',
-              data: {
-                orderId: order.id,
-                storeId: order.storeId,
-                paymentMethod: payment.provider,
-                locale: undefined,
-              },
-            })
-            .catch((err: unknown) =>
-              logger.error(
-                { err, orderId: order.id },
-                '[Refresh] Failed to enqueue post-payment order/created'
-              )
-            );
-        }
-      } else if (status.status === 'failed' || status.status === 'expired') {
-        await prisma.$transaction([
-          prisma.payment.update({
-            where: { id: payment.id },
-            data: { status: status.status },
-          }),
-          prisma.order.update({
-            where: { id: order.id },
-            data: { paymentStatus: 'failed' },
-          }),
-        ]);
-
-        await recordPaymentEvent({
-          paymentId: payment.id,
+          metadata: payment.metadata,
+        },
+        order: {
+          id: order.id,
           storeId: order.storeId,
-          orderId: order.id,
-          eventType: 'admin_action',
-          fromStatus: payment.status,
-          toStatus: status.status,
-          provider: payment.provider,
-          triggeredByUserId: user.userId,
-          details: { reason: 'manual_refresh', providerStatus: status.status },
-        });
-      }
+          paymentStatus: order.paymentStatus,
+          locale: order.locale,
+        },
+        providerStatus: status,
+        source: 'admin_refresh',
+        triggeredByUserId: user.userId,
+      });
 
       await auditLog({
         action: 'order.payment_refreshed',

@@ -87,17 +87,24 @@ export default function StoreOrdersPage() {
       });
       if (statusFilter !== 'all') qs.set('status', statusFilter);
 
+      // The API (OrderService.list) returns pagination under `meta`, not
+      // `pagination`. Reading the wrong key left `total`/`totalPages` at 0 —
+      // the footer showed "0 of 0" and Next stayed disabled, so a merchant
+      // with real (e.g. pending/unpaid) orders saw a list that looked empty
+      // and couldn't page to older orders. Accept both keys defensively.
       const { data, error: apiError } = await apiGet<{
         orders: Order[];
-        pagination: Pagination;
+        meta?: Pagination;
+        pagination?: Pagination;
       }>(`/api/v1/stores/${storeId}/orders?${qs}`);
 
       if (apiError) {
         setError(apiError.message || t('errors.fetchFailed'));
       } else {
         setOrders(data?.orders || []);
-        if (data?.pagination) {
-          setPagination(prev => ({ ...prev, ...data.pagination }));
+        const pageMeta = data?.meta ?? data?.pagination;
+        if (pageMeta) {
+          setPagination(prev => ({ ...prev, ...pageMeta }));
         }
       }
     } catch {

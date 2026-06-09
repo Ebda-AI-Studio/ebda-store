@@ -24,7 +24,7 @@
 
 import type { InngestFunction } from 'inngest';
 import * as Sentry from '@sentry/node';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { inngest } from '../client';
 import {
   wbsBridgeService,
@@ -100,18 +100,22 @@ export async function handleOrderWhatsAppNotify(
   }
 
   // ── Step 1: Load store config ──────────────────────────────────────────
-  const storeConfig = await step.run('load-store-config', async () => {
-    return prisma.store.findUnique({
-      where: { id: storeId },
-      select: {
-        name: true,
-        wbsEnabled: true,
-        wbsClientId: true,
-        wbsApiKey: true,
-        wbsTemplates: true,
-      },
-    });
-  });
+  // FORCE RLS: wrap in runInTenantContext so the GUC is set for this
+  // Inngest job (which runs outside the HTTP request lifecycle).
+  const storeConfig = await step.run('load-store-config', () =>
+    runInTenantContext(storeId, () =>
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: {
+          name: true,
+          wbsEnabled: true,
+          wbsClientId: true,
+          wbsApiKey: true,
+          wbsTemplates: true,
+        },
+      })
+    )
+  );
 
   if (!storeConfig) {
     logger.warn({ storeId }, '[WBS-NOTIFY] Store not found — skipping');
@@ -153,26 +157,28 @@ export async function handleOrderWhatsAppNotify(
   }
 
   // ── Step 3: Load order + customer phone ───────────────────────────────
-  const order = await step.run('load-order', async () => {
-    return prisma.order.findUnique({
-      where: { id: orderId },
-      select: {
-        orderNumber: true,
-        total: true,
-        currency: true,
-        shippingAddress: true,
-        shipment: { select: { trackingNumber: true } },
-        customer: {
-          select: {
-            firstName: true,
-            lastName: true,
-            phone: true,
-            email: true,
+  const order = await step.run('load-order', () =>
+    runInTenantContext(storeId, () =>
+      prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+          orderNumber: true,
+          total: true,
+          currency: true,
+          shippingAddress: true,
+          shipment: { select: { trackingNumber: true } },
+          customer: {
+            select: {
+              firstName: true,
+              lastName: true,
+              phone: true,
+              email: true,
+            },
           },
         },
-      },
-    });
-  });
+      })
+    )
+  );
 
   if (!order) {
     logger.warn({ orderId }, '[WBS-NOTIFY] Order not found — skipping');
@@ -249,21 +255,26 @@ export async function handleOrderWhatsAppNotify(
 
         // Auto-disable after consecutive failures: check how many 401 logs
         // are recorded in NotificationLog for this store in the last 24 hours.
-        const recentFailures = await prisma.notificationLog.count({
-          where: {
-            storeId,
-            channel: 'wbs_bridge',
-            status: 'failed',
-            error: 'WBS_UNAUTHORIZED',
-            createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-          },
-        });
+        // FORCE RLS: wrap in runInTenantContext so reads/writes hit the correct rows.
+        const recentFailures = await runInTenantContext(storeId, () =>
+          prisma.notificationLog.count({
+            where: {
+              storeId,
+              channel: 'wbs_bridge',
+              status: 'failed',
+              error: 'WBS_UNAUTHORIZED',
+              createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+            },
+          })
+        );
 
         if (recentFailures >= AUTO_DISABLE_THRESHOLD - 1) {
-          await prisma.store.update({
-            where: { id: storeId },
-            data: { wbsEnabled: false },
-          });
+          await runInTenantContext(storeId, () =>
+            prisma.store.update({
+              where: { id: storeId },
+              data: { wbsEnabled: false },
+            })
+          );
           logger.error(
             { storeId, recentFailures },
             '[WBS-NOTIFY] Auto-disabled WBS integration after repeated 401s'
@@ -271,19 +282,21 @@ export async function handleOrderWhatsAppNotify(
         }
 
         // Record the failure
-        await prisma.notificationLog
-          .create({
-            data: {
-              storeId,
-              channel: 'wbs_bridge',
-              event: eventName,
-              status: 'failed',
-              error: 'WBS_UNAUTHORIZED',
-              idempotencyKey,
-              metadata: { templateName: templateConfig.name },
-            },
-          })
-          .catch(() => {});
+        await runInTenantContext(storeId, () =>
+          prisma.notificationLog
+            .create({
+              data: {
+                storeId,
+                channel: 'wbs_bridge',
+                event: eventName,
+                status: 'failed',
+                error: 'WBS_UNAUTHORIZED',
+                idempotencyKey,
+                metadata: { templateName: templateConfig.name },
+              },
+            })
+            .catch(() => {})
+        ).catch(() => {});
 
         // Do NOT rethrow — 401 is not retryable
         return { skipped: 'wbs-unauthorized' };
@@ -303,19 +316,21 @@ export async function handleOrderWhatsAppNotify(
           // swallow
         }
 
-        await prisma.notificationLog
-          .create({
-            data: {
-              storeId,
-              channel: 'wbs_bridge',
-              event: eventName,
-              status: 'failed',
-              error: 'WBS_TEMPLATE_MISSING',
-              idempotencyKey,
-              metadata: { templateName: templateConfig.name },
-            },
-          })
-          .catch(() => {});
+        await runInTenantContext(storeId, () =>
+          prisma.notificationLog
+            .create({
+              data: {
+                storeId,
+                channel: 'wbs_bridge',
+                event: eventName,
+                status: 'failed',
+                error: 'WBS_TEMPLATE_MISSING',
+                idempotencyKey,
+                metadata: { templateName: templateConfig.name },
+              },
+            })
+            .catch(() => {})
+        ).catch(() => {});
 
         // Do NOT rethrow — 422 is not retryable
         return { skipped: 'template-not-approved' };
@@ -332,24 +347,29 @@ export async function handleOrderWhatsAppNotify(
   }
 
   // Record success in NotificationLog
-  await step.run('record-success', async () => {
-    await prisma.notificationLog
-      .create({
-        data: {
-          storeId,
-          channel: 'wbs_bridge',
-          event: eventName,
-          status: 'sent',
-          providerMessageId: (result as { messageId?: string })?.messageId,
-          idempotencyKey,
-          metadata: {
-            templateName: templateConfig.name,
-            wbsClientId: storeConfig.wbsClientId,
+  // FORCE RLS: wrap in runInTenantContext so the insert is visible to the correct tenant.
+  await step.run('record-success', () =>
+    runInTenantContext(storeId, () =>
+      prisma.notificationLog
+        .create({
+          data: {
+            storeId,
+            channel: 'wbs_bridge',
+            event: eventName,
+            status: 'sent',
+            providerMessageId: (result as { messageId?: string })?.messageId,
+            idempotencyKey,
+            metadata: {
+              templateName: templateConfig.name,
+              wbsClientId: storeConfig.wbsClientId,
+            },
           },
-        },
-      })
-      .catch(err => logger.error({ err }, '[WBS-NOTIFY] Failed to write NotificationLog'));
-  });
+        })
+        .catch(err => {
+          logger.error({ err }, '[WBS-NOTIFY] Failed to write NotificationLog');
+        })
+    )
+  );
 
   return { sent: true, messageId: (result as { messageId?: string })?.messageId };
 }

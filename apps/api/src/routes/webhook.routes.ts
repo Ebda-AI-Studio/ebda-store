@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import express from 'express';
 import crypto from 'crypto';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { PaymentProvider } from '../services/payment-providers/types';
 import { config } from '../config';
@@ -55,35 +55,59 @@ function verifyWebhookSignature(req: Request, res: Response, next: NextFunction)
 }
 
 /**
- * Check if a webhook has already been processed (idempotency check)
+ * Check if a webhook has already been processed (idempotency check).
+ *
+ * Runs inside withRlsBypass because the storeId is not known yet at this point
+ * (we haven't resolved which store this webhook belongs to). The query is
+ * read-only and cross-tenant by nature — we're matching on an idempotency key
+ * that may span any store.
  */
 async function checkIdempotency(idempotencyKey: string): Promise<{
   alreadyProcessed: boolean;
   orderId?: string;
 }> {
-  const order = await prisma.order.findUnique({
-    where: { idempotencyKey },
-    select: { id: true, webhookProcessedAt: true },
+  return withRlsBypass(async tx => {
+    const order = await tx.order.findUnique({
+      where: { idempotencyKey },
+      select: { id: true, webhookProcessedAt: true },
+    });
+
+    if (order && order.webhookProcessedAt) {
+      return { alreadyProcessed: true, orderId: order.id };
+    }
+
+    return { alreadyProcessed: false, orderId: order?.id };
   });
-
-  if (order && order.webhookProcessedAt) {
-    return { alreadyProcessed: true, orderId: order.id };
-  }
-
-  return { alreadyProcessed: false, orderId: order?.id };
 }
 
 /**
- * Mark a webhook as processed
+ * Mark a webhook as processed.
+ *
+ * storeId is required so the write runs inside runInTenantContext and the
+ * FORCE RLS GUC is set on the connection. When storeId is unavailable (edge
+ * case where we have an orderId but not a storeId) we fall back to
+ * withRlsBypass — the write is still safe because orderId is the primary key.
  */
-async function markWebhookProcessed(orderId: string, idempotencyKey: string): Promise<void> {
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      idempotencyKey,
-      webhookProcessedAt: new Date(),
-    },
-  });
+async function markWebhookProcessed(
+  orderId: string,
+  idempotencyKey: string,
+  storeId?: string
+): Promise<void> {
+  if (storeId) {
+    await runInTenantContext(storeId, () =>
+      prisma.order.update({
+        where: { id: orderId },
+        data: { idempotencyKey, webhookProcessedAt: new Date() },
+      })
+    );
+  } else {
+    await withRlsBypass(tx =>
+      tx.order.update({
+        where: { id: orderId },
+        data: { idempotencyKey, webhookProcessedAt: new Date() },
+      })
+    );
+  }
 }
 
 /**
@@ -149,6 +173,11 @@ function generateIdempotencyKey(
  * Returns undefined when we can't match the payload to a Payment row —
  * handleWebhook will then take its env-var path, which is correct
  * behaviour for the platform-only test stores (currently none in prod).
+ *
+ * Runs inside withRlsBypass because the storeId is unknown at this point —
+ * we're doing a cross-tenant payment lookup to discover which store owns the
+ * incoming webhook. Once storeId is known the caller switches to
+ * runInTenantContext for all subsequent writes.
  */
 async function resolveStoreIdFromWebhookPayload(
   provider: PaymentProvider,
@@ -182,14 +211,16 @@ async function resolveStoreIdFromWebhookPayload(
 
   if (!transactionId && !invoiceId) return undefined;
 
-  const payment = await prisma.payment.findFirst({
-    where: {
-      OR: [...(transactionId ? [{ transactionId }] : []), ...(invoiceId ? [{ invoiceId }] : [])],
-    },
-    select: { order: { select: { storeId: true } } },
+  // Cross-tenant read — storeId not known yet, so use withRlsBypass.
+  return withRlsBypass(async tx => {
+    const payment = await tx.payment.findFirst({
+      where: {
+        OR: [...(transactionId ? [{ transactionId }] : []), ...(invoiceId ? [{ invoiceId }] : [])],
+      },
+      select: { order: { select: { storeId: true } } },
+    });
+    return payment?.order?.storeId;
   });
-
-  return payment?.order?.storeId;
 }
 
 // ==========================================
@@ -278,18 +309,39 @@ router.post(
       // per-store webhook secret for signature verification — without this,
       // signature checks against platform-level env vars (always empty in
       // FWB prod) would reject every per-tenant webhook.
+      //
+      // FORCE RLS: resolveStoreIdFromWebhookPayload runs in withRlsBypass
+      // (cross-tenant). Once storeId is known, handleWebhook + markWebhookProcessed
+      // run in runInTenantContext(storeId) so all their payment/order writes are
+      // correctly scoped. When storeId is undefined (platform-level path) we
+      // fall back to withRlsBypass for the handleWebhook call.
       const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
-      const result = await PaymentService.handleWebhook(
-        provider,
-        payload,
-        signature,
-        storeIdForWebhook,
-        rawBody.toString()
-      );
+      let result: { success: boolean; status?: string; orderId?: string };
+      if (storeIdForWebhook) {
+        result = await runInTenantContext(storeIdForWebhook, () =>
+          PaymentService.handleWebhook(
+            provider,
+            payload,
+            signature,
+            storeIdForWebhook,
+            rawBody.toString()
+          )
+        );
+      } else {
+        result = await withRlsBypass(_tx =>
+          PaymentService.handleWebhook(
+            provider,
+            payload,
+            signature,
+            storeIdForWebhook,
+            rawBody.toString()
+          )
+        );
+      }
 
       // Mark as processed if we have an order
       if (result.orderId) {
-        await markWebhookProcessed(result.orderId, idempotencyKey);
+        await markWebhookProcessed(result.orderId, idempotencyKey, storeIdForWebhook);
       }
 
       logger.info({ provider, storeId: storeIdForWebhook, result }, '[WEBHOOK] Processed');
@@ -416,18 +468,38 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
     // Resolve storeId from the payment row matching this payload so the per-
     // store webhook secret is used for signature verification (see handler
     // above for the same rationale).
+    //
+    // FORCE RLS: resolveStoreIdFromWebhookPayload runs in withRlsBypass
+    // (cross-tenant). Once storeId is known, handleWebhook + markWebhookProcessed
+    // run in runInTenantContext(storeId) so all their payment/order writes are
+    // correctly scoped. When storeId is undefined we fall back to withRlsBypass.
     const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
-    const result = await PaymentService.handleWebhook(
-      provider,
-      payload,
-      signature,
-      storeIdForWebhook,
-      rawBody.toString()
-    );
+    let result: { success: boolean; status?: string; orderId?: string };
+    if (storeIdForWebhook) {
+      result = await runInTenantContext(storeIdForWebhook, () =>
+        PaymentService.handleWebhook(
+          provider,
+          payload,
+          signature,
+          storeIdForWebhook,
+          rawBody.toString()
+        )
+      );
+    } else {
+      result = await withRlsBypass(_tx =>
+        PaymentService.handleWebhook(
+          provider,
+          payload,
+          signature,
+          storeIdForWebhook,
+          rawBody.toString()
+        )
+      );
+    }
 
     // Mark as processed if we have an order
     if (result.orderId) {
-      await markWebhookProcessed(result.orderId, idempotencyKey);
+      await markWebhookProcessed(result.orderId, idempotencyKey, storeIdForWebhook);
     }
 
     logger.info(

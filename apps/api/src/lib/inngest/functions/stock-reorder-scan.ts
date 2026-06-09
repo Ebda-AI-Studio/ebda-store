@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runReorderScan } from '../../../services/accounting/reorder-scan.service';
@@ -27,11 +27,15 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
     triggers: [{ cron: '0 3 * * *' }], // 06:00 KW = 03:00 UTC (Kuwait is UTC+3)
   },
   async ({ step }) => {
+    // FORCE RLS: cron has no storeId — use withRlsBypass to enumerate stores.
+    // runReorderScan already calls withRlsBypass internally for its per-store reads.
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: { accountingEnabled: true, aiFeaturesEnabled: true, deletedAt: null },
-        select: { id: true },
-      })
+      withRlsBypass(tx =>
+        tx.store.findMany({
+          where: { accountingEnabled: true, aiFeaturesEnabled: true, deletedAt: null },
+          select: { id: true },
+        })
+      )
     );
 
     let totalSuggested = 0;

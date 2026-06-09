@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import { AuthService } from '../../../services/auth.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -52,10 +52,14 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
   async ({ step }) => {
     const cutoff = new Date(Date.now() - ABANDONED_CART_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
+    // FORCE RLS: data-retention is cross-tenant — no storeId available.
+    // Use withRlsBypass for all DB operations in this cron.
     const candidateCount = await step.run('count-candidates', () =>
-      prisma.abandonedCart.count({
-        where: { createdAt: { lt: cutoff }, customerId: null },
-      })
+      withRlsBypass(tx =>
+        tx.abandonedCart.count({
+          where: { createdAt: { lt: cutoff }, customerId: null },
+        })
+      )
     );
 
     if (candidateCount === 0) {
@@ -66,19 +70,21 @@ export const abandonedCartPurge: InngestFunction.Any = inngest.createFunction(
     // deleteMany is server-side bulk; the BATCH_CAP throttles via `id`
     // window so a runaway backlog (e.g. first run after months of
     // missed schedules) doesn't lock the table for minutes.
-    const deleted = await step.run('delete-batch', async () => {
-      const candidates = await prisma.abandonedCart.findMany({
-        where: { createdAt: { lt: cutoff }, customerId: null },
-        select: { id: true },
-        orderBy: { createdAt: 'asc' },
-        take: ABANDONED_CART_BATCH_CAP,
-      });
-      if (candidates.length === 0) return 0;
-      const result = await prisma.abandonedCart.deleteMany({
-        where: { id: { in: candidates.map(c => c.id) } },
-      });
-      return result.count;
-    });
+    const deleted = await step.run('delete-batch', () =>
+      withRlsBypass(async tx => {
+        const candidates = await tx.abandonedCart.findMany({
+          where: { createdAt: { lt: cutoff }, customerId: null },
+          select: { id: true },
+          orderBy: { createdAt: 'asc' },
+          take: ABANDONED_CART_BATCH_CAP,
+        });
+        if (candidates.length === 0) return 0;
+        const result = await tx.abandonedCart.deleteMany({
+          where: { id: { in: candidates.map(c => c.id) } },
+        });
+        return result.count;
+      })
+    );
 
     logger.info({ cutoff, candidateCount, deleted }, 'abandoned-cart-purge: completed');
     return { purged: deleted, remaining: candidateCount - deleted };
@@ -98,16 +104,19 @@ export const softDeletedUserAnonymize: InngestFunction.Any = inngest.createFunct
     // Already-erased rows have email `erased-<uuid>@anonymized.local`
     // (see AuthService.eraseAccount). Skip those — re-running the
     // erase transaction is idempotent but wastes a write per row.
+    // FORCE RLS: cross-tenant cron — use withRlsBypass throughout.
     const candidates = await step.run('find-candidates', () =>
-      prisma.user.findMany({
-        where: {
-          role: 'customer',
-          deletedAt: { not: null, lt: cutoff },
-          NOT: { email: { startsWith: 'erased-' } },
-        },
-        select: { id: true },
-        take: USER_ANONYMIZE_BATCH_CAP,
-      })
+      withRlsBypass(tx =>
+        tx.user.findMany({
+          where: {
+            role: 'customer',
+            deletedAt: { not: null, lt: cutoff },
+            NOT: { email: { startsWith: 'erased-' } },
+          },
+          select: { id: true },
+          take: USER_ANONYMIZE_BATCH_CAP,
+        })
+      )
     );
 
     if (candidates.length === 0) {
@@ -181,25 +190,28 @@ export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunc
   async ({ step }) => {
     const cutoff = new Date(Date.now() - ORDER_ANONYMIZE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
+    // FORCE RLS: cross-tenant cron — use withRlsBypass throughout.
     const candidates = await step.run('find-candidates', () =>
-      prisma.order.findMany({
-        where: {
-          createdAt: { lt: cutoff },
-          // Skip rows already anonymized (idempotent re-runs).
-          // The eraseAccount path writes {anonymized: true}; checking
-          // for `path: ['anonymized'], equals: true` is the prisma
-          // way to query inside JSONB.
-          NOT: {
-            shippingAddress: {
-              path: ['anonymized'],
-              equals: true,
+      withRlsBypass(tx =>
+        tx.order.findMany({
+          where: {
+            createdAt: { lt: cutoff },
+            // Skip rows already anonymized (idempotent re-runs).
+            // The eraseAccount path writes {anonymized: true}; checking
+            // for `path: ['anonymized'], equals: true` is the prisma
+            // way to query inside JSONB.
+            NOT: {
+              shippingAddress: {
+                path: ['anonymized'],
+                equals: true,
+              },
             },
           },
-        },
-        select: { id: true },
-        take: ORDER_ANONYMIZE_BATCH_CAP,
-        orderBy: { createdAt: 'asc' },
-      })
+          select: { id: true },
+          take: ORDER_ANONYMIZE_BATCH_CAP,
+          orderBy: { createdAt: 'asc' },
+        })
+      )
     );
 
     if (candidates.length === 0) {
@@ -213,17 +225,19 @@ export const orderAnonymizeAtFiveYears: InngestFunction.Any = inngest.createFunc
 
     for (const { id } of candidates) {
       try {
-        await step.run(`anonymize-${id}`, async () => {
-          await prisma.order.update({
-            where: { id },
-            data: {
-              customerId: null,
-              shippingAddress: anonymizedJson,
-              billingAddress: anonymizedJson,
-              customerNotes: null,
-            },
-          });
-        });
+        await step.run(`anonymize-${id}`, () =>
+          withRlsBypass(tx =>
+            tx.order.update({
+              where: { id },
+              data: {
+                customerId: null,
+                shippingAddress: anonymizedJson,
+                billingAddress: anonymizedJson,
+                customerNotes: null,
+              },
+            })
+          )
+        );
         anonymized += 1;
       } catch (err) {
         failed += 1;

@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { InvoiceService } from '../../../services/invoice.service';
 import { EmailService } from '../../../services/email.service';
 import logger from '../../logger';
@@ -27,18 +27,23 @@ export const invoiceEmail: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
+    // InvoiceService.generateInvoice reads the order; it runs its own DB
+    // calls that need tenant context. Wrap in runInTenantContext so FORCE
+    // RLS lets those reads through (Inngest has no HTTP middleware context).
     const html = await step.run('render-invoice', () =>
-      InvoiceService.generateInvoice(storeId, orderId)
+      runInTenantContext(storeId, () => InvoiceService.generateInvoice(storeId, orderId))
     );
 
-    const order = await step.run('load-order-number', async () => {
-      const row = await prisma.order.findUnique({
-        where: { id: orderId },
-        select: { orderNumber: true, locale: true },
-      });
-      if (!row) throw new Error(`Order ${orderId} not found`);
-      return row;
-    });
+    const order = await step.run('load-order-number', () =>
+      runInTenantContext(storeId, async () => {
+        const row = await prisma.order.findUnique({
+          where: { id: orderId },
+          select: { orderNumber: true, locale: true },
+        });
+        if (!row) throw new Error(`Order ${orderId} not found`);
+        return row;
+      })
+    );
 
     const orderLocale = (order.locale ?? undefined) as 'en' | 'ar' | undefined;
 

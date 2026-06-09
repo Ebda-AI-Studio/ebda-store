@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { EmailService } from '../../../services/email.service';
 import { signReviewToken } from '../../review-token';
 import logger from '../../logger';
@@ -48,39 +48,42 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
     await step.sleep('wait-7-days', '7d');
 
     // ── Re-verify order state after the delay ──────────────────────────────
+    // FORCE RLS: Inngest jobs run outside HTTP — wrap in runInTenantContext.
     const order = await step.run('load-order', () =>
-      prisma.order.findUnique({
-        where: { id: orderId },
-        select: {
-          id: true,
-          status: true,
-          storeId: true,
-          locale: true,
-          reviewRequestSentAt: true,
-          shippingAddress: true,
-          customer: {
-            select: {
-              firstName: true,
-              lastName: true,
-              email: true,
-              language: true,
+      runInTenantContext(storeId, () =>
+        prisma.order.findUnique({
+          where: { id: orderId },
+          select: {
+            id: true,
+            status: true,
+            storeId: true,
+            locale: true,
+            reviewRequestSentAt: true,
+            shippingAddress: true,
+            customer: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+                language: true,
+              },
             },
-          },
-          items: {
-            select: {
-              productId: true,
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  nameAr: true,
-                  images: true,
+            items: {
+              select: {
+                productId: true,
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    nameAr: true,
+                    images: true,
+                  },
                 },
               },
             },
           },
-        },
-      })
+        })
+      )
     );
 
     if (!order) {
@@ -128,10 +131,12 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
 
     // ── Resolve store base URL ─────────────────────────────────────────────
     const store = await step.run('load-store', () =>
-      prisma.store.findUnique({
-        where: { id: storeId },
-        select: { slug: true, domain: true },
-      })
+      runInTenantContext(storeId, () =>
+        prisma.store.findUnique({
+          where: { id: storeId },
+          select: { slug: true, domain: true },
+        })
+      )
     );
 
     if (!store) {
@@ -171,10 +176,12 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
 
     // ── Mark order so retries are idempotent ──────────────────────────────
     await step.run('mark-sent', () =>
-      prisma.order.update({
-        where: { id: orderId },
-        data: { reviewRequestSentAt: new Date() },
-      })
+      runInTenantContext(storeId, () =>
+        prisma.order.update({
+          where: { id: orderId },
+          data: { reviewRequestSentAt: new Date() },
+        })
+      )
     );
 
     logger.info({ orderId, itemCount: items.length, language }, '[REVIEW-REQUEST] sent');

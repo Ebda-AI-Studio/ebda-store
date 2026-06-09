@@ -1,4 +1,5 @@
 import type { InngestFunction } from 'inngest';
+import { runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postOrderPaymentJournal } from '../../../services/accounting/posting/order-posting';
@@ -51,9 +52,15 @@ export const accountingPostOrderJournal: InngestFunction.Any = inngest.createFun
       );
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
     }
+    // FORCE RLS: postOrderPaymentJournal reads the order via prisma — it
+    // must run inside runInTenantContext(storeId) so the GUC is set.
+    // The accounting services (journal.service, account.service) already
+    // call withRlsBypass internally for their cross-tenant GL writes, so
+    // wrapping the outer call in runInTenantContext is safe (the inner
+    // bypasses nest cleanly via separate transactions).
     await step.run('post-journal', async () => {
       try {
-        await postOrderPaymentJournal({ orderId });
+        await runInTenantContext(storeId, () => postOrderPaymentJournal({ orderId }));
       } catch (err) {
         // Surface the failure to structured logs + Sentry. Without this the
         // throw is only visible in the Inngest dashboard — a starved COA (the
