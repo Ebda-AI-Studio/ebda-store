@@ -42,6 +42,10 @@ export interface Store {
   heroCtaTextAr?: string | null;
   heroCtaLink?: string | null;
   heroImage?: string | null;
+  // SEO — email sender local-part (the prefix before @ on outbound mail).
+  // Configured on the /seo page; the /domain DNS preview reads it so the
+  // shown sender matches the address real mail is sent from.
+  emailSenderLocalPart?: string | null;
   // Marketing pixels — stored as a JSON blob on the store record
   marketingPixels?: Record<string, unknown>;
   // Dashboard/admin fields — present on GET /stores/:id responses, used by

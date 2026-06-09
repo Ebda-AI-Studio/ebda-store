@@ -545,12 +545,23 @@ export class StoreService {
     return updatedStore;
   }
 
-  static async updateTheme(storeId: string, theme: Prisma.InputJsonValue) {
+  // Shallow-merge PATCH for the theme JSON column. Multiple admin surfaces
+  // write `theme` (Branding ThemeTab writes fonts/preset/footer-logo; the
+  // Page Builder Smart Palette writes the brand color tokens). Each used to
+  // PUT the WHOLE theme object, so the last writer clobbered keys the other
+  // surface had just changed (open Branding + Page Builder in two tabs → one
+  // save reverts the other's edits). Merging incoming keys into the stored
+  // theme means a surface only ever overwrites the keys it explicitly sends;
+  // keys absent from the payload are preserved. Same read-merge-write posture
+  // as `updateFloatingWidget` / `updateSocialLinks`.
+  static async updateTheme(storeId: string, theme: Record<string, unknown>) {
     const store = await this.getById(storeId);
+    const existingTheme = (store.theme as Record<string, unknown>) || {};
+    const mergedTheme = { ...existingTheme, ...theme };
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
-      data: { theme },
+      data: { theme: mergedTheme as Prisma.InputJsonValue },
     });
 
     await StoreService.invalidateCache(store);
@@ -667,12 +678,24 @@ export class StoreService {
     return updatedStore;
   }
 
-  static async updateAnnouncementBar(storeId: string, announcementBar: Prisma.InputJsonValue) {
+  // Shallow-merge PATCH for the announcement-bar JSONB. The `/announcement`
+  // admin page owns the TEXT content (text / textAr / link / linkText* /
+  // dismissible / textColor); the Page Builder owns VISIBILITY + bgColor
+  // (layout.announcement.enabled / bgColor, which win at render). The
+  // `/announcement` page no longer sends `enabled`/`bgColor`, so merging
+  // (instead of whole-object replace) preserves any legacy values already
+  // stored there and avoids wiping keys this surface no longer edits.
+  static async updateAnnouncementBar(storeId: string, announcementBar: Record<string, unknown>) {
     const store = await this.getById(storeId);
+    const existing =
+      store.announcementBar && typeof store.announcementBar === 'object'
+        ? (store.announcementBar as Record<string, unknown>)
+        : {};
+    const merged = { ...existing, ...announcementBar };
 
     const updatedStore = await prisma.store.update({
       where: { id: storeId },
-      data: { announcementBar },
+      data: { announcementBar: merged as Prisma.InputJsonValue },
     });
 
     await StoreService.invalidateCache(store);

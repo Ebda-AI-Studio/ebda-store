@@ -397,19 +397,22 @@ export function SocialGlyph({
  * Build a filtered array of social link entries from a `StoreSocials` object.
  * Only entries that have a non-empty URL are included.
  *
- * When `contact.whatsapp` is supplied, a synthetic WhatsApp entry is appended
- * unless `socials.whatsapp` was already set — the merchant's contact phone
- * doubles as a chat link via wa.me. We strip non-digits so saved phone numbers
- * with formatting characters (+, spaces, dashes) still produce a valid URL.
+ * The WhatsApp display number is canonical on `contact.whatsapp` (the store
+ * column edited in /contact). It's the single source — the merchant's contact
+ * phone doubles as a chat link via wa.me (we strip non-digits so saved phone
+ * numbers with formatting characters (+, spaces, dashes) still produce a valid
+ * URL). A legacy `socials.whatsapp` value (from before /social stopped writing
+ * it — see 2026-06-09 overlap audit #8) is honored only as a fallback for old
+ * rows that have no contact number.
  */
 export function getSocialLinks(
   socials: StoreSocials,
   contact?: Pick<StoreContact, 'whatsapp'>
 ): SocialLinkEntry[] {
   const contactWhatsapp = contact?.whatsapp?.trim();
-  const whatsappUrl =
-    socials.whatsapp ||
-    (contactWhatsapp ? `https://wa.me/${contactWhatsapp.replace(/\D/g, '')}` : undefined);
+  const whatsappUrl = contactWhatsapp
+    ? `https://wa.me/${contactWhatsapp.replace(/\D/g, '')}`
+    : socials.whatsapp || undefined;
   const candidates: Array<{
     key: string;
     icon: string;

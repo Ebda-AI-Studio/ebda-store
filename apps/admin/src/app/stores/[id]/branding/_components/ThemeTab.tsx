@@ -1,10 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { BrandPreview } from './BrandPreview';
-import { ColorPalettePicker } from './ColorPalettePicker';
-import { TypographyPicker } from './TypographyPicker';
-import { BackgroundPresetPicker } from './BackgroundPresetPicker';
 import { ImageUpload } from '../../../../../components/ImageUpload';
 import type { StoreBranding } from './types';
 
@@ -15,42 +13,80 @@ interface ThemeTabProps {
 }
 
 /**
- * Theme & colors tab: primary/secondary palette, typography, and a live preview.
+ * A one-line "edit this in the Page Builder" pointer. The control it
+ * replaces was retired here because the Page Builder (Smart Palette /
+ * per-zone Typography / per-section background) is now the single editor
+ * for that field — keeping a duplicate editor in Branding produced the
+ * whole-theme clobber documented in the 2026-06-09 overlap audit. The
+ * underlying theme field is preserved (the storefront still reads it);
+ * only the duplicate EDITOR moved.
+ */
+function PageBuilderPointer({
+  href,
+  title,
+  hint,
+  link,
+}: {
+  href: string;
+  title: string;
+  hint: string;
+  link: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-1.5">
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className="text-xs text-muted-foreground">{hint}</p>
+      <Link
+        href={href}
+        className="inline-flex items-center text-xs font-semibold text-primary hover:underline"
+      >
+        {link}
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * Theme & colors tab. The primary/secondary color pickers, font-family
+ * picker and section-background preset were RETIRED here (2026-06-09):
+ * the Page Builder's Smart Palette, per-zone Typography and per-section
+ * background are the canonical editors. This tab now keeps only the
+ * Branding-owned fields (blog toggle, footer logo) plus pointers into the
+ * Page Builder for the moved controls, and a live preview.
  */
 export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
   const t = useT('branding.theme');
+  const pageBuilderHref = `/stores/${storeId}/page-builder`;
 
   return (
     <div className="bg-card rounded-xl border p-6 space-y-6">
-      <ColorPalettePicker
-        label={t('primaryColor')}
-        hslValue={branding.theme.primaryColor}
-        onChange={hsl => onChange({ ...branding, theme: { ...branding.theme, primaryColor: hsl } })}
-        showPresets
-        placeholder="#FF6600"
+      {/* Color tokens (primaryColor / secondaryColor / accentColor) are now
+          owned by the Page Builder Smart Palette. Field preserved; editor
+          moved. */}
+      <PageBuilderPointer
+        href={pageBuilderHref}
+        title={t('pageBuilderPointer.colors.title')}
+        hint={t('pageBuilderPointer.colors.hint')}
+        link={t('pageBuilderPointer.colors.link')}
       />
 
-      <ColorPalettePicker
-        label={t('secondaryColor')}
-        hslValue={branding.theme.secondaryColor}
-        onChange={hsl =>
-          onChange({ ...branding, theme: { ...branding.theme, secondaryColor: hsl } })
-        }
-        placeholder="#F3F4F6"
+      {/* Fonts (fontFamily / headingFontFamily) are now owned by the Page
+          Builder's Fonts library + per-zone Typography (which emits
+          font-family !important and wins on every tagged element). */}
+      <PageBuilderPointer
+        href={pageBuilderHref}
+        title={t('pageBuilderPointer.fonts.title')}
+        hint={t('pageBuilderPointer.fonts.hint')}
+        link={t('pageBuilderPointer.fonts.link')}
       />
 
-      <TypographyPicker
-        theme={branding.theme}
-        onChange={theme => onChange({ ...branding, theme })}
-      />
-
-      {/* Sprint 1 (2026-05-17) — homepage section background preset.
-          ADDITIVE: doesn't replace or remove any existing branding
-          control. Defaults to 'none' so existing stores see no visual
-          change until they explicitly pick a preset. */}
-      <BackgroundPresetPicker
-        theme={branding.theme}
-        onChange={theme => onChange({ ...branding, theme })}
+      {/* Per-section background (theme.backgroundPreset) is now owned by the
+          Page Builder per-section bgColor controls. */}
+      <PageBuilderPointer
+        href={pageBuilderHref}
+        title={t('pageBuilderPointer.background.title')}
+        hint={t('pageBuilderPointer.background.hint')}
+        link={t('pageBuilderPointer.background.link')}
       />
 
       {/* Brand badge + Quick add card-level toggles REMOVED 2026-05-20:

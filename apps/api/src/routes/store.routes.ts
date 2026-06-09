@@ -202,7 +202,12 @@ const socialSchema = z
     linkedin: optionalUrl,
     wikidata: optionalUrl,
     wikipedia: optionalUrl,
-    whatsapp: optionalStr(50),
+    // NOTE: `whatsapp` is intentionally NOT a social-links field. The WhatsApp
+    // display number is canonical on the `store.whatsapp` column (edited in
+    // /contact). Keeping it here too let `/social` store a divergent value that
+    // never synced with the column (2026-06-09 overlap audit #8). The storefront
+    // footer/floating-widget now DERIVE the WhatsApp link from `contact.whatsapp`
+    // (with any legacy `socialLinks.whatsapp` only as a fallback for old rows).
   })
   .strip();
 
@@ -628,7 +633,7 @@ router.put(
       const { id } = req.params;
       const theme = themeSchema.parse(req.body);
 
-      const store = await StoreService.updateTheme(id, theme as Prisma.InputJsonValue);
+      const store = await StoreService.updateTheme(id, theme as Record<string, unknown>);
 
       res.json({
         success: true,

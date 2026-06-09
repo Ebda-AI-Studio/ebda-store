@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+// NOTE (2026-06-09 overlap audit #4/#5): announcement-bar VISIBILITY (`enabled`)
+// and BACKGROUND color (`bgColor`) are now owned by the Page Builder
+// (layout.announcement.*), which wins at render (ShopChrome resolves
+// `layout.announcement.enabled ?? announcementBar.enabled` and the same for
+// bgColor). This page is now content-only: it edits text/link/textColor and
+// no longer sends `enabled`/`bgColor`, so the two surfaces can't diverge.
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
@@ -74,7 +80,14 @@ export default function AnnouncementPage() {
     setIsSaving(true);
     setMessage(null);
     try {
-      const { error } = await apiPut(`/api/v1/stores/${storeId}/announcement`, settings);
+      // Send content only. `enabled` + `bgColor` are owned by the Page Builder
+      // (layout.announcement.*) and intentionally omitted — the API merges, so
+      // omitting them preserves any legacy values without this page clobbering
+      // the page-builder-managed chrome.
+      const { enabled: _enabled, bgColor: _bgColor, ...content } = settings;
+      void _enabled;
+      void _bgColor;
+      const { error } = await apiPut(`/api/v1/stores/${storeId}/announcement`, content);
 
       if (!error) {
         setMessage({ type: 'success', text: t('successMessage') });
@@ -130,10 +143,11 @@ export default function AnnouncementPage() {
           <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
             {t('preview')}
           </p>
+          {/* Preview uses a neutral surface — the live background color is set
+              in the Page Builder (announcement section). */}
           <div
-            className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-foreground"
             style={{
-              backgroundColor: settings.bgColor,
               color: settings.textColor,
             }}
           >
@@ -146,23 +160,17 @@ export default function AnnouncementPage() {
       )}
 
       <div className="space-y-6">
-        {/* Enable/Disable */}
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-foreground">{t('sectionTitle')}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{t('sectionHint')}</p>
-            </div>
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={settings.enabled}
-                onChange={e => setSettings(prev => ({ ...prev, enabled: e.target.checked }))}
-                className="sr-only peer"
-              />
-              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-card after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20" />
-            </label>
-          </div>
+        {/* Visibility + background color are managed in the Page Builder
+            (overlap audit #4/#5). Pointer instead of a duplicate toggle. */}
+        <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1.5">
+          <p className="text-sm font-semibold text-foreground">{t('managedInPageBuilderTitle')}</p>
+          <p className="text-xs text-muted-foreground">{t('managedInPageBuilderHint')}</p>
+          <Link
+            href={`/stores/${storeId}/page-builder`}
+            className="inline-flex items-center text-xs font-semibold text-primary hover:underline"
+          >
+            {t('managedInPageBuilderLink')}
+          </Link>
         </div>
 
         {/* Content */}
@@ -240,49 +248,12 @@ export default function AnnouncementPage() {
           </div>
         </div>
 
-        {/* Colors */}
+        {/* Text color. The background color is set in the Page Builder
+            (announcement section) — see the pointer above. */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <h2 className="font-semibold text-foreground">{t('colors')}</h2>
 
           <div className="grid gap-6 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                {t('backgroundColor')}
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={settings.bgColor}
-                  onChange={e => setSettings(prev => ({ ...prev, bgColor: e.target.value }))}
-                  className="h-10 w-14 cursor-pointer rounded-lg border border-border p-1"
-                />
-                <input
-                  type="text"
-                  value={settings.bgColor}
-                  onChange={e => setSettings(prev => ({ ...prev, bgColor: e.target.value }))}
-                  placeholder="#000000"
-                  className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              {/* Quick presets */}
-              <div className="mt-2 flex gap-2">
-                {['#000000', '#1f2937', '#dc2626', '#2563eb', '#16a34a', '#ea580c'].map(color => (
-                  <button
-                    type="button"
-                    key={color}
-                    onClick={() => setSettings(prev => ({ ...prev, bgColor: color }))}
-                    className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                      settings.bgColor === color
-                        ? 'border-foreground scale-110'
-                        : 'border-transparent'
-                    }`}
-                    style={{ backgroundColor: color }}
-                    title={color}
-                  />
-                ))}
-              </div>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 {t('textColor')}

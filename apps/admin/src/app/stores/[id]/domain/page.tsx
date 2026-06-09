@@ -214,7 +214,10 @@ export default function StoreDomainPage() {
 
   const senderPreview = (() => {
     const name = store?.name ?? '';
-    const localPart = 'noreply'; // updated in Task 13 to read store.emailSenderLocalPart
+    // Read the SEO-configured sender prefix so the DNS-setup preview matches
+    // the address real mail is sent from (resend.service uses the same field).
+    // Falls back to 'noreply' — the same column default — when unset.
+    const localPart = store?.emailSenderLocalPart || 'noreply';
     const verifiedCustom = domainStatus?.emailSender?.status === 'verified' && !!store?.domain;
     const host = verifiedCustom ? store!.domain : 'forcemediakw.com';
     return `${name} <${localPart}@${host}>`;
