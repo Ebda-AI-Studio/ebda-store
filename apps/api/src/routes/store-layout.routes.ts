@@ -10,7 +10,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
-import { resolveLayoutSettings } from '@force/shared';
+import { resolveLayoutSettings, isSafeUrl } from '@force/shared';
 import type { TemplateId } from '@force/shared';
 import { authenticate } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -41,7 +41,16 @@ const heroSlideSchema = z.object({
   headlineAr: z.string().optional(),
   ctaText: z.string().optional(),
   ctaTextAr: z.string().optional(),
-  ctaHref: z.string().optional(),
+  // Rendered into an `<a href>` on the storefront hero — enforce the safe-URL
+  // scheme allowlist so a `javascript:`/`data:` slide CTA can't be stored.
+  // Empty string is allowed (no CTA); any non-empty value must be safe.
+  ctaHref: z
+    .string()
+    .optional()
+    .refine(v => v === undefined || v === '' || isSafeUrl(v), {
+      message:
+        'CTA link must be a relative path or use http(s)/mailto/tel — javascript: is not allowed',
+    }),
 });
 
 // Color value: hex (#RGB, #RRGGBB, #RRGGBBAA) OR brand token (token:<name>) OR empty.

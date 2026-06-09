@@ -138,6 +138,7 @@ export function PixelPlatformCard({
               </label>
               <input
                 type="password"
+                autoComplete="off"
                 value={config.accessToken || ''}
                 onChange={e => onFieldChange('accessToken', e.target.value)}
                 placeholder={t('fields.accessTokenPlaceholder')}

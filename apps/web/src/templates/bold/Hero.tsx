@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { sanitizeUrl } from '@force/shared';
 import type { HeroProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -24,7 +25,11 @@ export default function BoldHero({
   const displaySubtitle = (isRtl && subtitleAr ? subtitleAr : subtitle) ?? '';
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تسوق الآن' : 'Shop Now');
 
-  const resolvedCtaLink = ctaLink.startsWith('/') && urlPrefix ? `${urlPrefix}${ctaLink}` : ctaLink;
+  // Defensive XSS guard: reject `javascript:`/`data:` schemes before the link
+  // reaches an `<a href>`. Safe values (relative paths, http(s)) pass through.
+  const safeCtaLink = sanitizeUrl(ctaLink, '/products');
+  const resolvedCtaLink =
+    safeCtaLink.startsWith('/') && urlPrefix ? `${urlPrefix}${safeCtaLink}` : safeCtaLink;
 
   return (
     <section

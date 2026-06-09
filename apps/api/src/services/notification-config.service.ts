@@ -124,6 +124,42 @@ class NotificationConfigService {
     return masked;
   }
 
+  /**
+   * Merge incoming credentials over the currently-stored (decrypted) values,
+   * preserving any field whose incoming value is still the `****` mask
+   * sentinel. Stops a "Save" with an untouched, masked credential from
+   * overwriting the real stored secret with mask text.
+   */
+  private async preserveMaskedCredentials(
+    storeId: string,
+    channel: string,
+    incoming: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    let stored: Record<string, unknown> | null = null;
+    const out: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(incoming)) {
+      // A masked value always contains the `****` sentinel emitted by
+      // `maskCredentials`. Lazily load the stored config only when needed.
+      if (typeof value === 'string' && value.includes('****')) {
+        if (stored === null) {
+          const current = await this.getConfig(storeId, channel);
+          stored = (current?.credentials as Record<string, unknown>) ?? {};
+        }
+        const storedVal = stored[key];
+        // Keep the real stored secret; if none exists, drop the field rather
+        // than persisting mask text as a credential.
+        if (typeof storedVal === 'string' && storedVal.length > 0) {
+          out[key] = storedVal;
+        }
+      } else {
+        out[key] = value;
+      }
+    }
+
+    return out;
+  }
+
   // ==========================================
   // Public API
   // ==========================================
@@ -166,7 +202,18 @@ class NotificationConfigService {
     channel: string,
     data: UpsertConfigData
   ): Promise<DecryptedConfig> {
-    const encryptedCredentials = encryption.encrypt(JSON.stringify(data.credentials));
+    // Masked-secret resubmit guard: the admin GET returns credentials masked
+    // (`****1234`). If the admin saves a channel without editing a credential,
+    // that masked value comes back on the PUT — persisting it would overwrite
+    // the real secret (e.g. Unifonic appSid) with mask text. Treat any value
+    // still carrying the `****` sentinel as "unchanged" and keep the stored
+    // credential instead.
+    const mergedCredentials = await this.preserveMaskedCredentials(
+      storeId,
+      channel,
+      data.credentials
+    );
+    const encryptedCredentials = encryption.encrypt(JSON.stringify(mergedCredentials));
 
     await prisma.notificationConfig.upsert({
       where: { storeId_channel: { storeId, channel } },

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { sanitizeUrl } from '@force/shared';
 import type { AnnouncementBarProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -28,7 +29,7 @@ export default function MinimalAnnouncementBar({
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {link ? (
-        <Link href={link} className="hover:opacity-70 transition-opacity">
+        <Link href={sanitizeUrl(link)} className="hover:opacity-70 transition-opacity">
           {content}
         </Link>
       ) : (

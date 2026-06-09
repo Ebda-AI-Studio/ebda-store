@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { sanitizeUrl } from '@force/shared';
 import type { AnnouncementBarProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -28,7 +29,7 @@ export default function BoldAnnouncementBar({
     <div className="bg-primary text-primary-foreground py-3 px-4" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto">
         {link ? (
-          <Link href={link} className="block hover:opacity-80 transition-opacity">
+          <Link href={sanitizeUrl(link)} className="block hover:opacity-80 transition-opacity">
             {content}
           </Link>
         ) : (

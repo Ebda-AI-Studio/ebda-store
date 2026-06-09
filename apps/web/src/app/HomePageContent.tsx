@@ -13,6 +13,7 @@ import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/
 import { toTemplateProduct, toTemplateCategory } from '../templates/adapters';
 import { getHomepageTemplate } from '../lib/serverTemplate';
 import type { TemplateId, StoreLayoutSettings } from '@force/shared';
+import { sanitizeUrl } from '@force/shared';
 import { sectionBgStyle } from '../templates/shared/section-bg';
 import { resolveSectionZone } from '../templates/shared/section-typography';
 
@@ -236,7 +237,13 @@ export function HomePageContent({
   const heroSubtitleArVal = store.heroSubtitleAr || '';
   const heroCtaEn = store.heroCtaText || 'Shop Now';
   const heroCtaArVal = store.heroCtaTextAr || 'تسوق الآن';
-  const heroCtaLink = store.heroCtaLink ? storeUrl(store.heroCtaLink) : storeUrl('/products');
+  // Defensive: sanitize the merchant-supplied CTA link scheme before it reaches
+  // an `<a href>`. The server schema rejects unsafe values, but legacy rows
+  // saved before that shipped (or a direct DB write) could still carry a
+  // `javascript:` link — `sanitizeUrl` degrades those to '#'.
+  const heroCtaLink = store.heroCtaLink
+    ? storeUrl(sanitizeUrl(store.heroCtaLink, '/products'))
+    : storeUrl('/products');
   const heroImage = store.heroImage || undefined;
 
   // Hero rendering: prefer the new HeroSlider/HeroBanner shells when the

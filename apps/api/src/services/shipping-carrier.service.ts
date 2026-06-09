@@ -96,7 +96,18 @@ class ShippingCarrierService {
    * Upsert a carrier config (encrypts credentials, invalidates cache)
    */
   async upsertCarrierConfig(storeId: string, carrier: CarrierCode, data: CarrierConfigData) {
-    const encryptedCredentials = encryption.encrypt(JSON.stringify(data.credentials));
+    // Masked-secret resubmit guard: the route GET returns credentials masked
+    // (e.g. `abcd******`, or `****`). If the merchant saves a carrier without
+    // editing a credential, that masked value comes back on the PUT —
+    // persisting it would overwrite the real encrypted secret (ICarry apiKey,
+    // Aramex password) with mask text. Treat any value still carrying a `*`
+    // as "unchanged" and keep the stored credential instead.
+    const mergedCredentials = await this.preserveMaskedCredentials(
+      storeId,
+      carrier,
+      data.credentials
+    );
+    const encryptedCredentials = encryption.encrypt(JSON.stringify(mergedCredentials));
 
     const result = await prisma.shippingCarrierConfig.upsert({
       where: { storeId_carrier: { storeId, carrier } },
@@ -118,6 +129,44 @@ class ShippingCarrierService {
 
     await this.invalidateCarrierConfigCache(storeId);
     return result;
+  }
+
+  /**
+   * Merge incoming carrier credentials over the currently-stored (decrypted)
+   * values, preserving any field whose incoming value is still a mask. The
+   * route's `maskCredentials` emits `<prefix>****` / `****`, so any value
+   * containing `*` is treated as the masked-unchanged sentinel — credentials
+   * (API keys, passwords) never legitimately contain `*`.
+   */
+  private async preserveMaskedCredentials(
+    storeId: string,
+    carrier: CarrierCode,
+    incoming: Record<string, string>
+  ): Promise<Record<string, string>> {
+    let stored: Record<string, string> | null = null;
+    const out: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(incoming)) {
+      if (typeof value === 'string' && value.includes('*')) {
+        if (stored === null) {
+          const current = await this.getCarrierConfig(storeId, carrier);
+          stored = ((current?.credentials as Record<string, string>) ?? {}) as Record<
+            string,
+            string
+          >;
+        }
+        const storedVal = stored[key];
+        // Keep the real stored secret; if none exists, drop the field rather
+        // than persisting mask text as a credential.
+        if (typeof storedVal === 'string' && storedVal.length > 0) {
+          out[key] = storedVal;
+        }
+      } else {
+        out[key] = value;
+      }
+    }
+
+    return out;
   }
 
   /**

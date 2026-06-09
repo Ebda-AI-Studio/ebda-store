@@ -20,6 +20,7 @@ import { featureService } from '../services/feature.service';
 import { getCached } from '../lib/public-cache';
 import { redis } from '../services/redis.service';
 import { setEdgeCache } from '../lib/edge-cache';
+import { stripMarketingPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { verifyReviewToken } from '../lib/review-token';
 import { inngest } from '../lib/inngest/client';
 
@@ -836,6 +837,15 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
 
       if (!store) return null;
 
+      // Strip server-only marketing-pixel secrets (Meta CAPI / TikTok Events
+      // access tokens) before this store object reaches the public storefront
+      // (and the edge cache). The browser pixel snippets only use the public
+      // pixel IDs — the tokens must never be exposed to anonymous visitors.
+      const publicStore = {
+        ...store,
+        marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+      };
+
       const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
       // Mirror the /store/resolve endpoint: surface explicitly-disabled
       // CMS pages so the storefront footer can hide their links rather
@@ -845,7 +855,7 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
         select: { slug: true },
       });
       const disabledCmsSlugs = disabledPages.map(p => p.slug);
-      return { store, enabledFeatures, disabledCmsSlugs };
+      return { store: publicStore, enabledFeatures, disabledCmsSlugs };
     });
 
     if (!result) {
@@ -1061,10 +1071,17 @@ router.get(
       });
       const disabledCmsSlugs = disabledPages.map(p => p.slug);
 
+      // Strip server-only marketing-pixel secrets before the store reaches the
+      // public storefront + edge cache (browser pixels use public IDs only).
+      const publicStore = {
+        ...store,
+        marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+      };
+
       setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
       res.json({
         success: true,
-        data: { store, enabledFeatures, disabledCmsSlugs },
+        data: { store: publicStore, enabledFeatures, disabledCmsSlugs },
       });
     } catch (error) {
       next(error);

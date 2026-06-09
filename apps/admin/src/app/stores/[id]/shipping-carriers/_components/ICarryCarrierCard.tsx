@@ -90,6 +90,7 @@ export function ICarryCarrierCard({
           </label>
           <input
             type="password"
+            autoComplete="off"
             value={config.apiKey}
             onChange={e => onConfigChange({ apiKey: e.target.value })}
             placeholder={t('placeholders.apiKey')}

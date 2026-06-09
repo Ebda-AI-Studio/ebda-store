@@ -68,8 +68,12 @@ export function SmsChannelCard({
           <label className="block text-sm font-medium text-muted-foreground mb-2">
             {t('fields.appSid')}
           </label>
+          {/* appSid is a Unifonic credential — mask it like a password. The
+              server returns it masked (`****1234`) and treats a resubmitted
+              masked value as "unchanged" (see notification-config.service). */}
           <input
-            type="text"
+            type="password"
+            autoComplete="off"
             value={config.appSid || ''}
             onChange={e => onConfigChange({ appSid: e.target.value })}
             placeholder={t('placeholders.appSid')}

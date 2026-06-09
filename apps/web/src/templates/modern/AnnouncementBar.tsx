@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { sanitizeUrl } from '@force/shared';
 import type { AnnouncementBarProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -70,7 +71,7 @@ export default function ModernAnnouncementBar({
             </span>
             {link && (
               <Link
-                href={link}
+                href={sanitizeUrl(link)}
                 className="inline-flex items-center gap-1 text-sm font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity shrink-0"
               >
                 {displayLinkText || (isRtl ? 'تسوق الآن' : 'Shop Now')}

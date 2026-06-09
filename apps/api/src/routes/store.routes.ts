@@ -14,6 +14,11 @@ import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
 import { bustCorsCache } from '../lib/cors-cache';
 import { auditLog } from '../middleware/security';
+import { isSafeUrl } from '@force/shared';
+import {
+  maskMarketingPixelSecrets,
+  preserveMaskedPixelSecrets,
+} from '../lib/marketing-pixels-secrets';
 
 const router = Router();
 
@@ -33,6 +38,24 @@ const createStoreSchema = z.object({
 const heroNullableStr = (maxLen: number) =>
   z.preprocess(v => (v === '' ? null : v), z.string().max(maxLen).nullable().optional());
 
+// Hero CTA link is rendered into an `<a href>` on the storefront. Validate the
+// URL scheme so a `javascript:` / `data:` / `vbscript:` value can never be
+// persisted (stored-XSS guard). Allows site-relative paths + http(s)/mailto/tel
+// via the shared `isSafeUrl` allowlist. Empty string → null (CTA falls back to
+// `/products` at render).
+const heroCtaLinkSchema = z.preprocess(
+  v => (v === '' ? null : v),
+  z
+    .string()
+    .max(500)
+    .refine(isSafeUrl, {
+      message:
+        'Link must be a relative path or use http(s)/mailto/tel — javascript: is not allowed',
+    })
+    .nullable()
+    .optional()
+);
+
 const updateStoreSchema = createStoreSchema.partial().extend({
   heroTitle: heroNullableStr(200),
   heroTitleAr: heroNullableStr(200),
@@ -40,7 +63,7 @@ const updateStoreSchema = createStoreSchema.partial().extend({
   heroSubtitleAr: heroNullableStr(500),
   heroCtaText: heroNullableStr(100),
   heroCtaTextAr: heroNullableStr(100),
-  heroCtaLink: heroNullableStr(500),
+  heroCtaLink: heroCtaLinkSchema,
   heroImage: heroNullableStr(1000),
   blogEnabled: z.boolean().optional(),
 });
@@ -89,6 +112,23 @@ const optionalGoogleVerification = z.preprocess(v => {
 const optionalUrl = z.preprocess(
   v => (v === '' || v === null ? undefined : v),
   z.string().url().max(500).optional()
+);
+
+// Like `optionalUrl` but additionally enforces the safe-scheme allowlist. Use
+// for any URL that is rendered into an `<a href>` on the storefront (e.g. the
+// announcement-bar link) so a `javascript:`/`data:` value can't be stored.
+// `z.string().url()` alone ACCEPTS `javascript:alert(1)` — it only checks URL
+// shape, not scheme safety.
+const safeOptionalUrl = z.preprocess(
+  v => (v === '' || v === null ? undefined : v),
+  z
+    .string()
+    .max(500)
+    .refine(isSafeUrl, {
+      message:
+        'Link must be a relative path or use http(s)/mailto/tel — javascript: is not allowed',
+    })
+    .optional()
 );
 
 const optionalEmail = z.preprocess(
@@ -176,7 +216,7 @@ const announcementSchema = z
     textAr: z.string().max(500).optional(),
     bgColor: z.string().max(50).optional(),
     textColor: z.string().max(50).optional(),
-    link: optionalUrl,
+    link: safeOptionalUrl,
     linkText: optionalStr(200),
     linkTextAr: optionalStr(200),
     dismissible: z.boolean().optional(),
@@ -310,9 +350,17 @@ router.get(
 
       const store = await StoreService.getById(id);
 
+      // Mask marketing-pixel secrets (Meta CAPI / TikTok Events access tokens)
+      // before the store object leaves the API. They're long-lived secrets the
+      // admin UI must not display in plaintext; on save, masked values are
+      // treated as "unchanged" (see PUT /marketing-pixels).
+      const safeStore = store
+        ? { ...store, marketingPixels: maskMarketingPixelSecrets(store.marketingPixels) }
+        : store;
+
       res.json({
         success: true,
-        data: { store },
+        data: { store: safeStore },
       });
     } catch (error) {
       next(error);
@@ -816,14 +864,27 @@ router.put(
         .object({ marketingPixels: marketingPixelsSchema })
         .parse(req.body);
 
-      const store = await StoreService.updateMarketingPixels(
-        id,
-        marketingPixels as Prisma.InputJsonValue
-      );
+      // Masked-secret resubmit guard: if the admin saves without editing a
+      // token field, the UI sends back the masked value (`EAAB****wXyz`).
+      // Treat any value still carrying the `****` sentinel as "unchanged" and
+      // keep the real stored token rather than overwriting it with mask text.
+      const current = await prisma.store.findUnique({
+        where: { id },
+        select: { marketingPixels: true },
+      });
+      const merged = preserveMaskedPixelSecrets(marketingPixels, current?.marketingPixels);
+
+      const store = await StoreService.updateMarketingPixels(id, merged as Prisma.InputJsonValue);
+
+      // Mask secrets again on the way back out so the response can't leak the
+      // freshly-stored token.
+      const safeStore = store
+        ? { ...store, marketingPixels: maskMarketingPixelSecrets(store.marketingPixels) }
+        : store;
 
       res.json({
         success: true,
-        data: { store },
+        data: { store: safeStore },
       });
     } catch (error) {
       next(error);

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { sanitizeUrl } from '@force/shared';
 import type { AnnouncementBarProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -29,7 +30,7 @@ export default function ElegantAnnouncementBar({
     >
       {link ? (
         <Link
-          href={link}
+          href={sanitizeUrl(link)}
           className="hover:opacity-70 transition-opacity inline-flex items-center gap-3"
         >
           {content}

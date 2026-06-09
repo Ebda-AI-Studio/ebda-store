@@ -3,7 +3,7 @@
 import type React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { IMAGE_STANDARDS } from '@force/shared';
+import { IMAGE_STANDARDS, sanitizeUrl } from '@force/shared';
 import type { HeroBannerProps } from '../types';
 import { getPackStyles } from './pack-styles';
 import { responsiveFontSize } from './section-typography';
@@ -157,7 +157,7 @@ export function HeroBanner({
             )}
             {cta && ctaHref && (
               <Link
-                href={ctaHref}
+                href={sanitizeUrl(ctaHref)}
                 className={`mt-6 inline-flex items-center justify-center ${styles.heroCta}`}
                 data-cta="button"
               >

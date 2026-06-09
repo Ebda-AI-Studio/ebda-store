@@ -22,6 +22,8 @@ export { lightenColor, darkenColor, generateSectionPalette } from './color';
 export type { PaletteSeeds, SectionPaletteEntry, SectionKey, PalettePattern } from './color';
 // Brand engine — palette → contrast-safe storefront CSS vars
 export { deriveBrandRoles } from './brand-roles';
+// URL-scheme safety (XSS guard for merchant-supplied link fields)
+export { isSafeUrl, sanitizeUrl } from './safe-url';
 
 /**
  * Format a price value as a localised currency string.

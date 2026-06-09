@@ -6,6 +6,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import { ResendService } from '../services/resend.service';
 import { renderBrandedShell } from '../services/email.service';
+import { sanitizeNewsletterHtml } from '../lib/email-html-sanitizer';
 import logger from '../lib/logger';
 
 /**
@@ -268,7 +269,12 @@ router.post(
         defaultLanguage,
         theme: store.theme as { primaryColor?: string | null; primary?: string | null } | null,
       };
-      const wrappedHtml = renderBrandedShell(body.html, storeContext);
+      // Sanitize the merchant-composed HTML before relaying it to every
+      // subscriber: strip <script>/<iframe>/<object> etc., on* handlers, and
+      // javascript:/data: URLs. Stops a careless or malicious admin from
+      // broadcasting active/phishing content through our sender reputation.
+      const safeHtml = sanitizeNewsletterHtml(body.html);
+      const wrappedHtml = renderBrandedShell(safeHtml, storeContext);
 
       // Send in chunks of 50 (well within Resend's per-call limit)
       const CHUNK = 50;

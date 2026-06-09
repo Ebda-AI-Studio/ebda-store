@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { sanitizeUrl } from '@force/shared';
 import type { HeroProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -26,6 +27,9 @@ export default function ModernHero({
   // CTA text falls back to a functional generic ("Shop Now") because it's
   // a button label, not content; without it the button has no text.
   const displayCta = isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'تسوق الآن' : 'Shop Now');
+  // Defensive XSS guard: reject `javascript:`/`data:` schemes before the link
+  // reaches an `<a href>`.
+  const safeCtaLink = sanitizeUrl(ctaLink, '/products');
 
   // When no image is configured, render a single-column centered hero
   // with a subtle radial gradient. This keeps the hero polished for stores
@@ -52,7 +56,7 @@ export default function ModernHero({
             </p>
             <div className="mt-10 flex justify-center">
               <Link
-                href={ctaLink}
+                href={safeCtaLink}
                 className="group inline-flex min-h-[44px] items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] transition-all duration-500 ease-out hover:shadow-[0_22px_48px_-18px_hsl(var(--primary)/0.55)] hover:-translate-y-0.5"
               >
                 {displayCta}
@@ -106,7 +110,7 @@ export default function ModernHero({
               className={`flex flex-col sm:flex-row gap-3 ${isRtl ? 'items-end sm:flex-row-reverse' : 'items-start'}`}
             >
               <Link
-                href={ctaLink}
+                href={safeCtaLink}
                 className="group inline-flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-lg shadow-primary/20 transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 w-full sm:w-auto justify-center"
               >
                 {displayCta}

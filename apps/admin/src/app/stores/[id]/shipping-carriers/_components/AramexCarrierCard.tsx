@@ -97,6 +97,7 @@ export function AramexCarrierCard({
           </label>
           <input
             type="password"
+            autoComplete="off"
             value={config.accountPin}
             onChange={e => onConfigChange({ accountPin: e.target.value })}
             placeholder={t('placeholders.accountPin')}
@@ -145,6 +146,7 @@ export function AramexCarrierCard({
           </label>
           <input
             type="password"
+            autoComplete="off"
             value={config.password}
             onChange={e => onConfigChange({ password: e.target.value })}
             placeholder={t('placeholders.password')}

@@ -60,7 +60,16 @@ export default function NewsletterPage() {
   const [broadcastSending, setBroadcastSending] = useState(false);
   const [broadcastResult, setBroadcastResult] = useState<BroadcastResult | null>(null);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const subjectRef = useRef<HTMLInputElement>(null);
+
+  // Heuristic warning for content the server-side sanitizer will strip before
+  // sending. Mirrors the API allowlist so merchants get feedback before they
+  // hit Send (the API is still the authoritative guard).
+  const hasRiskyHtml =
+    /<\s*(script|iframe|object|embed|form)\b/i.test(html) ||
+    /\son[a-z-]+\s*=/i.test(html) ||
+    /(href|src)\s*=\s*["']?\s*(javascript|vbscript|data:(?!image\/))/i.test(html);
 
   const fetchSubs = useCallback(async () => {
     setLoading(true);
@@ -326,6 +335,39 @@ export default function NewsletterPage() {
                     placeholder={tPage('broadcastBodyPlaceholder')}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
                   />
+
+                  {hasRiskyHtml && (
+                    <div className="mt-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs text-warning-foreground">
+                      {tPage('broadcastUnsafeWarning')}
+                    </div>
+                  )}
+
+                  {html.trim() && (
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowPreview(p => !p)}
+                        className="text-sm font-medium text-primary hover:underline"
+                      >
+                        {showPreview
+                          ? tPage('broadcastPreviewHide')
+                          : tPage('broadcastPreviewShow')}
+                      </button>
+                      {showPreview && (
+                        <div className="mt-2 rounded-lg border border-border overflow-hidden bg-white">
+                          {/* sandbox="" blocks script execution + same-origin
+                              access, so the preview can render merchant HTML
+                              without any XSS risk to the admin app. */}
+                          <iframe
+                            title={tPage('broadcastPreviewTitle')}
+                            sandbox=""
+                            srcDoc={html}
+                            className="w-full h-72 border-0"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {broadcastError && (

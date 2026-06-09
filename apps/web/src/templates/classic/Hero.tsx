@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { sanitizeUrl } from '@force/shared';
 import type { HeroProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -25,6 +26,9 @@ export default function ClassicHero({
   // CTA falls back to a generic button label since it's functional UI.
   const displayCta =
     isRtl && ctaTextAr ? ctaTextAr : ctaText || (isRtl ? 'استكشف المجموعة' : 'Explore Collection');
+  // Defensive XSS guard: reject `javascript:`/`data:` schemes before the link
+  // reaches an `<a href>`.
+  const safeCtaLink = sanitizeUrl(ctaLink, '/products');
 
   return (
     <section className="bg-white dark:bg-background overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -72,7 +76,7 @@ export default function ClassicHero({
             {/* CTA — outlined button with classic serif treatment */}
             <div className={image ? (isRtl ? 'text-right' : 'text-left') : 'text-center'}>
               <Link
-                href={ctaLink}
+                href={safeCtaLink}
                 className="group inline-flex min-h-[44px] items-center gap-3 border border-foreground px-9 py-3.5 font-serif text-sm tracking-[0.22em] uppercase text-foreground hover:bg-foreground hover:text-background transition-colors duration-500 ease-out cursor-pointer"
               >
                 <span>{displayCta}</span>
