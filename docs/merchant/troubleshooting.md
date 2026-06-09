@@ -11,6 +11,16 @@ When something looks wrong, check here first before WhatsApping support. لو ظ
 3. If platform is up but storefront still blank: clear browser cache (Cmd+Shift+R / Ctrl+Shift+R)
 4. If still broken: WhatsApp support with a screenshot + the URL
 
+### Changes I saved in Page Builder aren't showing on the storefront — حفظت التغييرات لكنها لا تظهر في الواجهة
+
+There are three distinct root causes for this:
+
+1. **Save confirmation** — if you see the save spinner but no success toast, the save may have failed silently. Check the browser DevTools Network tab for a non-2xx response on the `PUT /stores/.../layout` or `PUT /stores/.../theme` request. If you see a 4xx, contact support with the response body.
+2. **Section order** — dragging sections to reorder them in Page Builder saves the order but the storefront renders sections in a fixed sequence in version 1 of the section-order feature. The saved order is not yet honored on the live storefront. Use the visibility toggle to hide sections you don't want instead of relying on order.
+3. **Hero banner** — if you edited the legacy Hero page (`/hero`) before 2026-06-09, those fields were only used as a fallback when there were no Page Builder hero slides. After the 2026-06-09 migration, your hero content is in Page Builder slides. Check **Admin → Page Builder → Hero** for your content.
+
+انتظر دقيقتين بعد الحفظ لتحديث الكاش. لو التغييرات لا تزال مفقودة، تحقّق: (1) هل ظهرت رسالة نجاح الحفظ؟ (2) ترتيب الأقسام لا يُطبَّق بعد في الواجهة — استخدم زر الإخفاء بدلًا من الترتيب. (3) إن كنت تحرّر صفحة البانر القديمة `/hero`، اذهب إلى Page Builder → Hero.
+
 ### A product I added isn't showing — منتج أضفته لا يظهر
 
 Check in **Admin → Products → [your product]**:
@@ -78,13 +88,13 @@ Rare but possible — usually a payment provider mid-state failure. Recovery:
 
 ### Admin keeps logging me out — يطلب تسجيل دخول كل شوي
 
-Force Store sessions last 7 days. If you're logged out earlier:
+Force Store sessions last 30 days. If you're logged out earlier:
 
 - Did you switch networks (Wi-Fi → mobile data)? Cross-origin cookie behavior on iOS Safari occasionally drops the auth cookie.
 - Did you clear cookies? That resets all sessions.
 - Are you using a browser extension that blocks cookies (uBlock Origin, etc.)? Whitelist `app.forcemediakw.com`.
 
-الجلسة تستمر 7 أيام. إذا انقطعت أسرع: تأكد ما غيّرت شبكة، ما فعّلت إضافة تحظر الكوكيز، وأن الكوكيز ما اتمسحت.
+الجلسة تستمر 30 يومًا. إذا انقطعت أسرع: تأكد ما غيّرت شبكة، ما فعّلت إضافة تحظر الكوكيز، وأن الكوكيز ما اتمسحت.
 
 ### "Validation failed" when saving a product — رسالة خطأ عند حفظ المنتج
 

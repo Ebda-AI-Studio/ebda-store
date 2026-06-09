@@ -231,6 +231,35 @@ and route to a "check your email" page.
 
 ---
 
+## User-supplied URLs: scheme validation required
+
+Any URL stored in the database and later rendered as an `<a href>` on the storefront
+must pass a URL-scheme check before being saved. Allowed schemes are `https?:` and
+relative paths. `javascript:` and `data:` URIs must be rejected at the API layer —
+they bypass any client-side sanitization and render as stored XSS on the storefront.
+
+### The contract
+
+1. **Every `*Link` / `*Url` field in Zod schemas that is rendered in an `<a href>` on
+   the storefront MUST validate the URL scheme** using a shared helper (e.g. `isAllowedUrl()`
+   from `@force/shared`).
+2. The validation must live on the **server** (API Zod schema), not only on the client.
+   Client-side validation is defence-in-depth; the API is the trust boundary.
+3. **`heroCtaLink` was the first confirmed case** — it accepted `javascript:alert(1)` and
+   rendered it on the live storefront (`heroCtaLink` XSS, C6 from the 2026-06-09 audit).
+   The fix ships in PR #87. Any future field that feeds an `<a href>` must add the same
+   check at addition time.
+
+### Where this lives
+
+- Zod schema in `apps/api/src/routes/store-layout.routes.ts` — `heroCtaLink` now
+  has `.refine(isAllowedUrl)`.
+- `packages/shared/src/utils/url-validation.ts` — `isAllowedUrl()` (shared helper).
+- Audit grep: `grep -rn 'href={' apps/web/src | grep -E 'ctaLink|Url|href'` — every
+  match that accepts a user-supplied value needs the scheme check on the write path.
+
+---
+
 ## Cross-service tenant isolation: Force Store ↔ WBS bridge
 
 The Force WhatsApp Business Platform (WBS) calls Force Store's `/api/v1/wa-bridge/*`

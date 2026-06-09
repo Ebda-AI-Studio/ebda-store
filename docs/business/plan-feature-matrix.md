@@ -3,7 +3,7 @@
 > **Single source of truth for which features each plan tier includes.** Generated from
 > `packages/shared/src/plan-baselines.ts` (the code that actually gates features at runtime).
 > If this table and the code disagree, the code wins — regenerate this doc.
-> Last synced: **2026-06-01**.
+> Last synced: **2026-06-09**.
 
 Plans are **layered (strict superset)**: Professional includes everything in Starter, Enterprise
 includes everything in Professional. `free` is a stripped grace/demo state, **not a sold tier**
@@ -50,7 +50,8 @@ self-serve signup and no free trial). Super-admin can override any feature per s
 ## Not plan-gated by baseline (add-on or always-on)
 
 - **Product discount engine** (per-product percentage/fixed discount with live preview) — part of the core product editor; available from Starter up.
-- **WhatsApp Business Platform integration** (`whatsapp`) — sold as an add-on / via the Force WhatsApp product; not in any plan baseline. Per-store override or the linked WBS product enables it.
+- **WhatsApp Business Platform integration** (`whatsapp`) — sold as an add-on / via the Force WhatsApp product; not in any plan baseline. Per-store override or the linked WBS product enables it. **As of 2026-06-09 the `/whatsapp` admin pages are feature-gated** — only stores with the `whatsapp` feature enabled (via `StoreFeature` override) see the WhatsApp hub; all others see the upgrade gate.
+- **AI Tools** (`ai_tools`) — admin AI-bulk-sweep pages are feature-gated as of 2026-06-09; only stores with `ai_tools` feature enabled see the AI Tools hub. This prevents unbounded Gemini API usage from stores that haven't been provisioned for it.
 - **Email campaigns** (`email_campaigns`), **customer wallet** (`customer_wallet`), **staff accounts** (`staff_accounts`) — present in the registry; enable per-store via override when sold. Not in baselines as of this sync.
 - The legacy parent `inventory` flag is **intentionally not in any baseline** — code reads the granular `inventory.*` sub-keys.
 

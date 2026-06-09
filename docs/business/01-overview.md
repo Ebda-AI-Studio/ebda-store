@@ -62,8 +62,8 @@ Most platforms give you a theme picker and call it customization. Force Store gi
 - **5 themes** (modern / elegant / classic / minimal / bold) — every store starts from one of these
 - **Per-section typography** — change font size, weight, family on any page section without touching code
 - **Per-section background colors** — section-by-section, not just global
-- **Brand palette generator** — pick 1-3 seed colors, get a full WCAG-compliant palette suggested automatically
-- **Page builder** — drag-and-drop section ordering, with bilingual editing; storefront Navigation links, Footer links, and Category page config are all consolidated inside the Page Builder — one destination for all storefront layout decisions
+- **Smart Palette** — pick 1-3 seed colors, get a full WCAG-compliant palette applied across the whole store automatically; the canonical brand-color editor (lives in Page Builder)
+- **Page Builder** — the single destination for all design decisions: brand colors (Smart Palette), fonts (Typography library), hero banner slides, per-section backgrounds, section order, Navigation links, Footer links, and Category page config
 - **7 visual toggles** — brand badges on product cards, quick-add buttons, brand story block, trust strip, dividers, mobile floating widget, blog
 - **Per-store custom domain** — your-shop.com, auto-provisioned through our Vercel integration
 - **Per-store branded email** — order confirmations come from your domain, not ours

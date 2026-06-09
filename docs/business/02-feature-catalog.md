@@ -182,12 +182,13 @@ Everything you need to bring customers back and reach new ones:
 Full control over how your store looks and behaves:
 
 - **Identity** — Store name in Arabic and English, logo (separate Arabic and English variants), contact details.
-- **Theme and Branding** — Choose your theme, set your brand colors with the Smart Palette tool, upload your logo, choose card frame style and background presets per section.
-- **Typography** — Override font family, size, and weight per section of your store — product titles, prices, section headings, body text — each independently configurable.
-- **Layout and Dividers** — Control section dividers and the overall page structure.
+- **Theme and Branding** — Choose your theme, toggle visual features (brand badges, quick-add, brand story, trust strip, blog). Brand colors and fonts are set in **Page Builder → Smart Palette** and **Page Builder → Typography** — the Branding tab now shows read-only swatches with a direct link to the canonical editor.
+- **Page Builder** — The single destination for all design decisions: brand color palette (Smart Palette), fonts (Typography), hero banner, per-section backgrounds, section order, and layout config.
 - **Custom Domain** — Connect your own domain (e.g. mystore.com). The platform handles provisioning automatically.
 - **Payment Providers** — Connect your KNET gateway credentials (see Section 4).
 - **Feature Toggles** — Enable or disable individual features for your store.
+
+> **Design system note (2026-06-09):** Page Builder is the canonical editor for all color, font, and hero controls. The Branding tab's standalone color pickers and font-family selector from prior versions have been retired in favour of Page Builder's Smart Palette and Typography library. All existing hero content was migrated to Page Builder slides; the legacy Hero page (`/hero`) now redirects to Page Builder.
 
 ---
 

@@ -189,15 +189,18 @@ Probably. The full feature catalog is in [02-feature-catalog.md](02-feature-cata
 
 ### Can I customize the design?
 
-Yes, deeply. You can change:
+Yes, deeply. All design controls live in **Admin → Page Builder**, which is the single
+destination for every visual setting. You can change:
 
-- Per-section typography (font size, weight, family) — without touching code
-- Per-section background colors
-- Brand palette (we'll generate a WCAG-compliant palette from 1–3 seed colors)
+- **Brand colors** — Smart Palette (in Page Builder): pick 1–3 seed colors, get a WCAG-compliant full palette applied across the store
+- **Fonts** — Page Builder → Typography / Fonts library: choose fonts and set per-section overrides
+- **Hero banner** — Page Builder → Hero: manage slides (image, headline, CTA)
+- Per-section background colors — per-section within Page Builder
+- Per-section typography (font size, weight) — without touching code
 - Card sizes, shapes, corner radius
-- 7 visual toggles (brand badges, quick-add buttons, brand story block, etc.)
+- 7 visual toggles (brand badges, quick-add buttons, brand story block, etc.) — from the Branding tab
 - Theme — pick from 5 (modern / elegant / classic / minimal / bold)
-- Page builder — drag-and-drop section ordering
+- Page Builder — drag-and-drop section ordering, bilingual copy for every section
 - Custom CSS for advanced users (Professional+ tier)
 
 You **cannot** edit raw HTML or change the underlying templates — that level of customization isn't supported. If you need that, you'll outgrow Force Store and need a custom build.

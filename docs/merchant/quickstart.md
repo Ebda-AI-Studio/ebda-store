@@ -99,10 +99,12 @@ If you ship via a known carrier (Aramex, iCarry), enter your API credentials so 
 
 **Admin → Page Builder**
 
-The Page Builder is the single destination for all storefront layout decisions. From here you can:
+The Page Builder is the single destination for all storefront design and layout decisions. From here you can:
 
+- **Smart Palette** — pick your brand colors; the platform derives a full WCAG-compliant palette automatically and applies it to every section. This is the canonical place to set brand colors (not the Branding tab's color pickers, which are retired as of 2026-06-09).
+- **Typography / Fonts** — choose your font library and set per-section font overrides. This is the canonical font editor.
 - **Homepage sections** — drag-and-drop to reorder, toggle visibility, edit each section's headline and subheadline (bilingual)
-- **Hero banner** — image + headline + CTA
+- **Hero banner** — manage slides (image + headline + CTA). The legacy `/hero` page has been retired and redirects here; all previous hero content is available as slides.
 - **Featured categories** — which 4-6 show on the home page
 - **Featured products** — which appear in the "Bestsellers" carousel
 - **Testimonials** — customer reviews shown on the home page
@@ -112,7 +114,7 @@ The Page Builder is the single destination for all storefront layout decisions. 
 
 All copy is bilingual.
 
-كل نصوص الواجهة قابلة للتخصيص بالعربية والإنجليزية من لوحة «Page Builder»: البانر الرئيسي، الفئات المميّزة، التقييمات، التنقل، روابط الفوتر، صفحات الفئات.
+كل نصوص الواجهة قابلة للتخصيص بالعربية والإنجليزية من لوحة «Page Builder»: ألوان العلامة التجارية (Smart Palette)، الخطوط، البانر الرئيسي (الشرائح)، الفئات المميّزة، التقييمات، التنقل، روابط الفوتر، صفحات الفئات.
 
 ## 8. Connect a custom domain (optional)
 
