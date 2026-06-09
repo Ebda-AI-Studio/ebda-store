@@ -183,7 +183,12 @@ const layoutSchema = z
       subtitleAr: z.string().optional(),
       // 2026-05-16: per-store card size / aspect / visual toggles.
       cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
-      cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+      // 2026-06-09: added wide + ultrawide — UI exposes these but the enum
+      // only listed 4 values, causing a ZodError (400) on save whenever a
+      // merchant picked either option. Fix: keep in sync with page-builder UI.
+      cardAspect: z
+        .enum(['theme', 'square', 'portrait', 'landscape', 'wide', 'ultrawide'])
+        .optional(),
       // 2026-05-16 batch 2: cardGap (spacing between cards) + cardShape
       // (named preset that bundles aspect + radius). Must be listed here
       // or Zod silently strips on PUT — exact same trap that bit
@@ -238,7 +243,9 @@ const layoutSchema = z
       title: z.string().optional(),
       titleAr: z.string().optional(),
       cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
-      cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+      cardAspect: z
+        .enum(['theme', 'square', 'portrait', 'landscape', 'wide', 'ultrawide'])
+        .optional(),
       cardShape: z
         .enum([
           'theme',
@@ -283,7 +290,9 @@ const layoutSchema = z
       title: z.string().optional(),
       titleAr: z.string().optional(),
       cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
-      cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+      cardAspect: z
+        .enum(['theme', 'square', 'portrait', 'landscape', 'wide', 'ultrawide'])
+        .optional(),
       cardShape: z
         .enum([
           'theme',
@@ -442,7 +451,9 @@ const layoutSchema = z
             showSubtitleLines: z.boolean().optional(),
             bgColor: colorValue,
             cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
-            cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+            cardAspect: z
+              .enum(['theme', 'square', 'portrait', 'landscape', 'wide', 'ultrawide'])
+              .optional(),
             cardShape: z
               .enum([
                 'theme',
@@ -498,7 +509,9 @@ const layoutSchema = z
     productCardDefaults: z
       .object({
         cardSize: z.enum(['xxs', 'xs', 'sm', 'md', 'lg', 'xl']).optional(),
-        cardAspect: z.enum(['theme', 'square', 'portrait', 'landscape']).optional(),
+        cardAspect: z
+          .enum(['theme', 'square', 'portrait', 'landscape', 'wide', 'ultrawide'])
+          .optional(),
         cardShape: z
           .enum([
             'theme',

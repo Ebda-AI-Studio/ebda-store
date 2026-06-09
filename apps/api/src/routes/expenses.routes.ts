@@ -40,7 +40,11 @@ const createSchema = z.object({
   paidFromAccountId: z.string().uuid(),
   amount: z.number().int().positive(),
   taxAmount: z.number().int().nonnegative().optional(),
-  expenseDate: z.string().datetime(),
+  // Accept both a full ISO-8601 datetime ("2026-06-15T00:00:00.000Z") and a
+  // bare date string ("2026-06-15") produced by <input type="date">.
+  // z.coerce.date() converts either form to a Date; the service stores it as a
+  // DB timestamp so both are safe. Fixes the 422 on every manual expense save.
+  expenseDate: z.coerce.date(),
   currency: z.string().length(3).optional(),
   receiptImageUrl: z.string().url().optional(),
   notes: z.string().max(1000).optional(),

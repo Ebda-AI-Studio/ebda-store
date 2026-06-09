@@ -216,6 +216,15 @@ router.post(
           description: data.description,
           descriptionAr: data.descriptionAr,
           image: data.image,
+          // SEO meta — mirror the PUT path so fields are persisted at create
+          // time. Without this block the fields pass Zod validation but are
+          // silently dropped, making every newly created category lose all SEO.
+          metaTitle: data.metaTitle,
+          metaTitleAr: data.metaTitleAr,
+          metaDescription: data.metaDescription,
+          metaDescriptionAr: data.metaDescriptionAr,
+          metaDescriptionAeo: data.metaDescriptionAeo,
+          metaDescriptionAeoAr: data.metaDescriptionAeoAr,
         },
         include: {
           _count: { select: { products: true } },

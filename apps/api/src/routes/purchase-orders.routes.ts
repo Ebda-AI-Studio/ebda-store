@@ -17,7 +17,9 @@ const router = Router();
 
 const createSchema = z.object({
   supplierId: z.string().uuid(),
-  expectedDate: z.string().datetime().optional(),
+  // Accept both full ISO-8601 and bare YYYY-MM-DD from <input type="date">.
+  // z.coerce.date() handles both; service stores as a DB timestamp.
+  expectedDate: z.coerce.date().optional(),
   notes: z.string().optional(),
   notesAr: z.string().optional(),
   items: z

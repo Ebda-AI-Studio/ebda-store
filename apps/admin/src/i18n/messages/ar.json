@@ -754,7 +754,9 @@
         "quantityPlaceholder": "0",
         "productStatus": "حالة المنتج",
         "category": "الفئة",
-        "noCategory": "بدون فئة"
+        "noCategory": "بدون فئة",
+        "lowStockThreshold": "حد المخزون المنخفض",
+        "lowStockThresholdPlaceholder": "5"
       },
       "statusOptions": {
         "draft": "مسودة",
@@ -3245,7 +3247,11 @@
       "current": "الحالي",
       "aboutTitle": "عن القوالب",
       "aboutBody": "تحدّد القوالب الشكل العام لواجهة متجرك. يمكنك تغيير القوالب في أي وقت، وسيتكيّف المحتوى تلقائيًا مع التصميم الجديد. خصّص الألوان والخطوط في",
-      "brandingSettings": "إعدادات الهوية البصرية"
+      "brandingSettings": "إعدادات الهوية البصرية",
+      "saveSuccess": "تم حفظ القالب",
+      "saveSuccessBody": "تم تحديث قالب متجرك.",
+      "saveError": "فشل حفظ القالب",
+      "saveErrorBody": "حدث خطأ ما. يرجى المحاولة مرة أخرى."
     }
   },
   "seo": {

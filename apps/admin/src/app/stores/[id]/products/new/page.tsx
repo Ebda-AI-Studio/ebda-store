@@ -52,6 +52,10 @@ export default function NewProductPage() {
     costPrice: '',
     sku: '',
     inventory: '',
+    /** Low-stock threshold — mirrors the edit form field. Absent here meant
+     *  new products always fell back to the DB default (5) with no way to
+     *  set a different value at creation time. */
+    lowStockThreshold: '',
     category: '',
     status: 'draft',
   });
@@ -153,6 +157,9 @@ export default function NewProductPage() {
         discountValue: apiDiscountValue,
         sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
+        ...(formData.lowStockThreshold !== ''
+          ? { lowStockThreshold: parseInt(formData.lowStockThreshold, 10) }
+          : {}),
         status: formData.status,
         images: images.map(url => ({ url })),
       };
@@ -381,6 +388,14 @@ export default function NewProductPage() {
                   value={formData.inventory}
                   onChange={e => updateField('inventory', e.target.value)}
                   placeholder={t('fields.quantityPlaceholder')}
+                />
+                <Input
+                  label={t('fields.lowStockThreshold')}
+                  type="number"
+                  min={0}
+                  value={formData.lowStockThreshold}
+                  onChange={e => updateField('lowStockThreshold', e.target.value)}
+                  placeholder={t('fields.lowStockThresholdPlaceholder')}
                 />
               </div>
             </div>

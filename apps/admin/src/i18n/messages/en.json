@@ -754,7 +754,9 @@
         "quantityPlaceholder": "0",
         "productStatus": "Product Status",
         "category": "Category",
-        "noCategory": "No category"
+        "noCategory": "No category",
+        "lowStockThreshold": "Low-Stock Threshold",
+        "lowStockThresholdPlaceholder": "5"
       },
       "statusOptions": {
         "draft": "Draft",
@@ -3245,7 +3247,11 @@
       "current": "Current",
       "aboutTitle": "About Templates",
       "aboutBody": "Templates define the overall look and feel of your storefront. You can change templates at any time, and your content will automatically adapt to the new design. Customize colors and fonts in the",
-      "brandingSettings": "Branding settings"
+      "brandingSettings": "Branding settings",
+      "saveSuccess": "Template saved",
+      "saveSuccessBody": "Your storefront template has been updated.",
+      "saveError": "Failed to save template",
+      "saveErrorBody": "Something went wrong. Please try again."
     }
   },
   "seo": {

@@ -674,9 +674,35 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const socialLinks = socialSchema.parse(req.body);
+      const incoming = socialSchema.parse(req.body);
 
-      const store = await StoreService.updateSocialLinks(id, socialLinks);
+      // Merge with the existing socialLinks so keys the admin UI omits
+      // (e.g. `whatsapp`, which lives in the schema but has no UI input)
+      // are never silently wiped on save. Only keys the client explicitly
+      // sends (present in req.body) are updated; absent keys keep their
+      // existing values. A sent key with an empty string maps to undefined
+      // (via optionalUrl preprocessing) and clears the stored value.
+      const existing = await StoreService.getById(id);
+      const existingLinks = (existing.socialLinks as Record<string, string | null> | null) ?? {};
+      const merged: Record<string, string | null | undefined> = { ...existingLinks };
+      // Iterate the schema's STATIC key allowlist (never user-controlled keys) so a
+      // crafted body like {"__proto__": ...} / {"constructor": ...} can't reach
+      // `merged[key]` — avoids remote property injection / prototype pollution.
+      // `hasOwnProperty` (not the `in` operator) keeps the "was this key sent?" check
+      // off the prototype chain. Only keys the client explicitly sent are touched;
+      // a sent empty value clears, an omitted key keeps its existing value.
+      const incomingRecord = incoming as Record<string, string | undefined>;
+      for (const key of Object.keys(socialSchema.shape)) {
+        if (!Object.prototype.hasOwnProperty.call(req.body, key)) continue;
+        const val = incomingRecord[key];
+        if (val === undefined) {
+          delete merged[key]; // explicitly cleared (empty string → remove)
+        } else {
+          merged[key] = val;
+        }
+      }
+
+      const store = await StoreService.updateSocialLinks(id, merged as Prisma.InputJsonValue);
 
       res.json({
         success: true,

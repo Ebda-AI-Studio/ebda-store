@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 
 type TemplateId = 'modern' | 'classic' | 'minimal' | 'bold' | 'elegant';
@@ -84,6 +85,7 @@ export default function StoreTemplatePage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('template.page');
+  const toast = useToast();
 
   const [store, setStore] = useState<{ name: string; template: TemplateId } | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>('modern');
@@ -127,11 +129,16 @@ export default function StoreTemplatePage() {
         template: selectedTemplate,
       });
 
-      if (!error) {
-        router.push(`/stores/${storeId}`);
+      if (error) {
+        toast.error(t('saveError'), error.message || t('saveErrorBody'));
+        return;
       }
-    } catch (error) {
-      console.error('Failed to update template:', error);
+
+      toast.success(t('saveSuccess'), t('saveSuccessBody'));
+      router.push(`/stores/${storeId}`);
+    } catch (err) {
+      console.error('Failed to update template:', err);
+      toast.error(t('saveError'), t('saveErrorBody'));
     } finally {
       setIsSaving(false);
     }
