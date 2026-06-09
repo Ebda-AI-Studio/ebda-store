@@ -81,12 +81,22 @@ const shippingAddressSchema = z.object({
   lastName: z.string().trim().min(1).max(100),
   address1: z.string().trim().min(1).max(500),
   address2: z.string().max(500).optional(),
-  city: z.string().trim().min(1).max(150),
+  // City is NOT required: Kuwait addresses have no "city" — the locality is the
+  // area/district, which the storefront sends in `state`. The checkout form
+  // always sends city:'' (KW model), so requiring it here 400'd EVERY order
+  // ("خطأ في الدفع" → bounce back to the info step). Accept empty.
+  city: z.string().trim().max(150).optional().default(''),
   state: z.string().max(150).optional().default(''),
   postalCode: z.string().max(30).optional().default(''),
   country: z.string().trim().min(2).max(60),
   phone: z.string().max(40).optional(),
-  email: z.string().email().optional(),
+  // Email is optional. The form sends '' when the buyer leaves it blank;
+  // z.string().email() rejects '' and .optional() only permits undefined, so a
+  // blank email also 400'd the order. Treat '' (or whitespace) as "not given".
+  email: z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z.string().email().optional()
+  ),
 });
 
 const createOrderSchema = z.object({
