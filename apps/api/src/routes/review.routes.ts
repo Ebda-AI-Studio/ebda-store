@@ -8,7 +8,7 @@ import { ReviewService } from '../services/review.service';
 import { LoyaltyService } from '../services/loyalty.service';
 import logger from '../lib/logger';
 import { prisma } from '@force/database';
-import { auditLog } from '../middleware/security';
+import { auditLog, writeLimiter } from '../middleware/security';
 import { draftOwnerResponse, summarizeProductReviews } from '../lib/ai/review-tools';
 
 // `mergeParams: true` so the child router's handlers see `:storeId` from
@@ -227,6 +227,7 @@ router.put(
   requireStore,
   requireStoreAccess,
   requireFeature('reviews'),
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -252,6 +253,7 @@ router.post(
   requireStore,
   requireStoreAccess,
   requireFeature('reviews'),
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -302,6 +304,7 @@ router.post(
   requireStore,
   requireStoreAccess,
   requireFeature('reviews'),
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -337,6 +340,7 @@ router.delete(
   requireStore,
   requireStoreAccess,
   requireFeature('reviews'),
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
@@ -412,6 +416,7 @@ router.put(
   requireStore,
   requireStoreAccess,
   requireFeature('reviews'),
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

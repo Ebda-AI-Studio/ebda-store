@@ -3884,7 +3884,8 @@
       "submit": "Post entry",
       "submitting": "Posting…",
       "cancel": "Cancel",
-      "superAdminNotice": "Manual entries require super-admin. Posted entries are immutable — corrections via reversal only.",
+      "superAdminOnly": "Insufficient permissions",
+      "superAdminNotice": "Manual journal entries require super-admin access. Store admins cannot post raw GL entries — corrections are made via order refunds, expense updates, or by contacting your platform administrator.",
       "errors": {
         "unbalanced": "Debits must equal credits"
       }

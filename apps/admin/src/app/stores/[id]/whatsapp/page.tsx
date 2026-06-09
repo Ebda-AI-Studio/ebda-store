@@ -19,6 +19,7 @@
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 import { ConnectionTab } from '../../../../components/whatsapp/ConnectionTab';
 import { BotConfigTab } from '../../../../components/whatsapp/BotConfigTab';
 import { TemplatesTab } from '../../../../components/whatsapp/TemplatesTab';
@@ -63,6 +64,10 @@ function isValidTab(value: string | null): value is TabKey {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WhatsAppMasterPage() {
+  // Feature gate: whatsapp is an addon feature; absent from PLAN_BASELINE by
+  // default and enabled only via super-admin override per store.
+  const { gate } = useRequireFeature('whatsapp');
+
   const params = useParams<{ id: string }>();
   const storeId = params.id;
   const router = useRouter();
@@ -74,6 +79,10 @@ export default function WhatsAppMasterPage() {
   const switchTab = (key: TabKey) => {
     router.replace(`/stores/${storeId}/whatsapp?tab=${key}`);
   };
+
+  // Render gate (upsell page) for store_admin when feature is disabled.
+  // Super-admin always passes through so they can configure the feature.
+  if (gate) return gate;
 
   return (
     <AdminLayout

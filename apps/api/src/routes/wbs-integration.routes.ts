@@ -28,6 +28,7 @@ import { config } from '../config';
 import { buildTemplatesForStore } from '../lib/wa-templates/buildForStore';
 import { resolveHeaderHandle } from '../lib/wa-templates/resolveHeaderHandle';
 import { auditLog } from '../middleware/security';
+import { requireFeature } from '../middleware/feature-gate';
 import { getAuthUser } from '../utils/store-helpers';
 import { sendAlert } from '../services/alerts.service';
 import logger from '../lib/logger';
@@ -144,6 +145,7 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('whatsapp'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;
@@ -284,6 +286,7 @@ router.put(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('whatsapp'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id: storeId } = req.params;

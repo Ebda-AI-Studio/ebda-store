@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { couponValidateLimiter, writeLimiter } from '../middleware/security';
 import { CouponService } from '../services/coupon.service';
 
 const router = Router();
@@ -98,6 +99,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('coupons'),
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -122,6 +124,7 @@ router.put(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('coupons'),
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -146,6 +149,7 @@ router.delete(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('coupons'),
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -169,6 +173,7 @@ router.patch(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('coupons'),
+  writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, id } = req.params;
@@ -187,8 +192,14 @@ router.patch(
 
 // Public endpoint: Validate coupon code
 // POST /public/stores/:storeId/coupons/validate
+//
+// Rate-limited at 20/min per IP to prevent brute-force code discovery.
+// Responses are intentionally generic — we never reveal whether a code
+// doesn't exist vs is expired vs is exhausted (all return INVALID_COUPON)
+// so an attacker can't distinguish valid codes from invalid ones.
 router.post(
   '/public/:storeId/coupons/validate',
+  couponValidateLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -202,7 +213,18 @@ router.post(
         return;
       }
 
-      const coupon = await CouponService.getByCode(storeId, code);
+      let coupon;
+      try {
+        coupon = await CouponService.getByCode(storeId, code);
+      } catch {
+        // Return a generic response regardless of whether the code doesn't
+        // exist, is expired, or is exhausted — prevents code enumeration.
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_COUPON', message: 'Coupon code is not valid' },
+        });
+        return;
+      }
 
       // Check minimum order amount
       if (coupon.minOrderAmount && orderTotal && orderTotal < coupon.minOrderAmount) {

@@ -438,6 +438,24 @@ export const newsletterLimiter = rateLimit({
   },
 });
 
+// Coupon validate limiter — public brute-force discovery protection.
+// 20 attempts per minute per IP is enough for a legitimate checkout flow
+// but prevents rapid enumeration of valid coupon codes.
+// ipKeyGenerator() collapses IPv6 /128 → /64 (ERR_ERL_KEY_GEN_IPV6).
+export const couponValidateLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'coupon-validate'),
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipForLoadTest,
+  keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+});
+
 // ==========================================
 // Audit Logging
 // ==========================================

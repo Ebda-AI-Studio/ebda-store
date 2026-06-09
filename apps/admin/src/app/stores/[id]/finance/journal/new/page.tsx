@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,8 @@ export default function NewJournalEntryPage() {
   const router = useRouter();
   const t = useT('finance.journal');
   const tNew = useT('finance.newEntry');
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [memo, setMemo] = useState('');
@@ -118,6 +121,22 @@ export default function NewJournalEntryPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Only super_admin can post manual journal entries (API enforces this with
+  // authorize('super_admin')). Show a clear permission notice to store_admin
+  // so they don't waste time filling the form and getting a cryptic 403.
+  if (!isSuperAdmin) {
+    return (
+      <AdminLayout title={tNew('title')} subtitle={tNew('description')}>
+        <div className="max-w-4xl">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+            <p className="font-semibold mb-1">{tNew('superAdminOnly')}</p>
+            <p>{tNew('superAdminNotice')}</p>
+          </div>
+        </div>
+      </AdminLayout>
+    );
   }
 
   return (

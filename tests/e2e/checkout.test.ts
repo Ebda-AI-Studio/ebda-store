@@ -311,7 +311,12 @@ describe('Checkout Flow', () => {
         .post(`/public/${testStoreId}/coupons/validate`)
         .send({ code: 'INVALID-CODE', orderTotal: 10000 });
 
-      expect(res.status).toBe(404);
+      // Security (PR-3 / audit H6): the validate endpoint returns a uniform
+      // 400 INVALID_COUPON for non-existent, expired, and exhausted codes alike
+      // so an attacker can't enumerate valid codes by status/message. (Was 404,
+      // which leaked "this code does not exist" as distinct from other failures.)
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('INVALID_COUPON');
     });
 
     it('should reject expired coupon', async () => {

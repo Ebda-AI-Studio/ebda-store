@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { encryption } from '../services/encryption.service';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -40,6 +41,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('whatsapp'),
   async (req: Request, res: Response) => {
     const storeId = req.params.id;
     try {
@@ -95,6 +97,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('whatsapp'),
   async (req: Request, res: Response) => {
     const storeId = req.params.id;
     try {
@@ -171,6 +174,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('whatsapp'),
   async (req: Request, res: Response) => {
     const storeId = req.params.id;
     try {
@@ -261,6 +265,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('whatsapp'),
   async (req: Request, res: Response) => {
     const storeId = req.params.id;
     try {

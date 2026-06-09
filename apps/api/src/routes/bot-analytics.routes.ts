@@ -18,6 +18,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { encryption } from '../services/encryption.service';
 import { config } from '../config';
 import logger from '../lib/logger';
@@ -31,6 +32,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('whatsapp'),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id: storeId } = req.params;

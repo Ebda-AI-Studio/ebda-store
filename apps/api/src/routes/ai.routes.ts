@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { writeLimiter } from '../middleware/security';
+import { requireFeature } from '../middleware/feature-gate';
 import { AIService } from '../services/ai.service';
 import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
@@ -303,6 +304,7 @@ async function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promis
 
 router.post(
   '/bulk/translate',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -338,43 +340,48 @@ router.post(
   }
 );
 
-router.post('/bulk/seo', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const force = req.body?.force === true;
-
-    const job = await prisma.bulkAiJob.create({
-      data: {
-        storeId,
-        userId: req.user!.userId,
-        kind: 'seo',
-        ...(force ? { errors: { force: true } as object } : {}),
-      },
-      select: { id: true, status: true, kind: true, createdAt: true },
-    });
-
+router.post(
+  '/bulk/seo',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await inngest.send({
-        name: 'bulk-ai/seo-requested',
-        data: { jobId: job.id, storeId, force },
-      });
-    } catch (err) {
-      await markJobFailedIfEnqueueFailed(job.id, err);
-      res.status(503).json({
-        success: false,
-        error: {
-          code: 'AI_QUEUE_UNREACHABLE',
-          message: 'Could not enqueue the sweep right now. Try again in a minute.',
-        },
-      });
-      return;
-    }
+      const { storeId } = req.params;
+      const force = req.body?.force === true;
 
-    res.status(202).json({ success: true, data: { job } });
-  } catch (error) {
-    next(error);
+      const job = await prisma.bulkAiJob.create({
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'seo',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/seo-requested',
+          data: { jobId: job.id, storeId, force },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 router.get('/bulk', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -633,6 +640,7 @@ router.get('/usage/log', async (req: Request, res: Response, next: NextFunction)
 
 router.post(
   '/bulk/faq-aeo',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -676,6 +684,7 @@ router.post(
 
 router.post(
   '/bulk/howto-aeo',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -719,6 +728,7 @@ router.post(
 
 router.post(
   '/bulk/meta-aeo',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -769,6 +779,7 @@ router.post(
 
 router.post(
   '/bulk/recommendations',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -818,6 +829,7 @@ router.post(
 
 router.post(
   '/bulk/aeo-sweep-all',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -916,6 +928,7 @@ router.post(
 
 router.post(
   '/bulk/llms-txt',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -958,6 +971,7 @@ router.post(
 
 router.post(
   '/bulk/citation-copy',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1000,6 +1014,7 @@ router.post(
 
 router.post(
   '/bulk/brand-facts',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1042,6 +1057,7 @@ router.post(
 
 router.post(
   '/bulk/geo-sweep-all',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1145,6 +1161,7 @@ router.post(
 
 router.post(
   '/jobs/:jobId/cancel',
+  requireFeature('bulk_operations'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

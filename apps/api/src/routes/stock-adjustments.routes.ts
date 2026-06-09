@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { writeLimiter } from '../middleware/security';
 import { runInTenantContext } from '@force/database';
 import {
   createAdjustment,
@@ -83,6 +84,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('inventory.bulk_adjustments'),
+  writeLimiter,
   async (req, res, next) => {
     try {
       const body = createSchema.safeParse(req.body);
@@ -110,6 +112,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('inventory.bulk_adjustments'),
+  writeLimiter,
   async (req, res, next) => {
     try {
       const data = await runInTenantContext(req.params.storeId, () =>

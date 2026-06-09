@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { writeLimiter } from '../middleware/security';
 import { runInTenantContext } from '@force/database';
 import {
   createSupplier,
@@ -76,6 +77,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
+  writeLimiter,
   async (req, res, next) => {
     try {
       const body = createSchema.safeParse(req.body);
@@ -99,6 +101,7 @@ router.patch(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
+  writeLimiter,
   async (req, res, next) => {
     try {
       const body = updateSchema.safeParse(req.body);
@@ -122,6 +125,7 @@ router.delete(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('accounting.basic'),
+  writeLimiter,
   async (req, res, next) => {
     try {
       await runInTenantContext(req.params.storeId, () =>

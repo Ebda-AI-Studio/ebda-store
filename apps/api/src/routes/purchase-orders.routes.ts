@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { writeLimiter } from '../middleware/security';
 import { runInTenantContext } from '@force/database';
 import {
   createPurchaseOrder,
@@ -100,6 +101,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('inventory.purchase_orders'),
+  writeLimiter,
   async (req, res, next) => {
     try {
       const body = createSchema.safeParse(req.body);
@@ -128,6 +130,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('inventory.purchase_orders'),
+  writeLimiter,
   async (req, res, next) => {
     try {
       const body = receiveSchema.safeParse(req.body);
@@ -156,6 +159,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   requireFeature('inventory.purchase_orders'),
+  writeLimiter,
   async (req, res, next) => {
     try {
       const data = await runInTenantContext(req.params.storeId, () =>

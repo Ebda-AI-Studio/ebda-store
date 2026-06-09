@@ -8,6 +8,7 @@ import { DateRangePicker } from '../../../../../components/DateRangePicker';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 import { useNotifications, useUiRefresh } from '@/contexts/NotificationContext';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
@@ -41,6 +42,8 @@ export default function JournalListPage() {
   const tNew = useT('finance.newEntry');
   const tc = useT('common');
   const router = useRouter();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const { subscribeToStore, unsubscribeFromStore } = useNotifications();
 
@@ -115,15 +118,18 @@ export default function JournalListPage() {
 
       {entries && (
         <div className="max-w-5xl space-y-4">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => router.push(`/stores/${storeId}/finance/journal/new`)}
-              className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm"
-            >
-              {tNew('addNew')}
-            </button>
-          </div>
+          {/* New Entry button: only super_admin can post manual journal entries. */}
+          {isSuperAdmin && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => router.push(`/stores/${storeId}/finance/journal/new`)}
+                className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm"
+              >
+                {tNew('addNew')}
+              </button>
+            </div>
+          )}
           {entries.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('noEntries')}</p>
           ) : (

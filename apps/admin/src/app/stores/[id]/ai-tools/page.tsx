@@ -9,6 +9,7 @@ import { apiGet, apiPost } from '../../../../lib/api';
 import { GeoResultsPanel } from './_components/GeoResultsPanel';
 import { AiSweepResultsPanels } from './_components/AiSweepResultsPanels';
 import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO
@@ -104,6 +105,10 @@ function jobKindLabel(kind: BulkAiJob['kind'], direction?: 'to_ar' | 'to_en' | n
 }
 
 export default function AiToolsPage() {
+  // Feature gate: bulk_operations covers AI catalogue sweeps; absent from
+  // PLAN_BASELINE by default and enabled via super-admin override per store.
+  const { gate } = useRequireFeature('bulk_operations');
+
   const params = useParams();
   const storeId = params?.id as string;
 
@@ -289,6 +294,10 @@ export default function AiToolsPage() {
     await fetchMasterJobs(sweep);
     await fetchJobs();
   }
+
+  // Render gate (upsell page) for store_admin when feature is disabled.
+  // Super-admin always passes through so they can configure the feature.
+  if (gate) return gate;
 
   return (
     <AdminLayout
