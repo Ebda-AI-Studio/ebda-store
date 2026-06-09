@@ -31,10 +31,16 @@ function appendPoolParams(url: string | undefined): string | undefined {
       u.searchParams.set('connect_timeout', '10');
     }
     if (!u.searchParams.has('pool_timeout')) {
-      u.searchParams.set('pool_timeout', '10');
+      u.searchParams.set('pool_timeout', process.env.DB_POOL_TIMEOUT || '20');
     }
     if (!u.searchParams.has('connection_limit')) {
-      u.searchParams.set('connection_limit', '5');
+      // A limit of 5 starved the pool under real concurrency (storefront + admin
+      // + Inngest async writers share one process) -> ~220x/day "Timed out
+      // fetching a new connection from the pool" in Sentry. Neon's pooled
+      // endpoint runs pgbouncer in transaction mode, so a higher per-instance
+      // client limit multiplexes safely onto fewer server connections.
+      // Default 15; override via DB_CONNECTION_LIMIT in Railway without a deploy.
+      u.searchParams.set('connection_limit', process.env.DB_CONNECTION_LIMIT || '15');
     }
     // Enable pgbouncer mode for Neon pooler URLs
     if (u.hostname.includes('neon.tech') && !u.searchParams.has('pgbouncer')) {

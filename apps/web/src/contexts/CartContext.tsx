@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useToast } from '@force/ui';
 import { api } from '@/lib/api';
 import { useLanguage } from './LanguageContext';
+import { useStore } from './StoreContext';
 
 export interface CartItem {
   // Server cart_item row id once the item is synced. Before the first
@@ -77,6 +78,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const migratedRef = useRef(false);
   const toast = useToast();
   const { t, language } = useLanguage();
+  // On the platform domain root (store.forcemediakw.com/) there is no resolved
+  // store, so `store.id` is the 'demo' sentinel and ApiClient never gets an
+  // X-Store-ID. Calling GET /public/cart in that state 400s with
+  // STORE_NOT_RESOLVED (~115x/day in Sentry). Gate every cart round-trip on a
+  // real store; without one the cart is purely localStorage until a store
+  // resolves (deps re-run hydrate when it does).
+  const { store } = useStore();
+  const hasStore = !!store?.id && store.id !== 'demo';
 
   // Fast first paint: load cached items from localStorage before the server
   // round-trip. These are overwritten once the authoritative cart arrives.
@@ -95,11 +104,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refetchCart = useCallback(async () => {
+    if (!hasStore) return;
     const res = await api.getCart();
     if (res.success && res.data?.cart) {
       setItems((res.data.cart.items as ServerCartItem[]).map(mapServerItem));
     }
-  }, []);
+  }, [hasStore]);
 
   // Hydrate from the server cart. If the server cart is empty but we have
   // local items (pre-fix users or guests who added items before hydration),
@@ -108,6 +118,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function hydrate() {
+      // No resolved store (platform root) -> skip the server cart entirely;
+      // the localStorage cart is still painted and isReady unblocks the UI.
+      if (!hasStore) {
+        if (!cancelled) setIsReady(true);
+        return;
+      }
       try {
         const res = await api.getCart();
         if (cancelled) return;
@@ -159,7 +175,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [refetchCart]);
+  }, [refetchCart, hasStore]);
 
   // Persist to localStorage so the next page load can paint the cart
   // instantly while the server round-trip is in flight.
