@@ -1,18 +1,22 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import type { StoreTheme } from '@force/shared';
+import { ColorField } from '../../../../../components/ColorField';
 import { IOS_STATUS_OPTIONS, type PWASettings } from './types';
 
 interface PwaIosSettingsProps {
   settings: PWASettings;
   pwaEnabled: boolean;
   onChange: (settings: PWASettings) => void;
+  /** Store theme — passed through so ColorField can offer brand-token presets. */
+  theme?: StoreTheme;
 }
 
 /**
  * iOS-specific manifest tweaks: Safari status bar style and splash screen color.
  */
-export function PwaIosSettings({ settings, pwaEnabled, onChange }: PwaIosSettingsProps) {
+export function PwaIosSettings({ settings, pwaEnabled, onChange, theme }: PwaIosSettingsProps) {
   const t = useT('pwa.ios');
 
   return (
@@ -41,26 +45,14 @@ export function PwaIosSettings({ settings, pwaEnabled, onChange }: PwaIosSetting
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-2">
-            {t('splashScreenColor')}
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={settings.splashScreenColor}
-              onChange={e => onChange({ ...settings, splashScreenColor: e.target.value })}
-              className="w-10 h-10 rounded border border-border cursor-pointer"
-              disabled={!pwaEnabled}
-            />
-            <input
-              type="text"
-              value={settings.splashScreenColor}
-              onChange={e => onChange({ ...settings, splashScreenColor: e.target.value })}
-              className="flex-1 px-3 py-2 border border-border rounded-lg text-sm uppercase"
-              disabled={!pwaEnabled}
-            />
-          </div>
+        <div className={pwaEnabled ? '' : 'opacity-50 pointer-events-none'}>
+          <ColorField
+            label={t('splashScreenColor')}
+            value={settings.splashScreenColor}
+            onChange={v => onChange({ ...settings, splashScreenColor: v || '#ffffff' })}
+            theme={theme}
+            showContrastPreview={false}
+          />
         </div>
       </div>
     </div>

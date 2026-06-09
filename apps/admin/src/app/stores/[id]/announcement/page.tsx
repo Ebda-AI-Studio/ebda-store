@@ -12,8 +12,10 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
+import { ColorField } from '../../../../components/ColorField';
 import { apiGet, apiPut } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import type { StoreTheme } from '@force/shared';
 
 // Field names mirror the canonical AnnouncementBar shape from @force/shared
 // and the API's announcementSchema (`bgColor`, `link`). The previous local
@@ -49,6 +51,9 @@ export default function AnnouncementPage() {
   const t = useT('announcement.page');
 
   const [settings, setSettings] = useState<AnnouncementSettings>(DEFAULT_SETTINGS);
+  // Store theme is loaded in parallel with the announcement settings so the
+  // ColorField can offer brand-token options for the text color picker.
+  const [storeTheme, setStoreTheme] = useState<StoreTheme | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -57,12 +62,21 @@ export default function AnnouncementPage() {
     if (!storeId) return;
     setIsLoading(true);
     try {
-      const { data } = await apiGet<{ announcement?: AnnouncementSettings } | AnnouncementSettings>(
-        `/api/v1/stores/${storeId}/announcement`
-      );
-      const announcement = (data && 'announcement' in data ? data.announcement : data) || null;
+      const [announcementRes, storeRes] = await Promise.all([
+        apiGet<{ announcement?: AnnouncementSettings } | AnnouncementSettings>(
+          `/api/v1/stores/${storeId}/announcement`
+        ),
+        apiGet<{ store?: { theme?: StoreTheme } }>(`/api/v1/stores/${storeId}`),
+      ]);
+      const announcement =
+        (announcementRes.data && 'announcement' in announcementRes.data
+          ? announcementRes.data.announcement
+          : announcementRes.data) || null;
       if (announcement) {
         setSettings({ ...DEFAULT_SETTINGS, ...announcement });
+      }
+      if (storeRes.data?.store?.theme) {
+        setStoreTheme(storeRes.data.store.theme);
       }
       // If 404 or no data, keep defaults
     } catch (err) {
@@ -254,41 +268,13 @@ export default function AnnouncementPage() {
           <h2 className="font-semibold text-foreground">{t('colors')}</h2>
 
           <div className="grid gap-6 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                {t('textColor')}
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={settings.textColor}
-                  onChange={e => setSettings(prev => ({ ...prev, textColor: e.target.value }))}
-                  className="h-10 w-14 cursor-pointer rounded-lg border border-border p-1"
-                />
-                <input
-                  type="text"
-                  value={settings.textColor}
-                  onChange={e => setSettings(prev => ({ ...prev, textColor: e.target.value }))}
-                  placeholder="#ffffff"
-                  className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              {/* Quick presets */}
-              <div className="mt-2 flex gap-2">
-                {['#ffffff', '#f3f4f6', '#fef08a', '#fbbf24', '#000000'].map(color => (
-                  <button
-                    type="button"
-                    key={color}
-                    onClick={() => setSettings(prev => ({ ...prev, textColor: color }))}
-                    className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                      settings.textColor === color ? 'border-foreground scale-110' : 'border-border'
-                    }`}
-                    style={{ backgroundColor: color }}
-                    title={color}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorField
+              label={t('textColor')}
+              value={settings.textColor}
+              onChange={v => setSettings(prev => ({ ...prev, textColor: v }))}
+              theme={storeTheme}
+              showContrastPreview={false}
+            />
           </div>
         </div>
 

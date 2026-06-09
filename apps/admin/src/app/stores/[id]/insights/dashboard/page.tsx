@@ -71,7 +71,6 @@ export default function InsightsDashboardPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.dashboard');
-  const tc = useT('common');
 
   const [data, setData] = useState<InsightsDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +96,9 @@ export default function InsightsDashboardPage() {
   if (!data) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
+        <div className="flex items-center justify-center h-64">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
       </AdminLayout>
     );
   }
@@ -134,7 +135,9 @@ export default function InsightsDashboardPage() {
               KWD
               {aovChange !== 0 && (
                 <span
-                  className={`ms-2 font-medium ${aovChange >= 0 ? 'text-green-700' : 'text-red-600'}`}
+                  className={`ms-2 font-medium ${
+                    aovChange >= 0 ? 'text-green-700' : 'text-red-600'
+                  }`}
                 >
                   {aovChange >= 0 ? '+' : ''}
                   {num(aovChange, 1)}%
@@ -198,7 +201,9 @@ export default function InsightsDashboardPage() {
                 <div key={step.label} className="rounded-lg border border-border p-3 space-y-0.5">
                   <p className="text-xs text-muted-foreground">{step.label}</p>
                   <p
-                    className={`text-xl font-semibold font-mono ${step.highlight ? 'text-primary' : ''}`}
+                    className={`text-xl font-semibold font-mono ${
+                      step.highlight ? 'text-primary' : ''
+                    }`}
                   >
                     {step.value}
                   </p>

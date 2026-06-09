@@ -19,8 +19,16 @@ import { Button, useToast } from '@force/ui';
 import { apiGet, apiPut } from '../../lib/api';
 
 // ─── Canonical defaults (mirror of WBS botCopyDefaults.js) ───────────────────
-// Kept here so the admin can show placeholder text without a network round-trip.
-// Update this when botCopyDefaults.js changes.
+// These are the out-of-the-box bot messages shipped with the WBS service.
+// They are duplicated here so the admin can render placeholder text for each
+// key without an extra network round-trip to the WBS service.
+//
+// MAINTENANCE NOTE (BUG-COPY-01): The WBS `GET /integrations/wbs` endpoint
+// does not yet expose these canonical defaults. When WBS adds a
+// `canonicalBotCopy` field to that response, wire it here instead:
+//   const [canonicalDefaults, setCanonicalDefaults] = useState(CANONICAL_DEFAULTS);
+//   // in fetchConfig: if (data?.canonicalBotCopy) setCanonicalDefaults(data.canonicalBotCopy);
+// Until then, update this constant when WBS botCopyDefaults.js changes.
 
 const CANONICAL_DEFAULTS: Record<string, { en: string; ar: string }> = {
   catalog_preparing: {

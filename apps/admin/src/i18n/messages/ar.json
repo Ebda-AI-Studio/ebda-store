@@ -1377,9 +1377,6 @@
       "descriptionAr": "الوصف (بالعربية)"
     },
     "theme": {
-      "primaryColor": "اللون الأساسي",
-      "secondaryColor": "اللون الثانوي",
-      "fontFamily": "نوع الخط",
       "borderRadius": "انحناء الحواف",
       "hex": "HEX",
       "pageBuilderPointer": {
@@ -3192,8 +3189,6 @@
       "saveChanges": "حفظ التغييرات",
       "saving": "جارٍ الحفظ...",
       "preview": "معاينة",
-      "sectionTitle": "شريط الإعلانات",
-      "sectionHint": "إظهار شريط أعلى متجرك للترويجات والإعلانات والأخبار",
       "managedInPageBuilderTitle": "الظهور ولون الخلفية",
       "managedInPageBuilderHint": "يتم الآن ضبط ظهور الشريط ولون خلفيته من قسم الإعلانات في منشئ الصفحات. هذه الصفحة تحرر محتوى النص.",
       "managedInPageBuilderLink": "إدارة الظهور والخلفية من منشئ الصفحات ←",
@@ -3210,7 +3205,6 @@
       "linkTextArabic": "نص الرابط (العربية)",
       "linkTextArabicPlaceholder": "تسوق الآن",
       "colors": "الألوان",
-      "backgroundColor": "لون الخلفية",
       "textColor": "لون النص",
       "successMessage": "تم حفظ إعدادات الإعلان بنجاح",
       "failedMessage": "تعذّر حفظ إعدادات الإعلان",

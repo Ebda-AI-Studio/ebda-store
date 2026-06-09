@@ -47,7 +47,6 @@ export default function InsightsProductsPage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('insights.products');
-  const tc = useT('common');
 
   const [data, setData] = useState<ProductsData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +72,9 @@ export default function InsightsProductsPage() {
   if (!data) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
+        <div className="flex items-center justify-center h-64">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
       </AdminLayout>
     );
   }

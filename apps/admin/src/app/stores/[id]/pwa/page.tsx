@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import type { StoreTheme } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { AutoPopulateBanner } from './_components/AutoPopulateBanner';
@@ -84,13 +85,23 @@ export default function PWASettingsPage() {
 
           <PwaBranding settings={settings} pwaEnabled={pwaEnabled} onChange={setSettings} />
 
-          <PwaManifestPreview settings={settings} pwaEnabled={pwaEnabled} onChange={setSettings} />
+          <PwaManifestPreview
+            settings={settings}
+            pwaEnabled={pwaEnabled}
+            onChange={setSettings}
+            theme={storeInfo?.theme as StoreTheme | undefined}
+          />
 
           <PwaIconUploader settings={settings} pwaEnabled={pwaEnabled} onChange={setSettings} />
 
           <PwaInstallBanner settings={settings} pwaEnabled={pwaEnabled} onChange={setSettings} />
 
-          <PwaIosSettings settings={settings} pwaEnabled={pwaEnabled} onChange={setSettings} />
+          <PwaIosSettings
+            settings={settings}
+            pwaEnabled={pwaEnabled}
+            onChange={setSettings}
+            theme={storeInfo?.theme as StoreTheme | undefined}
+          />
 
           {message && <PwaStatusMessage message={message} />}
 

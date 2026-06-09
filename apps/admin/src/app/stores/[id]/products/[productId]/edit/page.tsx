@@ -793,7 +793,7 @@ export default function EditProductPage() {
                     />
                   </div>
                   <Input
-                    label={`Meta title (${formData.metaTitle.length}/60)`}
+                    label={`Meta title (${formData.metaTitle.length}/70)`}
                     value={formData.metaTitle}
                     onChange={e => updateField('metaTitle', e.target.value)}
                     maxLength={70}
@@ -810,7 +810,7 @@ export default function EditProductPage() {
                     />
                   </div>
                   <Input
-                    label={`Meta title AR (${formData.metaTitleAr.length}/60)`}
+                    label={`Meta title AR (${formData.metaTitleAr.length}/70)`}
                     value={formData.metaTitleAr}
                     onChange={e => updateField('metaTitleAr', e.target.value)}
                     maxLength={70}
@@ -829,7 +829,7 @@ export default function EditProductPage() {
                     />
                   </div>
                   <Textarea
-                    label={`Meta description (${formData.metaDescription.length}/160)`}
+                    label={`Meta description (${formData.metaDescription.length}/180)`}
                     value={formData.metaDescription}
                     onChange={e => updateField('metaDescription', e.target.value)}
                     maxLength={180}
@@ -847,7 +847,7 @@ export default function EditProductPage() {
                     />
                   </div>
                   <Textarea
-                    label={`Meta description AR (${formData.metaDescriptionAr.length}/160)`}
+                    label={`Meta description AR (${formData.metaDescriptionAr.length}/180)`}
                     value={formData.metaDescriptionAr}
                     onChange={e => updateField('metaDescriptionAr', e.target.value)}
                     maxLength={180}
@@ -865,14 +865,14 @@ export default function EditProductPage() {
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Textarea
-                    label={`AEO meta description EN (${formData.metaDescriptionAeo.length}/160)`}
+                    label={`AEO meta description EN (${formData.metaDescriptionAeo.length}/180)`}
                     value={formData.metaDescriptionAeo}
                     onChange={e => updateField('metaDescriptionAeo', e.target.value)}
                     maxLength={180}
                     rows={3}
                   />
                   <Textarea
-                    label={`AEO meta description AR (${formData.metaDescriptionAeoAr.length}/160)`}
+                    label={`AEO meta description AR (${formData.metaDescriptionAeoAr.length}/180)`}
                     value={formData.metaDescriptionAeoAr}
                     onChange={e => updateField('metaDescriptionAeoAr', e.target.value)}
                     maxLength={180}

@@ -39,7 +39,6 @@ export default function InsightsCohortsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.cohorts');
-  const tc = useT('common');
 
   const [data, setData] = useState<CohortData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +64,9 @@ export default function InsightsCohortsPage() {
   if (!data) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
+        <div className="flex items-center justify-center h-64">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
       </AdminLayout>
     );
   }
@@ -148,7 +149,9 @@ export default function InsightsCohortsPage() {
                             return (
                               <td key={o} className="px-2 py-2 text-center">
                                 <span
-                                  className={`inline-block rounded px-1.5 py-0.5 font-medium ${retentionColor(rate)}`}
+                                  className={`inline-block rounded px-1.5 py-0.5 font-medium ${retentionColor(
+                                    rate
+                                  )}`}
                                   title={`${cell.customersActive} / ${total} customers active`}
                                 >
                                   {(rate * 100).toFixed(0)}%

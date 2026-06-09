@@ -197,9 +197,11 @@ export function useBranding(storeId: string, messages: ToastMessages) {
         { name: messages.sectionContact, result: contactResult },
         { name: messages.sectionSocial, result: socialResult },
         { name: messages.sectionContact, result: settingsResult },
-      ].filter(r => r.result.error !== null);
+      ].filter(r => r.result.error != null);
 
       if (failed.length > 0) {
+        // Surface all failed sections, not just the first, so merchants know
+        // exactly which parts of their branding didn't save.
         const first = failed[0];
         const err = first.result.error;
         if (err?.status === 403) {
@@ -207,8 +209,9 @@ export function useBranding(storeId: string, messages: ToastMessages) {
         } else if (err?.status === 401) {
           toast.error(messages.sessionExpiredTitle, messages.sessionExpiredBody);
         } else {
+          const failedNames = [...new Set(failed.map(f => f.name))].join(', ');
           toast.error(
-            `${messages.saveFailedPrefix}${first.name}`,
+            `${messages.saveFailedPrefix}${failedNames}`,
             err?.message || messages.serverError
           );
         }

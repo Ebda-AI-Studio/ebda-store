@@ -1377,9 +1377,6 @@
       "descriptionAr": "Description (Arabic)"
     },
     "theme": {
-      "primaryColor": "Primary Color",
-      "secondaryColor": "Secondary Color",
-      "fontFamily": "Font Family",
       "borderRadius": "Border Radius",
       "hex": "HEX",
       "pageBuilderPointer": {
@@ -3192,8 +3189,6 @@
       "saveChanges": "Save Changes",
       "saving": "Saving...",
       "preview": "Preview",
-      "sectionTitle": "Announcement Bar",
-      "sectionHint": "Show a banner at the top of your store for promotions, announcements or news",
       "managedInPageBuilderTitle": "Visibility & background color",
       "managedInPageBuilderHint": "Whether the bar shows and its background color are now set in the Page Builder's announcement section. This page edits the text content.",
       "managedInPageBuilderLink": "Manage visibility & background in the Page Builder →",
@@ -3210,7 +3205,6 @@
       "linkTextArabic": "Link Text (Arabic)",
       "linkTextArabicPlaceholder": "تسوق الآن",
       "colors": "Colors",
-      "backgroundColor": "Background Color",
       "textColor": "Text Color",
       "successMessage": "Announcement settings saved successfully",
       "failedMessage": "Failed to save announcement settings",

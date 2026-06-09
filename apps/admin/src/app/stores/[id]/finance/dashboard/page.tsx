@@ -91,14 +91,6 @@ export default function FinanceDashboardPage() {
    */
   const [salesStats, setSalesStats] = useState<SalesStats | null>(null);
 
-  // Build YYYY-MM-DD strings from the resolved date range.
-  function toDateStr(d: Date): string {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
   useEffect(() => {
     if (!storeId) return;
 
@@ -106,8 +98,14 @@ export default function FinanceDashboardPage() {
     setDashboardErr(null);
 
     const resolved = resolveDateRange(period, customRange);
-    const from = toDateStr(resolved.startDate);
-    const to = toDateStr(resolved.endDate);
+    // Use ISO timestamps (UTC) for both finance and analytics so "today"
+    // refers to the same window regardless of the viewer's local timezone.
+    // BUG-F-DASH-02 fix (2026-06-09): `toDateStr` produced local YYYY-MM-DD
+    // which the finance API appended T00:00:00 as local midnight, while
+    // analytics used toISOString() (UTC), causing Kuwait (UTC+3) users to
+    // see a 3-hour boundary mismatch between the two panels on the same page.
+    const from = resolved.startDate.toISOString();
+    const to = resolved.endDate.toISOString();
 
     // Main dashboard — pass the resolved date window
     apiGet<DashboardData>(`/api/v1/stores/${storeId}/finance/dashboard?from=${from}&to=${to}`)
@@ -201,7 +199,9 @@ export default function FinanceDashboardPage() {
                   {t('revenue')}
                 </p>
                 <p
-                  className={`text-2xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : 'text-green-700'}`}
+                  className={`text-2xl font-semibold font-mono ${
+                    dashboardErr ? 'text-muted-foreground' : 'text-green-700'
+                  }`}
                   title={dashboardErr ?? undefined}
                 >
                   {dashboardErr ? '—' : kwd(thisMonth.revenue)}
@@ -221,7 +221,9 @@ export default function FinanceDashboardPage() {
                   {t('expenses')}
                 </p>
                 <p
-                  className={`text-2xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : 'text-red-600'}`}
+                  className={`text-2xl font-semibold font-mono ${
+                    dashboardErr ? 'text-muted-foreground' : 'text-red-600'
+                  }`}
                   title={dashboardErr ?? undefined}
                 >
                   {dashboardErr ? '—' : kwd(thisMonth.expenses)}
@@ -239,7 +241,13 @@ export default function FinanceDashboardPage() {
               <div className="rounded-xl border border-border p-4 space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('net')}</p>
                 <p
-                  className={`text-2xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : netPositive ? 'text-green-700' : 'text-red-600'}`}
+                  className={`text-2xl font-semibold font-mono ${
+                    dashboardErr
+                      ? 'text-muted-foreground'
+                      : netPositive
+                        ? 'text-green-700'
+                        : 'text-red-600'
+                  }`}
                   title={dashboardErr ?? undefined}
                 >
                   {dashboardErr ? (
@@ -309,7 +317,9 @@ export default function FinanceDashboardPage() {
               <div className="rounded-xl border border-border p-6 flex items-center justify-center">
                 <div className="text-center space-y-1">
                   <p
-                    className={`text-3xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : ''}`}
+                    className={`text-3xl font-semibold font-mono ${
+                      dashboardErr ? 'text-muted-foreground' : ''
+                    }`}
                     title={dashboardErr ?? undefined}
                   >
                     {dashboardErr ? '—' : kwd(stockValue)}
@@ -391,7 +401,9 @@ export default function FinanceDashboardPage() {
                       {t(labelKey)}
                     </p>
                     <p
-                      className={`text-xl font-semibold font-mono ${dashboardErr ? 'text-muted-foreground' : ''}`}
+                      className={`text-xl font-semibold font-mono ${
+                        dashboardErr ? 'text-muted-foreground' : ''
+                      }`}
                       title={dashboardErr ?? undefined}
                     >
                       {dashboardErr ? '—' : kwd(val)}

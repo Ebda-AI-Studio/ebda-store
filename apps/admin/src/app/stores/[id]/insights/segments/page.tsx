@@ -52,7 +52,6 @@ export default function InsightsSegmentsPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('insights.segments');
-  const tc = useT('common');
 
   const [data, setData] = useState<SegmentsData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +77,9 @@ export default function InsightsSegmentsPage() {
   if (!data) {
     return (
       <AdminLayout title={t('title')}>
-        <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
+        <div className="flex items-center justify-center h-64">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
       </AdminLayout>
     );
   }
