@@ -522,7 +522,13 @@ router.get('/me/export', authenticate, async (req: Request, res: Response, next:
 router.put('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const updateSchema = z.object({
-      firstName: z.string().min(1, 'First name is required').optional(),
+      // ProfileClient.tsx always sends firstName from the form — even when
+      // the user clears the field it sends ''. Coerce '' → undefined so that
+      // a deliberate clear is treated as "don't update" rather than a 400.
+      firstName: z.preprocess(
+        v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+        z.string().min(1, 'First name is required').optional()
+      ),
       lastName: z.string().optional(),
       phone: z.string().optional(),
     });

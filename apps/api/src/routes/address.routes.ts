@@ -17,7 +17,10 @@ const addressSchema = z.object({
   lastName: z.string().trim().min(1, 'Last name is required').max(100),
   address1: z.string().trim().min(1, 'Street address is required').max(500),
   address2: z.string().max(500).optional(),
-  city: z.string().trim().min(1, 'City is required').max(150),
+  // Kuwait uses no postal-code and city is not a meaningful address field
+  // (the storefront's "city" input is always left blank). Mirror the P0 fix
+  // from public.routes.ts: accept '' by making city optional with a default.
+  city: z.string().trim().max(150).optional().default(''),
   state: z.string().max(150).optional(),
   area: z.string().max(150).optional(),
   postalCode: z.string().max(30).optional(),
