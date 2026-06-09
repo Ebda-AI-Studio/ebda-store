@@ -73,6 +73,59 @@ export function getApiUrl(): string {
 }
 
 /**
+ * Transparent refresh-on-401 (matches the storefront ApiClient).
+ *
+ * The access token is now short-lived (30 min). When a protected request
+ * 401s mid-session we silently exchange the long-lived refresh token for a
+ * fresh access+refresh pair via /auth/refresh and retry the original request
+ * once — the merchant never sees a logout. Rotation means the response
+ * returns a NEW refresh token; we mirror both into localStorage for the iOS
+ * PWA Bearer path. The HTTP-only refresh cookie is rotated server-side in
+ * parallel for the browser-cookie path.
+ *
+ * Single-flight: concurrent 401s share ONE in-flight refresh promise so we
+ * don't fire N parallel /auth/refresh calls (which would rotate the family
+ * N times and trip reuse-detection on all but the first).
+ */
+let refreshInFlight: Promise<string | null> | null = null;
+
+function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async (): Promise<string | null> => {
+    if (typeof window === 'undefined') return null;
+    // Body token for the Bearer/localStorage path; the HTTP-only refresh
+    // cookie is sent automatically via credentials:'include' for the
+    // pure-browser path (the API accepts either).
+    const refreshToken = localStorage.getItem('refreshToken');
+
+    try {
+      const res = await fetch(`${getApiUrl()}/api/v1/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      if (json?.success && json.data) {
+        if (json.data.accessToken) localStorage.setItem('accessToken', json.data.accessToken);
+        if (json.data.refreshToken) localStorage.setItem('refreshToken', json.data.refreshToken);
+        if (json.data.csrfToken) localStorage.setItem('csrfToken', json.data.csrfToken);
+        return json.data.accessToken ?? null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })().finally(() => {
+    refreshInFlight = null;
+  });
+
+  return refreshInFlight;
+}
+
+/**
  * Make an API request with proper error handling.
  * Authentication is handled automatically via the HTTP-only cookie sent
  * by the browser when `credentials: 'include'` is set.
@@ -83,8 +136,9 @@ export async function apiRequest<T = unknown>(
 ): Promise<{ data: T | null; error: ApiError | null }> {
   const url = endpoint.startsWith('http') ? endpoint : `${getApiUrl()}${endpoint}`;
 
-  try {
-    // Include CSRF token for state-changing requests
+  // Build the request headers fresh each call so a retry after a token
+  // refresh picks up the new Bearer + CSRF token from localStorage.
+  const buildHeaders = (): Record<string, string> => {
     const method = (options.method || 'GET').toUpperCase();
     const csrfHeaders: Record<string, string> = {};
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
@@ -110,16 +164,38 @@ export async function apiRequest<T = unknown>(
       }
     }
 
-    const response = await fetch(url, {
+    return {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+      ...csrfHeaders,
+      ...(options.headers as Record<string, string>),
+    };
+  };
+
+  try {
+    let response = await fetch(url, {
       ...options,
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-        ...csrfHeaders,
-        ...options.headers,
-      },
+      headers: buildHeaders(),
     });
+
+    // Transparent refresh-on-401: the access token is short-lived, so an
+    // expired one gets silently swapped for a fresh pair and the request is
+    // retried ONCE. Skip /auth/ endpoints to avoid a refresh→401→refresh loop.
+    if (
+      response.status === 401 &&
+      !endpoint.startsWith('/auth/') &&
+      typeof window !== 'undefined'
+    ) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        response = await fetch(url, {
+          ...options,
+          credentials: 'include',
+          headers: buildHeaders(),
+        });
+      }
+    }
 
     let data: ApiResponse<T>;
     try {
@@ -190,27 +266,47 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
   const url = endpoint.startsWith('http') ? endpoint : `${getApiUrl()}${endpoint}`;
   const method = (options.method || 'GET').toUpperCase();
 
-  const csrfHeaders: Record<string, string> = {};
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-    const csrfToken = typeof window !== 'undefined' ? localStorage.getItem('csrfToken') : null;
-    if (csrfToken) csrfHeaders['X-CSRF-Token'] = csrfToken;
-  }
+  // Rebuilt for the retry so a refreshed Bearer/CSRF token is picked up.
+  const buildHeaders = (): Record<string, string> => {
+    const csrfHeaders: Record<string, string> = {};
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      const csrfToken = typeof window !== 'undefined' ? localStorage.getItem('csrfToken') : null;
+      if (csrfToken) csrfHeaders['X-CSRF-Token'] = csrfToken;
+    }
 
-  const authHeaders: Record<string, string> = {};
-  if (typeof window !== 'undefined') {
-    const accessToken = localStorage.getItem('accessToken');
-    if (accessToken) authHeaders.Authorization = `Bearer ${accessToken}`;
-  }
+    const authHeaders: Record<string, string> = {};
+    if (typeof window !== 'undefined') {
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) authHeaders.Authorization = `Bearer ${accessToken}`;
+    }
 
-  return fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: {
+    return {
       ...authHeaders,
       ...csrfHeaders,
-      ...options.headers,
-    },
+      ...(options.headers as Record<string, string>),
+    };
+  };
+
+  let response = await fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: buildHeaders(),
   });
+
+  // Same transparent refresh-on-401 as apiRequest — keeps file downloads /
+  // invoice HTML working after the short-lived access token expires.
+  if (response.status === 401 && !endpoint.startsWith('/auth/') && typeof window !== 'undefined') {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await fetch(url, {
+        ...options,
+        credentials: 'include',
+        headers: buildHeaders(),
+      });
+    }
+  }
+
+  return response;
 }
 
 /**

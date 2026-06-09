@@ -63,13 +63,24 @@ export const config = {
   // from prod traffic on the shared Railway Redis instance.
   redisKeyPrefix: process.env.REDIS_KEY_PREFIX || '',
 
-  // JWT - No fallback in production. Long lifetimes are intentional: the
-  // admin PWA on a phone is expected to "stay logged in" between visits
-  // so a store admin can tap a push notification about a new order and
-  // land directly on the order page without re-authenticating. The
-  // refresh token (1 year) is the practical re-login window.
+  // JWT - No fallback in production.
+  //
+  // Access token is SHORT-LIVED (30 min). With refresh-token rotation in
+  // place, a short access token is what gives rotation its security value:
+  // a leaked access token is useless within half an hour, and a leaked
+  // refresh token is single-use (rotated on every refresh, reuse self-
+  // revokes the whole family). The 30-min access token silently refreshes
+  // in the background (the web/admin clients retry on 401 via /auth/refresh)
+  // so the user never sees it expire.
+  //
+  // The user-facing "always signed in" UX is governed by the REFRESH token
+  // lifetime, NOT the access token: the admin PWA on a phone stays logged in
+  // for the full refresh window (1 year) so a store admin can tap a push
+  // notification about a new order weeks later and land directly on the
+  // order page without re-authenticating. Shortening the access token does
+  // NOT shorten the session — it only forces a transparent token swap.
   jwtSecret: getRequiredSecret('JWT_SECRET', 'JWT Secret'),
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30d',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30m',
   refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '365d',
 
   // Encryption

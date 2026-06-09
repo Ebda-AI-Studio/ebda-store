@@ -138,8 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.csrfToken) {
       localStorage.setItem('csrfToken', data.csrfToken);
     }
-    // Set session indicator cookie so middleware can gate admin pages.
-    // 30 days matches the API access-token JWT lifetime.
+    // Set session indicator cookie so middleware can gate admin pages. 30
+    // days is the "looks signed in" hint window — the real session lasts as
+    // long as the refresh token (the access token is short-lived and silently
+    // rotates), so this is just a UX hint, not the auth source of truth.
     document.cookie = 'force-session=1; path=/; max-age=' + 30 * 24 * 60 * 60 + '; SameSite=Lax';
     setUser(data.user);
   }

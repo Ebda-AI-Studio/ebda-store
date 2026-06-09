@@ -10,15 +10,36 @@ import { redis } from '../services/redis.service';
 
 const router = Router();
 
-/** Shared cookie options for the HTTP-only auth token cookie. The 30-day
- *  maxAge mirrors the access-token JWT lifetime in config.ts — a phone
- *  PWA user opening the admin once a month stays signed in seamlessly,
- *  and refresh-token rotation (1 year) covers longer gaps. */
+/** Shared cookie options for the HTTP-only access-token cookie.
+ *
+ *  The access-token JWT itself is short-lived (30 min, config.jwtExpiresIn) but
+ *  the cookie's maxAge is deliberately the full refresh window (1 year). A
+ *  cookie outliving its JWT is harmless — the auth middleware rejects on the
+ *  JWT `exp` and the client transparently refreshes — and keeping the cookie
+ *  present avoids a "no cookie at all" state that would force an interactive
+ *  login on a returning PWA user. The refresh cookie (below) is the real
+ *  session-length governor. */
 const AUTH_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: config.nodeEnv === 'production',
   sameSite: config.nodeEnv === 'production' ? 'none' : 'lax', // 'none' required for cross-origin cookies
-  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days — matches jwtExpiresIn
+  maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year — matches the refresh window, NOT the 30-min JWT exp
+  path: '/',
+};
+
+/** Shared cookie options for the HTTP-only refresh-token cookie. Same
+ *  cross-origin posture as the access cookie (SameSite=None;Secure in prod)
+ *  so a pure-browser client (no localStorage mirror) can present it to
+ *  /auth/refresh automatically. Distinct cookie NAME ('refresh_token') from
+ *  the access cookie ('token') so the two never collide. Path is '/' to match
+ *  the access cookie — scoping tighter (e.g. /api/v1/auth/refresh) risks the
+ *  browser not sending it through Next rewrites/proxies, the classic
+ *  "cookie silently not sent" refresh bug. */
+const REFRESH_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: config.nodeEnv === 'production',
+  sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
+  maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year — matches config.refreshTokenExpiresIn + the DB row expiry
   path: '/',
 };
 
@@ -27,9 +48,25 @@ function setTokenCookie(res: Response, accessToken: string): void {
   res.cookie('token', accessToken, AUTH_COOKIE_OPTIONS);
 }
 
-/** Clear the auth token cookie on the response */
-function clearTokenCookie(res: Response): void {
+/** Set the refresh token as its own HTTP-only cookie on the response.
+ *  MUST be called on every response that issues/rotates a refresh token
+ *  (login, register-via-login, mfa/verify, refresh) — on rotation the
+ *  browser's stored refresh cookie has to be replaced or the next refresh
+ *  presents the now-rotated token and self-revokes the whole family. */
+function setRefreshCookie(res: Response, refreshToken: string): void {
+  res.cookie('refresh_token', refreshToken, REFRESH_COOKIE_OPTIONS);
+}
+
+/** Set both auth cookies in one call. Used by login + mfa/verify. */
+export function setSessionCookies(res: Response, accessToken: string, refreshToken: string): void {
+  setTokenCookie(res, accessToken);
+  setRefreshCookie(res, refreshToken);
+}
+
+/** Clear both auth cookies on the response (logout / logout-all / erase). */
+function clearSessionCookies(res: Response): void {
   res.clearCookie('token', { path: '/' });
+  res.clearCookie('refresh_token', { path: '/' });
 }
 
 // Validation schemas
@@ -224,8 +261,11 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
       userAgent: req.headers['user-agent'],
     });
 
-    // Set access token as HTTP-only cookie for cookie-based auth.
-    setTokenCookie(res, result.accessToken);
+    // Set BOTH the access cookie and the rotating refresh cookie for
+    // cookie-based auth. The refresh cookie lets a pure-browser client
+    // (no localStorage mirror) hit /auth/refresh once the short-lived
+    // access token expires, without ever surfacing a re-login.
+    setSessionCookies(res, result.accessToken, result.refreshToken);
 
     // ALSO return the access token in the body so Bearer-token clients
     // (the iOS admin PWA — Safari/WebKit purges third-party cookies) can
@@ -255,7 +295,13 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
 // POST /auth/refresh
 router.post('/refresh', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { refreshToken } = req.body;
+    // Accept the refresh token from the JSON body (Bearer/localStorage
+    // clients — the iOS admin PWA) OR the HTTP-only refresh cookie
+    // (pure-browser path). Body wins when both are present so an explicit
+    // localStorage token isn't shadowed by a stale cookie.
+    const refreshToken =
+      (req.body?.refreshToken as string | undefined) ||
+      (req.cookies?.refresh_token as string | undefined);
 
     if (!refreshToken) {
       res.status(400).json({
@@ -265,13 +311,18 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
       return;
     }
 
+    // Rotation: this returns a NEW access + NEW refresh token and revokes
+    // the presented one. Reuse of an already-rotated token throws inside
+    // refreshTokens() and revokes the whole family (see AuthService).
     const tokens = await AuthService.refreshTokens(refreshToken);
 
-    // Update the HTTP-only cookie with the new access token (browser path).
-    setTokenCookie(res, tokens.accessToken);
+    // Replace BOTH cookies with the rotated pair (browser path). The
+    // refresh cookie MUST be updated — leaving the old one would make the
+    // next refresh present the now-rotated token and self-revoke the family.
+    setSessionCookies(res, tokens.accessToken, tokens.refreshToken);
 
-    // ALSO return it in the body for Bearer-token clients (iOS admin PWA)
-    // so they can replace their localStorage token. Same reasoning as
+    // ALSO return them in the body for Bearer-token clients (iOS admin PWA)
+    // so they can replace their localStorage tokens. Same reasoning as
     // login/register — the API supports both auth modes.
     res.json({
       success: true,
@@ -288,7 +339,12 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
 // or missing token must still be able to clear their session cookie.
 router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { refreshToken } = req.body;
+    // Read the refresh token from the body OR the cookie so a pure-browser
+    // client (which never had the token in JS) still gets it revoked
+    // server-side, not just cleared locally.
+    const refreshToken =
+      (req.body?.refreshToken as string | undefined) ||
+      (req.cookies?.refresh_token as string | undefined);
 
     if (refreshToken) {
       await AuthService.logout(refreshToken);
@@ -318,8 +374,8 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
       // token invalid / expired — skip denylist, still clear cookie below
     }
 
-    // Clear the HTTP-only auth cookie
-    clearTokenCookie(res);
+    // Clear BOTH the access cookie and the refresh cookie.
+    clearSessionCookies(res);
 
     res.json({
       success: true,
@@ -340,7 +396,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await AuthService.revokeAllSessions(req.user!.userId);
-      clearTokenCookie(res);
+      clearSessionCookies(res);
       res.json({
         success: true,
         data: { message: 'All sessions revoked' },
@@ -420,11 +476,11 @@ router.post(
         userAgent: req.headers['user-agent'],
       });
 
-      // Best-effort clear the auth cookie — the JWT itself is no longer
+      // Best-effort clear both auth cookies — the JWT itself is no longer
       // valid against the user row (passwordHash rotated, status flipped
-      // to inactive) but expiring the cookie removes the dead token from
+      // to inactive) but expiring the cookies removes the dead tokens from
       // subsequent requests cleanly.
-      clearTokenCookie(res);
+      clearSessionCookies(res);
 
       res.json({
         success: true,

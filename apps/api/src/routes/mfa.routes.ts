@@ -6,6 +6,7 @@ import { prisma } from '@force/database';
 import { encryption } from '../services/encryption.service';
 import { MfaService } from '../services/mfa.service';
 import { AuthService } from '../services/auth.service';
+import { setSessionCookies } from './auth.routes';
 import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import { redis } from '../services/redis.service';
@@ -179,6 +180,11 @@ router.post('/verify', authLimiter, async (req, res, next) => {
     }
 
     const result = await AuthService.issueSessionFor(u);
+    // Set BOTH the access and rotating-refresh cookies, identical to a
+    // normal /auth/login response — so the post-MFA cookie path behaves
+    // the same as direct login (a pure-browser client gets a refresh
+    // cookie it can rotate against). Bearer clients use the body tokens.
+    setSessionCookies(res, result.accessToken, result.refreshToken);
     res.json({ success: true, data: result });
   } catch (error) {
     next(error);

@@ -158,6 +158,30 @@ The API and frontends are on **different domains**. This has major implications:
 5. Cross-origin cookies require `credentials: 'include'` on fetch AND `Access-Control-Allow-Credentials: true` from the API
 6. The API must set cookies with `SameSite=None; Secure` for cross-origin to work
 
+**Rotating refresh tokens (2026-06-09).** Two HTTP-only cookies, both
+`SameSite=None; Secure` cross-origin:
+
+- `token` — short-lived access JWT (30 min, `JWT_EXPIRES_IN`). Verified by the
+  `authenticate` middleware, carries `jti` (per-token denylist) + `tv` (per-user
+  bulk revocation).
+- `refresh_token` — long-lived rotating refresh token (`REFRESH_TOKEN_EXPIRES_IN`,
+  default 365 days). DB-backed (`refresh_tokens` table) with reuse-detection:
+  every refresh rotates the token (old row → `revokedReason='rotated'`,
+  `replacedById` back-link) and a replay of an already-rotated token revokes the
+  WHOLE family (`AuthService.refreshTokens`). `revokeAllSessions` (logout-all /
+  password change) bumps `tv` AND revokes all refresh tokens — one call kills
+  access + refresh. MFA composes: `login()` returns a challenge token (audience
+  `force-mfa-challenge`); only `issueSessionFor` (login-direct or `/auth/mfa/verify`)
+  mints the real pair.
+
+`/auth/refresh` accepts the refresh token from the JSON body (Bearer/localStorage
+clients — the iOS admin PWA) OR the `refresh_token` cookie (pure-browser path),
+and rotates BOTH cookies on every call. Both frontends transparently refresh on
+401 and retry once: web `ApiClient.request` and admin `apiRequest`/`apiFetch`
+(single-flight so concurrent 401s share one refresh and don't trip
+reuse-detection). Per rule #4 this stays client-side — do NOT add cookie checks
+to Next middleware.
+
 ### Single Source of Truth Patterns
 
 - **Auth state**: `AuthProvider` (`lib/auth.tsx`) is the ONLY auth checker. Individual pages must NOT duplicate auth checks or call `/auth/me` independently.
@@ -306,7 +330,10 @@ authenticate → authorize('store_admin', 'super_admin') → requireStoreAccess 
 - Use `authorize()` for role checks, NOT `requireRole()` — standardized across all routes
 - Every endpoint with a storeId param MUST have `requireStoreAccess` (prevents cross-store access)
 - Public endpoints (no auth) should NOT have `requireStoreAccess`
-- JWT access tokens last 30 days — stale role requires re-login
+- JWT access tokens are short-lived (30 min, `JWT_EXPIRES_IN`) and silently
+  rotate via `/auth/refresh`; the session lives as long as the rotating refresh
+  token (`REFRESH_TOKEN_EXPIRES_IN`, default 365 days). A stale role takes effect
+  on the next access-token refresh (≤30 min) rather than requiring a full re-login.
 
 ## Code Standards
 
@@ -365,6 +392,8 @@ Required in production (app crashes without these):
 
 Optional (feature degrades gracefully if missing):
 
+- `JWT_EXPIRES_IN` (default `30m`) — access-token JWT lifetime. Short by design so refresh-token rotation has security value; the session length is governed by the refresh token, not this. Pin a different value here only with a deliberate reason.
+- `REFRESH_TOKEN_EXPIRES_IN` (default `365d`) — rotating refresh-token lifetime = the practical "always signed in" window. Lower it to shorten the max session age; never below the 30-day floor Ahmad wants for the admin PWA.
 - `REDIS_URL` — Railway internal (`redis.railway.internal:6379`); falls back to `localhost:6379` in dev
 - `ONESIGNAL_APP_ID` / `ONESIGNAL_REST_API_KEY` — admin order alerts + storefront broadcasts. When missing, broadcast endpoint returns `503 PUSH_NOT_CONFIGURED`.
 - `ONESIGNAL_ADMIN_APP_ID` / `ONESIGNAL_ADMIN_REST_API_KEY` — optional separate OneSignal app for admin alerts; falls back to the public app id/key if unset.
