@@ -44,6 +44,13 @@ const STARTER_CORE: FeatureKey[] = [
   'shipping_carriers',
   'bulk_operations',
   'abandoned_cart',
+  // WhatsApp admin access is available to ALL stores by default (managed-agency:
+  // Ahmad onboards every client and WhatsApp is a core offering — default full
+  // access, restrict by exception). The feature still needs per-tenant WABA
+  // config to actually send; the baseline only ungates the admin section so
+  // every merchant can set it up. To restrict a specific client (limited deal),
+  // super-admin sets a StoreFeature `whatsapp` override with enabled=false.
+  'whatsapp',
   // Basic inventory (granular sub-feature). The legacy `inventory` parent
   // flag is intentionally NOT in any baseline — new code paths read
   // `inventory.basic` and friends.
@@ -98,6 +105,8 @@ export const PLAN_BASELINE: Record<StorePlan, readonly FeatureKey[]> = {
     'coupons',
     'reviews',
     'inventory.basic',
+    // WhatsApp admin access is universal (managed-agency default — see STARTER_CORE).
+    'whatsapp',
   ],
   starter: STARTER_CORE,
   professional: [...STARTER_CORE, ...PROFESSIONAL_ADDITIONS],

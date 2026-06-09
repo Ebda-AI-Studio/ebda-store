@@ -21,4 +21,8 @@ regexTarget = "line"
 regexes = [
   '''test-encryption-key-for-ci-32chars''',
   '''test-jwt-secret-for-ci-only-32chars''',
+  # Fake marketing-pixel access-token fixtures (H4 secret-masking tests) — not real creds.
+  '''EAAB1234567890abcdef''',
+  '''EAAB_NEW_TOKEN_xyz''',
+  '''tt_secret_abc''',
 ]
