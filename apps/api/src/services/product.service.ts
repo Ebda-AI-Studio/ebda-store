@@ -405,6 +405,28 @@ export class ProductService {
   static async update(storeId: string, productId: string, data: UpdateProductData) {
     const product = await this.getById(storeId, productId);
 
+    // Money guard: a fixed discount must never exceed the price (would store a
+    // negative sale price). The route schema catches this when the PATCH sends
+    // both `price` and `discountValue`; this covers the update-only case where
+    // the merchant changes the discount alone and `price` is read from the DB.
+    const effectiveType =
+      data.discountType !== undefined ? data.discountType : product.discountType;
+    const effectiveDiscount =
+      data.discountValue !== undefined ? data.discountValue : product.discountValue;
+    const effectivePrice = data.price !== undefined ? data.price : product.price;
+    if (
+      effectiveType === 'fixed' &&
+      typeof effectiveDiscount === 'number' &&
+      typeof effectivePrice === 'number' &&
+      effectiveDiscount > effectivePrice
+    ) {
+      throw new AppError(
+        400,
+        'INVALID_DISCOUNT',
+        'Fixed discount cannot exceed the price (would produce a negative sale price).'
+      );
+    }
+
     // Auto-deduplicate slug if changing
     let finalSlug = data.slug;
     if (finalSlug && finalSlug !== product.slug) {

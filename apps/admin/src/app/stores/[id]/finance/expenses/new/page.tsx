@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, getApiUrl } from '@/lib/api';
+import { isCashOrBankAccount } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -107,9 +108,15 @@ export default function NewExpensePage() {
       const allExpense = flattenTree(data.expenses ?? []).sort((a, b) =>
         a.code.localeCompare(b.code)
       );
-      const allAsset = flattenTree(data.assets ?? []).sort((a, b) => a.code.localeCompare(b.code));
+      // "Paid From" must be a cash/bank account (1000–1099 band) so the
+      // double-entry stays correct (debit expense, credit cash). Paying "from"
+      // Inventory / Fixed Assets / AR would record a wrong credit, so they are
+      // filtered out of the dropdown here AND rejected server-side.
+      const cashBankAssets = flattenTree(data.assets ?? [])
+        .filter(isCashOrBankAccount)
+        .sort((a, b) => a.code.localeCompare(b.code));
       setExpenseAccounts(allExpense);
-      setAssetAccounts(allAsset);
+      setAssetAccounts(cashBankAssets);
     });
 
     // Load suppliers

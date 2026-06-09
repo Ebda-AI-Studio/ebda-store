@@ -1116,6 +1116,7 @@
       "countSingular": "{count} عميل",
       "countPlural": "{count} عميل",
       "paginationShowing": "عرض {from} إلى {to} من {total} عميل",
+      "truncatedNotice": "هذا المتجر لديه سجل طلبات كبير جدًا — تعرض قائمة العملاء أحدث الطلبات فقط. استخدم التصدير للحصول على صورة أشمل، أو تواصل مع الدعم.",
       "previous": "السابق",
       "next": "التالي",
       "badges": {
@@ -2332,6 +2333,7 @@
       "exportXlsx": "تصدير XLSX",
       "sendBroadcast": "إرسال النشرة",
       "totalCount": "{count} مشترك",
+      "truncatedNotice": "يتم عرض أول {shown} من {total} مشترك. قم بالتصدير لتنزيل القائمة الكاملة.",
       "emptyTitle": "لا يوجد مشتركون بعد",
       "emptyDescription": "عندما يسجل العملاء في النشرة الإخبارية من واجهة المتجر، ستظهر بياناتهم هنا.",
       "broadcastTitle": "إرسال نشرة جماعية",
@@ -4050,7 +4052,9 @@
       "quickAdjust": "تعديل سريع",
       "badgeReorder": "يُقترح إعادة الطلب",
       "badgeDeadstock": "بضاعة راكدة",
-      "searchPlaceholder": "ابحث بالاسم أو الرمز…"
+      "searchPlaceholder": "ابحث بالاسم أو الرمز…",
+      "showingCount": "عرض {shown} من {total} منتج",
+      "truncatedNotice": "يتم عرض أول {shown} من {total} منتج. استخدم البحث لتضييق القائمة، أو تواصل مع الدعم لعرض الباقي."
     },
     "adjustments": {
       "title": "تسويات المخزون",

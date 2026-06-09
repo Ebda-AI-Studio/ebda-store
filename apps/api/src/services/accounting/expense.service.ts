@@ -1,8 +1,10 @@
 import { prisma } from '@force/database';
 import type { Expense } from '@prisma/client';
+import { isCashOrBankAccount } from '@force/shared';
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';
 import logger from '../../lib/logger';
+import { AppError } from '../../middleware/error-handler';
 
 export interface CreateExpenseInput {
   storeId: string;
@@ -30,6 +32,26 @@ export type ExpenseWithRelations = Expense & {
  * Status is always 'draft' on creation.
  */
 export async function createExpense(input: CreateExpenseInput): Promise<ExpenseWithRelations> {
+  // Money guard: the "paid from" account MUST be a cash/bank account so the
+  // double-entry is correct (debit expense, credit cash). Paying out of
+  // Inventory / Fixed Assets / AR would post a wrong credit. We validate the
+  // account belongs to THIS store (tenant isolation) and is in the cash/bank
+  // band before creating the draft.
+  const paidFrom = await prisma.account.findFirst({
+    where: { id: input.paidFromAccountId, storeId: input.storeId },
+    select: { code: true, type: true },
+  });
+  if (!paidFrom) {
+    throw new AppError(400, 'INVALID_PAID_FROM', 'Paid-from account not found for this store.');
+  }
+  if (!isCashOrBankAccount(paidFrom)) {
+    throw new AppError(
+      400,
+      'INVALID_PAID_FROM',
+      'Paid-from account must be a cash or bank account (codes 1000–1099).'
+    );
+  }
+
   const expenseNumber = await nextSequence(input.storeId, 'expense');
   const taxAmount = input.taxAmount ?? 0;
   const total = input.amount + taxAmount;

@@ -430,6 +430,9 @@ export default function FinanceDashboardPage() {
                   <div className="divide-y divide-border/40">
                     {recentAnomalies.map(a => {
                       const sign = a.deltaPercent >= 0 ? '+' : '';
+                      // `deltaPercent` is stored as a ratio (e.g. -0.35); ×100
+                      // to show a real percentage, matching the anomalies page.
+                      const deltaPercentDisplay = a.deltaPercent * 100;
                       return (
                         <div key={a.id} className="px-3 py-2 space-y-0.5">
                           <div className="flex items-center gap-2">
@@ -451,7 +454,7 @@ export default function FinanceDashboardPage() {
                               }`}
                             >
                               {sign}
-                              {a.deltaPercent.toFixed(1)}%
+                              {deltaPercentDisplay.toFixed(1)}%
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-1">

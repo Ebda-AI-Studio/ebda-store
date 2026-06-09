@@ -73,6 +73,10 @@ function AnomalyRow({
   const [acking, setAcking] = useState(false);
 
   const deltaSign = item.deltaPercent >= 0 ? '+' : '';
+  // `deltaPercent` is persisted as a RATIO (e.g. -0.35 for a 35% drop) by
+  // profit-anomaly.service.ts — the AI narration multiplies by 100, so the
+  // displayed delta must too, otherwise a real -35% shows as -0.4%.
+  const deltaPercentDisplay = item.deltaPercent * 100;
   const metricKey = `metric.${item.metric}` as const;
 
   async function handleAck() {
@@ -123,7 +127,7 @@ function AnomalyRow({
             }`}
           >
             {deltaSign}
-            {item.deltaPercent.toFixed(1)}%
+            {deltaPercentDisplay.toFixed(1)}%
           </p>
         </div>
       </div>

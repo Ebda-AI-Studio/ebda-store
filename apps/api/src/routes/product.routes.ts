@@ -65,7 +65,36 @@ const createProductSchema = z.object({
     .optional(),
 });
 
-const updateProductSchema = createProductSchema.partial();
+/**
+ * Reject a fixed discount that exceeds the price — it would produce a
+ * negative sale price. The storefront's `computeDiscountAmount` clamps at
+ * render time, but a `discountValue > price` is always a data-entry mistake:
+ * fail loudly so the merchant fixes it rather than silently storing garbage.
+ *
+ * Only enforceable when BOTH `price` and `discountValue` are present on the
+ * payload (always true for create; conditionally true for partial updates —
+ * the update-only case where `price` is omitted is caught in ProductService).
+ */
+function refineFixedDiscount(
+  data: { discountType?: string | null; discountValue?: number | null; price?: number },
+  ctx: z.RefinementCtx
+): void {
+  if (
+    data.discountType === 'fixed' &&
+    typeof data.discountValue === 'number' &&
+    typeof data.price === 'number' &&
+    data.discountValue > data.price
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['discountValue'],
+      message: 'Fixed discount cannot exceed the price (would produce a negative sale price).',
+    });
+  }
+}
+
+const createProductSchemaChecked = createProductSchema.superRefine(refineFixedDiscount);
+const updateProductSchema = createProductSchema.partial().superRefine(refineFixedDiscount);
 
 /**
  * @swagger
@@ -430,7 +459,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const data = createProductSchema.parse(req.body);
+      const data = createProductSchemaChecked.parse(req.body);
 
       const product = await ProductService.create(storeId, data);
 

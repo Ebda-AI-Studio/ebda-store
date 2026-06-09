@@ -42,6 +42,11 @@ interface BroadcastResult {
   errors?: string[];
 }
 
+// Max subscribers fetched into the table view. The full count is always shown
+// from `pagination.total`; when it exceeds this cap a notice tells the merchant
+// the table is partial (and to use export for the complete list).
+const SUBSCRIBER_FETCH_LIMIT = 200;
+
 export default function NewsletterPage() {
   const params = useParams();
   const storeId = params?.id as string;
@@ -75,7 +80,7 @@ export default function NewsletterPage() {
     setLoading(true);
     setError(null);
     const { data, error: err } = await apiGet<SubscribersResponse>(
-      `/api/v1/stores/${storeId}/newsletter/subscribers?limit=200`
+      `/api/v1/stores/${storeId}/newsletter/subscribers?limit=${SUBSCRIBER_FETCH_LIMIT}`
     );
     if (err) {
       setError(err.message || 'Failed to load subscribers');
@@ -188,6 +193,14 @@ export default function NewsletterPage() {
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">{tPage('totalCount', { count: total })}</p>
         </div>
+
+        {/* Truncation notice — the table is capped; the full count above is
+            accurate, but rows beyond the cap are only available via export. */}
+        {total > subs.length && (
+          <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
+            {tPage('truncatedNotice', { shown: subs.length, total })}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center h-64">

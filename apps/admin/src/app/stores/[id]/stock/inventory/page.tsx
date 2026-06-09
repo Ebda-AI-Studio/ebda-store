@@ -42,6 +42,11 @@ interface FlagListResponse {
   meta?: { total: number };
 }
 
+// Hard cap on rows fetched per inventory load. The server allows up to 500;
+// 100 keeps the single-page table responsive. Stores above this are surfaced
+// via a "showing N of M" indicator + notice rather than silently truncated.
+const INVENTORY_PAGE_LIMIT = 100;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function StockInventoryPage() {
@@ -52,6 +57,10 @@ export default function StockInventoryPage() {
   const tc = useT('common');
 
   const [products, setProducts] = useState<ProductRow[] | null>(null);
+  // Total SKUs matching the current filter (from API meta). Used to surface a
+  // "showing N of M" indicator + a truncation notice — the list is hard-capped
+  // at INVENTORY_PAGE_LIMIT so larger catalogues used to truncate silently.
+  const [totalSkus, setTotalSkus] = useState(0);
   const [suggestedSet, setSuggestedSet] = useState<Set<string>>(new Set());
   const [deadSet, setDeadSet] = useState<Set<string>>(new Set());
   // Per-fetch error: products failure used to trigger an early-return blank page.
@@ -70,7 +79,10 @@ export default function StockInventoryPage() {
   // Build the inventory list URL. Lists ALL items (no status filter) so the
   // merchant sees draft/archived stock too; opts into the sold-units aggregate.
   const buildListUrl = (term: string) => {
-    const qs = new URLSearchParams({ limit: '100', withSalesQuantity: 'true' });
+    const qs = new URLSearchParams({
+      limit: String(INVENTORY_PAGE_LIMIT),
+      withSalesQuantity: 'true',
+    });
     if (term) qs.set('search', term);
     return `/api/v1/stores/${storeId}/products?${qs.toString()}`;
   };
@@ -127,6 +139,7 @@ export default function StockInventoryPage() {
           setProductsErr(apiError.message);
         } else {
           setProducts(data?.products ?? []);
+          setTotalSkus(data?.meta?.total ?? data?.products?.length ?? 0);
         }
       })
       .catch(() => setProductsErr('Failed to load inventory'));
@@ -162,6 +175,7 @@ export default function StockInventoryPage() {
           setProductsErr(apiError.message);
         } else {
           setProducts(data?.products ?? []);
+          setTotalSkus(data?.meta?.total ?? data?.products?.length ?? 0);
         }
       })
       .catch(() => setProductsErr('Failed to load inventory'));
@@ -286,119 +300,131 @@ export default function StockInventoryPage() {
           <p className="text-muted-foreground text-sm">{tc('noResults')}</p>
         )}
         {products && products.length > 0 && (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="px-3 py-2 w-10">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={toggleSelectAll}
-                      aria-label={t('selectAll')}
-                      className="rounded border-border"
-                    />
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
-                    {t('sku')}
-                  </th>
-                  <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                    {t('name')}
-                  </th>
-                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                    {t('onHand')}
-                  </th>
-                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                    {t('lowStockThreshold')}
-                  </th>
-                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                    {t('cost')}
-                  </th>
-                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                    {t('price')}
-                  </th>
-                  <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
-                    {t('salesQuantity')}
-                  </th>
-                  <th className="text-center px-3 py-2 font-medium text-muted-foreground w-28">
-                    {t('allowsBackorder')}
-                  </th>
-                  <th className="px-3 py-2 w-28" />
-                </tr>
-              </thead>
-              <tbody>
-                {products.map(p => {
-                  const isLow = p.inventory > 0 && p.inventory <= p.lowStockThreshold;
-                  const hasReorder = suggestedSet.has(p.id);
-                  const hasDead = deadSet.has(p.id);
-                  return (
-                    <tr key={p.id} className="border-t border-border/40">
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(p.id)}
-                          onChange={() => toggleSelection(p.id)}
-                          aria-label={p.name}
-                          className="rounded border-border"
-                        />
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                        {p.sku ?? '—'}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="truncate max-w-[10rem]">{p.name}</span>
-                          {hasReorder && (
-                            <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 shrink-0">
-                              🔴 {t('badgeReorder')}
-                            </span>
-                          )}
-                          {hasDead && (
-                            <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 shrink-0">
-                              🟡 {t('badgeDeadstock')}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-end font-mono text-xs font-semibold ${
-                          p.inventory === 0 ? 'text-red-600' : isLow ? 'text-amber-600' : ''
-                        }`}
-                      >
-                        {p.inventory}
-                      </td>
-                      <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
-                        {p.lowStockThreshold}
-                      </td>
-                      <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
-                        {p.costPrice == null ? '—' : formatPrice(p.costPrice)}
-                      </td>
-                      <td className="px-3 py-2 text-end font-mono text-xs">
-                        {formatPrice(p.price)}
-                      </td>
-                      <td className="px-3 py-2 text-end font-mono text-xs">{p.soldQuantity}</td>
-                      <td className="px-3 py-2 text-center text-muted-foreground">
-                        {p.allowBackorder ? '✓' : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            router.push(
-                              `/stores/${storeId}/stock/adjustments/new?productId=${p.id}&newQty=${p.inventory}`
-                            )
-                          }
-                          className="text-primary text-xs underline underline-offset-2 hover:opacity-80"
+          <>
+            {/* "Showing N of M" indicator — so a catalogue larger than the
+                page cap is never silently truncated. */}
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>{t('showingCount', { shown: products.length, total: totalSkus })}</span>
+            </div>
+            {totalSkus > products.length && (
+              <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
+                {t('truncatedNotice', { shown: products.length, total: totalSkus })}
+              </div>
+            )}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/30">
+                  <tr>
+                    <th className="px-3 py-2 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        aria-label={t('selectAll')}
+                        className="rounded border-border"
+                      />
+                    </th>
+                    <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
+                      {t('sku')}
+                    </th>
+                    <th className="text-start px-3 py-2 font-medium text-muted-foreground">
+                      {t('name')}
+                    </th>
+                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
+                      {t('onHand')}
+                    </th>
+                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
+                      {t('lowStockThreshold')}
+                    </th>
+                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
+                      {t('cost')}
+                    </th>
+                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
+                      {t('price')}
+                    </th>
+                    <th className="text-end px-3 py-2 font-medium text-muted-foreground w-24">
+                      {t('salesQuantity')}
+                    </th>
+                    <th className="text-center px-3 py-2 font-medium text-muted-foreground w-28">
+                      {t('allowsBackorder')}
+                    </th>
+                    <th className="px-3 py-2 w-28" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map(p => {
+                    const isLow = p.inventory > 0 && p.inventory <= p.lowStockThreshold;
+                    const hasReorder = suggestedSet.has(p.id);
+                    const hasDead = deadSet.has(p.id);
+                    return (
+                      <tr key={p.id} className="border-t border-border/40">
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(p.id)}
+                            onChange={() => toggleSelection(p.id)}
+                            aria-label={p.name}
+                            className="rounded border-border"
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                          {p.sku ?? '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="truncate max-w-[10rem]">{p.name}</span>
+                            {hasReorder && (
+                              <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 shrink-0">
+                                🔴 {t('badgeReorder')}
+                              </span>
+                            )}
+                            {hasDead && (
+                              <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 shrink-0">
+                                🟡 {t('badgeDeadstock')}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-end font-mono text-xs font-semibold ${
+                            p.inventory === 0 ? 'text-red-600' : isLow ? 'text-amber-600' : ''
+                          }`}
                         >
-                          {t('quickAdjust')}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          {p.inventory}
+                        </td>
+                        <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
+                          {p.lowStockThreshold}
+                        </td>
+                        <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
+                          {p.costPrice == null ? '—' : formatPrice(p.costPrice)}
+                        </td>
+                        <td className="px-3 py-2 text-end font-mono text-xs">
+                          {formatPrice(p.price)}
+                        </td>
+                        <td className="px-3 py-2 text-end font-mono text-xs">{p.soldQuantity}</td>
+                        <td className="px-3 py-2 text-center text-muted-foreground">
+                          {p.allowBackorder ? '✓' : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-end">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/stores/${storeId}/stock/adjustments/new?productId=${p.id}&newQty=${p.inventory}`
+                              )
+                            }
+                            className="text-primary text-xs underline underline-offset-2 hover:opacity-80"
+                          >
+                            {t('quickAdjust')}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </AdminLayout>

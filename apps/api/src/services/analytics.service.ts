@@ -51,7 +51,10 @@ interface DateRange {
 interface DashboardStats {
   totalRevenue: number;
   totalOrders: number;
+  /** Distinct customers who ordered within the selected period. */
   totalCustomers: number;
+  /** Cumulative distinct customers across all time (period-independent). */
+  allTimeCustomers: number;
   totalProducts: number;
   averageOrderValue: number;
   conversionRate: number;
@@ -193,7 +196,13 @@ export class AnalyticsService {
     return {
       totalRevenue: currentStats.revenue,
       totalOrders: currentStats.orders,
-      totalCustomers,
+      // Period-scoped distinct customers (customers who ordered within the
+      // selected window) so this KPI moves with the date picker like
+      // revenue/orders, instead of showing the misleading all-time count.
+      // `totalCustomers` (all-time) remains available below as
+      // `allTimeCustomers` for callers that want the cumulative figure.
+      totalCustomers: customerCount,
+      allTimeCustomers: totalCustomers,
       totalProducts,
       averageOrderValue: currentStats.orders > 0 ? currentStats.revenue / currentStats.orders : 0,
       conversionRate: 0, // Would need session tracking

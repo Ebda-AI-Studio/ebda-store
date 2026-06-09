@@ -8,40 +8,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiFetch, unwrapList } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
 
-const CUSTOMERS_PAGE_SIZE = 10;
-
-interface OrderCustomer {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string | null;
-}
-
-interface OrderShippingAddress {
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  email?: string;
-  address1?: string;
-  address2?: string;
-  city?: string;
-  area?: string;
-  state?: string;
-  country?: string;
-  postalCode?: string;
-}
-
-interface Order {
-  id: string;
-  orderNumber?: string;
-  customer: OrderCustomer | null;
-  total: number;
-  status?: string;
-  paymentStatus?: string;
-  createdAt: string;
-  shippingAddress?: OrderShippingAddress | null;
-}
+const CUSTOMERS_PAGE_SIZE = 20;
 
 interface CustomerRow {
   id: string;
@@ -66,8 +33,6 @@ interface CustomerRow {
    */
   lastOrderTotal: number;
   lastOrderDate: string;
-  lastOrderId: string;
-  lastOrderNumber?: string;
   /** Status of the latest order so a 'cancelled' chip can show inline. */
   lastOrderStatus?: string;
   /** Payment status of the latest order. */
@@ -76,17 +41,16 @@ interface CustomerRow {
   isGuest: boolean;
 }
 
-/**
- * Pretty-print a shipping address. Returns "" if every slot is empty.
- * Used to surface the latest delivery destination on the customers
- * table per Ahmad 2026-05-16 ask.
- */
-function formatShippingAddress(addr: OrderShippingAddress | null | undefined): string {
-  if (!addr) return '';
-  const parts = [addr.address1, addr.address2, addr.area, addr.city, addr.country].filter(
-    (p): p is string => typeof p === 'string' && p.trim().length > 0
-  );
-  return parts.join(', ');
+/** Paginated customers list response from the server-side aggregation. */
+interface CustomersListResponse {
+  data: CustomerRow[];
+  meta: {
+    page: number;
+    perPage: number;
+    total: number;
+    totalPages: number;
+    truncated: boolean;
+  };
 }
 
 function formatDate(dateString: string) {
@@ -126,17 +90,37 @@ export default function StoreCustomersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  // Pagination state — client-side slice of filteredCustomers
+  // Debounced search term actually sent to the server (300ms after typing).
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Server-side pagination state.
   const [page, setPage] = useState(1);
-  // Track whether we are still fetching additional pages beyond the first
-  const [isFetchingAll, setIsFetchingAll] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  // True when the server capped the order scan (very large store) — surfaced
+  // as a notice so the merchant knows the list may be partial.
+  const [truncated, setTruncated] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const { error: toastError } = useToast();
 
+  // Debounce the search input so we don't hit the aggregation endpoint on
+  // every keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  // Reset to page 1 whenever the (debounced) search term changes so results
+  // always start from the beginning of the filtered set.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   /**
-   * Fetch all orders for the store across all pages, then deduplicate by
-   * customer to build the customer list. The orders endpoint is paginated so
-   * we loop until we have every page.
+   * Fetch a single page of aggregated customers from the server. The previous
+   * implementation read orders page-1 then fired `Promise.all` over EVERY
+   * remaining page (a 49+ concurrent-request fan-out on a large store). The
+   * aggregation now happens server-side, bounded + paginated, so this is a
+   * single request per page.
    */
   const fetchCustomers = useCallback(async () => {
     if (!storeId) return;
@@ -144,118 +128,28 @@ export default function StoreCustomersPage() {
     setError(null);
 
     try {
-      const limit = 100;
+      const qs = new URLSearchParams({
+        page: String(page),
+        perPage: String(CUSTOMERS_PAGE_SIZE),
+      });
+      if (debouncedSearch) qs.set('search', debouncedSearch);
 
-      // Fetch first page to learn total. API wraps paging in `meta`, NOT
-      // `pagination` — the previous shape mismatch silently capped this
-      // page at the first 100 orders forever (Ahmad 2026-05-16: 'why new
-      // orders customer info not loaded').
-      const { data: firstData, error: firstError } = await apiGet<{
-        orders: Order[];
-        meta?: { totalPages: number };
-      }>(`/api/v1/stores/${storeId}/orders?page=1&limit=${limit}`);
+      const { data, error: fetchError } = await apiGet<CustomersListResponse>(
+        `/api/v1/stores/${storeId}/customers?${qs.toString()}`
+      );
 
-      if (firstError || !firstData) {
-        // Set the per-fetch error and fall through to `finally` so the
-        // customers table keeps rendering (empty state + inline retry).
-        // The original `return` here caused a blank table body — removed.
-        setError(firstError?.message || t('fetchFailed'));
+      if (fetchError || !data) {
+        setError(fetchError?.message || t('fetchFailed'));
         setCustomers([]);
+        setTotalCount(0);
+        setTotalPages(1);
         return;
       }
 
-      const allOrders: Order[] = firstData.orders ?? [];
-      const totalPages: number = firstData.meta?.totalPages ?? 1;
-
-      // Fetch remaining pages in parallel if there are more
-      if (totalPages > 1) {
-        setIsFetchingAll(true);
-        const pageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-        const remainingResults = await Promise.all(
-          pageNumbers.map(async pageNum => {
-            const { data } = await apiGet<{ orders: Order[] }>(
-              `/api/v1/stores/${storeId}/orders?page=${pageNum}&limit=${limit}`
-            );
-            return data?.orders ?? [];
-          })
-        );
-        for (const pageOrders of remainingResults) {
-          allOrders.push(...pageOrders);
-        }
-        setIsFetchingAll(false);
-      }
-
-      // Aggregate orders by customer. Two passes through the same loop:
-      // 1) registered customer (User row) keyed by customer.id
-      // 2) guest checkout (no User row) keyed by shippingAddress email
-      //    or phone — Ahmad 2026-05-16: 'get the info even if cancelled
-      //    or unpaid'. Cancelled / failed / pending orders still count
-      //    because the API doesn't filter by status either.
-      const customerMap = new Map<string, CustomerRow>();
-
-      for (const order of allOrders) {
-        const ship = order.shippingAddress;
-        const isGuest = !order.customer?.id;
-        const key =
-          order.customer?.id ||
-          ship?.email?.toLowerCase() ||
-          ship?.phone ||
-          // last-resort synthetic key keeps each guest order as its own
-          // row instead of silently merging unrelated guest orders.
-          `guest:${order.id}`;
-
-        const firstName = order.customer?.firstName || ship?.firstName || '';
-        const lastName = order.customer?.lastName || ship?.lastName || '';
-        const email = order.customer?.email || ship?.email || '';
-        const phone = order.customer?.phone || ship?.phone || '';
-        const address = formatShippingAddress(ship);
-
-        const existing = customerMap.get(key);
-        if (existing) {
-          existing.totalOrders += 1;
-          existing.totalSpent += order.total;
-          // Keep track of the most recent order
-          if (order.createdAt > existing.lastOrderDate) {
-            existing.lastOrderDate = order.createdAt;
-            existing.lastOrderId = order.id;
-            existing.lastOrderNumber = order.orderNumber;
-            existing.lastOrderTotal = order.total;
-            existing.lastOrderStatus = order.status;
-            existing.lastOrderPaymentStatus = order.paymentStatus;
-            // Latest order's address + phone + name win when newer
-            if (address) existing.address = address;
-            if (phone) existing.phone = phone;
-            if (firstName) existing.firstName = firstName;
-            if (lastName) existing.lastName = lastName;
-            if (email && !existing.email) existing.email = email;
-          } else {
-            if (!existing.phone && phone) existing.phone = phone;
-            if (!existing.address && address) existing.address = address;
-          }
-        } else {
-          customerMap.set(key, {
-            id: order.customer?.id || key,
-            firstName,
-            lastName,
-            email,
-            phone,
-            address,
-            totalOrders: 1,
-            totalSpent: order.total,
-            lastOrderTotal: order.total,
-            lastOrderDate: order.createdAt,
-            lastOrderId: order.id,
-            lastOrderNumber: order.orderNumber,
-            lastOrderStatus: order.status,
-            lastOrderPaymentStatus: order.paymentStatus,
-            isGuest,
-          });
-        }
-      }
-
-      // Sort by total spent descending
-      const sorted = Array.from(customerMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
-      setCustomers(sorted);
+      setCustomers(data.data ?? []);
+      setTotalCount(data.meta?.total ?? 0);
+      setTotalPages(Math.max(1, data.meta?.totalPages ?? 1));
+      setTruncated(Boolean(data.meta?.truncated));
     } catch {
       setError(t('connectionError'));
     } finally {
@@ -280,35 +174,15 @@ export default function StoreCustomersPage() {
       .catch(() => {
         // insights not yet computed — RFM badges stay hidden, no error state
       });
-  }, [storeId, t]);
+  }, [storeId, t, page, debouncedSearch]);
 
   useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  const filteredCustomers = customers.filter(customer => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return (
-      customer.firstName.toLowerCase().includes(s) ||
-      customer.lastName.toLowerCase().includes(s) ||
-      customer.email.toLowerCase().includes(s) ||
-      (customer.phone?.toLowerCase().includes(s) ?? false)
-    );
-  });
-
-  // Reset to page 1 whenever the search term changes so the user always
-  // sees results from the beginning of the filtered set.
-  useEffect(() => {
-    setPage(1);
-  }, [search]);
-
-  const totalPages = Math.ceil(filteredCustomers.length / CUSTOMERS_PAGE_SIZE);
-  // Slice the filtered list to the current page window.
-  const pagedCustomers = filteredCustomers.slice(
-    (page - 1) * CUSTOMERS_PAGE_SIZE,
-    page * CUSTOMERS_PAGE_SIZE
-  );
+  // The server already paginated + filtered; the current page rows render
+  // directly. Aliased to keep the render block below unchanged.
+  const pagedCustomers = customers;
 
   /**
    * Trigger the server-side XLSX export. We hit the API via raw fetch
@@ -385,13 +259,13 @@ export default function StoreCustomersPage() {
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
-            {isLoading || isFetchingAll
+            {isLoading
               ? t('loading')
-              : filteredCustomers.length === 1
-                ? t('countSingular', { count: filteredCustomers.length })
-                : t('countPlural', { count: filteredCustomers.length })}
+              : totalCount === 1
+                ? t('countSingular', { count: totalCount })
+                : t('countPlural', { count: totalCount })}
           </span>
-          {isFetchingAll && (
+          {isLoading && (
             <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           )}
         </div>
@@ -430,6 +304,14 @@ export default function StoreCustomersPage() {
         </div>
       )}
 
+      {/* Truncation notice — the server capped the order scan on a very large
+          store, so this list aggregates only the most recent orders. */}
+      {truncated && (
+        <div className="mb-6 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground">
+          {t('truncatedNotice')}
+        </div>
+      )}
+
       {/* Customers table */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {isLoading ? (
@@ -446,7 +328,7 @@ export default function StoreCustomersPage() {
               </div>
             ))}
           </div>
-        ) : filteredCustomers.length === 0 ? (
+        ) : totalCount === 0 ? (
           <div className="force-empty-state">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
               <svg
@@ -675,8 +557,8 @@ export default function StoreCustomersPage() {
                 <p className="text-sm text-muted-foreground">
                   {t('paginationShowing', {
                     from: (page - 1) * CUSTOMERS_PAGE_SIZE + 1,
-                    to: Math.min(page * CUSTOMERS_PAGE_SIZE, filteredCustomers.length),
-                    total: filteredCustomers.length,
+                    to: Math.min(page * CUSTOMERS_PAGE_SIZE, totalCount),
+                    total: totalCount,
                   })}
                 </p>
                 <div className="flex gap-2">

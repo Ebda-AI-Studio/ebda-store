@@ -1116,6 +1116,7 @@
       "countSingular": "{count} customer",
       "countPlural": "{count} customers",
       "paginationShowing": "Showing {from} to {to} of {total} customers",
+      "truncatedNotice": "This store has a very large order history — the customer list shows the most recent orders only. Use the export for a fuller picture, or contact support.",
       "previous": "Previous",
       "next": "Next",
       "badges": {
@@ -2332,6 +2333,7 @@
       "exportXlsx": "Export XLSX",
       "sendBroadcast": "Send Newsletter",
       "totalCount": "{count} subscribers",
+      "truncatedNotice": "Showing the first {shown} of {total} subscribers. Export to download the full list.",
       "emptyTitle": "No subscribers yet",
       "emptyDescription": "When customers submit the newsletter form on your storefront, they appear here.",
       "broadcastTitle": "Send Newsletter Broadcast",
@@ -4050,7 +4052,9 @@
       "quickAdjust": "Quick Adjust",
       "badgeReorder": "Reorder suggested",
       "badgeDeadstock": "Dead stock",
-      "searchPlaceholder": "Search by name or SKU…"
+      "searchPlaceholder": "Search by name or SKU…",
+      "showingCount": "Showing {shown} of {total} SKUs",
+      "truncatedNotice": "Showing the first {shown} of {total} SKUs. Use search to narrow the list, or contact support to view the rest."
     },
     "adjustments": {
       "title": "Stock Adjustments",

@@ -68,15 +68,32 @@ function formatShippingAddress(addr: ShippingAddressShape | null): string {
 }
 
 /**
+ * Hard cap on the number of orders scanned to build the aggregated customer
+ * list / export. Protects the API from an OOM/timeout on stores with tens of
+ * thousands of orders (the previous `findMany` had NO `take`). When the cap is
+ * hit, the result carries `truncated: true` so the UI can surface a notice.
+ *
+ * 20k orders × the small projected row is well within a single request's
+ * memory budget and covers the overwhelming majority of stores in full.
+ */
+const MAX_ORDERS_SCANNED = 20000;
+
+/**
  * Aggregate customers from order history. Now includes:
  * - guest orders (no User row) keyed by shipping email/phone
  * - cancelled / unpaid orders (no status filter — Ahmad 2026-05-16:
  *   'get the info even if cancelled or unpaid')
  * - latest shipping address + per-order payment amount so the export
  *   surfaces what the merchant needs to ship + reconcile
+ *
+ * Bounded by `MAX_ORDERS_SCANNED`: we fetch up to the cap + 1 to detect
+ * truncation, then aggregate only the capped slice. Orders are newest-first,
+ * so a truncated result keeps the most recent activity.
  */
-async function aggregateCustomers(storeId: string): Promise<AggregatedCustomer[]> {
-  const orders = await prisma.order.findMany({
+async function aggregateCustomers(
+  storeId: string
+): Promise<{ customers: AggregatedCustomer[]; truncated: boolean; ordersScanned: number }> {
+  const fetched = await prisma.order.findMany({
     where: { storeId, deletedAt: null },
     select: {
       id: true,
@@ -95,7 +112,12 @@ async function aggregateCustomers(storeId: string): Promise<AggregatedCustomer[]
       },
     },
     orderBy: { createdAt: 'desc' },
+    // Fetch one extra row to detect whether more orders exist beyond the cap.
+    take: MAX_ORDERS_SCANNED + 1,
   });
+
+  const truncated = fetched.length > MAX_ORDERS_SCANNED;
+  const orders = truncated ? fetched.slice(0, MAX_ORDERS_SCANNED) : fetched;
 
   // Per-key transient tracking sets so we can emit comma-joined fields
   // after the loop without polluting the AggregatedCustomer shape.
@@ -207,7 +229,8 @@ async function aggregateCustomers(storeId: string): Promise<AggregatedCustomer[]
     row.avgOrderValue = row.totalOrders > 0 ? Math.round(row.totalSpent / row.totalOrders) : 0;
   }
 
-  return Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+  const customers = Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+  return { customers, truncated, ordersScanned: orders.length };
 }
 
 /**
@@ -229,7 +252,7 @@ router.get(
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
 
-      const customers = await aggregateCustomers(storeId);
+      const { customers, truncated, ordersScanned } = await aggregateCustomers(storeId);
 
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Force Website Builder';
@@ -306,6 +329,16 @@ router.get(
         });
       }
 
+      // When the order scan hit the cap, append a visible notice row so the
+      // merchant knows the export is partial (newest orders only) rather than
+      // silently believing it's the complete customer history.
+      if (truncated) {
+        const noticeRow = sheet.addRow({
+          firstName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were aggregated. Contact support for a full export of larger stores.`,
+        });
+        noticeRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
+      }
+
       // Format the date + currency columns. Excel's "kwd" doesn't have a
       // built-in symbol, so we use a numeric format with 3 decimals.
       sheet.getColumn('totalSpent').numFmt = '0.000';
@@ -327,6 +360,62 @@ router.get(
       // stream; piping into res lets the response close cleanly.
       await workbook.xlsx.write(res);
       res.end();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /stores/:storeId/customers?page=&perPage=&search=
+ *
+ * Server-side aggregated customers list. Replaces the admin page's previous
+ * client-side "fetch page 1, then Promise.all over every remaining orders
+ * page" fan-out (49+ concurrent requests on a large store). The aggregation
+ * (incl. guest orders + cancelled/unpaid) happens here once, bounded by
+ * `MAX_ORDERS_SCANNED`, and only the requested page of customers is returned.
+ *
+ * Response: { data, meta: { page, perPage, total, totalPages, truncated } }.
+ */
+router.get(
+  '/customers',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const page = Math.max(1, Number(req.query.page ?? 1) || 1);
+      // Hard-cap perPage so a caller can't request an unbounded page.
+      const perPage = Math.min(100, Math.max(1, Number(req.query.perPage ?? 20) || 20));
+      const search = (req.query.search as string | undefined)?.trim().toLowerCase() ?? '';
+
+      const { customers, truncated } = await aggregateCustomers(storeId);
+
+      // Optional server-side filter so search is consistent across pages
+      // (the old client-only search only matched the fetched page).
+      const filtered = search
+        ? customers.filter(
+            c =>
+              c.firstName.toLowerCase().includes(search) ||
+              c.lastName.toLowerCase().includes(search) ||
+              c.email.toLowerCase().includes(search) ||
+              c.phone.toLowerCase().includes(search)
+          )
+        : customers;
+
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / perPage));
+      const start = (page - 1) * perPage;
+      const pageItems = filtered.slice(start, start + perPage);
+
+      // Double-wrapped on purpose: the admin `apiGet` helper unwraps one
+      // `data` layer, so the inner `{ data, meta }` is what reaches the page.
+      res.json({
+        success: true,
+        data: {
+          data: pageItems,
+          meta: { page, perPage, total, totalPages, truncated },
+        },
+      });
     } catch (error) {
       next(error);
     }
