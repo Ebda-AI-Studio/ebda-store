@@ -10,6 +10,7 @@ interface TopBarProps {
   subtitle?: string;
   actions?: React.ReactNode;
   showBackButton: boolean;
+  isSidebarOpen?: boolean;
   onOpenSidebar: () => void;
   onBack: () => void;
   viewStoreUrl: string | null;
@@ -20,6 +21,7 @@ export function TopBar({
   subtitle,
   actions,
   showBackButton,
+  isSidebarOpen = false,
   onOpenSidebar,
   onBack,
   viewStoreUrl,
@@ -39,8 +41,16 @@ export function TopBar({
             onClick={onOpenSidebar}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
             aria-label={t('openSidebar')}
+            aria-expanded={isSidebarOpen}
+            aria-controls="admin-mobile-sidebar"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"

@@ -300,9 +300,11 @@ export function AdminLayout({
 
       {/* Mobile Sidebar */}
       <aside
+        id="admin-mobile-sidebar"
         className={`fixed inset-y-0 start-0 z-50 w-72 transform border-e border-border/50 bg-card shadow-2xl transition-transform duration-300 ease-out lg:hidden ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
         }`}
+        aria-hidden={!isSidebarOpen}
       >
         <div className="flex h-full flex-col">
           <button
@@ -311,7 +313,13 @@ export function AdminLayout({
             className="absolute end-3 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
             aria-label={t('closeSidebar')}
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -336,6 +344,7 @@ export function AdminLayout({
           subtitle={subtitle}
           actions={actions}
           showBackButton={showBackButton}
+          isSidebarOpen={isSidebarOpen}
           onOpenSidebar={() => setIsSidebarOpen(true)}
           onBack={() => router.back()}
           viewStoreUrl={viewStoreUrl}

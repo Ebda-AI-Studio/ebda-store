@@ -47,10 +47,18 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         disabled={disabled || isLoading}
+        aria-busy={isLoading || undefined}
         {...props}
       >
         {isLoading ? (
-          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <>
+            <span
+              className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+              aria-hidden="true"
+            />
+            {/* Screen-reader-only loading announcement */}
+            <span className="sr-only">Loading</span>
+          </>
         ) : null}
         {children}
       </button>

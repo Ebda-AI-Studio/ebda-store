@@ -98,9 +98,16 @@ export function Modal({ isOpen, onClose, children, title, className, size = 'md'
               </h2>
               <button
                 onClick={onClose}
-                className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close dialog"
+                className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
