@@ -56,33 +56,21 @@ export async function generateMetadata({
       return { title: 'Product' };
     }
 
-    const response = await fetch(
-      `${API_URL}/stores/${storeId}/products/${encodeURIComponent(slug)}`,
-      { next: { revalidate: 60 } }
-    );
+    // Storefront SSR carries no auth token, so the authenticated
+    // /stores/:id/products/:slug endpoint always 401'd here (~4957x/day in
+    // Sentry) before falling through to this public call. Hit the public
+    // endpoint directly — it resolves the store from the X-Store-ID header.
+    const response = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
+      next: { revalidate: 60 },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Store-ID': store.id,
+        ...(store.domain ? { 'x-store-domain': store.domain } : {}),
+      },
+    });
 
     if (!response.ok) {
-      // Fall back to public endpoint
-      const publicResponse = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
-        next: { revalidate: 60 },
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Store-ID': store.id,
-          ...(store.domain ? { 'x-store-domain': store.domain } : {}),
-        },
-      });
-
-      if (!publicResponse.ok) {
-        return { title: 'Product Not Found' };
-      }
-
-      const publicData = await publicResponse.json();
-      const product = publicData?.data?.product;
-      if (!product) {
-        return { title: 'Product Not Found' };
-      }
-
-      return buildProductMetadata(product, store.name);
+      return { title: 'Product Not Found' };
     }
 
     const data = await response.json();
@@ -143,25 +131,17 @@ async function fetchInitialProduct(slug: string, store: { id: string; domain?: s
     const storeId = store.id !== 'demo' ? store.id : null;
     if (!storeId) return null;
 
-    const response = await fetch(
-      `${API_URL}/stores/${storeId}/products/${encodeURIComponent(slug)}`,
-      { next: { revalidate: 60 } }
-    );
-
-    if (!response.ok) {
-      const publicResponse = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
-        next: { revalidate: 60 },
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Store-ID': store.id,
-          ...(store.domain ? { 'x-store-domain': store.domain } : {}),
-        },
-      });
-      if (!publicResponse.ok) return null;
-      const publicData = await publicResponse.json();
-      return publicData?.data?.product ?? null;
-    }
-
+    // Public endpoint only — storefront SSR is unauthenticated, so the
+    // /stores/:id/products/:slug call always 401'd before this fallback.
+    const response = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
+      next: { revalidate: 60 },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Store-ID': store.id,
+        ...(store.domain ? { 'x-store-domain': store.domain } : {}),
+      },
+    });
+    if (!response.ok) return null;
     const data = await response.json();
     return data?.data?.product ?? null;
   } catch {
