@@ -38,6 +38,11 @@ vi.mock('@force/database', () => ({
     order: mockPrismaOrder,
     notificationLog: mockPrismaNotificationLog,
   },
+  // The notify function wraps its prisma reads/writes in runInTenantContext to
+  // set the Postgres RLS GUC (added in #101). The unit test runs against the
+  // mocked prisma above, so the tenant context is a no-op passthrough that
+  // simply invokes the callback and returns its result.
+  runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));
 
 const mockSendOrderNotification = vi.fn();
