@@ -12,6 +12,7 @@ import { getStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import { organizationJsonLd, getSiteUrl } from '../lib/structured-data';
 import { pickMetaDescription } from '../lib/seo/meta-description';
+import { resolveStoreOgImage } from '../lib/seo/og-image';
 import { MarketingPixelsProvider } from '../components/MarketingPixels';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { ServiceWorkerRegistration } from '../components/ServiceWorkerRegistration';
@@ -152,8 +153,17 @@ export async function generateMetadata(): Promise<Metadata> {
       ? `${localizedStoreName} - تسوق أونلاين في الكويت`
       : `${localizedStoreName} - Online Shopping in Kuwait`);
 
-  // Prefer admin-configured Open Graph image; fall back to store logo.
-  const ogImageUrl = store.ogImage || store.logo;
+  // Resolve the og:image entry: prefer admin-configured ogImage or store logo
+  // (both are absolute R2 https URLs). Falls back to the generated /opengraph-image
+  // route (branded 1200×630 card via next/og) when neither is available.
+  // resolveStoreOgImage rejects any non-https URL so WhatsApp never gets a
+  // broken or relative URL — see apps/web/src/lib/seo/og-image.ts for details.
+  const ogImageEntry = resolveStoreOgImage(
+    store.ogImage || store.logo,
+    siteUrl,
+    localizedStoreName
+  );
+
   // Normalize Twitter handle to leading-@ form expected by Twitter card meta.
   const twitterHandle = store.twitterHandle
     ? store.twitterHandle.startsWith('@')
@@ -231,13 +241,21 @@ export async function generateMetadata(): Promise<Metadata> {
       locale: preferAr ? 'ar_KW' : 'en_KW',
       alternateLocale: preferAr ? 'en_KW' : 'ar_KW',
       siteName: localizedStoreName,
-      images: ogImageUrl ? [{ url: ogImageUrl }] : undefined,
+      title: titleDefault,
+      description,
+      url: siteUrl,
+      // Always include an og:image with explicit dimensions.
+      // WhatsApp requires og:image to be an ABSOLUTE https URL with
+      // og:image:width + og:image:height — without dimensions WhatsApp
+      // falls back to a thumbnail scrape that produces a blank card.
+      images: [ogImageEntry],
     },
     twitter: {
       card: 'summary_large_image',
       title: titleDefault,
       description,
-      ...(ogImageUrl ? { images: [ogImageUrl] } : {}),
+      // Twitter card image — use the same absolute URL as og:image.
+      images: [ogImageEntry.url],
       ...(twitterHandle ? { site: twitterHandle, creator: twitterHandle } : {}),
     },
     robots:
