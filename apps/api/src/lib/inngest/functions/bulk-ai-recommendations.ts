@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { Prisma, prisma, withMoneyTx } from '@force/database';
+import { Prisma, prisma, withMoneyTx, runInTenantContext } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -165,6 +165,7 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
       return;
     }
 
+    return runInTenantContext(storeId, async () => {
     // Flip the job to 'running' as the very first step BEFORE any heavy
     // load. Two reasons: (a) the queue-depth watcher can distinguish
     // "Inngest never delivered the event" (status stays 'queued' for
@@ -505,5 +506,6 @@ Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by 
     });
 
     logger.info({ jobId, storeId, quotaReached, force }, 'bulk-ai-recommendations complete');
+    }); // end runInTenantContext
   }
 );

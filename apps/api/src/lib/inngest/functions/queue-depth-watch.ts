@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
@@ -38,32 +38,37 @@ export const queueDepthWatch: InngestFunction.Any = inngest.createFunction(
     const queuedThreshold = new Date(now - 30 * 60 * 1000); // 30 min ago
     const runningThreshold = new Date(now - 60 * 60 * 1000); // 60 min ago
 
-    const [stuckQueued, stuckRunning] = await Promise.all([
-      prisma.bulkAiJob.findMany({
-        where: { status: 'queued', createdAt: { lt: queuedThreshold } },
-        select: {
-          id: true,
-          storeId: true,
-          kind: true,
-          createdAt: true,
-          store: { select: { name: true, slug: true } },
-        },
-        take: 20,
-      }),
-      prisma.bulkAiJob.findMany({
-        where: { status: 'running', startedAt: { lt: runningThreshold } },
-        select: {
-          id: true,
-          storeId: true,
-          kind: true,
-          processed: true,
-          total: true,
-          startedAt: true,
-          store: { select: { name: true, slug: true } },
-        },
-        take: 20,
-      }),
-    ]);
+    // Cross-tenant cron — BulkAiJob is an RLS table. No tenant GUC is set in
+    // Inngest workers, so plain prisma reads return 0 rows. Use withRlsBypass
+    // to see all stores' jobs for the health check.
+    const [stuckQueued, stuckRunning] = await withRlsBypass(tx =>
+      Promise.all([
+        tx.bulkAiJob.findMany({
+          where: { status: 'queued', createdAt: { lt: queuedThreshold } },
+          select: {
+            id: true,
+            storeId: true,
+            kind: true,
+            createdAt: true,
+            store: { select: { name: true, slug: true } },
+          },
+          take: 20,
+        }),
+        tx.bulkAiJob.findMany({
+          where: { status: 'running', startedAt: { lt: runningThreshold } },
+          select: {
+            id: true,
+            storeId: true,
+            kind: true,
+            processed: true,
+            total: true,
+            startedAt: true,
+            store: { select: { name: true, slug: true } },
+          },
+          take: 20,
+        }),
+      ])
+    );
 
     const stuckCount = stuckQueued.length + stuckRunning.length;
 
@@ -94,14 +99,17 @@ export const queueDepthWatch: InngestFunction.Any = inngest.createFunction(
       // Marking failed here clears the dashboard confusion + lets the
       // merchant retry from the UI without needing manual SQL.
       try {
-        await prisma.bulkAiJob.update({
-          where: { id: job.id },
-          data: {
-            status: 'failed',
-            errorMessage: `auto-reaped by queue-depth-watch: stuck running ${ageMin}m at progress ${progress}. likely cause: worker died mid-execution (deploy window / crash / inngest disconnect). retry from UI.`,
-            completedAt: new Date(),
-          },
-        });
+        // Auto-reap write also needs bypass — same reason as the reads above.
+        await withRlsBypass(tx =>
+          tx.bulkAiJob.update({
+            where: { id: job.id },
+            data: {
+              status: 'failed',
+              errorMessage: `auto-reaped by queue-depth-watch: stuck running ${ageMin}m at progress ${progress}. likely cause: worker died mid-execution (deploy window / crash / inngest disconnect). retry from UI.`,
+              completedAt: new Date(),
+            },
+          })
+        );
       } catch (err) {
         logger.error(
           { jobId: job.id, err: (err as Error).message },

@@ -19,7 +19,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runDailyRollup } from '../../../services/accounting/analytics-rollup.service';
@@ -37,17 +37,25 @@ export const analyticsDailyRollupCron: InngestFunction.Any = inngest.createFunct
     triggers: [{ cron: '0 23 * * *' }], // 02:00 KW = 23:00 UTC (Kuwait is UTC+3)
   },
   async ({ step }) => {
+    // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
+    // stores table does not filter to 0 rows (no tenant GUC is set).
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: { accountingEnabled: true, deletedAt: null },
-        select: { id: true },
-      })
+      withRlsBypass(tx =>
+        tx.store.findMany({
+          where: { accountingEnabled: true, deletedAt: null },
+          select: { id: true },
+        })
+      )
     );
 
     const totals = { cohortRows: 0, funnelDays: 0, rfmCustomers: 0 };
 
     for (const store of stores) {
-      const result = await step.run(`rollup-${store.id}`, () => runDailyRollup(store.id));
+      // runDailyRollup uses bare prisma internally. Wrap in runInTenantContext
+      // so FORCE RLS policies see the correct store GUC for all reads/writes.
+      const result = await step.run(`rollup-${store.id}`, () =>
+        runInTenantContext(store.id, () => runDailyRollup(store.id))
+      );
       totals.cohortRows += result.cohortRows;
       totals.funnelDays += result.funnelDays;
       totals.rfmCustomers += result.rfmCustomers;
@@ -76,7 +84,11 @@ export const analyticsRollupOnDemand: InngestFunction.Any = inngest.createFuncti
       return { skipped: 'missing-storeId' };
     }
 
-    const result = await step.run('rollup', () => runDailyRollup(storeId));
+    // On-demand also runs without HTTP tenant context — wrap so FORCE RLS
+    // sees the correct GUC.
+    const result = await step.run('rollup', () =>
+      runInTenantContext(storeId, () => runDailyRollup(storeId))
+    );
     logger.info({ storeId, ...result }, 'analytics-rollup-on-demand: completed');
     return result;
   }

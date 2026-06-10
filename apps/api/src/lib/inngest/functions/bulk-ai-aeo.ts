@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -229,6 +229,9 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
+    // Wrap entire sweep in runInTenantContext — Inngest workers run without
+    // HTTP tenant context, so FORCE RLS would return 0 rows on every query.
+    return runInTenantContext(storeId, async () => {
     const errors: Array<{
       entityKind: string;
       entityId: string;
@@ -480,6 +483,7 @@ No other text, no markdown code fences — pure JSON only.`;
       { jobId, storeId, filled, skipped, failed, quotaReached },
       'bulk-ai-faq-aeo complete'
     );
+    }); // end runInTenantContext
   }
 );
 
@@ -512,6 +516,7 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
+    return runInTenantContext(storeId, async () => {
     const errors: Array<{
       entityKind: string;
       entityId: string;
@@ -746,6 +751,7 @@ No markdown, no code fences — pure JSON only.`;
       { jobId, storeId, filled, skipped, failed, quotaReached },
       'bulk-ai-howto-aeo complete'
     );
+    }); // end runInTenantContext
   }
 );
 
@@ -798,6 +804,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
+    return runInTenantContext(storeId, async () => {
     const errors: Array<{
       entityKind: string;
       entityId: string;
@@ -1139,6 +1146,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
       { jobId, storeId, filled, skipped, failed, quotaReached, force },
       'bulk-ai-meta-aeo complete'
     );
+    }); // end runInTenantContext
   }
 );
 

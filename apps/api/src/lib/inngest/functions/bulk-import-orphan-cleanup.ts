@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -32,27 +32,31 @@ export const bulkImportOrphanCleanup: InngestFunction.Any = inngest.createFuncti
   async () => {
     const orphanCutoff = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
 
-    const orphans = await prisma.bulkImportJob.findMany({
-      where: {
-        status: 'running',
-        startedAt: { lt: orphanCutoff },
-      },
-      select: { id: true, storeId: true, startedAt: true },
-    });
+    const orphans = await withRlsBypass(tx =>
+      tx.bulkImportJob.findMany({
+        where: {
+          status: 'running',
+          startedAt: { lt: orphanCutoff },
+        },
+        select: { id: true, storeId: true, startedAt: true },
+      })
+    );
 
     if (orphans.length === 0) {
       return { orphansSwept: 0 };
     }
 
-    await prisma.bulkImportJob.updateMany({
-      where: { id: { in: orphans.map(o => o.id) } },
-      data: {
-        status: 'failed',
-        errorMessage:
-          'Job orphaned — process restarted mid-import without completing. Re-upload the CSV to retry.',
-        completedAt: new Date(),
-      },
-    });
+    await withRlsBypass(tx =>
+      tx.bulkImportJob.updateMany({
+        where: { id: { in: orphans.map(o => o.id) } },
+        data: {
+          status: 'failed',
+          errorMessage:
+            'Job orphaned — process restarted mid-import without completing. Re-upload the CSV to retry.',
+          completedAt: new Date(),
+        },
+      })
+    );
 
     logger.warn(
       { orphansSwept: orphans.length, jobIds: orphans.map(o => o.id) },

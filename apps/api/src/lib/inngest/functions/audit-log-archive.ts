@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { prisma } from '@force/database';
+import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -31,8 +31,11 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
   async ({ step }) => {
     const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
+    // audit_logs is a cross-tenant system table. Inngest crons run without any
+    // HTTP tenant context so no store GUC is set. FORCE RLS on audit_logs would
+    // filter every read to 0 rows. Use withRlsBypass for all DB access here.
     const total = await step.run('count-old-rows', () =>
-      prisma.auditLog.count({ where: { createdAt: { lt: cutoff } } })
+      withRlsBypass(tx => tx.auditLog.count({ where: { createdAt: { lt: cutoff } } }))
     );
 
     if (total === 0) {
@@ -62,12 +65,16 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
       let cursor: string | null = null;
       let written = 0;
       while (true) {
-        const rows: Array<{ id: string }> = await prisma.auditLog.findMany({
-          where: { createdAt: { lt: cutoff } },
-          orderBy: { id: 'asc' },
-          take: EXPORT_PAGE,
-          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-        });
+        // withRlsBypass in a loop: each page is a fresh transaction. The cursor
+        // value is captured in closure so the next page picks up where we left off.
+        const rows: Array<{ id: string }> = await withRlsBypass(tx =>
+          tx.auditLog.findMany({
+            where: { createdAt: { lt: cutoff } },
+            orderBy: { id: 'asc' },
+            take: EXPORT_PAGE,
+            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+          })
+        );
         if (rows.length === 0) break;
         for (const r of rows) chunks.push(JSON.stringify(r) + '\n');
         written += rows.length;
@@ -97,11 +104,15 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
     const deleted = await step.run('delete-old-rows', async () => {
       let total = 0;
       while (true) {
-        const result = await prisma.$executeRawUnsafe<number>(
-          `DELETE FROM public.audit_logs WHERE id IN (
-             SELECT id FROM public.audit_logs WHERE created_at < $1 LIMIT ${DELETE_BATCH}
-           )`,
-          cutoff
+        // Raw DELETE bypasses Prisma's model layer — wrap in withRlsBypass so
+        // the session's GUC allows the DELETE to execute cross-tenant.
+        const result = await withRlsBypass(tx =>
+          tx.$executeRawUnsafe<number>(
+            `DELETE FROM public.audit_logs WHERE id IN (
+               SELECT id FROM public.audit_logs WHERE created_at < $1 LIMIT ${DELETE_BATCH}
+             )`,
+            cutoff
+          )
         );
         if (!result || result === 0) break;
         total += Number(result);

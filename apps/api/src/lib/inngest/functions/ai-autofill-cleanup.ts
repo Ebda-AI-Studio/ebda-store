@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { recommendationService } from '../../../services/recommendation.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -35,56 +35,58 @@ export const aiAutofillCleanup: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    // Collect the source products whose recommendation caches need busting
-    // BEFORE we delete the rows (we need the sourceProductId values).
-    const referrers = await prisma.aiRecommendation.findMany({
-      where: { storeId, targetProductId: productId },
-      select: { sourceProductId: true },
-    });
+    await runInTenantContext(storeId, async () => {
+      // Collect the source products whose recommendation caches need busting
+      // BEFORE we delete the rows (we need the sourceProductId values).
+      const referrers = await prisma.aiRecommendation.findMany({
+        where: { storeId, targetProductId: productId },
+        select: { sourceProductId: true },
+      });
 
-    // Purge the recommendation tables in a single transaction. The product is
-    // SOFT-deleted (its row stays), so FK cascade never fires — we must remove
-    // both directions explicitly: rows pointing AT it (so it's never
-    // recommended) and rows it generated (so they don't orphan in the table /
-    // inflate the overview count).
-    await prisma.$transaction([
-      prisma.aiRecommendation.deleteMany({
-        where: {
-          storeId,
-          OR: [{ targetProductId: productId }, { sourceProductId: productId }],
-        },
-      }),
-      prisma.frequentlyBoughtTogether.deleteMany({
-        where: {
-          storeId,
-          OR: [{ productId1: productId }, { productId2: productId }],
-        },
-      }),
-      prisma.productRelation.deleteMany({
-        where: {
-          storeId,
-          OR: [{ targetProductId: productId }, { sourceProductId: productId }],
-        },
-      }),
-    ]);
+      // Purge the recommendation tables in a single transaction. The product is
+      // SOFT-deleted (its row stays), so FK cascade never fires — we must remove
+      // both directions explicitly: rows pointing AT it (so it's never
+      // recommended) and rows it generated (so they don't orphan in the table /
+      // inflate the overview count).
+      await prisma.$transaction([
+        prisma.aiRecommendation.deleteMany({
+          where: {
+            storeId,
+            OR: [{ targetProductId: productId }, { sourceProductId: productId }],
+          },
+        }),
+        prisma.frequentlyBoughtTogether.deleteMany({
+          where: {
+            storeId,
+            OR: [{ productId1: productId }, { productId2: productId }],
+          },
+        }),
+        prisma.productRelation.deleteMany({
+          where: {
+            storeId,
+            OR: [{ targetProductId: productId }, { sourceProductId: productId }],
+          },
+        }),
+      ]);
 
-    // Invalidate the recommendation cache for each affected source product.
-    // Errors are swallowed per-item so one bad Redis call doesn't block the rest.
-    const uniqueSourceIds = [...new Set(referrers.map(r => r.sourceProductId))];
-    await Promise.all(
-      uniqueSourceIds.map(id =>
-        recommendationService.invalidateProductCache(storeId, id).catch(err => {
-          logger.warn(
-            { err, storeId, productId: id },
-            '[ai-autofill-cleanup] cache invalidation failed'
-          );
-        })
-      )
-    );
+      // Invalidate the recommendation cache for each affected source product.
+      // Errors are swallowed per-item so one bad Redis call doesn't block the rest.
+      const uniqueSourceIds = [...new Set(referrers.map(r => r.sourceProductId))];
+      await Promise.all(
+        uniqueSourceIds.map(id =>
+          recommendationService.invalidateProductCache(storeId, id).catch(err => {
+            logger.warn(
+              { err, storeId, productId: id },
+              '[ai-autofill-cleanup] cache invalidation failed'
+            );
+          })
+        )
+      );
 
-    logger.info(
-      { storeId, productId, referrers: referrers.length },
-      '[ai-autofill-cleanup] cleanup done'
-    );
+      logger.info(
+        { storeId, productId, referrers: referrers.length },
+        '[ai-autofill-cleanup] cleanup done'
+      );
+    }); // end runInTenantContext
   }
 );

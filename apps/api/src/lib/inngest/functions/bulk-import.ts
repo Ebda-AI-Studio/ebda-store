@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 import { BulkService } from '../../../services/bulk.service';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -39,49 +39,56 @@ export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    const job = await prisma.bulkImportJob.findUnique({ where: { id: jobId } });
+    // BulkImportJob is a cross-tenant job queue table — use withRlsBypass to
+    // load it (no storeId GUC set yet at this point).
+    const job = await withRlsBypass(tx => tx.bulkImportJob.findUnique({ where: { id: jobId } }));
     if (!job) {
       logger.warn({ jobId }, 'bulk-import/started fired for missing job');
       return;
     }
 
-    await prisma.bulkImportJob.update({
-      where: { id: jobId },
-      data: { status: 'running', startedAt: new Date() },
+    // From here we know the storeId. Use runInTenantContext so all subsequent
+    // reads/writes (Products, Categories, BulkImportJob status) go through the
+    // tenant's RLS policies rather than silently returning 0 rows.
+    await runInTenantContext(job.storeId, async () => {
+      await prisma.bulkImportJob.update({
+        where: { id: jobId },
+        data: { status: 'running', startedAt: new Date() },
+      });
+
+      try {
+        const result = await BulkService.importProducts(
+          job.storeId,
+          job.csvData,
+          { updateExisting: job.updateExisting },
+          job.userId ?? undefined
+        );
+
+        await prisma.bulkImportJob.update({
+          where: { id: jobId },
+          data: {
+            status: 'completed',
+            total: result.total,
+            processed: result.total,
+            created: result.created,
+            updated: result.updated,
+            failed: result.failed,
+            errors: result.errors,
+            completedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger.error({ err, jobId }, 'Bulk import job failed');
+        await prisma.bulkImportJob.update({
+          where: { id: jobId },
+          data: {
+            status: 'failed',
+            errorMessage: message,
+            completedAt: new Date(),
+          },
+        });
+      }
     });
-
-    try {
-      const result = await BulkService.importProducts(
-        job.storeId,
-        job.csvData,
-        { updateExisting: job.updateExisting },
-        job.userId ?? undefined
-      );
-
-      await prisma.bulkImportJob.update({
-        where: { id: jobId },
-        data: {
-          status: 'completed',
-          total: result.total,
-          processed: result.total,
-          created: result.created,
-          updated: result.updated,
-          failed: result.failed,
-          errors: result.errors,
-          completedAt: new Date(),
-        },
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.error({ err, jobId }, 'Bulk import job failed');
-      await prisma.bulkImportJob.update({
-        where: { id: jobId },
-        data: {
-          status: 'failed',
-          errorMessage: message,
-          completedAt: new Date(),
-        },
-      });
-    }
   }
 );

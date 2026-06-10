@@ -58,24 +58,39 @@ Paths audited: `apps/api/src/lib/inngest/functions/`, `apps/api/src/routes/*webh
 
 ---
 
-## Paths NOT fixed in this PR (documented as residual risk)
+## Follow-up fixes (this PR — fix/rls-async-writer-tail)
 
-These paths also touch RLS tables from async contexts but were **out of scope**
-per the task brief. They are documented here as the next-priority work.
+All items from the "NOT fixed" table above were addressed in this PR plus 4
+additional files found by a full grep of `apps/api/src/lib/inngest/functions/`.
 
-| path                                                                  | tables                         | priority | reason not fixed                                                                                                                 |
-| --------------------------------------------------------------------- | ------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `accounting-period-reconciliation.ts` — `list-stores-with-accounting` | `stores`                       | medium   | `prisma.store.findMany` without bypass; inner queries already use `withRlsBypass`. Partial fix exists — complete it.             |
-| `accounting-profit-anomaly.ts` — store enumeration                    | `stores`, `journal_entries`    | medium   | Cross-tenant cron with no RLS bypass on the outer store findMany.                                                                |
-| `analytics-daily-rollup.ts` — all steps                               | `stores`, analytics tables     | medium   | Cross-tenant cron; `prisma.store.findMany` unguarded.                                                                            |
-| `audit-log-archive.ts` — all steps                                    | `audit_logs`                   | medium   | Cron; `auditLog.count` + `auditLog.findMany` + `$executeRawUnsafe` without bypass.                                               |
-| `stock-deadstock-scan.ts` — store enumeration                         | `stores`, `products`           | medium   | `prisma.store.findMany` without bypass.                                                                                          |
-| `review-moderation.ts` — `update` call                                | `reviews`                      | medium   | `prisma.review.update` has a storeId in scope but no `runInTenantContext`.                                                       |
-| `ai-autofill-sweep.ts` — store enumeration                            | `stores`, `bulk_ai_jobs`       | low      | Sweep dispatches per-store events; the actual writes happen in `ai-autofill-product.ts` which is event-driven and has a storeId. |
-| `bulk-import.ts` — all steps                                          | `bulk_import_jobs`, `products` | medium   | `bulkImportJob.findUnique/update` without bypass; storeId available in event.data.                                               |
-| `product-meta-sync.ts` — all steps                                    | `stores`, `products`           | medium   | `prisma.store.findUnique` + `prisma.product.findUnique` without bypass.                                                          |
-| `queue-depth-watch.ts` — all steps                                    | `bulk_ai_jobs`                 | low      | Monitoring-only read; worst case = incomplete depth alert, not data corruption.                                                  |
-| `bulk-ai-*.ts` (aeo, geo, seo, translate, faqs, recommendations)      | `products`, `bulk_ai_jobs`     | medium   | Bulk AI job functions read/update products without context. Each has storeId in event.data.                                      |
+| path                                      | tables                                                                                        | fix applied                                                                                                                                              |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accounting-period-reconciliation.ts`     | `stores`, `journal_entries`                                                                   | `withRlsBypass` for store enumeration; inner queries already wrapped                                                                                     |
+| `accounting-profit-anomaly.ts`            | `stores`, `journal_entries`                                                                   | `withRlsBypass` for store listing + `runInTenantContext(store.id)` per-store scan                                                                        |
+| `analytics-daily-rollup.ts`               | `stores`, `store_analytics_daily`                                                             | `withRlsBypass` for store listing (cron path) + `runInTenantContext(storeId)` for both cron per-store and on-demand paths                                |
+| `audit-log-archive.ts`                    | `audit_logs`                                                                                  | `withRlsBypass` on count, paginated findMany loop, and `$executeRawUnsafe` delete                                                                        |
+| `stock-deadstock-scan.ts`                 | `stores`, `products`                                                                          | `withRlsBypass` for store listing; `runDeadstockScan` already wraps its own queries internally                                                           |
+| `review-moderation.ts`                    | `reviews`                                                                                     | `runInTenantContext(storeId)` wrapping `detectSpamReview`, `prisma.review.update`, and `translateReview`                                                 |
+| `bulk-import.ts`                          | `bulk_import_jobs`, `products`, `categories`                                                  | `withRlsBypass` for initial job load (no storeId yet); `runInTenantContext(job.storeId)` wrapping the entire execution body                              |
+| `product-meta-sync.ts`                    | `stores`, `products`                                                                          | `runInTenantContext(storeId)` wrapping store/product reads and fetch dispatch                                                                            |
+| `queue-depth-watch.ts`                    | `bulk_ai_jobs`                                                                                | `withRlsBypass` on dual findMany + auto-reap update                                                                                                      |
+| `bulk-ai-seo.ts`                          | `products`, `bulk_ai_jobs`                                                                    | `runInTenantContext(storeId)` wrapping entire function body                                                                                              |
+| `bulk-ai-translate.ts`                    | `products`, `categories`, `stores`, `bulk_ai_jobs`                                            | `runInTenantContext(storeId)` wrapping entire function body                                                                                              |
+| `bulk-ai-aeo.ts` (3 functions)            | `products`, `bulk_ai_jobs`                                                                    | `runInTenantContext(storeId)` wrapping each function independently                                                                                       |
+| `bulk-ai-geo.ts` (3 functions)            | `stores`, `products`, `bulk_ai_jobs`                                                          | `runInTenantContext(storeId)` wrapping each function independently                                                                                       |
+| `bulk-ai-product-faqs.ts`                 | `stores`, `products`, `product_faqs`, `bulk_ai_jobs`                                          | `runInTenantContext(storeId)` wrapping function body                                                                                                     |
+| `bulk-ai-recommendations.ts`              | `products`, `product_recommendations`, `frequently_bought_together`, `bulk_ai_jobs`, `orders` | `runInTenantContext(storeId)` wrapping function body                                                                                                     |
+| `ai-autofill-cleanup.ts` _(extra)_        | `ai_recommendations`, `frequently_bought_together`, `product_relations`                       | `runInTenantContext(storeId)` wrapping findMany + $transaction delete block (event-driven `product.deleted`, storeId in event.data)                      |
+| `bulk-import-orphan-cleanup.ts` _(extra)_ | `bulk_import_jobs`                                                                            | `withRlsBypass` on findMany + updateMany (cross-tenant cron, no storeId)                                                                                 |
+| `ai-autofill-sweep.ts` _(extra)_          | `stores`, `products`, `bulk_ai_jobs`                                                          | `withRlsBypass` for store listing + `runInTenantContext(s.id)` per-store for `recalculateFBT` + `sweepStore` calls                                       |
+| `ai-autofill-product.ts` _(extra)_        | `products`, `bulk_ai_jobs`                                                                    | `runInTenantContext(storeId)` wrapping `isAutopilotEnabled`, `fillProductFields`, and `bulkAiJob.findFirst/create` (event-driven, storeId in event.data) |
+
+**Intentionally not wrapped (out of scope for async-context RLS):**
+
+| path                                           | reason                                                                                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/database/scripts/*.mjs`              | One-shot admin scripts run as DB owner via `railway run`; not async Inngest paths; FORCE RLS does not apply to owner-role connections |
+| `apps/api/src/services/ai-autofill.service.ts` | Service is always called from a wrapper that already sets the context (`runInTenantContext` at the Inngest function level covers it)  |
 
 ---
 

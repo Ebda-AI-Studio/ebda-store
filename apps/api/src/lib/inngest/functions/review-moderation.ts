@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { inngest } from '../client';
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import { translateReview, detectSpamReview } from '../../ai/review-tools';
 import logger from '../../logger';
 import { featureService } from '../../../services/feature.service';
@@ -45,23 +45,33 @@ export const reviewModeration: InngestFunction.Any = inngest.createFunction(
     }
 
     // ── 1. Spam check — determines visibility ──────────────────────────────
-    const spam = await step.run('detect-spam', () => detectSpamReview(reviewId));
+    // detectSpamReview uses bare prisma internally. Wrap in runInTenantContext
+    // so FORCE RLS sees the correct store GUC and the Review row is visible.
+    const spam = await step.run('detect-spam', () =>
+      runInTenantContext(storeId, () => detectSpamReview(reviewId))
+    );
 
+    // persist-spam-result also needs the tenant context — Review is an RLS table.
     await step.run('persist-spam-result', () =>
-      prisma.review.update({
-        where: { id: reviewId },
-        data: {
-          spamScore: spam.spamScore,
-          spamReasons: spam.reasons,
-          status: spam.recommendedStatus,
-        },
-      })
+      runInTenantContext(storeId, () =>
+        prisma.review.update({
+          where: { id: reviewId },
+          data: {
+            spamScore: spam.spamScore,
+            spamReasons: spam.reasons,
+            status: spam.recommendedStatus,
+          },
+        })
+      )
     );
 
     // ── 2. Translate — only if not spam ────────────────────────────────────
     if (spam.recommendedStatus !== 'spam') {
       try {
-        await step.run('translate', () => translateReview(reviewId));
+        // translateReview uses bare prisma — wrap for the same reason.
+        await step.run('translate', () =>
+          runInTenantContext(storeId, () => translateReview(reviewId))
+        );
       } catch (err) {
         // Non-blocking: review already has correct status; just log.
         logger.warn({ err, reviewId }, '[REVIEW-MODERATION] translate failed; continuing');

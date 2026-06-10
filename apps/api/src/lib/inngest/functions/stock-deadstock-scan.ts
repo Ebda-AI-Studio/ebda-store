@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma } from '@force/database';
+import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runDeadstockScan } from '../../../services/accounting/deadstock-scan.service';
@@ -28,11 +28,16 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
     triggers: [{ cron: '0 3 * * 0' }], // Sunday 06:00 KW = Sunday 03:00 UTC (Kuwait is UTC+3)
   },
   async ({ step }) => {
+    // Cross-tenant cron — list stores with withRlsBypass so FORCE RLS on the
+    // stores table does not filter to 0 rows (no tenant GUC is set).
+    // runDeadstockScan() already wraps its own DB work in withRlsBypass.
     const stores = await step.run('list-stores', () =>
-      prisma.store.findMany({
-        where: { accountingEnabled: true, aiFeaturesEnabled: true, deletedAt: null },
-        select: { id: true },
-      })
+      withRlsBypass(tx =>
+        tx.store.findMany({
+          where: { accountingEnabled: true, aiFeaturesEnabled: true, deletedAt: null },
+          select: { id: true },
+        })
+      )
     );
 
     let totalFlagged = 0;
