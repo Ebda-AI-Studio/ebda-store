@@ -79,7 +79,7 @@ const updateCartItemSchema = z.object({
 // whitespace on required fields so a stray space doesn't trip min(1), and we
 // add generous max lengths to bound abuse without rejecting normal Arabic or
 // English input.
-const shippingAddressSchema = z.object({
+export const shippingAddressSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   address1: z.string().trim().min(1).max(500),
@@ -102,7 +102,7 @@ const shippingAddressSchema = z.object({
   ),
 });
 
-const createOrderSchema = z.object({
+export const createOrderSchema = z.object({
   shippingAddress: shippingAddressSchema,
   billingAddress: shippingAddressSchema.optional(),
   paymentMethod: z.string().min(1),
