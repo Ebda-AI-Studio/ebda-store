@@ -54,7 +54,9 @@ jobs:
   lint:
     name: Lint
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 5
+    # 8 (was 5): eslint+prettier across the monorepo exceeds 5m when the 2
+    # self-hosted runners are saturated by concurrent PRs (timed out 2026-06-10).
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
 

@@ -60,7 +60,15 @@ jobs:
             printf '%s' '{"result":"{\"summary\":\"AI review skipped: CLAUDE_CODE_OAUTH_TOKEN not configured.\",\"findings\":[]}"}' > /tmp/claude-out.json
             exit 0
           fi
-          npm install -g @anthropic-ai/claude-code
+          # Self-hosted runners share one global node_modules. Two jobs running
+          # `npm install -g @anthropic-ai/claude-code` at once race on the same
+          # dir and one dies with `ENOTEMPTY: rename ... .claude-code-XXedge`
+          # (exit 217) — the flake that blocked merges all of 2026-06-10. Serialize
+          # the install behind a flock and skip it when claude is already present.
+          (
+            flock 200
+            command -v claude >/dev/null 2>&1 || npm install -g @anthropic-ai/claude-code
+          ) 200>/tmp/.force-claude-code-install.lock
           claude -p --output-format json \
             --model claude-opus-4-8 \
             --allowedTools "Read,Grep,Glob" \
