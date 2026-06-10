@@ -1,0 +1,74 @@
+name: blast-radius
+
+# Informational PR gate: for every changed file, surface its transitive
+# DEPENDENTS from the committed graphify dependency graph, so the reviewer
+# (human or AI) reviews the BLAST RADIUS — not just the diff. Catches the
+# "changed a shared symbol, silently broke a consumer" class (incl. stale test
+# doubles). Never fails the build; it annotates + comments.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_cloud:
+        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+        type: boolean
+        default: false
+
+concurrency:
+  group: blast-radius-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  blast-radius:
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need base + head to diff
+
+      - name: Compute blast radius
+        id: br
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -o pipefail
+          # ref-based mode (no gh needed); path = repo root. Degrades gracefully
+          # if graphify-out/graph.json is absent.
+          bash scripts/blast-radius.sh force-website-builder "${BASE_SHA:-HEAD~1}..${HEAD_SHA:-HEAD}" . \
+            | tee blast-radius.txt || true
+          {
+            echo '## 🌐 Blast radius (transitive dependents of the changed files)'
+            echo ''
+            echo '```'
+            cat blast-radius.txt 2>/dev/null || echo '(no output)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          body=$(printf '## 🌐 Blast radius\n\nTransitive dependents of this PR'\''s changed files (review THESE, not just the diff):\n\n```\n%s\n```\n' "$(cat blast-radius.txt 2>/dev/null | head -120)")
+          # upsert a single marker comment so re-runs don't spam the PR
+          marker='<!-- blast-radius-bot -->'
+          body="$body"$'\n'"$marker"
+          existing=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json comments \
+            --jq ".comments[] | select(.body | contains(\"$marker\")) | .url" 2>/dev/null | head -1)
+          if [ -n "$existing" ]; then
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --edit-last --body "$body" 2>/dev/null \
+              || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"
+          fi
