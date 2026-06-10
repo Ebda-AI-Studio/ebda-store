@@ -1,3 +1,6 @@
+// MUST be first: OTel auto-instrumentation patches http/express/pg at
+// require-time, so the tracing SDK has to start before those modules load.
+import './tracing';
 import express, { Request, Response } from 'express';
 import { createServer } from 'http';
 import cookieParser from 'cookie-parser';
