@@ -629,3 +629,16 @@ main > div {
     scroll-behavior: auto !important;
   }
 }
+
+/* Mobile touch: iOS Safari zooms the viewport when a focused form control has
+   font-size < 16px and never unzooms — a touch-quality bug on every <16px
+   input/select/textarea. Force >=16px on text-entry controls at phone widths so
+   focus never triggers the zoom. !important beats Tailwind's text-sm/text-xs
+   utilities; desktop keeps the tighter component sizing above 640px. */
+@media (max-width: 639px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
