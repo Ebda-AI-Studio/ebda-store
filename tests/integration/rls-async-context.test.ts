@@ -25,17 +25,29 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
   let storeId: string;
   let orderId: string;
   let customerId: string;
+  let ownerId: string;
 
   beforeAll(async () => {
     // Create a minimal store + customer + order so we have rows to test against.
     // Use withRlsBypass for the setup writes (no tenant context active yet).
     await withRlsBypass(async tx => {
+      // Create an owner user first
+      const owner = await tx.user.create({
+        data: {
+          email: `rls-owner-${Date.now()}@example.com`,
+          passwordHash: 'not-a-real-hash',
+          role: 'store_admin',
+        },
+      });
+      ownerId = owner.id;
+
       const store = await tx.store.create({
         data: {
           name: 'rls-test-store',
           slug: `rls-test-${Date.now()}`,
           template: 'modern',
           currency: 'KWD',
+          ownerId: owner.id,
         },
       });
       storeId = store.id;
@@ -79,6 +91,9 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
     }
     if (storeId) {
       await withRlsBypass(tx => tx.store.delete({ where: { id: storeId } })).catch(() => {});
+    }
+    if (ownerId) {
+      await withRlsBypass(tx => tx.user.delete({ where: { id: ownerId } })).catch(() => {});
     }
   });
 
