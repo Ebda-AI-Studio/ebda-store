@@ -29,9 +29,14 @@
  */
 
 import { ImageResponse } from 'next/og';
+import sharp from 'sharp';
 import { getStore } from '../lib/store-resolver';
 
-export const runtime = 'edge';
+// node runtime (NOT edge): sharp is a native module. We use it to rasterize SVG
+// store logos to PNG on the fly so the OG card can <img> them — Satori (the
+// ImageResponse renderer) cannot render an SVG <img> source, which is why the
+// WhatsApp/social preview previously showed the store name instead of the logo.
+export const runtime = 'nodejs';
 export const contentType = 'image/png';
 export const size = { width: 1200, height: 630 };
 
@@ -84,8 +89,30 @@ export default async function Image() {
   // an SVG or unknown format, fall through to the branded store-name card, which
   // always renders and is a far better preview than a blank image.
   const candidate = store.ogImage || store.logo || null;
-  const isRaster = !!candidate && /\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(candidate);
-  const logoUrl = isRaster ? candidate : null;
+  // Resolve a RASTER logo the OG card can <img>. Raster URLs pass through;
+  // an SVG is fetched + rasterized to a PNG data URI via sharp ("the FWB system
+  // converts the SVG"); anything that fails falls through to the branded
+  // store-name card (which always renders — never a blank preview).
+  let logoUrl: string | null = null;
+  if (candidate) {
+    if (/\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(candidate)) {
+      logoUrl = candidate;
+    } else if (/\.svg(\?|#|$)/i.test(candidate)) {
+      try {
+        const res = await fetch(candidate, { next: { revalidate: 3600 } });
+        if (res.ok) {
+          const svgBuf = Buffer.from(await res.arrayBuffer());
+          const png = await sharp(svgBuf, { density: 240 })
+            .resize(600, 600, { fit: 'inside', withoutEnlargement: false })
+            .png()
+            .toBuffer();
+          logoUrl = `data:image/png;base64,${png.toString('base64')}`;
+        }
+      } catch {
+        logoUrl = null; // fall back to the name card
+      }
+    }
+  }
   const storeName = store.name || 'Store';
 
   return new ImageResponse(
