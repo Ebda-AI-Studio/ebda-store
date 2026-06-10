@@ -213,7 +213,13 @@ export async function generateMetadata(): Promise<Metadata> {
   })();
 
   return {
-    metadataBase: new URL(siteUrl),
+    // og:image (the file-based opengraph-image route) resolves against
+    // metadataBase. NEXT_PUBLIC_SITE_URL forces siteUrl to the platform domain
+    // for EVERY store, so og:image pointed at store.forcemediakw.com/opengraph-image
+    // — where the path-slug middleware serves HTML, not the image (broken WhatsApp
+    // preview). Anchor metadataBase to the store's OWN domain when it has one so
+    // the OG image resolves on the domain the page is actually served from.
+    metadataBase: new URL(store.domain ? `https://${store.domain}` : siteUrl),
     title: {
       default: titleDefault,
       template: `%s | ${localizedStoreName}`,

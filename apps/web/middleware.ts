@@ -79,6 +79,16 @@ const KNOWN_APP_ROUTES = new Set([
   'manifest',
   'error',
   'not-found',
+  // Reserved Next.js file-based metadata routes (no file extension, so the
+  // `firstSegment.includes('.')` check below doesn't catch them). Without these
+  // the platform domain treats e.g. /opengraph-image as a store slug and serves
+  // HTML, breaking WhatsApp/social link-preview images + favicons.
+  'opengraph-image',
+  'twitter-image',
+  'icon',
+  'apple-icon',
+  'sitemap',
+  'robots',
 ]);
 
 /**

@@ -78,7 +78,14 @@ export default async function Image() {
   const bgLight = lightenHsl(primaryHsl, 20);
 
   // Prefer admin-configured OG image, then store logo. Both are absolute R2 URLs.
-  const logoUrl = store.ogImage || store.logo || null;
+  // CRITICAL: Satori (ImageResponse's renderer) can only embed RASTER images in
+  // <img> — an SVG src renders blank (this is why the WhatsApp preview showed no
+  // logo: most store logos are SVG). So only use <img> for png/jpg/webp/gif; for
+  // an SVG or unknown format, fall through to the branded store-name card, which
+  // always renders and is a far better preview than a blank image.
+  const candidate = store.ogImage || store.logo || null;
+  const isRaster = !!candidate && /\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(candidate);
+  const logoUrl = isRaster ? candidate : null;
   const storeName = store.name || 'Store';
 
   return new ImageResponse(
