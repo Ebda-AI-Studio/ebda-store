@@ -166,201 +166,201 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
     }
 
     return runInTenantContext(storeId, async () => {
-    // Flip the job to 'running' as the very first step BEFORE any heavy
-    // load. Two reasons: (a) the queue-depth watcher can distinguish
-    // "Inngest never delivered the event" (status stays 'queued' for
-    // >30min → alert) from "delivered but stuck on Gemini" (status
-    // 'running' >30min → different alert path); (b) the UI shows
-    // immediate feedback so the merchant doesn't think nothing's
-    // happening while products + categories load. Wrapped in step.run
-    // so Inngest persists the transition independently from subsequent
-    // failures — a Gemini error doesn't roll back this update.
-    await step.run('mark-running', () =>
-      prisma.bulkAiJob.update({
-        where: { id: jobId },
-        data: { status: 'running', startedAt: new Date() },
-      })
-    );
-
-    const errors: Array<{
-      entityKind: string;
-      entityId: string;
-      entityName: string;
-      error: string;
-    }> = [];
-    let filled = 0;
-    let skipped = 0;
-    let failed = 0;
-    let quotaReached = false;
-
-    try {
-      // Load all active products up-front. The full list is used to:
-      //   a) set BulkAiJob.total so the progress bar is accurate
-      //   b) build the candidate index we pass to Gemini
-      const products = await prisma.product.findMany({
-        where: { storeId, status: 'active', deletedAt: null },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          // Use the ProductCategory join table to get category names.
-          // A product may belong to multiple categories; we use the first
-          // for the catalog index summary passed to Gemini.
-          categories: {
-            include: { category: { select: { name: true } } },
-            take: 1,
-          },
-        },
-      });
-
-      await prisma.bulkAiJob.update({
-        where: { id: jobId },
-        data: { total: products.length },
-      });
-
-      if (products.length < 2) {
-        // Nothing useful to recommend from a 0- or 1-product catalogue.
-        await prisma.bulkAiJob.update({
+      // Flip the job to 'running' as the very first step BEFORE any heavy
+      // load. Two reasons: (a) the queue-depth watcher can distinguish
+      // "Inngest never delivered the event" (status stays 'queued' for
+      // >30min → alert) from "delivered but stuck on Gemini" (status
+      // 'running' >30min → different alert path); (b) the UI shows
+      // immediate feedback so the merchant doesn't think nothing's
+      // happening while products + categories load. Wrapped in step.run
+      // so Inngest persists the transition independently from subsequent
+      // failures — a Gemini error doesn't roll back this update.
+      await step.run('mark-running', () =>
+        prisma.bulkAiJob.update({
           where: { id: jobId },
-          data: {
-            status: 'completed',
-            completedAt: new Date(),
-            processed: products.length,
-            filled: 0,
-            skipped: products.length,
-            failed: 0,
-          },
-        });
-        logger.info({ jobId, storeId }, 'bulk-ai-recommendations: catalog too small, skipped');
-        return;
-      }
-
-      // Pre-build a compact catalog index. Passed as JSON context so Gemini
-      // can pick valid IDs. We cap at CANDIDATE_SLICE per call to keep
-      // prompt sizes reasonable and reduce hallucinated IDs.
-      const catalogIndex = products.map(p => ({
-        id: p.id,
-        name: p.name,
-        // A product may sit in multiple categories; take the first for the
-        // summary label we pass to Gemini.
-        category: p.categories[0]?.category.name ?? null,
-      }));
-
-      // Smart-skip — pre-fetch the set of product IDs that already have AI
-      // recommendations in this store. Re-running the sweep should be
-      // incremental: products with existing recs are left alone (saves
-      // Gemini quota + preserves prior recs verbatim). Products without
-      // any recs get processed. A merchant who wants to fully regenerate
-      // can clear ai_recommendation rows for the store and re-run.
-      const existingRecRows = await prisma.aiRecommendation.findMany({
-        where: { storeId },
-        select: { sourceProductId: true },
-        distinct: ['sourceProductId'],
-      });
-      const productsWithRecs = new Set(existingRecRows.map(r => r.sourceProductId));
-
-      // Frequently-bought-together signal from real order history. Passed
-      // into each product's prompt so Gemini prioritises genuine
-      // complements (products actually bought together) over merely-similar
-      // catalogue items. Empty map for stores with no order history → the
-      // prompt falls back to catalogue-only reasoning.
-      const nameById = new Map(catalogIndex.map(c => [c.id, c.name] as const));
-      let coPurchase: Map<string, Array<{ productId: string; coOrders: number }>>;
-      try {
-        coPurchase = await computeCoPurchasePairs(storeId);
-      } catch (err) {
-        // FBT is an enhancement, not a hard dependency — never fail the
-        // sweep because the co-purchase query had a problem.
-        logger.warn(
-          { jobId, storeId, err: err instanceof Error ? err.message : String(err) },
-          'bulk-ai-recommendations: co-purchase signal unavailable, falling back to catalogue-only'
-        );
-        coPurchase = new Map();
-      }
-
-      logger.info(
-        {
-          jobId,
-          storeId,
-          totalProducts: products.length,
-          alreadyHaveRecs: productsWithRecs.size,
-          toProcess: products.length - productsWithRecs.size,
-          productsWithCoPurchaseSignal: coPurchase.size,
-        },
-        'bulk-ai-recommendations: pre-sweep state'
+          data: { status: 'running', startedAt: new Date() },
+        })
       );
 
-      const genAI = getGenAI();
-      const model = genAI.getGenerativeModel({
-        model: MODEL,
-        generationConfig: { responseMimeType: 'application/json' },
-      });
+      const errors: Array<{
+        entityKind: string;
+        entityId: string;
+        entityName: string;
+        error: string;
+      }> = [];
+      let filled = 0;
+      let skipped = 0;
+      let failed = 0;
+      let quotaReached = false;
 
-      let processed = 0;
+      try {
+        // Load all active products up-front. The full list is used to:
+        //   a) set BulkAiJob.total so the progress bar is accurate
+        //   b) build the candidate index we pass to Gemini
+        const products = await prisma.product.findMany({
+          where: { storeId, status: 'active', deletedAt: null },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            // Use the ProductCategory join table to get category names.
+            // A product may belong to multiple categories; we use the first
+            // for the catalog index summary passed to Gemini.
+            categories: {
+              include: { category: { select: { name: true } } },
+              take: 1,
+            },
+          },
+        });
 
-      for (const product of products) {
-        // Cooperative cancellation — check every 5 items whether the
-        // merchant clicked Cancel. If so, break out cleanly.
-        if (processed % 5 === 0 && processed > 0) {
-          const currentJob = await prisma.bulkAiJob.findUnique({
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { total: products.length },
+        });
+
+        if (products.length < 2) {
+          // Nothing useful to recommend from a 0- or 1-product catalogue.
+          await prisma.bulkAiJob.update({
             where: { id: jobId },
-            select: { status: true },
+            data: {
+              status: 'completed',
+              completedAt: new Date(),
+              processed: products.length,
+              filled: 0,
+              skipped: products.length,
+              failed: 0,
+            },
           });
-          if (currentJob?.status === 'cancelled') {
-            logger.info(
-              { jobId, storeId, processed, filled, skipped, failed },
-              'bulk-ai-recommendations: cancelled by merchant'
-            );
-            break;
-          }
+          logger.info({ jobId, storeId }, 'bulk-ai-recommendations: catalog too small, skipped');
+          return;
         }
 
-        // Skip products that already have AI recs from a prior sweep.
-        // When force=true, bypass the skip so every product gets fresh recs.
-        // Counts toward `skipped` in the job summary, NOT `failed`, so
-        // re-runs report cleanly: e.g. "230 skipped, 1 filled" when the
-        // merchant fixes the one product that failed last time.
-        if (!force && productsWithRecs.has(product.id)) {
-          skipped++;
-          processed++;
-          if (processed % 25 === 0 || processed === products.length) {
-            await prisma.bulkAiJob.update({
-              where: { id: jobId },
-              data: { processed, filled, skipped, failed, errors: errors as object },
-            });
-          }
-          continue;
-        }
+        // Pre-build a compact catalog index. Passed as JSON context so Gemini
+        // can pick valid IDs. We cap at CANDIDATE_SLICE per call to keep
+        // prompt sizes reasonable and reduce hallucinated IDs.
+        const catalogIndex = products.map(p => ({
+          id: p.id,
+          name: p.name,
+          // A product may sit in multiple categories; take the first for the
+          // summary label we pass to Gemini.
+          category: p.categories[0]?.category.name ?? null,
+        }));
 
+        // Smart-skip — pre-fetch the set of product IDs that already have AI
+        // recommendations in this store. Re-running the sweep should be
+        // incremental: products with existing recs are left alone (saves
+        // Gemini quota + preserves prior recs verbatim). Products without
+        // any recs get processed. A merchant who wants to fully regenerate
+        // can clear ai_recommendation rows for the store and re-run.
+        const existingRecRows = await prisma.aiRecommendation.findMany({
+          where: { storeId },
+          select: { sourceProductId: true },
+          distinct: ['sourceProductId'],
+        });
+        const productsWithRecs = new Set(existingRecRows.map(r => r.sourceProductId));
+
+        // Frequently-bought-together signal from real order history. Passed
+        // into each product's prompt so Gemini prioritises genuine
+        // complements (products actually bought together) over merely-similar
+        // catalogue items. Empty map for stores with no order history → the
+        // prompt falls back to catalogue-only reasoning.
+        const nameById = new Map(catalogIndex.map(c => [c.id, c.name] as const));
+        let coPurchase: Map<string, Array<{ productId: string; coOrders: number }>>;
         try {
-          await assertAiQuota();
+          coPurchase = await computeCoPurchasePairs(storeId);
+        } catch (err) {
+          // FBT is an enhancement, not a hard dependency — never fail the
+          // sweep because the co-purchase query had a problem.
+          logger.warn(
+            { jobId, storeId, err: err instanceof Error ? err.message : String(err) },
+            'bulk-ai-recommendations: co-purchase signal unavailable, falling back to catalogue-only'
+          );
+          coPurchase = new Map();
+        }
 
-          const desc = (product.description ?? '').slice(0, 300);
-          const candidates = catalogIndex
-            .filter(c => c.id !== product.id)
-            .slice(0, CANDIDATE_SLICE);
+        logger.info(
+          {
+            jobId,
+            storeId,
+            totalProducts: products.length,
+            alreadyHaveRecs: productsWithRecs.size,
+            toProcess: products.length - productsWithRecs.size,
+            productsWithCoPurchaseSignal: coPurchase.size,
+          },
+          'bulk-ai-recommendations: pre-sweep state'
+        );
 
-          const productCategory = product.categories[0]?.category.name ?? null;
+        const genAI = getGenAI();
+        const model = genAI.getGenerativeModel({
+          model: MODEL,
+          generationConfig: { responseMimeType: 'application/json' },
+        });
 
-          // Frequently-bought-together signal — the products customers have
-          // ACTUALLY ordered alongside this one, ranked by co-order count.
-          // This is the strongest available complement signal; the prompt
-          // instructs Gemini to prioritise it.
-          const fbt = (coPurchase.get(product.id) ?? [])
-            .filter(p => nameById.has(p.productId))
-            .map(p => ({
-              productId: p.productId,
-              name: nameById.get(p.productId)!,
-              coOrders: p.coOrders,
-            }));
-          const fbtBlock =
-            fbt.length > 0
-              ? `\nFrequently bought together (REAL co-purchase data — customers ordered these in the SAME order as the source product; higher coOrders = stronger signal). Prioritise these when they fit as complements:\n${JSON.stringify(
-                  fbt
-                )}\n`
-              : '';
+        let processed = 0;
 
-          const prompt = `You recommend complementary products for an e-commerce store. Pick the ${RECS_PER_PRODUCT} catalog products that are most likely to be bought TOGETHER with the source product (genuine cross-sells / bundles / accessories — NOT substitutes or near-duplicates).
+        for (const product of products) {
+          // Cooperative cancellation — check every 5 items whether the
+          // merchant clicked Cancel. If so, break out cleanly.
+          if (processed % 5 === 0 && processed > 0) {
+            const currentJob = await prisma.bulkAiJob.findUnique({
+              where: { id: jobId },
+              select: { status: true },
+            });
+            if (currentJob?.status === 'cancelled') {
+              logger.info(
+                { jobId, storeId, processed, filled, skipped, failed },
+                'bulk-ai-recommendations: cancelled by merchant'
+              );
+              break;
+            }
+          }
+
+          // Skip products that already have AI recs from a prior sweep.
+          // When force=true, bypass the skip so every product gets fresh recs.
+          // Counts toward `skipped` in the job summary, NOT `failed`, so
+          // re-runs report cleanly: e.g. "230 skipped, 1 filled" when the
+          // merchant fixes the one product that failed last time.
+          if (!force && productsWithRecs.has(product.id)) {
+            skipped++;
+            processed++;
+            if (processed % 25 === 0 || processed === products.length) {
+              await prisma.bulkAiJob.update({
+                where: { id: jobId },
+                data: { processed, filled, skipped, failed, errors: errors as object },
+              });
+            }
+            continue;
+          }
+
+          try {
+            await assertAiQuota();
+
+            const desc = (product.description ?? '').slice(0, 300);
+            const candidates = catalogIndex
+              .filter(c => c.id !== product.id)
+              .slice(0, CANDIDATE_SLICE);
+
+            const productCategory = product.categories[0]?.category.name ?? null;
+
+            // Frequently-bought-together signal — the products customers have
+            // ACTUALLY ordered alongside this one, ranked by co-order count.
+            // This is the strongest available complement signal; the prompt
+            // instructs Gemini to prioritise it.
+            const fbt = (coPurchase.get(product.id) ?? [])
+              .filter(p => nameById.has(p.productId))
+              .map(p => ({
+                productId: p.productId,
+                name: nameById.get(p.productId)!,
+                coOrders: p.coOrders,
+              }));
+            const fbtBlock =
+              fbt.length > 0
+                ? `\nFrequently bought together (REAL co-purchase data — customers ordered these in the SAME order as the source product; higher coOrders = stronger signal). Prioritise these when they fit as complements:\n${JSON.stringify(
+                    fbt
+                  )}\n`
+                : '';
+
+            const prompt = `You recommend complementary products for an e-commerce store. Pick the ${RECS_PER_PRODUCT} catalog products that are most likely to be bought TOGETHER with the source product (genuine cross-sells / bundles / accessories — NOT substitutes or near-duplicates).
 
 Ranking priority:
 1. Products in the "Frequently bought together" list below — these are real co-purchases and should rank highest when they make sense as complements.
@@ -380,132 +380,135 @@ ${JSON.stringify(candidates)}
 
 Output schema: [{"productId":"<id from candidate list>","score":0.0,"reason":"<one sentence — mention if it's frequently bought together>"}]
 
-Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by descending score (strongest complement first).`;
+Return exactly ${Math.min(
+              RECS_PER_PRODUCT,
+              candidates.length
+            )} items sorted by descending score (strongest complement first).`;
 
-          const result = await callWithRetry(
-            () => model.generateContent(prompt),
-            `recommendations:${product.id}`
-          );
-          const raw = result.response.text();
-          let parsed: LlmRec[];
-
-          try {
-            // parseAiJson applies the outermost-JSON-span slice (strips any
-            // leading/trailing prose Gemini adds) + control-char sanitising
-            // before JSON.parse. See feedback-gemini-json-response-extra-text.
-            parsed = parseAiJson<LlmRec[]>(raw);
-          } catch {
-            throw new Error('LLM returned unparseable JSON');
-          }
-
-          if (!Array.isArray(parsed)) {
-            throw new Error('LLM response is not a JSON array');
-          }
-
-          // Validate picks — Gemini occasionally hallucinates IDs that
-          // don't exist in the catalog. Filter those out silently.
-          const validIdSet = new Set(catalogIndex.map(c => c.id));
-          const validRecs = parsed
-            .filter(
-              (r): r is LlmRec =>
-                r !== null &&
-                typeof r === 'object' &&
-                typeof r.productId === 'string' &&
-                validIdSet.has(r.productId) &&
-                r.productId !== product.id
-            )
-            .slice(0, RECS_PER_PRODUCT);
-
-          if (validRecs.length === 0) {
-            // No valid picks — count as skipped (not an error).
-            skipped++;
-          } else {
-            // Fully replace prior AI recs for this source product so
-            // re-sweeping the catalogue produces a clean result.
-            await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-              await tx.aiRecommendation.deleteMany({
-                where: { storeId, sourceProductId: product.id },
-              });
-              await tx.aiRecommendation.createMany({
-                data: validRecs.map(r => ({
-                  storeId,
-                  sourceProductId: product.id,
-                  targetProductId: r.productId,
-                  score: typeof r.score === 'number' ? Math.max(0, Math.min(1, r.score)) : 0.5,
-                  reason: typeof r.reason === 'string' ? r.reason.slice(0, 500) : null,
-                })),
-                skipDuplicates: true,
-              });
-            });
-            filled++;
-          }
-        } catch (err) {
-          if (isAiQuotaCapError(err)) {
-            // Quota errors propagate up so the Inngest retry mechanism
-            // can surface them cleanly; do not silently swallow them.
-            logger.warn(
-              { storeId, jobId },
-              'bulk-ai-recommendations: quota cap hit, aborting sweep'
+            const result = await callWithRetry(
+              () => model.generateContent(prompt),
+              `recommendations:${product.id}`
             );
-            throw err;
+            const raw = result.response.text();
+            let parsed: LlmRec[];
+
+            try {
+              // parseAiJson applies the outermost-JSON-span slice (strips any
+              // leading/trailing prose Gemini adds) + control-char sanitising
+              // before JSON.parse. See feedback-gemini-json-response-extra-text.
+              parsed = parseAiJson<LlmRec[]>(raw);
+            } catch {
+              throw new Error('LLM returned unparseable JSON');
+            }
+
+            if (!Array.isArray(parsed)) {
+              throw new Error('LLM response is not a JSON array');
+            }
+
+            // Validate picks — Gemini occasionally hallucinates IDs that
+            // don't exist in the catalog. Filter those out silently.
+            const validIdSet = new Set(catalogIndex.map(c => c.id));
+            const validRecs = parsed
+              .filter(
+                (r): r is LlmRec =>
+                  r !== null &&
+                  typeof r === 'object' &&
+                  typeof r.productId === 'string' &&
+                  validIdSet.has(r.productId) &&
+                  r.productId !== product.id
+              )
+              .slice(0, RECS_PER_PRODUCT);
+
+            if (validRecs.length === 0) {
+              // No valid picks — count as skipped (not an error).
+              skipped++;
+            } else {
+              // Fully replace prior AI recs for this source product so
+              // re-sweeping the catalogue produces a clean result.
+              await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+                await tx.aiRecommendation.deleteMany({
+                  where: { storeId, sourceProductId: product.id },
+                });
+                await tx.aiRecommendation.createMany({
+                  data: validRecs.map(r => ({
+                    storeId,
+                    sourceProductId: product.id,
+                    targetProductId: r.productId,
+                    score: typeof r.score === 'number' ? Math.max(0, Math.min(1, r.score)) : 0.5,
+                    reason: typeof r.reason === 'string' ? r.reason.slice(0, 500) : null,
+                  })),
+                  skipDuplicates: true,
+                });
+              });
+              filled++;
+            }
+          } catch (err) {
+            if (isAiQuotaCapError(err)) {
+              // Quota errors propagate up so the Inngest retry mechanism
+              // can surface them cleanly; do not silently swallow them.
+              logger.warn(
+                { storeId, jobId },
+                'bulk-ai-recommendations: quota cap hit, aborting sweep'
+              );
+              throw err;
+            }
+            const msg = err instanceof Error ? err.message : String(err);
+            if (errors.length < ERROR_CAP) {
+              errors.push({
+                entityKind: 'product',
+                entityId: product.id,
+                entityName: product.name,
+                error: msg,
+              });
+            }
+            failed++;
           }
-          const msg = err instanceof Error ? err.message : String(err);
-          if (errors.length < ERROR_CAP) {
-            errors.push({
-              entityKind: 'product',
-              entityId: product.id,
-              entityName: product.name,
-              error: msg,
+
+          processed++;
+
+          // Throttle to stay under the free-tier ~30 RPM. Only sleep after a
+          // real model call — the quota-gate early-return above never reaches
+          // this line, so the sleep is always paired with a Gemini call.
+          await sleep(THROTTLE_MS);
+
+          // Persist incremental progress so the admin polling UI sees live
+          // updates rather than a single jump at completion.
+          if (processed % 10 === 0 || processed === products.length) {
+            await prisma.bulkAiJob.update({
+              where: { id: jobId },
+              data: { processed, filled, skipped, failed, errors: errors as object },
             });
           }
-          failed++;
         }
-
-        processed++;
-
-        // Throttle to stay under the free-tier ~30 RPM. Only sleep after a
-        // real model call — the quota-gate early-return above never reaches
-        // this line, so the sleep is always paired with a Gemini call.
-        await sleep(THROTTLE_MS);
-
-        // Persist incremental progress so the admin polling UI sees live
-        // updates rather than a single jump at completion.
-        if (processed % 10 === 0 || processed === products.length) {
-          await prisma.bulkAiJob.update({
-            where: { id: jobId },
-            data: { processed, filled, skipped, failed, errors: errors as object },
+      } catch (err) {
+        if (!isAiQuotaCapError(err)) throw err;
+        quotaReached = true;
+        if (errors.length < ERROR_CAP) {
+          errors.push({
+            entityKind: 'store',
+            entityId: storeId,
+            entityName: 'sweep',
+            error: err instanceof Error ? err.message : 'AI quota cap reached',
           });
         }
       }
-    } catch (err) {
-      if (!isAiQuotaCapError(err)) throw err;
-      quotaReached = true;
-      if (errors.length < ERROR_CAP) {
-        errors.push({
-          entityKind: 'store',
-          entityId: storeId,
-          entityName: 'sweep',
-          error: err instanceof Error ? err.message : 'AI quota cap reached',
-        });
-      }
-    }
 
-    // Only mark completed if the merchant didn't cancel — otherwise the
-    // status row already says 'cancelled' from the cancel endpoint.
-    const finalRow = await prisma.bulkAiJob.findUnique({
-      where: { id: jobId },
-      select: { status: true },
-    });
-    await prisma.bulkAiJob.update({
-      where: { id: jobId },
-      data: {
-        status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-        completedAt: new Date(),
-        errors: errors as object,
-      },
-    });
+      // Only mark completed if the merchant didn't cancel — otherwise the
+      // status row already says 'cancelled' from the cancel endpoint.
+      const finalRow = await prisma.bulkAiJob.findUnique({
+        where: { id: jobId },
+        select: { status: true },
+      });
+      await prisma.bulkAiJob.update({
+        where: { id: jobId },
+        data: {
+          status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
+          completedAt: new Date(),
+          errors: errors as object,
+        },
+      });
 
-    logger.info({ jobId, storeId, quotaReached, force }, 'bulk-ai-recommendations complete');
+      logger.info({ jobId, storeId, quotaReached, force }, 'bulk-ai-recommendations complete');
     }); // end runInTenantContext
   }
 );

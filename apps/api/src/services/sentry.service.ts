@@ -55,8 +55,19 @@ export class SentryService {
    * a third-party SaaS. 2026-05-22 audit P0-3.
    */
   static errorHandler() {
-    return (err: Error & { status?: number }, req: Request, _res: Response, next: NextFunction) => {
-      if (this.isInitialized && (!err.status || err.status >= 500)) {
+    return (
+      err: Error & { status?: number; statusCode?: number },
+      req: Request,
+      _res: Response,
+      next: NextFunction
+    ) => {
+      // AppError carries `statusCode` (not `status`); reading only `err.status`
+      // made every 4xx (validation/auth/not-found) satisfy `!err.status` and get
+      // captured — the source of the 4957x/242x/115x Sentry noise. Prefer
+      // statusCode, fall back to status; capture only 5xx or unknown-code errors
+      // (no code = a genuine uncaught crash, which we DO want). 2026-06-10 audit F1.
+      const code = err.statusCode ?? err.status;
+      if (this.isInitialized && (!code || code >= 500)) {
         const { authorization, cookie, 'x-csrf-token': csrfToken, ...safeHeaders } = req.headers;
         // suppress unused-var warning — these are intentionally dropped
         void authorization;
