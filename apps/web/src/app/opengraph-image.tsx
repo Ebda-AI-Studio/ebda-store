@@ -41,6 +41,23 @@ export const contentType = 'image/png';
 export const size = { width: 1200, height: 630 };
 
 /**
+ * SSRF guard for the on-the-fly SVG rasterizer below. Store logo/ogImage URLs
+ * are tenant-controlled, and this route runs server-side (node runtime) — so we
+ * must NEVER fetch an arbitrary URL (it could point at internal/metadata
+ * endpoints). Only allow https URLs on the known public asset CDN (Cloudflare
+ * R2 `*.r2.dev`, where all store branding lives). Anything else → skip
+ * rasterization and fall back to the branded name card.
+ */
+function isAllowedAssetUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'https:' && /(^|\.)r2\.dev$/i.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Parse an HSL component string like "26 100% 50%" into a hex-style
  * color suitable for ImageResponse JSX. We convert to a CSS hsl() string
  * which Satori (ImageResponse's renderer) understands.
@@ -97,9 +114,9 @@ export default async function Image() {
   if (candidate) {
     if (/\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(candidate)) {
       logoUrl = candidate;
-    } else if (/\.svg(\?|#|$)/i.test(candidate)) {
+    } else if (/\.svg(\?|#|$)/i.test(candidate) && isAllowedAssetUrl(candidate)) {
       try {
-        const res = await fetch(candidate, { next: { revalidate: 3600 } });
+        const res = await fetch(candidate, { next: { revalidate: 3600 }, redirect: 'error' });
         if (res.ok) {
           const svgBuf = Buffer.from(await res.arrayBuffer());
           const png = await sharp(svgBuf, { density: 240 })
