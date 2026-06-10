@@ -20,6 +20,35 @@ import logger from '../../lib/logger';
 // https://docs.myfatoorah.com/
 // ==========================================
 
+const MYFATOORAH_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * MyFatoorah rejects an empty/blank CustomerEmail with the generic "Invalid
+ * data" (caused a checkout P0 on 2026-06-10 — email is OPTIONAL at FWB checkout
+ * so guests frequently have none). Always return a syntactically VALID email:
+ * the customer's real one if present, else a deterministic placeholder on the
+ * store's own domain (derived from the callback URL host, platform default if
+ * the URL is unparseable). A valid address is accepted whether MyFatoorah
+ * treats the field as required or optional; with NotificationOption=LNK no mail
+ * is actually sent to it. Exported for regression testing.
+ */
+export function resolveMyFatoorahEmail(
+  rawEmail: string | undefined,
+  callbackUrl: string,
+  orderNumber: string
+): string {
+  const real = rawEmail?.trim();
+  if (real && MYFATOORAH_EMAIL_RE.test(real)) return real;
+  let host = 'forcemediakw.com';
+  try {
+    const h = new URL(callbackUrl).hostname;
+    if (h) host = h;
+  } catch {
+    /* keep platform default */
+  }
+  return `guest-${orderNumber}@${host}`;
+}
+
 interface MyFatoorahPaymentMethod {
   PaymentMethodId: number;
   PaymentMethodAr: string;
@@ -120,8 +149,20 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
         },
         'MyFatoorah API request failed'
       );
+      // Surface the SPECIFIC field errors, not just the generic Message.
+      // MyFatoorah's Message is frequently just "Invalid data" while the real
+      // cause (e.g. CustomerEmail/CustomerMobile invalid) lives in
+      // ValidationErrors — without this, the error reaching Sentry is an
+      // undiagnosable "Invalid data" (cost us a P0 on 2026-06-10).
+      const fieldErrors = (data.ValidationErrors || [])
+        .map(v => {
+          const e = v as { Name?: string; Error?: string };
+          return e.Name ? `${e.Name}: ${e.Error}` : e.Error;
+        })
+        .filter(Boolean)
+        .join('; ');
       throw new Error(
-        data.Message || data.ValidationErrors?.[0]?.Error || 'MyFatoorah API request failed'
+        [data.Message, fieldErrors].filter(Boolean).join(' — ') || 'MyFatoorah API request failed'
       );
     }
 
@@ -179,11 +220,21 @@ export class MyFatoorahPaymentProvider implements IPaymentProvider {
     // values so a typo doesn't silently dispatch unwanted comms.
     const notificationOption =
       request.notifyVia === 'email' ? 'EML' : request.notifyVia === 'all' ? 'ALL' : 'LNK';
+
+    // MyFatoorah rejects an empty/blank CustomerEmail with the generic
+    // "Invalid data" (caused a checkout P0 on 2026-06-10). See
+    // resolveMyFatoorahEmail below — always send a syntactically valid address.
+    const customerEmail = resolveMyFatoorahEmail(
+      request.customer.email,
+      request.callbackUrl,
+      request.orderNumber
+    );
+
     const sendData = {
       NotificationOption: notificationOption,
       InvoiceValue: amountInKWD,
       CustomerName: request.customer.name,
-      CustomerEmail: request.customer.email,
+      CustomerEmail: customerEmail,
       CustomerMobile: normalizeMobile(request.customer.phone),
       CustomerReference: request.orderNumber,
       DisplayCurrencyIso: request.currency,
