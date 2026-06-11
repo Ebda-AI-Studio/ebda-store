@@ -80,7 +80,7 @@ export function SidebarFooter({ isDark, onToggleTheme, user, onLogout }: Sidebar
           </div>
           <Link
             href="/account/security"
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label={t('security')}
             title={t('security')}
           >
@@ -102,7 +102,7 @@ export function SidebarFooter({ isDark, onToggleTheme, user, onLogout }: Sidebar
           <button
             type="button"
             onClick={onLogout}
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
             aria-label={t('logout')}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

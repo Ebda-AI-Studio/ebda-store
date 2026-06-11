@@ -138,7 +138,7 @@ export function SidebarHeader({
           </div>
           <Link
             href="/stores"
-            className="mt-2 flex items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="mt-2 flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <svg
               className="h-3.5 w-3.5"

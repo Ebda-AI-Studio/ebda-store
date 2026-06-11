@@ -33,13 +33,15 @@ export function HubTabs({ items }: Props) {
 
   return (
     <div className="border-b border-border bg-background sticky top-0 z-10">
-      <nav className="flex gap-1 overflow-x-auto px-4 py-2 text-sm" aria-label="Hub sections">
+      <nav className="flex gap-1 overflow-x-auto px-4 py-1 text-sm" aria-label="Hub sections">
         {items.map(t => (
           <Link
             key={t.href}
             href={t.href}
             className={
-              'px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ' +
+              /* min-h-11 = 44px satisfies Apple HIG / WCAG 2.5.5 touch target on mobile;
+                 md:min-h-9 relaxes to 36px on desktop to keep the tab bar compact. */
+              'inline-flex items-center px-3 min-h-11 md:min-h-9 rounded-md whitespace-nowrap transition-colors ' +
               (active === t.href
                 ? 'bg-primary text-primary-foreground font-medium'
                 : 'hover:bg-muted text-muted-foreground hover:text-foreground')

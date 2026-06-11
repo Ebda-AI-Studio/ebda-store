@@ -326,7 +326,7 @@ export default function FloatingWidgetPage() {
                         type="button"
                         onClick={() => moveButton(b.id, -1)}
                         disabled={i === 0}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
+                        className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
                         aria-label="Move up"
                       >
                         ▲
@@ -335,7 +335,7 @@ export default function FloatingWidgetPage() {
                         type="button"
                         onClick={() => moveButton(b.id, 1)}
                         disabled={i === arr.length - 1}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"
+                        className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
                         aria-label="Move down"
                       >
                         ▼

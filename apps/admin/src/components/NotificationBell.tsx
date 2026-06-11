@@ -80,7 +80,7 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-muted dark:hover:bg-foreground transition-colors"
+        className="touch-target relative rounded-lg hover:bg-muted dark:hover:bg-foreground transition-colors"
         aria-label={t('ariaLabel')}
       >
         <svg

@@ -38,7 +38,7 @@ export function StatusFilterPills<T extends string = string>({
   value,
   onChange,
   className = 'flex items-center gap-1 rounded-xl bg-muted p-1',
-  pillClassName = 'cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all duration-200',
+  pillClassName = 'cursor-pointer rounded-lg px-3 min-h-11 md:min-h-8 inline-flex items-center text-xs font-medium capitalize transition-all duration-200',
   activeClassName = 'bg-card text-foreground shadow-sm',
   inactiveClassName = 'text-muted-foreground hover:text-foreground',
 }: StatusFilterPillsProps<T>) {

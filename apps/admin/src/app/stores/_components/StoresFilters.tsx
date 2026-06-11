@@ -95,7 +95,7 @@ export function StoresFilters({
           <button
             type="button"
             onClick={() => setViewMode('grid')}
-            className={`rounded-lg p-2 transition-all ${
+            className={`touch-target rounded-lg transition-all ${
               viewMode === 'grid'
                 ? 'bg-card text-primary shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -115,7 +115,7 @@ export function StoresFilters({
           <button
             type="button"
             onClick={() => setViewMode('table')}
-            className={`rounded-lg p-2 transition-all ${
+            className={`touch-target rounded-lg transition-all ${
               viewMode === 'table'
                 ? 'bg-card text-primary shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'

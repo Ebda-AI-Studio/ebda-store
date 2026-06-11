@@ -317,6 +317,25 @@
     @apply animate-pulse rounded-lg bg-muted;
   }
 
+  /* Touch target — ensures ≥44×44px tap area (Apple HIG / WCAG 2.5.5).
+     Use on icon-only buttons and other small interactive controls that would
+     otherwise be too small on mobile. On desktop (md+) the size floor is
+     relaxed to 36×36px so dense UIs stay compact. */
+  .touch-target {
+    min-height: 2.75rem; /* 44px */
+    min-width: 2.75rem; /* 44px */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  @media (min-width: 768px) {
+    .touch-target {
+      min-height: 2.25rem; /* 36px on desktop */
+      min-width: 2.25rem;
+    }
+  }
+
   /* Force Empty State */
   .force-empty-state {
     @apply flex flex-col items-center justify-center py-16 text-center;

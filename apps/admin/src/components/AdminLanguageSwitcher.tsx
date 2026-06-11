@@ -38,7 +38,7 @@ export default function AdminLanguageSwitcher() {
             onClick={() => change(loc)}
             disabled={isPending}
             aria-pressed={isActive}
-            className={`min-w-[44px] min-h-[32px] rounded-md px-2.5 py-1 font-semibold uppercase tracking-wide transition-colors disabled:opacity-60 cursor-pointer ${
+            className={`min-w-[44px] min-h-[44px] md:min-h-[32px] rounded-md px-2.5 py-1 font-semibold uppercase tracking-wide transition-colors disabled:opacity-60 cursor-pointer ${
               isActive
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'

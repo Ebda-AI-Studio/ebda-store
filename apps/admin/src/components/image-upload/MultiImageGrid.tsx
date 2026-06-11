@@ -36,7 +36,7 @@ export function MultiImageGrid({ values, onMove, onRemove }: MultiImageGridProps
               <button
                 type="button"
                 onClick={() => onMove(i, i - 1)}
-                className="p-1 bg-white rounded-full shadow"
+                className="touch-target bg-white rounded-full shadow"
                 title={t('moveLeft')}
                 aria-label={t('moveLeft')}
               >
@@ -54,7 +54,7 @@ export function MultiImageGrid({ values, onMove, onRemove }: MultiImageGridProps
               <button
                 type="button"
                 onClick={() => onMove(i, i + 1)}
-                className="p-1 bg-white rounded-full shadow"
+                className="touch-target bg-white rounded-full shadow"
                 title={t('moveRight')}
                 aria-label={t('moveRight')}
               >
@@ -71,7 +71,7 @@ export function MultiImageGrid({ values, onMove, onRemove }: MultiImageGridProps
             <button
               type="button"
               onClick={() => onRemove(i)}
-              className="p-1 bg-destructive text-white rounded-full shadow"
+              className="touch-target bg-destructive text-white rounded-full shadow"
               title={t('remove')}
               aria-label={t('remove')}
             >

@@ -3436,7 +3436,7 @@ function ManualProductPicker({
                   type="button"
                   disabled={idx === 0}
                   onClick={() => move(idx, -1)}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label="Move up"
                 >
                   ↑
@@ -3445,7 +3445,7 @@ function ManualProductPicker({
                   type="button"
                   disabled={idx === value.length - 1}
                   onClick={() => move(idx, 1)}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="touch-target rounded text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label="Move down"
                 >
                   ↓
@@ -3453,7 +3453,7 @@ function ManualProductPicker({
                 <button
                   type="button"
                   onClick={() => remove(id)}
-                  className="rounded p-1 text-destructive hover:bg-destructive/10"
+                  className="touch-target rounded text-destructive hover:bg-destructive/10"
                   aria-label="Remove"
                 >
                   ×

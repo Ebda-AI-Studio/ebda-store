@@ -34,7 +34,7 @@ export function SidebarNav({ navItems, pathname, onNavigate, activeHubKey }: Sid
               <Link
                 href={item.href}
                 onClick={onNavigate}
-                className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-primary/8 text-primary'
                     : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'

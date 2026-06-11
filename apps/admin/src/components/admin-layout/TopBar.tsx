@@ -39,7 +39,7 @@ export function TopBar({
           <button
             type="button"
             onClick={onOpenSidebar}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
             aria-label={t('openSidebar')}
             aria-expanded={isSidebarOpen}
             aria-controls="admin-mobile-sidebar"
@@ -63,7 +63,7 @@ export function TopBar({
             <button
               type="button"
               onClick={onBack}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               aria-label={t('goBack')}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
