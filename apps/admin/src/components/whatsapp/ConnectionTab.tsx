@@ -295,7 +295,13 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
       {/* Connected banner */}
       {isConnected && (
         <>
-          <div className="rounded-xl border border-green-200 bg-green-50 dark:border-green-900/50 dark:bg-green-950/30 p-4 flex items-start justify-between gap-4">
+          <div
+            className={`rounded-xl border p-4 flex items-start justify-between gap-4 ${
+              tenantDetailsAvailable
+                ? 'border-green-200 bg-green-50 dark:border-green-900/50 dark:bg-green-950/30'
+                : 'border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30'
+            }`}
+          >
             <div>
               {tenantDetailsAvailable && config.connectedTenant ? (
                 <>
@@ -316,14 +322,14 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
                 </>
               ) : (
                 <div>
-                  <span className="text-green-700 dark:text-green-400 font-medium">
-                    Connected — key saved and active
+                  <span className="text-amber-700 dark:text-amber-400 font-medium">
+                    Saved — not verified
                   </span>
                   {tenantDetailsFailed && (
-                    <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
+                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
                       {config.connectedTenantError === 'invalid_api_key'
-                        ? 'The API key may be invalid. Templates sending will fail — disconnect and re-key.'
-                        : "Couldn't reach WBS to load business details. Key is saved and working."}
+                        ? 'The API key may be invalid. Template sending will fail — disconnect and re-key.'
+                        : "Couldn't reach Force AI WhatsApp to verify this key. It's saved but unconfirmed — use Retry."}
                     </p>
                   )}
                 </div>

@@ -337,8 +337,14 @@ export function AdminLayout({
         {sidebarContent}
       </aside>
 
-      {/* Main Content */}
-      <main id="admin-main-content" tabIndex={-1} className="flex-1 lg:ms-72">
+      {/* Main Content. min-w-0 lets this flex child shrink below its content
+          width so a wide descendant (table, long row) scrolls itself instead
+          of pushing the whole viewport; overflow-x-clip is the backstop. */}
+      <main
+        id="admin-main-content"
+        tabIndex={-1}
+        className="min-w-0 flex-1 overflow-x-clip lg:ms-72"
+      >
         <TopBar
           title={title}
           subtitle={subtitle}

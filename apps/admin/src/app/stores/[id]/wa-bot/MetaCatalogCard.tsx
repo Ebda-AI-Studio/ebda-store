@@ -158,9 +158,12 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
             System User Access Token
           </label>
           {hasToken && !accessToken && (
-            <div className="mb-2 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800 dark:bg-emerald-950/30">
+            // Neutral, not green: a token string is stored, but FWB does not
+            // validate it live against Meta (it may be expired/revoked or have
+            // lost the catalog_management scope). Don't imply "verified".
+            <div className="mb-2 flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/40">
               <svg
-                className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -173,7 +176,9 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              <span className="text-sm text-emerald-700 dark:text-emerald-300">Token set ✓</span>
+              <span className="text-sm text-slate-600 dark:text-slate-300">
+                Token saved · not verified
+              </span>
             </div>
           )}
           <input

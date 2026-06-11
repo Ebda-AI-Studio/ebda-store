@@ -23,7 +23,10 @@ import { PLAN_LABELS, STORE_PLANS, type StorePlan } from '@force/shared';
  */
 function WhatsAppStatusInline({ storeId }: { storeId: string }) {
   const [status, setStatus] = useState<{
-    connected: boolean;
+    /** credentials saved in the DB (API key present + WBS toggle on) */
+    saved: boolean;
+    /** a live call to WBS with that key actually succeeded just now */
+    verified: boolean;
     waOrdering: boolean;
   } | null>(null);
 
@@ -33,11 +36,16 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
       hasApiKey: boolean;
       wbsEnabled: boolean;
       waCustomerOrderingEnabled: boolean;
+      // The API performs a live fetchMetadata() against WBS on every GET and
+      // returns the validated tenant (null when WBS is unreachable or the key
+      // is invalid/revoked). Status must reflect THIS, not just "key saved".
+      connectedTenant?: unknown | null;
     }>(`/api/v1/stores/${storeId}/integrations/wbs`)
       .then(({ data }) => {
         if (data) {
           setStatus({
-            connected: Boolean(data.hasApiKey && data.wbsEnabled),
+            saved: Boolean(data.hasApiKey && data.wbsEnabled),
+            verified: data.connectedTenant != null,
             waOrdering: Boolean(data.waCustomerOrderingEnabled),
           });
         }
@@ -49,21 +57,30 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
 
   if (!status) return null;
 
+  // Three honest states:
+  //   verified  → green  "Connected"            (live WBS check passed just now)
+  //   saved     → amber  "Saved · not verified" (key in DB but WBS unreachable / key invalid)
+  //   neither   → gray   "Not connected"
+  const tone = status.verified ? 'green' : status.saved ? 'amber' : 'gray';
+  const chip =
+    tone === 'green'
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
+      : tone === 'amber'
+        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
+        : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
+  const dot = tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-gray-400';
+  const label =
+    tone === 'green' ? 'Connected' : tone === 'amber' ? 'Saved · not verified' : 'Not connected';
+
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       <span
-        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-          status.connected
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
-            : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
-        }`}
+        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${chip}`}
       >
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${status.connected ? 'bg-emerald-500' : 'bg-gray-400'}`}
-        />
-        {status.connected ? 'Connected' : 'Not connected'}
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+        {label}
       </span>
-      {status.connected && (
+      {status.verified && (
         <span
           className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
             status.waOrdering
