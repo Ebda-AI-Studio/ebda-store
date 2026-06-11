@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../lib/api';
 import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 interface LoyaltyTransaction {
   id: string;
@@ -147,6 +148,77 @@ export default function LoyaltyTransactionsPage() {
     fetchTransactions();
   };
 
+  const columns: DataTableColumn<LoyaltyTransaction>[] = [
+    {
+      header: 'Customer / العميل',
+      primaryOnMobile: true,
+      cell: tx => (
+        <div>
+          <div className="text-sm font-medium text-foreground">
+            {[tx.customer.firstName, tx.customer.lastName].filter(Boolean).join(' ') || '—'}
+          </div>
+          <div className="text-xs text-muted-foreground">{tx.customer.email ?? ''}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Points / النقاط',
+      mobileBadge: true,
+      alignEnd: true,
+      cell: tx => (
+        <span className="font-mono text-sm">
+          <PointsCell points={tx.points} />
+        </span>
+      ),
+    },
+    {
+      header: 'Date / التاريخ',
+      cell: tx => (
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
+          {new Date(tx.createdAt).toLocaleDateString('en-US', { dateStyle: 'medium' })}
+        </span>
+      ),
+    },
+    {
+      header: 'Order # / الطلب',
+      cell: tx =>
+        tx.order ? (
+          <Link
+            href={`/stores/${storeId}/orders/${tx.order.id}`}
+            className="text-primary hover:underline font-mono text-xs"
+          >
+            {tx.order.orderNumber}
+          </Link>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      header: 'Type / النوع',
+      cell: tx => <TypeBadge type={tx.type} />,
+    },
+    {
+      header: 'Description / الوصف',
+      hideOnMobile: true,
+      cell: tx => (
+        <span className="text-sm text-muted-foreground max-w-xs truncate block">
+          {tx.description ?? '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'Expires / الانتهاء',
+      hideOnMobile: true,
+      cell: tx => (
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
+          {tx.expiresAt
+            ? new Date(tx.expiresAt).toLocaleDateString('en-US', { dateStyle: 'medium' })
+            : '—'}
+        </span>
+      ),
+    },
+  ];
+
   if (gate) return gate;
 
   return (
@@ -223,146 +295,48 @@ export default function LoyaltyTransactionsPage() {
         </div>
 
         {/* Table */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-            </div>
-          ) : transactions.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-muted-foreground">No transactions found / لا توجد معاملات</p>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full" aria-label="Loyalty transactions">
-                  <thead>
-                    <tr className="border-b border-border bg-muted">
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                      >
-                        Date / التاريخ
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                      >
-                        Customer / العميل
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                      >
-                        Order # / الطلب
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                      >
-                        Type / النوع
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                      >
-                        Points / النقاط
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                      >
-                        Description / الوصف
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                      >
-                        Expires / الانتهاء
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {transactions.map(tx => (
-                      <tr key={tx.id} className="hover:bg-muted/50">
-                        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                          {new Date(tx.createdAt).toLocaleDateString('en-US', {
-                            dateStyle: 'medium',
-                          })}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-foreground">
-                            {[tx.customer.firstName, tx.customer.lastName]
-                              .filter(Boolean)
-                              .join(' ') || '—'}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {tx.customer.email ?? ''}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {tx.order ? (
-                            <Link
-                              href={`/stores/${storeId}/orders/${tx.order.id}`}
-                              className="text-primary hover:underline font-mono text-xs"
-                            >
-                              {tx.order.orderNumber}
-                            </Link>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <TypeBadge type={tx.type} />
-                        </td>
-                        <td className="px-4 py-3 text-end text-sm font-mono">
-                          <PointsCell points={tx.points} />
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">
-                          {tx.description ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                          {tx.expiresAt
-                            ? new Date(tx.expiresAt).toLocaleDateString('en-US', {
-                                dateStyle: 'medium',
-                              })
-                            : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 rounded-2xl border border-border bg-card">
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={transactions}
+            rowKey={tx => tx.id}
+            emptyState={
+              <div className="p-12 text-center">
+                <p className="text-muted-foreground">No transactions found / لا توجد معاملات</p>
               </div>
+            }
+          />
+        )}
 
-              {meta && meta.totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-border bg-muted px-4 py-3">
-                  <p className="text-sm text-muted-foreground">
-                    Page {meta.page} of {meta.totalPages} &mdash; {meta.total.toLocaleString()}{' '}
-                    total
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page <= 1}
-                      className="rounded border border-border px-3 py-1 text-sm disabled:opacity-50 hover:bg-card"
-                    >
-                      Previous / السابق
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
-                      disabled={page >= meta.totalPages}
-                      className="rounded border border-border px-3 py-1 text-sm disabled:opacity-50 hover:bg-card"
-                    >
-                      Next / التالي
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        {meta && meta.totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-muted px-4 py-3">
+            <p className="text-sm text-muted-foreground">
+              Page {meta.page} of {meta.totalPages} &mdash; {meta.total.toLocaleString()} total
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="rounded border border-border px-3 py-1 text-sm disabled:opacity-50 hover:bg-card"
+              >
+                Previous / السابق
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+                disabled={page >= meta.totalPages}
+                className="rounded border border-border px-3 py-1 text-sm disabled:opacity-50 hover:bg-card"
+              >
+                Next / التالي
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

@@ -7,6 +7,7 @@ import { Button, useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiFetch, unwrapList } from '../../../../lib/api';
 import { useT } from '@/i18n/useT';
+import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 
 const CUSTOMERS_PAGE_SIZE = 20;
 
@@ -219,6 +220,187 @@ export default function StoreCustomersPage() {
     }
   }, [storeId, isExporting, t, toastError]);
 
+  /** DataTable column definitions — closed over rfmMap + storeId. */
+  const columns: DataTableColumn<CustomerRow>[] = [
+    {
+      header: t('colCustomer'),
+      primaryOnMobile: true,
+      cell: customer => {
+        const seg = rfmMap.get(customer.id);
+        // Use the RFM segment badge when the customer has a
+        // snapshot; otherwise fall back so EVERY customer
+        // shows a badge: "Active Buyer" for anyone who has
+        // ordered, "New" for zero-order registrations.
+        const badgeKey =
+          seg && RFM_BADGE_COLORS[seg] ? seg : customer.totalOrders >= 1 ? 'activeBuyer' : 'new';
+        const colors = RFM_BADGE_COLORS[badgeKey];
+        return (
+          <div className="flex items-center gap-3">
+            {/* Avatar with initials */}
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary flex-shrink-0">
+              {customer.firstName?.[0]}
+              {customer.lastName?.[0]}
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <p className="font-medium text-foreground">
+                {customer.firstName} {customer.lastName}
+              </p>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${colors.bg} ${colors.text}`}
+              >
+                {t(`badges.${badgeKey}`)}
+              </span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      header: t('colOrders'),
+      mobileBadge: true,
+      cell: customer => (
+        <span className="inline-flex items-center rounded-full bg-info/5 px-2.5 py-1 text-xs font-medium text-info">
+          {customer.totalOrders === 1
+            ? t('orderCount', { count: customer.totalOrders })
+            : t('ordersCount', { count: customer.totalOrders })}
+        </span>
+      ),
+    },
+    {
+      header: t('colEmail'),
+      cell: customer => <span className="text-sm text-muted-foreground">{customer.email}</span>,
+    },
+    {
+      header: t('colPhone'),
+      cell: customer =>
+        customer.phone ? (
+          <a
+            href={`tel:${customer.phone}`}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            dir="ltr"
+          >
+            {customer.phone}
+          </a>
+        ) : (
+          <span className="text-sm text-muted-foreground/60">—</span>
+        ),
+    },
+    {
+      header: t('colSpent'),
+      alignEnd: true,
+      cell: customer => (
+        <span className="font-bold text-foreground">
+          {(customer.totalSpent / 1000).toFixed(3)} KWD
+        </span>
+      ),
+    },
+    {
+      // Last Payment column — hidden on mobile to keep cards lean; shown at desktop lg+
+      header: 'Last Payment',
+      hideOnMobile: true,
+      cell: customer => (
+        <div className="text-sm text-foreground">
+          <span className="font-medium">{(customer.lastOrderTotal / 1000).toFixed(3)} KWD</span>
+          {customer.lastOrderPaymentStatus && (
+            <span
+              className={`ms-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                customer.lastOrderPaymentStatus === 'paid'
+                  ? 'bg-success/10 text-success'
+                  : customer.lastOrderPaymentStatus === 'failed'
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'bg-warning/10 text-warning'
+              }`}
+            >
+              {customer.lastOrderPaymentStatus}
+            </span>
+          )}
+          {customer.lastOrderStatus === 'cancelled' && (
+            <span className="ms-2 inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+              cancelled
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: 'Address',
+      hideOnMobile: true,
+      cell: customer =>
+        customer.address ? (
+          <span
+            className="text-sm text-muted-foreground line-clamp-2 max-w-xs"
+            title={customer.address}
+          >
+            {customer.address}
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground/60">—</span>
+        ),
+    },
+    {
+      header: t('colLastOrder'),
+      hideOnMobile: true,
+      cell: customer => (
+        <span className="text-sm text-muted-foreground">{formatDate(customer.lastOrderDate)}</span>
+      ),
+    },
+    {
+      header: t('colActions'),
+      alignEnd: true,
+      mobileActions: true,
+      cell: customer => (
+        /* Link to the customer detail page (full profile +
+           every order). The route param accepts either a
+           User.id UUID or a guest synthetic key (email /
+           phone). Encoded because email keys contain @. */
+        <Link
+          href={`/stores/${storeId}/customers/${encodeURIComponent(customer.id)}`}
+          className="min-h-11 inline-flex items-center gap-1 px-3 py-2 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+          title={t('viewOrdersTitle')}
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+            />
+          </svg>
+          {t('viewOrders')}
+        </Link>
+      ),
+    },
+  ];
+
+  const emptyState = (
+    <div className="force-empty-state">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+        <svg
+          className="h-8 w-8 text-muted-foreground"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+          />
+        </svg>
+      </div>
+      <p className="font-semibold text-foreground">{search ? t('noMatch') : t('empty')}</p>
+      {!search && (
+        <>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
+          <Link href={`/stores/${storeId}/products/new`} className="mt-4 inline-block">
+            <Button size="sm">{t('emptyAddProduct')}</Button>
+          </Link>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <AdminLayout
       title={t('title')}
@@ -313,277 +495,62 @@ export default function StoreCustomersPage() {
       )}
 
       {/* Customers table */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="space-y-4 p-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 animate-pulse">
-                <div className="h-10 w-10 rounded-full bg-muted" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-32 rounded bg-muted" />
-                  <div className="h-3 w-48 rounded bg-muted" />
-                </div>
-                <div className="h-6 w-20 rounded bg-muted" />
-                <div className="h-6 w-20 rounded bg-muted" />
+      {isLoading ? (
+        <div className="space-y-4 rounded-xl border bg-card p-6 shadow-sm">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 animate-pulse">
+              <div className="h-10 w-10 rounded-full bg-muted" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-32 rounded bg-muted" />
+                <div className="h-3 w-48 rounded bg-muted" />
               </div>
-            ))}
-          </div>
-        ) : totalCount === 0 ? (
-          <div className="force-empty-state">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-              <svg
-                className="h-8 w-8 text-muted-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
+              <div className="h-6 w-20 rounded bg-muted" />
+              <div className="h-6 w-20 rounded bg-muted" />
             </div>
-            <p className="font-semibold text-foreground">{search ? t('noMatch') : t('empty')}</p>
-            {!search && (
-              <>
-                <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                  {t('emptyDescription')}
-                </p>
-                <Link href={`/stores/${storeId}/products/new`} className="mt-4 inline-block">
-                  <Button size="sm">{t('emptyAddProduct')}</Button>
-                </Link>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full" aria-label={t('tableLabel')}>
-              <thead className="bg-muted border-b">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    {t('colCustomer')}
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    {t('colEmail')}
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    {t('colPhone')}
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    {t('colOrders')}
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    {t('colSpent')}
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell"
-                  >
-                    Last Payment
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell"
-                  >
-                    Address
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell"
-                  >
-                    {t('colLastOrder')}
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider"
-                  >
-                    {t('colActions')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {pagedCustomers.map(customer => (
-                  <tr key={customer.id} className="hover:bg-muted transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {/* Avatar with initials */}
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary flex-shrink-0">
-                          {customer.firstName?.[0]}
-                          {customer.lastName?.[0]}
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <p className="font-medium text-foreground">
-                            {customer.firstName} {customer.lastName}
-                          </p>
-                          {(() => {
-                            const seg = rfmMap.get(customer.id);
-                            // Use the RFM segment badge when the customer has a
-                            // snapshot; otherwise fall back so EVERY customer
-                            // shows a badge: "Active Buyer" for anyone who has
-                            // ordered, "New" for zero-order registrations.
-                            const badgeKey =
-                              seg && RFM_BADGE_COLORS[seg]
-                                ? seg
-                                : customer.totalOrders >= 1
-                                  ? 'activeBuyer'
-                                  : 'new';
-                            const colors = RFM_BADGE_COLORS[badgeKey];
-                            return (
-                              <span
-                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${colors.bg} ${colors.text}`}
-                              >
-                                {t(`badges.${badgeKey}`)}
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">{customer.email}</td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {customer.phone ? (
-                        <a
-                          href={`tel:${customer.phone}`}
-                          className="hover:text-foreground transition-colors"
-                          dir="ltr"
-                        >
-                          {customer.phone}
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground/60">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center rounded-full bg-info/5 px-2.5 py-1 text-xs font-medium text-info">
-                        {customer.totalOrders === 1
-                          ? t('orderCount', { count: customer.totalOrders })
-                          : t('ordersCount', { count: customer.totalOrders })}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-bold text-foreground">
-                        {(customer.totalSpent / 1000).toFixed(3)} KWD
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 hidden lg:table-cell text-sm text-foreground">
-                      <span className="font-medium">
-                        {(customer.lastOrderTotal / 1000).toFixed(3)} KWD
-                      </span>
-                      {customer.lastOrderPaymentStatus && (
-                        <span
-                          className={`ms-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                            customer.lastOrderPaymentStatus === 'paid'
-                              ? 'bg-success/10 text-success'
-                              : customer.lastOrderPaymentStatus === 'failed'
-                                ? 'bg-destructive/10 text-destructive'
-                                : 'bg-warning/10 text-warning'
-                          }`}
-                        >
-                          {customer.lastOrderPaymentStatus}
-                        </span>
-                      )}
-                      {customer.lastOrderStatus === 'cancelled' && (
-                        <span className="ms-2 inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
-                          cancelled
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 hidden lg:table-cell text-sm text-muted-foreground max-w-xs">
-                      {customer.address ? (
-                        <span className="line-clamp-2" title={customer.address}>
-                          {customer.address}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground/60">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">
-                      {formatDate(customer.lastOrderDate)}
-                    </td>
-                    <td className="px-6 py-4 text-end">
-                      {/* Link to the customer detail page (full profile +
-                          every order). The route param accepts either a
-                          User.id UUID or a guest synthetic key (email /
-                          phone). Encoded because email keys contain @. */}
-                      <Link
-                        href={`/stores/${storeId}/customers/${encodeURIComponent(customer.id)}`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-                        title={t('viewOrdersTitle')}
-                      >
-                        <svg
-                          className="h-3.5 w-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                          />
-                        </svg>
-                        {t('viewOrders')}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          ))}
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={pagedCustomers}
+          rowKey={c => c.id}
+          emptyState={emptyState}
+        />
+      )}
 
-            {/* Pagination controls — only rendered when there is more than
-                one page. The "Showing X to Y of Z" line is always visible
-                when the table is non-empty so merchants know how many
-                customers they have at a glance. */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t px-6 py-3">
-                <p className="text-sm text-muted-foreground">
-                  {t('paginationShowing', {
-                    from: (page - 1) * CUSTOMERS_PAGE_SIZE + 1,
-                    to: Math.min(page * CUSTOMERS_PAGE_SIZE, totalCount),
-                    total: totalCount,
-                  })}
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === 1}
-                    onClick={() => setPage(p => p - 1)}
-                  >
-                    {t('previous')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === totalPages}
-                    onClick={() => setPage(p => p + 1)}
-                  >
-                    {t('next')}
-                  </Button>
-                </div>
-              </div>
-            )}
+      {/* Pagination controls — only rendered when there is more than
+          one page. The "Showing X to Y of Z" line is always visible
+          when the table is non-empty so merchants know how many
+          customers they have at a glance. */}
+      {!isLoading && totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between rounded-xl border bg-card px-6 py-3 shadow-sm">
+          <p className="text-sm text-muted-foreground">
+            {t('paginationShowing', {
+              from: (page - 1) * CUSTOMERS_PAGE_SIZE + 1,
+              to: Math.min(page * CUSTOMERS_PAGE_SIZE, totalCount),
+              total: totalCount,
+            })}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 1}
+              onClick={() => setPage(p => p - 1)}
+            >
+              {t('previous')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === totalPages}
+              onClick={() => setPage(p => p + 1)}
+            >
+              {t('next')}
+            </Button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
