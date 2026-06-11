@@ -273,7 +273,12 @@ jobs:
           INNGEST_DRY_RUN: 'true'
 
       - name: Run integration tests
-        run: npx vitest run tests/integration --reporter=verbose
+        # Also run the colocated regression tests under apps/**/__tests__ — they
+        # were never executed by CI before (the unit job globs only tests/unit),
+        # so the regression tests for the MyFatoorah empty-email P0 + the Sentry
+        # 4xx-gate were dead weight. They run HERE (not the unit job) because the
+        # shared test setup connects to Postgres + Redis, which only this job has.
+        run: npx vitest run tests/integration apps/api/src --reporter=verbose
         env:
           # TEST_DATABASE_URL points at the Neon "preview" staging branch.
           # setup-e2e.ts uses this in preference to DATABASE_URL so integration
