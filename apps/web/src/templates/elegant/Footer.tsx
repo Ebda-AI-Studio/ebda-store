@@ -22,8 +22,8 @@ export default function ElegantFooter({
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
-  footerLogoInvert,
   hideFooterLogoMobile,
+  footerLogoAutoFilter,
 }: FooterProps) {
   const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -173,8 +173,8 @@ export default function ElegantFooter({
                 alt={displayName}
                 className="hidden md:block h-16 sm:h-20 w-auto object-contain mb-6"
                 style={
-                  !footerLogo && footerLogoInvert
-                    ? { filter: 'brightness(0) invert(1)' }
+                  !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
+                    ? { filter: footerLogoAutoFilter }
                     : undefined
                 }
               />
@@ -299,8 +299,8 @@ export default function ElegantFooter({
                     alt={displayName}
                     className="md:hidden ms-auto h-16 w-auto object-contain"
                     style={
-                      !footerLogo && footerLogoInvert
-                        ? { filter: 'brightness(0) invert(1)' }
+                      !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
+                        ? { filter: footerLogoAutoFilter }
                         : undefined
                     }
                   />

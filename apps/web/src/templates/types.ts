@@ -280,6 +280,18 @@ export interface FooterProps {
    * still shows on desktop. Wired from `theme.hideFooterLogoMobile`.
    */
   hideFooterLogoMobile?: boolean;
+  /**
+   * Pre-computed CSS filter string for the brand-logo fallback (i.e. when
+   * `footerLogo` is NOT set). Derived by ShopChrome via
+   * `footerLogoContrastFilter(effectiveFooterBg, store.theme.footerLogoInvert)`
+   * so every theme gets the same auto-contrast logic without duplicating the
+   * luminance math. Values: `'brightness(0) invert(1)'` (white logo on dark
+   * bg), `'brightness(0)'` (black logo on light bg), or `'none'`.
+   *
+   * A custom uploaded `footerLogo` is NEVER filtered — the merchant's
+   * dedicated footer asset is assumed correct for their brand.
+   */
+  footerLogoAutoFilter?: string;
 }
 
 /**

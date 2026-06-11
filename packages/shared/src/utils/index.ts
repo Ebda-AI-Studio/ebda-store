@@ -17,6 +17,7 @@ export {
   parseColorToRgb,
   relativeLuminance,
   COLOR_TOKENS,
+  footerLogoContrastFilter,
 } from './color';
 export type { ColorValue, ColorToken, Rgb } from './color';
 export { lightenColor, darkenColor, generateSectionPalette } from './color';

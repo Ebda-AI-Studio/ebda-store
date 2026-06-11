@@ -9,6 +9,7 @@ import {
   generateSectionPalette,
   lightenColor,
   darkenColor,
+  footerLogoContrastFilter,
 } from './color';
 import type { PalettePattern } from './color';
 import type { StoreTheme } from '../types/store-theme';
@@ -137,6 +138,43 @@ describe('lightenColor / darkenColor', () => {
     const seedLum = relativeLuminance(parseColorToRgb('#FF6E00')!);
     const darkLum = relativeLuminance(parseColorToRgb(darker)!);
     expect(darkLum).toBeLessThan(seedLum);
+  });
+});
+
+describe('footerLogoContrastFilter', () => {
+  it('explicit true → white-logo filter regardless of bg', () => {
+    // Dark bg with explicit true.
+    expect(footerLogoContrastFilter('#000000', true)).toBe('brightness(0) invert(1)');
+    // Light bg with explicit true — still forces white.
+    expect(footerLogoContrastFilter('#FFFFFF', true)).toBe('brightness(0) invert(1)');
+    // Undefined bg with explicit true.
+    expect(footerLogoContrastFilter(undefined, true)).toBe('brightness(0) invert(1)');
+  });
+
+  it('explicit false → no filter (keep original logo color)', () => {
+    expect(footerLogoContrastFilter('#000000', false)).toBe('none');
+    expect(footerLogoContrastFilter('#FFFFFF', false)).toBe('none');
+    expect(footerLogoContrastFilter(undefined, false)).toBe('none');
+  });
+
+  it('auto (undefined explicitInvert): dark bg → white logo filter', () => {
+    // Black footer — logo must be white.
+    expect(footerLogoContrastFilter('#000000')).toBe('brightness(0) invert(1)');
+    // Very dark grey.
+    expect(footerLogoContrastFilter('#1a1a1a')).toBe('brightness(0) invert(1)');
+  });
+
+  it('auto: light bg → black logo filter (brightness(0))', () => {
+    // White footer — logo must be black.
+    expect(footerLogoContrastFilter('#FFFFFF')).toBe('brightness(0)');
+    // Typical light section-alt bg (bare HSL triplet format used by bgSectionAlt).
+    expect(footerLogoContrastFilter('0 0% 98%')).toBe('brightness(0)');
+  });
+
+  it('auto: unparseable bg → no filter (leave logo as-is)', () => {
+    expect(footerLogoContrastFilter(undefined)).toBe('none');
+    expect(footerLogoContrastFilter('var(--bg-section-alt)')).toBe('none');
+    expect(footerLogoContrastFilter('')).toBe('none');
   });
 });
 

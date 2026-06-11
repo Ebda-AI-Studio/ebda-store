@@ -9,7 +9,7 @@ import { BottomTabBar } from '../templates/shared/BottomTabBar';
 import { FloatingWidget } from '../templates/shared/FloatingWidget';
 import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/SectionDivider';
 import type { FloatingWidgetConfig } from '@force/shared';
-import { resolveColor } from '@force/shared';
+import { resolveColor, footerLogoContrastFilter, resolveBackgroundPreset } from '@force/shared';
 import type { StoreLayoutSettings } from '@force/shared';
 import type {
   FooterBottomBarConfig,
@@ -319,6 +319,19 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           footerLogo={store.theme?.footerLogo ?? undefined}
           footerLogoInvert={store.theme?.footerLogoInvert === true}
           hideFooterLogoMobile={store.theme?.hideFooterLogoMobile === true}
+          footerLogoAutoFilter={(() => {
+            // Resolve the EFFECTIVE footer background so the brand-logo fallback
+            // is auto-contrasted against whatever color the footer actually paints.
+            // Priority: merchant's explicit page-builder override (resolved hex) →
+            // theme default (the section-alt HSL triplet from resolveBackgroundPreset).
+            // Both formats are parseable by pickReadableForeground in @force/shared.
+            const explicitBg = layout?.footer?.bgColor
+              ? (resolveColor(layout.footer.bgColor, store.theme) ?? undefined)
+              : undefined;
+            const themeBg =
+              explicitBg ?? `hsl(${resolveBackgroundPreset(store.theme).bgSectionAlt})`;
+            return footerLogoContrastFilter(themeBg, store.theme?.footerLogoInvert);
+          })()}
         />
       </div>
       {/* afterFooter — empty placeholder so any merchant-injected text

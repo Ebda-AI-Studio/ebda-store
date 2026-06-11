@@ -15,8 +15,8 @@ export default function MinimalFooter({
   isRtl: isRtlProp,
   bgColor,
   footerLogo,
-  footerLogoInvert,
   hideFooterLogoMobile,
+  footerLogoAutoFilter,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -65,8 +65,11 @@ export default function MinimalFooter({
                 alt={displayName}
                 className="h-16 sm:h-20 w-auto object-contain"
                 style={
-                  !footerLogo && footerLogoInvert
-                    ? { filter: 'brightness(0) invert(1)' }
+                  // Custom footerLogo is trusted as-is. For the brand-logo
+                  // fallback, apply the pre-computed auto-contrast filter so
+                  // the logo is always readable against the footer background.
+                  !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
+                    ? { filter: footerLogoAutoFilter }
                     : undefined
                 }
               />
@@ -116,8 +119,8 @@ export default function MinimalFooter({
                   alt={displayName}
                   className="md:hidden ms-auto h-16 w-auto object-contain"
                   style={
-                    !footerLogo && footerLogoInvert
-                      ? { filter: 'brightness(0) invert(1)' }
+                    !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
+                      ? { filter: footerLogoAutoFilter }
                       : undefined
                   }
                 />

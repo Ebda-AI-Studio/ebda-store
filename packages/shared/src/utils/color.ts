@@ -228,6 +228,40 @@ export function contrastRatio(bg: string, fg: string): number {
   return (brighter + 0.05) / (darker + 0.05);
 }
 
+// Footer logo auto-contrast helper
+
+/**
+ * Returns the CSS filter string that makes a brand-logo fallback contrast-safe
+ * against the footer background.
+ *
+ * Priority:
+ *   explicitInvert === true  → force white logo  (brightness(0) invert(1))
+ *   explicitInvert === false → keep original color (none)
+ *   undefined (AUTO)         → dark bg → white logo; light bg → black logo
+ *
+ * Only call this for the BRAND-LOGO FALLBACK path — a custom uploaded
+ * `footerLogo` is assumed correct and must never be filtered.
+ *
+ * The `footerBg` parameter should be the RESOLVED footer background color
+ * (hex or hsl string) — pass the merchant's override when set, otherwise
+ * the theme's `--bg-section-alt` HSL triplet. When the bg is unresolvable
+ * (e.g. a CSS var reference) the function returns 'none' so the logo stays
+ * as-is rather than silently turning black.
+ */
+export function footerLogoContrastFilter(
+  footerBg: string | undefined,
+  explicitInvert?: boolean
+): string {
+  // Explicit merchant choice always wins over auto-contrast.
+  if (explicitInvert === true) return 'brightness(0) invert(1)';
+  if (explicitInvert === false) return 'none';
+  // AUTO path: derive optimal logo color from bg luminance.
+  const readable = pickReadableForeground(footerBg); // '#ffffff' | '#000000' | undefined
+  if (readable === '#ffffff') return 'brightness(0) invert(1)'; // dark bg → white logo
+  if (readable === '#000000') return 'brightness(0)'; // light bg → black logo
+  return 'none'; // unparseable bg → leave logo as-is
+}
+
 // Task 15d: lightenColor / darkenColor / rgbToHex / generateSectionPalette
 import type { CardFrameSize, CardFrameWidth } from '../types/store-layout';
 
