@@ -270,7 +270,7 @@ model Store {
   // /blog routes return 404 and BlogCarousel hides on the homepage.
   blogEnabled Boolean @default(false) @map("blog_enabled")
 
-  // Force WhatsApp Business Platform integration (opt-in per store)
+  // Force AI WhatsApp Business Platform integration (opt-in per store)
   // wbsApiKey is encrypted via AES-GCM using apps/api/src/services/encryption.service.ts
   // wbsTemplates shape: { orderPaid?, orderShipped?, orderDelivered? }
   //   each entry: { name: string, languageCode: string, channels?: { whatsapp: boolean, email: boolean } }

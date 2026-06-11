@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
-const ISSUER = 'Force Store';
+const ISSUER = 'Force AI Store';
 
 export class MfaService {
   static generateEnrollment(accountLabel: string): { secret: string; otpauthUrl: string } {

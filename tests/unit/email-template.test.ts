@@ -96,7 +96,7 @@ describe('renderBrandedShell', () => {
 
   it('includes powered-by line in footer', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore());
-    expect(html).toContain('Powered by Force Store');
+    expect(html).toContain('Powered by Force AI');
   });
 
   it('escapes the store name to prevent XSS in header', () => {

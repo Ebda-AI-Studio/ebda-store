@@ -148,7 +148,7 @@ router.use('/public', affiliateRoutes);
 // public.routes.ts so visitors don't need a JWT to subscribe.
 router.use('/stores', tenantContext, newsletterRoutes);
 
-// WBS integration routes (Force Store ↔ WBS bridge config)
+// WBS integration routes (Force AI Store ↔ WBS bridge config)
 router.use('/stores', tenantContext, wbsIntegrationRoutes);
 
 // Phase 7: WhatsApp templates admin (generate / sync / status)

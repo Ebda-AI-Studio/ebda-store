@@ -1,4 +1,4 @@
-# Force Store — Product Roadmap
+# Force AI Store — Product Roadmap
 
 **Internal document. Last updated: 2026-06-01.**
 

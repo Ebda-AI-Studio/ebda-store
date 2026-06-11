@@ -1,7 +1,7 @@
-# Force Store — Feature Catalog
+# Force AI Store — Feature Catalog
 
-> **Who this is for:** Kuwait and GCC merchants evaluating Force Store as their online store platform.
-> Force Store is built and operated by Force AI (Kuwait) — a platform designed from the ground up for the Gulf market.
+> **Who this is for:** Kuwait and GCC merchants evaluating Force AI Store as their online store platform.
+> Force AI Store is built and operated by Force AI (Kuwait) — a platform designed from the ground up for the Gulf market.
 
 ---
 
@@ -132,7 +132,7 @@ Full inventory management without needing a separate system. Features are tiered
 
 ### Finance (المالية) — Accounting module
 
-Most e-commerce platforms make you connect QuickBooks or Xero for proper accounting. Force Store includes a full Finance hub — no third-party integration required.
+Most e-commerce platforms make you connect QuickBooks or Xero for proper accounting. Force AI Store includes a full Finance hub — no third-party integration required.
 
 **Professional plan and above:**
 
@@ -170,7 +170,7 @@ Five analytical views to understand how your store is actually performing:
 Everything you need to bring customers back and reach new ones:
 
 - AI Bulk Sweeps (translation, SEO, AEO content — covered in Section 3)
-- WhatsApp order notifications via the Force WhatsApp Business Platform bridge
+- WhatsApp order notifications via the Force AI WhatsApp Business Platform bridge
 - Push notifications to subscribed shoppers
 - Abandoned cart recovery — automatic reminders to shoppers who left items behind
 - Newsletter tools
@@ -194,7 +194,7 @@ Full control over how your store looks and behaves:
 
 ## 3. AI Features (ما يميّزنا — الذكاء الاصطناعي)
 
-Force Store ships AI assistance on every content-heavy task. There is no separate AI subscription — it is part of the platform. Every AI feature has a "smart skip" rule: if you already filled a field, the AI will not overwrite it.
+Force AI Store ships AI assistance on every content-heavy task. There is no separate AI subscription — it is part of the platform. Every AI feature has a "smart skip" rule: if you already filled a field, the AI will not overwrite it.
 
 **AI Autopilot (AI-first, ON by default).** You don't have to click anything. When you add or edit a product, the platform automatically fills the missing pieces — within about a minute — and a 3-day background sweep keeps the whole catalog complete. It's **bilingual both ways**: write the product in Arabic and the English fills in; write it in English and the Arabic fills in. Empty SEO tags are written in both languages, and new products get "frequently bought together" recommendations. The guarantee runs the other way too: **anything you type yourself — in either language — is marked yours and the AI never overwrites it** (your existing products are never touched without your edit). A small "✨ AI" badge shows which fields the AI wrote; next to any field you wrote, a "✨ Switch to AI" button hands it back to the engine on demand. You can pause Autopilot per store in Settings → Branding; the manual one-click "Generate" and bulk-sweep buttons keep working either way.
 
@@ -216,13 +216,13 @@ Force Store ships AI assistance on every content-heavy task. There is no separat
 
 > 📸 Screenshot: Product edit form showing AI auto-fill buttons next to the Arabic and English description fields
 
-**Note on reviews:** Force Store does not generate fake reviews. AI assists with translation, summarization, and response drafting only. All published reviews come from real verified purchases.
+**Note on reviews:** Force AI Store does not generate fake reviews. AI assists with translation, summarization, and response drafting only. All published reviews come from real verified purchases.
 
 ---
 
 ## 4. Kuwait/GCC-Specific Features (مخصص للكويت والخليج)
 
-Force Store was built in Kuwait for Kuwait — not adapted from a Western platform.
+Force AI Store was built in Kuwait for Kuwait — not adapted from a Western platform.
 
 ### KNET and Local Payment Gateways
 
@@ -237,7 +237,7 @@ KNET (the Kuwaiti national debit network) is accessible through four fully integ
 
 Your payment credentials are stored encrypted. No other merchant can see your gateway configuration.
 
-Stripe is not available in Kuwait. Platforms built for the US and UK market add KNET as an afterthought through third-party plugins. On Force Store, KNET is native.
+Stripe is not available in Kuwait. Platforms built for the US and UK market add KNET as an afterthought through third-party plugins. On Force AI Store, KNET is native.
 
 > 📸 Screenshot: Checkout payment step showing KNET option alongside card payment
 
@@ -253,7 +253,7 @@ Shipping zones are configured for Kuwait's governorate and district structure �
 
 ## 5. Multi-Tenant Capabilities (كل متجر مستقل بذاته)
 
-Force Store runs multiple stores on one platform, but each store is completely isolated and independently configurable. Everything below is per-store, not shared:
+Force AI Store runs multiple stores on one platform, but each store is completely isolated and independently configurable. Everything below is per-store, not shared:
 
 | What you can configure          | Per store                                       |
 | ------------------------------- | ----------------------------------------------- |
@@ -276,7 +276,7 @@ When the platform ships a new feature or design improvement, all stores receive 
 
 ## 6. WhatsApp Customer Ordering — واتساب التسوّق المباشر (Phase 6 + Phase 8)
 
-Force Store connects to the **Force WhatsApp Business Platform** to turn every customer DM into a complete order — without any human agent typing it out.
+Force AI Store connects to the **Force AI WhatsApp Business Platform** to turn every customer DM into a complete order — without any human agent typing it out.
 
 ### One-click Meta catalog setup — إعداد كتالوج Meta بضغطة واحدة
 
@@ -296,7 +296,7 @@ Then the existing product-sync pipeline pushes your full catalog to Meta within 
 2. Within 1 second they receive a category list (interactive tap-menu, not plain text).
 3. Tap a category → product list. Tap a product → quantity picker. Tap quantity → cart summary.
 4. Tap **Checkout** → receives a checkout link valid for 30 minutes.
-5. Tap the link → lands on your Force Store checkout with their cart and phone number already filled in.
+5. Tap the link → lands on your Force AI Store checkout with their cart and phone number already filled in.
 6. Pays via KNET, Tap, MyFatoorah, or their preferred gateway — the same checkout your website customers use.
 7. Receives a WhatsApp thank-you message automatically after successful payment.
 
@@ -314,13 +314,13 @@ The bot is not a rigid keyword-matching system. It understands natural language:
 | Sends a voice note         | Transcribes it, processes as text                                 |
 | Sends a product photo      | Matches it against your catalog, suggests the closest product     |
 
-**How it works:** powered by Google Gemini AI running inside the Force WhatsApp Business Platform. All AI cost is absorbed by the platform — there is no per-message or per-AI-call charge to merchants. No API key required on your side.
+**How it works:** powered by Google Gemini AI running inside the Force AI WhatsApp Business Platform. All AI cost is absorbed by the platform — there is no per-message or per-AI-call charge to merchants. No API key required on your side.
 
 **Returning-customer greeting:** for any customer who has completed an order before, the bot opens with a personalized message offering to repeat their last order. This alone increases conversion for repeat buyers.
 
 ### Bot Copy — تخصيص رسائل البوت
 
-Your bot's messages use your brand voice. From Force Store admin → Settings → WhatsApp Integration → Bot Copy, you can edit:
+Your bot's messages use your brand voice. From Force AI Store admin → Settings → WhatsApp Integration → Bot Copy, you can edit:
 
 - The welcome greeting (Arabic + English)
 - Category and product prompts
@@ -382,7 +382,7 @@ This replaces the need to call customers back to re-do checkout. Send a link, cu
 
 The WhatsApp integration is a single consolidated page in your admin: **Settings → WhatsApp Integration**. It covers six areas via tabs:
 
-1. **Connection** — connect your Force WhatsApp Business Platform account with one API key. The card shows live status: "Connected / Not connected" + "DM ordering: ON/OFF" at a glance — you can see both states without clicking into the tab.
+1. **Connection** — connect your Force AI WhatsApp Business Platform account with one API key. The card shows live status: "Connected / Not connected" + "DM ordering: ON/OFF" at a glance — you can see both states without clicking into the tab.
 2. **Templates** — view all your Meta-approved templates. If Meta rejects a template, use the **Reset to Draft** button to rename it (e.g. `order_paid` → `order_paid_v2`) and resubmit. **Version-agnostic lookup:** dropdowns across the admin always resolve to the latest approved version automatically — you never need to re-select a template after a rename. This means a rejection auto-recovers once the new version is approved.
 3. **Order Updates** — per-event, per-channel toggles + language picker (see Section 7 above).
 4. **Payment Link** — generate and send payment links from any order (see Section 8 above).
@@ -421,7 +421,7 @@ The affiliate program is available as a premium add-on. Affiliates, influencers,
 
 ## 11. Plan-Gated Features — What Each Tier Unlocks
 
-Force Store uses four plan tiers: **Starter**, **Professional**, **Enterprise**, plus a `free` grace state (not sold — only used for lapsed/demo stores). Every tier is a strict superset of the one below it.
+Force AI Store uses four plan tiers: **Starter**, **Professional**, **Enterprise**, plus a `free` grace state (not sold — only used for lapsed/demo stores). Every tier is a strict superset of the one below it.
 
 When a merchant tries to access a feature above their current plan, they see an on-brand **upgrade page** — "Available on the Professional plan and above" — with a prompt to contact their Force AI account manager. There are no silent redirects.
 
@@ -461,8 +461,8 @@ A sticky button that sits on every page of your storefront. It collapses to a si
 
 ### WhatsApp Notifications — إشعارات واتساب (add-on, any plan)
 
-The full WhatsApp integration described in Section 9 is an add-on available at any plan tier. It requires an active Force WhatsApp Business Platform account and a connected Meta-approved WABA. The bot intelligence features (natural language ordering, voice, photo matching, returning-customer personalization) are included in the WhatsApp add-on at no extra charge — they run on the free Google Gemini tier.
+The full WhatsApp integration described in Section 9 is an add-on available at any plan tier. It requires an active Force AI WhatsApp Business Platform account and a connected Meta-approved WABA. The bot intelligence features (natural language ordering, voice, photo matching, returning-customer personalization) are included in the WhatsApp add-on at no extra charge — they run on the free Google Gemini tier.
 
 ---
 
-_Force Store is a product of Force AI — a Kuwait company. For pricing and activation, contact your Force AI account manager._
+_Force AI Store is a product of Force AI — a Kuwait company. For pricing and activation, contact your Force AI account manager._

@@ -1,4 +1,4 @@
-# Force Store — Plan ⇄ Feature Matrix
+# Force AI Store — Plan ⇄ Feature Matrix
 
 > **Single source of truth for which features each plan tier includes.** Generated from
 > `packages/shared/src/plan-baselines.ts` (the code that actually gates features at runtime).
@@ -7,7 +7,7 @@
 
 Plans are **layered (strict superset)**: Professional includes everything in Starter, Enterprise
 includes everything in Professional. `free` is a stripped grace/demo state, **not a sold tier**
-(Force Store is sold managed-agency with a custom proposal + yearly contract — there is no
+(Force AI Store is sold managed-agency with a custom proposal + yearly contract — there is no
 self-serve signup and no free trial). Super-admin can override any feature per store via the
 `StoreFeature` table without changing the plan.
 

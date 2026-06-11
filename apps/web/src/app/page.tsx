@@ -230,7 +230,7 @@ export default async function HomePage({
   const store = await getStoreOrNotFound();
 
   // Bare-root on a platform domain (no slug, no custom domain) —
-  // serve the Force Store Builder landing page instead of a merchant
+  // serve the Force AI Store Builder landing page instead of a merchant
   // homepage. Replaces the old "redirect to forcemediakw.com" flow
   // because the marketing site doesn't actually pitch the store-
   // builder service this URL belongs to.

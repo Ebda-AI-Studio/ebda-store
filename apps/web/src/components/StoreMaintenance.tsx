@@ -26,7 +26,7 @@ import { useLanguage } from '../contexts/LanguageContext';
  *   - The contact strip only renders when at least one contact channel is
  *     set — empty stores get the headline + body alone, which still reads
  *     intentional rather than half-finished.
- *   - "Powered by Force" footer link points to the marketing site so any
+ *   - "Powered by Force AI" footer link points to the marketing site so any
  *     customer who lands here can verify the platform is healthy even when
  *     this particular store is offline.
  *

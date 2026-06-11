@@ -1,12 +1,12 @@
 # Pitch Deck Outline
 
-> 12-slide outline for sales / investor / acquirer conversations about Force Store. Adapt slides 11–12 per audience.
+> 12-slide outline for sales / investor / acquirer conversations about Force AI Store. Adapt slides 11–12 per audience.
 
 ---
 
 ## Slide 1 — Title
 
-**Force Store** — Kuwait's e-commerce platform, built for Arabic merchants.
+**Force AI Store** — Kuwait's e-commerce platform, built for Arabic merchants.
 
 Subtitle: _Sell online in 4 hours. Bilingual from minute one. KNET-native. AI-assisted._
 
@@ -30,7 +30,7 @@ Visual: 3-column comparison showing the gaps in each existing option.
 
 ## Slide 3 — Our Solution
 
-**Force Store is what Shopify would look like if Shopify was built in Kuwait.**
+**Force AI Store is what Shopify would look like if Shopify was built in Kuwait.**
 
 - Arabic + English equal — every field, every page, every email
 - KNET works on day one through 4 native gateways (Tap, MyFatoorah, Hesabe, UPayments)
@@ -141,7 +141,7 @@ Visual: a single-frame "how it works" diagram showing the 6-step client journey 
 - Growing 18% YoY
 - SMB segment underserved by global SaaS (Shopify) + regional players (Salla, Zid focus Saudi)
 
-**Realistic SOM (Force Store at maturity):**
+**Realistic SOM (Force AI Store at maturity):**
 
 - Year 1: 25-50 hand-onboarded Kuwait merchants × custom proposal ARPU
 - Year 3: 200-500 merchants × custom proposal ARPU + 1-2 additional onboarding staff
@@ -151,13 +151,13 @@ Agency model trades raw merchant count for higher per-client revenue + lower chu
 
 GCC expansion path: add Mada (Saudi) + Benefit (Bahrain) + UAE payment rails → 10× TAM.
 
-Visual: Kuwait market funnel → SMB segment → Force Store's wedge.
+Visual: Kuwait market funnel → SMB segment → Force AI Store's wedge.
 
 ---
 
 ## Slide 10 — Competitive moat
 
-**Why a Kuwait merchant chooses Force Store over Shopify in 2027:**
+**Why a Kuwait merchant chooses Force AI Store over Shopify in 2027:**
 
 | Switching cost                       | Shopify → FWB                   | FWB → Shopify                                           |
 | ------------------------------------ | ------------------------------- | ------------------------------------------------------- |
@@ -167,7 +167,7 @@ Visual: Kuwait market funnel → SMB segment → Force Store's wedge.
 | Product data export                  | 0 (CSV / Excel export)          | 0                                                       |
 | Storefront design                    | Low (5 themes ≠ Shopify's 100+) | 0                                                       |
 
-**The asymmetry:** moving TO Force Store costs nothing and unlocks features. Moving FROM Force Store costs translation + KNET + AI features.
+**The asymmetry:** moving TO Force AI Store costs nothing and unlocks features. Moving FROM Force AI Store costs translation + KNET + AI features.
 
 Visual: 2-column table emphasizing FROM vs TO asymmetry.
 
@@ -175,7 +175,7 @@ Visual: 2-column table emphasizing FROM vs TO asymmetry.
 
 ## Slide 11 — Team
 
-**Force AI / Force Store** is built by Ahmad Sharaf:
+**Force AI / Force AI Store** is built by Ahmad Sharaf:
 
 - Kuwait-based engineer + product lead
 - Sister company to Force Media Kuwait (the agency arm) — direct merchant feedback loop from day one
@@ -216,9 +216,9 @@ Visual: Ahmad's photo + bio + Force Media logo connection.
 
 ### For Kuwait merchants
 
-> **Request a tailored proposal.** Force Store is a managed e-commerce service — every client gets a custom contract built around the features they need. Talk to us at [forcemediakw.com/contact](https://forcemediakw.com/contact). Live demo of a working Kuwait store at [wadyaljuz.com](https://wadyaljuz.com).
+> **Request a tailored proposal.** Force AI Store is a managed e-commerce service — every client gets a custom contract built around the features they need. Talk to us at [forcemediakw.com/contact](https://forcemediakw.com/contact). Live demo of a working Kuwait store at [wadyaljuz.com](https://wadyaljuz.com).
 
-Visual: clean ask line with contact email + Force Store logo.
+Visual: clean ask line with contact email + Force AI Store logo.
 
 ---
 
@@ -226,7 +226,7 @@ Visual: clean ask line with contact email + Force Store logo.
 
 - **Color palette:** Force AI brand orange (#FF7700) + Force Media maroon (#2D1418) + neutral (#ECECEC)
 - **Font:** for the deck, a clean Arabic-capable typeface like IBM Plex Sans Arabic (free) — matches the bilingual product positioning
-- **Logo placement:** Force Store wordmark top-right corner every slide except #1 and #12
+- **Logo placement:** Force AI Store wordmark top-right corner every slide except #1 and #12
 - **Per-slide footer:** small `forcemediakw.com` + slide number, e.g. `1/12`
 - **Bilingual deck variant:** consider an Arabic mirror version for Kuwait-domestic merchant pitches. Slides 1-6 + 8 + 12 translate directly; 7 + 9 + 11 may need re-localizing.
 

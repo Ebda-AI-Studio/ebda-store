@@ -281,7 +281,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
             <div>
               <strong>Not connected yet.</strong>
               <p className="mt-1">
-                Connect to Force WhatsApp Business Platform first from the{' '}
+                Connect to Force AI WhatsApp Business Platform first from the{' '}
                 <strong>Connection</strong> tab, then come back here.
               </p>
             </div>

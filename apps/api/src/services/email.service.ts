@@ -236,7 +236,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
       ${contactBlock}
       <p class="copyright">© ${year} ${storeName}</p>
       ${footerLines.map(l => `<p>${l}</p>`).join('\n      ')}
-      <p class="powered">Powered by Force Store</p>
+      <p class="powered">Powered by Force AI</p>
     </div>
   </div>
 </body>
@@ -362,7 +362,7 @@ export class EmailService {
     replyTo?: string;
   }): Promise<void> {
     const html = renderBrandedShell(args.content, {
-      name: 'Force Store',
+      name: 'Force AI Store',
       nameAr: null,
       logo: null,
       theme: null,
@@ -373,7 +373,7 @@ export class EmailService {
     });
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
-      from: 'Force Store <noreply@forcemediakw.com>',
+      from: 'Force AI Store <noreply@forcemediakw.com>',
       to: Array.isArray(args.to) ? args.to : [args.to],
       subject: args.subject,
       html,
@@ -409,7 +409,7 @@ export class EmailService {
   static async sendPlatformRaw(options: EmailOptions): Promise<void> {
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
-      from: 'Force Store <noreply@forcemediakw.com>',
+      from: 'Force AI Store <noreply@forcemediakw.com>',
       to: Array.isArray(options.to) ? options.to : [options.to],
       subject: options.subject,
       html: options.html,
@@ -839,7 +839,7 @@ export class EmailService {
       content,
       text: this.htmlToText(
         renderBrandedShell(content, {
-          name: 'Force Store',
+          name: 'Force AI Store',
           nameAr: null,
           logo: null,
           theme: null,

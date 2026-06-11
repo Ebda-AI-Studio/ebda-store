@@ -1,7 +1,7 @@
 /**
- * WBS Integration Routes — Force Store ↔ WBS Bridge Admin API
+ * WBS Integration Routes — Force AI Store ↔ WBS Bridge Admin API
  *
- * Allows store admins to configure their Force WhatsApp Business Platform
+ * Allows store admins to configure their Force AI WhatsApp Business Platform
  * integration: enable/disable, set client ID, API key (stored encrypted),
  * and per-event template names.
  *
@@ -359,7 +359,7 @@ router.put(
               success: false,
               error: {
                 code: 'INVALID_API_KEY',
-                message: 'The API key was rejected by Force WhatsApp Business Platform',
+                message: 'The API key was rejected by Force AI WhatsApp Business Platform',
               },
             });
             return;

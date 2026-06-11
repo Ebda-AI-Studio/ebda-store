@@ -34,7 +34,7 @@ export interface StreamXlsxOpts {
  */
 export async function streamXlsxResponse(res: Response, opts: StreamXlsxOpts): Promise<void> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Force Store';
+  wb.creator = 'Force AI Store';
   wb.created = new Date();
 
   const ws = wb.addWorksheet(opts.sheetName || 'Sheet1');

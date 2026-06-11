@@ -132,18 +132,18 @@ force-website-builder/
 
 ### Bot Intelligence (Phase 8)
 
-The Force WhatsApp Business Platform (WBS) hosts the bot engine. Force Store exposes a proxy layer (`apps/api/src/routes/wa-bridge.routes.ts`) that WBS calls to:
+The Force AI WhatsApp Business Platform (WBS) hosts the bot engine. Force AI Store exposes a proxy layer (`apps/api/src/routes/wa-bridge.routes.ts`) that WBS calls to:
 
 1. **Read the catalog** — categories, products, and inventory in real time
 2. **Enumerate abandoned WhatsApp carts** — unified cart recovery sweeps website + WhatsApp DM carts
-3. **Toggle DM ordering per-store** — enable/disable the bot from the Force Store admin
-4. **Proxy bot analytics** — the Force Store admin Bot Analytics tab reads the WBS funnel data via this bridge
+3. **Toggle DM ordering per-store** — enable/disable the bot from the Force AI Store admin
+4. **Proxy bot analytics** — the Force AI Store admin Bot Analytics tab reads the WBS funnel data via this bridge
 
-The Gemini AI models live entirely in WBS (`GEMINI_API_KEY` env var on the Railway WBS service). Force Store's `apps/api/src/services/ai.service.ts` uses `GOOGLE_GENERATIVE_AI_KEY` for catalog content tasks (translate, SEO, category suggestion). These are two separate keys and two separate call paths:
+The Gemini AI models live entirely in WBS (`GEMINI_API_KEY` env var on the Railway WBS service). Force AI Store's `apps/api/src/services/ai.service.ts` uses `GOOGLE_GENERATIVE_AI_KEY` for catalog content tasks (translate, SEO, category suggestion). These are two separate keys and two separate call paths:
 
 | Key                        | Service         | Used for                                                                               |
 | -------------------------- | --------------- | -------------------------------------------------------------------------------------- |
-| `GOOGLE_GENERATIVE_AI_KEY` | Force Store API | Translation, SEO generation, category suggestion, FAQ generation, review summarization |
+| `GOOGLE_GENERATIVE_AI_KEY` | Force AI Store API | Translation, SEO generation, category suggestion, FAQ generation, review summarization |
 | `GEMINI_API_KEY`           | WBS API         | Bot intent classification, voice transcription, product photo matching                 |
 
 The bot degrades gracefully: if `GEMINI_API_KEY` is unset in WBS, the bot reverts to legacy keyword mode (still functional, no natural language understanding).
@@ -230,7 +230,7 @@ After init, `npx neonctl@latest projects list`, `npx neonctl@latest branches cre
 | `VERCEL_PROJECT_ID`        | Storefront project ID                                          |
 | `GOOGLE_GENERATIVE_AI_KEY` | Gemini Flash Lite — translation, SEO, AEO, category suggestion |
 
-**Note on AI keys:** `GOOGLE_GENERATIVE_AI_KEY` is for Force Store's own catalog AI features. The WhatsApp bot AI (`GEMINI_API_KEY`) lives in the WBS Railway service — not here. See Bot Intelligence section above for details.
+**Note on AI keys:** `GOOGLE_GENERATIVE_AI_KEY` is for Force AI Store's own catalog AI features. The WhatsApp bot AI (`GEMINI_API_KEY`) lives in the WBS Railway service — not here. See Bot Intelligence section above for details.
 
 **Admin & Storefront (Vercel):**
 

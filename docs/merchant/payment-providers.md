@@ -1,8 +1,8 @@
 # Payment Provider Setup — إعداد بوابات الدفع
 
-Force Store integrates with 4 Kuwait-based payment providers + Cash on Delivery. You only need **one** provider account to accept online payments; multiple providers give your customers more checkout options.
+Force AI Store integrates with 4 Kuwait-based payment providers + Cash on Delivery. You only need **one** provider account to accept online payments; multiple providers give your customers more checkout options.
 
-تتكامل Force Store مع 4 بوابات دفع كويتية + الدفع عند الاستلام. تحتاج حساب مع بوابة واحدة فقط — الباقي اختياري.
+تتكامل Force AI Store مع 4 بوابات دفع كويتية + الدفع عند الاستلام. تحتاج حساب مع بوابة واحدة فقط — الباقي اختياري.
 
 ## Comparison
 
@@ -18,7 +18,7 @@ Fees are approximate per public pricing pages 2026-05; confirm with each provide
 
 ## Universal webhook URL
 
-**All four providers use the SAME webhook URL on Force Store:**
+**All four providers use the SAME webhook URL on Force AI Store:**
 
 ```
 https://store-api.forcemediakw.com/api/v1/webhooks/payment/<provider>
@@ -26,7 +26,7 @@ https://store-api.forcemediakw.com/api/v1/webhooks/payment/<provider>
 
 Where `<provider>` is one of: `tap`, `myfatoorah`, `hesabe`, `upayments`.
 
-Force Store displays the exact URL inside each provider's panel in **Admin → Settings → Payment Settings** with a one-click Copy button — you don't need to construct it manually.
+Force AI Store displays the exact URL inside each provider's panel in **Admin → Settings → Payment Settings** with a one-click Copy button — you don't need to construct it manually.
 
 كل بوابات الدفع تستخدم نفس صيغة الـ webhook URL — تجده مع زر نسخ بجانب كل مزوّد في لوحة إعدادات الدفع.
 
@@ -41,7 +41,7 @@ Force Store displays the exact URL inside each provider's panel in **Admin → S
    - URL: `https://store-api.forcemediakw.com/api/v1/webhooks/payment/tap`
    - Events: `charge.created`, `charge.updated`, `charge.captured`, `charge.failed`, `charge.refunded`
    - Save → Tap shows the webhook secret — **copy it now, shown once**
-5. In Force Store: **Admin → Settings → Payment Settings → Tap**:
+5. In Force AI Store: **Admin → Settings → Payment Settings → Tap**:
    - Toggle: ON
    - API Key: paste the secret key from step 3
    - Webhook Secret: paste the webhook secret from step 4
@@ -60,7 +60,7 @@ Force Store displays the exact URL inside each provider's panel in **Admin → S
    - URL: `https://store-api.forcemediakw.com/api/v1/webhooks/payment/myfatoorah`
    - Secret: click Generate → copy the secret
    - Events: tick all payment events (Paid, Failed, Refunded, etc.)
-5. In Force Store: **Admin → Settings → Payment Settings → MyFatoorah**:
+5. In Force AI Store: **Admin → Settings → Payment Settings → MyFatoorah**:
    - Toggle: ON
    - API Key: paste the live token
    - Webhook Secret: paste the webhook secret
@@ -79,7 +79,7 @@ Hesabe is contract-based — you'll receive credentials by email from your accou
    - Merchant Code
    - API Key
    - Webhook Secret
-3. In Force Store: **Admin → Settings → Payment Settings → Hesabe**:
+3. In Force AI Store: **Admin → Settings → Payment Settings → Hesabe**:
    - Toggle: ON
    - Merchant ID: paste the merchant code
    - API Key: paste the key
@@ -100,7 +100,7 @@ Hesabe is contract-based — you'll receive credentials by email from your accou
 4. **Settings → Webhooks**:
    - URL: `https://store-api.forcemediakw.com/api/v1/webhooks/payment/upayments`
    - Secret: copy
-5. In Force Store: **Admin → Settings → Payment Settings → UPayments**:
+5. In Force AI Store: **Admin → Settings → Payment Settings → UPayments**:
    - Toggle: ON
    - API Key + Webhook Secret: paste
    - Test Mode: OFF for live
@@ -159,7 +159,7 @@ To generate a payment link from the admin:
 1. **Admin → Orders → [any order] → Payment Link** (or create a new manual order)
 2. Use the **typeahead product picker** to search your catalog and add products, OR enter a **custom amount** for a deposit or service fee
 3. Click **Generate Link** → copy and paste into WhatsApp
-4. The customer taps the link → lands on your Force Store checkout with the cart pre-filled
+4. The customer taps the link → lands on your Force AI Store checkout with the cart pre-filled
 5. Pays via their preferred method (KNET, Apple Pay, cards — whatever your gateway supports)
 
 If a payment link was already generated for an order, the **Copy** and **Open** buttons appear inline — you do not need to generate a new one.
@@ -172,7 +172,7 @@ If a payment link was already generated for an order, the **Copy** and **Open** 
 
 You may wonder: "if every store uses the same webhook URL, can other merchants see my payment events?"
 
-**No.** Each store has its own per-tenant webhook secret. When a payment provider sends a webhook to `store-api.forcemediakw.com/api/v1/webhooks/payment/myfatoorah`, Force Store:
+**No.** Each store has its own per-tenant webhook secret. When a payment provider sends a webhook to `store-api.forcemediakw.com/api/v1/webhooks/payment/myfatoorah`, Force AI Store:
 
 1. Looks up the transaction ID inside the payload
 2. Finds which store's order it belongs to (via the `Order` table)
@@ -187,9 +187,9 @@ A merchant configuring a different store's credentials can't intercept anyone el
 
 ## How a paid order is confirmed (two paths)
 
-Force Store confirms an online payment via **two** independent paths, so a single misconfigured webhook can't leave a paid order stuck:
+Force AI Store confirms an online payment via **two** independent paths, so a single misconfigured webhook can't leave a paid order stuck:
 
-1. **Verify-on-return (primary).** The moment the customer returns to the order-success page after paying, Force Store asks the provider directly "is this invoice paid?" and — if yes — marks the order paid and fires all your notifications (email + admin push + WhatsApp). This works even when the provider's webhook isn't configured. The success page then shows the truthful status: **paid**, **confirming…**, or **payment not completed** (with a "Try payment again" button).
+1. **Verify-on-return (primary).** The moment the customer returns to the order-success page after paying, Force AI Store asks the provider directly "is this invoice paid?" and — if yes — marks the order paid and fires all your notifications (email + admin push + WhatsApp). This works even when the provider's webhook isn't configured. The success page then shows the truthful status: **paid**, **confirming…**, or **payment not completed** (with a "Try payment again" button).
 2. **Webhook (backup).** If you've pasted the webhook URL into your provider portal, the provider also pushes the status to us. This is the safety net — and it's idempotent with path (1), so the customer/admin never get duplicate notifications.
 
 طريقتان مستقلتان لتأكيد الدفع: (1) **التحقق عند العودة** — بمجرد رجوع العميل لصفحة نجاح الطلب نسأل المزوّد مباشرة إن كان الدفع تمّ، ونؤكد الطلب ونرسل الإشعارات؛ (2) **الويب هوك** كخط احتياطي. الطريقتان لا تُكرّران الإشعارات.

@@ -46,7 +46,7 @@ The storefront has its own language toggle (top-right corner) independent of the
 
 ### Storefront SSL warning / "Not Secure" badge — تحذير شهادة SSL
 
-- **Default Force Store domain (`store.forcemediakw.com/<slug>`)**: should always show the padlock. If not, this is a Force Store bug — WhatsApp support immediately.
+- **Default Force AI Store domain (`store.forcemediakw.com/<slug>`)**: should always show the padlock. If not, this is a Force AI Store bug — WhatsApp support immediately.
 - **Custom domain (`yourstore.com`)**: certificate auto-issues within 1-5 minutes after DNS verification. If still showing after 30 minutes, see [custom-domain.md](./custom-domain.md#common-issues) — common cause is a CAA DNS record blocking Let's Encrypt.
 
 ---
@@ -58,7 +58,7 @@ The storefront has its own language toggle (top-right corner) independent of the
 Check in order:
 
 1. **Email notification**: check spam folder. Confirm your notification email in **Admin → Settings → Notifications**.
-2. **Push notification**: did you install Force Store admin as a PWA + grant notification permission? If you cleared browser data, the permission is revoked — re-grant.
+2. **Push notification**: did you install Force AI Store admin as a PWA + grant notification permission? If you cleared browser data, the permission is revoked — re-grant.
 3. **Telegram bot**: only the Force Media operator account gets platform-level Telegram alerts. Merchant-level push goes via email + admin PWA push.
 
 تحقّق: مجلد السبام، إعدادات إيميل الإشعارات، صلاحية الإشعارات في متصفّحك (لو ثبّت كPWA).
@@ -88,7 +88,7 @@ Rare but possible — usually a payment provider mid-state failure. Recovery:
 
 ### Admin keeps logging me out — يطلب تسجيل دخول كل شوي
 
-Force Store sessions last 30 days. If you're logged out earlier:
+Force AI Store sessions last 30 days. If you're logged out earlier:
 
 - Did you switch networks (Wi-Fi → mobile data)? Cross-origin cookie behavior on iOS Safari occasionally drops the auth cookie.
 - Did you clear cookies? That resets all sessions.
@@ -98,7 +98,7 @@ Force Store sessions last 30 days. If you're logged out earlier:
 
 ### "Validation failed" when saving a product — رسالة خطأ عند حفظ المنتج
 
-Force Store enforces strict validation. The error message tells you which field — common ones:
+Force AI Store enforces strict validation. The error message tells you which field — common ones:
 
 - **Name (Arabic) is required**: even if you only sell to English-speakers, Arabic name is required for SEO + Search
 - **Price must be > 0**: free products → use a coupon for 100% discount instead
@@ -157,7 +157,7 @@ Check all of the following:
 1. Open the WhatsApp Business Platform admin dashboard (ws.forcemediakw.com)
 2. Go to your template list — check the status column on Meta for each template
 3. Templates may have been rejected by Meta. Use the **Reset to Draft** button on any rejected template to automatically rename it (e.g., `order_paid_v2`) and resubmit for approval
-4. After approval, template dropdowns in Force Store admin resolve the new version automatically — you do not need to re-select them
+4. After approval, template dropdowns in Force AI Store admin resolve the new version automatically — you do not need to re-select them
 5. If the template list is **still empty** after your templates are approved: disconnect then reconnect the WBS integration (Settings → WhatsApp Integration → Connection → Disconnect, then reconnect with the same API key). This triggers a fresh metadata fetch from WBS which unions the FWB-side approved templates with the live list.
 
 تحقّق من حالة القوالب في لوحة WBS وMeta. القوالب المرفوضة يمكن إعادة تقديمها بزر «Reset to Draft» — القوائم المنسدلة في المتجر تتعرّف على الإصدار الجديد تلقائيًا. إن استمرت القائمة فارغة بعد الاعتماد، افصل ثم أعد الاتصال لإجراء تحديث للبيانات الوصفية.

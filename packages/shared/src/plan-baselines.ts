@@ -1,4 +1,4 @@
-// Plan baselines — which features are included by default per Force Store plan.
+// Plan baselines — which features are included by default per Force AI Store plan.
 //
 // Resolution rule used by `apps/api/src/lib/feature-gate.ts`:
 //

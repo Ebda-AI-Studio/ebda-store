@@ -1,6 +1,6 @@
 # Google Search Console — Indexing Guide for wadyaljuz.com
 
-_Last updated: 2026-05-28 | Applies to: wadyaljuz.com GSC property + Force Store platform_
+_Last updated: 2026-05-28 | Applies to: wadyaljuz.com GSC property + Force AI Store platform_
 
 ---
 

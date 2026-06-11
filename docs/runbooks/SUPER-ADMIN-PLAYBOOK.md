@@ -9,7 +9,7 @@
 
 ## Plans
 
-Force Store: **Starter / Professional / Enterprise** (plus `free` as a stripped fallback for the demo state / lapsed payment).
+Force AI Store: **Starter / Professional / Enterprise** (plus `free` as a stripped fallback for the demo state / lapsed payment).
 
 | Domain                                                                               | Starter            | Professional       | Enterprise         |
 | ------------------------------------------------------------------------------------ | ------------------ | ------------------ | ------------------ |
@@ -22,7 +22,7 @@ Force Store: **Starter / Professional / Enterprise** (plus `free` as a stripped 
 | Accounting — tax reports + multi-currency + profit anomaly + bank reconcile          | —                  | —                  | ✓                  |
 | Loyalty + push notifications + upsell-crosssell                                      | —                  | ✓                  | ✓                  |
 | Affiliate program + SMS + floating widget                                            | —                  | —                  | ✓                  |
-| Force WhatsApp bot integration                                                       | **Separate quote** | **Separate quote** | **Separate quote** |
+| Force AI WhatsApp bot integration                                                       | **Separate quote** | **Separate quote** | **Separate quote** |
 
 The canonical source is `packages/shared/src/plan-baselines.ts` — when the table here disagrees with the code, the code is right.
 
@@ -83,11 +83,11 @@ Suspension is for missed renewals + AUP violations. **Super-admin only.**
 
 Same UI, the button reads "Reactivate Store" in green when status is suspended. Click → confirm → `status` flips to `active`. Storefront returns immediately on the next request.
 
-## Force WhatsApp side
+## Force AI WhatsApp side
 
-Force WhatsApp is a **separate product** with its own 3-tier plan system on the WBS side (`Client.plan` + `ClientFeature` table). Same super-admin UI pattern in WBS admin frontend.
+Force AI WhatsApp is a **separate product** with its own 3-tier plan system on the WBS side (`Client.plan` + `ClientFeature` table). Same super-admin UI pattern in WBS admin frontend.
 
-**Cross-product rule (HARD):** `wbs.bot.*` features REQUIRE a linked active Force Store. WBS plan can be at any tier, but if no Force Store is linked OR the linked store is suspended/inactive, all bot features resolve to disabled. Bulk campaigns + unified inbox + templates work without Force Store. Super-admin override on a `wbs.bot.*` feature CANNOT bypass this precondition — it's a runtime check, not a config flag.
+**Cross-product rule (HARD):** `wbs.bot.*` features REQUIRE a linked active Force AI Store. WBS plan can be at any tier, but if no Force AI Store is linked OR the linked store is suspended/inactive, all bot features resolve to disabled. Bulk campaigns + unified inbox + templates work without Force AI Store. Super-admin override on a `wbs.bot.*` feature CANNOT bypass this precondition — it's a runtime check, not a config flag.
 
 ## Where the code lives
 

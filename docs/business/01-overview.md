@@ -1,6 +1,6 @@
-# Force Store — One-Pager
+# Force AI Store — One-Pager
 
-> **Force Store** is a multi-tenant e-commerce platform built in Kuwait for Kuwait and the GCC. Bilingual Arabic + English from the ground up, AI-assisted from day one, KNET-native, and priced for SMB merchants.
+> **Force AI Store** is a multi-tenant e-commerce platform built in Kuwait for Kuwait and the GCC. Bilingual Arabic + English from the ground up, AI-assisted from day one, KNET-native, and priced for SMB merchants.
 
 ---
 
@@ -8,7 +8,7 @@
 
 You're a Kuwait merchant who sells products online. Today you have three options: pay Shopify $30–80/month + buy a $20/month translation plugin + worry about KNET integration, or pay Salla in Saudi Riyals for a platform that doesn't speak Kuwaiti payment rails, or piece WooCommerce together with a developer who quits in three months.
 
-Force Store gives you the same storefront, the same admin tools, the same payment integrations — but built for Kuwait first. **Arabic and English are equal**, not afterthoughts. **KNET works on day one**, not after a plugin install. **AI fills in your product translations, SEO, and category tags automatically**, included in your subscription, not as a paid add-on.
+Force AI Store gives you the same storefront, the same admin tools, the same payment integrations — but built for Kuwait first. **Arabic and English are equal**, not afterthoughts. **KNET works on day one**, not after a plugin install. **AI fills in your product translations, SEO, and category tags automatically**, included in your subscription, not as a paid add-on.
 
 You launch in hours, not weeks. You pay in Kuwaiti Dinars. Your customers check out with the payment method 80% of Kuwaitis already use.
 
@@ -57,7 +57,7 @@ Each merchant picks their preferred provider. Switching is a configuration chang
 
 ### 4. Customization granularity
 
-Most platforms give you a theme picker and call it customization. Force Store gives you:
+Most platforms give you a theme picker and call it customization. Force AI Store gives you:
 
 - **5 themes** (modern / elegant / classic / minimal / bold) — every store starts from one of these
 - **Per-section typography** — change font size, weight, family on any page section without touching code
@@ -70,7 +70,7 @@ Most platforms give you a theme picker and call it customization. Force Store gi
 
 ---
 
-## Who Force Store is for
+## Who Force AI Store is for
 
 **Ideal fit:**
 
@@ -97,7 +97,7 @@ Most platforms give you a theme picker and call it customization. Force Store gi
 - **B2B with contract pricing per customer** — no per-customer-tier price lists today
 - **Dropshipping with AliExpress-style supplier integration** — not on the roadmap
 - **Subscription products** (recurring billing for the same product monthly) — not yet supported
-- **Marketplace (multi-vendor)** — Force Store is multi-tenant, but each tenant is one merchant, not a marketplace of vendors
+- **Marketplace (multi-vendor)** — Force AI Store is multi-tenant, but each tenant is one merchant, not a marketplace of vendors
 
 ---
 
@@ -111,7 +111,7 @@ Most platforms give you a theme picker and call it customization. Force Store gi
 
 ## Who we are
 
-Force Store is built by **Force AI**, a Kuwait company owned by Ahmad Sharaf. We're a sister company to Force Media Kuwait, the agency that's been building websites and brand identities for Kuwaiti businesses for years. The same team that ships marketing campaigns also ships product code, so the gap between "what we sell" and "what we build" is small.
+Force AI Store is built by **Force AI**, a Kuwait company owned by Ahmad Sharaf. We're a sister company to Force Media Kuwait, the agency that's been building websites and brand identities for Kuwaiti businesses for years. The same team that ships marketing campaigns also ships product code, so the gap between "what we sell" and "what we build" is small.
 
 We're not VC-backed. We don't have a 50-person team. We ship every day, and every merchant on the platform inherits every improvement automatically.
 
@@ -119,7 +119,7 @@ We're not VC-backed. We don't have a 50-person team. We ship every day, and ever
 
 ## One-click WhatsApp Meta-catalog setup
 
-Connecting a store to WhatsApp's Native Catalog feature normally requires merchants to navigate Meta Business Manager, create a Commerce Catalog, generate a system-user token, and copy multiple IDs. Force Store removes all of that.
+Connecting a store to WhatsApp's Native Catalog feature normally requires merchants to navigate Meta Business Manager, create a Commerce Catalog, generate a system-user token, and copy multiple IDs. Force AI Store removes all of that.
 
 From Admin → WhatsApp Bot → Meta Commerce Catalog, click **Provision automatically**. The Force AI backend calls the Meta Graph API on your behalf to create the catalog, assign the long-lived access token, and save everything encrypted — in under 60 seconds. Your product catalog syncs to Meta automatically after that. This is a meaningful differentiator: no other Gulf e-commerce platform offers self-serve Meta catalog provisioning for merchants.
 
@@ -127,7 +127,7 @@ From Admin → WhatsApp Bot → Meta Commerce Catalog, click **Provision automat
 
 ## Get started
 
-Force Store is sold as a **managed e-commerce service** — every client gets a custom proposal based on the features they need, not a self-serve subscription. To start:
+Force AI Store is sold as a **managed e-commerce service** — every client gets a custom proposal based on the features they need, not a self-serve subscription. To start:
 
 - **See it live:** [wadyaljuz.com](https://wadyaljuz.com) (our flagship Kuwait merchant — 235 products, 8 categories, full bilingual)
 - **Talk to us:** [forcemediakw.com/contact](https://forcemediakw.com/contact) — we'll schedule a 30-minute call to understand your needs and send you a written proposal within 2-3 business days

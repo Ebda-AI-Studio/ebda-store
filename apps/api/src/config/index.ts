@@ -186,7 +186,7 @@ export const config = {
   vercelProjectId: process.env.VERCEL_PROJECT_ID || '',
   vercelTeamId: process.env.VERCEL_TEAM_ID || '',
 
-  // AI features — Force Store AI assistant uses Google Gemini 2.0 Flash
+  // AI features — Force AI Store AI assistant uses Google Gemini 2.0 Flash
   // for translation, SEO meta generation, and category suggestions.
   // Free tier covers 15 req/min and ~1500 req/day per project, which
   // is well above what a single store will use. `AI_FEATURES_ENABLED`
@@ -221,7 +221,7 @@ export const config = {
   icarryWebhookSecret: process.env.ICARRY_WEBHOOK_SECRET || '',
   aramexWebhookSecret: process.env.ARAMEX_WEBHOOK_SECRET || '',
 
-  // Force WhatsApp Business Platform bridge
+  // Force AI WhatsApp Business Platform bridge
   // Base URL of the WBS backend. In production: https://backend.forcemediakw.com
   // Leave unset in dev — the bridge will skip sends gracefully when store.wbsEnabled=false.
   wbsBaseUrl: process.env.WBS_BASE_URL || 'https://backend.forcemediakw.com',

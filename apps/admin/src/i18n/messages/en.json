@@ -1305,7 +1305,7 @@
       },
       "whatsappBridge": {
         "title": "WhatsApp Business",
-        "description": "Connect Force Store to Force WhatsApp Business Platform — paste your API key + configure templates"
+        "description": "Connect Force AI Store to Force AI WhatsApp Business Platform — paste your API key + configure templates"
       },
       "whatsappTemplates": {
         "title": "WhatsApp Templates",

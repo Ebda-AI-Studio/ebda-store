@@ -1,21 +1,21 @@
-# Force Store — Frequently Asked Questions
+# Force AI Store — Frequently Asked Questions
 
-> Public-facing FAQ for prospective Kuwait/GCC merchants evaluating Force Store. Customer-facing language, bilingual where helpful, no engineering jargon.
+> Public-facing FAQ for prospective Kuwait/GCC merchants evaluating Force AI Store. Customer-facing language, bilingual where helpful, no engineering jargon.
 
 ---
 
 ## Getting started
 
-### How do I get started with Force Store?
+### How do I get started with Force AI Store?
 
-Force Store is a **managed e-commerce service** — there is no self-serve signup. Every client goes through a custom proposal and onboarding process:
+Force AI Store is a **managed e-commerce service** — there is no self-serve signup. Every client goes through a custom proposal and onboarding process:
 
 1. **Request a proposal** — contact us at [hello@forcemediakw.com](mailto:hello@forcemediakw.com) or via WhatsApp. We'll schedule a 30-minute call to understand your needs.
 2. **Receive and sign a custom proposal** — we send a written proposal within 2-3 business days covering setup fee, monthly fee, and the feature set tailored to your business.
 3. **Onboarding begins** — once you sign and pay the deposit, we handle:
    - Store provisioning and theme configuration
    - Brand setup (logo, colors, fonts, hero images)
-   - Catalog import (your Excel/CSV → Force Store products, bilingual)
+   - Catalog import (your Excel/CSV → Force AI Store products, bilingual)
    - Payment provider setup (Tap/MyFatoorah/Hesabe/UPayments account connection)
    - Custom domain provisioning
    - 1-hour live training session
@@ -23,7 +23,7 @@ Force Store is a **managed e-commerce service** — there is no self-serve signu
 
 ### Do I need to be technical?
 
-No. If you can use Google Docs, you can use Force Store admin. The page builder is drag-and-drop. The product editor has AI buttons for translation and SEO. The payment provider setup is "paste your API key here."
+No. If you can use Google Docs, you can use Force AI Store admin. The page builder is drag-and-drop. The product editor has AI buttons for translation and SEO. The payment provider setup is "paste your API key here."
 
 We don't sell to developers — we sell to merchants who want to sell, not configure.
 
@@ -33,7 +33,7 @@ We don't sell to developers — we sell to merchants who want to sell, not confi
 
 **Themes + storefront design:** no automatic migration. You'll pick from our 5 themes and re-build your visual identity. This usually takes 1–3 hours; we offer a free migration consultation for paid plans.
 
-**Apps + plugins:** any third-party Shopify or WooCommerce app needs to be re-evaluated. Many of those apps exist to fill gaps that Force Store already covers natively (translation, SEO, inventory, accounting, reviews).
+**Apps + plugins:** any third-party Shopify or WooCommerce app needs to be re-evaluated. Many of those apps exist to fill gaps that Force AI Store already covers natively (translation, SEO, inventory, accounting, reviews).
 
 ---
 
@@ -77,13 +77,13 @@ Yes. KNET works through any of these 4 Kuwait payment providers, all configured 
 - **Hesabe** — Kuwait-specific, KNET + Visa/Mastercard
 - **UPayments** — Kuwait fintech, KNET + digital wallets
 
-You pick **one** provider for your store, paste their API credentials into your Force Store admin, and KNET starts working immediately. No 3rd-party plugin.
+You pick **one** provider for your store, paste their API credentials into your Force AI Store admin, and KNET starts working immediately. No 3rd-party plugin.
 
 If you don't have an account with any of these providers yet, we recommend **Tap** for new merchants (easiest signup, best documentation, GCC-wide).
 
 ### How much do payment providers charge?
 
-Provider fees are paid by you to your provider (not to Force Store). Typical 2026 rates:
+Provider fees are paid by you to your provider (not to Force AI Store). Typical 2026 rates:
 
 | Provider   | KNET  | Visa/MC domestic | International |
 | ---------- | ----- | ---------------- | ------------- |
@@ -92,7 +92,7 @@ Provider fees are paid by you to your provider (not to Force Store). Typical 202
 | Hesabe     | ~2.5% | ~3.5%            | —             |
 | UPayments  | ~2.5% | ~3.0%            | —             |
 
-**Force Store does not take a cut of your sales.** Your contract is a fixed setup fee + monthly platform fee. Payment provider fees (2-3.5% per transaction) go directly from your customer to your payment gateway — not through us.
+**Force AI Store does not take a cut of your sales.** Your contract is a fixed setup fee + monthly platform fee. Payment provider fees (2-3.5% per transaction) go directly from your customer to your payment gateway — not through us.
 
 ### Can I use Stripe?
 
@@ -108,7 +108,7 @@ Yes — toggle COD on per store. We track it as a payment method and your delive
 
 ### How much does it cost?
 
-**Force Store is sold as a managed service with a custom proposal per client** — not a self-serve subscription with a public price list. Pricing depends on:
+**Force AI Store is sold as a managed service with a custom proposal per client** — not a self-serve subscription with a public price list. Pricing depends on:
 
 - How many products you have (catalog size affects onboarding cost)
 - Whether you need bilingual translation (EN/AR — usually yes for Kuwait)
@@ -118,7 +118,7 @@ Yes — toggle COD on per store. We track it as a payment method and your delive
 
 **How to get a real quote:** [contact us](mailto:hello@forcemediakw.com) with a short description of your business. We'll send a custom proposal within 2-3 business days. Most Kuwait SMBs land in the **[setup fee 500-1,000 KWD] + [monthly 50-150 KWD]** range, but every contract is custom.
 
-**No hidden fees:** the proposal you sign is the price you pay. Payment provider fees (Tap/MyFatoorah/Hesabe/UPayments charge 2-3.5% per transaction) go directly to your gateway — Force Store doesn't take a cut.
+**No hidden fees:** the proposal you sign is the price you pay. Payment provider fees (Tap/MyFatoorah/Hesabe/UPayments charge 2-3.5% per transaction) go directly to your gateway — Force AI Store doesn't take a cut.
 
 Annual prepay typically saves 2 months of fees.
 
@@ -163,7 +163,7 @@ We'll send an updated proposal for the additions; the change applies the same bi
 
 ## Features
 
-### Does Force Store have [feature X]?
+### Does Force AI Store have [feature X]?
 
 Probably. The full feature catalog is in [02-feature-catalog.md](02-feature-catalog.md). Most-asked:
 
@@ -184,7 +184,7 @@ Probably. The full feature catalog is in [02-feature-catalog.md](02-feature-cata
 - ✅ **Email marketing** — basic transactional emails yes; campaign builder is on our roadmap
 - ✅ **PWA (installable as app)** — yes
 - ⚠️ **Subscriptions / recurring billing** — not yet
-- ⚠️ **Multi-vendor marketplace** — not yet (each Force Store tenant is a single merchant)
+- ⚠️ **Multi-vendor marketplace** — not yet (each Force AI Store tenant is a single merchant)
 - ⚠️ **Dropshipping integration** — not on roadmap
 
 ### Can I customize the design?
@@ -203,7 +203,7 @@ destination for every visual setting. You can change:
 - Page Builder — drag-and-drop section ordering, bilingual copy for every section
 - Custom CSS for advanced users (Professional+ tier)
 
-You **cannot** edit raw HTML or change the underlying templates — that level of customization isn't supported. If you need that, you'll outgrow Force Store and need a custom build.
+You **cannot** edit raw HTML or change the underlying templates — that level of customization isn't supported. If you need that, you'll outgrow Force AI Store and need a custom build.
 
 ### What if I want a feature that doesn't exist?
 
@@ -250,13 +250,13 @@ Generated per-store at `/privacy` on your storefront. Edit it from the admin →
 
 ### Coming from Shopify
 
-**You're going to save money** — most Shopify Kuwait merchants pay $30–80/mo + $20/mo translation + $0–20/mo for Arabic apps. Force Store includes all of that.
+**You're going to save money** — most Shopify Kuwait merchants pay $30–80/mo + $20/mo translation + $0–20/mo for Arabic apps. Force AI Store includes all of that.
 
 **What you keep:** product catalog (CSV export → import), customer list, order history (CSV).
 
 **What changes:** your storefront design (5 themes to pick from). Shopify themes don't migrate; you'll re-build with our page builder. Usually takes 1–3 hours.
 
-**KNET:** if you were using a Shopify plugin for KNET, you'll set up direct KNET via Tap or MyFatoorah inside Force Store admin. Easier, faster, no plugin maintenance.
+**KNET:** if you were using a Shopify plugin for KNET, you'll set up direct KNET via Tap or MyFatoorah inside Force AI Store admin. Easier, faster, no plugin maintenance.
 
 ### Coming from Salla
 
@@ -266,17 +266,17 @@ Salla is Saudi-first. If you're a Kuwait merchant on Salla, you've probably been
 - Saudi shipping zones / couriers (not Kuwait districts)
 - Salla's UI being Arabic-only (limiting your English-speaking audience)
 
-Force Store gives you the same admin power but Kuwait-tuned. Product import is CSV-based.
+Force AI Store gives you the same admin power but Kuwait-tuned. Product import is CSV-based.
 
 ### Coming from WooCommerce
 
 You'll lose some flexibility (no raw PHP, no plugins) but gain peace of mind (no maintenance, no security patching, no "developer quit, what now?").
 
-If your WooCommerce site has heavy custom code, Force Store may not be a fit — talk to us first.
+If your WooCommerce site has heavy custom code, Force AI Store may not be a fit — talk to us first.
 
 ### Coming from Wix / Squarespace
 
-These are great for static brochure sites but weak for transactional e-commerce in Kuwait (no native KNET, limited multi-language, no inventory module). Force Store is purpose-built for what they're not.
+These are great for static brochure sites but weak for transactional e-commerce in Kuwait (no native KNET, limited multi-language, no inventory module). Force AI Store is purpose-built for what they're not.
 
 ---
 
@@ -291,7 +291,7 @@ These are great for static brochure sites but weak for transactional e-commerce 
 
 ### Do you offer onboarding help?
 
-Yes — all Force Store clients receive a managed onboarding. The depth scales with contract level:
+Yes — all Force AI Store clients receive a managed onboarding. The depth scales with contract level:
 
 - **Starter contracts:** docs + email + WhatsApp support; onboarding call included
 - **Professional contracts:** dedicated onboarding call (1 hour, includes catalog migration walkthrough)
@@ -333,7 +333,7 @@ Internal API exists; public-facing API is on the roadmap (currently used by our 
 
 ### Is the code open source?
 
-No. Force Store source code is proprietary (`license: UNLICENSED`). The platform is operated as a SaaS — you rent it, we run it.
+No. Force AI Store source code is proprietary (`license: UNLICENSED`). The platform is operated as a SaaS — you rent it, we run it.
 
 ### Where can I see what's been recently shipped?
 

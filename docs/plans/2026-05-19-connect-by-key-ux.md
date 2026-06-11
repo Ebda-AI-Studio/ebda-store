@@ -39,7 +39,7 @@ New smart logic:
 
 Two-step guided flow:
 
-- Step 1 (no key): single "Force WhatsApp API Key" text field + "Connect" button.
+- Step 1 (no key): single "Force AI WhatsApp API Key" text field + "Connect" button.
 - Step 2 (key set): read-only banner with businessName/phone + "Disconnect",
   4 dropdowns from `availableTemplates`, "Enable" toggle at bottom.
 

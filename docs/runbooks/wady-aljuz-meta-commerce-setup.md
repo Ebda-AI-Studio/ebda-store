@@ -121,7 +121,7 @@ Meta requires manual review before a catalog can be used in WhatsApp interactive
 1. Meta Commerce Manager → Wady Aljuz catalog → **Settings** → **Catalog review**
 2. Submit. Approval typically takes **24-48 hours**.
 3. Common rejection reasons:
-   - Missing product images → ensure every product has `image_url` (Force Store auto-passes `product.images[0].url`)
+   - Missing product images → ensure every product has `image_url` (Force AI Store auto-passes `product.images[0].url`)
    - Generic/placeholder descriptions → if any product still has a SEO-only description, fill the meta description AND product description before sync
    - Restricted category mismatch → Wady Aljuz is mostly spices / herbs / food; should map to `FOOD_BEVERAGES_AND_TOBACCO` category in Meta. Verify the `category` field is being passed correctly (in `metaCatalogService.upsertProduct`).
 
@@ -204,7 +204,7 @@ If something goes wrong during steps 5-9 (token rejected, sync failed, etc.):
 
 Each new merchant repeats steps 1-10. To scale:
 
-- Add a `force-store-admin → bulk Meta provisioning` flow that ties Force Store onboarding to Meta catalog creation in one click (manual today, automatable when catalog count reaches ~10)
+- Add a `force-store-admin → bulk Meta provisioning` flow that ties Force AI Store onboarding to Meta catalog creation in one click (manual today, automatable when catalog count reaches ~10)
 - Build a `meta-catalog-health` background job that periodically GETs the catalog status + alerts if `review_status` regresses (Meta can demote a catalog post-approval if products violate policy)
 - Add a Telegram alert when product sync fails for a merchant (currently the failure shows in Inngest dashboard only)
 

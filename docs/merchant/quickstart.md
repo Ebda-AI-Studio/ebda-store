@@ -67,7 +67,7 @@ Optional but recommended:
 
 **Admin → Settings → Payment Settings**
 
-Force Store supports 4 Kuwait-based payment providers:
+Force AI Store supports 4 Kuwait-based payment providers:
 
 - Tap Payments
 - MyFatoorah
@@ -122,14 +122,14 @@ By default your store is at `store.forcemediakw.com/<your-slug>`. To use `yourst
 
 افتراضيًا متجرك على `store.forcemediakw.com/<slug>`. لربط `yourstore.com` بدلًا، راجع [custom-domain.md](./custom-domain.md) — 10 دقائق من إعدادات DNS وSSL تلقائي.
 
-## 9. Connect Force WhatsApp Business Platform (optional but recommended)
+## 9. Connect Force AI WhatsApp Business Platform (optional but recommended)
 
 If you want WhatsApp order notifications or the customer DM ordering bot:
 
 **Admin → Settings → WhatsApp Integration → Connection**
 
-1. Ask your Force AI contact for the Force WhatsApp Business Platform setup — you'll need an active WBS account.
-2. In Force Store admin, click **Generate API Key** under the WhatsApp Integration card.
+1. Ask your Force AI contact for the Force AI WhatsApp Business Platform setup — you'll need an active WBS account.
+2. In Force AI Store admin, click **Generate API Key** under the WhatsApp Integration card.
 3. Copy the key and paste it into the WBS admin under your store's settings.
 4. Once connected, the status chip on the Settings card shows **Connected** in green.
 

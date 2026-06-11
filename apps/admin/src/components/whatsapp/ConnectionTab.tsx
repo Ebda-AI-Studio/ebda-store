@@ -114,7 +114,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
         if (error.code === 'INVALID_API_KEY' || error.message?.includes('invalid_api_key')) {
           toastError('Invalid key', 'The API key was rejected. Generate a new key in WBS admin.');
         } else {
-          toastError('Connection failed', error.message || 'Could not connect to Force WhatsApp');
+          toastError('Connection failed', error.message || 'Could not connect to Force AI WhatsApp');
         }
       } else {
         const seeded = data?.templatesAutoSeeded;
@@ -123,7 +123,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
         if (autoErr) {
           toastSuccess(
             'Connected',
-            `Force WhatsApp connected — but template auto-submit failed: ${autoErr}. Visit Templates tab to retry.`
+            `Force AI WhatsApp connected — but template auto-submit failed: ${autoErr}. Visit Templates tab to retry.`
           );
         } else if (seeded && seeded > 0) {
           toastSuccess(
@@ -131,7 +131,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
             `${seeded} template${seeded === 1 ? '' : 's'} seeded, ${submitted ?? 0} pending Meta approval (~10min–24h).`
           );
         } else {
-          toastSuccess('Connected', 'Force WhatsApp Business Platform connected');
+          toastSuccess('Connected', 'Force AI WhatsApp Business Platform connected');
         }
         setApiKeyInput('');
         await fetchConfig();
@@ -239,27 +239,27 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
       {!isConnected && !keySetNotEnabled && (
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
           <div>
-            <h3 className="font-medium text-foreground">Connect Force WhatsApp</h3>
+            <h3 className="font-medium text-foreground">Connect Force AI WhatsApp</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Paste the API key generated in your Force WhatsApp Business Platform admin to link
+              Paste the API key generated in your Force AI WhatsApp Business Platform admin to link
               this store.
             </p>
           </div>
           <div className="space-y-1">
             <label htmlFor="wbsApiKey" className="text-sm font-medium text-foreground">
-              Force WhatsApp API Key
+              Force AI WhatsApp API Key
             </label>
             <input
               id="wbsApiKey"
               type="password"
               value={apiKeyInput}
               onChange={e => setApiKeyInput(e.target.value)}
-              placeholder="Paste key from WBS admin → Client → Force Store Bridge"
+              placeholder="Paste key from WBS admin → Client → Force AI Store Bridge"
               autoComplete="new-password"
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <p className="text-xs text-muted-foreground">
-              Generate the key in WBS admin → Clients → Force Store Bridge icon. Paste it here — the
+              Generate the key in WBS admin → Clients → Force AI Store Bridge icon. Paste it here — the
               key is verified immediately.
             </p>
           </div>
@@ -273,7 +273,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
       {keySetNotEnabled && (
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
           <div>
-            <h3 className="font-medium text-foreground">Finish connecting Force WhatsApp</h3>
+            <h3 className="font-medium text-foreground">Finish connecting Force AI WhatsApp</h3>
             <p className="text-sm text-muted-foreground mt-1">
               An API key is saved but WhatsApp notifications aren&apos;t enabled yet. Select your
               templates below and enable to activate.

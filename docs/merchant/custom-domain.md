@@ -1,12 +1,12 @@
 # Custom Domain Setup — ربط النطاق المخصص
 
-Point `yourstore.com` at Force Store in ~10 minutes. ربط نطاقك بالمتجر خلال 10 دقائق.
+Point `yourstore.com` at Force AI Store in ~10 minutes. ربط نطاقك بالمتجر خلال 10 دقائق.
 
 ## What you need
 
 - A domain you own (registered at GoDaddy, Namecheap, Cloudflare, etc.)
 - Access to your domain registrar's DNS panel
-- Force Store admin access
+- Force AI Store admin access
 
 نطاق مسجّل، صلاحية تعديل DNS، صلاحية لوحة الإدارة.
 
@@ -24,7 +24,7 @@ The admin will show you two DNS records to add. Keep this page open.
 
 ## Step 2 — Add the DNS records at your registrar
 
-Force Store uses Vercel for SSL provisioning, so the records vary slightly per setup. The admin will show you the exact ones, but they look like:
+Force AI Store uses Vercel for SSL provisioning, so the records vary slightly per setup. The admin will show you the exact ones, but they look like:
 
 | Type    | Name               | Value                  | TTL  |
 | ------- | ------------------ | ---------------------- | ---- |
@@ -36,7 +36,7 @@ Force Store uses Vercel for SSL provisioning, so the records vary slightly per s
 1. Find the DNS management panel (often labeled "DNS Records", "DNS Settings", or "Manage DNS")
 2. Delete any existing `A` record on `@` if present (it's usually the registrar's default parking page)
 3. Add both rows from the table above
-4. **If you use Cloudflare**: set the proxy status to **DNS-only** (gray cloud), NOT Proxied (orange cloud). Force Store needs to verify the domain directly.
+4. **If you use Cloudflare**: set the proxy status to **DNS-only** (gray cloud), NOT Proxied (orange cloud). Force AI Store needs to verify the domain directly.
 
 أضف السجلات عند جهة تسجيل النطاق (GoDaddy / Namecheap / Cloudflare). لو تستخدم Cloudflare، أبقِ الـ proxy على "DNS only" (سحابة رمادية).
 
@@ -46,7 +46,7 @@ Back in **Admin → Settings → Custom Domain**:
 
 - Click **Verify Now**
 - The status changes from `pending` to `verifying` (DNS propagation — usually 1-5 minutes, max 24h)
-- Once verified, status changes to `active` and Force Store auto-issues an SSL certificate (Let's Encrypt)
+- Once verified, status changes to `active` and Force AI Store auto-issues an SSL certificate (Let's Encrypt)
 
 ارجع للوحة الإدارة واضغط «تحقّق الآن». الحالة ستتغيّر تدريجيًا: `pending` → `verifying` → `active`. شهادة SSL تُصدر تلقائيًا.
 
@@ -78,10 +78,10 @@ DNS changes can take up to 24h to propagate globally, though Cloudflare-hosted D
 Let's Encrypt issuance usually completes in 1-5 minutes after DNS verification. If it's been > 30 minutes, contact support — there may be a CAA record on your domain blocking Let's Encrypt.
 
 **"Site loads but shows a Vercel error page"**
-Your DNS resolved correctly but the domain isn't yet linked to your Force Store account internally. Wait 2-3 minutes after clicking Verify; if still broken contact support.
+Your DNS resolved correctly but the domain isn't yet linked to your Force AI Store account internally. Wait 2-3 minutes after clicking Verify; if still broken contact support.
 
 **"Cloudflare orange-cloud breaks SSL"**
-If you proxy DNS through Cloudflare (orange cloud), Force Store can't verify the domain because Cloudflare presents its own SSL. Switch to "DNS only" (gray cloud) until verification completes; you can re-enable proxy afterwards if you want Cloudflare's CDN, but you'll lose Force Store's own caching layer.
+If you proxy DNS through Cloudflare (orange cloud), Force AI Store can't verify the domain because Cloudflare presents its own SSL. Switch to "DNS only" (gray cloud) until verification completes; you can re-enable proxy afterwards if you want Cloudflare's CDN, but you'll lose Force AI Store's own caching layer.
 
 لو ما حصلت تحقّق من النطاق: تأكد إن DNS انتشر (استخدم dnschecker.org)، تأكد إن Cloudflare على DNS-only لا Proxied، تأكد ما في CAA record يمنع Let's Encrypt.
 
@@ -93,4 +93,4 @@ To remove a custom domain:
 2. The storefront becomes available again at `store.forcemediakw.com/<your-slug>`
 3. Delete the A/CNAME records at your registrar (or repoint them at a different host)
 
-لإلغاء نطاق مخصص: ادخل لوحة الإدارة، اضغط «إزالة». المتجر يرجع لنطاق Force Store الافتراضي. لا تنسَ حذف سجلات DNS من جهة تسجيل النطاق.
+لإلغاء نطاق مخصص: ادخل لوحة الإدارة، اضغط «إزالة». المتجر يرجع لنطاق Force AI Store الافتراضي. لا تنسَ حذف سجلات DNS من جهة تسجيل النطاق.

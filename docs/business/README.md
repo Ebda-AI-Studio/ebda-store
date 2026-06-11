@@ -1,6 +1,6 @@
-# Force Store — Business Documentation
+# Force AI Store — Business Documentation
 
-> Customer-facing + go-to-market documentation for Force Store / Force Website Builder. Generated 2026-05-22 from the comprehensive SaaS audit, the codebase feature registry, and verified competitive research.
+> Customer-facing + go-to-market documentation for Force AI Store / Force Website Builder. Generated 2026-05-22 from the comprehensive SaaS audit, the codebase feature registry, and verified competitive research.
 
 ---
 
@@ -11,7 +11,7 @@
 | 1   | [01-overview.md](01-overview.md)                               | Everyone — start here                                                                                        | ~1,200 words |
 | 2   | [02-feature-catalog.md](02-feature-catalog.md)                 | Merchant prospect evaluating the product                                                                     | ~3,200 words |
 | 3   | [03-competitive-positioning.md](03-competitive-positioning.md) | Merchant comparing vs Shopify / Salla / Wix / WooCommerce                                                    | ~2,900 words |
-| 4   | [04-pricing-tiers.md](04-pricing-tiers.md)                     | Internal — proposal-pricing framework (Force Store is sold as a managed agency service, not self-serve SaaS) | ~3,800 words |
+| 4   | [04-pricing-tiers.md](04-pricing-tiers.md)                     | Internal — proposal-pricing framework (Force AI Store is sold as a managed agency service, not self-serve SaaS) | ~3,800 words |
 | 5   | [05-pitch-deck-outline.md](05-pitch-deck-outline.md)           | Sales / investor / acquirer pitch (12-slide outline)                                                         | ~1,800 words |
 | 6   | [06-faq.md](06-faq.md)                                         | Public-facing FAQ                                                                                            | ~3,000 words |
 
@@ -21,9 +21,9 @@
 
 ## Reading order by audience
 
-### Kuwait merchant evaluating Force Store
+### Kuwait merchant evaluating Force AI Store
 
-1. **01-overview** — 5-minute read, decide if Force Store fits
+1. **01-overview** — 5-minute read, decide if Force AI Store fits
 2. **06-faq** — answers to "do you support X?"
 3. **02-feature-catalog** — deep dive on what's included
 4. **03-competitive-positioning** — honest comparison vs whatever you're using today
@@ -45,7 +45,7 @@
 4. **02-feature-catalog** — what features exist + what's coming
 5. **03-competitive-positioning** — defensibility analysis
 
-### Journalist / blogger writing about Force Store
+### Journalist / blogger writing about Force AI Store
 
 1. **01-overview** — the pitch you can quote
 2. **06-faq** — answers to common reader questions
@@ -104,4 +104,4 @@ If you came from the business side and want to peek under the hood:
 
 - **Spotted a contradiction?** Open an issue or email [hello@forcemediakw.com](mailto:hello@forcemediakw.com)
 - **Want to translate to Arabic?** AR versions are on the roadmap — the primary product is already bilingual, but these docs are EN-only for now
-- **Want to use this material in marketing?** Yes, the prose is yours to adapt. Cite Force Store / Force AI as source.
+- **Want to use this material in marketing?** Yes, the prose is yours to adapt. Cite Force AI Store / Force AI as source.

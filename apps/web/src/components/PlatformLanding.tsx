@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 /**
  * Platform landing page for `store.forcemediakw.com` — replaces the
  * old "redirect to forcemediakw.com" behaviour with a properly
- * positioned page about the Force Store Builder service itself.
+ * positioned page about the Force AI Store Builder service itself.
  *
  * Used in two places:
  *   1. The bare-root homepage when no merchant slug / domain resolved
@@ -26,12 +26,12 @@ const ORANGE_DARK = '#3D1F1F';
 type Lang = 'en' | 'ar';
 
 const COPY = {
-  // Force AI = company, Force Store = product on this page.
+  // Force AI = company, Force AI Store = product on this page.
   // Header shows the product name prominently with the company as a
   // smaller affiliation line — same pattern Stripe uses (Stripe /
   // Atlas, Stripe / Climate). Visitors see what page they're on
   // first, then who makes it.
-  brand: { en: 'Force Store', ar: 'فورس ستور' },
+  brand: { en: 'Force AI Store', ar: 'فورس ستور' },
   brandCompany: { en: 'by Force AI', ar: 'من Force AI' },
   langToggle: { en: 'عربي', ar: 'English' },
   navServices: { en: 'What we do', ar: 'خدماتنا' },
@@ -48,8 +48,8 @@ const COPY = {
     ar: 'بيع أكثر في الكويت، بمجهود أقل',
   },
   heroSubtitle: {
-    en: 'Force Store is a done-for-you online store that handles the boring parts — payments, delivery, taxes, customer accounts — so you can focus on products, marketing, and growing your sales.',
-    ar: 'Force Store متجر إلكتروني نُجهّزه لك يتولى المهام الرتيبة — الدفع، التوصيل، الضرائب، حسابات العملاء — حتى تتفرغ لمنتجاتك وتسويقك ونمو مبيعاتك.',
+    en: 'Force AI Store is a done-for-you online store that handles the boring parts — payments, delivery, taxes, customer accounts — so you can focus on products, marketing, and growing your sales.',
+    ar: 'Force AI Store متجر إلكتروني نُجهّزه لك يتولى المهام الرتيبة — الدفع، التوصيل، الضرائب، حسابات العملاء — حتى تتفرغ لمنتجاتك وتسويقك ونمو مبيعاتك.',
   },
   heroCta1: { en: 'Talk on WhatsApp', ar: 'تواصل عبر واتساب' },
   heroCta2: { en: 'Email us', ar: 'راسلنا بالبريد' },
@@ -111,7 +111,7 @@ const COPY = {
     ar: 'لديك قائمة عملاء جاهزة؟',
   },
   wbsCalloutBody: {
-    en: 'Force WhatsApp Business Platform is our sister product. Send personalised WhatsApp campaigns to hundreds or thousands of customers at once — promotions, order updates, abandoned-cart reminders. Bundle it with your store and we’ll connect your customer list on day one.',
+    en: 'Force AI WhatsApp Business Platform is our sister product. Send personalised WhatsApp campaigns to hundreds or thousands of customers at once — promotions, order updates, abandoned-cart reminders. Bundle it with your store and we’ll connect your customer list on day one.',
     ar: 'منصة فورس لأعمال واتساب هي منتجنا الشقيق. أرسل حملات واتساب مخصصة لمئات أو آلاف العملاء دفعة واحدة — عروض، تحديثات طلبات، تذكير بالسلات المتروكة. اشترك معه مع متجرك ونربط قائمة عملائك من اليوم الأول.',
   },
   wbsCalloutCta: { en: 'Ask about the bundle', ar: 'اسأل عن الباقة المشتركة' },
@@ -125,8 +125,8 @@ const COPY = {
   contactCity: { en: 'Fahad Al-Salem Street, Kuwait City', ar: 'شارع فهد السالم، مدينة الكويت' },
 
   footerTagline: {
-    en: 'Force Store + Force WhatsApp Business Platform · made by Force AI in Kuwait.',
-    ar: 'Force Store و Force WhatsApp Business Platform · من إنتاج Force AI في الكويت.',
+    en: 'Force AI Store + Force AI WhatsApp Business Platform · made by Force AI in Kuwait.',
+    ar: 'Force AI Store و Force AI WhatsApp Business Platform · من إنتاج Force AI في الكويت.',
   },
   footerCopyright: {
     en: '© 2026 Force Media Kuwait. All rights reserved.',
@@ -390,7 +390,7 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link href="/" className="flex items-center gap-2.5">
-            <img src="/logo.svg" alt="Force Store" className="h-9 w-auto md:h-10" />
+            <img src="/logo.svg" alt="Force AI Store" className="h-9 w-auto md:h-10" />
             <div className="flex flex-col leading-none">
               <span className="text-xl font-extrabold tracking-tight text-gray-900 md:text-2xl">
                 {t(COPY.brand)}
@@ -626,10 +626,10 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
         </div>
       </section>
 
-      {/* Sister-product callout — Force WhatsApp Business Platform.
+      {/* Sister-product callout — Force AI WhatsApp Business Platform.
           Sits BEFORE the parent-brand marketing callout so the
           adjacent product upsell (operational use case for an
-          existing Force Store customer) is the first cross-sell a
+          existing Force AI Store customer) is the first cross-sell a
           merchant sees. The marketing callout below cross-sells the
           parent brand for traffic acquisition. */}
       <section className="py-20">
@@ -736,7 +736,7 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
       <footer className="border-t border-gray-100 bg-white py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 text-sm text-gray-500 md:flex-row">
           <div className="flex items-center gap-2.5">
-            <img src="/logo.svg" alt="Force Store" className="h-7 w-auto" />
+            <img src="/logo.svg" alt="Force AI Store" className="h-7 w-auto" />
             <div className="flex flex-col leading-none">
               <span className="text-base font-extrabold text-gray-800">{t(COPY.brand)}</span>
               <span

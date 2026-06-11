@@ -1,4 +1,4 @@
--- AI usage tracking for the Force Store AI assistant. Every call to
+-- AI usage tracking for the Force AI Store AI assistant. Every call to
 -- AIService writes a row so we can enforce per-store daily token
 -- budgets and audit usage. Cached hits are recorded with
 -- `cached_hit=true` for observability but are not counted against the

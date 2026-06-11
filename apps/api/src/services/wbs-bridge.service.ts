@@ -1,5 +1,5 @@
 /**
- * Force WhatsApp Business Platform Bridge Service
+ * Force AI WhatsApp Business Platform Bridge Service
  *
  * Sends WhatsApp order-lifecycle notifications through a merchant's WBS client
  * by calling the external API endpoint on the WBS backend.
@@ -59,7 +59,7 @@ export interface WbsSendParams {
   idempotencyKey: string;
   /**
    * Phase 6 final-loop. Optional: when this template send corresponds to a
-   * Force Store order, pass the order id so WBS can stamp wa_carts.fwb_order_id
+   * Force AI Store order, pass the order id so WBS can stamp wa_carts.fwb_order_id
    * during the auto-completion side-effect. Closes the analytics join.
    */
   fwbOrderId?: string;

@@ -241,7 +241,7 @@ export function storeJsonLd(s: StoreSchemaData): object {
           address: {
             '@type': 'PostalAddress',
             streetAddress: s.address,
-            addressCountry: 'KW', // Kuwait — platform-wide default for Force Store
+            addressCountry: 'KW', // Kuwait — platform-wide default for Force AI Store
           },
         }
       : {}),

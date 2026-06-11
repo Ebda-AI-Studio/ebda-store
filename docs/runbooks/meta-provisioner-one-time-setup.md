@@ -69,7 +69,7 @@ railway variables --set FORCE_AI_META_ADMIN_TOKEN=<paste-the-token-from-step-4>
 railway redeploy --yes  # so the API picks up the new env
 ```
 
-Alternative if you prefer the dashboard: Railway → Force Store API service → **Variables** tab → **+ New Variable** for each.
+Alternative if you prefer the dashboard: Railway → Force AI Store API service → **Variables** tab → **+ New Variable** for each.
 
 ## Step 6 — Smoke test from your laptop
 
@@ -103,7 +103,7 @@ If either returns a `401` or `OAuthException`, the token is wrong / scopes are m
 Save to your password manager:
 
 - Vault entry: `Force AI — Meta master provisioner token`
-- Note: this token is in Railway's env vars on the Force Store API service as `FORCE_AI_META_ADMIN_TOKEN`. Rotating it requires (a) generating a fresh token in Meta BM (re-do step 4), (b) updating the Railway var, (c) `railway redeploy`. No merchant downtime.
+- Note: this token is in Railway's env vars on the Force AI Store API service as `FORCE_AI_META_ADMIN_TOKEN`. Rotating it requires (a) generating a fresh token in Meta BM (re-do step 4), (b) updating the Railway var, (c) `railway redeploy`. No merchant downtime.
 
 ## Troubleshooting
 

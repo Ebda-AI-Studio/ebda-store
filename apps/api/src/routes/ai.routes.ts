@@ -1,5 +1,5 @@
 /**
- * Force Store AI assistant — translation, SEO meta, category suggestions.
+ * Force AI Store AI assistant — translation, SEO meta, category suggestions.
  *
  * Mounted at `/stores/:storeId/ai/*`. Every endpoint requires
  * `store_admin` or `super_admin` scoped to the store, plus the

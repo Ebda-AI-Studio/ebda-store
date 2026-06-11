@@ -155,14 +155,14 @@ async function fetchProducts(storeId: string): Promise<PublicProduct[]> {
 function buildPlatformBody(stores: PublicStore[]): string {
   const storeLines = stores
     .map(s => {
-      const desc = s.description?.trim() || 'Kuwait-based merchant on Force Store.';
+      const desc = s.description?.trim() || 'Kuwait-based merchant on Force AI Store.';
       return `- [${s.name}](https://store.forcemediakw.com/${s.slug}): ${desc}`;
     })
     .join('\n');
 
-  return `# Force Store — Multi-tenant Storefront Platform
+  return `# Force AI Store — Multi-tenant Storefront Platform
 
-> Force Store is the per-merchant e-commerce platform run by Force Media Kuwait.
+> Force AI Store is the per-merchant e-commerce platform run by Force Media Kuwait.
 > Each merchant gets a path-based storefront at \`store.forcemediakw.com/<slug>\`
 > with their own products, branding, and contact info. Customers in Kuwait,
 > Saudi Arabia, and Qatar can browse + buy across multiple merchants from one
@@ -227,7 +227,7 @@ function buildPerStoreBody(
   const contactLines = contactParts.join('\n');
 
   const storeTitle = store.nameAr ? `${store.name} (${store.nameAr})` : store.name;
-  const storeDesc = store.description || `${store.name} on Force Store — Kuwait-based merchant.`;
+  const storeDesc = store.description || `${store.name} on Force AI Store — Kuwait-based merchant.`;
 
   return `# ${storeTitle}
 
@@ -254,7 +254,7 @@ ${prodLines || '_No active products._'}
 
 ## Platform
 
-This store is hosted on Force Store, a multi-tenant e-commerce platform by
+This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
 Force Media Kuwait. See https://store.forcemediakw.com/llms.txt for the
 platform-wide index.
 `;

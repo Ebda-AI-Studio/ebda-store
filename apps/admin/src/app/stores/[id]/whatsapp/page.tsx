@@ -87,7 +87,7 @@ export default function WhatsAppMasterPage() {
   return (
     <AdminLayout
       title="WhatsApp Integration"
-      subtitle="Force WhatsApp Business Platform · templates · order updates · payment links"
+      subtitle="Force AI WhatsApp Business Platform · templates · order updates · payment links"
     >
       {/* Tab strip */}
       <div className="border-b border-border mb-6">

@@ -75,7 +75,7 @@ Changes vs current static wrapper:
 
 - **Header bar** background = sanitized `store.theme.primary` (HSL string or hex, runs through the existing `sanitizeThemeColor` pipeline from `apps/web/src/app/layout.tsx`). Fall back to platform orange `#ff6e00` if missing or invalid.
 - **Header content** = `<img src="${store.logo}">` if logo present, else `<h1>${store.name}</h1>` in white. RTL-aware via `dir="rtl"` when `defaultLanguage === 'ar'`.
-- **Footer** = `© ${year} ${store.name}` + store address + phone + contact email, followed by a small grey "Powered by Force Store" attribution line.
+- **Footer** = `© ${year} ${store.name}` + store address + phone + contact email, followed by a small grey "Powered by Force AI" attribution line.
 - **Subjects** — every hardcoded "Force Media" in `subject:` strings replaced with `store.name`. Localized AR variants when `defaultLanguage === 'ar'`.
 - **Order confirmation** receipt content — already structurally correct (items + totals + shipping addr). Add the "Thanks for shopping at ${store.name}" line at the top.
 
@@ -173,7 +173,7 @@ GET  /stores/:id/email-sender/dns         → returns unified DNS record list (V
 
 ## Bug-class audit (per Ahmad's standing rule)
 
-While in this code path, fix all instances of the `forcemedia.com` typo. Grep `apps/api/src` + `packages/shared/src` for `'forcemedia.com'` (without the `kw`) and replace with `'forcemediakw.com'`. Also audit subject-line and template-string hardcodes for any other `Force Media` / `Force Store` references that should be `store.name` in the customer-facing path.
+While in this code path, fix all instances of the `forcemedia.com` typo. Grep `apps/api/src` + `packages/shared/src` for `'forcemedia.com'` (without the `kw`) and replace with `'forcemediakw.com'`. Also audit subject-line and template-string hardcodes for any other `Force Media` / `Force AI Store` references that should be `store.name` in the customer-facing path.
 
 ## Out of scope (deferred)
 

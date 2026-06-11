@@ -93,7 +93,7 @@ try {
       <p style="margin-top:24px;color:#666;font-size:13px;">Generated at ${new Date().toISOString()}</p>
     </div>
     <div style="background:#f5f5f5;padding:16px;text-align:center;font-size:12px;color:#666;">
-      Powered by Force Store
+      Powered by Force AI
     </div>
   </div>
 </body>

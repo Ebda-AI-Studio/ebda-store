@@ -1,17 +1,17 @@
-# Force Store — Proposal Pricing Framework
+# Force AI Store — Proposal Pricing Framework
 
 **Internal document. Last updated: 2026-06-01. Owner: Ahmad Sharaf / Force AI.**
 
-> **There is no public tier list.** Force Store is sold as a **managed e-commerce platform** by Force AI / Force Media. Every client gets a **custom proposal** based on the features they need. Pricing is per-client, not per-tier. This doc holds the inputs you need to write good proposals — cost floors, feature value bands, competitor benchmarks.
+> **There is no public tier list.** Force AI Store is sold as a **managed e-commerce platform** by Force AI / Force Media. Every client gets a **custom proposal** based on the features they need. Pricing is per-client, not per-tier. This doc holds the inputs you need to write good proposals — cost floors, feature value bands, competitor benchmarks.
 
 ---
 
-## 1. How Force Store actually sells
+## 1. How Force AI Store actually sells
 
 Per Ahmad's standing 2026-05-22 description:
 
 1. **Client comes to Force AI** (usually through Force Media agency relationships, referrals, or inbound contact)
-2. **Sees the contract** — full list of features Force Store offers
+2. **Sees the contract** — full list of features Force AI Store offers
 3. **You write a proposal** — pick the features the client needs, set a price, send the contract
 4. **Client pays** — typically upfront or 50/50 split (deposit + on-completion)
 5. **Onboarding begins** — you ask for:
@@ -64,17 +64,17 @@ What it costs YOU per merchant per month on infrastructure:
 | Wix eCommerce           | $27-59 USD                                                 | Limited Arabic support      |
 | WooCommerce + agency    | $5-15k upfront + $200-500/mo maintenance                   | Self-managed risk           |
 
-**Use this to:** anchor against the competitor the client cites. Most Kuwait merchants compare against Shopify or are evaluating "do I just hire a developer for WooCommerce?" — the agency-managed Force Store sells against both.
+**Use this to:** anchor against the competitor the client cites. Most Kuwait merchants compare against Shopify or are evaluating "do I just hire a developer for WooCommerce?" — the agency-managed Force AI Store sells against both.
 
 ### 2c. Plan tiers and feature value bands (what to charge for each feature group in a proposal)
 
-The Force Store plan system defines four tiers — `free` (grace/lapsed state only, not sold), `starter`, `professional`, `enterprise`. The source of truth is `packages/shared/src/plan-baselines.ts`. When building a proposal, use the tier as the starting point, then layer add-ons and white-glove services on top.
+The Force AI Store plan system defines four tiers — `free` (grace/lapsed state only, not sold), `starter`, `professional`, `enterprise`. The source of truth is `packages/shared/src/plan-baselines.ts`. When building a proposal, use the tier as the starting point, then layer add-ons and white-glove services on top.
 
 #### Starter plan — baseline features (always included for any paying client)
 
 `coupons`, `returns`, `reviews`, `tax`, `pwa`, `marketing_pixels`, `shipping_carriers`, `bulk_operations`, `abandoned_cart`, `inventory.basic`
 
-These are table stakes. Every Force Store client gets them. Don't itemize in a proposal — bundle into the platform fee.
+These are table stakes. Every Force AI Store client gets them. Don't itemize in a proposal — bundle into the platform fee.
 
 Also included in every tier at no extra charge:
 
@@ -103,7 +103,7 @@ Also included in every tier at no extra charge:
 | `inventory.multi_warehouse`, `inventory.barcode`, `inventory.purchase_orders`, `inventory.bulk_adjustments`     | "Full warehouse management, barcode scanning, purchase order workflow"            | Included in Enterprise                                  |
 | `accounting.tax_reports`, `accounting.multi_currency`, `accounting.profit_anomaly`, `accounting.bank_reconcile` | "Advanced accounting: tax reports, multi-currency, profit anomaly AI, bank recon" | Included in Enterprise                                  |
 
-> **`whatsapp` is a separate add-on at any plan tier.** It requires an active Force WhatsApp Business Platform account. Price: Setup 150-300 KWD + Monthly 10-25 KWD. Bot intelligence (Gemini NLU, voice, photo matching, returning-customer personalization) is included in the WhatsApp add-on at no extra charge — the platform absorbs the Gemini free-tier cost.
+> **`whatsapp` is a separate add-on at any plan tier.** It requires an active Force AI WhatsApp Business Platform account. Price: Setup 150-300 KWD + Monthly 10-25 KWD. Bot intelligence (Gemini NLU, voice, photo matching, returning-customer personalization) is included in the WhatsApp add-on at no extra charge — the platform absorbs the Gemini free-tier cost.
 
 > **`whatsapp` can be added to any Starter, Professional, or Enterprise client.** It is not baseline-included in any plan; it always requires a per-store activation step.
 
@@ -136,12 +136,12 @@ Custom dev requests are where Force AI margin is highest BUT also where scope cr
 Per Ahmad's standing 2026-05-22 instruction — **payments are handled by Ahmad/Force Media** as part of the onboarding service:
 
 - You help the client get a Tap, MyFatoorah, Hesabe, or UPayments account if they don't have one
-- The merchant's payment provider credentials are configured in their Force Store admin
+- The merchant's payment provider credentials are configured in their Force AI Store admin
 - Money flows direct from customer → merchant's payment provider account → merchant's bank
-- Force Store doesn't touch the funds
+- Force AI Store doesn't touch the funds
 - No CBK licensing required
 
-What Force Store charges the merchant:
+What Force AI Store charges the merchant:
 
 - One-off setup fee (your time onboarding)
 - Monthly platform fee (recurring)
@@ -227,7 +227,7 @@ Each enterprise prospect gets a fully custom contract. Typical contract value:
 | Objection                                              | Response                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | "Shopify is only $39/mo"                               | "Shopify is $39 + a $20 translation app + a 3rd-party KNET plugin + you still need someone to set it up. The all-in cost is $80-150/mo for what you'd get from us in one bill, fully managed."                                                                                                                                                                                                                                                                    |
-| "Salla is cheaper at SAR 99"                           | "Salla is built for Saudi Arabia. KNET works but is not the primary integration. AR is the only storefront language. If you sell to Kuwait specifically and want English-speaking customers too, Force Store is built for that case."                                                                                                                                                                                                                             |
+| "Salla is cheaper at SAR 99"                           | "Salla is built for Saudi Arabia. KNET works but is not the primary integration. AR is the only storefront language. If you sell to Kuwait specifically and want English-speaking customers too, Force AI Store is built for that case."                                                                                                                                                                                                                             |
 | "Can I do month-to-month?"                             | "Yes, but we offer 2 months free on annual prepay — most clients pick that. Month-to-month is fine for the first 3 months while you decide."                                                                                                                                                                                                                                                                                                                      |
 | "What if I want to leave?"                             | "Your data is yours. We export everything as CSV/Excel. Your custom domain transfers back to your registrar. We give you 30 days of read-only access after cancellation to download anything you need."                                                                                                                                                                                                                                                           |
 | "What about my customer reviews / orders / customers?" | "All exportable. We use standard formats — you can import them into Shopify, Wix, or anywhere else."                                                                                                                                                                                                                                                                                                                                                              |
@@ -244,7 +244,7 @@ Before sending a proposal:
 - [ ] Confirm the merchant's product count (drives catalog import cost)
 - [ ] Confirm bilingual needs (EN-only, AR-only, or both)
 - [ ] Confirm payment provider (Tap / MyFatoorah / Hesabe / UPayments) — set up account if they don't have one
-- [ ] Confirm custom domain availability (or provision a Force Store subdomain)
+- [ ] Confirm custom domain availability (or provision a Force AI Store subdomain)
 - [ ] Identify which Band 2 add-ons they want (Loyalty / Affiliate / WhatsApp / etc.)
 - [ ] Identify any Band 3 white-glove services they need (catalog import, photoshoot, branding)
 - [ ] Identify any Band 4 custom dev — if yes, fixed-scope contract addendum
@@ -263,7 +263,7 @@ Before sending a proposal:
 3. **Layer overrides only for hybrid deals** — only flip `StoreFeature` rows for features OUTSIDE the chosen plan's baseline (e.g. a starter client who paid for the `whatsapp_bot` add-on). Plan changes never touch override rows, so upgrading or downgrading the store doesn't lose merchant-paid extras.
 4. **Configure payment provider** — set up Tap/MyFatoorah/Hesabe/UPayments credentials per the client's account
 5. **Provision Meta Commerce catalog** — if the client paid for the WhatsApp Native Catalog Bot, click **Provision automatically** in Admin → WhatsApp Bot → MetaCatalogCard. No Meta Business Manager steps required from the client.
-6. **Onboard the client** — branding, catalog import (Excel → Force Store), theme config, training session
+6. **Onboard the client** — branding, catalog import (Excel → Force AI Store), theme config, training session
 7. **Verify it works** — place a test order, verify webhooks fire, verify order confirmation email arrives, check the `payment_events` audit log shows the full lifecycle
 8. **Hand over** — give the client admin credentials, schedule the training session, schedule a 2-week check-in
 
