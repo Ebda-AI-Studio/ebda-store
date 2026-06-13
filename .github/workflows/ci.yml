@@ -2,10 +2,10 @@ name: CI
 
 on:
   push:
-    # staging added 2026-05-27 — after the staging-deployment gate was
-    # introduced, staging is now an active integration target and needs
-    # the same CI rigor as main.
-    branches: [main, staging, develop]
+    # main-only (2026-06-13): the staging environment + branch were retired
+    # (worktree→PR→CI→main is the only flow; staging drained Neon + Railway
+    # 24/7 for zero use). develop was never active either.
+    branches: [main]
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -15,10 +15,8 @@ on:
       - '.vscode/**'
       - '.editorconfig'
   pull_request:
-    # PRs targeting staging must run the full CI suite — that's the whole
-    # point of staging being a gate. Before 2026-05-27, PRs to staging
-    # never fired ci.yml and merged with only the secret-scanner check.
-    branches: [main, staging, develop]
+    # main-only (2026-06-13): staging/develop retired (see push trigger above).
+    branches: [main]
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -196,7 +194,8 @@ jobs:
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+          --health-start-period 30s
       redis:
         image: redis:7-alpine
         ports:
@@ -252,14 +251,14 @@ jobs:
         run: |
           node apps/api/dist/index.js > /tmp/api-server.log 2>&1 &
           echo $! > /tmp/api-server.pid
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             if curl -sf http://localhost:4000/health > /dev/null; then
               echo "API server is healthy after ${i} attempts"
               exit 0
             fi
             sleep 1
           done
-          echo "API server failed to start within 30 seconds"
+          echo "API server failed to start within 90 seconds"
           cat /tmp/api-server.log
           exit 1
         env:
@@ -280,10 +279,11 @@ jobs:
         # shared test setup connects to Postgres + Redis, which only this job has.
         run: npx vitest run tests/integration apps/api/src --reporter=verbose
         env:
-          # TEST_DATABASE_URL points at the Neon "preview" staging branch.
-          # setup-e2e.ts uses this in preference to DATABASE_URL so integration
-          # tests run against ep-spring-dew (staging), never ep-falling-meadow (prod).
-          # The secret is set via: gh secret set TEST_DATABASE_URL --repo ForceAI-KW/force-website-builder
+          # Integration tests run against the ephemeral postgres SERVICE CONTAINER
+          # (localhost below), never a Neon branch. The old TEST_DATABASE_URL path
+          # (pointed at the ep-spring-dew preview branch) is retired with staging —
+          # the secret is no longer mapped here, so setup-e2e.ts falls through to
+          # this container DATABASE_URL. Standard: CI never forks a Neon branch.
           DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
           REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
@@ -329,7 +329,8 @@ jobs:
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+          --health-start-period 30s
       redis:
         image: redis:7-alpine
         ports:
