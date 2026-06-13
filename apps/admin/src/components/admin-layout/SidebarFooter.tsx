@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import AdminLanguageSwitcher from '../AdminLanguageSwitcher';
+import { useFocusMode } from '@/contexts/FocusModeContext';
 import { useT } from '@/i18n/useT';
 
 interface SidebarFooterUser {
@@ -15,13 +16,54 @@ interface SidebarFooterProps {
   onToggleTheme: () => void;
   user: SidebarFooterUser | null | undefined;
   onLogout: () => void;
+  /** When provided, the footer shows an "Enter focus mode" button. */
+  storeId?: string | null;
 }
 
-export function SidebarFooter({ isDark, onToggleTheme, user, onLogout }: SidebarFooterProps) {
+export function SidebarFooter({
+  isDark,
+  onToggleTheme,
+  user,
+  onLogout,
+  storeId,
+}: SidebarFooterProps) {
   const t = useT('components.adminLayout');
+  const { enterFocusMode } = useFocusMode();
 
   return (
     <>
+      {/* Focus Mode Entry — only shown when a store is in scope */}
+      {storeId && (
+        <div className="px-4 pb-2">
+          <button
+            type="button"
+            onClick={() => enterFocusMode(storeId)}
+            className="flex w-full items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            title={t('focusMode.focusModeHint')}
+          >
+            <svg
+              className="h-4 w-4 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              {/* Target / focus icon */}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.75}
+                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+              />
+            </svg>
+            <span className="flex-1 text-start">{t('focusMode.enterFocusMode')}</span>
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+              {t('focusMode.ordersOnly')}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* Language + Theme Toggles */}
       <div className="flex items-center justify-between gap-2 px-4 pb-2">
         <AdminLanguageSwitcher />

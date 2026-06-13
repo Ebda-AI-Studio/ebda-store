@@ -19,7 +19,9 @@ import { SidebarHeader } from './admin-layout/SidebarHeader';
 import { SidebarNav } from './admin-layout/SidebarNav';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
 import { TopBar } from './admin-layout/TopBar';
+import { FocusTopBar } from './admin-layout/FocusTopBar';
 import { MobileBottomNav } from './mobile/MobileBottomNav';
+import { useFocusMode } from '../contexts/FocusModeContext';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -55,6 +57,7 @@ export function AdminLayout({
   const { user, logout, isLoading } = useAuth();
   const { selectedStoreId: globalStoreId } = useStore();
   const { isEnabled: isFeatureEnabled } = useFeatures();
+  const { isFocused, focusStoreId, enterFocusMode } = useFocusMode();
 
   // When a super_admin is browsing inside a specific store
   // (`/stores/<id>/...`), they need the store-admin nav (Layout, Content,
@@ -172,6 +175,41 @@ export function AdminLayout({
     return null;
   }, [storeId, pathname, globalStoreId]);
 
+  // ── Focus-mode pending resolution ──────────────────────────────────────
+  // When the admin PWA is launched via the "?focus=1" shortcut but there
+  // was no storeId in localStorage yet, FocusModeProvider sets the internal
+  // state to '__pending__' (isFocused=false, focusStoreId=null externally).
+  // AdminLayout waits until currentStoreId resolves and then calls
+  // enterFocusMode to complete the transition.
+  useEffect(() => {
+    if (!isFocused && currentStoreId && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('focus') === '1') {
+        try {
+          // Only enter if there's no valid stored storeId yet
+          const raw = localStorage.getItem('fwb_focus_mode');
+          if (!raw) {
+            enterFocusMode(currentStoreId);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [isFocused, currentStoreId, enterFocusMode]);
+
+  // ── Focus-mode route guard (client-side only) ──────────────────────────
+  // When focus mode is ON, every page under the current store that is NOT
+  // under /orders redirects to the orders list. We deliberately do NOT
+  // touch server middleware (cross-origin auth is client-side in this app).
+  useEffect(() => {
+    if (!isFocused || !focusStoreId || !pathname) return;
+    const ordersBase = `/stores/${focusStoreId}/orders`;
+    if (!pathname.startsWith(ordersBase)) {
+      router.replace(ordersBase);
+    }
+  }, [isFocused, focusStoreId, pathname, router]);
+
   // Fetch store domain/slug + branding for "View Store" button and sidebar
   // header. The shared useCurrentStore hook dedupes + caches, so we only hit
   // the network once per storeId regardless of how many admin pages mount
@@ -266,7 +304,13 @@ export function AdminLayout({
         onNavigate={() => setIsSidebarOpen(false)}
         activeHubKey={activeHubKey}
       />
-      <SidebarFooter isDark={isDark} onToggleTheme={toggleTheme} user={user} onLogout={logout} />
+      <SidebarFooter
+        isDark={isDark}
+        onToggleTheme={toggleTheme}
+        user={user}
+        onLogout={logout}
+        storeId={navStoreId || null}
+      />
     </>
   );
 
@@ -283,6 +327,22 @@ export function AdminLayout({
           </div>
           <p className="text-sm font-medium text-muted-foreground">{tc('loadingDashboard')}</p>
         </div>
+      </div>
+    );
+  }
+
+  // ── Focus mode layout ─────────────────────────────────────────────────
+  // All sidebars and bottom nav are suppressed; a minimal top bar replaces
+  // the full TopBar. The `lg:ms-72` offset is dropped because there is no
+  // desktop sidebar to avoid. Hub tabs are not needed — orders list is the
+  // only destination.
+  if (isFocused) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <FocusTopBar storeBranding={resolvedStoreBranding} />
+        <main id="admin-main-content" tabIndex={-1} className="min-w-0 flex-1 p-4 pb-6 lg:p-6">
+          {children}
+        </main>
       </div>
     );
   }

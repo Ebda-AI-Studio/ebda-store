@@ -3829,7 +3829,15 @@
       "forcePlatformBrand": "Platform",
       "forceAdminBrand": "Admin",
       "forceBrandPrefix": "Force",
-      "languageLabel": "Language"
+      "languageLabel": "Language",
+      "focusMode": {
+        "enterFocusMode": "Focus mode",
+        "exitFocusMode": "Exit focus mode",
+        "ordersOnly": "Orders only",
+        "enableNotifications": "Enable order notifications",
+        "notificationsEnabled": "Notifications on",
+        "focusModeHint": "Collapses the app to orders only on this device"
+      }
     },
     "errorState": {
       "defaultTitle": "Something went wrong",

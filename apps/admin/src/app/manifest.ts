@@ -55,6 +55,24 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: 'any',
       },
     ],
+    // Focus-mode shortcut: install the admin PWA, long-press its icon (Android)
+    // or use the shortcuts list, and pick "Orders Focus" to land straight in
+    // the orders-only station without going through the full dashboard.
+    shortcuts: [
+      {
+        name: 'Orders Focus',
+        short_name: 'Orders',
+        description: 'Jump straight to focus mode — orders-only view',
+        url: '/?focus=1',
+        icons: [
+          {
+            src: '/icon-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+        ],
+      },
+    ],
     categories: ['business', 'productivity'],
   };
 }

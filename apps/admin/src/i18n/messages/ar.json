@@ -3829,7 +3829,15 @@
       "forcePlatformBrand": "Platform",
       "forceAdminBrand": "Admin",
       "forceBrandPrefix": "Force",
-      "languageLabel": "اللغة"
+      "languageLabel": "اللغة",
+      "focusMode": {
+        "enterFocusMode": "وضع التركيز",
+        "exitFocusMode": "الخروج من وضع التركيز",
+        "ordersOnly": "الطلبات فقط",
+        "enableNotifications": "تفعيل إشعارات الطلبات",
+        "notificationsEnabled": "الإشعارات مفعّلة",
+        "focusModeHint": "يُقيّد التطبيق على شاشة الطلبات فقط على هذا الجهاز"
+      }
     },
     "errorState": {
       "defaultTitle": "حدث خطأ ما",
