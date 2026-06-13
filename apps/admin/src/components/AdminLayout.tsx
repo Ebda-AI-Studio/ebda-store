@@ -338,13 +338,11 @@ export function AdminLayout({
       </aside>
 
       {/* Main Content. min-w-0 lets this flex child shrink below its content
-          width so a wide descendant (table, long row) scrolls itself instead
-          of pushing the whole viewport; overflow-x-clip is the backstop. */}
-      <main
-        id="admin-main-content"
-        tabIndex={-1}
-        className="min-w-0 flex-1 overflow-x-clip lg:ms-72"
-      >
+          width so wide descendants don't push the viewport. We deliberately do
+          NOT clip overflow here: overflow-x-clip was hiding real data (order
+          prices / store dates ran under the clip). Individual wide surfaces
+          (tables) own their own overflow-x-auto instead. */}
+      <main id="admin-main-content" tabIndex={-1} className="min-w-0 flex-1 lg:ms-72">
         <TopBar
           title={title}
           subtitle={subtitle}

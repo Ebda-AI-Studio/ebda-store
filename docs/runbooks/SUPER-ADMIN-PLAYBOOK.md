@@ -22,7 +22,7 @@ Force AI Store: **Starter / Professional / Enterprise** (plus `free` as a stripp
 | Accounting — tax reports + multi-currency + profit anomaly + bank reconcile          | —                  | —                  | ✓                  |
 | Loyalty + push notifications + upsell-crosssell                                      | —                  | ✓                  | ✓                  |
 | Affiliate program + SMS + floating widget                                            | —                  | —                  | ✓                  |
-| Force AI WhatsApp bot integration                                                       | **Separate quote** | **Separate quote** | **Separate quote** |
+| Force AI WhatsApp bot integration                                                    | **Separate quote** | **Separate quote** | **Separate quote** |
 
 The canonical source is `packages/shared/src/plan-baselines.ts` — when the table here disagrees with the code, the code is right.
 

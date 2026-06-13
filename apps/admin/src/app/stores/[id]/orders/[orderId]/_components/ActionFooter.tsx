@@ -93,8 +93,11 @@ export function ActionFooter({
   const showRefreshRefundStatus = !!refundedPayment;
 
   return (
+    // Lifted above the fixed MobileBottomNav (h-14 = 56px) on mobile so the
+    // action buttons aren't hidden behind it — rule 6 "fixed-bottom UI" recipe.
+    // md:bottom-0 because the nav is md:hidden (desktop = sidebar).
     <div
-      className="sticky bottom-0 z-20 -mx-4 mt-6 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:bg-card sm:p-3 print:hidden"
+      className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 z-20 -mx-4 mt-6 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:bg-card sm:p-3 print:hidden"
       role="toolbar"
       aria-label="Order actions"
     >

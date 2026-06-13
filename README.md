@@ -141,10 +141,10 @@ The Force AI WhatsApp Business Platform (WBS) hosts the bot engine. Force AI Sto
 
 The Gemini AI models live entirely in WBS (`GEMINI_API_KEY` env var on the Railway WBS service). Force AI Store's `apps/api/src/services/ai.service.ts` uses `GOOGLE_GENERATIVE_AI_KEY` for catalog content tasks (translate, SEO, category suggestion). These are two separate keys and two separate call paths:
 
-| Key                        | Service         | Used for                                                                               |
-| -------------------------- | --------------- | -------------------------------------------------------------------------------------- |
+| Key                        | Service            | Used for                                                                               |
+| -------------------------- | ------------------ | -------------------------------------------------------------------------------------- |
 | `GOOGLE_GENERATIVE_AI_KEY` | Force AI Store API | Translation, SEO generation, category suggestion, FAQ generation, review summarization |
-| `GEMINI_API_KEY`           | WBS API         | Bot intent classification, voice transcription, product photo matching                 |
+| `GEMINI_API_KEY`           | WBS API            | Bot intent classification, voice transcription, product photo matching                 |
 
 The bot degrades gracefully: if `GEMINI_API_KEY` is unset in WBS, the bot reverts to legacy keyword mode (still functional, no natural language understanding).
 

@@ -6,14 +6,14 @@
 
 ## Documents in this folder
 
-| #   | Document                                                       | Audience                                                                                                     | Length       |
-| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------ |
-| 1   | [01-overview.md](01-overview.md)                               | Everyone — start here                                                                                        | ~1,200 words |
-| 2   | [02-feature-catalog.md](02-feature-catalog.md)                 | Merchant prospect evaluating the product                                                                     | ~3,200 words |
-| 3   | [03-competitive-positioning.md](03-competitive-positioning.md) | Merchant comparing vs Shopify / Salla / Wix / WooCommerce                                                    | ~2,900 words |
+| #   | Document                                                       | Audience                                                                                                        | Length       |
+| --- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------ |
+| 1   | [01-overview.md](01-overview.md)                               | Everyone — start here                                                                                           | ~1,200 words |
+| 2   | [02-feature-catalog.md](02-feature-catalog.md)                 | Merchant prospect evaluating the product                                                                        | ~3,200 words |
+| 3   | [03-competitive-positioning.md](03-competitive-positioning.md) | Merchant comparing vs Shopify / Salla / Wix / WooCommerce                                                       | ~2,900 words |
 | 4   | [04-pricing-tiers.md](04-pricing-tiers.md)                     | Internal — proposal-pricing framework (Force AI Store is sold as a managed agency service, not self-serve SaaS) | ~3,800 words |
-| 5   | [05-pitch-deck-outline.md](05-pitch-deck-outline.md)           | Sales / investor / acquirer pitch (12-slide outline)                                                         | ~1,800 words |
-| 6   | [06-faq.md](06-faq.md)                                         | Public-facing FAQ                                                                                            | ~3,000 words |
+| 5   | [05-pitch-deck-outline.md](05-pitch-deck-outline.md)           | Sales / investor / acquirer pitch (12-slide outline)                                                            | ~1,800 words |
+| 6   | [06-faq.md](06-faq.md)                                         | Public-facing FAQ                                                                                               | ~3,000 words |
 
 **Total:** ~16,200 words. Reading time end-to-end: ~75 minutes.
 

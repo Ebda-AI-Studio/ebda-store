@@ -68,7 +68,8 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
       : tone === 'amber'
         ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
         : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
-  const dot = tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-gray-400';
+  const dot =
+    tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-gray-400';
   const label =
     tone === 'green' ? 'Connected' : tone === 'amber' ? 'Saved · not verified' : 'Not connected';
 

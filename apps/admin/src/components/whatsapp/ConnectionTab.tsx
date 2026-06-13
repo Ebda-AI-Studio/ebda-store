@@ -114,7 +114,10 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
         if (error.code === 'INVALID_API_KEY' || error.message?.includes('invalid_api_key')) {
           toastError('Invalid key', 'The API key was rejected. Generate a new key in WBS admin.');
         } else {
-          toastError('Connection failed', error.message || 'Could not connect to Force AI WhatsApp');
+          toastError(
+            'Connection failed',
+            error.message || 'Could not connect to Force AI WhatsApp'
+          );
         }
       } else {
         const seeded = data?.templatesAutoSeeded;
@@ -259,8 +262,8 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <p className="text-xs text-muted-foreground">
-              Generate the key in WBS admin → Clients → Force AI Store Bridge icon. Paste it here — the
-              key is verified immediately.
+              Generate the key in WBS admin → Clients → Force AI Store Bridge icon. Paste it here —
+              the key is verified immediately.
             </p>
           </div>
           <Button onClick={handleConnect} disabled={connecting || !apiKeyInput.trim()}>
