@@ -105,11 +105,15 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
         <>
           <Script
             id="ga4"
-            src={`https://www.googletagmanager.com/gtag/js?id=${pixels.googleAnalytics!.measurementId}`}
+            src={`https://www.googletagmanager.com/gtag/js?id=${
+              pixels.googleAnalytics!.measurementId
+            }`}
             strategy="afterInteractive"
           />
           <Script id="ga4-config" strategy="afterInteractive">
-            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${pixels.googleAnalytics!.measurementId}')`}
+            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${
+              pixels.googleAnalytics!.measurementId
+            }')`}
           </Script>
         </>
       )}
@@ -117,42 +121,54 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
       {/* Google Ads */}
       {validGoogleAds && (
         <Script id="gads-config" strategy="afterInteractive">
-          {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('config','${pixels.googleAds!.conversionId}')`}
+          {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('config','${
+            pixels.googleAds!.conversionId
+          }')`}
         </Script>
       )}
 
       {/* Meta Pixel */}
       {validMeta && (
         <Script id="meta-pixel" strategy="afterInteractive">
-          {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${pixels.meta!.pixelId}');fbq('track','PageView')`}
+          {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${
+            pixels.meta!.pixelId
+          }');fbq('track','PageView')`}
         </Script>
       )}
 
       {/* TikTok Pixel */}
       {validTiktok && (
         <Script id="tiktok-pixel" strategy="afterInteractive">
-          {`!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load('${pixels.tiktok!.pixelId}');ttq.page()}(window,document,'ttq')`}
+          {`!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load('${
+            pixels.tiktok!.pixelId
+          }');ttq.page()}(window,document,'ttq')`}
         </Script>
       )}
 
       {/* Snapchat Pixel */}
       {validSnapchat && (
         <Script id="snapchat-pixel" strategy="afterInteractive">
-          {`(function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function(){a.handleRequest?a.handleRequest.apply(a,arguments):a.queue.push(arguments)};a.queue=[];var s='script';r=t.createElement(s);r.async=!0;r.src=n;var u=t.getElementsByTagName(s)[0];u.parentNode.insertBefore(r,u)})(window,document,'https://sc-static.net/scevent.min.js');snaptr('init','${pixels.snapchat!.pixelId}');snaptr('track','PAGE_VIEW')`}
+          {`(function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function(){a.handleRequest?a.handleRequest.apply(a,arguments):a.queue.push(arguments)};a.queue=[];var s='script';r=t.createElement(s);r.async=!0;r.src=n;var u=t.getElementsByTagName(s)[0];u.parentNode.insertBefore(r,u)})(window,document,'https://sc-static.net/scevent.min.js');snaptr('init','${
+            pixels.snapchat!.pixelId
+          }');snaptr('track','PAGE_VIEW')`}
         </Script>
       )}
 
       {/* Twitter Pixel */}
       {validTwitter && (
         <Script id="twitter-pixel" strategy="afterInteractive">
-          {`!function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments)},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');twq('config','${pixels.twitter!.pixelId}');twq('track','PageView')`}
+          {`!function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments)},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');twq('config','${
+            pixels.twitter!.pixelId
+          }');twq('track','PageView')`}
         </Script>
       )}
 
       {/* Pinterest Tag */}
       {validPinterest && (
         <Script id="pinterest-tag" strategy="afterInteractive">
-          {`!function(e){if(!window.pintrk){window.pintrk=function(){window.pintrk.queue.push(Array.prototype.slice.call(arguments))};var n=window.pintrk;n.queue=[],n.version="3.0";var t=document.createElement("script");t.async=!0,t.src=e;var r=document.getElementsByTagName("script")[0];r.parentNode.insertBefore(t,r)}}("https://s.pinimg.com/ct/core.js");pintrk('load','${pixels.pinterest!.tagId}');pintrk('page')`}
+          {`!function(e){if(!window.pintrk){window.pintrk=function(){window.pintrk.queue.push(Array.prototype.slice.call(arguments))};var n=window.pintrk;n.queue=[],n.version="3.0";var t=document.createElement("script");t.async=!0,t.src=e;var r=document.getElementsByTagName("script")[0];r.parentNode.insertBefore(t,r)}}("https://s.pinimg.com/ct/core.js");pintrk('load','${
+            pixels.pinterest!.tagId
+          }');pintrk('page')`}
         </Script>
       )}
     </>
@@ -315,6 +331,12 @@ export function trackInitiateCheckout(params: {
 
 /**
  * Track Purchase/Conversion event
+ *
+ * DEDUPLICATION — eventID must equal the orderId passed here. The server-side
+ * CAPI function (order-capi-conversion.ts) uses the same orderId as `event_id`
+ * when posting to Meta and TikTok. Both platforms deduplicate on this pair so
+ * only one conversion is counted even if both the browser pixel and the server
+ * event arrive.
  */
 export function trackPurchase(params: {
   orderId: string;
@@ -326,17 +348,27 @@ export function trackPurchase(params: {
   if (typeof window === 'undefined') return;
   const w = window as TrackingWindow;
 
-  w.fbq?.('track', 'Purchase', {
-    content_ids: params.contentIds,
-    num_items: params.numItems,
-    value: params.value,
-    currency: params.currency || 'KWD',
-  });
+  // eventID = orderId enables Meta CAPI deduplication (server event uses same id).
+  w.fbq?.(
+    'track',
+    'Purchase',
+    {
+      content_ids: params.contentIds,
+      num_items: params.numItems,
+      value: params.value,
+      currency: params.currency || 'KWD',
+    },
+    {
+      eventID: params.orderId,
+    }
+  );
 
+  // event_id = orderId enables TikTok Events API deduplication.
   w.ttq?.track('CompletePayment', {
     content_ids: params.contentIds,
     value: params.value,
     currency: params.currency || 'KWD',
+    event_id: params.orderId,
   });
 
   w.snaptr?.('track', 'PURCHASE', {

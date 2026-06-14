@@ -39,6 +39,7 @@ import { productMetaSyncFn, productMetaSyncDeleteFn } from './product-meta-sync'
 import { aiAutofillProduct } from './ai-autofill-product';
 import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
+import { orderCapiConversion } from './order-capi-conversion';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -97,4 +98,6 @@ export const inngestFunctions: InngestFunction.Any[] = [
   aiAutofillCleanup,
   // AI-first autofill: 3-day leader-locked catalogue sweep with order-driven recos
   aiAutofillSweep,
+  // Server-side conversion API: Meta CAPI + TikTok Events API on purchase
+  orderCapiConversion,
 ];

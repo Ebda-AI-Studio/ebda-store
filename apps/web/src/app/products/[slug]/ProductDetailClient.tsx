@@ -81,7 +81,9 @@ function ProductFAQSection({
               >
                 <span className="font-medium text-foreground">{question}</span>
                 <svg
-                  className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${openIndex === index ? 'rotate-180' : ''}`}
+                  className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${
+                    openIndex === index ? 'rotate-180' : ''
+                  }`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

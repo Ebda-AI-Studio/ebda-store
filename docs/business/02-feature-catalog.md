@@ -401,6 +401,8 @@ Browser and mobile push notifications let you reach subscribed customers directl
 
 Connect Meta (Facebook/Instagram), Google, and TikTok tracking pixels to your store. Pixel events fire only after a visitor has accepted your cookie consent banner — the platform handles this automatically so you stay on the right side of advertising platform policies.
 
+**Server-side conversions (Conversions API):** In addition to the browser pixel, the platform now sends Purchase events server-to-server via the Meta Conversions API and TikTok Events API the moment an order is confirmed. These server events reach Meta and TikTok even when the browser pixel is blocked by an ad-blocker or iOS Intelligent Tracking Prevention (ITP). Both signals are automatically deduplicated by the platforms using the order ID — you do not get double-counted conversions. To activate, enter your CAPI access token in **Admin → Marketing Pixels → Meta → Access Token** (and/or TikTok → Access Token). Use the "Test event code" field to verify delivery in Meta Events Manager before going live.
+
 ### Analytics (التحليلات السلوكية)
 
 Visitor behavior tracking is built in to power the Analytics hub's conversion funnel, cohort, and segment reports. Date range pickers appear across Finance, Orders, Stock, Bot Analytics, and the Analytics Overview — every report can be filtered to any custom time period.
