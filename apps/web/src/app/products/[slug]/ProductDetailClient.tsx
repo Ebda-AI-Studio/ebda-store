@@ -412,6 +412,15 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // Derived add-to-cart state
   const variantRequired = hasVariants && !selectedVariant;
   const outOfStock = effectiveInventory === 0;
+  // Backorder: when the product (or selected variant) accepts backorders, an
+  // out-of-stock item stays orderable — the cart + order API already honor
+  // allowBackorder (product.service.ts enrichStockFlags → acceptsBackorder).
+  // The storefront previously hard-disabled Add-to-Cart at 0 inventory,
+  // silently blocking the backorder feature merchants paid for (FWB audit
+  // 2026-06-14).
+  const canBackorder =
+    outOfStock &&
+    (selectedVariant ? selectedVariant.acceptsBackorder : product.acceptsBackorder) === true;
 
   return (
     <ShopChrome layout={resolvedLayout}>
@@ -632,13 +641,15 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     className="flex-1"
                     onClick={handleAddToCart}
                     isLoading={isAdding}
-                    disabled={outOfStock || variantRequired}
+                    disabled={(outOfStock && !canBackorder) || variantRequired}
                   >
-                    {outOfStock
-                      ? t('Out of Stock', 'غير متوفر')
-                      : variantRequired
-                        ? t('Select Options', 'اختر الخيارات')
-                        : t('Add to Cart', translations['Add to Cart'])}
+                    {variantRequired
+                      ? t('Select Options', 'اختر الخيارات')
+                      : canBackorder
+                        ? t('Pre-order', 'اطلب مسبقاً')
+                        : outOfStock
+                          ? t('Out of Stock', 'غير متوفر')
+                          : t('Add to Cart', translations['Add to Cart'])}
                   </Button>
 
                   <Button

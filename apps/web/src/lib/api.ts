@@ -44,6 +44,12 @@ interface ProductVariant {
   compareAtPrice?: number;
   inventory?: number;
   /**
+   * Server-computed (enrichStockFlags in product.service.ts): true when
+   * inventory <= 0 AND the variant/product allows backorders. The storefront
+   * uses this to keep Add-to-Cart enabled for out-of-stock backorderable items.
+   */
+  acceptsBackorder?: boolean;
+  /**
    * Optional per-variant image. When set, the product detail gallery swaps
    * its main image to this URL while the variant is selected, and reverts
    * to the product's images on deselection. Useful when a variant looks
@@ -95,6 +101,10 @@ interface Product {
   compareAtPrice?: number;
   sku?: string;
   inventory?: number;
+  /** Server-computed: inventory <= 0 && allowBackorder. Keeps Add-to-Cart
+   *  enabled for out-of-stock backorderable products (the cart/order API
+   *  honors backorders; the storefront must not silently block them). */
+  acceptsBackorder?: boolean;
   status: string;
   images: Array<{ id: string; url: string; alt?: string }>;
   categories?: ProductCategory[];
