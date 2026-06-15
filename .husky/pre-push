@@ -52,4 +52,34 @@ _DB="test_db"
 export TEST_DATABASE_URL="${_SCHEME}://${_CREDS}@${_HOST}/${_DB}"
 npm run test:unit
 
+# --- Blast-radius + AI review: moved OUT of CI to this AI-OS pre-push gate ---
+# These were the blast-radius.yml / scoped-audit.yml / ai-review.yml workflows that
+# each held a self-hosted runner ~15-20 min per PR. They now run locally before the
+# push so CI only does deterministic gates. Advisory + non-blocking. Skip: SKIP_AI_GATE=1.
+if [ "${SKIP_AI_GATE:-0}" != "1" ] && [ "$current_branch" != "main" ]; then
+  git fetch origin main -q 2>/dev/null || true
+  RANGE="origin/main...HEAD"
+
+  echo "-> AI-OS gate: blast-radius (graphify dependents of this diff, advisory)..."
+  if [ -x scripts/blast-radius.sh ]; then
+    bash scripts/blast-radius.sh force-website-builder "$RANGE" . || echo "! blast-radius advisory failed (non-blocking)"
+  else
+    echo "! scripts/blast-radius.sh missing; skipping blast-radius"
+  fi
+
+  echo "-> AI-OS gate: Opus AI review of this diff (advisory)..."
+  if command -v claude >/dev/null 2>&1; then
+    git diff "$RANGE" -- ':(exclude)**/package-lock.json' ':(exclude)**/*.lock' > /tmp/force-prepush.diff 2>/dev/null || true
+    if [ -s /tmp/force-prepush.diff ]; then
+      {
+        printf 'Review this diff for CRITICAL bugs, security issues, and regressions ONLY. Be terse; list nothing if clean.\n\n'
+        cat /tmp/force-prepush.diff
+      } > /tmp/force-prepush-review.md
+      claude -p --model claude-opus-4-8 < /tmp/force-prepush-review.md || echo "! AI review advisory failed (non-blocking)"
+    fi
+  else
+    echo "! claude CLI not found; skipping AI review (npm i -g @anthropic-ai/claude-code)"
+  fi
+fi
+
 echo "OK pre-push CI gate passed -- push proceeding"
