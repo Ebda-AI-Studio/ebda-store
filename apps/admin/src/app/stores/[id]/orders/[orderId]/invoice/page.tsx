@@ -26,7 +26,13 @@ export default function OrderInvoicePage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch(`/api/v1/stores/${storeId}/orders/${orderId}/invoice`);
+        // Pass the admin UI locale so the invoice renders in the same
+        // language the admin is currently using (AR → Arabic RTL invoice,
+        // EN → English invoice). The API falls back to order.locale when
+        // this param is absent.
+        const res = await apiFetch(
+          `/api/v1/stores/${storeId}/orders/${orderId}/invoice?locale=${encodeURIComponent(locale)}`
+        );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
         if (!cancelled) setHtml(text);

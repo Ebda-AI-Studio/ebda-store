@@ -751,7 +751,9 @@ router.get(
         return;
       }
 
-      const html = await InvoiceService.generateInvoice(storeId, id);
+      // ?locale=ar renders an Arabic RTL invoice; falls back to order.locale.
+      const locale = typeof req.query.locale === 'string' ? req.query.locale : undefined;
+      const html = await InvoiceService.generateInvoice(storeId, id, locale);
       res.setHeader('Content-Type', 'text/html');
       res.send(html);
     } catch (error) {
