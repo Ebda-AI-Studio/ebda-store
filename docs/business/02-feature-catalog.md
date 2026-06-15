@@ -113,7 +113,7 @@ Full inventory management without needing a separate system. Features are tiered
 
 **Professional plan and above:**
 
-- **Reorder Alerts** — Set a minimum stock threshold per product; get an automatic email before you run out. (`inventory.stock_alerts`)
+- **Low-Stock Alert Emails** — Set a minimum stock threshold per product; when a product's inventory drops below the threshold an automatic bilingual digest email is sent to the store owner. The alert fires once per drop event (deduplicated via Redis sentinel) and re-arms when the product is restocked above the threshold. Powered by the `stock-low-stock-alert` Inngest cron (every 6 hours). (`inventory.stock_alerts`)
 - **Backorders** — Accept orders for out-of-stock products and fulfill them when stock arrives. (`inventory.backorder`)
 - **Reorder AI** — AI-driven reorder suggestions based on sales velocity and current stock levels.
 

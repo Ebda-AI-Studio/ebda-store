@@ -14,6 +14,7 @@ import { orderShippedTemplate } from './email-templates/order-shipped';
 import { returnConfirmationTemplate } from './email-templates/return-confirmation';
 import { returnStatusUpdateTemplate } from './email-templates/return-status-update';
 import { reviewRequestTemplate, type ReviewRequestData } from './email-templates/review-request';
+import { lowStockAlertTemplate, type LowStockAlertItem } from './email-templates/low-stock-alert';
 
 // ==========================================
 // Email Service
@@ -123,13 +124,19 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
     // while keeping the formatted version visible to readers.
     const dial = store.phone.replace(/[^+\d]/g, '');
     footerLines.push(
-      `<a href="tel:${escapeHtml(dial)}" style="color: var(--ink-soft); text-decoration: none;">${safePhone}</a>`
+      `<a href="tel:${escapeHtml(
+        dial
+      )}" style="color: var(--ink-soft); text-decoration: none;">${safePhone}</a>`
     );
   }
   // Contact line — replaces the per-template "please reply to this email"
   // sentence so every branded email has a canonical reachable contact.
   const contactBlock = store.email
-    ? `<p class="contact-cta">Questions? Email us at <a href="mailto:${escapeHtml(store.email)}" style="color: var(--brand); text-decoration: none; font-weight: 600;">${escapeHtml(store.email)}</a></p>`
+    ? `<p class="contact-cta">Questions? Email us at <a href="mailto:${escapeHtml(
+        store.email
+      )}" style="color: var(--brand); text-decoration: none; font-weight: 600;">${escapeHtml(
+        store.email
+      )}</a></p>`
     : '';
 
   return `<!DOCTYPE html>
@@ -792,6 +799,50 @@ export class EmailService {
   }
 
   // ---------------------------------------------------------------------------
+  // Merchant-facing operational alerts (sent to the store owner, not the customer)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Low Stock Digest Alert — sent to the store owner when one or more products
+   * drop below their configured threshold.
+   *
+   * Uses the store's branded shell and the store's default language so the
+   * owner receives the alert in their preferred locale.
+   *
+   * Recipient: `to` is provided by the caller (runLowStockScan resolves
+   * store.owner.email via a withRlsBypass query; this method accepts it
+   * as a parameter so the scan service doesn't need to re-fetch the store).
+   */
+  static async sendLowStockAlert(
+    storeId: string,
+    data: {
+      to: string;
+      items: LowStockAlertItem[];
+      storeName: string;
+      adminUrl: string;
+    },
+    language?: 'en' | 'ar'
+  ): Promise<void> {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { name: true, settings: true },
+    });
+    const lang: 'en' | 'ar' =
+      language ??
+      ((store?.settings as { defaultLanguage?: string } | null)?.defaultLanguage === 'ar'
+        ? 'ar'
+        : 'en');
+    const alertData = {
+      items: data.items,
+      storeName: data.storeName,
+      adminUrl: data.adminUrl,
+    };
+    const subject = lowStockAlertTemplate.subject[lang](alertData);
+    const content = lowStockAlertTemplate[lang](alertData);
+    await this.sendForStore(storeId, { to: data.to, subject, content, language: lang });
+  }
+
+  // ---------------------------------------------------------------------------
   // Admin / platform-facing emails (no storeId — platform sender)
   // ---------------------------------------------------------------------------
 
@@ -864,7 +915,9 @@ export class EmailService {
     return `
       <h2>New Order Received</h2>
       <p><strong>Order #${escapeHtml(d.orderNumber)}</strong></p>
-      <p><strong>Customer:</strong> ${escapeHtml(d.customerName)} (${escapeHtml(d.customerEmail)})</p>
+      <p><strong>Customer:</strong> ${escapeHtml(d.customerName)} (${escapeHtml(
+        d.customerEmail
+      )})</p>
       <p><strong>Total:</strong> ${(d.total / 1000).toFixed(3)} KWD</p>
       <p><strong>Items:</strong> ${d.items.length}</p>
       <p style="text-align: center; margin: 24px 0;">
@@ -905,7 +958,9 @@ export class EmailService {
       <h2>New Contact Form Submission</h2>
       <p><strong>From:</strong> ${escapeHtml(d.name)} (${escapeHtml(d.email)})</p>
       <p><strong>Subject:</strong> ${escapeHtml(d.subject)}</p>
-      <div style="background: #f9f9f9; padding: 16px; border-radius: 4px; margin: 16px 0; white-space: pre-wrap;">${escapeHtml(d.message)}</div>
+      <div style="background: #f9f9f9; padding: 16px; border-radius: 4px; margin: 16px 0; white-space: pre-wrap;">${escapeHtml(
+        d.message
+      )}</div>
       <p style="font-size: 14px; color: #666;">You can reply directly to this email to respond to the sender.</p>
     `;
   }

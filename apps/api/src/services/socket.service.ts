@@ -349,7 +349,9 @@ class SocketService {
     this.notifyStore(storeId, {
       type: 'new_order',
       title: 'New Order Received',
-      message: `Order #${order.orderNumber} from ${order.customerName} - ${(order.total / 1000).toFixed(3)} KWD`,
+      message: `Order #${order.orderNumber} from ${order.customerName} - ${(
+        order.total / 1000
+      ).toFixed(3)} KWD`,
       data: { ...order, storeId, url },
       createdAt: new Date(),
     });
@@ -394,21 +396,11 @@ class SocketService {
     });
   }
 
-  lowStockNotification(
-    storeId: string,
-    product: { productId?: string; name: string; inventory: number }
-  ) {
-    const url = product.productId
-      ? `/stores/${storeId}/products/${product.productId}/edit`
-      : `/stores/${storeId}/inventory`;
-    this.notifyStore(storeId, {
-      type: 'low_stock',
-      title: 'Low Stock Alert',
-      message: `${product.name} has only ${product.inventory} items left in stock`,
-      data: { ...product, storeId, url },
-      createdAt: new Date(),
-    });
-  }
+  // lowStockNotification was removed (2026-06-14): it was dead code (0 callers) —
+  // low-stock alerts are now delivered via the stock-low-stock-alert Inngest
+  // cron which sends a branded bilingual email digest to the store owner.
+  // WebSocket push is intentionally not re-added: merchants are not required to
+  // have the admin open to receive stock alerts.
 
   orderStatusNotification(userId: string, order: { orderNumber: string; status: string }) {
     this.notifyUser(userId, {

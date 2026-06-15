@@ -136,6 +136,14 @@ type StockDeadstockScanRequestedEvent = EventPayload & {
   };
 };
 
+type StockLowStockScanRequestedEvent = EventPayload & {
+  name: 'stock/low-stock-scan-requested';
+  data: {
+    storeId: string;
+    requestedBy?: string;
+  };
+};
+
 type AccountingExpenseOcrProcessEvent = EventPayload & {
   name: 'accounting/expense-ocr-process';
   data: {
@@ -168,6 +176,7 @@ export type AppEvent =
   | AccountingExpensePostedEvent
   | StockReorderScanRequestedEvent
   | StockDeadstockScanRequestedEvent
+  | StockLowStockScanRequestedEvent
   | AccountingExpenseOcrProcessEvent
   | InsightsRollupRequestedEvent;
 
