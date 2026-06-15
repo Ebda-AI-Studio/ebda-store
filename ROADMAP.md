@@ -47,7 +47,7 @@
 
 ### Accounting Module (Professional plan)
 
-- [x] Chart of Accounts — double-entry bookkeeping organized by account categories (54 default accounts seeded)
+- [x] Chart of Accounts — double-entry bookkeeping organized by account categories (27 default accounts seeded on onboarding; system accounts are read-only — merchants may add custom child accounts under them)
 - [x] Journal entries — auto-posted on paid orders (sales, cost of goods, refunds); manual entry UI
 - [x] Profit & Loss — live P&L report reflecting actual store activity
 - [x] Expense tracking — categorized expense entry with receipt attachment and monthly summary (Professional+)
@@ -110,7 +110,7 @@
 
 - [x] Affiliate program (Enterprise+) — referral tracking, commission management, invite emails
 - [x] Loyalty program (Professional+) — points earn/redeem, configurable redemption rate
-- [x] Marketing pixels — Meta/Facebook, Google, TikTok; fires only after cookie consent
+- [x] Marketing pixels — Meta/Facebook, Google, TikTok with server-side Conversions API (CAPI) for Meta and TikTok; fires only after cookie consent
 - [x] Floating widget (Enterprise+) — sticky multi-action button; position, direction, colors, labels all configurable
 - [x] Analytics hub — overview, cohort analysis, conversion funnel, customer segments, product analytics, date range pickers
 

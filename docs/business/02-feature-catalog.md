@@ -136,7 +136,7 @@ Most e-commerce platforms make you connect QuickBooks or Xero for proper account
 
 **Professional plan and above:**
 
-- **Chart of Accounts** — A real double-entry bookkeeping system organized by account categories (54 default accounts seeded on onboarding; fully editable).
+- **Chart of Accounts** — A real double-entry bookkeeping system organized by account categories (27 default accounts seeded on onboarding; system accounts are read-only — merchants may add custom child accounts under them).
 - **Journal Entries** — Double-entry journal auto-posted on every paid order (sales revenue, cost of goods, refunds). Manual journal entry UI for non-order financial events.
 - **Profit & Loss** — A live P&L report that reflects your actual store activity over any date range.
 - **Expense Tracking** — Log operating expenses with category tagging and receipt attachment. Monthly summary by expense category. (`accounting.expenses`)
@@ -146,7 +146,7 @@ Most e-commerce platforms make you connect QuickBooks or Xero for proper account
 
 - **Tax Reports** — VAT/sales-tax export per reporting period with full transaction-level breakdown. (`accounting.tax_reports`)
 - **Multi-Currency** — Track non-KWD transactions with FX rates and automatic KWD conversion at the bookkeeping level. (`accounting.multi_currency`)
-- **Profit Anomaly Watch** — AI-driven margin watcher that flags sales below cost and unusual margin drops vs. baseline. (`accounting.profit_anomaly`)
+- **Profit Anomaly Watch** — Runs a daily AI scan of margins (06:30 KWT); flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline. (`accounting.profit_anomaly`)
 - **Bank Reconciliation** — Bank statement import (CSV/OFX) with automated ledger matching and manual override. (`accounting.bank_reconcile`)
 
 **Available on all plans:**
@@ -174,7 +174,7 @@ Everything you need to bring customers back and reach new ones:
 - Push notifications to subscribed shoppers
 - Abandoned cart recovery — automatic reminders to shoppers who left items behind
 - Newsletter tools
-- Marketing pixels (Meta/Facebook, Google, TikTok)
+- Marketing pixels (Meta/Facebook, Google, TikTok) with server-side Conversions API (CAPI) for Meta and TikTok — fires on every order even when browser ad-blockers suppress the client-side pixel
 - Affiliate program management
 
 ### Settings (الإعدادات)

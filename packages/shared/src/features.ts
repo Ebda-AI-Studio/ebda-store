@@ -243,8 +243,10 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     key: 'marketing_pixels',
     name: 'Marketing Pixels',
     nameAr: 'بكسلات التسويق',
-    description: 'Integrate tracking pixels for Facebook, Google, TikTok, and more.',
-    descriptionAr: 'دمج بكسلات التتبع لـ Facebook وGoogle وTikTok والمزيد.',
+    description:
+      'Marketing pixels (Meta/Facebook, Google, TikTok) with server-side Conversions API (CAPI) for Meta and TikTok — fires on every order even when browser ad-blockers suppress the client-side pixel.',
+    descriptionAr:
+      'بكسلات التسويق (Meta/Facebook وGoogle وTikTok) مع واجهة برمجة تحويلات من جانب الخادم (CAPI) لـ Meta وTikTok — تُطلَق مع كل طلب حتى عند حجب البكسل من قِبل أدوات منع الإعلانات.',
     category: 'marketing',
     tier: 'core',
   },
@@ -438,9 +440,9 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     name: 'Accounting — Profit Anomaly Watch',
     nameAr: 'المحاسبة — مراقبة شذوذ الأرباح',
     description:
-      'AI-driven margin watcher that flags sales below cost and unusual margin drops vs. baseline.',
+      'Runs a daily AI scan of margins (06:30 KWT); flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline.',
     descriptionAr:
-      'مراقب هوامش بالذكاء الاصطناعي ينبّه عند البيع تحت التكلفة أو هبوط الهامش بشكل غير مألوف.',
+      'فحص يومي بالذكاء الاصطناعي للهوامش (06:30 بتوقيت الكويت)؛ ينبّه عند هبوط الهامش أو ارتفاع حجم التكلفة بشكل غير مألوف مقارنةً بمتوسط 28 يومًا.',
     category: 'operations',
     tier: 'addon',
   },
