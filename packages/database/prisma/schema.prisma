@@ -967,6 +967,14 @@ model Order {
   currency            String             @default("KWD")
   couponCode          String?            @map("coupon_code")
   couponDiscount      Int                @default(0) @map("coupon_discount")
+  // Loyalty redemption applied at checkout. loyaltyPointsRedeemed is the
+  // number of points the customer spent on this order (NULL = none redeemed
+  // / pre-feature order); loyaltyDiscount is the resulting discount amount in
+  // FILS that was folded into `discount` + `total`. Both are written
+  // atomically with LoyaltyService.redeemPoints inside the order-create
+  // transaction, and read by reverseRedeemedPointsFromOrder on refund/cancel.
+  loyaltyPointsRedeemed Int?             @map("loyalty_points_redeemed")
+  loyaltyDiscount     Int                @default(0) @map("loyalty_discount")
   notes               String?
   customerNotes       String?            @map("customer_notes")
   shippingAddress     Json               @map("shipping_address")

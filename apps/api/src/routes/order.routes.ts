@@ -46,6 +46,9 @@ const createOrderSchema = z.object({
   paymentMethod: z.string(),
   notes: z.string().max(2000).optional(),
   couponCode: z.string().trim().min(1).max(50).optional(),
+  // Loyalty points requested for redemption — re-resolved server-side
+  // against the customer's balance + store caps (never a trusted discount).
+  pointsToRedeem: z.number().int().min(0).max(100_000_000).optional(),
 });
 
 const updateStatusSchema = z.object({

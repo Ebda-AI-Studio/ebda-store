@@ -431,6 +431,8 @@ When a merchant tries to access a feature above their current plan, they see an 
 
 Reward repeat customers automatically. Customers earn points on every purchase and redeem them for discounts on future orders. A loyalty program is one of the most effective tools for increasing repeat purchase rates — typical e-commerce stores see 20–30% of revenue come from repeat buyers once a loyalty program is active.
 
+Redemption happens right at checkout: a logged-in customer sees their points balance and its cash value in the order summary, chooses how many points to apply (respecting your configured minimum and maximum-percentage caps), and the discount comes off the order total instantly. If an order is refunded or cancelled, the redeemed points are automatically returned to the customer's balance.
+
 **Example:** A customer who spends KD 50 earns 500 points. At your configured redemption rate, they spend those points on their next order — bringing them back rather than shopping elsewhere.
 
 ### Push Notifications — الإشعارات الفورية (Professional+)

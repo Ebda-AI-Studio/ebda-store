@@ -4,7 +4,7 @@ import logger from '../lib/logger';
 import { featureService } from './feature.service';
 
 // Default loyalty settings structure
-interface LoyaltySettings {
+export interface LoyaltySettings {
   // Points earning
   pointsPerDinar: number; // Points earned per 1 KWD spent (e.g., 10 points per KWD)
   signupBonus: number; // Points given on account creation
@@ -29,7 +29,7 @@ interface LoyaltySettings {
   expirationMonths: number; // Points expire after X months (0 = never)
 }
 
-const DEFAULT_LOYALTY_SETTINGS: LoyaltySettings = {
+export const DEFAULT_LOYALTY_SETTINGS: LoyaltySettings = {
   pointsPerDinar: 10, // 10 points per 1 KWD
   signupBonus: 100,
   referralBonus: 200,
@@ -50,6 +50,78 @@ const DEFAULT_LOYALTY_SETTINGS: LoyaltySettings = {
 interface LoyaltySettingsResponse {
   loyaltyEnabled: boolean;
   settings: LoyaltySettings;
+}
+
+/** Result of resolving a requested loyalty redemption against the store's
+ *  settings + the customer's balance + the order subtotal. All money is in
+ *  FILS (integers). `pointsToRedeem`/`discountFils` are 0 when redemption is
+ *  not possible (below minimum, no balance, zero subtotal). */
+export interface RedemptionQuote {
+  /** Points that will actually be burned (clamped to balance + caps). */
+  pointsToRedeem: number;
+  /** Discount in fils = pointsToRedeem * pointsValue. */
+  discountFils: number;
+  /** Whether the requested redemption produced any discount at all. */
+  applied: boolean;
+}
+
+/**
+ * Pure, side-effect-free redemption math. Server-side source of truth — the
+ * order-create path NEVER trusts a client-sent discount; it sends only a
+ * *requested* point count and this function decides what (if anything) is
+ * actually redeemable.
+ *
+ * Rules (all in fils, all integer):
+ *  - below `minRedeemPoints` → nothing redeemed (applied=false).
+ *  - clamp requested points to the customer's available balance.
+ *  - the discount is capped at BOTH the order subtotal AND
+ *    `maxRedeemPercentage`% of the subtotal (whichever is smaller). When the
+ *    cap binds, we reduce the burned point count to match so we never spend
+ *    points we don't credit as discount (discount = points * pointsValue
+ *    exactly — no orphaned points).
+ *  - `pointsValue` is fils-per-point (>=1 by schema), so the integer division
+ *    when re-deriving capped points is exact at the floor.
+ */
+export function computeRedemption(
+  settings: LoyaltySettings,
+  requestedPoints: number,
+  subtotalFils: number,
+  availablePoints: number
+): RedemptionQuote {
+  const none: RedemptionQuote = { pointsToRedeem: 0, discountFils: 0, applied: false };
+
+  if (!Number.isFinite(requestedPoints) || requestedPoints <= 0) return none;
+  if (subtotalFils <= 0) return none;
+
+  const pointsValue = Math.max(1, Math.floor(settings.pointsValue || 1));
+
+  // Clamp the request to what the customer actually has.
+  let points = Math.min(Math.floor(requestedPoints), Math.max(0, Math.floor(availablePoints)));
+
+  // Minimum-redemption gate. Checked AFTER the balance clamp so a customer who
+  // requests more than they have but still >= the minimum can redeem what they
+  // hold; if their actual balance is below the minimum, nothing redeems.
+  if (points < settings.minRedeemPoints) return none;
+
+  // Cap the discount at the lower of the subtotal and maxRedeemPercentage% of it.
+  const pct = Math.min(100, Math.max(0, settings.maxRedeemPercentage ?? 100));
+  const pctCapFils = Math.floor((subtotalFils * pct) / 100);
+  const maxDiscountFils = Math.min(subtotalFils, pctCapFils);
+
+  let discountFils = points * pointsValue;
+  if (discountFils > maxDiscountFils) {
+    // The cap binds — reduce the burned points so discount == points*value
+    // exactly. floor() means we never over-discount; the customer keeps the
+    // remainder of their points.
+    points = Math.floor(maxDiscountFils / pointsValue);
+    discountFils = points * pointsValue;
+  }
+
+  // After capping, re-check the minimum — if the cap pushed us below the
+  // minimum redeemable points, redeem nothing rather than a sub-minimum amount.
+  if (points < settings.minRedeemPoints || points <= 0 || discountFils <= 0) return none;
+
+  return { pointsToRedeem: points, discountFils, applied: true };
 }
 
 interface CustomerPointsInfo {
@@ -506,16 +578,62 @@ export class LoyaltyService {
   }
 
   /**
-   * Redeem points for a discount
+   * Resolve the server-side context needed to decide a redemption: whether
+   * loyalty is active for the store, the effective settings, and the
+   * customer's current available balance. Returns `null` when loyalty is
+   * disabled or the customer has no points record (nothing to redeem). Used
+   * by the order-create path to compute the actual discount via
+   * `computeRedemption` before opening the order transaction.
+   */
+  static async getRedeemableContext(
+    storeId: string,
+    customerId: string
+  ): Promise<{ settings: LoyaltySettings; availablePoints: number } | null> {
+    const [store, loyaltyEnabled, loyalty] = await Promise.all([
+      prisma.store.findUnique({
+        where: { id: storeId },
+        select: { loyaltySettings: true, loyaltyEnabled: true },
+      }),
+      featureService.isFeatureEnabled(storeId, 'loyalty'),
+      prisma.loyaltyPoints.findUnique({
+        where: { storeId_customerId: { storeId, customerId } },
+        select: { points: true },
+      }),
+    ]);
+
+    if (!store || !store.loyaltyEnabled || !loyaltyEnabled || !loyalty) return null;
+
+    const settings = {
+      ...DEFAULT_LOYALTY_SETTINGS,
+      ...(store.loyaltySettings as Partial<LoyaltySettings>),
+    };
+
+    return { settings, availablePoints: loyalty.points };
+  }
+
+  /**
+   * Redeem points for a discount.
+   *
+   * `pointsToRedeem` is the EXACT, already-validated number of points to burn
+   * (the caller resolves the request against the customer's balance + the
+   * store caps via `computeRedemption` first). This method enforces the
+   * minimum + the race-safe decrement and returns the resulting discount.
+   *
+   * Pass `client` to run inside an enclosing interactive transaction (the
+   * order-create path) so the point decrement + the `redeem_discount` log
+   * commit atomically with the order row — points are never deducted without
+   * an order, and the order is never created without the deduction. Without a
+   * `client` it runs on the global prisma client (standalone use).
    */
   static async redeemPoints(
     storeId: string,
     customerId: string,
     orderId: string,
-    pointsToRedeem: number
+    pointsToRedeem: number,
+    client: Prisma.TransactionClient | typeof prisma = prisma
   ): Promise<{ discountFils: number; newBalance: number }> {
     const [store, loyaltyEnabled] = await Promise.all([
-      prisma.store.findUnique({
+      client.store.findUnique({
         where: { id: storeId },
         select: {
           loyaltySettings: true,
@@ -541,8 +659,8 @@ export class LoyaltyService {
       );
     }
 
-    // Calculate discount value
-    const discountFils = pointsToRedeem * settings.pointsValue;
+    // Calculate discount value. pointsValue is fils-per-point.
+    const discountFils = pointsToRedeem * Math.max(1, Math.floor(settings.pointsValue || 1));
 
     // Race-safe redeem: previously this was read-then-decrement, so two
     // concurrent calls could both pass the `loyalty.points >=
@@ -550,8 +668,10 @@ export class LoyaltyService {
     // twice. The conditional `updateMany` does the gate AND the
     // decrement in a single statement; if the row's points have
     // already moved below the threshold, `count === 0` and we treat
-    // that as INSUFFICIENT_POINTS.
-    const reserve = await prisma.loyaltyPoints.updateMany({
+    // that as INSUFFICIENT_POINTS. Inside the order transaction this also
+    // means a concurrent checkout that already spent the balance loses
+    // here and rolls back its whole order.
+    const reserve = await client.loyaltyPoints.updateMany({
       where: {
         storeId,
         customerId,
@@ -566,7 +686,7 @@ export class LoyaltyService {
       // Either no row at all, or balance dropped below the threshold
       // between the read and the write. Distinguish for a clearer
       // client error.
-      const exists = await prisma.loyaltyPoints.findUnique({
+      const exists = await client.loyaltyPoints.findUnique({
         where: { storeId_customerId: { storeId, customerId } },
         select: { id: true },
       });
@@ -577,11 +697,9 @@ export class LoyaltyService {
     }
 
     // The decrement succeeded — log the transaction and return the
-    // post-write balance. We re-read the row inside the same logical
-    // call so the caller sees the value AFTER the decrement; a separate
-    // tx isn't needed because the conditional updateMany already
-    // committed the consistent state.
-    await prisma.loyaltyTransaction.create({
+    // post-write balance. Re-read inside the same client so the caller sees
+    // the value AFTER the decrement.
+    await client.loyaltyTransaction.create({
       data: {
         storeId,
         customerId,
@@ -591,7 +709,7 @@ export class LoyaltyService {
         description: `Redeemed ${pointsToRedeem} points for ${(discountFils / 1000).toFixed(3)} KWD discount`,
       },
     });
-    const updated = await prisma.loyaltyPoints.findUnique({
+    const updated = await client.loyaltyPoints.findUnique({
       where: { storeId_customerId: { storeId, customerId } },
       select: { points: true },
     });
@@ -600,6 +718,75 @@ export class LoyaltyService {
       discountFils,
       newBalance: updated?.points ?? 0,
     };
+  }
+
+  /**
+   * Re-credit points that were redeemed at checkout when an order is
+   * refunded or cancelled. Mirror of `reverseEarnedPointsFromOrder`.
+   *
+   * Idempotent: looks up the original `redeem_discount` transaction for
+   * (orderId, customerId). If none exists (guest order, no redemption, or
+   * this already ran) it's a no-op. The re-credit is guarded by a tagged
+   * `adjust` row (`redeem-recredit:<txId>`) so a second refund call (e.g.
+   * partial-then-full) never double-credits. It adds the points back to
+   * `points` and reduces `totalRedeemed` by the same amount (the redemption
+   * is unwound, not a new spend). Tier is NOT recomputed — redemption never
+   * changed tier (tier tracks totalEarned, untouched here).
+   *
+   * Called from `OrderService.applyRefundEffects` alongside the earn reversal.
+   */
+  static async reverseRedeemedPointsFromOrder(
+    storeId: string,
+    orderId: string
+  ): Promise<{ pointsRecredited: number; newBalance: number } | null> {
+    const redeem = await prisma.loyaltyTransaction.findFirst({
+      where: { storeId, orderId, type: 'redeem_discount' },
+    });
+    // points on a redeem_discount row are stored negative (e.g. -500).
+    if (!redeem || redeem.points >= 0) return null;
+
+    const pointsToRecredit = Math.abs(redeem.points);
+
+    // Idempotency guard tagged with the original redeem tx id.
+    const tag = `redeem-recredit:${redeem.id}`;
+    const already = await prisma.loyaltyTransaction.findFirst({
+      where: { storeId, orderId, type: 'adjust', description: tag },
+    });
+    if (already) {
+      const current = await prisma.loyaltyPoints.findUnique({
+        where: { storeId_customerId: { storeId, customerId: redeem.customerId } },
+      });
+      return { pointsRecredited: 0, newBalance: current?.points ?? 0 };
+    }
+
+    const loyalty = await prisma.loyaltyPoints.findUnique({
+      where: { storeId_customerId: { storeId, customerId: redeem.customerId } },
+    });
+    if (!loyalty) return null;
+
+    const newTotalRedeemed = Math.max(0, loyalty.totalRedeemed - pointsToRecredit);
+
+    const [updated] = await prisma.$transaction([
+      prisma.loyaltyPoints.update({
+        where: { id: loyalty.id },
+        data: {
+          points: { increment: pointsToRecredit },
+          totalRedeemed: newTotalRedeemed,
+        },
+      }),
+      prisma.loyaltyTransaction.create({
+        data: {
+          storeId,
+          customerId: redeem.customerId,
+          orderId,
+          type: 'adjust',
+          points: pointsToRecredit,
+          description: tag,
+        },
+      }),
+    ]);
+
+    return { pointsRecredited: pointsToRecredit, newBalance: updated.points };
   }
 
   /**

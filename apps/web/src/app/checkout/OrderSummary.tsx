@@ -7,6 +7,26 @@ import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
 import type { CheckoutCartItem, Coupon } from './types';
 
+/** Loyalty redemption control state, threaded from CheckoutClient. Present
+ *  only for logged-in customers with a positive balance on a loyalty-enabled
+ *  store; undefined otherwise (the block doesn't render). */
+export interface LoyaltyRedeemControl {
+  /** Current available points balance. */
+  points: number;
+  /** Fils per point (for the value estimate). */
+  pointsValue: number;
+  /** Store minimum points required to redeem. */
+  minRedeemPoints: number;
+  /** Whether redemption is toggled on for this order. */
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+  /** Points the customer chose to redeem. */
+  pointsToRedeem: number;
+  onPointsChange: (points: number) => void;
+  /** Discount (fils) the redemption currently yields (already capped). */
+  loyaltyDiscount: number;
+}
+
 interface OrderSummaryProps {
   items: CheckoutCartItem[];
   subtotal: number;
@@ -20,6 +40,8 @@ interface OrderSummaryProps {
   onApplyCoupon: () => void;
   onRemoveCoupon: () => void;
   couponError: string;
+  /** Loyalty redemption control — omitted for guests / no balance. */
+  loyalty?: LoyaltyRedeemControl;
   /** Per-store checkout typography (page-builder → Checkout page). */
   typography?: { heading?: CSSProperties; label?: CSSProperties; price?: CSSProperties };
 }
@@ -37,9 +59,13 @@ export function OrderSummary({
   onApplyCoupon,
   onRemoveCoupon,
   couponError,
+  loyalty,
   typography,
 }: OrderSummaryProps) {
   const { t, isRtl } = useLanguage();
+  // KWD formatting for the points-value hint (pointsValue is fils/point).
+  const pointsValueLabel = (points: number) =>
+    loyalty ? formatPrice(points * loyalty.pointsValue) : '';
   // Localised product name on the order summary line — checkout +
   // payment review need to mirror the storefront which already shows
   // Arabic names. Falls back to `name` when nameAr isn't set.
@@ -147,6 +173,74 @@ export function OrderSummary({
           {couponError && <p className="mt-2 text-sm text-destructive">{couponError}</p>}
         </div>
 
+        {/* Loyalty points redemption — only for logged-in customers with a
+            positive balance on a loyalty-enabled store. */}
+        {loyalty && (
+          <div className="mt-6 border-t pt-6">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={loyalty.enabled}
+                onChange={e => {
+                  loyalty.onToggle(e.target.checked);
+                  // Default to redeeming the full balance when first enabled.
+                  if (e.target.checked && loyalty.pointsToRedeem <= 0) {
+                    loyalty.onPointsChange(loyalty.points);
+                  }
+                }}
+                className="mt-1 h-4 w-4 rounded border-input text-primary focus:ring-primary"
+              />
+              <span className="flex-1">
+                <span className="text-sm font-medium text-foreground">
+                  {t('Use loyalty points', 'استخدام نقاط الولاء')}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {t('Balance', 'الرصيد')}: {loyalty.points.toLocaleString()} {t('points', 'نقطة')}
+                  {' · '}
+                  {t('worth', 'بقيمة')} {pointsValueLabel(loyalty.points)}
+                </span>
+              </span>
+            </label>
+
+            {loyalty.enabled && (
+              <div className="mt-3 ps-7">
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={loyalty.points}
+                    step={1}
+                    value={loyalty.pointsToRedeem || ''}
+                    onChange={e => {
+                      const raw = parseInt(e.target.value, 10);
+                      const clamped = Number.isFinite(raw)
+                        ? Math.max(0, Math.min(raw, loyalty.points))
+                        : 0;
+                      loyalty.onPointsChange(clamped);
+                    }}
+                    className="w-32"
+                    aria-label={t('Points to redeem', 'النقاط المراد استخدامها')}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => loyalty.onPointsChange(loyalty.points)}
+                  >
+                    {t('Max', 'الكل')}
+                  </Button>
+                </div>
+                {loyalty.pointsToRedeem > 0 && loyalty.pointsToRedeem < loyalty.minRedeemPoints && (
+                  <p className="mt-2 text-sm text-destructive">
+                    {t('Minimum', 'الحد الأدنى')} {loyalty.minRedeemPoints.toLocaleString()}{' '}
+                    {t('points to redeem', 'نقطة للاستخدام')}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Totals */}
         <div className="mt-6 space-y-3 border-t pt-6">
           <div className="flex justify-between text-sm">
@@ -157,19 +251,46 @@ export function OrderSummary({
               {formatPrice(subtotal)}
             </span>
           </div>
-          {discount > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-[hsl(var(--success))]" style={typography?.label}>
-                {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
-              </span>
-              <span
-                className="font-medium text-[hsl(var(--success))] tabular-nums"
-                style={typography?.price}
-              >
-                -{formatPrice(discount)}
-              </span>
-            </div>
-          )}
+          {(() => {
+            // `discount` is coupon + loyalty combined. Show the coupon portion
+            // and the loyalty portion as separate lines so the customer sees
+            // exactly what each saved them.
+            const loyaltyDiscount = loyalty?.loyaltyDiscount ?? 0;
+            const couponPortion = Math.max(0, discount - loyaltyDiscount);
+            return (
+              <>
+                {couponPortion > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[hsl(var(--success))]" style={typography?.label}>
+                      {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
+                    </span>
+                    <span
+                      className="font-medium text-[hsl(var(--success))] tabular-nums"
+                      style={typography?.price}
+                    >
+                      -{formatPrice(couponPortion)}
+                    </span>
+                  </div>
+                )}
+                {loyaltyDiscount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[hsl(var(--success))]" style={typography?.label}>
+                      {t(
+                        'Loyalty points',
+                        '\u0646\u0642\u0627\u0637 \u0627\u0644\u0648\u0644\u0627\u0621'
+                      )}
+                    </span>
+                    <span
+                      className="font-medium text-[hsl(var(--success))] tabular-nums"
+                      style={typography?.price}
+                    >
+                      -{formatPrice(loyaltyDiscount)}
+                    </span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground" style={typography?.label}>
               {t('Shipping', translations['Shipping'])}

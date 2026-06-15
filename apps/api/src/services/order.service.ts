@@ -16,7 +16,7 @@ import {
 import { inngest } from '../lib/inngest/client';
 import { shippingCarrierService } from './shipping-carrier.service';
 import { ShippingService } from './shipping.service';
-import { LoyaltyService } from './loyalty.service';
+import { LoyaltyService, computeRedemption } from './loyalty.service';
 import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
@@ -51,6 +51,11 @@ interface CreateOrderData {
   paymentMethod: string;
   notes?: string;
   couponCode?: string;
+  /** Loyalty points the customer requested to redeem at checkout. The server
+   *  re-resolves this against the customer's real balance + the store's
+   *  redemption settings (min/max/percentage cap) — it is a REQUEST, never a
+   *  trusted discount. Ignored for guest checkout (no customerId). */
+  pointsToRedeem?: number;
   /** Buyer's UI locale at checkout time. Stored on the order so
    *  transactional emails are sent in the buyer's language. */
   locale?: 'en' | 'ar';
@@ -253,7 +258,35 @@ export class OrderService {
       }
     }
 
-    const discount = couponDiscount;
+    // Resolve loyalty redemption on the SERVER. data.pointsToRedeem is a
+    // request, never a trusted discount. Guests (no customerId) can't redeem.
+    // We compute the actual burnable points + discount against the customer's
+    // real balance + the store's redemption caps, then cap the loyalty
+    // discount at the subtotal REMAINING after the coupon so the two discounts
+    // can't drive the order below zero or over-discount the goods. The actual
+    // point decrement happens inside the order transaction (atomic) via
+    // LoyaltyService.redeemPoints with the resolved point count.
+    let loyaltyPointsRedeemed = 0;
+    let loyaltyDiscount = 0;
+    if (customerId && typeof data.pointsToRedeem === 'number' && data.pointsToRedeem > 0) {
+      const ctx = await LoyaltyService.getRedeemableContext(storeId, customerId);
+      if (ctx) {
+        // Cap against the goods value still payable after the coupon discount.
+        const redeemableSubtotal = Math.max(0, subtotal - couponDiscount);
+        const quote = computeRedemption(
+          ctx.settings,
+          data.pointsToRedeem,
+          redeemableSubtotal,
+          ctx.availablePoints
+        );
+        if (quote.applied) {
+          loyaltyPointsRedeemed = quote.pointsToRedeem;
+          loyaltyDiscount = quote.discountFils;
+        }
+      }
+    }
+
+    const discount = couponDiscount + loyaltyDiscount;
     const total = Math.max(0, subtotal + tax + shipping - discount);
 
     // Generate order number
@@ -390,6 +423,8 @@ export class OrderService {
           discount,
           couponCode: appliedCoupon?.code ?? null,
           couponDiscount,
+          loyaltyPointsRedeemed: loyaltyPointsRedeemed > 0 ? loyaltyPointsRedeemed : null,
+          loyaltyDiscount,
           total,
           locale: data.locale ?? null,
           shippingAddress: data.shippingAddress,
@@ -471,6 +506,24 @@ export class OrderService {
             data: { costPriceDeferred: true },
           });
         }
+      }
+
+      // Redeem loyalty points INSIDE the order transaction so the point
+      // decrement + the redeem_discount ledger row commit atomically with the
+      // order — points are never spent without an order, and the order is
+      // never created without the deduction. The conditional gate inside
+      // redeemPoints makes a concurrent checkout that already drained the
+      // balance throw INSUFFICIENT_POINTS here, rolling back this whole order.
+      // customerId is guaranteed non-null here (guests never set
+      // loyaltyPointsRedeemed > 0 above).
+      if (loyaltyPointsRedeemed > 0 && customerId) {
+        await LoyaltyService.redeemPoints(
+          storeId,
+          customerId,
+          newOrder.id,
+          loyaltyPointsRedeemed,
+          tx
+        );
       }
 
       // Clear cart
@@ -1014,6 +1067,16 @@ export class OrderService {
         logger.error(
           { err, storeId, orderId },
           '[OrderService] Loyalty reversal failed during refund'
+        )
+      );
+
+      // Re-credit points the customer SPENT at checkout. No-op for orders with
+      // no redemption. Idempotent — repeat refunds (partial→full) re-credit
+      // exactly once via the tagged adjust row.
+      await LoyaltyService.reverseRedeemedPointsFromOrder(storeId, orderId).catch(err =>
+        logger.error(
+          { err, storeId, orderId },
+          '[OrderService] Loyalty redemption re-credit failed during refund'
         )
       );
     }

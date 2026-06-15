@@ -108,6 +108,11 @@ export const createOrderSchema = z.object({
   paymentMethod: z.string().min(1),
   notes: z.string().max(2000).optional(),
   couponCode: z.string().trim().min(1).max(50).optional(),
+  /** Loyalty points the customer requests to redeem. A request, not a
+   *  trusted discount — the server re-resolves it against the customer's
+   *  real balance + store caps. Ignored for guests. Bounded to a sane
+   *  integer ceiling so a malformed value can't overflow the math. */
+  pointsToRedeem: z.number().int().min(0).max(100_000_000).optional(),
   /** Buyer's UI locale. Stored on the order so transactional emails
    *  arrive in the buyer's language regardless of the store default. */
   locale: z.enum(['en', 'ar']).optional(),

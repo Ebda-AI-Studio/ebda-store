@@ -8,6 +8,7 @@ import { Button, Input, Select } from '@force/ui';
 import { MinimalChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
@@ -168,6 +169,21 @@ export default function CheckoutClient() {
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponError, setCouponError] = useState('');
+
+  // Loyalty redemption (logged-in customers only). `loyalty` holds the
+  // customer's balance + the store's redemption settings; `redeemEnabled`
+  // toggles whether to apply points to THIS order; `pointsToRedeem` is the
+  // number the customer chose. All money math is re-validated server-side at
+  // order create — these values are display-only / a request.
+  const { isAuthenticated } = useAuth();
+  const [loyalty, setLoyalty] = useState<{
+    points: number;
+    pointsValue: number; // fils per point
+    minRedeemPoints: number;
+    maxRedeemPercentage: number;
+  } | null>(null);
+  const [redeemEnabled, setRedeemEnabled] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -513,11 +529,78 @@ export default function CheckoutClient() {
     applyCouponCode(stored);
   }, [cartIsReady, cart, promoStorageKey, applyCouponCode]);
 
+  // Fetch the customer's loyalty balance + redemption settings once we know
+  // they're logged in and we have a real store. Public endpoints; silently
+  // no-op for guests, disabled loyalty, or stores without the feature.
+  useEffect(() => {
+    if (!isAuthenticated || !store?.id || store.id === 'demo') {
+      setLoyalty(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [pointsRes, infoRes] = await Promise.all([
+          api.get<{
+            points: { points: number; pointsValue: number } | null;
+          }>(`/public/${store.id}/loyalty/my-points`),
+          api.get<{
+            enabled: boolean;
+            pointsValue?: number;
+            minRedeemPoints?: number;
+          }>(`/public/${store.id}/loyalty/info`),
+        ]);
+        if (cancelled) return;
+        const pts = pointsRes.success ? pointsRes.data?.points : null;
+        const info = infoRes.success ? infoRes.data : null;
+        if (!pts || !info?.enabled || pts.points <= 0) {
+          setLoyalty(null);
+          return;
+        }
+        setLoyalty({
+          points: pts.points,
+          pointsValue: info.pointsValue ?? pts.pointsValue ?? 1,
+          minRedeemPoints: info.minRedeemPoints ?? 0,
+          // maxRedeemPercentage isn't exposed publicly; the server enforces
+          // it authoritatively. Use 100 here so the UI estimate never blocks a
+          // valid redemption — the server caps the real discount.
+          maxRedeemPercentage: 100,
+        });
+      } catch {
+        if (!cancelled) setLoyalty(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, store?.id]);
+
   // Calculate totals
   const subtotal = cart?.subtotal || 0;
-  const discount = couponDiscount;
+
+  // Loyalty discount estimate. Mirrors the server's computeRedemption so the
+  // order summary matches what the API will actually apply: clamp points to
+  // balance, gate at the minimum, cap the discount at the goods value
+  // remaining after the coupon. The server re-validates; this is display-only.
+  const redeemableAfterCoupon = Math.max(0, subtotal - couponDiscount);
+  const effectiveRedeemPoints =
+    redeemEnabled && loyalty
+      ? Math.min(Math.max(0, Math.floor(pointsToRedeem)), loyalty.points)
+      : 0;
+  const loyaltyDiscount =
+    loyalty && effectiveRedeemPoints >= loyalty.minRedeemPoints && effectiveRedeemPoints > 0
+      ? Math.min(effectiveRedeemPoints * loyalty.pointsValue, redeemableAfterCoupon)
+      : 0;
+  // The point count we actually send: when the subtotal cap binds, reduce
+  // points so we never request to burn more than the discount represents.
+  const pointsToSend =
+    loyalty && loyaltyDiscount > 0
+      ? Math.min(effectiveRedeemPoints, Math.floor(loyaltyDiscount / loyalty.pointsValue))
+      : 0;
+
+  const discount = couponDiscount + loyaltyDiscount;
   const shipping = freeShipping ? 0 : shippingCost;
-  const total = subtotal - discount + shipping;
+  const total = Math.max(0, subtotal - discount + shipping);
 
   // Submit order
   const handleSubmit = async (e: React.FormEvent) => {
@@ -559,6 +642,10 @@ export default function CheckoutClient() {
         paymentMethod: selectedProvider,
         notes: formData.notes,
         couponCode: appliedCoupon?.code,
+        // Only send a redemption request when the customer opted in AND the
+        // amount clears the store minimum. The server re-validates against the
+        // real balance + caps regardless.
+        pointsToRedeem: pointsToSend > 0 ? pointsToSend : undefined,
       });
 
       if (!orderResult.success || !orderResult.data?.order) {
@@ -1103,6 +1190,20 @@ export default function CheckoutClient() {
               onApplyCoupon={handleApplyCoupon}
               onRemoveCoupon={removeCoupon}
               couponError={couponError}
+              loyalty={
+                loyalty
+                  ? {
+                      points: loyalty.points,
+                      pointsValue: loyalty.pointsValue,
+                      minRedeemPoints: loyalty.minRedeemPoints,
+                      enabled: redeemEnabled,
+                      onToggle: setRedeemEnabled,
+                      pointsToRedeem,
+                      onPointsChange: setPointsToRedeem,
+                      loyaltyDiscount,
+                    }
+                  : undefined
+              }
               typography={checkoutTypography}
             />
           </div>

@@ -226,6 +226,9 @@ interface CreateOrderData {
   paymentMethod: string;
   notes?: string;
   couponCode?: string;
+  /** Loyalty points the customer requests to redeem. Re-validated server-side
+   *  against the real balance + store caps; ignored for guest checkout. */
+  pointsToRedeem?: number;
 }
 
 class ApiClient {
