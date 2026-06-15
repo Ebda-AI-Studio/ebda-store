@@ -26,7 +26,19 @@ jobs:
         # actions/setup-python@v5 cannot provision (no prebuilt 3.12 for 26.04).
         run: |
           set -euo pipefail
-          python3 -m venv "$RUNNER_TEMP/semgrep-venv"
+          # A freshly-provisioned self-hosted VM (e.g. the Mac OrbStack Ubuntu
+          # 26.04 box) ships python3 WITHOUT the venv module — `python3 -m venv`
+          # then fails with "ensurepip is not available". Self-heal it so a VM
+          # rebuild can't silently break this SECURITY gate; on cloud runners
+          # venv is already present so the install is a no-op.
+          if ! python3 -m venv "$RUNNER_TEMP/semgrep-venv" 2>/dev/null; then
+            echo "::notice::python3 venv missing — installing python3-venv on this runner"
+            venv_pkg="$(python3 -c 'import sys; print(f"python3.{sys.version_info.minor}-venv")')"
+            sudo apt-get update -qq
+            sudo apt-get install -y python3-venv "$venv_pkg"
+            rm -rf "$RUNNER_TEMP/semgrep-venv"
+            python3 -m venv "$RUNNER_TEMP/semgrep-venv"
+          fi
           "$RUNNER_TEMP/semgrep-venv/bin/pip" install --quiet --upgrade semgrep
           "$RUNNER_TEMP/semgrep-venv/bin/semgrep" scan \
             --config p/default \
