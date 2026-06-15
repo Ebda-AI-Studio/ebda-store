@@ -266,8 +266,7 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     description: 'Add team members with role-based permissions to manage the store.',
     descriptionAr: 'إضافة أعضاء الفريق بأذونات قائمة على الأدوار لإدارة المتجر.',
     category: 'operations',
-    tier: 'experimental',
-    hidden: true, // No Staff/team-membership model or admin invite UI yet.
+    tier: 'core',
   },
   pwa: {
     key: 'pwa',

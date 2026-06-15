@@ -13,6 +13,12 @@ export interface NavItem {
   hubKey?: string;
   /** When true, this nav item is only shown to super_admin users. */
   superAdminOnly?: boolean;
+  /**
+   * When true, this nav item is hidden from staff users.
+   * Staff can manage day-to-day operations but cannot touch store configuration
+   * (billing, payment settings, branding, domain, shipping zones, etc.).
+   */
+  staffRestricted?: boolean;
 }
 
 /**
@@ -121,6 +127,8 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       // Calculator (Heroicons v2 `calculator`) — reads as accounting, not
       // just "money/revenue" like the old dollar-circle.
       icon: 'M15.75 15.75V18 M8.25 6h7.5v2.25h-7.5V6z M12 2.25c-1.892 0-3.758.11-5.593.322C5.307 2.7 4.5 3.65 4.5 4.757V19.5a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25V4.757c0-1.108-.806-2.057-1.907-2.185A48.507 48.507 0 0012 2.25z M8.25 11.25h.008v.008H8.25v-.008z M8.25 13.5h.008v.008H8.25V13.5z M8.25 15.75h.008v.008H8.25v-.008z M8.25 18h.008v.008H8.25V18z M10.748 11.25h.008v.008h-.008v-.008z M10.748 13.5h.008v.008h-.008V13.5z M10.748 15.75h.008v.008h-.008v-.008z M10.748 18h.008v.008h-.008V18z M13.252 11.25h.008v.008h-.008v-.008z M13.252 13.5h.008v.008h-.008V13.5z M13.252 15.75h.008v.008h-.008v-.008z M13.252 18h.008v.008h-.008V18z M15.75 11.25h.008v.008h-.008v-.008z M15.75 13.5h.008v.008h-.008V13.5z',
+      // Accounting/financial records are owner-only — staff cannot post journal entries or view P&L
+      staffRestricted: true,
     },
     {
       name: labels.analytics,
@@ -144,6 +152,8 @@ export function buildStoreAdminNav(storeId: string, labels: NavLabels): NavItem[
       hubKey: 'settings',
       // Gear icon
       icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+      // Staff users should not see store settings (billing, payment config, branding)
+      staffRestricted: true,
     },
     {
       name: labels.manageFeatures,

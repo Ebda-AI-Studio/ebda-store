@@ -7,7 +7,12 @@ import { AppError } from '../middleware/error-handler';
 
 const router = Router({ mergeParams: true });
 
-const adminMiddleware = [authenticate, authorize('store_admin', 'super_admin'), requireStoreAccess];
+// staff can read customer records (needed for order context lookups)
+const adminMiddleware = [
+  authenticate,
+  authorize('store_admin', 'super_admin', 'staff'),
+  requireStoreAccess,
+];
 
 interface AggregatedCustomer {
   id: string;

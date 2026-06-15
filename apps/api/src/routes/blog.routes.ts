@@ -107,7 +107,7 @@ router.get(
 router.get(
   '/stores/:storeId/blog',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -126,7 +126,7 @@ router.get(
 router.get(
   '/stores/:storeId/blog/:postId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -145,7 +145,7 @@ router.get(
 router.post(
   '/stores/:storeId/blog',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -166,7 +166,7 @@ router.post(
 router.put(
   '/stores/:storeId/blog/:postId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -187,7 +187,7 @@ router.put(
 router.delete(
   '/stores/:storeId/blog/:postId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {

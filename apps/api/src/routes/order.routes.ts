@@ -190,7 +190,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 router.put(
   '/:id/status',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requirePermission('orders:manage'),
   writeLimiter,
@@ -230,7 +230,7 @@ router.put(
 router.get(
   '/:orderId/invoice',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -255,7 +255,7 @@ router.get(
 router.post(
   '/:orderId/invoice/email',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -325,7 +325,7 @@ router.get('/my/list', authenticate, async (req: Request, res: Response, next: N
 router.post(
   '/:orderId/mark-paid',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -433,7 +433,7 @@ router.post(
 router.post(
   '/bulk-mark-paid',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -562,7 +562,7 @@ router.post(
 router.post(
   '/:orderId/refresh-payment-status',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -680,7 +680,7 @@ router.post(
 router.post(
   '/:orderId/refresh-refund-status',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -855,7 +855,7 @@ const refundViaProviderSchema = z.object({
 router.post(
   '/:orderId/refund-via-provider',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1023,7 +1023,7 @@ const adminOrderSchema = z.object({
 router.post(
   '/admin',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -1071,7 +1071,7 @@ const issuePaymentLinkSchema = z.object({
 router.post(
   '/:orderId/payment-link',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {

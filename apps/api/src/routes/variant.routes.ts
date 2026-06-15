@@ -83,7 +83,7 @@ const reorderSchema = z.object({
 router.get(
   '/:storeId/products/:productId/variants',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -104,7 +104,7 @@ router.get(
 router.post(
   '/:storeId/products/:productId/options',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -128,7 +128,7 @@ router.post(
 router.put(
   '/:storeId/products/:productId/options/reorder',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -151,7 +151,7 @@ router.put(
 router.put(
   '/:storeId/products/:productId/options/:optionId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -177,7 +177,7 @@ router.put(
 router.delete(
   '/:storeId/products/:productId/options/:optionId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -199,7 +199,7 @@ router.delete(
 router.post(
   '/:storeId/products/:productId/options/:optionId/values',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -222,7 +222,7 @@ router.post(
 router.put(
   '/:storeId/products/:productId/option-values/:valueId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -248,7 +248,7 @@ router.put(
 router.delete(
   '/:storeId/products/:productId/option-values/:valueId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -270,7 +270,7 @@ router.delete(
 router.post(
   '/:storeId/products/:productId/variants',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -294,7 +294,7 @@ router.post(
 router.put(
   '/:storeId/products/:productId/variants/reorder',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -317,7 +317,7 @@ router.put(
 router.put(
   '/:storeId/products/:productId/variants/:variantId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -340,7 +340,7 @@ router.put(
 router.delete(
   '/:storeId/products/:productId/variants/:variantId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -362,7 +362,7 @@ router.delete(
 router.post(
   '/:storeId/products/:productId/variants/generate',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -384,7 +384,7 @@ router.post(
 router.post(
   '/:storeId/products/:productId/variants/bulk-inventory',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

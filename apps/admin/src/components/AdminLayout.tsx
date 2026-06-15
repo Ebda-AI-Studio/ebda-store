@@ -76,9 +76,9 @@ export function AdminLayout({
   // Derive the mode from the authenticated user's role unless the page
   // explicitly opts out. A store_admin can never see super_admin chrome
   // (security + UX), so even if a page passes mode="super_admin" we coerce
-  // it to store_admin when the user only has store_admin privileges.
+  // it to store_admin when the user only has store_admin or staff privileges.
   const mode: 'super_admin' | 'store_admin' =
-    user?.role === 'store_admin'
+    user?.role === 'store_admin' || user?.role === 'staff'
       ? 'store_admin'
       : (explicitMode ?? (isStoreScopedPath ? 'store_admin' : 'super_admin'));
 
@@ -252,6 +252,8 @@ export function AdminLayout({
   const navItems = allNavItems.filter(item => {
     if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
     if (item.superAdminOnly && user?.role !== 'super_admin') return false;
+    // Staff users cannot access store settings (billing, branding, payment config, etc.)
+    if (item.staffRestricted && user?.role === 'staff') return false;
     return true;
   });
 
@@ -296,7 +298,7 @@ export function AdminLayout({
         mode={mode}
         storeBranding={resolvedStoreBranding}
         isStoreAdminWithBranding={isStoreAdminWithBranding}
-        userRole={user?.role as 'super_admin' | 'store_admin' | 'customer' | undefined}
+        userRole={user?.role as 'super_admin' | 'store_admin' | 'staff' | 'customer' | undefined}
       />
       <SidebarNav
         navItems={navItems}

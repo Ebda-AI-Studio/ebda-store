@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import { AppError } from './error-handler';
 import { auditLog } from './security';
 
@@ -101,6 +101,35 @@ export async function requireStoreAccess(
       return next();
     }
 
+    // Staff users can access stores they are explicitly added to
+    if (user.role === 'staff') {
+      const membership = await withRlsBypass(tx =>
+        tx.storeStaff.findUnique({
+          where: { userId_storeId: { userId: user.userId, storeId } },
+          select: { id: true },
+        })
+      );
+
+      if (!membership) {
+        await auditLog({
+          action: 'STORE_ACCESS_DENIED',
+          userId: user.userId,
+          resourceType: 'store',
+          resourceId: storeId,
+          details: {
+            reason: 'not_staff_member',
+            attemptedStoreId: storeId,
+          },
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+        throw new AppError(403, 'FORBIDDEN', 'You do not have access to this store');
+      }
+
+      req.store = store;
+      return next();
+    }
+
     // Customers and other roles cannot access store admin routes
     throw new AppError(403, 'FORBIDDEN', 'Insufficient permissions to access store');
   } catch (error) {
@@ -141,6 +170,17 @@ export async function checkStoreAccess(
   }
   if (user.role === 'store_admin' && store.ownerId === user.userId) {
     return { ok: true, store };
+  }
+  if (user.role === 'staff') {
+    const membership = await withRlsBypass(tx =>
+      tx.storeStaff.findUnique({
+        where: { userId_storeId: { userId: user.userId, storeId } },
+        select: { id: true },
+      })
+    );
+    if (membership) {
+      return { ok: true, store };
+    }
   }
   return {
     ok: false,

@@ -9,7 +9,7 @@ interface PaymentCardProps {
   order: OrderDetail;
   onEdit?: () => void;
   /** Viewer role — used to gate the super-admin raw-payload button on the timeline. */
-  userRole?: 'super_admin' | 'store_admin' | 'customer';
+  userRole?: 'super_admin' | 'store_admin' | 'customer' | 'staff';
 }
 
 export function PaymentCard({ order, onEdit, userRole }: PaymentCardProps) {

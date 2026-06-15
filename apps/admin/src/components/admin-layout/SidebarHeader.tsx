@@ -12,7 +12,7 @@ interface SidebarHeaderProps {
   /** Authenticated user role — distinct from `mode`. A super_admin viewing a
    *  store renders mode='store_admin' chrome but should still surface their
    *  actual role + a way back to the platform store list. */
-  userRole?: 'super_admin' | 'store_admin' | 'customer';
+  userRole?: 'super_admin' | 'store_admin' | 'staff' | 'customer';
 }
 
 export function SidebarHeader({
@@ -29,6 +29,7 @@ export function SidebarHeader({
   // "Super Admin / Viewing this store" badge + a "← All stores" link so
   // the super_admin always has a one-click escape back to the platform.
   const isSuperAdminViewingStore = userRole === 'super_admin' && mode === 'store_admin';
+  const isStaffUser = userRole === 'staff';
 
   return (
     <>
@@ -98,8 +99,23 @@ export function SidebarHeader({
         </div>
       )}
 
+      {/* Staff Badge */}
+      {isStaffUser && isStoreAdminWithBranding && (
+        <div className="border-b border-border/50 px-4 py-3">
+          <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 px-3 py-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-[10px] font-bold text-white shadow-sm">
+              ST
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-semibold text-foreground">Staff</span>
+              <p className="text-[10px] text-muted-foreground truncate">Limited access</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Store Admin Badge — actual store_admin role only */}
-      {isStoreAdminWithBranding && !isSuperAdminViewingStore && (
+      {isStoreAdminWithBranding && !isSuperAdminViewingStore && !isStaffUser && (
         <div className="border-b border-border/50 px-4 py-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-3 py-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-[10px] font-bold text-white shadow-sm">

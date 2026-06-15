@@ -9,7 +9,7 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'super_admin' | 'store_admin' | 'customer';
+  role: 'super_admin' | 'store_admin' | 'staff' | 'customer';
 }
 
 export interface MfaChallenge {
@@ -171,9 +171,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { mfaRequired: true, challengeToken: data.data.challengeToken } as MfaChallenge;
     }
 
-    // Check if user is admin
-    if (data.data.user.role !== 'super_admin' && data.data.user.role !== 'store_admin') {
-      throw new Error('Access denied. Admin privileges required.');
+    // Check if user is admin or staff
+    const adminRoles = ['super_admin', 'store_admin', 'staff'];
+    if (!adminRoles.includes(data.data.user.role)) {
+      throw new Error('Access denied. Admin or staff privileges required.');
     }
 
     // Mirror the access token into localStorage for the iOS PWA path —
@@ -204,8 +205,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error?.message || 'Verification failed');
     }
 
-    if (data.data.user.role !== 'super_admin' && data.data.user.role !== 'store_admin') {
-      throw new Error('Access denied. Admin privileges required.');
+    const adminRolesMfa = ['super_admin', 'store_admin', 'staff'];
+    if (!adminRolesMfa.includes(data.data.user.role)) {
+      throw new Error('Access denied. Admin or staff privileges required.');
     }
 
     storeSession(data.data);

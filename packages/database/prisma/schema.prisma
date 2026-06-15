@@ -79,6 +79,7 @@ model User {
   abandonedCarts           AbandonedCart[]         @relation("AbandonedCartCustomer")
   triggeredPaymentEvents   PaymentEvent[]
   triggeredAffiliateEvents AffiliateEvent[]        @relation("AffiliateEventTriggeredBy")
+  staffMemberships         StoreStaff[]            @relation("StaffUser")
 
   // Composite unique (storeId, email) — one customer account per email per
   // store. Admins (storeId NULL) are not subject to this constraint thanks
@@ -104,6 +105,7 @@ enum UserRole {
   customer
   store_admin
   super_admin
+  staff
 }
 
 enum UserStatus {
@@ -407,12 +409,37 @@ model Store {
   customerRfmSnapshots     CustomerRfmSnapshot[]
   whatsAppTemplates        WhatsAppTemplate[]
   paymentEvents            PaymentEvent[]
+  staffMembers             StoreStaff[]               @relation("StoreStaffMembers")
 
   @@index([ownerId])
   @@index([status])
   @@index([plan])
   @@index([createdAt])
   @@map("stores")
+}
+
+// ==========================================
+// Staff Accounts (store-scoped team members)
+// ==========================================
+
+/**
+ * Links a `staff`-role user to a specific store.
+ * A staff user can only access stores they are members of.
+ * The owning store_admin (or super_admin) adds/removes rows here.
+ */
+model StoreStaff {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  store Store @relation("StoreStaffMembers", fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation("StaffUser",          fields: [userId],  references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId])
+  @@index([storeId])
+  @@index([userId])
+  @@map("store_staff")
 }
 
 // ==========================================

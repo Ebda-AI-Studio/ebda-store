@@ -167,7 +167,7 @@ const updateProductSchema = createProductSchema.partial().superRefine(refineFixe
 router.get(
   '/',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -210,7 +210,7 @@ router.get(
 router.get(
   '/search',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -268,7 +268,7 @@ router.get(
 router.get(
   '/suggestions',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -295,7 +295,7 @@ router.get(
 router.get(
   '/filters',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -318,7 +318,7 @@ router.get(
 router.get(
   '/:id',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -352,7 +352,7 @@ router.get(
 router.post(
   '/bulk-set-backorder',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.backorder'),
   writeLimiter,
@@ -397,7 +397,7 @@ router.post(
 router.post(
   '/bulk-set-low-stock-threshold',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.stock_alerts'),
   writeLimiter,
@@ -568,7 +568,7 @@ const productFaqSchema = z.object({
 router.get(
   '/:id/faqs',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -586,7 +586,7 @@ router.get(
 router.post(
   '/:id/faqs',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -612,7 +612,7 @@ router.post(
 router.put(
   '/:id/faqs/:faqId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -641,7 +641,7 @@ router.put(
 router.delete(
   '/:id/faqs/:faqId',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

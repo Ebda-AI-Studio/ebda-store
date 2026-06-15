@@ -59,7 +59,7 @@ const updateCategorySchema = z.object({
 router.get(
   '/best-sellers-image',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -147,7 +147,7 @@ router.put(
 router.get(
   '/',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

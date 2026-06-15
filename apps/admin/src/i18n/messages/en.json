@@ -1303,6 +1303,10 @@
         "title": "WhatsApp Integration",
         "description": "Force Business Platform · templates · order updates · payment links"
       },
+      "staff": {
+        "title": "Staff Members",
+        "description": "Add team members with limited access to manage orders, products, and inventory"
+      },
       "whatsappBridge": {
         "title": "WhatsApp Business",
         "description": "Connect Force AI Store to Force AI WhatsApp Business Platform — paste your API key + configure templates"

@@ -347,7 +347,7 @@ function EventRow({ event, isLast, isSuperAdmin }: EventRowProps) {
 
 interface PaymentEventsTimelineProps {
   paymentId: string;
-  userRole?: 'super_admin' | 'store_admin' | 'customer';
+  userRole?: 'super_admin' | 'store_admin' | 'customer' | 'staff';
 }
 
 export function PaymentEventsTimeline({ paymentId, userRole }: PaymentEventsTimelineProps) {

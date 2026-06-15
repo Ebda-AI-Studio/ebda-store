@@ -73,7 +73,7 @@ export function OneSignalInit() {
         // `role` matching the order's storeId / 'super_admin' respectively.
         await OneSignal.User.addTag('user_id', user.id);
         await OneSignal.User.addTag('role', user.role);
-        if (user.role === 'store_admin') {
+        if (user.role === 'store_admin' || user.role === 'staff') {
           // selectedStoreId can be 'all' before the store list resolves, in
           // which case we don't tag yet — the next render will catch up.
           if (selectedStoreId && selectedStoreId !== 'all') {

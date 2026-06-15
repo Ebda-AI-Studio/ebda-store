@@ -50,7 +50,7 @@ const bulkAdjustSchema = z.object({
 router.get(
   '/:storeId/inventory/stats',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -72,7 +72,7 @@ router.get(
 router.get(
   '/:storeId/inventory/products',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -103,7 +103,7 @@ router.get(
 router.get(
   '/:storeId/inventory/alerts',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.stock_alerts'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -125,7 +125,7 @@ router.get(
 router.post(
   '/:storeId/inventory/adjust',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -160,7 +160,7 @@ router.post(
 router.post(
   '/:storeId/inventory/bulk-adjust',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.bulk_adjustments'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -195,7 +195,7 @@ router.post(
 router.put(
   '/:storeId/inventory/products/:productId/set',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -226,7 +226,7 @@ router.put(
 router.put(
   '/:storeId/inventory/products/:productId/threshold',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.stock_alerts'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -250,7 +250,7 @@ router.put(
 router.get(
   '/:storeId/inventory/products/:productId/history',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -277,7 +277,7 @@ router.get(
 router.get(
   '/:storeId/inventory/history',
   authenticate,
-  authorize('store_admin', 'super_admin'),
+  authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
   requireFeature('inventory.basic'),
   async (req: Request, res: Response, next: NextFunction) => {

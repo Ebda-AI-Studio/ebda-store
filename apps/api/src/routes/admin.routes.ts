@@ -124,15 +124,45 @@ router.post(
 
 /**
  * GET /admin/stores
- * List all stores
+ * List all stores.
+ *   - super_admin: all stores
+ *   - store_admin: only stores they own
+ *   - staff: only stores they are a member of (via store_staff)
  */
 router.get(
   '/stores',
-  requireRole(['super_admin', 'store_admin']),
+  requireRole(['super_admin', 'store_admin', 'staff']),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { page: pageStr, limit: limitStr, status, search } = req.query;
       const { page, limit } = parsePagination(pageStr, limitStr);
+
+      // Staff users are scoped to the stores they are explicitly added to.
+      if (req.user?.role === 'staff') {
+        const memberships = await withRlsBypass(tx =>
+          tx.storeStaff.findMany({
+            where: { userId: req.user!.userId },
+            select: { storeId: true },
+          })
+        );
+        const storeIds = memberships.map(m => m.storeId);
+        if (storeIds.length === 0) {
+          res.json({
+            success: true,
+            data: { stores: [], pagination: { page: 1, limit, total: 0, totalPages: 0 } },
+          });
+          return;
+        }
+        // Fetch the actual store rows for these ids
+        const stores = await withRlsBypass(tx =>
+          tx.store.findMany({
+            where: { id: { in: storeIds } },
+            select: { id: true, name: true, nameAr: true, logo: true, slug: true, status: true },
+          })
+        );
+        res.json({ success: true, data: { stores } });
+        return;
+      }
 
       const result = await ProvisioningService.listStores({
         page,
