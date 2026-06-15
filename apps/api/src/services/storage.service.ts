@@ -2,7 +2,9 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
@@ -209,6 +211,57 @@ export class StorageService {
    */
   static async deleteMultiple(keys: string[]): Promise<void> {
     await Promise.all(keys.map(key => this.delete(key)));
+  }
+
+  /**
+   * Delete EVERY object under a key prefix (paginated list → batched delete).
+   *
+   * Used to reclaim R2 storage when a whole tenant is removed: uploads are
+   * namespaced as `stores/<storeId>/...` (see composeKey), so the entire set of
+   * a store's assets is `deleteByPrefix('stores/<storeId>/')`. Returns the count
+   * of objects removed. Caller is responsible for passing a correctly-scoped,
+   * trailing-slash prefix so a prefix can never match a sibling tenant
+   * (`stores/abc/` never matches `stores/abcd/`).
+   */
+  static async deleteByPrefix(prefix: string): Promise<number> {
+    if (!prefix || prefix === 'stores/') {
+      // Guard: never allow an empty or bucket-wide prefix to wipe everything.
+      throw new AppError(400, 'INVALID_PREFIX', 'deleteByPrefix requires a scoped prefix');
+    }
+    const client = this.getClient();
+    let deleted = 0;
+    let continuationToken: string | undefined;
+
+    do {
+      const listed = await client.send(
+        new ListObjectsV2Command({
+          Bucket: config.storageBucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        })
+      );
+
+      const objects = (listed.Contents ?? [])
+        .map(o => o.Key)
+        .filter((k): k is string => Boolean(k))
+        .map(Key => ({ Key }));
+
+      if (objects.length > 0) {
+        // DeleteObjects caps at 1000 keys/request; ListObjectsV2 also caps the
+        // page at 1000, so one delete per page stays within the limit.
+        await client.send(
+          new DeleteObjectsCommand({
+            Bucket: config.storageBucket,
+            Delete: { Objects: objects, Quiet: true },
+          })
+        );
+        deleted += objects.length;
+      }
+
+      continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+    } while (continuationToken);
+
+    return deleted;
   }
 
   /**

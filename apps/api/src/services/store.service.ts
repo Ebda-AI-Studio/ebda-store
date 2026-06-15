@@ -5,6 +5,7 @@ import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
+import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
 
 /**
@@ -441,6 +442,21 @@ export class StoreService {
 
     // Public-facing storefront caches too — same logic as updates.
     await bustStoreCaches(storeId, store.slug);
+
+    // Reclaim R2 storage: every upload for this store is namespaced under
+    // `stores/<storeId>/...`, so purge that whole prefix. Best-effort + AFTER
+    // the DB commit — a storage hiccup must never block (or roll back) the
+    // store deletion. Orphaned objects would otherwise sit in the bucket
+    // forever (there is no other cleanup path on delete).
+    try {
+      const removed = await StorageService.deleteByPrefix(`stores/${storeId}/`);
+      logger.info({ storeId, removed }, '[STORE_DELETE] purged R2 objects');
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown', storeId },
+        '[STORE_DELETE] R2 prefix purge failed (objects orphaned, DB delete stands)'
+      );
+    }
 
     return { id: storeId, name: store.name, slug: store.slug };
   }
