@@ -8,6 +8,7 @@ import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
 import { runInTenantContext } from '@force/database';
 import { inngest } from '../lib/inngest/client';
+import { ALLOWED_CURRENCIES } from '@force/shared';
 import logger from '../lib/logger';
 import {
   createExpense,
@@ -34,22 +35,51 @@ const receiptUpload = multer({
   },
 });
 
-const createSchema = z.object({
-  supplierId: z.string().uuid().optional(),
-  expenseAccountId: z.string().uuid(),
-  paidFromAccountId: z.string().uuid(),
-  amount: z.number().int().positive(),
-  taxAmount: z.number().int().nonnegative().optional(),
-  // Accept both a full ISO-8601 datetime ("2026-06-15T00:00:00.000Z") and a
-  // bare date string ("2026-06-15") produced by <input type="date">.
-  // z.coerce.date() converts either form to a Date; the service stores it as a
-  // DB timestamp so both are safe. Fixes the 422 on every manual expense save.
-  expenseDate: z.coerce.date(),
-  currency: z.string().length(3).optional(),
-  receiptImageUrl: z.string().url().optional(),
-  notes: z.string().max(1000).optional(),
-  notesAr: z.string().max(1000).optional(),
-});
+const createSchema = z
+  .object({
+    supplierId: z.string().uuid().optional(),
+    expenseAccountId: z.string().uuid(),
+    paidFromAccountId: z.string().uuid(),
+    amount: z.number().int().positive(),
+    taxAmount: z.number().int().nonnegative().optional(),
+    // Accept both a full ISO-8601 datetime ("2026-06-15T00:00:00.000Z") and a
+    // bare date string ("2026-06-15") produced by <input type="date">.
+    // z.coerce.date() converts either form to a Date; the service stores it as a
+    // DB timestamp so both are safe. Fixes the 422 on every manual expense save.
+    expenseDate: z.coerce.date(),
+    /** ISO-4217 currency code. Defaults to 'KWD' when absent. */
+    currency: z
+      .enum(ALLOWED_CURRENCIES)
+      .optional()
+      .transform(v => v?.toUpperCase() ?? 'KWD'),
+    /**
+     * FX rate: 1 unit of `currency` = fxRate KWD.
+     * Required when currency !== 'KWD'. Positive finite number.
+     */
+    fxRate: z.number().positive().finite().optional(),
+    /**
+     * Original amount in the foreign currency's minor units.
+     * When absent, the API treats `amount` as the raw foreign amount.
+     */
+    originalAmount: z.number().int().nonnegative().optional(),
+    receiptImageUrl: z.string().url().optional(),
+    notes: z.string().max(1000).optional(),
+    notesAr: z.string().max(1000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const currency = (data.currency ?? 'KWD').toUpperCase();
+    // fxRate is required for non-KWD currencies when the expense is NOT an
+    // OCR-created draft (those omit fxRate and store a placeholder).
+    // We enforce this at the API boundary so callers don't silently store
+    // a 1:1 rate for a genuinely non-KWD amount.
+    if (currency !== 'KWD' && data.fxRate === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['fxRate'],
+        message: `fxRate is required when currency is ${currency}`,
+      });
+    }
+  });
 
 const rejectSchema = z.object({
   reason: z.string().max(500).optional(),

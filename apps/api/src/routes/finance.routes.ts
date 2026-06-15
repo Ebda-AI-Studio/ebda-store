@@ -21,6 +21,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { ALLOWED_CURRENCIES, convertToKwd, requiresFxRate } from '@force/shared';
 import {
   listAccountsTree,
   createChildAccount,
@@ -165,20 +166,40 @@ router.get(
 
 // ─── POST /:storeId/finance/journal ──────────────────────────────────────────
 
+const lineSchema = z
+  .object({
+    accountId: z.string().uuid(),
+    /** KWD fils when currency=KWD. Foreign minor units when currency≠KWD. */
+    debit: z.number().int().nonnegative(),
+    credit: z.number().int().nonnegative(),
+    lineMemo: z.string().optional(),
+    /** ISO-4217 code. Defaults to 'KWD'. */
+    currency: z.enum(ALLOWED_CURRENCIES).optional(),
+    /**
+     * FX rate: 1 unit of `currency` = fxRate KWD.
+     * Required when currency !== 'KWD'. The route converts debit/credit to
+     * KWD fils and stores originalAmount before passing to postEntry.
+     */
+    fxRate: z.number().positive().finite().optional(),
+    /** Original amount in foreign minor units (derived from debit|credit when absent). */
+    originalAmount: z.number().int().nonnegative().optional(),
+  })
+  .superRefine((line, ctx) => {
+    const currency = (line.currency ?? 'KWD').toUpperCase();
+    if (currency !== 'KWD' && line.fxRate === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['fxRate'],
+        message: `fxRate is required when line currency is ${currency}`,
+      });
+    }
+  });
+
 const manualEntrySchema = z.object({
   memo: z.string().optional(),
   memoAr: z.string().optional(),
   postedAt: z.string().datetime().optional(),
-  lines: z
-    .array(
-      z.object({
-        accountId: z.string().uuid(),
-        debit: z.number().int().nonnegative(),
-        credit: z.number().int().nonnegative(),
-        lineMemo: z.string().optional(),
-      })
-    )
-    .min(2),
+  lines: z.array(lineSchema).min(2),
 });
 
 /**
@@ -205,6 +226,30 @@ router.post(
       }
 
       const body = parsed.data;
+
+      // Convert non-KWD lines to KWD fils before passing to postEntry.
+      // postEntry only validates DR=CR on KWD amounts; FX metadata is stored
+      // alongside but the accounting invariant is always in KWD.
+      const resolvedLines = body.lines.map(l => {
+        const currency = (l.currency ?? 'KWD').toUpperCase();
+        if (!requiresFxRate(currency) || l.fxRate == null) {
+          // KWD line or no rate provided — pass through unchanged
+          return { ...l, currency: currency };
+        }
+        const origDebit = l.debit;
+        const origCredit = l.credit;
+        const kwdDebit = origDebit > 0 ? convertToKwd(origDebit, l.fxRate) : 0;
+        const kwdCredit = origCredit > 0 ? convertToKwd(origCredit, l.fxRate) : 0;
+        return {
+          ...l,
+          currency,
+          debit: kwdDebit,
+          credit: kwdCredit,
+          fxRate: l.fxRate,
+          originalAmount: l.originalAmount ?? (origDebit || origCredit),
+        };
+      });
+
       const entry = await runInTenantContext(req.params.storeId, () =>
         postEntry({
           storeId: req.params.storeId,
@@ -213,7 +258,7 @@ router.post(
           memoAr: body.memoAr,
           postedAt: body.postedAt ? new Date(body.postedAt) : undefined,
           postedBy: (req as any).user?.id,
-          lines: body.lines,
+          lines: resolvedLines,
         })
       );
 
@@ -852,6 +897,94 @@ router.get(
         ],
         rows: [...txRows, ...summaryRows],
       });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── FX Rate Registry (Multi-Currency — Enterprise) ──────────────────────────
+//
+// Simple merchant-maintained rate log. Merchants record the day's rate for a
+// currency pair and the system uses it for non-KWD expense/journal entry
+// creation. There is no automatic rate fetch — manual entry is intentional
+// (auditable, no external API dependency, correct for small merchants).
+//
+// Routes:
+//   GET  /:storeId/finance/fx-rates        — list recent rates (last 90 days, per-currency)
+//   POST /:storeId/finance/fx-rates        — record a rate for a given date
+
+const fxRateCreateSchema = z.object({
+  /** ISO-4217 code (must be in ALLOWED_CURRENCIES, not KWD). */
+  currency: z.enum(ALLOWED_CURRENCIES.filter(c => c !== 'KWD') as [string, ...string[]]),
+  /** Rate: 1 unit of `currency` = rate KWD. Must be positive. */
+  rate: z.number().positive().finite(),
+  /** Date the rate applies to. ISO date string e.g. "2026-06-15". Defaults to today. */
+  rateDate: z.string().optional(),
+});
+
+router.get(
+  '/:storeId/finance/fx-rates',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.multi_currency'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const currency = typeof req.query.currency === 'string' ? req.query.currency : undefined;
+      const where: Record<string, unknown> = {
+        storeId: req.params.storeId,
+        // Default to last 90 days
+        rateDate: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+      };
+      if (currency) where.currency = currency.toUpperCase();
+
+      const rates = await runInTenantContext(req.params.storeId, () =>
+        prisma.fxRateEntry.findMany({
+          where,
+          orderBy: { rateDate: 'desc' },
+          take: 200,
+          select: { id: true, currency: true, rate: true, rateDate: true, createdAt: true },
+        })
+      );
+      res.json({ data: rates });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/:storeId/finance/fx-rates',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.multi_currency'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = fxRateCreateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        return;
+      }
+      const { currency, rate, rateDate } = parsed.data;
+      const rateDateValue = rateDate ? new Date(rateDate) : new Date();
+
+      const entry = await runInTenantContext(req.params.storeId, () =>
+        prisma.fxRateEntry.create({
+          data: {
+            storeId: req.params.storeId,
+            currency: currency.toUpperCase(),
+            rate,
+            rateDate: rateDateValue,
+            recordedBy: (req as any).user?.id ?? null,
+          },
+          select: { id: true, currency: true, rate: true, rateDate: true, createdAt: true },
+        })
+      );
+      res.status(201).json({ data: entry });
     } catch (err) {
       next(err);
     }

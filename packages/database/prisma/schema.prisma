@@ -398,6 +398,7 @@ model Store {
   reorderRules             ReorderRule[]
   backorderLines           BackorderLine[]
   expenses                 Expense[]
+  fxRateEntries            FxRateEntry[]
   reorderSuggestions       ReorderSuggestion[]
   deadstockFlags           DeadStockFlag[]
   profitAnomalies          ProfitAnomaly[]
@@ -2382,17 +2383,25 @@ model JournalEntry {
 }
 
 model JournalLine {
-  id         String   @id @default(uuid())
-  entryId    String   @map("entry_id")
-  accountId  String   @map("account_id")
-  debit      Int      @default(0)
-  credit     Int      @default(0)
-  currency   String   @default("KWD")
-  lineMemo   String?  @map("line_memo")
-  lineMemoAr String?  @map("line_memo_ar")
-  refTable   String?  @map("ref_table")
-  refId      String?  @map("ref_id")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  entryId        String   @map("entry_id")
+  accountId      String   @map("account_id")
+  debit          Int      @default(0)
+  credit         Int      @default(0)
+  currency       String   @default("KWD")
+  /// FX rate: 1 unit of `currency` = fxRate KWD.
+  /// Stored as exact numeric(16,8) — no float drift.
+  /// KWD lines: 1. Non-KWD: e.g. 0.30700000 for USD→KWD.
+  fxRate         Decimal? @default(1) @map("fx_rate") @db.Decimal(16, 8)
+  /// Original amount in minor units of `currency` before KWD conversion.
+  /// For KWD lines this equals debit (or credit). For non-KWD lines this is
+  /// the raw foreign amount; debit/credit hold the KWD-converted fils.
+  originalAmount Int?     @default(0) @map("original_amount")
+  lineMemo       String?  @map("line_memo")
+  lineMemoAr     String?  @map("line_memo_ar")
+  refTable       String?  @map("ref_table")
+  refId          String?  @map("ref_id")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   account Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
@@ -2401,6 +2410,38 @@ model JournalLine {
   @@index([accountId])
   @@index([refTable, refId])
   @@map("journal_lines")
+}
+
+/**
+ * FX Rate Registry — merchant-maintained log of exchange rates for a date.
+ *
+ * Rate meaning: 1 unit of `currency` = `rate` KWD.
+ * Example: { currency: 'USD', rate: 0.307, rateDate: '2026-06-15' }
+ *   means 1 USD was worth 0.307 KWD on that date.
+ *
+ * There is no unique constraint on (storeId, currency, rateDate) by design —
+ * merchants may record multiple rates for the same date (intraday corrections).
+ * The most recently created row for a given date is the effective rate.
+ *
+ * Feature gate: accounting.multi_currency (Enterprise).
+ * RLS: standard store_id-scoped policy.
+ */
+model FxRateEntry {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  /// ISO-4217 currency code (e.g. 'USD', 'EUR'). Always uppercase.
+  currency    String
+  /// Rate: 1 unit of `currency` = rate KWD. numeric(16,8) — exact decimal.
+  rate        Decimal  @db.Decimal(16, 8)
+  /// Date the rate applies to. Stored as a date-only timestamp (UTC midnight).
+  rateDate    DateTime @map("rate_date") @db.Date
+  recordedBy  String?  @map("recorded_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, currency, rateDate(sort: Desc)])
+  @@map("fx_rate_entries")
 }
 
 // ==========================================
@@ -2640,6 +2681,13 @@ model Expense {
   taxAmount            Int           @default(0) @map("tax_amount")
   total                Int
   currency             String        @default("KWD")
+  /// FX rate used to convert this expense to KWD.
+  /// numeric(16,8) — exact decimal, no IEEE 754 float drift.
+  /// 1 unit of `currency` = fxRate KWD. KWD expenses: 1.
+  fxRate               Decimal?      @default(1) @map("fx_rate") @db.Decimal(16, 8)
+  /// Original amount in minor units of `currency` (before KWD conversion).
+  /// For KWD expenses: equals `amount`. For non-KWD: the raw foreign fils/cents.
+  originalAmount       Int?          @default(0) @map("original_amount")
   expenseDate          DateTime      @map("expense_date")
   status               ExpenseStatus @default(draft)
   receiptImageUrl      String?       @map("receipt_image_url")

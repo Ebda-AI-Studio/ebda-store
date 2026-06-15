@@ -217,7 +217,7 @@ export async function processExpenseReceipt(
 
   const nonKwdNote =
     currency !== 'KWD'
-      ? ' Non-KWD receipt — manual review required for correct fils conversion.'
+      ? ` Non-KWD receipt (${currency}). FX rate stored as 1 (placeholder). Please set the correct rate before approving.`
       : '';
 
   const notes = [
@@ -228,6 +228,10 @@ export async function processExpenseReceipt(
     .trim();
 
   // ── 7. Create draft Expense ───────────────────────────────────────────────
+  // For non-KWD OCR receipts we don't know the day's FX rate — store the raw
+  // foreign-currency amount as `originalAmount` and fxRate=1 as a placeholder.
+  // The merchant must set the correct fxRate in the expense edit UI before
+  // approving, which will re-compute the KWD amount.
   let exp;
   try {
     exp = await createExpense({
@@ -238,6 +242,7 @@ export async function processExpenseReceipt(
       taxAmount: taxFils,
       expenseDate: parsed.invoiceDate ? new Date(parsed.invoiceDate) : new Date(),
       currency,
+      // fxRate omitted for non-KWD (stored as 1 placeholder): merchant reviews before posting
       receiptImageUrl: receiptUrl,
       notes,
       createdBy: uploadedBy,

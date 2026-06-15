@@ -1,0 +1,273 @@
+'use client';
+
+/**
+ * FX Rate Registry — Admin page for multi-currency accounting.
+ *
+ * Allows store admins to record and view the exchange rates used for
+ * non-KWD expense and journal entry conversions.
+ *
+ * Feature-gated: accounting.multi_currency (Enterprise).
+ * If the feature is inactive, a friendly notice is shown instead.
+ *
+ * Rate meaning: 1 unit of the foreign currency = rate KWD.
+ * Example: { currency: 'USD', rate: 0.307 } means 1 USD = 0.307 KWD.
+ */
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { AdminLayout } from '@/components/AdminLayout';
+import { apiGet, apiPost } from '@/lib/api';
+import { ALLOWED_CURRENCIES } from '@force/shared';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface FxRateEntry {
+  id: string;
+  currency: string;
+  rate: number;
+  rateDate: string;
+  createdAt: string;
+}
+
+interface FxRatesResponse {
+  data: FxRateEntry[];
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+const NON_KWD_CURRENCIES = ALLOWED_CURRENCIES.filter(c => c !== 'KWD');
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function FxRatesPage() {
+  const params = useParams();
+  const storeId = params?.id as string;
+
+  const [rates, setRates] = useState<FxRateEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
+  const [filterCurrency, setFilterCurrency] = useState('');
+
+  // Form state
+  const [formCurrency, setFormCurrency] = useState('USD');
+  const [formRate, setFormRate] = useState('');
+  const [formDate, setFormDate] = useState(todayIso());
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+
+    // Check feature
+    apiGet<{ features: Record<string, boolean> }>(`/api/v1/stores/${storeId}/my-features`)
+      .then(({ data }) => {
+        setFeatureEnabled(data?.features?.['accounting.multi_currency'] === true);
+      })
+      .catch(() => setFeatureEnabled(false));
+  }, [storeId]);
+
+  useEffect(() => {
+    if (!storeId || featureEnabled !== true) return;
+    loadRates();
+  }, [storeId, featureEnabled, filterCurrency]);
+
+  async function loadRates() {
+    setLoading(true);
+    const url = `/api/v1/stores/${storeId}/finance/fx-rates${
+      filterCurrency ? `?currency=${filterCurrency}` : ''
+    }`;
+    const { data } = await apiGet<FxRatesResponse>(url);
+    setRates(data?.data ?? []);
+    setLoading(false);
+  }
+
+  async function handleSubmit() {
+    setFormError(null);
+    setFormSuccess(false);
+    if (!formCurrency) {
+      setFormError('Currency is required');
+      return;
+    }
+    const rateNum = Number(formRate);
+    if (!formRate || rateNum <= 0 || !isFinite(rateNum)) {
+      setFormError('Rate must be a positive number');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await apiPost(`/api/v1/stores/${storeId}/finance/fx-rates`, {
+        currency: formCurrency,
+        rate: rateNum,
+        rateDate: formDate || undefined,
+      });
+      if (error) {
+        setFormError(error.message ?? 'Failed to save rate');
+        return;
+      }
+      setFormSuccess(true);
+      setFormRate('');
+      setFormDate(todayIso());
+      await loadRates();
+    } catch (e: unknown) {
+      setFormError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Feature not active
+  if (featureEnabled === false) {
+    return (
+      <AdminLayout title="FX Rate Registry" subtitle="Multi-Currency Accounting">
+        <div className="max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <p className="font-semibold mb-1">Feature not active</p>
+          <p>
+            The <strong>Accounting — Multi-Currency</strong> feature is not enabled for this store.
+            Contact your account manager to enable it on an Enterprise plan.
+          </p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout title="FX Rate Registry" subtitle="Record exchange rates for non-KWD transactions">
+      <div className="max-w-3xl space-y-6">
+        {/* ── Add Rate Form ─────────────────────────────────────────────── */}
+        <div className="rounded-xl border border-border bg-muted/10 p-5 space-y-4">
+          <p className="text-sm font-semibold">Record a New Rate</p>
+          <p className="text-xs text-muted-foreground">
+            Rate meaning: 1 unit of the selected currency = <strong>rate KWD</strong>.<br />
+            Example: USD at 0.307 means 1 USD = 0.307 KWD (307 fils).
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Currency</span>
+              <select
+                value={formCurrency}
+                onChange={e => setFormCurrency(e.target.value)}
+                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              >
+                {NON_KWD_CURRENCIES.map(c => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Rate (KWD per 1 {formCurrency})</span>
+              <input
+                type="number"
+                min="0.000001"
+                step="0.000001"
+                value={formRate}
+                onChange={e => setFormRate(e.target.value)}
+                placeholder="e.g. 0.30700"
+                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
+              />
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Rate Date</span>
+              <input
+                type="date"
+                value={formDate}
+                onChange={e => setFormDate(e.target.value)}
+                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              />
+            </label>
+          </div>
+
+          {/* Live KWD preview */}
+          {formRate && Number(formRate) > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Preview: 1 {formCurrency} = <strong>{Number(formRate).toFixed(6)} KWD</strong> | 100{' '}
+              {formCurrency} = <strong>{(Number(formRate) * 100).toFixed(3)} KWD</strong>
+            </p>
+          )}
+
+          {formError && <p className="text-red-600 text-sm">{formError}</p>}
+          {formSuccess && <p className="text-green-700 text-sm">Rate saved successfully.</p>}
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm font-medium disabled:opacity-50"
+          >
+            {submitting ? 'Saving…' : 'Save Rate'}
+          </button>
+        </div>
+
+        {/* ── Rate History ──────────────────────────────────────────────── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-semibold">Rate History (last 90 days)</p>
+            <select
+              value={filterCurrency}
+              onChange={e => setFilterCurrency(e.target.value)}
+              className="border border-border rounded px-2 py-1 text-xs"
+            >
+              <option value="">All currencies</option>
+              {NON_KWD_CURRENCIES.map(c => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : rates.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No rates recorded yet. Add the first rate above.
+            </p>
+          ) : (
+            <div className="rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/30">
+                  <tr>
+                    <th className="text-start px-4 py-2 font-medium text-muted-foreground">
+                      Currency
+                    </th>
+                    <th className="text-end px-4 py-2 font-medium text-muted-foreground">
+                      Rate (KWD)
+                    </th>
+                    <th className="text-start px-4 py-2 font-medium text-muted-foreground">Date</th>
+                    <th className="text-start px-4 py-2 font-medium text-muted-foreground">
+                      Recorded
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rates.map(r => (
+                    <tr key={r.id} className="border-t border-border/40">
+                      <td className="px-4 py-2 font-mono font-medium">{r.currency}</td>
+                      <td className="px-4 py-2 text-end font-mono">{Number(r.rate).toFixed(6)}</td>
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {new Date(r.rateDate).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-2 text-muted-foreground text-xs">
+                        {new Date(r.createdAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}

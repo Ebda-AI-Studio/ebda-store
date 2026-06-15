@@ -5,7 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, getApiUrl } from '@/lib/api';
-import { isCashOrBankAccount } from '@force/shared';
+import {
+  isCashOrBankAccount,
+  ALLOWED_CURRENCIES,
+  convertToKwd,
+  requiresFxRate,
+} from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,9 +87,12 @@ export default function NewExpensePage() {
   const [paidFromAccountId, setPaidFromAccountId] = useState('');
   const [amount, setAmount] = useState('');
   const [taxAmount, setTaxAmount] = useState('0');
+  const [currency, setCurrency] = useState('KWD');
+  const [fxRate, setFxRate] = useState('');
   const [notes, setNotes] = useState('');
   const [notesAr, setNotesAr] = useState('');
   const [receiptUrl, setReceiptUrl] = useState('');
+  const [multiCurrencyEnabled, setMultiCurrencyEnabled] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +131,15 @@ export default function NewExpensePage() {
     apiGet<SupplierRow[]>(`/api/v1/stores/${storeId}/suppliers`).then(({ data }) => {
       setSuppliers(data ?? []);
     });
+
+    // Check multi-currency feature flag via the store-admin endpoint
+    apiGet<{ features: Record<string, boolean> }>(`/api/v1/stores/${storeId}/my-features`)
+      .then(({ data }) => {
+        setMultiCurrencyEnabled(data?.features?.['accounting.multi_currency'] === true);
+      })
+      .catch(() => {
+        // Feature check failure is non-fatal — default to KWD-only
+      });
 
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
@@ -226,8 +243,16 @@ export default function NewExpensePage() {
 
   // ── Manual form submit ───────────────────────────────────────────────────
 
-  const totalFils = (Number(amount) || 0) + (Number(taxAmount) || 0);
-  const totalKwd = (totalFils / 1000).toFixed(3);
+  const rawAmount = Number(amount) || 0;
+  const rawTax = Number(taxAmount) || 0;
+  const isNonKwd = multiCurrencyEnabled && requiresFxRate(currency);
+  const fxRateNum = Number(fxRate) || 0;
+
+  // Live KWD preview — for non-KWD, use convertToKwd; for KWD, pass through
+  const kwdAmountFils = isNonKwd && fxRateNum > 0 ? convertToKwd(rawAmount, fxRateNum) : rawAmount;
+  const kwdTaxFils = isNonKwd && fxRateNum > 0 ? convertToKwd(rawTax, fxRateNum) : rawTax;
+  const totalFilsKwd = kwdAmountFils + kwdTaxFils;
+  const totalKwd = (totalFilsKwd / 1000).toFixed(3);
 
   async function submit() {
     setError(null);
@@ -243,24 +268,35 @@ export default function NewExpensePage() {
       setError('Paid-from account is required');
       return;
     }
-    if (!amount || Number(amount) <= 0) {
+    if (!amount || rawAmount <= 0) {
       setError('Amount must be greater than 0');
+      return;
+    }
+    if (isNonKwd && (!fxRate || fxRateNum <= 0)) {
+      setError(`FX rate is required for ${currency} expenses and must be a positive number`);
       return;
     }
 
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         expenseDate,
         supplierId: supplierId || undefined,
         expenseAccountId,
         paidFromAccountId,
-        amount: Math.round(Number(amount)),
-        taxAmount: Math.round(Number(taxAmount) || 0),
+        amount: Math.round(rawAmount),
+        taxAmount: Math.round(rawTax),
+        currency,
         notes: notes || undefined,
         notesAr: notesAr || undefined,
         receiptUrl: receiptUrl || undefined,
       };
+
+      // Include FX fields only for non-KWD currencies
+      if (isNonKwd && fxRateNum > 0) {
+        payload.fxRate = fxRateNum;
+        payload.originalAmount = Math.round(rawAmount);
+      }
 
       const { error: apiError } = await apiPost(`/api/v1/stores/${storeId}/expenses`, payload);
 
@@ -424,11 +460,56 @@ export default function NewExpensePage() {
           </select>
         </label>
 
+        {/* Currency selector (shown only when multi-currency feature is enabled) */}
+        {multiCurrencyEnabled && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Currency</span>
+              <select
+                value={currency}
+                onChange={e => {
+                  setCurrency(e.target.value);
+                  setFxRate('');
+                }}
+                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              >
+                {ALLOWED_CURRENCIES.map(c => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {/* FX rate input — only visible when currency ≠ KWD */}
+            {requiresFxRate(currency) && (
+              <label className="block space-y-1">
+                <span className="text-sm font-medium">
+                  FX Rate (1 {currency} = ? KWD) <span className="text-red-500">*</span>
+                </span>
+                <input
+                  type="number"
+                  min="0.000001"
+                  step="0.000001"
+                  value={fxRate}
+                  onChange={e => setFxRate(e.target.value)}
+                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
+                  placeholder="e.g. 0.30700"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the exchange rate from your bank or receipt date.
+                </p>
+              </label>
+            )}
+          </div>
+        )}
+
         {/* Amount + Tax */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="block space-y-1">
             <span className="text-sm font-medium">
-              {t('amount')} <span className="text-red-500">*</span>
+              {t('amount')} {isNonKwd ? `(${currency} minor units)` : '(fils)'}{' '}
+              <span className="text-red-500">*</span>
             </span>
             <input
               type="number"
@@ -440,9 +521,16 @@ export default function NewExpensePage() {
               placeholder="0"
               required
             />
+            {isNonKwd && rawAmount > 0 && fxRateNum > 0 && (
+              <p className="text-xs text-muted-foreground">
+                = {(kwdAmountFils / 1000).toFixed(3)} KWD
+              </p>
+            )}
           </label>
           <label className="block space-y-1">
-            <span className="text-sm font-medium">{t('taxAmount')}</span>
+            <span className="text-sm font-medium">
+              {t('taxAmount')} {isNonKwd ? `(${currency} minor units)` : '(fils)'}
+            </span>
             <input
               type="number"
               min="0"
@@ -451,13 +539,29 @@ export default function NewExpensePage() {
               onChange={e => setTaxAmount(e.target.value)}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
             />
+            {isNonKwd && rawTax > 0 && fxRateNum > 0 && (
+              <p className="text-xs text-muted-foreground">
+                = {(kwdTaxFils / 1000).toFixed(3)} KWD
+              </p>
+            )}
           </label>
         </div>
 
         {/* KWD total display */}
         <div className="rounded-lg bg-muted/30 px-4 py-3 text-sm">
-          <span className="text-muted-foreground">{t('totalInKwd')}: </span>
-          <span className="font-semibold font-mono">{totalKwd} KWD</span>
+          {isNonKwd && fxRateNum > 0 ? (
+            <>
+              <span className="text-muted-foreground">
+                Total in KWD (converted @ {fxRateNum} rate):{' '}
+              </span>
+              <span className="font-semibold font-mono">{totalKwd} KWD</span>
+            </>
+          ) : (
+            <>
+              <span className="text-muted-foreground">{t('totalInKwd')}: </span>
+              <span className="font-semibold font-mono">{totalKwd} KWD</span>
+            </>
+          )}
         </div>
 
         {/* Notes */}

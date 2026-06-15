@@ -12,6 +12,24 @@ export interface JournalLineInput {
   lineMemoAr?: string;
   refTable?: string;
   refId?: string;
+  /**
+   * ISO-4217 currency code of the original transaction.
+   * Defaults to 'KWD' (no conversion needed).
+   */
+  currency?: string;
+  /**
+   * FX rate: 1 unit of `currency` = fxRate KWD.
+   * Required when currency !== 'KWD'.
+   * Stored as Prisma Decimal (numeric(16,8)) for exact arithmetic.
+   * Pass as a number or string — it is coerced to Decimal on write.
+   */
+  fxRate?: number;
+  /**
+   * Original amount in the foreign currency's minor units (before KWD conversion).
+   * For KWD lines this equals debit or credit.
+   * For non-KWD lines, debit/credit hold the KWD-converted fils.
+   */
+  originalAmount?: number;
 }
 
 export interface PostEntryInput {
@@ -100,6 +118,15 @@ export async function postEntry(input: PostEntryInput): Promise<JournalEntry> {
         accountId: l.accountId,
         debit: l.debit,
         credit: l.credit,
+        // Multi-currency: thread FX fields through when present.
+        // KWD lines omit these (Prisma uses schema defaults: currency='KWD', fxRate=1, originalAmount=0).
+        ...(l.currency && l.currency !== 'KWD'
+          ? {
+              currency: l.currency,
+              fxRate: l.fxRate ?? 1,
+              originalAmount: l.originalAmount ?? (l.debit || l.credit),
+            }
+          : {}),
         lineMemo: l.lineMemo,
         lineMemoAr: l.lineMemoAr,
         refTable: l.refTable,
@@ -219,6 +246,15 @@ export async function reverseEntry(
             accountId: l.accountId,
             debit: l.credit,
             credit: l.debit,
+            // Preserve FX metadata on reversals so the reversal entry still
+            // shows the original foreign-currency context.
+            ...(l.currency && l.currency !== 'KWD'
+              ? {
+                  currency: l.currency,
+                  fxRate: l.fxRate ?? 1,
+                  originalAmount: l.originalAmount ?? 0,
+                }
+              : {}),
             lineMemo: l.lineMemo,
             lineMemoAr: l.lineMemoAr,
             refTable: l.refTable,

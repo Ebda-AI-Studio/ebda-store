@@ -1,6 +1,11 @@
 import { prisma } from '@force/database';
 import type { Expense } from '@prisma/client';
-import { isCashOrBankAccount } from '@force/shared';
+import {
+  isCashOrBankAccount,
+  convertToKwd,
+  requiresFxRate,
+  ALLOWED_CURRENCIES,
+} from '@force/shared';
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';
 import logger from '../../lib/logger';
@@ -11,10 +16,28 @@ export interface CreateExpenseInput {
   supplierId?: string;
   expenseAccountId: string;
   paidFromAccountId: string;
+  /**
+   * When currency=KWD (or absent): amount in KWD fils.
+   * When currency≠KWD: amount in the FOREIGN currency's minor units (e.g. USD cents).
+   *   The service converts to KWD fils using fxRate and stores both.
+   */
   amount: number;
   taxAmount?: number;
   expenseDate: Date | string;
+  /** ISO-4217 code. Defaults to 'KWD'. */
   currency?: string;
+  /**
+   * FX rate: 1 unit of `currency` = fxRate KWD.
+   * Required when currency !== 'KWD'. Stored as Decimal (exact; no float drift).
+   * For non-KWD OCR drafts where the rate is unknown, omit and the service
+   * stores fxRate=1 as a placeholder; the merchant must update before posting.
+   */
+  fxRate?: number;
+  /**
+   * Pre-computed original amount in foreign minor units.
+   * When absent, defaults to `amount` (the caller's raw input).
+   */
+  originalAmount?: number;
   receiptImageUrl?: string;
   notes?: string;
   notesAr?: string;
@@ -53,8 +76,50 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
   }
 
   const expenseNumber = await nextSequence(input.storeId, 'expense');
-  const taxAmount = input.taxAmount ?? 0;
-  const total = input.amount + taxAmount;
+  const currency = (input.currency ?? 'KWD').toUpperCase();
+
+  // Validate currency against the allowed set
+  if (!ALLOWED_CURRENCIES.includes(currency as (typeof ALLOWED_CURRENCIES)[number])) {
+    throw new AppError(422, 'INVALID_CURRENCY', `Currency '${currency}' is not supported.`);
+  }
+
+  // ── Multi-currency FX conversion ──────────────────────────────────────────
+  // When currency is KWD: input.amount is already in KWD fils — no conversion.
+  // When currency is non-KWD:
+  //   - input.amount is in the FOREIGN currency's minor units (e.g. USD cents).
+  //   - fxRate converts: 1 foreign unit → fxRate KWD.
+  //   - If fxRate is not provided, we store fxRate=1 as a placeholder and flag
+  //     the expense so the merchant reviews before posting.
+  let amountKwd: number;
+  let taxAmountKwd: number;
+  let fxRateToStore: number;
+  let originalAmountToStore: number;
+  let originalTaxAmountToStore: number;
+
+  if (!requiresFxRate(currency)) {
+    // KWD path — identical to before
+    amountKwd = input.amount;
+    taxAmountKwd = input.taxAmount ?? 0;
+    fxRateToStore = 1;
+    originalAmountToStore = input.amount;
+    originalTaxAmountToStore = input.taxAmount ?? 0;
+  } else {
+    // Non-KWD path
+    const rate = input.fxRate ?? 1; // placeholder if not supplied
+    if (rate <= 0 || !isFinite(rate)) {
+      throw new AppError(422, 'INVALID_FX_RATE', 'fxRate must be a finite positive number.');
+    }
+    const rawAmount = input.originalAmount ?? input.amount;
+    const rawTax = input.taxAmount ?? 0;
+    amountKwd = convertToKwd(rawAmount, rate);
+    taxAmountKwd = convertToKwd(rawTax, rate);
+    fxRateToStore = rate;
+    originalAmountToStore = rawAmount;
+    originalTaxAmountToStore = rawTax;
+  }
+
+  const total = amountKwd + taxAmountKwd;
+  const taxAmount = taxAmountKwd;
 
   return prisma.expense.create({
     data: {
@@ -63,10 +128,14 @@ export async function createExpense(input: CreateExpenseInput): Promise<ExpenseW
       supplierId: input.supplierId ?? null,
       expenseAccountId: input.expenseAccountId,
       paidFromAccountId: input.paidFromAccountId,
-      amount: input.amount,
+      amount: amountKwd,
       taxAmount,
       total,
-      currency: input.currency ?? 'KWD',
+      currency,
+      fxRate: fxRateToStore,
+      // originalAmount stores the TOTAL original foreign amount (amount + tax in foreign units)
+      // so it mirrors how `total` mirrors (amount + tax) in KWD fils.
+      originalAmount: originalAmountToStore + originalTaxAmountToStore,
       expenseDate: new Date(input.expenseDate),
       status: 'draft',
       receiptImageUrl: input.receiptImageUrl ?? null,
