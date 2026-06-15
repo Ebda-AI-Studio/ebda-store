@@ -10,6 +10,8 @@
  *   GET  /stores/:storeId/finance/journal           — paginated entry list (store_admin+)
  *   GET  /stores/:storeId/finance/journal/:entryId  — single entry detail (store_admin+)
  *   POST /stores/:storeId/finance/journal           — manual adjusting entry (super_admin only)
+ *   GET  /stores/:storeId/finance/reports/tax-report       — transaction-level tax report (Enterprise)
+ *   GET  /stores/:storeId/finance/reports/tax-report.xlsx  — XLSX download (Enterprise)
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
@@ -27,6 +29,7 @@ import {
 } from '../services/accounting/account.service';
 import { postEntry } from '../services/accounting/journal.service';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
+import { generateTaxReport } from '../services/accounting/tax-report.service';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 
 const router = Router({ mergeParams: true });
@@ -678,6 +681,176 @@ router.get(
           { header: 'Amount (KWD)', key: 'amount', width: 18, numFmt: '#,##0.000' },
         ],
         rows,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── Tax Report (Enterprise) ──────────────────────────────────────────────────
+
+const taxReportQuerySchema = z.object({
+  from: z.string().min(1, 'from is required'),
+  to: z.string().min(1, 'to is required'),
+});
+
+/**
+ * GET /:storeId/finance/reports/tax-report
+ *
+ * Transaction-level VAT / sales-tax report.
+ * Returns every order in the period that had tax posted to account 2100 (Tax Payable).
+ * Gated: accounting.tax_reports (Enterprise plan).
+ *
+ * Query params:
+ *   from  — ISO date string, start of period (inclusive), e.g. 2026-01-01
+ *   to    — ISO date string, end of period (inclusive), e.g. 2026-03-31
+ */
+router.get(
+  '/:storeId/finance/reports/tax-report',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.tax_reports'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = taxReportQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        return;
+      }
+      const from = new Date(parsed.data.from + 'T00:00:00.000Z');
+      const to = new Date(parsed.data.to + 'T23:59:59.999Z');
+      if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+        res.status(422).json({ error: 'invalid_date', message: 'from and to must be valid dates' });
+        return;
+      }
+      const data = await runInTenantContext(req.params.storeId, () =>
+        generateTaxReport(req.params.storeId, { from, to })
+      );
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /:storeId/finance/reports/tax-report.xlsx
+ *
+ * XLSX export of the tax report. Same auth + feature gate as the JSON endpoint.
+ * Sheet: "Tax Report" — one transaction row per order + a summary section appended below.
+ */
+router.get(
+  '/:storeId/finance/reports/tax-report.xlsx',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.tax_reports'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = taxReportQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(422).json({ error: 'validation_failed', details: parsed.error.flatten() });
+        return;
+      }
+      const from = new Date(parsed.data.from + 'T00:00:00.000Z');
+      const to = new Date(parsed.data.to + 'T23:59:59.999Z');
+      if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+        res.status(422).json({ error: 'invalid_date', message: 'from and to must be valid dates' });
+        return;
+      }
+      const report = await runInTenantContext(req.params.storeId, () =>
+        generateTaxReport(req.params.storeId, { from, to })
+      );
+
+      type XlsxRow = {
+        rowType: string;
+        date: string;
+        orderNumber: string;
+        customer: string;
+        subtotal: number | string;
+        taxRate: string;
+        taxCollected: number | string;
+        total: number | string;
+      };
+
+      // Transaction rows
+      const txRows: XlsxRow[] = report.rows.map(r => ({
+        rowType: 'Transaction',
+        date: r.date,
+        orderNumber: r.orderNumber,
+        customer: r.customerName ?? '',
+        subtotal: r.subtotal / 1000,
+        taxRate: `${r.taxRate}%`,
+        taxCollected: r.taxCollected / 1000,
+        total: r.total / 1000,
+      }));
+
+      // Summary section
+      const summaryRows: XlsxRow[] = [
+        {
+          rowType: '',
+          date: '',
+          orderNumber: '',
+          customer: '',
+          subtotal: '',
+          taxRate: '',
+          taxCollected: '',
+          total: '',
+        },
+        {
+          rowType: 'Summary',
+          date: '',
+          orderNumber: `Total Transactions: ${report.summary.transactionCount}`,
+          customer: '',
+          subtotal: report.summary.totalTaxableSales / 1000,
+          taxRate: '',
+          taxCollected: report.summary.totalTaxCollected / 1000,
+          total: '',
+        },
+        {
+          rowType: '',
+          date: '',
+          orderNumber: '',
+          customer: '',
+          subtotal: '',
+          taxRate: '',
+          taxCollected: '',
+          total: '',
+        },
+      ];
+      for (const byRate of report.summary.byRate) {
+        summaryRows.push({
+          rowType: 'By Rate',
+          date: '',
+          orderNumber: '',
+          customer: `${byRate.taxRate}% — ${byRate.transactionCount} transaction(s)`,
+          subtotal: byRate.totalSubtotal / 1000,
+          taxRate: `${byRate.taxRate}%`,
+          taxCollected: byRate.totalTaxCollected / 1000,
+          total: '',
+        });
+      }
+
+      const fromStr = from.toISOString().slice(0, 10);
+      const toStr = to.toISOString().slice(0, 10);
+      await streamXlsxResponse(res, {
+        filename: `tax-report-${fromStr}-to-${toStr}.xlsx`,
+        sheetName: 'Tax Report',
+        columns: [
+          { header: 'Type', key: 'rowType', width: 14 },
+          { header: 'Date', key: 'date', width: 14 },
+          { header: 'Order Number', key: 'orderNumber', width: 20 },
+          { header: 'Customer', key: 'customer', width: 28 },
+          { header: 'Taxable Base (KWD)', key: 'subtotal', width: 20, numFmt: '#,##0.000' },
+          { header: 'Tax Rate', key: 'taxRate', width: 12 },
+          { header: 'Tax Collected (KWD)', key: 'taxCollected', width: 22, numFmt: '#,##0.000' },
+          { header: 'Order Total (KWD)', key: 'total', width: 20, numFmt: '#,##0.000' },
+        ],
+        rows: [...txRows, ...summaryRows],
       });
     } catch (err) {
       next(err);

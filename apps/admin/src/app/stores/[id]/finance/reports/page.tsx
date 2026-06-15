@@ -8,7 +8,7 @@ import { apiGet, apiFetch } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet';
+type TabKey = 'trialBalance' | 'pnl' | 'balanceSheet' | 'taxReport';
 
 interface TrialBalanceRow {
   code: string;
@@ -39,6 +39,35 @@ interface BalanceSheetData {
   assets: BalanceSheetSection;
   liabilities: BalanceSheetSection;
   equity: BalanceSheetSection;
+}
+
+interface TaxReportRow {
+  date: string;
+  orderNumber: string;
+  customerName: string | null;
+  subtotal: number;
+  taxRate: string;
+  taxCollected: number;
+  total: number;
+}
+
+interface TaxRateSummary {
+  taxRate: string;
+  transactionCount: number;
+  totalSubtotal: number;
+  totalTaxCollected: number;
+}
+
+interface TaxReportData {
+  from: string;
+  to: string;
+  rows: TaxReportRow[];
+  summary: {
+    transactionCount: number;
+    totalTaxableSales: number;
+    totalTaxCollected: number;
+    byRate: TaxRateSummary[];
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -413,7 +442,9 @@ function PnlTab({ storeId }: { storeId: string }) {
           <div className="rounded-xl border border-border p-4 flex justify-between items-center">
             <span className="font-semibold">{tp('netIncome')}</span>
             <span
-              className={`text-xl font-semibold font-mono ${data.netIncome >= 0 ? 'text-green-700' : 'text-red-600'}`}
+              className={`text-xl font-semibold font-mono ${
+                data.netIncome >= 0 ? 'text-green-700' : 'text-red-600'
+              }`}
             >
               {data.netIncome < 0 ? '−' : ''}
               {kwd(Math.abs(data.netIncome))} KWD
@@ -560,6 +591,252 @@ function BalanceSheetTab({ storeId }: { storeId: string }) {
   );
 }
 
+function TaxReportTab({ storeId }: { storeId: string }) {
+  const t = useT('finance.reports');
+  const tt = useT('finance.reports.taxReport');
+  const [from, setFrom] = useState(firstOfMonth());
+  const [to, setTo] = useState(todayIso());
+  const [data, setData] = useState<TaxReportData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+
+  const fetchReport = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    apiGet<TaxReportData>(
+      `/api/v1/stores/${storeId}/finance/reports/tax-report?from=${from}&to=${to}`
+    )
+      .then(({ data: d, error: apiError }) => {
+        if (apiError) setError(apiError.message);
+        else setData(d ?? null);
+      })
+      .catch(() => setError('Failed to load tax report'))
+      .finally(() => setLoading(false));
+  }, [storeId, from, to]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  function exportCsv() {
+    if (!data) return;
+    const header = [
+      tt('date'),
+      tt('orderNumber'),
+      tt('customer'),
+      tt('taxableBase'),
+      tt('taxRate'),
+      tt('taxCollected'),
+      tt('orderTotal'),
+    ];
+    const rows = data.rows.map(r => [
+      r.date,
+      r.orderNumber,
+      r.customerName ?? '',
+      kwd(r.subtotal),
+      `${r.taxRate}%`,
+      kwd(r.taxCollected),
+      kwd(r.total),
+    ]);
+    downloadCsv(`tax-report-${from}-to-${to}.csv`, [header, ...rows]);
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="space-y-1">
+          <span className="text-sm font-medium">{t('from')}</span>
+          <input
+            type="date"
+            value={from}
+            onChange={e => setFrom(e.target.value)}
+            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-sm font-medium">{t('to')}</span>
+          <input
+            type="date"
+            value={to}
+            onChange={e => setTo(e.target.value)}
+            className="block border border-border rounded px-3 py-2 text-base sm:text-sm"
+          />
+        </label>
+        <div className="flex gap-2 ms-auto">
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={!data || data.rows.length === 0}
+            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
+          >
+            {t('exportCsv')}
+          </button>
+          <button
+            type="button"
+            disabled={!data || data.rows.length === 0 || exportingXlsx}
+            onClick={async () => {
+              setExportingXlsx(true);
+              try {
+                await downloadXlsx(
+                  `/api/v1/stores/${storeId}/finance/reports/tax-report.xlsx?from=${from}&to=${to}`,
+                  `tax-report-${from}-to-${to}.xlsx`
+                );
+              } finally {
+                setExportingXlsx(false);
+              }
+            }}
+            className="px-3 py-2 border border-border rounded text-sm disabled:opacity-40"
+          >
+            {exportingXlsx ? t('exporting') : t('exportXlsx')}
+          </button>
+        </div>
+      </div>
+
+      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {data && !loading && (
+        <div className="space-y-6">
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-border p-4">
+              <p className="text-xs text-muted-foreground mb-1">{tt('transactionCount')}</p>
+              <p className="text-2xl font-semibold font-mono">{data.summary.transactionCount}</p>
+            </div>
+            <div className="rounded-xl border border-border p-4">
+              <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxableSales')}</p>
+              <p className="text-2xl font-semibold font-mono">
+                {kwd(data.summary.totalTaxableSales)} KWD
+              </p>
+            </div>
+            <div className="rounded-xl border border-border p-4 bg-amber-50 border-amber-200">
+              <p className="text-xs text-muted-foreground mb-1">{tt('totalTaxCollected')}</p>
+              <p className="text-2xl font-semibold font-mono text-amber-800">
+                {kwd(data.summary.totalTaxCollected)} KWD
+              </p>
+            </div>
+          </div>
+
+          {/* By-rate breakdown */}
+          {data.summary.byRate.length > 0 && (
+            <section>
+              <h3 className="text-sm font-semibold mb-2">{tt('byRateBreakdown')}</h3>
+              <div className="rounded-xl border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/30">
+                    <tr>
+                      <th className="text-start px-3 py-2 font-medium text-muted-foreground">
+                        {tt('taxRate')}
+                      </th>
+                      <th className="text-end px-3 py-2 font-medium text-muted-foreground">
+                        {tt('transactions')}
+                      </th>
+                      <th className="text-end px-3 py-2 font-medium text-muted-foreground">
+                        {tt('taxableBase')} (KWD)
+                      </th>
+                      <th className="text-end px-3 py-2 font-medium text-muted-foreground">
+                        {tt('taxCollected')} (KWD)
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.summary.byRate.map((r, i) => (
+                      <tr key={i} className="border-t border-border/40">
+                        <td className="px-3 py-2 font-mono">{r.taxRate}%</td>
+                        <td className="px-3 py-2 text-end font-mono">{r.transactionCount}</td>
+                        <td className="px-3 py-2 text-end font-mono">{kwd(r.totalSubtotal)}</td>
+                        <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
+                          {kwd(r.totalTaxCollected)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* Transaction table */}
+          <section>
+            <h3 className="text-sm font-semibold mb-2">{tt('transactions')}</h3>
+            {data.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                {tt('noTransactions')}
+              </p>
+            ) : (
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/30">
+                      <tr>
+                        <th className="text-start px-3 py-2 font-medium text-muted-foreground w-28">
+                          {tt('date')}
+                        </th>
+                        <th className="text-start px-3 py-2 font-medium text-muted-foreground">
+                          {tt('orderNumber')}
+                        </th>
+                        <th className="text-start px-3 py-2 font-medium text-muted-foreground">
+                          {tt('customer')}
+                        </th>
+                        <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
+                          {tt('taxableBase')} (KWD)
+                        </th>
+                        <th className="text-end px-3 py-2 font-medium text-muted-foreground w-20">
+                          {tt('taxRate')}
+                        </th>
+                        <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
+                          {tt('taxCollected')} (KWD)
+                        </th>
+                        <th className="text-end px-3 py-2 font-medium text-muted-foreground w-28">
+                          {tt('orderTotal')} (KWD)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.rows.map((row, i) => (
+                        <tr key={i} className="border-t border-border/40">
+                          <td className="px-3 py-2 font-mono text-xs">{row.date}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{row.orderNumber}</td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {row.customerName ?? <span className="italic">Guest</span>}
+                          </td>
+                          <td className="px-3 py-2 text-end font-mono">{kwd(row.subtotal)}</td>
+                          <td className="px-3 py-2 text-end font-mono">{row.taxRate}%</td>
+                          <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
+                            {kwd(row.taxCollected)}
+                          </td>
+                          <td className="px-3 py-2 text-end font-mono">{kwd(row.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-muted/20 border-t border-border">
+                      <tr>
+                        <td className="px-3 py-2 font-semibold" colSpan={3}>
+                          {tt('totals')}
+                        </td>
+                        <td className="px-3 py-2 text-end font-mono font-semibold">
+                          {kwd(data.summary.totalTaxableSales)}
+                        </td>
+                        <td />
+                        <td className="px-3 py-2 text-end font-mono font-semibold text-amber-800">
+                          {kwd(data.summary.totalTaxCollected)}
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function FinanceReportsPage() {
@@ -573,6 +850,7 @@ export default function FinanceReportsPage() {
     { key: 'trialBalance', label: t('tabs.trialBalance') },
     { key: 'pnl', label: t('tabs.pnl') },
     { key: 'balanceSheet', label: t('tabs.balanceSheet') },
+    { key: 'taxReport', label: t('tabs.taxReport') },
   ];
 
   return (
@@ -602,6 +880,7 @@ export default function FinanceReportsPage() {
             {tab === 'trialBalance' && <TrialBalanceTab storeId={storeId} />}
             {tab === 'pnl' && <PnlTab storeId={storeId} />}
             {tab === 'balanceSheet' && <BalanceSheetTab storeId={storeId} />}
+            {tab === 'taxReport' && <TaxReportTab storeId={storeId} />}
           </>
         )}
       </div>

@@ -144,7 +144,7 @@ Most e-commerce platforms make you connect QuickBooks or Xero for proper account
 
 **Enterprise plan only:**
 
-- **Tax Reports** — VAT/sales-tax export per reporting period with full transaction-level breakdown. (`accounting.tax_reports`)
+- **Tax Reports** — VAT/sales-tax export per reporting period with full transaction-level breakdown. Sourced directly from the double-entry ledger (account 2100 — Tax Payable): each row shows date, order number, customer, taxable base, effective tax rate, and tax collected. Summary by tax rate with XLSX export. (`accounting.tax_reports`) **[SHIPPED]**
 - **Multi-Currency** — Track non-KWD transactions with FX rates and automatic KWD conversion at the bookkeeping level. (`accounting.multi_currency`)
 - **Profit Anomaly Watch** — Runs a daily AI scan of margins (06:30 KWT); flags unusual margin drops and cost-volume spikes vs a 28-day rolling baseline. (`accounting.profit_anomaly`)
 - **Bank Reconciliation** — Bank statement import (CSV/OFX) with automated ledger matching and manual override. (`accounting.bank_reconcile`)

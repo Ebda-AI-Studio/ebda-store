@@ -4018,11 +4018,12 @@
     },
     "reports": {
       "title": "Financial Reports",
-      "description": "Trial Balance, Profit & Loss, and Balance Sheet from your journal entries.",
+      "description": "Trial Balance, Profit & Loss, Balance Sheet, and Tax Reports from your journal entries.",
       "tabs": {
         "trialBalance": "Trial Balance",
         "pnl": "Profit & Loss",
-        "balanceSheet": "Balance Sheet"
+        "balanceSheet": "Balance Sheet",
+        "taxReport": "Tax Report"
       },
       "asOf": "As of",
       "from": "From",
@@ -4055,6 +4056,22 @@
         "equity": "Equity",
         "totalEquity": "Total Equity",
         "balanced": "Balance sheet verified — Assets = Liabilities + Equity"
+      },
+      "taxReport": {
+        "date": "Date",
+        "orderNumber": "Order #",
+        "customer": "Customer",
+        "taxableBase": "Taxable Base",
+        "taxRate": "Tax Rate",
+        "taxCollected": "Tax Collected",
+        "orderTotal": "Order Total",
+        "totals": "Totals",
+        "transactionCount": "Total Transactions",
+        "totalTaxableSales": "Total Taxable Sales",
+        "totalTaxCollected": "Total Tax Collected",
+        "byRateBreakdown": "Breakdown by Rate",
+        "transactions": "Transactions",
+        "noTransactions": "No taxable transactions in this period."
       }
     }
   },
