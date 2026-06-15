@@ -7,7 +7,7 @@
  */
 
 import webpush from 'web-push';
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import logger from '../lib/logger';
 import { config } from '../config';
 import { notificationConfigService } from './notification-config.service';
@@ -68,11 +68,20 @@ class PushService {
       return;
     }
 
-    // 3. Get all push subscriptions for this store
-    const subscriptions = await prisma.pushSubscription.findMany({
-      where: { storeId },
-      select: { id: true, endpoint: true, p256dh: true, auth: true },
-    });
+    // 3. Get all push subscriptions for this store.
+    // push_subscriptions is under FORCE ROW LEVEL SECURITY. sendToStore is
+    // called from background fan-out (order-created / abandoned-cart Inngest
+    // jobs) with NO tenant GUC, where the policy would return 0 rows → "no
+    // subscriptions, skipping" → storefront order push silently broken. Trusted
+    // internal read already scoped by `where: { storeId }`, so use withRlsBypass.
+    // Only the DB read is wrapped — the webpush network sends below stay OUTSIDE
+    // any transaction so we never hold a Neon connection open across HTTP I/O.
+    const subscriptions = await withRlsBypass(tx =>
+      tx.pushSubscription.findMany({
+        where: { storeId },
+        select: { id: true, endpoint: true, p256dh: true, auth: true },
+      })
+    );
 
     if (subscriptions.length === 0) {
       logger.debug({ storeId }, '[PushService] No push subscriptions for store, skipping');
@@ -121,16 +130,16 @@ class PushService {
       }
     });
 
-    // 7. Clean up expired subscriptions
+    // 7. Clean up expired subscriptions (RLS-bypass: same FORCE-RLS table, called
+    // from non-tenant-context fan-out — without bypass the delete would match 0 rows).
     if (expiredEndpoints.length > 0) {
-      await prisma.pushSubscription
-        .deleteMany({ where: { storeId, endpoint: { in: expiredEndpoints } } })
-        .catch(err =>
-          logger.warn(
-            { err, storeId },
-            '[PushService] Failed to clean up expired push subscriptions'
-          )
-        );
+      await withRlsBypass(tx =>
+        tx.pushSubscription.deleteMany({
+          where: { storeId, endpoint: { in: expiredEndpoints } },
+        })
+      ).catch(err =>
+        logger.warn({ err, storeId }, '[PushService] Failed to clean up expired push subscriptions')
+      );
 
       logger.info(
         { storeId, count: expiredEndpoints.length },
@@ -141,8 +150,10 @@ class PushService {
     // 8. Log result — shape matches previous FCM implementation so the admin notifications page still works
     const status = successCount > 0 ? 'sent' : 'failed';
 
-    await prisma.notificationLog
-      .create({
+    // notification_logs is under FORCE-RLS too — bypass so the write succeeds
+    // from non-tenant-context fan-out.
+    await withRlsBypass(tx =>
+      tx.notificationLog.create({
         data: {
           storeId,
           channel: 'push',
@@ -156,7 +167,7 @@ class PushService {
           },
         },
       })
-      .catch(err => logger.error({ err }, '[PushService] Failed to write NotificationLog'));
+    ).catch(err => logger.error({ err }, '[PushService] Failed to write NotificationLog'));
 
     logger.info(
       { storeId, successCount, failureCount, title },

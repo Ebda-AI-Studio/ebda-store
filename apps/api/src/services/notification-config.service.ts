@@ -1,4 +1,4 @@
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
 import logger from '../lib/logger';
@@ -69,10 +69,19 @@ class NotificationConfigService {
   // ==========================================
 
   private async readFromDb(storeId: string): Promise<Record<string, DecryptedConfig>> {
-    const rows = await prisma.notificationConfig.findMany({
-      where: { storeId },
-      select: { channel: true, provider: true, credentials: true, enabled: true },
-    });
+    // notification_configs is under FORCE ROW LEVEL SECURITY. This read runs
+    // from BOTH request handlers (which carry tenant context) AND background
+    // fan-out (order-created / abandoned-cart Inngest jobs) which do NOT — and
+    // without the GUC the policy returns 0 rows, so the result would be an empty
+    // (and Redis-cached) config map: storefront push/SMS silently disabled. This
+    // is a trusted internal read already scoped by `where: { storeId }`, so run
+    // it under withRlsBypass to make it context-independent.
+    const rows = await withRlsBypass(tx =>
+      tx.notificationConfig.findMany({
+        where: { storeId },
+        select: { channel: true, provider: true, credentials: true, enabled: true },
+      })
+    );
 
     const map: Record<string, DecryptedConfig> = {};
 

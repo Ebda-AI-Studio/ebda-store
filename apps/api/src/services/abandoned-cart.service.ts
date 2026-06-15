@@ -10,7 +10,7 @@
  *     └─ processReminders()       — send scheduled reminder steps
  */
 
-import { prisma } from '@force/database';
+import { prisma, withRlsBypass } from '@force/database';
 import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { wbsBridgeService, WbsUnauthorizedError, type AbandonedWaCart } from './wbs-bridge.service';
@@ -158,11 +158,17 @@ class AbandonedCartService {
   // ──────────────────────────────────────────
 
   async detectNewAbandonments(correlationId?: string): Promise<void> {
-    // Find all stores with the abandoned_cart feature enabled
-    const storeFeatures = await prisma.storeFeature.findMany({
-      where: { featureKey: 'abandoned_cart', enabled: true },
-      select: { storeId: true },
-    });
+    // Find all stores with the abandoned_cart feature enabled.
+    // store_features is FORCE-RLS; this is a platform-level cron with no tenant
+    // context, and the scan is INTENTIONALLY cross-tenant (all eligible stores).
+    // Without bypass the policy returns 0 rows → the whole abandoned-cart system
+    // silently never runs. Bypass is correct here (cross-tenant by design).
+    const storeFeatures = await withRlsBypass(tx =>
+      tx.storeFeature.findMany({
+        where: { featureKey: 'abandoned_cart', enabled: true },
+        select: { storeId: true },
+      })
+    );
 
     if (storeFeatures.length === 0) {
       logger.debug(
@@ -294,17 +300,21 @@ class AbandonedCartService {
    *   WA-origin cart → WhatsApp template only (email not applicable)
    */
   async detectAndNotifyAbandonedWaCarts(correlationId?: string): Promise<void> {
-    // Find all stores with both abandoned_cart + whatsapp features enabled
-    const [storeFeatures, waFeatures] = await Promise.all([
-      prisma.storeFeature.findMany({
-        where: { featureKey: 'abandoned_cart', enabled: true },
-        select: { storeId: true },
-      }),
-      prisma.storeFeature.findMany({
-        where: { featureKey: 'whatsapp', enabled: true },
-        select: { storeId: true },
-      }),
-    ]);
+    // Find all stores with both abandoned_cart + whatsapp features enabled.
+    // Cross-tenant platform cron over FORCE-RLS store_features → bypass required
+    // (same reason as detectNewAbandonments above).
+    const [storeFeatures, waFeatures] = await withRlsBypass(tx =>
+      Promise.all([
+        tx.storeFeature.findMany({
+          where: { featureKey: 'abandoned_cart', enabled: true },
+          select: { storeId: true },
+        }),
+        tx.storeFeature.findMany({
+          where: { featureKey: 'whatsapp', enabled: true },
+          select: { storeId: true },
+        }),
+      ])
+    );
 
     const abandonedCartStoreIds = new Set(storeFeatures.map(sf => sf.storeId));
     const waStoreIds = new Set(waFeatures.map(sf => sf.storeId));

@@ -1,4 +1,4 @@
-import { prisma, Prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx, withRlsBypass } from '@force/database';
 import { FeatureKey, FEATURE_KEYS_ARRAY, PLAN_BASELINE, type StorePlan } from '@force/shared';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
@@ -86,13 +86,22 @@ class FeatureService {
   }
 
   private async readFromDb(storeId: string): Promise<Record<FeatureKey, boolean>> {
-    const [store, rows] = await Promise.all([
-      prisma.store.findUnique({ where: { id: storeId }, select: { plan: true } }),
-      prisma.storeFeature.findMany({
-        where: { storeId },
-        select: { featureKey: true, enabled: true },
-      }),
-    ]);
+    // store_features is under FORCE ROW LEVEL SECURITY. This map is read from
+    // BOTH request handlers (with tenant context) AND background fan-out
+    // (order-created / abandoned-cart Inngest jobs) which have no tenant GUC —
+    // and without it the per-store override rows return empty, so a feature
+    // enabled/disabled by override would be mis-resolved (and the wrong value
+    // Redis-cached). `stores` itself has RLS disabled, but read both inside one
+    // bypass tx — trusted internal read already scoped by `where: { storeId }`.
+    const [store, rows] = await withRlsBypass(tx =>
+      Promise.all([
+        tx.store.findUnique({ where: { id: storeId }, select: { plan: true } }),
+        tx.storeFeature.findMany({
+          where: { storeId },
+          select: { featureKey: true, enabled: true },
+        }),
+      ])
+    );
     // If the store doesn't exist, return all-false (safe default; callers
     // already handle missing stores at the route level via requireStoreAccess).
     if (!store) {

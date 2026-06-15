@@ -15,7 +15,7 @@ import { notificationConfigService } from './notification-config.service';
 import { smsQueue } from './sms-queue.service';
 import { pushService } from './push.service';
 import { redis } from './redis.service';
-import { prisma } from '@force/database';
+import { withRlsBypass } from '@force/database';
 import logger from '../lib/logger';
 import {
   NotificationEvent,
@@ -130,10 +130,17 @@ class NotificationDispatcherService {
    */
   async getEventConfig(storeId: string, event: NotificationEvent): Promise<EventConfig> {
     try {
-      const row = await prisma.notificationEventConfig.findUnique({
-        where: { storeId_event: { storeId, event } },
-        select: { sms: true, push: true },
-      });
+      // notification_event_configs is under FORCE-RLS; dispatch() runs from
+      // background fan-out with no tenant GUC, where findUnique would return
+      // null → we'd silently fall back to all-on. Trusted internal read scoped
+      // by the storeId+event unique key, so bypass RLS for a context-independent
+      // read (defaults stay all-on only when the row genuinely doesn't exist).
+      const row = await withRlsBypass(tx =>
+        tx.notificationEventConfig.findUnique({
+          where: { storeId_event: { storeId, event } },
+          select: { sms: true, push: true },
+        })
+      );
 
       if (!row) {
         return { sms: true, push: true };
