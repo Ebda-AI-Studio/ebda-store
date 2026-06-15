@@ -37,6 +37,8 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
           email: `rls-owner-${Date.now()}@example.com`,
           passwordHash: 'not-a-real-hash',
           role: 'store_admin',
+          firstName: 'RLS',
+          lastName: 'Test',
         },
       });
       ownerId = owner.id;
@@ -57,6 +59,8 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
           email: `rls-test-${Date.now()}@example.com`,
           passwordHash: 'not-a-real-hash',
           role: 'customer',
+          firstName: 'RLS',
+          lastName: 'Customer',
         },
       });
       customerId = customer.id;
