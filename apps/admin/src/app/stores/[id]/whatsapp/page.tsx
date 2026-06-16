@@ -89,16 +89,20 @@ export default function WhatsAppMasterPage() {
       title="WhatsApp Integration"
       subtitle="Force AI WhatsApp Business Platform · templates · order updates · payment links"
     >
-      {/* Tab strip */}
-      <div className="border-b border-border mb-6">
-        <nav className="-mb-px flex gap-1 overflow-x-auto" role="tablist">
+      {/* Tab strip — sticky so it stays accessible on long tabs (BotCopy, etc.).
+          top-14 positions it directly under the TopBar (h-14 mobile / h-16 desktop).
+          z-10 keeps it above content cards but below the TopBar (z-20).
+          -mx-4 + px-4 (-mx-6 + px-6 on lg) cancel the parent padding so the
+          bg+border span edge-to-edge without gaps. */}
+      <div className="sticky top-14 lg:top-16 z-10 -mx-4 lg:-mx-6 px-4 lg:px-6 bg-background border-b border-border mb-6">
+        <nav className="flex gap-1 overflow-x-auto" role="tablist" aria-label="WhatsApp settings">
           {TABS.map(tab => (
             <button
               key={tab.key}
               role="tab"
               aria-selected={activeTab === tab.key}
               onClick={() => switchTab(tab.key)}
-              className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-t ${
+              className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-t ${
                 activeTab === tab.key
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'

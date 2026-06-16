@@ -248,10 +248,10 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         MyFatoorah checkout, and pays. The link stays valid until the order is paid or canceled.
       </p>
 
-      <div className="rounded-lg border bg-white shadow-sm p-5 space-y-4">
+      <div className="rounded-lg border bg-card shadow-sm p-5 space-y-4">
         {/* Phone */}
         <div className="space-y-1.5">
-          <label htmlFor="pl-phone" className="text-sm font-medium text-gray-700">
+          <label htmlFor="pl-phone" className="text-sm font-medium text-foreground">
             Customer WhatsApp number (E.164)
           </label>
           <input
@@ -260,16 +260,18 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
             value={customerPhone}
             onChange={e => setCustomerPhone(e.target.value)}
             placeholder="+96512345678"
-            className="w-full rounded-md border px-3 py-2 text-sm font-mono"
+            className="w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm font-mono"
           />
           {!phoneValid && customerPhone.length > 4 && (
-            <p className="text-[11px] text-red-600">Must start with + and be 8–16 digits.</p>
+            <p className="text-[11px] text-red-600 dark:text-red-400">
+              Must start with + and be 8–16 digits.
+            </p>
           )}
         </div>
 
         {/* Name */}
         <div className="space-y-1.5">
-          <label htmlFor="pl-name" className="text-sm font-medium text-gray-700">
+          <label htmlFor="pl-name" className="text-sm font-medium text-foreground">
             Customer name (optional)
           </label>
           <input
@@ -278,14 +280,14 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
             value={customerName}
             onChange={e => setCustomerName(e.target.value)}
             placeholder="Ahmad"
-            className="w-full rounded-md border px-3 py-2 text-sm"
+            className="w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm"
           />
         </div>
 
         {/* Items — typeahead search per line (scales past 1000 products) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-foreground">
               Items {validLines.length > 0 && `(${validLines.length})`}
             </label>
             <button
@@ -307,10 +309,10 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
                     {selected ? (
-                      <div className="flex items-center justify-between rounded-md border bg-gray-50 px-3 py-2 text-sm">
-                        <span className="truncate">
+                      <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                        <span className="truncate text-foreground">
                           {selected.name} —{' '}
-                          <span className="font-mono tabular-nums text-gray-600">
+                          <span className="font-mono tabular-nums text-muted-foreground">
                             {(selected.price / 1000).toFixed(3)} KWD
                           </span>
                         </span>
@@ -336,13 +338,13 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                             ? 'Loading products...'
                             : `Search ${products.length} products by name or SKU…`
                         }
-                        className="w-full rounded-md border bg-white px-3 py-2 text-sm"
+                        className="w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm"
                       />
                     )}
                     {showSuggestions &&
                       suggestions.length > 0 &&
                       (query || products.length > 0) && (
-                        <div className="mt-1 max-h-60 overflow-y-auto rounded-md border bg-white shadow-sm">
+                        <div className="relative z-10 mt-1 max-h-60 overflow-y-auto rounded-md border bg-card shadow-md">
                           {suggestions.map(p => (
                             <button
                               key={p.id}
@@ -351,10 +353,10 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                                 updateLine(idx, { productId: p.id });
                                 setLineQueries(prev => ({ ...prev, [idx]: '' }));
                               }}
-                              className="block w-full px-3 py-2 text-start text-sm hover:bg-orange-50"
+                              className="block w-full px-3 py-2 text-start text-sm hover:bg-orange-50 dark:hover:bg-orange-950/30"
                             >
-                              <div className="truncate font-medium text-gray-900">{p.name}</div>
-                              <div className="text-[11px] text-gray-500 font-mono tabular-nums">
+                              <div className="truncate font-medium text-foreground">{p.name}</div>
+                              <div className="text-[11px] text-muted-foreground font-mono tabular-nums">
                                 {(p.price / 1000).toFixed(3)} KWD{p.sku ? ` · ${p.sku}` : ''}
                               </div>
                             </button>
@@ -370,7 +372,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                     onChange={e =>
                       updateLine(idx, { quantity: Math.max(1, parseInt(e.target.value) || 1) })
                     }
-                    className="w-16 rounded-md border px-2 py-2 text-sm tabular-nums text-center"
+                    className="w-16 rounded-md border bg-background text-foreground px-2 py-2 text-sm tabular-nums text-center"
                   />
                   {cartLines.length > 1 && (
                     <button
@@ -390,9 +392,9 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
 
         {/* Extra amount — custom charge with no Product. Webhook reconciles
             against Order.total which already includes this. */}
-        <div className="space-y-2 rounded-md border border-dashed border-gray-300 bg-gray-50 p-3">
-          <label className="text-sm font-medium text-gray-700">Custom amount (optional)</label>
-          <p className="text-[11px] text-gray-500 -mt-1">
+        <div className="space-y-2 rounded-md border border-dashed border-border bg-muted/40 p-3">
+          <label className="text-sm font-medium text-foreground">Custom amount (optional)</label>
+          <p className="text-[11px] text-muted-foreground -mt-1">
             Add a charge that isn&apos;t a catalogue product — a custom quote, service fee, or
             deposit. Baked into the order total + reconciled when MyFatoorah callback returns.
           </p>
@@ -404,16 +406,16 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
               value={extraAmountKwd}
               onChange={e => setExtraAmountKwd(e.target.value)}
               placeholder="0.000"
-              className="w-32 rounded-md border px-3 py-2 text-sm font-mono tabular-nums"
+              className="w-32 rounded-md border bg-background text-foreground px-3 py-2 text-sm font-mono tabular-nums"
             />
-            <span className="text-sm text-gray-500">KWD</span>
+            <span className="text-sm text-muted-foreground">KWD</span>
             <input
               type="text"
               value={extraAmountNote}
               onChange={e => setExtraAmountNote(e.target.value)}
               placeholder="What is this for? (optional)"
               maxLength={200}
-              className="flex-1 rounded-md border px-3 py-2 text-sm"
+              className="flex-1 rounded-md border bg-background text-foreground px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -448,14 +450,14 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
 
         {/* Language */}
         <div className="space-y-1.5">
-          <label htmlFor="pl-lang" className="text-sm font-medium text-gray-700">
+          <label htmlFor="pl-lang" className="text-sm font-medium text-foreground">
             WhatsApp message language
           </label>
           <select
             id="pl-lang"
             value={language}
             onChange={e => setLanguage(e.target.value as 'en' | 'ar')}
-            className="w-full rounded-md border bg-white px-3 py-2 text-sm"
+            className="w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm"
           >
             <option value="en">English</option>
             <option value="ar">Arabic</option>
@@ -518,7 +520,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         </div>
       )}
 
-      <div className="rounded-md border bg-blue-50/50 border-blue-200 p-3 text-xs text-blue-800">
+      <div className="rounded-md border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
         <strong>Requirements:</strong> the <em>paymentLink</em> template must be approved by Meta.
         Visit the <strong>Templates</strong> tab to generate and sync templates.
       </div>

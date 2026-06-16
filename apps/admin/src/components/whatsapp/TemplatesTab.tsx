@@ -363,7 +363,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
   const rejectedCount = (data?.rows || []).filter(r => r.status === 'rejected').length;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl space-y-6">
       {/* Top actions */}
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -406,7 +406,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
       {/* Logo-as-header opt-in */}
       {wbsConfig && (
         <div
-          className={`rounded-lg border p-4 ${wbsConfig.storeHasLogo ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-200 opacity-75'}`}
+          className={`rounded-lg border p-4 ${wbsConfig.storeHasLogo ? 'bg-card border-border' : 'bg-muted/40 border-border opacity-75'}`}
         >
           <label className="flex items-start gap-3 cursor-pointer">
             <input
@@ -416,23 +416,23 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
               onChange={e => toggleLogoHeader(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 peer-disabled:opacity-40 peer-disabled:cursor-not-allowed mt-0.5 shrink-0" />
+            <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 peer-disabled:opacity-40 peer-disabled:cursor-not-allowed mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="font-semibold text-sm text-gray-900">
+              <div className="font-semibold text-sm text-foreground">
                 Use my store logo as the WhatsApp message header
               </div>
-              <p className="text-xs text-gray-600 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Customers see your store logo at the top of every order-update message. Applied when
                 you next generate or sync templates.
               </p>
               {!wbsConfig.storeHasLogo && (
-                <p className="text-xs text-amber-700 mt-1">
-                  ⚠️ Set a store logo first under Branding before enabling this.
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                  Set a store logo first under Branding before enabling this.
                 </p>
               )}
               {wbsConfig.wbsTemplateUseLogoHeader && wbsConfig.storeHasLogo && (
-                <p className="text-xs text-emerald-700 mt-1">
-                  ✅ On. Next sync will upload your logo to Meta and submit templates with image
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
+                  On. Next sync will upload your logo to Meta and submit templates with image
                   headers.
                 </p>
               )}
@@ -443,14 +443,14 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
 
       {/* Template list */}
       {loading && !data ? (
-        <div className="rounded-md border bg-white p-8 text-center text-sm text-gray-500">
+        <div className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground">
           Loading templates…
         </div>
       ) : !hasAnyRows ? (
-        <div className="rounded-md border border-dashed bg-white p-8 text-center text-sm text-gray-600">
+        <div className="rounded-md border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
           <Icon.Sparkles className="mx-auto mb-2 h-8 w-8 text-orange-500" />
-          <p className="font-medium">No templates set up yet.</p>
-          <p className="mt-1 text-gray-500">
+          <p className="font-medium text-foreground">No templates set up yet.</p>
+          <p className="mt-1">
             Click <strong>Generate defaults</strong> to add the 12 canonical Force AI templates as
             drafts.
           </p>
@@ -461,14 +461,16 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
             const rows = groupedRows[key] || [];
             if (rows.length === 0) return null;
             return (
-              <div key={key} className="rounded-lg border bg-white shadow-sm overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50/50">
+              <div key={key} className="rounded-lg border bg-card shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{SOURCE_KEY_LABELS[key] || key}</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">{rows[0]?.category}</p>
+                    <h3 className="font-semibold text-foreground">
+                      {SOURCE_KEY_LABELS[key] || key}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">{rows[0]?.category}</p>
                   </div>
                 </div>
-                <div className="divide-y">
+                <div className="divide-y divide-border">
                   {rows.map(row => (
                     <div
                       key={row.id}
@@ -482,24 +484,24 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          className="h-3.5 w-3.5 text-gray-400"
+                          className="h-3.5 w-3.5 text-muted-foreground"
                         >
                           <path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" />
                         </svg>
-                        <span className="text-xs font-medium text-gray-600 uppercase">
+                        <span className="text-xs font-medium text-muted-foreground uppercase">
                           {row.language}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
                           {row.body}
                         </p>
                         {row.rejectionReason && (
-                          <p className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">
+                          <p className="mt-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded px-2 py-1">
                             Meta rejected: {row.rejectionReason}
                           </p>
                         )}
-                        <p className="mt-1.5 text-[10.5px] text-gray-400 font-mono">
+                        <p className="mt-1.5 text-[10.5px] text-muted-foreground font-mono">
                           {row.metaName}
                           {row.lastSyncedAt && (
                             <> · last sync {new Date(row.lastSyncedAt).toLocaleString()}</>
@@ -518,7 +520,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
         </div>
       )}
 
-      <div className="rounded-md border bg-blue-50/50 border-blue-200 p-3 text-xs text-blue-800">
+      <div className="rounded-md border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
         <strong>How it works:</strong> Click <em>Generate defaults</em> to create the canonical
         templates as drafts. Click <em>Sync to Meta</em> to submit them. Meta reviews each template;
         approval typically takes 10 minutes to 24 hours.

@@ -44,6 +44,14 @@ interface WbsConfig {
   wbsTemplates: WbsTemplates | null;
   connectedTenant: ConnectedTenant | null;
   connectedTenantError?: string | null;
+  /**
+   * True ONLY when the live fetchMetadata() call to WBS succeeded on this
+   * request. connectedTenant may be non-null even when this is false (the API
+   * augments it from local approved templates so this tab can show the template
+   * list). Use wbsLiveVerified — not connectedTenant != null — to drive the
+   * green "Connected" banner state.
+   */
+  wbsLiveVerified?: boolean;
   /** Whether the WA customer-DM ordering state machine is active for this store. Default false. */
   waCustomerOrderingEnabled: boolean;
 }
@@ -221,10 +229,13 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
     }
   };
 
-  // Derived state: treat hasApiKey+wbsEnabled as connected, even if connectedTenant is null
+  // Derived state: treat hasApiKey+wbsEnabled as connected, even if live check failed.
+  // tenantDetailsAvailable uses wbsLiveVerified (not connectedTenant != null) so the
+  // green "Connected to businessName" banner is shown only when the live WBS call
+  // actually succeeded — not when connectedTenant is populated from local templates only.
   const isConnected = config.hasApiKey && config.wbsEnabled;
-  const tenantDetailsAvailable = isConnected && config.connectedTenant !== null;
-  const tenantDetailsFailed = isConnected && config.connectedTenant === null;
+  const tenantDetailsAvailable = isConnected && Boolean(config.wbsLiveVerified);
+  const tenantDetailsFailed = isConnected && !config.wbsLiveVerified;
   const keySetNotEnabled = config.hasApiKey && !config.wbsEnabled;
   const templates = config.connectedTenant?.availableTemplates || [];
 

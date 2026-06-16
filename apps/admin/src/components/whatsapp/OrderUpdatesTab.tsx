@@ -290,24 +290,24 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
       )}
 
       {loading ? (
-        <div className="rounded-md border bg-white p-8 text-center text-sm text-gray-500">
+        <div className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground">
           Loading…
         </div>
       ) : (
         connected && (
           <>
-            <div className="rounded-lg border bg-white p-4">
-              <label htmlFor="lang-ou" className="text-sm font-semibold text-gray-700">
+            <div className="rounded-lg border bg-card p-4">
+              <label htmlFor="lang-ou" className="text-sm font-semibold text-foreground">
                 Message language
               </label>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Templates with this language code must be approved by Meta.
               </p>
               <select
                 id="lang-ou"
                 value={language}
                 onChange={e => setLanguage(e.target.value as 'en' | 'ar')}
-                className="mt-2 w-full rounded-md border bg-white px-3 py-2 text-sm"
+                className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
               >
                 <option value="en">English (en)</option>
                 <option value="ar">Arabic (ar)</option>
@@ -327,14 +327,14 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                 const enabledForEvent = enabled[evt.key];
                 const evtChannels = channels[evt.key];
                 return (
-                  <div key={evt.key} className="rounded-lg border bg-white p-4">
+                  <div key={evt.key} className="rounded-lg border bg-card p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{evt.label}</h3>
-                        <p className="text-sm text-gray-600 mt-0.5">{evt.description}</p>
+                        <h3 className="font-semibold text-foreground">{evt.label}</h3>
+                        <p className="text-sm text-muted-foreground mt-0.5">{evt.description}</p>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                           {matched && (
-                            <span className="font-mono text-gray-500">{matched.name}</span>
+                            <span className="font-mono text-muted-foreground">{matched.name}</span>
                           )}
                           <span
                             className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${
@@ -354,7 +354,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                           </span>
                         </div>
                         {status === 'missing' && (
-                          <p className="mt-2 text-xs text-gray-500">
+                          <p className="mt-2 text-xs text-muted-foreground">
                             Generate templates first from the <strong>Templates</strong> tab.
                           </p>
                         )}
@@ -362,7 +362,9 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                         {/* Channel toggles — only shown when event is enabled */}
                         {enabledForEvent && status !== 'missing' && (
                           <div className="mt-3 flex flex-wrap items-center gap-4">
-                            <span className="text-xs font-medium text-gray-500">Send via:</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                              Send via:
+                            </span>
                             {/* WhatsApp channel toggle */}
                             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
                               <input
@@ -374,9 +376,9 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                                     [evt.key]: { ...prev[evt.key], whatsapp: e.target.checked },
                                   }))
                                 }
-                                className="h-3.5 w-3.5 rounded border-gray-300 accent-green-500"
+                                className="h-3.5 w-3.5 rounded border-border accent-green-500"
                               />
-                              <span className="text-xs text-gray-700">WhatsApp</span>
+                              <span className="text-xs text-foreground">WhatsApp</span>
                             </label>
                             {/* Email channel toggle */}
                             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -389,12 +391,12 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                                     [evt.key]: { ...prev[evt.key], email: e.target.checked },
                                   }))
                                 }
-                                className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-500"
+                                className="h-3.5 w-3.5 rounded border-border accent-blue-500"
                               />
-                              <span className="text-xs text-gray-700">Email</span>
+                              <span className="text-xs text-foreground">Email</span>
                             </label>
                             {!evtChannels.whatsapp && !evtChannels.email && (
-                              <span className="text-xs text-amber-600 font-medium">
+                              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
                                 Both off — event will be silent
                               </span>
                             )}
@@ -409,7 +411,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                           disabled={status === 'missing'}
                           className="sr-only peer"
                         />
-                        <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 peer-disabled:opacity-40 peer-disabled:cursor-not-allowed" />
+                        <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 peer-disabled:opacity-40 peer-disabled:cursor-not-allowed" />
                       </label>
                     </div>
                   </div>
@@ -427,7 +429,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
               </Button>
             </div>
 
-            <div className="rounded-md border bg-blue-50/50 border-blue-200 p-3 text-xs text-blue-800">
+            <div className="rounded-md border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
               <strong>How it works:</strong> when a customer&apos;s order transitions to one of
               these states, the FWB API fires the corresponding WhatsApp template via your Force
               WhatsApp Business Platform integration. Use the channel checkboxes to control which

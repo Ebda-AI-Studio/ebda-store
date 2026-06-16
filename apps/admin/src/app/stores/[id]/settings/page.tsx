@@ -36,16 +36,19 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
       hasApiKey: boolean;
       wbsEnabled: boolean;
       waCustomerOrderingEnabled: boolean;
-      // The API performs a live fetchMetadata() against WBS on every GET and
-      // returns the validated tenant (null when WBS is unreachable or the key
-      // is invalid/revoked). Status must reflect THIS, not just "key saved".
-      connectedTenant?: unknown | null;
+      // wbsLiveVerified is true ONLY when the live fetchMetadata() call to WBS
+      // succeeded this request. connectedTenant may be non-null even when
+      // wbsLiveVerified is false (local-template fallback populates it for the
+      // ConnectionTab's template list). Always use wbsLiveVerified here — never
+      // connectedTenant != null — to avoid showing "Connected" when the WBS key
+      // is revoked/disconnected but the store still has local approved templates.
+      wbsLiveVerified?: boolean;
     }>(`/api/v1/stores/${storeId}/integrations/wbs`)
       .then(({ data }) => {
         if (data) {
           setStatus({
             saved: Boolean(data.hasApiKey && data.wbsEnabled),
-            verified: data.connectedTenant != null,
+            verified: Boolean(data.wbsLiveVerified),
             waOrdering: Boolean(data.waCustomerOrderingEnabled),
           });
         }

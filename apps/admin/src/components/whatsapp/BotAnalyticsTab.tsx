@@ -171,7 +171,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
   const inputTotal = data ? Object.values(data.inputBreakdown).reduce((s, v) => s + v, 0) : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl space-y-6">
       {/* Date range picker */}
       <DateRangePicker period={period} custom={custom} onChange={handlePeriodChange} />
 

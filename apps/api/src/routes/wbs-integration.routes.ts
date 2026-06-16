@@ -191,6 +191,12 @@ router.get(
         keySetAt?: string | null;
       } | null = null;
       let connectedTenantError: string | null = null;
+      // wbsLiveVerified is true ONLY when fetchMetadata() actually succeeded —
+      // it is NOT set by the local-template fallback below. The settings card
+      // uses this to show "Connected" vs "Saved · not verified": a store that
+      // has local approved templates but whose WBS key is revoked/unreachable
+      // must NOT show green "Connected".
+      let wbsLiveVerified = false;
 
       if (store.wbsApiKey) {
         try {
@@ -201,6 +207,7 @@ router.get(
             phoneNumber: metadata.phoneNumber,
             availableTemplates: metadata.templates,
           };
+          wbsLiveVerified = true;
         } catch (err) {
           // Silently absorb — WBS may be down or key was just revoked
           connectedTenantError =
@@ -268,6 +275,11 @@ router.get(
           metaCatalogId: store.metaCatalogId ?? null,
           metaBusinessId: store.metaBusinessId ?? null,
           hasMetaToken: Boolean(store.metaAccessToken),
+          // wbsLiveVerified: true ONLY when fetchMetadata() succeeded this request.
+          // connectedTenant may be non-null even when false (local-template fallback).
+          // The settings card MUST use this field — not connectedTenant — to determine
+          // whether to show the green "Connected" chip.
+          wbsLiveVerified,
           connectedTenant,
           ...(connectedTenantError ? { connectedTenantError } : {}),
         },
