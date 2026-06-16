@@ -665,14 +665,14 @@ export async function GET() {
 
   const storeLines = stores
     .map(s => {
-      const desc = s.description?.trim() || 'Kuwait-based merchant on Force Store.';
+      const desc = s.description?.trim() || 'Kuwait-based merchant on Force AI Store.';
       return `- [${s.name}](https://store.forcemediakw.com/${s.slug}): ${desc}`;
     })
     .join('\n');
 
-  const body = `# Force Store — Multi-tenant Storefront Platform
+  const body = `# Force AI Store — Multi-tenant Storefront Platform
 
-> Force Store is the per-merchant e-commerce platform run by Force Media Kuwait.
+> Force AI Store is the per-merchant e-commerce platform run by Force Media Kuwait.
 > Each merchant gets a path-based storefront at \`store.forcemediakw.com/<slug>\`
 > with their own products, branding, and contact info. Customers in Kuwait,
 > Saudi Arabia, and Qatar can browse + buy across multiple merchants from one
@@ -778,7 +778,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
 
   const body = `# ${store.name}${store.nameAr ? ` (${store.nameAr})` : ''}
 
-> ${store.description || `${store.name} on Force Store — Kuwait-based merchant.`}
+> ${store.description || `${store.name} on Force AI Store — Kuwait-based merchant.`}
 
 ## Contact
 
@@ -804,7 +804,7 @@ ${prodLines || '_No active products._'}
 
 ## Platform
 
-This store is hosted on Force Store, a multi-tenant e-commerce platform by
+This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
 Force Media Kuwait. See https://store.forcemediakw.com/llms.txt for the
 platform-wide index.
 `;
@@ -872,7 +872,7 @@ Create `force_media_landing_page/llms.txt`:
 
 ## Products under Force Media
 
-- [Force Store](https://store.forcemediakw.com): Multi-tenant e-commerce
+- [Force AI Store](https://store.forcemediakw.com): Multi-tenant e-commerce
   storefronts for Kuwait merchants. Each merchant gets a branded subdomain
   path, full catalogue + checkout, KWD/USD/SAR pricing.
 
@@ -882,7 +882,7 @@ Create `force_media_landing_page/llms.txt`:
 - Social media management — Instagram, TikTok, Snapchat focus
 - Content production — video, photography, graphic design
 - SEO — local + regional search optimization
-- Web/app development — custom builds + Force Store deployments
+- Web/app development — custom builds + Force AI Store deployments
 
 ## Contact
 

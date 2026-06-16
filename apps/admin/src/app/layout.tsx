@@ -48,10 +48,10 @@ export const metadata: Metadata = {
   // PWA install metadata. apple-* keys exist because iOS Safari requires
   // an installed PWA before granting Web Push permission, and the install
   // prompt picks up these tags rather than the manifest.
-  applicationName: 'Force Store Admin',
+  applicationName: 'Force AI Store Admin',
   appleWebApp: {
     capable: true,
-    title: 'Force Store Admin',
+    title: 'Force AI Store Admin',
     statusBarStyle: 'default',
   },
   formatDetection: {

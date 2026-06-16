@@ -1062,7 +1062,7 @@ describe('renderBrandedShell', () => {
 
   it('includes powered-by line in footer', () => {
     const html = renderBrandedShell('<p>hi</p>', baseStore());
-    expect(html).toContain('Powered by Force Store');
+    expect(html).toContain('Powered by Force AI Store');
   });
 
   it('escapes the store name to prevent XSS in header', () => {
@@ -1150,7 +1150,7 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
     <div class="footer">
       <p>&copy; ${year} ${storeName}. All rights reserved.</p>
       ${footerLines.map(l => `<p>${l}</p>`).join('\n      ')}
-      <p style="margin-top:12px;font-size:11px;color:#999;">Powered by Force Store</p>
+      <p style="margin-top:12px;font-size:11px;color:#999;">Powered by Force AI Store</p>
     </div>
   </div>
 </body>
@@ -1262,7 +1262,7 @@ Replace the existing private `static transporter = nodemailer.createTransport(..
     text?: string;
   }): Promise<void> {
     const platformStore = {
-      name: 'Force Store',
+      name: 'Force AI Store',
       nameAr: null,
       logo: null,
       theme: null,
@@ -1277,7 +1277,7 @@ Replace the existing private `static transporter = nodemailer.createTransport(..
     const client = (await import('resend')).Resend;
     const r = new (client)(config.resendApiKey);
     const { error } = await r.emails.send({
-      from: `Force Store <noreply@forcemediakw.com>`,
+      from: `Force AI Store <noreply@forcemediakw.com>`,
       to: Array.isArray(args.to) ? args.to : [args.to],
       subject: args.subject,
       html,
@@ -1466,7 +1466,7 @@ static async sendPlatformRaw(options: EmailOptions): Promise<void> {
   const client = (await import('resend')).Resend;
   const r = new (client)(config.resendApiKey);
   const { error } = await r.emails.send({
-    from: `Force Store <noreply@forcemediakw.com>`,
+    from: `Force AI Store <noreply@forcemediakw.com>`,
     to: Array.isArray(options.to) ? options.to : [options.to],
     subject: options.subject,
     html: options.html,
@@ -2016,7 +2016,7 @@ For each remaining match, replace with `forcemediakw.com`. Use `Edit` per file.
 
 - [ ] **Step 14.2: Audit for hardcoded "Force Media" in customer-facing subjects**
 
-Run: `grep -rn "Force Media\|Force Store" apps/api/src --include="*.ts" 2>/dev/null | grep -v node_modules | grep -iE "subject|title"`
+Run: `grep -rn "Force Media\|Force AI Store" apps/api/src --include="*.ts" 2>/dev/null | grep -v node_modules | grep -iE "subject|title"`
 Expected output lists call sites that hardcode the brand in subject lines.
 
 For customer-facing emails, replace the hardcoded string with `${store.name}`. Example: `subject: 'Welcome to Force Media!'` → `subject: \`Welcome to ${store.name}!\``. Skip admin-facing sends (those keep platform branding per the spec).
@@ -2038,7 +2038,7 @@ git commit -m "fix(api): bug-class audit — forcemedia.com typo + hardcoded bra
 
 sweeping fix for every 'forcemedia.com' (missing the 'kw') across apps
 + packages, and every customer-facing email subject that hardcoded
-'Force Media' or 'Force Store' now interpolates store.name. admin-
+'Force Media' or 'Force AI Store' now interpolates store.name. admin-
 facing subjects unchanged."
 ```
 
@@ -2104,7 +2104,7 @@ curl -X POST "http://localhost:4000/api/v1/orders/<ANY_WADY_ORDER_ID>/resend-con
 
 (If a "resend confirmation" endpoint doesn't exist, write a one-off node script: `node -e "import('./apps/api/dist/services/email.service.js').then(m => m.EmailService.sendOrderConfirmation('<WADY_ID>', { ...sampleOrder }))"`.)
 
-Check Ahmad's inbox: the email arrives from `Wady Aljuz <noreply@wadyaljuz.com>` (verified) or `Wady Aljuz <noreply@forcemediakw.com>` (fallback). Header bar uses Wady Aljuz's theme color. Footer shows Wady Aljuz contact details + "Powered by Force Store". Receipt content (items + totals + shipping addr) renders correctly.
+Check Ahmad's inbox: the email arrives from `Wady Aljuz <noreply@wadyaljuz.com>` (verified) or `Wady Aljuz <noreply@forcemediakw.com>` (fallback). Header bar uses Wady Aljuz's theme color. Footer shows Wady Aljuz contact details + "Powered by Force AI Store". Receipt content (items + totals + shipping addr) renders correctly.
 
 - [ ] **Step 15.7: Document outcome**
 

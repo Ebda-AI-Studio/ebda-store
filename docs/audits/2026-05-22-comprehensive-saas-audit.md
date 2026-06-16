@@ -1,7 +1,7 @@
 # FWB (Force Website Builder) — Comprehensive SaaS Due-Diligence Audit
 
 **Date:** 2026-05-22
-**Subject:** Force Website Builder / Force Store (proprietary multi-tenant e-commerce SaaS)
+**Subject:** Force Website Builder / Force AI Store (proprietary multi-tenant e-commerce SaaS)
 **Audit framing:** acquirer-grade due diligence — every square inch
 **Scope:** security, database, infrastructure, code quality, business features, cost forecast, risk register, SWOT
 
@@ -9,7 +9,7 @@
 
 ## Executive Summary (for the would-be acquirer)
 
-Force Website Builder (operated as "Force Store" by Force AI Kuwait) is a **proprietary multi-tenant SaaS e-commerce platform** purpose-built for Kuwait/GCC SMB merchants. The codebase is **1,158 tracked files, 79 Prisma models, 30 async Inngest functions, 51 API route files, 5 production storefront themes**, currently serving 2 live merchants (Wady Aljuz @ 235 products / 8 categories; Palora). Source code is proprietary (`license: UNLICENSED`).
+Force Website Builder (operated as "Force AI Store" by Force AI Kuwait) is a **proprietary multi-tenant SaaS e-commerce platform** purpose-built for Kuwait/GCC SMB merchants. The codebase is **1,158 tracked files, 79 Prisma models, 30 async Inngest functions, 51 API route files, 5 production storefront themes**, currently serving 2 live merchants (Wady Aljuz @ 235 products / 8 categories; Palora). Source code is proprietary (`license: UNLICENSED`).
 
 **The headline assessment:** this is a remarkably well-architected SaaS for its production stage. The 4 pillar moats — AI-as-default via Gemini Flash Lite, Arabic-first locality, Kuwait-native payment stack (Tap/MyFatoorah/Hesabe/UPayments), per-section customization granularity — are genuinely differentiated. Feature depth (full Chart-of-Accounts accounting, AEO/GEO 7-layer architecture, WBS WhatsApp bridge, dual-stack push) exceeds the SMB tier and would typically be found in $200–500/mo enterprise platforms. The platform's primary commercial weakness is operational: **no self-serve signup or public pricing exists**, capping growth to what the Force Media agency can close manually.
 
@@ -263,7 +263,7 @@ For a buyer evaluating FWB:
 - [ ] **Source code IP ownership** — confirm `license: UNLICENSED` and that Ahmad Sharaf holds all copyright (no third-party contributors with claims)
 - [ ] **Kuwait payment provider contracts** — confirm Tap, MyFatoorah, Hesabe, UPayments accounts are in Force AI's name (not Ahmad personally), or that they transfer with the asset
 - [ ] **Vercel + Railway + Neon + R2 + Inngest accounts** — confirm asset transfer mechanism (sub-org transfer vs new accounts)
-- [ ] **Trademark status** — "Force Store" / "Force AI" / "Force Media" Kuwait trademark registration
+- [ ] **Trademark status** — "Force AI Store" / "Force AI" / "Force Media" Kuwait trademark registration
 - [ ] **Live merchant contracts** — Wady Aljuz and Palora — confirm contract terms transfer with platform sale
 - [ ] **Gemini API key + Google Cloud account** — transferable? Tied to Ahmad's personal Google account?
 - [ ] **GitHub repo ownership** — `ForceAI-KW` org membership + admin rights

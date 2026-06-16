@@ -14,7 +14,7 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Force Store Admin',
+    name: 'Force AI Store Admin',
     short_name: 'Force Admin',
     description: 'Force Website Builder operator console',
     start_url: '/',

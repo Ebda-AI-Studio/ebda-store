@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use `superpowers:subagent-driven-development` (or `superpowers:executing-plans`) to execute task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** Introduce three named plans (Starter / Professional / Enterprise) for Force Store + three matching tiers for Force WhatsApp, with sub-feature-level toggles inside Inventory and Accounting, all gated behind a super-admin-only "Manage Features" page. Also gate the "Suspend Store" action to super-admins, and polish the existing storefront suspension page.
+**Goal:** Introduce three named plans (Starter / Professional / Enterprise) for Force AI Store + three matching tiers for Force WhatsApp, with sub-feature-level toggles inside Inventory and Accounting, all gated behind a super-admin-only "Manage Features" page. Also gate the "Suspend Store" action to super-admins, and polish the existing storefront suspension page.
 
 **Architecture:**
 
@@ -516,16 +516,16 @@ git commit -m "feat(web): add Powered by Force AI link to store maintenance page
 
 ---
 
-## Phase E — Cross-product gate (Force WhatsApp ↔ Force Store)
+## Phase E — Cross-product gate (Force WhatsApp ↔ Force AI Store)
 
-### Task E.1: WhatsApp catalog sync respects Force Store plan
+### Task E.1: WhatsApp catalog sync respects Force AI Store plan
 
 **Files:**
 
 - `apps/api/src/lib/inngest/functions/meta-catalog-sync.ts` (or wherever the catalog sync function lives)
 - `apps/api/src/routes/wa-bridge.routes.ts` (or equivalent)
 
-- [ ] **Step 1: Gate sync trigger on Force Store side**
+- [ ] **Step 1: Gate sync trigger on Force AI Store side**
 
 Before publishing a product to Meta Commerce, check `isFeatureEnabled(storeId, 'whatsapp_catalog_sync')`. If false, skip + log.
 
@@ -753,16 +753,16 @@ Visibility: client admin sees `clientId = own`; super-admin sees all entries.
 
 ---
 
-## Phase H — Cross-product gate (Force Store ↔ Force WhatsApp)
+## Phase H — Cross-product gate (Force AI Store ↔ Force WhatsApp)
 
 ### H.0: Standing precondition rule (2026-05-27, Ahmad's clarification)
 
-**ALL `wbs.bot.*` features REQUIRE a linked, active Force Store.** This is a SALES rule first, an architecture rule second:
+**ALL `wbs.bot.*` features REQUIRE a linked, active Force AI Store.** This is a SALES rule first, an architecture rule second:
 
-- WBS plans (W-Starter / W-Pro / W-Enterprise) are sold standalone — campaigns, inbox, templates all work without Force Store.
-- Bot features (native catalog, service menu, customer addresses, Meta sync, intelligence) only make sense when there's a product catalog to drive — Force Store IS that catalog.
-- A merchant on W-Pro WITHOUT Force Store gets: bulk campaigns + inbox + templates + segmentation + scheduling + analytics. The bot features in their plan baseline are silently disabled by the precondition; no bot configuration UI appears.
-- The moment they ALSO buy Force Store, the bot features automatically unlock (no super-admin action needed — the precondition flips).
+- WBS plans (W-Starter / W-Pro / W-Enterprise) are sold standalone — campaigns, inbox, templates all work without Force AI Store.
+- Bot features (native catalog, service menu, customer addresses, Meta sync, intelligence) only make sense when there's a product catalog to drive — Force AI Store IS that catalog.
+- A merchant on W-Pro WITHOUT Force AI Store gets: bulk campaigns + inbox + templates + segmentation + scheduling + analytics. The bot features in their plan baseline are silently disabled by the precondition; no bot configuration UI appears.
+- The moment they ALSO buy Force AI Store, the bot features automatically unlock (no super-admin action needed — the precondition flips).
 
 ### H.1: Resolver enforces precondition
 
@@ -776,7 +776,7 @@ async function isClientFeatureEnabled(clientId, key) {
   let enabled = await resolveBaselineAndOverride(clientId, key);
   if (!enabled) return false;
 
-  // Bot precondition: all wbs.bot.* features require a linked Force Store.
+  // Bot precondition: all wbs.bot.* features require a linked Force AI Store.
   // The link is stored as Client.forceStoreId on WBS side (existing field via the WBS bridge).
   if (key.startsWith(BOT_PREFIX)) {
     const client = await prisma.client.findUnique({
@@ -785,7 +785,7 @@ async function isClientFeatureEnabled(clientId, key) {
     });
     if (!client?.forceStoreId) return false;
 
-    // AND the Force Store must currently be active (not suspended).
+    // AND the Force AI Store must currently be active (not suspended).
     // Use the existing wa-bridge call to check FWB-side state.
     const storeActive = await forceStoreBridge.isStoreActive(client.forceStoreId);
     if (!storeActive) return false;
@@ -801,23 +801,23 @@ When rendering the WBS Manage Features matrix for a client:
 
 - For every `wbs.bot.*` row, if `client.forceStoreId` is null OR the linked store is inactive:
   - Show the toggle DISABLED (can't be flipped)
-  - Show inline copy: "Requires linked Force Store" with a "Connect Force Store" CTA if super-admin
+  - Show inline copy: "Requires linked Force AI Store" with a "Connect Force AI Store" CTA if super-admin
 - If `client.forceStoreId` is set + active:
   - Toggle behaves normally per the baseline/override logic
 
 ### H.3: Sales-facing UI copy
 
-| Merchant state                       | What they see                                                                                                                                                                          |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Force Store only (no Force WhatsApp) | Admin "Connect WhatsApp" panel says: "Activate Force WhatsApp to enable in-chat ordering. Separate quote."                                                                             |
-| Force WhatsApp only (no Force Store) | Bot tab in WBS admin says: "Bot ordering requires Force Store. Force Store gives the bot its product catalog and order destination." Bulk campaigns + inbox + templates work normally. |
-| Both products active                 | Bridge unlocks. Bot features render per plan baseline (W-Pro/W-Enterprise) + any overrides.                                                                                            |
+| Merchant state                          | What they see                                                                                                                                                                                |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Force AI Store only (no Force WhatsApp) | Admin "Connect WhatsApp" panel says: "Activate Force WhatsApp to enable in-chat ordering. Separate quote."                                                                                   |
+| Force WhatsApp only (no Force AI Store) | Bot tab in WBS admin says: "Bot ordering requires Force AI Store. Force AI Store gives the bot its product catalog and order destination." Bulk campaigns + inbox + templates work normally. |
+| Both products active                    | Bridge unlocks. Bot features render per plan baseline (W-Pro/W-Enterprise) + any overrides.                                                                                                  |
 
 ### H.4: Code locations to gate
 
 - **FWB**: `apps/api/src/lib/inngest/functions/meta-catalog-sync.ts` — check FWB-side `whatsapp_catalog_sync` feature before publishing
-- **WBS**: `backend/src/services/metaCatalogService.js` — bot precondition fires here (no Force Store = no sync attempt)
-- **WBS**: `backend/src/services/bot-service-router.js` — bot precondition fires on EVERY inbound message that would trigger a bot response (without Force Store, bot stays silent)
+- **WBS**: `backend/src/services/metaCatalogService.js` — bot precondition fires here (no Force AI Store = no sync attempt)
+- **WBS**: `backend/src/services/bot-service-router.js` — bot precondition fires on EVERY inbound message that would trigger a bot response (without Force AI Store, bot stays silent)
 - **WBS**: `frontend/src/app/admin/clients/[id]/features/page.tsx` — render disabled toggles + precondition copy
 - **FWB**: `apps/admin/src/components/store-settings/WhatsAppCard.tsx` — render different copy based on cross-product state
 
@@ -825,16 +825,16 @@ When rendering the WBS Manage Features matrix for a client:
 
 ```
 tests/integration/wbs-bot-precondition.test.ts
-- W-Pro client, no Force Store → wbs.bot.native_catalog resolves false
-- W-Pro client, Force Store linked + active → resolves true
-- W-Pro client, Force Store linked + suspended → resolves false
-- W-Enterprise client, no Force Store → all wbs.bot.* resolve false; non-bot features resolve normally
-- Super-admin override 'enabled=true' on wbs.bot.* without Force Store → STILL false (precondition wins; override cannot bypass)
+- W-Pro client, no Force AI Store → wbs.bot.native_catalog resolves false
+- W-Pro client, Force AI Store linked + active → resolves true
+- W-Pro client, Force AI Store linked + suspended → resolves false
+- W-Enterprise client, no Force AI Store → all wbs.bot.* resolve false; non-bot features resolve normally
+- Super-admin override 'enabled=true' on wbs.bot.* without Force AI Store → STILL false (precondition wins; override cannot bypass)
 ```
 
 ### H.6: Sales contract / proposal copy update
 
 The 2 WBS templates already updated 2026-05-27 in `~/Desktop/work/Force AI/assets/` need one additional clarification line:
 
-- `عقد خدمات - واتساب - قالب.html` — add a footnote in Section 2 (Scope of Services) on the bot bullets: "ميزات البوت تتطلب الربط بمتجر فورس (Force Store) النشط — تعمل الحملات والصندوق الموحد بدون ذلك."
+- `عقد خدمات - واتساب - قالب.html` — add a footnote in Section 2 (Scope of Services) on the bot bullets: "ميزات البوت تتطلب الربط بمتجر فورس (Force AI Store) النشط — تعمل الحملات والصندوق الموحد بدون ذلك."
 - `عرض سعر - واتساب - قالب.html` — same note under the new "بوت المحادثة الذكي والكتالوج التفاعلي" section.

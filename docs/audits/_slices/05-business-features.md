@@ -12,7 +12,7 @@
 
 ### Product Summary (Elevator Pitch)
 
-Force Store (the merchant-facing product name, developed and operated by Force AI — a standalone Kuwait company) is a multi-tenant e-commerce platform that lets Kuwait and GCC SMB merchants launch a bilingual Arabic/English online store in hours rather than weeks. It differentiates on three compounding advantages unavailable in global SaaS alternatives: (1) every manual content task — translation, SEO, category tagging, FAQ writing — has an AI "auto-fill" button powered by Gemini Flash Lite at zero per-call cost to the merchant; (2) the payment stack is native to Kuwait (Tap, MyFatoorah, Hesabe, UPayments, all KNET-compliant) rather than bolt-on; and (3) the entire admin and storefront treats Arabic as the primary language, not a translation overlay.
+Force AI Store (the merchant-facing product name, developed and operated by Force AI — a standalone Kuwait company) is a multi-tenant e-commerce platform that lets Kuwait and GCC SMB merchants launch a bilingual Arabic/English online store in hours rather than weeks. It differentiates on three compounding advantages unavailable in global SaaS alternatives: (1) every manual content task — translation, SEO, category tagging, FAQ writing — has an AI "auto-fill" button powered by Gemini Flash Lite at zero per-call cost to the merchant; (2) the payment stack is native to Kuwait (Tap, MyFatoorah, Hesabe, UPayments, all KNET-compliant) rather than bolt-on; and (3) the entire admin and storefront treats Arabic as the primary language, not a translation overlay.
 
 The platform is deployed at `app.forcemediakw.com` (admin), with per-merchant custom domains on the storefront. Current production tenants include Wady Aljuz (235 products, 8 categories) and Palora. The API runs on Railway; admin and storefront on Vercel. Source code is proprietary (`license: UNLICENSED`).
 
@@ -182,7 +182,7 @@ Source: `packages/shared/src/features.ts` (22 keys as of 2026-05-21).
 
 ### Competitive Analysis
 
-| Dimension                    | FWB / Force Store                                                                                         | Shopify (Kuwait)                          | Salla                             | Wix (Kuwait)                                | WooCommerce                   |
+| Dimension                    | FWB / Force AI Store                                                                                      | Shopify (Kuwait)                          | Salla                             | Wix (Kuwait)                                | WooCommerce                   |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------- | ------------------------------------------- | ----------------------------- |
 | Bilingual (EN+AR) out of box | Native — bilingual fields on every model, RTL admin                                                       | Add-on (Translate & Adapt ~$20/mo)        | Native AR, limited EN storefront  | Plugin-based, RTL partial                   | Plugin (WPML $99+/yr)         |
 | AI translation               | Built-in, free (Gemini Flash Lite)                                                                        | Shopify Magic — EN-only, paid plans only  | Not available                     | Not available                               | Not available                 |

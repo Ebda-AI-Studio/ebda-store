@@ -1,4 +1,4 @@
-# UI Coverage Audit — Force Store (FWB)
+# UI Coverage Audit — Force AI Store (FWB)
 
 **Date:** 2026-05-28  
 **Auditor:** Claude Code (automated, read-only)  

@@ -1,6 +1,6 @@
 # OSOSS → FWB Migration Runbook
 
-How to migrate a merchant from **OSOSS** (the Kuwait retail-ERP at ososs.com, formerly **zfloos.com** — its S3 bucket is `zfloos-production-storage`) onto Force Store. First used for **pecannbee** (665 products).
+How to migrate a merchant from **OSOSS** (the Kuwait retail-ERP at ososs.com, formerly **zfloos.com** — its S3 bucket is `zfloos-production-storage`) onto Force AI Store. First used for **pecannbee** (665 products).
 
 OSOSS is the competitor platform FWB displaces, so its product export is a recurring migration source. This runbook + the native variant import (below) make it a one-file job.
 
