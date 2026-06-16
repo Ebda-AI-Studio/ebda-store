@@ -16,9 +16,8 @@ export function AppHeader() {
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
       >
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-black text-primary-foreground">
-            F
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="Force AI Store" className="h-8 w-auto" width={38} height={32} />
           <h1 className="text-base font-bold text-foreground">{t.orders.title}</h1>
         </div>
         <div className="flex items-center gap-2">

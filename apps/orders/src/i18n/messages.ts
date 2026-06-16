@@ -74,13 +74,24 @@ export interface Messages {
     cta: string;
     dismiss: string;
   };
+  notifications: {
+    title: string;
+    body: string;
+    enable: string;
+    enabling: string;
+    dismiss: string;
+    enabled: string;
+    denied: string;
+    failed: string;
+    iosHint: string;
+  };
 }
 
 export const MESSAGES: Record<Locale, Messages> = {
   en: {
-    appName: 'Force Orders',
+    appName: 'Force AI Store Orders',
     login: {
-      title: 'Force Orders',
+      title: 'Force AI Store Orders',
       subtitle: 'Sign in to manage your orders.',
       email: 'Email',
       password: 'Password',
@@ -158,11 +169,22 @@ export const MESSAGES: Record<Locale, Messages> = {
       cta: 'Install app',
       dismiss: 'Not now',
     },
+    notifications: {
+      title: 'Get new-order alerts',
+      body: 'Enable notifications to be pinged the moment a new order arrives.',
+      enable: 'Enable',
+      enabling: 'Enabling…',
+      dismiss: 'Not now',
+      enabled: 'Notifications enabled',
+      denied: 'Notifications are blocked. Enable them in your browser settings.',
+      failed: 'Could not enable notifications. Try again.',
+      iosHint: 'Install the app first (Share → Add to Home Screen), then open it to enable alerts.',
+    },
   },
   ar: {
-    appName: 'طلبات فورس',
+    appName: 'طلبات متجر Force AI',
     login: {
-      title: 'طلبات فورس',
+      title: 'طلبات متجر Force AI',
       subtitle: 'سجّل الدخول لإدارة طلباتك.',
       email: 'البريد الإلكتروني',
       password: 'كلمة المرور',
@@ -239,6 +261,17 @@ export const MESSAGES: Record<Locale, Messages> = {
     install: {
       cta: 'تثبيت التطبيق',
       dismiss: 'ليس الآن',
+    },
+    notifications: {
+      title: 'تنبيهات الطلبات الجديدة',
+      body: 'فعّل الإشعارات لتصلك تنبيهات فور وصول طلب جديد.',
+      enable: 'تفعيل',
+      enabling: 'جارٍ التفعيل…',
+      dismiss: 'ليس الآن',
+      enabled: 'تم تفعيل الإشعارات',
+      denied: 'الإشعارات محظورة. فعّلها من إعدادات المتصفح.',
+      failed: 'تعذّر تفعيل الإشعارات. حاول مرة أخرى.',
+      iosHint: 'ثبّت التطبيق أولًا (مشاركة ← إضافة إلى الشاشة الرئيسية) ثم افتحه لتفعيل التنبيهات.',
     },
   },
 };

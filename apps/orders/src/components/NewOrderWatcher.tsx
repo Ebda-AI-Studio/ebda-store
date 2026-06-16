@@ -10,10 +10,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
  * increasing snapshot. When a NEW pending order id appears that we haven't seen
  * before, we beep (Web Audio) + toast.
  *
- * v2 will add real push delivery (the service worker already has a `push`
- * handler) once an OneSignal/VAPID app is provisioned for this PWA — at which
- * point this in-app watcher becomes the in-foreground complement to background
- * push. Documented as deferred in the plan.
+ * v2 ships real background push delivery (VAPID web-push, `orders_app`
+ * audience — see lib/push.ts + the order-created Inngest fanout). This in-app
+ * watcher remains the IN-FOREGROUND complement: it beeps + toasts while the
+ * app is open/focused, where a background OS push may be suppressed or
+ * deduplicated. The two are intentionally layered, not redundant.
  */
 export function NewOrderWatcher({ latestPendingId }: { latestPendingId: string | null }) {
   const { notify } = useToast();

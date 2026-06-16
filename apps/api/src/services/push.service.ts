@@ -7,10 +7,19 @@
  */
 
 import webpush from 'web-push';
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
 import logger from '../lib/logger';
 import { config } from '../config';
 import { notificationConfigService } from './notification-config.service';
+
+/**
+ * Push audiences. A single store can fan out to two distinct device sets:
+ *  - 'storefront' → shopper devices (the storefront subscribe flow)
+ *  - 'orders_app' → staff/admin devices running the Orders PWA
+ * The tag lives on `push_subscriptions.audience` (defaulted to 'storefront'
+ * so every legacy row keeps working).
+ */
+export type PushAudience = 'storefront' | 'orders_app';
 
 // ==========================================
 // VAPID initialization (one-time, at module load)
@@ -187,7 +196,8 @@ class PushService {
       auth: string;
       deviceInfo?: string;
     },
-    customerId?: string
+    customerId?: string,
+    audience: PushAudience = 'storefront'
   ): Promise<void> {
     await prisma.pushSubscription.upsert({
       where: { storeId_endpoint: { storeId, endpoint: subscription.endpoint } },
@@ -198,16 +208,156 @@ class PushService {
         auth: subscription.auth,
         deviceInfo: subscription.deviceInfo,
         customerId: customerId ?? null,
+        audience,
       },
       update: {
         p256dh: subscription.p256dh,
         auth: subscription.auth,
         deviceInfo: subscription.deviceInfo,
         customerId: customerId ?? null,
+        // Re-tag on re-subscribe so a device that switched apps lands in the
+        // right audience (the unique key is (storeId, endpoint), shared across
+        // surfaces — but in practice each surface registers a distinct endpoint).
+        audience,
       },
     });
 
-    logger.info({ storeId, customerId }, '[PushService] Push subscription upserted');
+    logger.info({ storeId, customerId, audience }, '[PushService] Push subscription upserted');
+  }
+
+  /**
+   * Send a web-push notification to the Orders-PWA staff devices of a store.
+   *
+   * Differs from `sendToStore` in three ways:
+   *  1. Targets ONLY `audience = 'orders_app'` subscriptions — staff devices
+   *     that subscribed through the role-gated Orders-PWA route. Never touches
+   *     shopper (`storefront`) subscriptions, so it can't double-send with the
+   *     storefront push.
+   *  2. Runs the subscription read inside `runInTenantContext` because callers
+   *     are Inngest jobs that run OUTSIDE the HTTP tenant-context middleware —
+   *     `push_subscriptions` is FORCE-RLS, so without the GUC the read returns
+   *     0 rows and the push silently no-ops.
+   *  3. Gates on the store's `order_confirmed` push EVENT opt-in (per-store)
+   *     rather than the channel-credentials check — VAPID is platform-wide and
+   *     needs no per-store credentials.
+   *
+   * Idempotency: the SAME `data.tag` is used for a given order, so if the
+   * Inngest step retries, the OS/browser collapses duplicate notifications for
+   * the same tag rather than stacking N copies.
+   */
+  async sendToOrdersAppStaff(
+    storeId: string,
+    title: string,
+    body: string,
+    data?: Record<string, unknown>
+  ): Promise<void> {
+    if (!vapidConfigured) {
+      if (!vapidWarnLogged) {
+        logger.warn('[PushService] VAPID keys not configured, skipping orders-app push send');
+        vapidWarnLogged = true;
+      }
+      return;
+    }
+
+    // Per-store opt-in: only fan out when the merchant has the push channel
+    // enabled AND the order_confirmed event has push turned on. Absent config
+    // = default ON for the orders-app (staff want new-order pings by default),
+    // mirroring how the in-app NewOrderWatcher always alerts.
+    const [channelConfig, eventConfigs] = await Promise.all([
+      notificationConfigService.getConfig(storeId, 'push'),
+      notificationConfigService.getEventConfigs(storeId),
+    ]);
+    if (channelConfig && channelConfig.enabled === false) {
+      logger.debug({ storeId }, '[PushService] Push channel disabled, skipping orders-app push');
+      return;
+    }
+    const eventOptIn = eventConfigs['order_confirmed'];
+    if (eventOptIn && eventOptIn.push === false) {
+      logger.debug(
+        { storeId },
+        '[PushService] order_confirmed push opted out, skipping orders-app push'
+      );
+      return;
+    }
+
+    // FORCE-RLS read — set the tenant GUC explicitly (Inngest has no middleware).
+    const subscriptions = await runInTenantContext(storeId, () =>
+      prisma.pushSubscription.findMany({
+        where: { storeId, audience: 'orders_app' },
+        select: { id: true, endpoint: true, p256dh: true, auth: true },
+      })
+    );
+
+    if (subscriptions.length === 0) {
+      logger.debug({ storeId }, '[PushService] No orders-app push subscriptions, skipping');
+      return;
+    }
+
+    const payload = JSON.stringify({ title, body, data: data ?? {} });
+
+    const results = await Promise.allSettled(
+      subscriptions.map(sub =>
+        webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        )
+      )
+    );
+
+    let successCount = 0;
+    let failureCount = 0;
+    const expiredEndpoints: string[] = [];
+
+    results.forEach((result, idx) => {
+      const sub = subscriptions[idx];
+      if (result.status === 'fulfilled') {
+        successCount += 1;
+        return;
+      }
+      failureCount += 1;
+      const err = result.reason as { statusCode?: number; message?: string };
+      if (err?.statusCode === 410 || err?.statusCode === 404) {
+        expiredEndpoints.push(sub.endpoint);
+      } else {
+        logger.warn(
+          { storeId, statusCode: err?.statusCode, err: err?.message ?? err },
+          '[PushService] Orders-app web push delivery failed'
+        );
+      }
+    });
+
+    if (expiredEndpoints.length > 0) {
+      await runInTenantContext(storeId, () =>
+        prisma.pushSubscription.deleteMany({
+          where: { storeId, endpoint: { in: expiredEndpoints } },
+        })
+      ).catch(err =>
+        logger.warn(
+          { err, storeId },
+          '[PushService] Failed to clean up expired orders-app subscriptions'
+        )
+      );
+    }
+
+    const status = successCount > 0 ? 'sent' : 'failed';
+    await runInTenantContext(storeId, () =>
+      prisma.notificationLog.create({
+        data: {
+          storeId,
+          channel: 'push',
+          event: 'orders_app_new_order',
+          status,
+          metadata: { title, tokenCount: subscriptions.length, successCount, failureCount },
+        },
+      })
+    ).catch(err =>
+      logger.error({ err }, '[PushService] Failed to write orders-app NotificationLog')
+    );
+
+    logger.info(
+      { storeId, successCount, failureCount },
+      '[PushService] Orders-app web push notification sent'
+    );
   }
 
   /**

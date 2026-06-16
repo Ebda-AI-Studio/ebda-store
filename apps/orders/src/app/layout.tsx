@@ -3,17 +3,21 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Force Orders',
-  description: 'Focused order management for your Force store.',
+  title: 'Force AI Store Orders',
+  description: 'Focused order management for your Force AI Store.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Force Orders',
+    title: 'Force AI Store Orders',
   },
   robots: { index: false, follow: false },
   icons: {
-    icon: '/icons/icon-192.png',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.png', sizes: '64x64', type: 'image/png' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
     apple: '/icons/icon-192.png',
   },
 };

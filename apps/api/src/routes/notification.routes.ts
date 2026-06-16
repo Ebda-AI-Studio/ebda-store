@@ -427,4 +427,64 @@ router.post(
   }
 );
 
+// ==========================================
+// Orders-PWA staff push routes — AUTHENTICATED (staff/admin only)
+//
+// Distinct from the public storefront push routes above. These register the
+// staff member's device against the `orders_app` audience so the order-created
+// Inngest fanout can ping the Orders PWA without ever touching shopper
+// subscriptions. Role + store-access gated (adminMiddleware): only a user who
+// can actually see the store's orders may subscribe a device to its order
+// pushes. Mounted at /stores → /stores/:storeId/orders-app/push/subscribe.
+// ==========================================
+router.post(
+  '/:storeId/orders-app/push/subscribe',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { endpoint, keys, deviceInfo } = pushSubscribeSchema.parse(req.body);
+
+      // The authenticated staff user's id — non-null here because `authenticate`
+      // ran in the chain. Binds the device to the staff member so a later
+      // offboarding / token revocation can prune their devices.
+      const customerId = (req as Request & { user?: { id: string } }).user?.id ?? undefined;
+
+      await pushService.subscribe(
+        storeId,
+        { endpoint, p256dh: keys.p256dh, auth: keys.auth, deviceInfo },
+        customerId,
+        'orders_app'
+      );
+
+      logger.info(
+        { storeId, customerId },
+        '[notification.routes] Orders-app push subscription registered'
+      );
+
+      res.status(201).json({ success: true, data: { message: 'Subscribed successfully' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/:storeId/orders-app/push/unsubscribe',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { endpoint } = pushUnsubscribeSchema.parse(req.body);
+
+      await pushService.unsubscribe(endpoint);
+
+      logger.info({ endpoint }, '[notification.routes] Orders-app push subscription removed');
+
+      res.json({ success: true, data: { message: 'Unsubscribed successfully' } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;

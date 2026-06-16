@@ -1,7 +1,7 @@
 {
-  "name": "Force Orders",
+  "name": "Force AI Store Orders",
   "short_name": "Orders",
-  "description": "Focused order management for your Force store.",
+  "description": "Focused order management for your Force AI Store.",
   "start_url": "/orders",
   "scope": "/",
   "display": "standalone",

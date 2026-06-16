@@ -1449,6 +1449,10 @@ model PushSubscription {
   p256dh     String
   auth       String
   deviceInfo String?  @map("device_info")
+  // Which app/surface this subscription belongs to: 'storefront' (shopper
+  // devices) or 'orders_app' (staff devices on the Orders PWA). Lets one store
+  // fan out to staff and shoppers independently without double-sending.
+  audience   String   @default("storefront")
   createdAt  DateTime @default(now()) @map("created_at")
 
   store    Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -1457,6 +1461,7 @@ model PushSubscription {
   @@unique([storeId, endpoint])
   @@index([storeId])
   @@index([customerId])
+  @@index([storeId, audience])
   @@map("push_subscriptions")
 }
 

@@ -5,13 +5,15 @@
  *  - NEVER cache API responses (authed, per-tenant, mutable). API calls are
  *    always network-first and bypass the cache entirely.
  *  - Same-origin static GETs use stale-while-revalidate.
- *  - A `push` handler + `notificationclick` are wired for the v2 push-delivery
- *    path; v1 ships without a configured push provider (the in-app polling
- *    watcher handles new-order alerts), so these only fire if a future
- *    OneSignal/VAPID integration sends a payload.
+ *  - The `push` + `notificationclick` handlers deliver real VAPID web-push
+ *    new-order alerts (v2). The API (push.service.ts) sends
+ *    `{ title, body, data: { tag, url, orderId } }`; the in-app NewOrderWatcher
+ *    is the in-foreground complement to these background notifications.
  */
 
-const CACHE = 'force-orders-v1';
+// Bumped to v2 alongside the real push-delivery handlers — the activate step
+// purges the old `force-orders-v1` shell cache so the updated SW takes over.
+const CACHE = 'force-orders-v2';
 const APP_SHELL = ['/orders', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
@@ -60,19 +62,27 @@ self.addEventListener('fetch', event => {
 });
 
 self.addEventListener('push', event => {
-  let data = {};
+  let payload = {};
   try {
-    data = event.data ? event.data.json() : {};
+    payload = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'New order', body: event.data ? event.data.text() : '' };
+    payload = { title: 'New order', body: event.data ? event.data.text() : '' };
   }
-  const title = data.title || 'New order';
+
+  // The API sends `{ title, body, data: { tag, url, orderId, ... } }`
+  // (push.service.ts). Read tag/url from the nested `data` object, but fall
+  // back to a flat shape for forward/backward compatibility with any other
+  // sender. The `tag` is what makes a retried delivery collapse onto ONE
+  // notification instead of stacking duplicates (idempotent UX).
+  const meta = payload.data && typeof payload.data === 'object' ? payload.data : payload;
+  const title = payload.title || 'New order';
   const options = {
-    body: data.body || 'You have a new order.',
+    body: payload.body || 'You have a new order.',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    tag: data.tag || 'force-order',
-    data: { url: data.url || '/orders' },
+    tag: meta.tag || payload.tag || 'force-order',
+    renotify: true,
+    data: { url: meta.url || payload.url || '/orders' },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });

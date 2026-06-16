@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/auth';
 import { AppHeader } from '@/components/AppHeader';
 import { OrderCard } from '@/components/OrderCard';
 import { InstallPrompt } from '@/components/InstallPrompt';
+import { EnableNotifications } from '@/components/EnableNotifications';
 import { NewOrderWatcher } from '@/components/NewOrderWatcher';
 
 const POLL_MS = 30_000;
@@ -119,6 +120,7 @@ export default function OrdersListPage() {
 
       <main className="mx-auto max-w-2xl px-4 pt-4">
         <InstallPrompt />
+        <EnableNotifications />
 
         {/* Status filter chips */}
         <div className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1">

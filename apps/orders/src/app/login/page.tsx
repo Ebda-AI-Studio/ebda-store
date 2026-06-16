@@ -56,9 +56,14 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-4 pb-16">
         <div className="w-full max-w-sm">
           <div className="mb-8 text-center">
-            <span className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-2xl font-black text-primary-foreground">
-              F
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.svg"
+              alt="Force AI Store"
+              className="mx-auto mb-4 h-14 w-auto"
+              width={64}
+              height={54}
+            />
             <h1 className="text-xl font-bold text-foreground">{t.login.title}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{t.login.subtitle}</p>
           </div>
