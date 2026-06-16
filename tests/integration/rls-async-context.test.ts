@@ -30,11 +30,14 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
   beforeAll(async () => {
     // Create a minimal store + customer + order so we have rows to test against.
     // Use withRlsBypass for the setup writes (no tenant context active yet).
+    // Add random suffix to prevent collisions during parallel test runs
+    const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
     await withRlsBypass(async tx => {
       // Create an owner user first
       const owner = await tx.user.create({
         data: {
-          email: `rls-owner-${Date.now()}@example.com`,
+          email: `rls-owner-${uniqueSuffix}@example.com`,
           passwordHash: 'not-a-real-hash',
           role: 'store_admin',
           firstName: 'RLS',
@@ -46,7 +49,7 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
       const store = await tx.store.create({
         data: {
           name: 'rls-test-store',
-          slug: `rls-test-${Date.now()}`,
+          slug: `rls-test-${uniqueSuffix}`,
           template: 'modern',
           currency: 'KWD',
           ownerId: owner.id,
@@ -56,11 +59,12 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
 
       const customer = await tx.user.create({
         data: {
-          email: `rls-test-${Date.now()}@example.com`,
+          email: `rls-test-customer-${uniqueSuffix}@example.com`,
           passwordHash: 'not-a-real-hash',
           role: 'customer',
           firstName: 'RLS',
           lastName: 'Customer',
+          storeId: store.id, // Add storeId for customer to comply with unique constraint
         },
       });
       customerId = customer.id;
