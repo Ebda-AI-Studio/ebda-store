@@ -5,7 +5,20 @@ import logger from '../../logger';
 import { featureService } from '../../../services/feature.service';
 
 interface SyncArgs {
-  event: { data: { storeId: string; productId: string; action: 'upsert' | 'delete' } };
+  // The upsert emitter (product.service) sends `op: 'create'|'update'`, NOT `action`.
+  // One handler serves both product.upserted and product.deleted, so `action` is
+  // derived from the EVENT NAME below — reading event.data.action made it undefined
+  // on every upsert, so FWB POSTed action:undefined and WBS rejected it with 400
+  // "missing required fields" (product→Meta sync silently failed on every save).
+  event: {
+    name?: string;
+    data: {
+      storeId: string;
+      productId: string;
+      op?: 'create' | 'update';
+      action?: 'upsert' | 'delete';
+    };
+  };
   step: { run: (name: string, fn: () => Promise<any>) => Promise<any> };
   prisma?: typeof defaultPrisma;
 }
@@ -30,7 +43,12 @@ export const productMetaSync = async ({
   step,
   prisma = defaultPrisma,
 }: SyncArgs): Promise<{ skipped: boolean; reason?: string; status?: number }> => {
-  const { storeId, productId, action } = event.data;
+  const { storeId, productId } = event.data;
+  // Derive the WBS-contract action from the event name (the upsert event only
+  // carries `op`, never `action`). product.deleted → 'delete'; everything else
+  // (product.upserted for create/update) → 'upsert'.
+  const action: 'upsert' | 'delete' =
+    event.name === 'product.deleted' || event.data.action === 'delete' ? 'delete' : 'upsert';
 
   return step.run('fanout-to-wbs', async () => {
     // Feature gate first — cheapest check + clearest signal in logs when
