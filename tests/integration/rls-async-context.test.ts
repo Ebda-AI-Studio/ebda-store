@@ -30,8 +30,33 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
   beforeAll(async () => {
     // Create a minimal store + customer + order so we have rows to test against.
     // Use withRlsBypass for the setup writes (no tenant context active yet).
-    // Add random suffix to prevent collisions during parallel test runs
-    const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    // Add process.pid to ensure uniqueness even with retries (vitest retry: 1)
+    const uniqueSuffix = `${Date.now()}-${process.pid}-${Math.random().toString(36).substring(7)}`;
+
+    // Clean up any previous failed attempts first (from retries)
+    await withRlsBypass(async tx => {
+      // Delete any existing test data from previous failed attempts
+      await tx.order
+        .deleteMany({
+          where: { orderNumber: { startsWith: 'RLS-TEST-' } },
+        })
+        .catch(() => {});
+      await tx.user
+        .deleteMany({
+          where: {
+            OR: [
+              { email: { startsWith: 'rls-owner-' } },
+              { email: { startsWith: 'rls-test-customer-' } },
+            ],
+          },
+        })
+        .catch(() => {});
+      await tx.store
+        .deleteMany({
+          where: { slug: { startsWith: 'rls-test-' } },
+        })
+        .catch(() => {});
+    });
 
     await withRlsBypass(async tx => {
       // Create an owner user first
@@ -73,7 +98,7 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
         data: {
           storeId,
           customerId,
-          orderNumber: `RLS-TEST-${Date.now()}`,
+          orderNumber: `RLS-TEST-${uniqueSuffix}`,
           status: 'confirmed',
           paymentStatus: 'paid',
           subtotal: 1000,
