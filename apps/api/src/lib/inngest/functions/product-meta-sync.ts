@@ -145,6 +145,28 @@ export const productMetaSync = async ({
       });
 
       if (!res.ok) {
+        // 400 from the WBS inngest-receiver is a non-retryable client/config
+        // condition (e.g. Meta catalog not connected, unknown kind, missing
+        // fields). Retrying a 400 will never succeed — treat it as a graceful
+        // skip so Inngest doesn't alert and doesn't retry.
+        //
+        // 401 = shared secret mismatch (real infra error — should alert).
+        // 5xx / network = transient (retryable — should alert and retry).
+        if (res.status >= 400 && res.status < 500 && res.status !== 401) {
+          let bodyCode: string | undefined;
+          try {
+            const body = (await res.json()) as { error?: string; reason?: string };
+            bodyCode = body?.error ?? body?.reason;
+          } catch {
+            // ignore parse errors — we already know the status
+          }
+          logger.info(
+            { storeId, productId, status: res.status, bodyCode },
+            'product-meta-sync: wbs receiver returned 4xx (not-connected / config); skipping gracefully'
+          );
+          return { skipped: true, reason: 'wbs-not-connected', status: res.status };
+        }
+
         logger.error(
           { storeId, productId, status: res.status },
           'product-meta-sync: wbs receiver failed'

@@ -146,4 +146,167 @@ describe('productMetaSync', () => {
       })
     );
   });
+
+  // ── Error handling tests ───────────────────────────────────────────────────
+
+  it('skips gracefully (no throw) when WBS returns 400 (store not connected)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: vi.fn().mockResolvedValue({ error: 'CLIENT_NOT_CONFIGURED' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const event = { data: { storeId: 'store1', productId: 'prod1', action: 'upsert' as const } };
+    const step = { run: vi.fn((name: string, fn: () => any) => fn()) };
+    const mockPrisma = {
+      store: {
+        findUnique: vi.fn().mockResolvedValue({
+          metaCatalogId: 'cat123',
+          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          name: 'Palora',
+          slug: 'palora',
+          domain: null,
+          currency: 'KWD',
+        }),
+      },
+      product: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'prod1',
+          name: 'P',
+          nameAr: null,
+          slug: 'p',
+          price: 100,
+          description: null,
+          images: [],
+          status: 'active',
+        }),
+      },
+    };
+
+    const result = await productMetaSync({ event, step, prisma: mockPrisma as any });
+    expect(result.skipped).toBe(true);
+    expect(result.reason).toBe('wbs-not-connected');
+    expect(result.status).toBe(400);
+  });
+
+  it('skips gracefully when WBS returns 400 with unparseable body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: vi.fn().mockRejectedValue(new Error('not json')),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const event = { data: { storeId: 'store1', productId: 'prod1', action: 'upsert' as const } };
+    const step = { run: vi.fn((name: string, fn: () => any) => fn()) };
+    const mockPrisma = {
+      store: {
+        findUnique: vi.fn().mockResolvedValue({
+          metaCatalogId: 'cat123',
+          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          name: 'Palora',
+          slug: 'palora',
+          domain: null,
+          currency: 'KWD',
+        }),
+      },
+      product: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'prod1',
+          name: 'P',
+          nameAr: null,
+          slug: 'p',
+          price: 100,
+          description: null,
+          images: [],
+          status: 'active',
+        }),
+      },
+    };
+
+    const result = await productMetaSync({ event, step, prisma: mockPrisma as any });
+    expect(result.skipped).toBe(true);
+    expect(result.reason).toBe('wbs-not-connected');
+  });
+
+  it('throws (retryable) when WBS returns 401 (auth misconfiguration)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({ error: 'unauthorized' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const event = { data: { storeId: 'store1', productId: 'prod1', action: 'upsert' as const } };
+    const step = { run: vi.fn((name: string, fn: () => any) => fn()) };
+    const mockPrisma = {
+      store: {
+        findUnique: vi.fn().mockResolvedValue({
+          metaCatalogId: 'cat123',
+          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          name: 'Palora',
+          slug: 'palora',
+          domain: null,
+          currency: 'KWD',
+        }),
+      },
+      product: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'prod1',
+          name: 'P',
+          nameAr: null,
+          slug: 'p',
+          price: 100,
+          description: null,
+          images: [],
+          status: 'active',
+        }),
+      },
+    };
+
+    await expect(productMetaSync({ event, step, prisma: mockPrisma as any })).rejects.toThrow(
+      'wbs receiver returned 401'
+    );
+  });
+
+  it('throws (retryable) when WBS returns 500 (server error)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: vi.fn().mockResolvedValue({ error: 'internal server error' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const event = { data: { storeId: 'store1', productId: 'prod1', action: 'upsert' as const } };
+    const step = { run: vi.fn((name: string, fn: () => any) => fn()) };
+    const mockPrisma = {
+      store: {
+        findUnique: vi.fn().mockResolvedValue({
+          metaCatalogId: 'cat123',
+          settings: { wbsBaseUrl: 'http://wbs:3001' },
+          name: 'Palora',
+          slug: 'palora',
+          domain: null,
+          currency: 'KWD',
+        }),
+      },
+      product: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'prod1',
+          name: 'P',
+          nameAr: null,
+          slug: 'p',
+          price: 100,
+          description: null,
+          images: [],
+          status: 'active',
+        }),
+      },
+    };
+
+    await expect(productMetaSync({ event, step, prisma: mockPrisma as any })).rejects.toThrow(
+      'wbs receiver returned 500'
+    );
+  });
 });
