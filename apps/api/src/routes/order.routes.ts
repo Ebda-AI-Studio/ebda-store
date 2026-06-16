@@ -23,9 +23,10 @@ const router = Router({ mergeParams: true });
 //
 // Kuwait-friendly address validation: state and postalCode are not universally
 // applicable (Kuwait uses governorate names but no postal codes for delivery).
-// City is also optional — Kuwait deliveries route on `area` (governorate /
-// district name) which we already capture in `state`. The storefront no
-// longer asks for a city; admin manual orders may still set one.
+// The structured Kuwait fields `area` (English governorate name) and `areaAr`
+// (Arabic name) are preferred over the generic `state` field. The storefront
+// checkout sends both since 2026-06-15; older orders only have `state`.
+// Admin manual order form sends `area` directly.
 const addressSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
@@ -33,6 +34,12 @@ const addressSchema = z.object({
   address1: z.string().trim().min(1).max(500),
   address2: z.string().max(500).optional(),
   city: z.string().max(150).optional().default(''),
+  // Structured Kuwait delivery area (governorate/district), English name.
+  // Preferred over generic `state`; both are accepted for backwards compat.
+  area: z.string().max(150).optional().default(''),
+  // Arabic name of the Kuwait delivery area — stored so the admin UI can
+  // render the address in Arabic without a client-side lookup table.
+  areaAr: z.string().max(150).optional().default(''),
   state: z.string().max(150).optional().default(''),
   postalCode: z.string().max(30).optional().default(''),
   country: z.string().trim().min(2).max(60),

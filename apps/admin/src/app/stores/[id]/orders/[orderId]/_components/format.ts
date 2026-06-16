@@ -5,37 +5,98 @@ export function formatMoney(fils: number, currency = 'KWD'): string {
   return `${major} ${currency}`;
 }
 
-export function formatAddressLines(addr: AddressJson | null | undefined): string[] {
+/** Labels used when rendering individual address field names. */
+export interface AddressLabels {
+  block: string;
+  street: string;
+  avenue: string;
+  house: string;
+  building: string;
+  floor: string;
+  apt: string;
+}
+
+const DEFAULT_LABELS: AddressLabels = {
+  block: 'Block',
+  street: 'Street',
+  avenue: 'Avenue',
+  house: 'House',
+  building: 'Building',
+  floor: 'Floor',
+  apt: 'Apt',
+};
+
+/** Extended address shape that also covers the legacy `state`/`address1`
+ *  fields sent by the storefront checkout (pre-2026-06-15 orders) and
+ *  admin-created orders that use the old schema keys. */
+interface ExtendedAddressJson extends AddressJson {
+  state?: string;
+  address1?: string;
+  address2?: string;
+  postalCode?: string;
+}
+
+/**
+ * Format an address into displayable lines.
+ *
+ * @param locale  The admin UI locale ('ar' | 'en' | other). When 'ar',
+ *   Arabic field values (areaAr, cityAr, streetAr) are preferred over
+ *   their English counterparts so the address renders in Arabic with RTL.
+ */
+export function formatAddressLines(
+  addr: AddressJson | null | undefined,
+  labels: AddressLabels = DEFAULT_LABELS,
+  locale?: string
+): string[] {
   if (!addr) return [];
+  const isAr = locale === 'ar';
+  const a = addr as ExtendedAddressJson;
   const lines: string[] = [];
 
-  const country = addr.country?.trim();
-  // When both English and Arabic city/area are populated and differ,
-  // show both — the merchant copying the address onto a delivery slip
-  // shouldn't have to switch locales to see what the customer wrote.
-  const city =
-    addr.city && addr.cityAr && addr.city.trim() !== addr.cityAr.trim()
-      ? `${addr.city.trim()} / ${addr.cityAr.trim()}`
-      : addr.city?.trim() || addr.cityAr?.trim();
-  const area =
-    addr.area && addr.areaAr && addr.area.trim() !== addr.areaAr.trim()
-      ? `${addr.area.trim()} / ${addr.areaAr.trim()}`
-      : addr.area?.trim() || addr.areaAr?.trim();
+  const country = a.country?.trim();
+
+  // Resolve city: prefer Arabic on AR locale, fall back to English.
+  // When both exist and differ, show the preferred one only (not both)
+  // so the line is clean and readable in the current UI locale.
+  const cityEn = a.city?.trim() || '';
+  const cityAr = a.cityAr?.trim() || '';
+  const city = isAr ? cityAr || cityEn : cityEn || cityAr;
+
+  // Resolve area/governorate:
+  //  1. Prefer structured `area`/`areaAr` fields (admin-created orders + new
+  //     storefront orders that populate both).
+  //  2. Fall back to legacy `state` field (storefront orders before 2026-06-15
+  //     which sent `state: area_en_name` with no Arabic counterpart).
+  const areaEn = a.area?.trim() || a.state?.trim() || '';
+  const areaAr = a.areaAr?.trim() || '';
+  const area = isAr ? areaAr || areaEn : areaEn || areaAr;
+
   const head = [country, city, area].filter(Boolean).join(' - ');
   if (head) lines.push(head);
 
+  // Resolve street: prefer AR on AR locale.
+  const streetEn = a.street?.trim() || '';
+  const streetAr = a.streetAr?.trim() || '';
+  const street = isAr ? streetAr || streetEn : streetEn || streetAr;
+
   const blockBits: string[] = [];
-  if (addr.block) blockBits.push(`Block ${addr.block}`);
-  if (addr.street) blockBits.push(`Street ${addr.street}`);
-  else if (addr.streetAr) blockBits.push(`Street ${addr.streetAr}`);
-  if (addr.avenue) blockBits.push(`Avenue ${addr.avenue}`);
-  if (addr.house) blockBits.push(`House ${addr.house}`);
+  if (a.block) blockBits.push(`${labels.block} ${a.block}`);
+  if (street) blockBits.push(`${labels.street} ${street}`);
+  if (a.avenue) blockBits.push(`${labels.avenue} ${a.avenue}`);
+  if (a.house) blockBits.push(`${labels.house} ${a.house}`);
+  // Fallback: when no structured Kuwait fields (block/street) are present,
+  // use `address1` (the free-text "Block & Street" field from the storefront
+  // checkout form) verbatim so the admin sees the full delivery address.
+  if (blockBits.length === 0 && a.address1) {
+    blockBits.push(a.address1.trim());
+    if (a.address2?.trim()) blockBits.push(a.address2.trim());
+  }
   if (blockBits.length) lines.push(blockBits.join(', '));
 
   const buildingBits: string[] = [];
-  if (addr.building) buildingBits.push(`Building ${addr.building}`);
-  if (addr.floor) buildingBits.push(`Floor ${addr.floor}`);
-  if (addr.apartment) buildingBits.push(`Apt ${addr.apartment}`);
+  if (a.building) buildingBits.push(`${labels.building} ${a.building}`);
+  if (a.floor) buildingBits.push(`${labels.floor} ${a.floor}`);
+  if (a.apartment) buildingBits.push(`${labels.apt} ${a.apartment}`);
   if (buildingBits.length) lines.push(buildingBits.join(', '));
 
   // Safety net: surface any non-empty string fields the schema didn't
@@ -49,18 +110,23 @@ export function formatAddressLines(addr: AddressJson | null | undefined): string
     'email',
     'country',
     'city',
+    'cityAr',
     'area',
+    'areaAr',
+    'state',
     'block',
     'street',
+    'streetAr',
     'avenue',
     'house',
     'building',
     'floor',
     'apartment',
     'notes',
-    'cityAr',
-    'areaAr',
-    'streetAr',
+    // Storefront checkout legacy fields — already consumed above
+    'address1',
+    'address2',
+    'postalCode',
   ]);
   for (const [key, raw] of Object.entries(addr as Record<string, unknown>)) {
     if (handled.has(key)) continue;

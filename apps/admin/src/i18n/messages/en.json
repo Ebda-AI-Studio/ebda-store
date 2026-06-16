@@ -934,7 +934,16 @@
         "statusUpdated": "Order status updated"
       },
       "notes": "Order notes",
-      "customerNotes": "Customer notes"
+      "customerNotes": "Customer notes",
+      "address": {
+        "block": "Block",
+        "street": "Street",
+        "avenue": "Avenue",
+        "house": "House",
+        "building": "Building",
+        "floor": "Floor",
+        "apt": "Apt"
+      }
     },
     "layout": {
       "title": "Storefront layout",

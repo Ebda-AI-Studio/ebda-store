@@ -210,8 +210,14 @@ interface OrderAddress {
   address1: string;
   address2?: string;
   city: string;
-  state: string;
-  postalCode: string;
+  /** Structured Kuwait delivery area (English governorate name).
+   * Preferred over the generic `state` field. */
+  area?: string;
+  /** Arabic name of the Kuwait delivery area — stored so the admin UI
+   * can render the address in Arabic when the admin locale is AR. */
+  areaAr?: string;
+  state?: string;
+  postalCode?: string;
   country: string;
   phone?: string;
   /** Buyer-supplied contact email captured at checkout. Persisted on the

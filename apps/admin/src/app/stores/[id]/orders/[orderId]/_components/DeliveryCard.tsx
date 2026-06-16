@@ -1,7 +1,8 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { formatAddressLines, formatDateTime } from './format';
+import { useLocale } from 'next-intl';
+import { formatAddressLines, formatDateTime, type AddressLabels } from './format';
 import type { OrderDetail } from './types';
 
 interface DeliveryCardProps {
@@ -12,7 +13,21 @@ interface DeliveryCardProps {
 
 export function DeliveryCard({ order, locale, onEdit }: DeliveryCardProps) {
   const t = useT('orders.detail');
-  const lines = formatAddressLines(order.shippingAddress);
+  const currentLocale = useLocale();
+  const isRtl = currentLocale === 'ar';
+
+  // Build locale-aware labels for address field prefixes (قطعة / Block, etc.)
+  const addressLabels: AddressLabels = {
+    block: t('address.block'),
+    street: t('address.street'),
+    avenue: t('address.avenue'),
+    house: t('address.house'),
+    building: t('address.building'),
+    floor: t('address.floor'),
+    apt: t('address.apt'),
+  };
+
+  const lines = formatAddressLines(order.shippingAddress, addressLabels, currentLocale);
 
   // Pull recipient details from the shipping address first (this is who
   // physically receives the package — the customer record is a fallback
@@ -175,7 +190,7 @@ export function DeliveryCard({ order, locale, onEdit }: DeliveryCardProps) {
           {lines.length > 0 ? (
             <>
               <div className="text-sm text-muted-foreground mb-1">{t('deliverTo')}:</div>
-              <div className="text-sm text-foreground space-y-0.5">
+              <div className="text-sm text-foreground space-y-0.5" dir={isRtl ? 'rtl' : 'ltr'}>
                 {lines.map((line, i) => (
                   <div key={i}>{line}</div>
                 ))}

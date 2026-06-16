@@ -934,7 +934,16 @@
         "statusUpdated": "تم تحديث حالة الطلب"
       },
       "notes": "ملاحظات الطلب",
-      "customerNotes": "ملاحظات العميل"
+      "customerNotes": "ملاحظات العميل",
+      "address": {
+        "block": "قطعة",
+        "street": "شارع",
+        "avenue": "جادة",
+        "house": "منزل",
+        "building": "بناية",
+        "floor": "طابق",
+        "apt": "شقة"
+      }
     },
     "layout": {
       "title": "تخطيط المتجر",

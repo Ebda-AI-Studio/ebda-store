@@ -632,15 +632,23 @@ export default function CheckoutClient() {
       // the invoice / order confirmation can show the *buyer's* contact email
       // — not the authenticated user's profile email (which can differ when
       // a logged-in admin checks out for someone else).
+      // Resolve both English and Arabic area names from the selected value
+      // (formData.area is always the English key from the KUWAIT_AREAS list).
+      const selectedKuwaitArea = KUWAIT_AREAS.find(a => a.en === formData.area);
       const orderResult = await api.createOrder({
         shippingAddress: {
           firstName: formData.firstName,
           lastName: formData.lastName,
           address1: formData.address,
           address2: formData.apartment,
+          // Use `area` (structured KW governorate field) instead of generic
+          // `state` so the admin delivery card can display it with proper labels.
+          area: selectedKuwaitArea?.en ?? formData.area,
+          // Store the Arabic name so the admin UI can render it in Arabic
+          // when the admin locale is AR — without this, only the English
+          // name is available and the address always shows in English.
+          areaAr: selectedKuwaitArea?.ar ?? '',
           city: '',
-          state: formData.area,
-          postalCode: '',
           country: 'KW',
           phone: formData.phone,
           email: formData.email,
