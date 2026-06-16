@@ -1392,23 +1392,6 @@
     "theme": {
       "borderRadius": "Border Radius",
       "hex": "HEX",
-      "pageBuilderPointer": {
-        "colors": {
-          "title": "Brand colors",
-          "hint": "Colors are now set in the Page Builder. Smart Palette derives your whole storefront palette from your brand colors or logo.",
-          "link": "Set colors in the Page Builder → Smart Palette →"
-        },
-        "fonts": {
-          "title": "Fonts & typography",
-          "hint": "Fonts are now set in the Page Builder. Per-zone Typography lets you tune headings, product names and more individually.",
-          "link": "Set fonts in the Page Builder → Typography →"
-        },
-        "background": {
-          "title": "Section background",
-          "hint": "Per-section backgrounds are now set in the Page Builder, where each section can carry its own tone.",
-          "link": "Set section backgrounds in the Page Builder →"
-        }
-      },
       "presets": {
         "orange": "Orange",
         "blue": "Blue",
@@ -3202,9 +3185,6 @@
       "saveChanges": "Save Changes",
       "saving": "Saving...",
       "preview": "Preview",
-      "managedInPageBuilderTitle": "Visibility & background color",
-      "managedInPageBuilderHint": "Whether the bar shows and its background color are now set in the Page Builder's announcement section. This page edits the text content.",
-      "managedInPageBuilderLink": "Manage visibility & background in the Page Builder →",
       "content": "Content",
       "textEnglish": "Announcement Text (English)",
       "textEnglishPlaceholder": "Free shipping on orders over 10 KWD!",

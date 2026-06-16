@@ -174,19 +174,6 @@ export default function AnnouncementPage() {
       )}
 
       <div className="space-y-6">
-        {/* Visibility + background color are managed in the Page Builder
-            (overlap audit #4/#5). Pointer instead of a duplicate toggle. */}
-        <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-1.5">
-          <p className="text-sm font-semibold text-foreground">{t('managedInPageBuilderTitle')}</p>
-          <p className="text-xs text-muted-foreground">{t('managedInPageBuilderHint')}</p>
-          <Link
-            href={`/stores/${storeId}/page-builder`}
-            className="inline-flex items-center text-xs font-semibold text-primary hover:underline"
-          >
-            {t('managedInPageBuilderLink')}
-          </Link>
-        </div>
-
         {/* Content */}
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
           <h2 className="font-semibold text-foreground">{t('content')}</h2>

@@ -188,7 +188,6 @@ export const HUBS: HubDefinition[] = [
       '/wa-order-updates',
       '/payment-link',
       '/branding',
-      '/navigation',
       '/seo',
       '/domain',
       '/payment-settings',
@@ -198,11 +197,7 @@ export const HUBS: HubDefinition[] = [
       '/pwa',
       '/language',
       '/template',
-      '/pages',
-      // P4-A (audit 2026-06-01): add standalone pages to Settings hub so the
-      // sidebar highlights correctly when a merchant lands on these URLs.
       '/announcement',
-      '/hero',
     ],
     buildTabs: () => [],
   },
