@@ -46,14 +46,14 @@ END $$;
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.count_sessions (
-  id              UUID          NOT NULL DEFAULT gen_random_uuid(),
-  store_id        UUID          NOT NULL,
+  id              TEXT           NOT NULL DEFAULT gen_random_uuid()::text,
+  store_id        TEXT           NOT NULL,
   status          "CountSessionStatus" NOT NULL DEFAULT 'open',
   note            TEXT,
-  created_by      UUID,
+  created_by      TEXT,
   closed_at       TIMESTAMPTZ,
   reconciled_at   TIMESTAMPTZ,
-  adjustment_id   UUID          UNIQUE,  -- FK to stock_adjustments.id set at reconcile time
+  adjustment_id   TEXT           UNIQUE,  -- FK to stock_adjustments.id set at reconcile time
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
 
@@ -73,10 +73,10 @@ CREATE INDEX IF NOT EXISTS "count_sessions_store_id_created_at_idx"
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.count_lines (
-  id           UUID        NOT NULL DEFAULT gen_random_uuid(),
-  session_id   UUID        NOT NULL,
-  product_id   UUID        NOT NULL,
-  variant_id   UUID,
+  id           TEXT         NOT NULL DEFAULT gen_random_uuid()::text,
+  session_id   TEXT         NOT NULL,
+  product_id   TEXT         NOT NULL,
+  variant_id   TEXT,
   counted_qty  INTEGER     NOT NULL,
   system_qty   INTEGER     NOT NULL,
   variance     INTEGER     NOT NULL,
@@ -106,17 +106,25 @@ ALTER TABLE public.count_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.count_sessions FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY count_sessions_store_isolation ON public.count_sessions
-  USING (store_id = current_setting('app.current_client_id', true)::uuid);
+  FOR ALL TO force_app
+  USING (
+    current_store_id() IS NULL
+    OR current_setting('app.bypass_rls', true) = 'true'
+    OR store_id::text = current_store_id()
+  );
 
 -- count_lines (scoped via session → store)
 ALTER TABLE public.count_lines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.count_lines FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY count_lines_store_isolation ON public.count_lines
+  FOR ALL TO force_app
   USING (
-    session_id IN (
+    current_store_id() IS NULL
+    OR current_setting('app.bypass_rls', true) = 'true'
+    OR session_id IN (
       SELECT id FROM public.count_sessions
-      WHERE store_id = current_setting('app.current_client_id', true)::uuid
+      WHERE store_id::text = current_store_id()
     )
   );
 
