@@ -1,8 +1,13 @@
+> **INTERNAL — Force AI / Force Media team only. Contains cost floors, margins, and market benchmark figures. NEVER share with clients.**
+
 # Force AI Store — Proposal Pricing Framework
 
-**Internal document. Last updated: 2026-06-01. Owner: Ahmad Sharaf / Force AI.**
+**Internal document. Last updated: 2026-06-15. Owner: Ahmad Sharaf / Force AI.**
 
-> **There is no public tier list.** Force AI Store is sold as a **managed e-commerce platform** by Force AI / Force Media. Every client gets a **custom proposal** based on the features they need. Pricing is per-client, not per-tier. This doc holds the inputs you need to write good proposals — cost floors, feature value bands, competitor benchmarks.
+> **There is no public tier list.** Force AI Store is sold as a **managed e-commerce platform** by
+> Force AI / Force Media. Every client gets a **custom proposal** based on the features they need.
+> Pricing is per-client, not per-tier. This doc holds the inputs you need to write good proposals —
+> cost floors, feature value bands, competitor benchmarks.
 
 ---
 
@@ -10,27 +15,34 @@
 
 Per Ahmad's standing 2026-05-22 description:
 
-1. **Client comes to Force AI** (usually through Force Media agency relationships, referrals, or inbound contact)
+1. **Client comes to Force AI** (usually through Force Media agency relationships, referrals, or
+   inbound contact)
 2. **Sees the contract** — full list of features Force AI Store offers
 3. **You write a proposal** — pick the features the client needs, set a price, send the contract
 4. **Client pays** — typically upfront or 50/50 split (deposit + on-completion)
 5. **Onboarding begins** — you ask for:
    - Brand assets (logo, colors, fonts, hero images)
-   - Excel file with categories, product names + AR translations, descriptions + AR translations, prices, images
+   - Excel file with categories, product names + AR translations, descriptions + AR translations,
+     prices, images
    - Domain (or you provision via Vercel)
    - Payment provider setup (Tap/MyFatoorah/Hesabe/UPayments account creation if needed)
-6. **You enable features via super_admin** — flip the per-store flags in `StoreFeature` for whatever the client signed and paid for
+6. **You enable features via super_admin** — flip the per-store flags in `StoreFeature` for
+   whatever the client signed and paid for
 7. **Store goes live**
 
-There's no self-serve signup. There's no monthly tier list on a public pricing page. Every deal is a custom contract.
+There's no self-serve signup. There's no monthly tier list on a public pricing page. Every deal is
+a custom contract.
 
 **Why this model fits Force AI today:**
 
-- **No CBK licensing risk** — you're not aggregating payments, each merchant has their own provider account
-- **No race-to-the-bottom pricing** — Salla/Shopify can publish a $39/mo Basic, you don't compete on that axis
+- **No CBK licensing risk** — you're not aggregating payments, each merchant has their own provider
+  account
+- **No race-to-the-bottom pricing** — other platforms publish a $39/mo Basic; we don't compete on
+  that axis
 - **Custom feature bundles** — clients pay for what they need, not for a marketing-driven tier
 - **Premium positioning** — agency-led delivery commands agency-level fees
-- **Less product engineering** — no signup flow, no billing dashboard, no Tap Subscriptions integration needed
+- **Less product engineering** — no signup flow, no billing dashboard, no subscription billing
+  integration needed
 
 ---
 
@@ -46,14 +58,20 @@ What it costs YOU per merchant per month on infrastructure:
 | 10k MAU / 100 merchants    | ~$171         | **$1.71**         | $5.13                  | $8.55                  |
 | 100k MAU / 1,000 merchants | ~$1,100       | **$1.10**         | $3.30                  | $5.50                  |
 
-**Use this to:** never quote a monthly maintenance fee below the loaded cost floor. Today, anything under ~$40/mo is unprofitable. At 100 merchants, $9/mo is the floor.
+**Use this to:** never quote a monthly maintenance fee below the loaded cost floor. Today, anything
+under ~$40/mo is unprofitable. At 100 merchants, $9/mo is the floor.
 
 **One-off vs recurring split in proposals:**
 
-- **Setup fee** (one-off) — your time onboarding the client (data import, branding setup, theme configuration, training). Recommended: 200-1000 KWD depending on complexity.
-- **Monthly platform fee** — covers infra + ongoing support + AI quotas + new features as they ship. Recommended: above the loaded cost floor + your margin.
+- **Setup fee** (one-off) — your time onboarding the client (data import, branding setup, theme
+  configuration, training). Recommended: 200-1000 KWD depending on complexity.
+- **Monthly platform fee** — covers infra + ongoing support + AI quotas + new features as they
+  ship. Recommended: above the loaded cost floor + your margin.
 
-### 2b. Competitor benchmarks (what client says they're comparing against)
+### 2b. INTERNAL — Market reference benchmarks (NEVER shown to clients)
+
+> These figures are for your pricing intelligence only. They inform what the client compares
+> against — not what you quote. Do not include this table in any proposal or client communication.
 
 | Competitor              | Equivalent monthly fee                                     | Notes                       |
 | ----------------------- | ---------------------------------------------------------- | --------------------------- |
@@ -62,25 +80,36 @@ What it costs YOU per merchant per month on infrastructure:
 | Salla Starter           | ~$22 USD (SAR 79)                                          | Saudi-first, no KNET native |
 | Salla Pro               | ~$130 USD (SAR 479)                                        | Same, no built-in AI        |
 | Wix eCommerce           | $27-59 USD                                                 | Limited Arabic support      |
-| WooCommerce + agency    | $5-15k upfront + $200-500/mo maintenance                   | Self-managed risk           |
+| WooCommerce + agency    | $5-15k upfront + $200-500/mo maintenance                   | Self-managed risk, no AI    |
 
-**Use this to:** anchor against the competitor the client cites. Most Kuwait merchants compare against Shopify or are evaluating "do I just hire a developer for WooCommerce?" — the agency-managed Force AI Store sells against both.
+**Use this to:** anchor against whatever the client says they're comparing. Most Kuwait merchants
+compare against Shopify or are evaluating "do I just hire a developer for WooCommerce?" — the
+agency-managed Force AI Store sells against both. Frame your response around what the merchant
+gets, not the competitor's shortcomings.
 
 ### 2c. Plan tiers and feature value bands (what to charge for each feature group in a proposal)
 
-The Force AI Store plan system defines four tiers — `free` (grace/lapsed state only, not sold), `starter`, `professional`, `enterprise`. The source of truth is `packages/shared/src/plan-baselines.ts`. When building a proposal, use the tier as the starting point, then layer add-ons and white-glove services on top.
+The Force AI Store plan system defines four tiers — `free` (grace/lapsed state only, not sold),
+`starter`, `professional`, `enterprise`. The source of truth is
+`packages/shared/src/plan-baselines.ts`. When building a proposal, use the tier as the starting
+point, then layer add-ons and white-glove services on top.
 
 #### Starter plan — baseline features (always included for any paying client)
 
-`coupons`, `returns`, `reviews`, `tax`, `pwa`, `marketing_pixels`, `shipping_carriers`, `bulk_operations`, `abandoned_cart`, `inventory.basic`
+`coupons`, `returns`, `reviews`, `tax`, `pwa`, `marketing_pixels`, `shipping_carriers`,
+`bulk_operations`, `abandoned_cart`, `inventory.basic`
 
-These are table stakes. Every Force AI Store client gets them. Don't itemize in a proposal — bundle into the platform fee.
+These are table stakes. Every Force AI Store client gets them. Don't itemize in a proposal —
+bundle into the platform fee.
 
 Also included in every tier at no extra charge:
 
-- **Product discount engine** — per-product discount dropdown (None / Percentage % / Fixed KWD) with live price preview; replaces manual compare-at-price entry
-- **AI features** — translation, SEO, AEO, category suggestion, FAQ/How-To, review tools, reorder/dead-stock AI (Gemini; platform absorbs cost)
-- **Page Builder** — drag-and-drop sections; Navigation, Footer, and Category config all consolidated here
+- **Product discount engine** — per-product discount dropdown (None / Percentage % / Fixed KWD)
+  with live price preview; replaces manual compare-at-price entry
+- **AI features** — translation, SEO, AEO, category suggestion, FAQ/How-To, review tools,
+  reorder/dead-stock AI (platform absorbs cost)
+- **Page Builder** — drag-and-drop sections; Navigation, Footer, and Category config all
+  consolidated here
 
 #### Professional plan — Starter + the following
 
@@ -95,19 +124,24 @@ Also included in every tier at no extra charge:
 
 #### Enterprise plan — Professional + the following
 
-| Feature group                                                                                                   | What to say in the proposal                                                       | Incremental price band vs Professional                  |
-| --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `affiliate`                                                                                                     | "Affiliate program — let influencers earn % per sale, track commissions"          | Setup: 100-200 KWD + Monthly: 5-10 KWD                  |
-| `sms`                                                                                                           | "Order updates via SMS (Kuwait carriers)"                                         | Setup: 50-150 KWD + Monthly: 3-10 KWD + SMS-per-message |
-| `floating_widget`                                                                                               | "Sticky WhatsApp/Instagram/music button on every storefront page"                 | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
-| `inventory.multi_warehouse`, `inventory.barcode`, `inventory.purchase_orders`, `inventory.bulk_adjustments`     | "Full warehouse management, barcode scanning, purchase order workflow"            | Included in Enterprise                                  |
-| `accounting.tax_reports`, `accounting.multi_currency`, `accounting.profit_anomaly`, `accounting.bank_reconcile` | "Advanced accounting: tax reports, multi-currency, profit anomaly AI, bank recon" | Included in Enterprise                                  |
+| Feature group                                                                                                   | What to say in the proposal                                                                                                         | Incremental price band vs Professional                  |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `affiliate`                                                                                                     | "Affiliate program — let influencers earn % per sale, track commissions"                                                            | Setup: 100-200 KWD + Monthly: 5-10 KWD                  |
+| `sms`                                                                                                           | "Order updates via SMS (Kuwait carriers)"                                                                                           | Setup: 50-150 KWD + Monthly: 3-10 KWD + SMS-per-message |
+| `floating_widget`                                                                                               | "Sticky WhatsApp/Instagram/music button on every storefront page"                                                                   | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
+| `inventory.multi_warehouse`, `inventory.barcode`, `inventory.purchase_orders`, `inventory.bulk_adjustments`     | "Full warehouse management — barcode scanning (receive/pick/cycle-count), multi-location stock, PO workflow"                        | Included in Enterprise                                  |
+| `accounting.tax_reports`, `accounting.multi_currency`, `accounting.profit_anomaly`, `accounting.bank_reconcile` | "Advanced accounting: VAT/tax reports (XLSX), multi-currency FX + KWD conversion, profit anomaly AI, bank reconciliation (CSV/OFX)" | Included in Enterprise                                  |
 
-> **`whatsapp` is a separate add-on at any plan tier.** It requires an active Force AI WhatsApp Business Platform account. Price: Setup 150-300 KWD + Monthly 10-25 KWD. Bot intelligence (Gemini NLU, voice, photo matching, returning-customer personalization) is included in the WhatsApp add-on at no extra charge — the platform absorbs the Gemini free-tier cost.
+> **`whatsapp` is a separate add-on at any plan tier.** It requires an active Force AI WhatsApp
+> Business Platform account. Price: Setup 150-300 KWD + Monthly 10-25 KWD. Bot intelligence (NLU,
+> voice, photo matching, returning-customer personalization) is included in the WhatsApp add-on at
+> no extra charge — the platform absorbs the AI cost.
 
-> **`whatsapp` can be added to any Starter, Professional, or Enterprise client.** It is not baseline-included in any plan; it always requires a per-store activation step.
+> **`whatsapp` can be added to any Starter, Professional, or Enterprise client.** It is not
+> baseline-included in any plan; it always requires a per-store activation step.
 
-These are the **upgrade levers** during a proposal conversation. A merchant on Professional wanting WhatsApp + Affiliate (Enterprise) adds ~250-500 KWD setup + ~15-35 KWD/month to the base.
+These are the **upgrade levers** during a proposal conversation. A merchant on Professional wanting
+WhatsApp + Affiliate (Enterprise) adds ~250-500 KWD setup + ~15-35 KWD/month to the base.
 
 #### Band 3 — White-glove services (your time, billed at agency rates)
 
@@ -129,11 +163,13 @@ These are the **upgrade levers** during a proposal conversation. A merchant on P
 | API access for client's external systems                     | Custom quote — 500+ KWD setup + monthly access fee     |
 | Multi-store under one account                                | Custom quote — pre-codebase support, 2000+ KWD setup   |
 
-Custom dev requests are where Force AI margin is highest BUT also where scope creep risk is highest. Have a fixed-scope contract before starting.
+Custom dev requests are where Force AI margin is highest BUT also where scope creep risk is
+highest. Have a fixed-scope contract before starting.
 
 ### 2d. Payment processing economics (no GMV cut from you)
 
-Per Ahmad's standing 2026-05-22 instruction — **payments are handled by Ahmad/Force Media** as part of the onboarding service:
+Per Ahmad's standing 2026-05-22 instruction — **payments are handled by Ahmad/Force Media** as
+part of the onboarding service:
 
 - You help the client get a Tap, MyFatoorah, Hesabe, or UPayments account if they don't have one
 - The merchant's payment provider credentials are configured in their Force AI Store admin
@@ -147,17 +183,22 @@ What Force AI Store charges the merchant:
 - Monthly platform fee (recurring)
 - Optional add-ons (paid per feature unlocked)
 
-The merchant pays payment provider fees (2-3.5% per transaction) directly to Tap/MyFatoorah/etc. You don't take a cut of those.
+The merchant pays payment provider fees (2-3.5% per transaction) directly to
+Tap/MyFatoorah/etc. You don't take a cut of those.
 
-This is the **managed-setup payment model** documented earlier — it stays clean from a regulatory standpoint and the merchant keeps 100% of every sale (minus what their gateway charges them).
+This is the **managed-setup payment model** documented earlier — it stays clean from a regulatory
+standpoint and the merchant keeps 100% of every sale (minus what their gateway charges them).
 
 ### 2e. Kuwait market context for proposal-writing
 
-- **Kuwait merchants negotiate.** Expect 10-30% pushback on first quote. Build that into your initial number.
+- **Kuwait merchants negotiate.** Expect 10-30% pushback on first quote. Build that into your
+  initial number.
 - **Round numbers anchor better** (50, 100, 250, 500, 1000 KWD) than precise ones (47, 113, 287)
 - **Annual prepay discount is expected** — typical 10-20% off if they prepay 12 months
-- **Q4 / Ramadan** (peak shopping seasons) — merchants are more price-sensitive at quote time but less likely to churn after launch
-- **Bilingual proposals** — if the client speaks Arabic, send the proposal in both languages. Force Media has a template you can adapt.
+- **Q4 / Ramadan** (peak shopping seasons) — merchants are more price-sensitive at quote time but
+  less likely to churn after launch
+- **Bilingual proposals** — if the client speaks Arabic, send the proposal in both languages. Force
+  Media has a template you can adapt.
 
 ---
 
@@ -226,14 +267,14 @@ Each enterprise prospect gets a fully custom contract. Typical contract value:
 
 | Objection                                              | Response                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Shopify is only $39/mo"                               | "Shopify is $39 + a $20 translation app + a 3rd-party KNET plugin + you still need someone to set it up. The all-in cost is $80-150/mo for what you'd get from us in one bill, fully managed."                                                                                                                                                                                                                                                                    |
-| "Salla is cheaper at SAR 99"                           | "Salla is built for Saudi Arabia. KNET works but is not the primary integration. AR is the only storefront language. If you sell to Kuwait specifically and want English-speaking customers too, Force AI Store is built for that case."                                                                                                                                                                                                                          |
+| "Platform X is only $39/mo"                            | "That's the subscription line item. Add a translation app, a KNET plugin, WhatsApp notifications, and someone to set it up — you're at $80-150/mo, fully unmanaged. We deliver all of that in one bill, fully configured."                                                                                                                                                                                                                                        |
+| "Another platform is cheaper"                          | "A lower monthly line item often means more add-ons and more of your time managing them. We include AI translation, KNET, WhatsApp, accounting, and full inventory in the platform — compare the full basket, not the subscription fee."                                                                                                                                                                                                                          |
 | "Can I do month-to-month?"                             | "Yes, but we offer 2 months free on annual prepay — most clients pick that. Month-to-month is fine for the first 3 months while you decide."                                                                                                                                                                                                                                                                                                                      |
 | "What if I want to leave?"                             | "Your data is yours. We export everything as CSV/Excel. Your custom domain transfers back to your registrar. We give you 30 days of read-only access after cancellation to download anything you need."                                                                                                                                                                                                                                                           |
-| "What about my customer reviews / orders / customers?" | "All exportable. We use standard formats — you can import them into Shopify, Wix, or anywhere else."                                                                                                                                                                                                                                                                                                                                                              |
+| "What about my customer reviews / orders / customers?" | "All exportable. We use standard formats — you can import them into any other platform."                                                                                                                                                                                                                                                                                                                                                                          |
 | "Why do I need an annual contract?"                    | "You don't — we offer monthly too. The annual contract saves you 2 months of fees and locks in your current pricing if our rates change."                                                                                                                                                                                                                                                                                                                         |
 | "How do I know you can hold the 99.5% uptime SLA?"     | Walk them through §6.5 below: CI-gated pushes (pre-push hook + GitHub Actions CI must pass before code reaches production); daily local pg_dump backups (30-day retention) so any deploy can be rolled back with a pg_restore in <30min; Inngest functions self-register on boot so post-deploy job queues never stall; Telegram + watchdog alert pipeline pages on any main-branch CI failure within 17min. Offer to share `docs/ROLLBACK.md` for them to audit. |
-| "What happens if there's an outage?"                   | "We get paged automatically — the Telegram alert hits within minutes of any main-branch CI failure or service health degradation. For a critical-severity incident we have a 4h response SLA and a tested rollback procedure that reverts the bad deploy + restores the previous Neon snapshot in <5min. The SLA carries a credit (1 day of service term extension per excess downtime hour, capped at 30/year)."                                                 |
+| "What happens if there's an outage?"                   | "We get paged automatically — the Telegram alert hits within minutes of any main-branch CI failure or service health degradation. For a critical-severity incident we have a 4h response SLA and a tested rollback procedure that reverts the bad deploy + restores the previous database backup in <5min. The SLA carries a credit (1 day of service term extension per excess downtime hour, capped at 30/year)."                                               |
 
 ---
 
@@ -243,7 +284,8 @@ Before sending a proposal:
 
 - [ ] Confirm the merchant's product count (drives catalog import cost)
 - [ ] Confirm bilingual needs (EN-only, AR-only, or both)
-- [ ] Confirm payment provider (Tap / MyFatoorah / Hesabe / UPayments) — set up account if they don't have one
+- [ ] Confirm payment provider (Tap / MyFatoorah / Hesabe / UPayments) — set up account if they
+      don't have one
 - [ ] Confirm custom domain availability (or provision a Force AI Store subdomain)
 - [ ] Identify which Band 2 add-ons they want (Loyalty / Affiliate / WhatsApp / etc.)
 - [ ] Identify any Band 3 white-glove services they need (catalog import, photoshoot, branding)
@@ -259,21 +301,35 @@ Before sending a proposal:
 ## 6. Operational discipline (what you do after the client pays)
 
 1. **Generate the store** — use the super_admin store-creation flow
-2. **Pick a plan tier** — set `Store.plan` to `starter` / `professional` / `enterprise` (use `free` only for the grace/lapsed state — it is not a sold tier). The plan-baseline resolver (see `packages/shared/src/plan-baselines.ts`) automatically enables every feature included in that tier — no manual `StoreFeature` row creation needed for baseline features. The upgrade-marketing gate will show an on-brand upsell page to merchants who try to access a feature above their plan.
-3. **Layer overrides only for hybrid deals** — only flip `StoreFeature` rows for features OUTSIDE the chosen plan's baseline (e.g. a starter client who paid for the `whatsapp_bot` add-on). Plan changes never touch override rows, so upgrading or downgrading the store doesn't lose merchant-paid extras.
-4. **Configure payment provider** — set up Tap/MyFatoorah/Hesabe/UPayments credentials per the client's account
-5. **Provision Meta Commerce catalog** — if the client paid for the WhatsApp Native Catalog Bot, click **Provision automatically** in Admin → WhatsApp Bot → MetaCatalogCard. No Meta Business Manager steps required from the client.
-6. **Onboard the client** — branding, catalog import (Excel → Force AI Store), theme config, training session
-7. **Verify it works** — place a test order, verify webhooks fire, verify order confirmation email arrives, check the `payment_events` audit log shows the full lifecycle
-8. **Hand over** — give the client admin credentials, schedule the training session, schedule a 2-week check-in
+2. **Pick a plan tier** — set `Store.plan` to `starter` / `professional` / `enterprise` (use
+   `free` only for the grace/lapsed state — it is not a sold tier). The plan-baseline resolver
+   (see `packages/shared/src/plan-baselines.ts`) automatically enables every feature included in
+   that tier — no manual `StoreFeature` row creation needed for baseline features. The
+   upgrade-marketing gate will show an on-brand upsell page to merchants who try to access a
+   feature above their plan.
+3. **Layer overrides only for hybrid deals** — only flip `StoreFeature` rows for features OUTSIDE
+   the chosen plan's baseline (e.g. a starter client who paid for the `whatsapp_bot` add-on). Plan
+   changes never touch override rows, so upgrading or downgrading the store doesn't lose
+   merchant-paid extras.
+4. **Configure payment provider** — set up Tap/MyFatoorah/Hesabe/UPayments credentials per the
+   client's account
+5. **Provision Meta Commerce catalog** — if the client paid for the WhatsApp Native Catalog Bot,
+   click **Provision automatically** in Admin → WhatsApp Bot → MetaCatalogCard. No Meta Business
+   Manager steps required from the client.
+6. **Onboard the client** — branding, catalog import (Excel → Force AI Store), theme config,
+   training session
+7. **Verify it works** — place a test order, verify webhooks fire, verify order confirmation email
+   arrives, check the `payment_events` audit log shows the full lifecycle
+8. **Hand over** — give the client admin credentials, schedule the training session, schedule a
+   2-week check-in
 
 ---
 
 ## 6.5. Operational maturity (defending the SLA when a merchant audits)
 
-The 99.5% uptime + 24h-normal / 4h-critical support response in the
-contract are not aspirational. As of 2026-05-27, each SLA component
-is backed by concrete infrastructure a merchant's CTO can audit:
+The 99.5% uptime + 24h-normal / 4h-critical support response in the contract are not aspirational.
+As of 2026-05-27, each SLA component is backed by concrete infrastructure a merchant's CTO can
+audit:
 
 | SLA clause                              | Backing infrastructure                                                                                                                                                                                                                                                                                                         |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -292,23 +348,33 @@ is backed by concrete infrastructure a merchant's CTO can audit:
 
 **When NOT to:**
 
-- 1500–5000 KWD SME deals — the merchant doesn't care + listing this depth reads as overcompensation. Trust the contract numbers.
+- 1500–5000 KWD SME deals — the merchant doesn't care + listing this depth reads as
+  overcompensation. Trust the contract numbers.
 
 ---
 
 ## 7. What this doc is NOT
 
-- **Not a public pricing page.** No version of this is published. Clients get a custom proposal, not a tier list.
-- **Not a feature paywall enforcement reference.** That logic is in `StoreFeature` table + per-route `feature-gate.ts` middleware.
-- **Not a contract template.** Use Force Media's existing legal templates for the actual contract; this doc informs the dollar amounts in the contract.
-- **Not exposed to the codebase.** Future engineers don't need to read this — pricing decisions live in your head + the proposals you send, not in code.
+- **Not a public pricing page.** No version of this is published. Clients get a custom proposal,
+  not a tier list.
+- **Not a feature paywall enforcement reference.** That logic is in `StoreFeature` table +
+  per-route `feature-gate.ts` middleware.
+- **Not a contract template.** Use Force Media's existing legal templates for the actual contract;
+  this doc informs the dollar amounts in the contract.
+- **Not exposed to the codebase.** Future engineers don't need to read this — pricing decisions
+  live in your head + the proposals you send, not in code.
 
 ---
 
 ## 8. Companion documents
 
-- [`02-feature-catalog.md`](02-feature-catalog.md) — feature inventory (informs what's available in a proposal)
-- [`03-competitive-positioning.md`](03-competitive-positioning.md) — competitor comparison (informs objection-handling)
-- [`05-pitch-deck-outline.md`](05-pitch-deck-outline.md) — sales pitch (for first conversations, before proposal)
-- [`docs/audits/_slices/06-cost-forecast.md`](../audits/_slices/06-cost-forecast.md) — full infra cost forecast (sets your cost floor)
-- [`packages/shared/src/features.ts`](../../packages/shared/src/features.ts) — FEATURE_REGISTRY source of truth
+- [`02-feature-catalog.md`](02-feature-catalog.md) — feature inventory (informs what's available
+  in a proposal)
+- [`03-competitive-positioning.md`](03-competitive-positioning.md) — market positioning context
+  (informs objection-handling)
+- [`05-pitch-deck-outline.md`](05-pitch-deck-outline.md) — sales pitch (for first conversations,
+  before proposal)
+- [`docs/audits/_slices/06-cost-forecast.md`](../audits/_slices/06-cost-forecast.md) — full infra
+  cost forecast (sets your cost floor)
+- [`packages/shared/src/features.ts`](../../packages/shared/src/features.ts) — FEATURE_REGISTRY
+  source of truth

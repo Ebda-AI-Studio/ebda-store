@@ -1,9 +1,13 @@
 # Force AI Store — Plan ⇄ Feature Matrix
 
-> **Single source of truth for which features each plan tier includes.** Generated from
-> `packages/shared/src/plan-baselines.ts` (the code that actually gates features at runtime).
-> If this table and the code disagree, the code wins — regenerate this doc.
-> Last synced: **2026-06-09**.
+> **INTERNAL — Force AI / Force Media team. Generated from `packages/shared/src/plan-baselines.ts`
+> (the code that actually gates features at runtime). If this table and the code disagree, the code
+> wins — regenerate this doc.**
+>
+> **Last synced: 2026-06-15.** Multi-currency, bank reconciliation, barcode scanning, and
+> multi-warehouse are now shipped Enterprise features (not roadmap). Tax reports (XLSX export),
+> profit anomaly watch, loyalty redemption, low-stock alerts, backorders, and server-side CAPI
+> pixels are also real and confirmed against code.
 
 Plans are **layered (strict superset)**: Professional includes everything in Starter, Enterprise
 includes everything in Professional. `free` is a stripped grace/demo state, **not a sold tier**

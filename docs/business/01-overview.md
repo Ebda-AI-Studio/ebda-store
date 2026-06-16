@@ -1,3 +1,5 @@
+> **INTERNAL — Force AI / Force Media team. Safe to share externally (no cost floors, no margins, no provider names).**
+
 # Force AI Store — One-Pager
 
 > **Force AI Store** is a multi-tenant e-commerce platform built in Kuwait for Kuwait and the GCC. Bilingual Arabic + English from the ground up, AI-assisted from day one, KNET-native, and priced for SMB merchants.
@@ -6,9 +8,9 @@
 
 ## The 30-second pitch
 
-You're a Kuwait merchant who sells products online. Today you have three options: pay Shopify $30–80/month + buy a $20/month translation plugin + worry about KNET integration, or pay Salla in Saudi Riyals for a platform that doesn't speak Kuwaiti payment rails, or piece WooCommerce together with a developer who quits in three months.
+You're a Kuwait merchant who sells products online. You want a store that speaks Arabic and English equally, accepts KNET without a plugin, and handles your translations, SEO, and category tags automatically — without hiring a developer.
 
-Force AI Store gives you the same storefront, the same admin tools, the same payment integrations — but built for Kuwait first. **Arabic and English are equal**, not afterthoughts. **KNET works on day one**, not after a plugin install. **AI fills in your product translations, SEO, and category tags automatically**, included in your subscription, not as a paid add-on.
+Force AI Store gives you all of that in one managed service. **Arabic and English are equal**, not afterthoughts. **KNET works on day one** with your choice of four Kuwait-licensed payment providers. **AI fills in your product translations, SEO, and category tags automatically**, included in your subscription, not as a paid add-on.
 
 You launch in hours, not weeks. You pay in Kuwaiti Dinars. Your customers check out with the payment method 80% of Kuwaitis already use.
 
@@ -28,13 +30,11 @@ Every manual content task that drains merchant time has an AI auto-fill button:
 - **Draft owner-responses** to customer reviews in either language
 - **Reorder + dead-stock recommendations** — AI flags which products need restocking and which are dead inventory, so you act before you lose sales or tie up cash
 
-Beyond content, AI powers the **WhatsApp DM ordering bot**: customers message your business number in natural Arabic or English, the bot understands what they want, walks them through your catalog, and hands them a checkout link — all without an agent. Voice notes are transcribed. Product photos are matched against your catalog. Returning customers are greeted by name and offered their last order. All powered by Google Gemini, **included free** in the WhatsApp integration at no per-message or per-AI-call cost.
-
-Compare to Shopify charging $20/month for Arabic translation alone — and offering no WhatsApp ordering bot at any price.
+Beyond content, AI powers the **WhatsApp DM ordering bot**: customers message your business number in natural Arabic or English, the bot understands what they want, walks them through your catalog, and hands them a checkout link — all without an agent. Voice notes are transcribed. Product photos are matched against your catalog. Returning customers are greeted by name and offered their last order. All powered by our AI engine, **included free** in the WhatsApp integration at no per-message or per-AI-call cost.
 
 ### 2. Arabic-first locality
 
-This is not "Shopify with an Arabic theme." Every database field has an Arabic and English version. The admin interface flips right-to-left when your team works in Arabic. Search hits both languages simultaneously — a customer searching for "زيت زيتون" and "olive oil" find the same product.
+This is not "a platform with an Arabic theme." Every database field has an Arabic and English version. The admin interface flips right-to-left when your team works in Arabic. Search hits both languages simultaneously — a customer searching for "زيت زيتون" and "olive oil" find the same product.
 
 Other locality details that matter:
 
@@ -81,7 +81,7 @@ Most platforms give you a theme picker and call it customization. Force AI Store
 - Doesn't have a developer on staff and doesn't want to hire one
 - Wants to take orders via WhatsApp DM (not just notifications — actual orders from customers DMing the business number)
 - Cares about WhatsApp order updates because that's how their customers communicate
-- Values built-in inventory, suppliers, purchase orders, and full accounting (Chart of Accounts, journal, P&L — no QuickBooks needed)
+- Values built-in inventory, suppliers, purchase orders, and full accounting (Chart of Accounts, journal, P&L — no third-party accounting software needed)
 - Needs per-product discount pricing (percentage or fixed KWD) that shows a live "Was / Now" preview in the admin
 
 **Strong fit:**
@@ -121,7 +121,7 @@ We're not VC-backed. We don't have a 50-person team. We ship every day, and ever
 
 Connecting a store to WhatsApp's Native Catalog feature normally requires merchants to navigate Meta Business Manager, create a Commerce Catalog, generate a system-user token, and copy multiple IDs. Force AI Store removes all of that.
 
-From Admin → WhatsApp Bot → Meta Commerce Catalog, click **Provision automatically**. The Force AI backend calls the Meta Graph API on your behalf to create the catalog, assign the long-lived access token, and save everything encrypted — in under 60 seconds. Your product catalog syncs to Meta automatically after that. This is a meaningful differentiator: no other Gulf e-commerce platform offers self-serve Meta catalog provisioning for merchants.
+From Admin → WhatsApp Bot → Meta Commerce Catalog, click **Provision automatically**. The Force AI backend calls the Meta Graph API on your behalf to create the catalog, assign the long-lived access token, and save everything encrypted — in under 60 seconds. Your product catalog syncs to Meta automatically after that.
 
 ---
 
@@ -131,7 +131,6 @@ Force AI Store is sold as a **managed e-commerce service** — every client gets
 
 - **See it live:** [wadyaljuz.com](https://wadyaljuz.com) (our flagship Kuwait merchant — 235 products, 8 categories, full bilingual)
 - **Talk to us:** [forcemediakw.com/contact](https://forcemediakw.com/contact) — we'll schedule a 30-minute call to understand your needs and send you a written proposal within 2-3 business days
-- **Compare:** see [03-competitive-positioning.md](03-competitive-positioning.md) for honest comparison vs Shopify / Salla / Wix Kuwait
 - **Feature catalog:** [02-feature-catalog.md](02-feature-catalog.md) — the full list of what's available before we talk
 
 Typical onboarding from contract signing to live store: **2-4 weeks** depending on catalog size and brand readiness.

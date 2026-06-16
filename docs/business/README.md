@@ -1,21 +1,24 @@
 # Force AI Store — Business Documentation
 
-> Customer-facing + go-to-market documentation for Force AI Store / Force Website Builder. Generated 2026-05-22 from the comprehensive SaaS audit, the codebase feature registry, and verified competitive research.
+> Go-to-market and sales-enablement documentation for Force AI Store / Force Website Builder.
+> Initially generated 2026-05-22 from the comprehensive SaaS audit, the codebase feature registry,
+> and verified market research. Last synced to code: **2026-06-15** (multi-currency, bank
+> reconciliation, barcode scanning, multi-warehouse, tax reports, CAPI pixels, loyalty redemption,
+> low-stock alerts, and backorders all now confirmed real).
 
 ---
 
 ## Documents in this folder
 
-| #   | Document                                                       | Audience                                                                                                        | Length       |
-| --- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------ |
-| 1   | [01-overview.md](01-overview.md)                               | Everyone — start here                                                                                           | ~1,200 words |
-| 2   | [02-feature-catalog.md](02-feature-catalog.md)                 | Merchant prospect evaluating the product                                                                        | ~3,200 words |
-| 3   | [03-competitive-positioning.md](03-competitive-positioning.md) | Merchant comparing vs Shopify / Salla / Wix / WooCommerce                                                       | ~2,900 words |
-| 4   | [04-pricing-tiers.md](04-pricing-tiers.md)                     | Internal — proposal-pricing framework (Force AI Store is sold as a managed agency service, not self-serve SaaS) | ~3,800 words |
-| 5   | [05-pitch-deck-outline.md](05-pitch-deck-outline.md)           | Sales / investor / acquirer pitch (12-slide outline)                                                            | ~1,800 words |
-| 6   | [06-faq.md](06-faq.md)                                         | Public-facing FAQ                                                                                               | ~3,000 words |
-
-**Total:** ~16,200 words. Reading time end-to-end: ~75 minutes.
+| #   | Document                                                       | Audience                                                                                 | Internal / Shareable |
+| --- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------- |
+| 1   | [01-overview.md](01-overview.md)                               | Everyone — start here                                                                    | Shareable            |
+| 2   | [02-feature-catalog.md](02-feature-catalog.md)                 | Merchant prospect evaluating the product                                                 | Shareable            |
+| 3   | [03-competitive-positioning.md](03-competitive-positioning.md) | Internal — market context + platform comparison for sales prep                           | **INTERNAL**         |
+| 4   | [04-pricing-tiers.md](04-pricing-tiers.md)                     | Internal — proposal-pricing framework (cost floors, margins, benchmarks)                 | **INTERNAL**         |
+| 5   | [05-pitch-deck-outline.md](05-pitch-deck-outline.md)           | Sales / investor / acquirer pitch (12-slide outline); slides 2+10 contain internal notes | Adapt before sharing |
+| 6   | [06-faq.md](06-faq.md)                                         | Public-facing FAQ                                                                        | Shareable            |
+| —   | [plan-feature-matrix.md](plan-feature-matrix.md)               | Internal — generated from plan-baselines.ts; source of truth for tier feature gates      | **INTERNAL**         |
 
 ---
 
@@ -26,8 +29,6 @@
 1. **01-overview** — 5-minute read, decide if Force AI Store fits
 2. **06-faq** — answers to "do you support X?"
 3. **02-feature-catalog** — deep dive on what's included
-4. **03-competitive-positioning** — honest comparison vs whatever you're using today
-5. **04-pricing-tiers** — pick a plan
 
 ### Investor / VC
 

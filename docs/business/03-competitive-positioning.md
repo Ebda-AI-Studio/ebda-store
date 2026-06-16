@@ -1,28 +1,61 @@
-# Force AI Store — Competitive Positioning for Kuwait & GCC Merchants
+> **INTERNAL — Force AI / Force Media team. This document names competitors and includes market analysis for sales preparation. Not for client distribution.**
 
-_Last updated: 2026-06-01. Pricing figures are sourced from live provider pages and third-party research; check linked sources before making a purchase decision._
+# Force AI Store — What Merchants Get (and How We're Positioned)
+
+_Last updated: 2026-06-15. Pricing figures are sourced from live provider pages and third-party
+research; check linked sources before making a purchase decision._
 
 ---
 
-## Why This Comparison Matters
+## What This Document Is For
 
-Kuwait's e-commerce market has a structural profile that generic platforms weren't designed for. KNET — the national debit network backed by Kuwait's major banks — accounts for more than 70% of digital transactions in the country ([Adyen, 2026](https://www.adyen.com/payment-methods/knet)). A merchant who can't accept KNET is effectively invisible to the majority of Kuwaiti shoppers. On top of that, Kuwait's new Decree 10/2026 requires that customer-facing communications, product information, and terms be available in Arabic ([Zelicra, 2026](https://zelicra.com/blog-decree-10-2026-complete-guide)), making bilingual storefronts a legal baseline, not a nice-to-have. Add the regional expectation of WhatsApp-based order communication, and the picture becomes clear: most of the platforms this document compares were built for Western markets first and treat the Gulf as a retrofit.
+Kuwait's e-commerce market has a structural profile that generic platforms weren't designed for.
+KNET — the national debit network backed by Kuwait's major banks — accounts for more than 70% of
+digital transactions in the country ([Adyen, 2026](https://www.adyen.com/payment-methods/knet)). A
+merchant who can't accept KNET is effectively invisible to the majority of Kuwaiti shoppers. On top
+of that, Kuwait's new Decree 10/2026 requires that customer-facing communications, product
+information, and terms be available in Arabic
+([Zelicra, 2026](https://zelicra.com/blog-decree-10-2026-complete-guide)), making bilingual
+storefronts a legal baseline, not a nice-to-have. Add the regional expectation of WhatsApp-based
+order communication, and the picture becomes clear: most platforms on the market were built for
+Western markets first and treat the Gulf as a retrofit.
 
-This document compares Force AI Store (built by Force AI, Kuwait) against Shopify, Salla, Wix, Magento/WooCommerce for a Kuwait or GCC merchant. It is not a sales pitch. Some competitors genuinely do certain things better, and those cases are named honestly. The goal is to help you make an informed decision.
+This document captures what merchants get from Force AI Store, what the market alternatives offer,
+and where the real gaps are — so Force AI sales conversations are grounded in facts.
 
 ---
 
 ## The 4 Pillars Force AI Store Is Built Around
 
-**1. AI as default, not an upsell.** Every content task a merchant would normally do by hand — translating product names into Arabic, writing SEO meta descriptions, suggesting categories, filling FAQ sections — has a one-click AI button powered by Google Gemini. Bulk sweeps let a merchant translate or generate SEO copy for an entire catalogue in a single action. This is built into the platform at no per-use cost to the merchant; it is not a third-party add-on or a higher-tier feature. The practical effect: a merchant adding 50 new products doesn't need to write 50 Arabic descriptions manually.
+**1. AI as default, not an upsell.** Every content task a merchant would normally do by hand —
+translating product names into Arabic, writing SEO meta descriptions, suggesting categories, filling
+FAQ sections — has a one-click AI button. Bulk sweeps let a merchant translate or generate SEO copy
+for an entire catalogue in a single action. This is built into the platform at no per-use cost to
+the merchant; it is not a third-party add-on or a higher-tier feature. The practical effect: a
+merchant adding 50 new products doesn't need to write 50 Arabic descriptions manually.
 
-Beyond content generation, AI runs the **WhatsApp DM ordering bot** — a natural-language commerce assistant that turns customer DMs into completed orders without any human agent. The bot understands Arabic and English in the same conversation, transcribes voice notes, matches product photos against the catalog, and greets returning customers with a personalized "want the same as last time?" message. No Shopify equivalent exists today. Salla does not offer it. This is the widest product capability gap on the market for Kuwait e-commerce merchants.
+Beyond content generation, AI runs the **WhatsApp DM ordering bot** — a natural-language commerce
+assistant that turns customer DMs into completed orders without any human agent. The bot understands
+Arabic and English in the same conversation, transcribes voice notes, matches product photos against
+the catalog, and greets returning customers with a personalized "want the same as last time?"
+message.
 
-**2. Arabic-first, not Arabic-as-afterthought.** Every database field that holds text has both an English and an Arabic column — product names, descriptions, category labels, SEO fields, FAQ content, review body. The admin dashboard is fully bilingual with RTL layout. Checkout and storefront search work in both languages simultaneously (searching "تمر" and "dates" return the same results). This is a data-model decision made at the start of the platform's design; it cannot be added later by flipping a setting. Platforms that treat Arabic as a translation layer on top of an English model carry that mismatch into every corner of the product.
+**2. Arabic-first, not Arabic-as-afterthought.** Every database field that holds text has both an
+English and an Arabic column — product names, descriptions, category labels, SEO fields, FAQ
+content, review body. The admin dashboard is fully bilingual with RTL layout. Checkout and
+storefront search work in both languages simultaneously. This is a data-model decision made at the
+start of the platform's design; it cannot be added later by flipping a setting.
 
-**3. Kuwait payment stack, native.** Force AI Store integrates with Tap, MyFatoorah, Hesabe, and UPayments — all four of the main Kuwait-licensed payment processors, all of which provide KNET access. Per-store payment credentials are stored encrypted. No third-party app install is required, no separate payment developer is needed, and the checkout flow is the same as the rest of the store — not an external redirect to a differently-branded payment page. For GCC merchants who need Apple Pay or regional card schemes, MyFatoorah covers that too.
+**3. Kuwait payment stack, native.** Force AI Store integrates with Tap, MyFatoorah, Hesabe, and
+UPayments — all four of the main Kuwait-licensed payment processors, all of which provide KNET
+access. Per-store payment credentials are stored encrypted. No third-party app install is required.
+For GCC merchants who need Apple Pay or regional card schemes, MyFatoorah covers that too.
 
-**4. Customization granularity without a developer.** Merchants can adjust typography per section of their storefront (heading font, body font, size), choose a background colour preset for the entire site, control card frame shape and size, manage section-level copy, and generate a matched palette from a single brand colour. These are dials that exist in the admin panel. On most competing platforms, reaching this level of visual control requires either buying a premium theme or hiring a developer to edit theme code. Force AI Store's compact design sensibility is also calibrated for how Kuwait merchants actually photograph products — not the luxury-retail 2048×2048px assumptions baked into many global themes.
+**4. Customization granularity without a developer.** Merchants can adjust typography per section
+of their storefront, choose a background colour preset for the entire site, control card frame shape
+and size, manage section-level copy, and generate a matched palette from a single brand colour.
+These are dials that exist in the admin panel. On most competing platforms, reaching this level of
+visual control requires either buying a premium theme or hiring a developer to edit theme code.
 
 ---
 
@@ -40,15 +73,20 @@ Beyond content generation, AI runs the **WhatsApp DM ordering bot** — a natura
 | Hesabe                              | Native                                                                                                    | Not in app store                                                                                                             | Not available                                                 | Not available                                                 | Custom integration          | Custom integration            |
 | UPayments                           | Native                                                                                                    | Not in app store                                                                                                             | Not available                                                 | Not available                                                 | Custom integration          | Custom integration            |
 | WhatsApp order notifications        | Built-in via WBS bridge (4 lifecycle templates, per-event toggles)                                        | Via third-party app ($15–$50/mo typical)                                                                                     | Via third-party                                               | Via third-party                                               | Via extension               | Via plugin                    |
-| WhatsApp DM ordering bot            | Built-in — Gemini NLU + voice + photo + returning-customer personalization                                | Not available                                                                                                                | Not available                                                 | Not available                                                 | Not available               | Not available                 |
+| WhatsApp DM ordering bot            | Built-in — NLU + voice + photo + returning-customer personalization                                       | Not available                                                                                                                | Not available                                                 | Not available                                                 | Not available               | Not available                 |
 | Merchant-initiated payment links    | Built-in — typeahead product picker + custom amount, all 4 gateways                                       | Via third-party app                                                                                                          | Via third-party                                               | Via third-party                                               | Via extension               | Via plugin                    |
 | Custom domain per store             | Auto-provisioned via Vercel API                                                                           | Yes                                                                                                                          | Yes                                                           | Yes (Business plan+)                                          | Yes (self-managed)          | Yes (self-managed)            |
 | Storefront themes                   | 5 themes, all fully configurable                                                                          | 100+ (most premium themes $150–$350 one-time) ([Shopify](https://www.shopify.com/pricing))                                   | ~30 themes                                                    | Hundreds (generic, Western-oriented)                          | Thousands via marketplace   | Thousands via marketplace     |
 | Per-section typography control      | Yes — merchant-controlled per zone, no dev required                                                       | Theme Liquid edit (developer access needed)                                                                                  | Limited                                                       | Limited (Business plan)                                       | Full (developer required)   | Full (developer required)     |
 | Per-product discount engine         | Yes — dropdown (None / Percentage / Fixed KWD) with live preview; replaces manual compare-at-price        | Compare-at-price only (manual field, no dropdown or live preview)                                                            | Compare-at-price only                                         | Compare-at-price only                                         | Via extension               | Via plugin                    |
-| Full accounting (Chart of Accounts) | Yes — Finance hub with journal, P&L, expense approval, invoicing (Professional+); advanced on Enterprise+ | No — requires QuickBooks or Xero app                                                                                         | No                                                            | No                                                            | Via extension               | Via extension                 |
-| Inventory management                | Full module — stock dashboard, suppliers, purchase orders, reorder alerts                                 | Built-in (strong)                                                                                                            | Basic                                                         | Basic                                                         | Full (developer-maintained) | Via WooCommerce Stock Manager |
+| Full accounting (Chart of Accounts) | Yes — Finance hub with journal, P&L, expense approval, invoicing (Professional+); advanced on Enterprise+ | No — requires external accounting software                                                                                   | No                                                            | No                                                            | Via extension               | Via extension                 |
+| Multi-currency bookkeeping          | Yes — FX capture + automatic KWD conversion (Enterprise+)                                                 | Requires Plus plan or app                                                                                                    | Limited                                                       | Limited                                                       | Via extension               | Via plugin                    |
+| Bank reconciliation                 | Yes — CSV/OFX import + ledger matching (Enterprise+)                                                      | Via third-party app                                                                                                          | No                                                            | No                                                            | Via extension               | Via plugin                    |
+| Barcode scanning                    | Yes — mobile receive / pick / cycle-count (Enterprise+)                                                   | Via app ($20–$50/mo)                                                                                                         | No                                                            | No                                                            | Via extension               | Via plugin                    |
+| Multi-warehouse                     | Yes — per-location stock + routing (Enterprise+)                                                          | Shopify Plus only                                                                                                            | No                                                            | No                                                            | Via extension               | Via plugin                    |
+| Inventory management                | Full module — stock dashboard, suppliers, purchase orders, reorder alerts, barcode, multi-warehouse       | Built-in (strong)                                                                                                            | Basic                                                         | Basic                                                         | Full (developer-maintained) | Via WooCommerce Stock Manager |
 | Abandoned cart recovery             | Built-in, core feature                                                                                    | Built-in (Basic plan+)                                                                                                       | Built-in                                                      | Built-in (Core plan+)                                         | Via extension               | Via plugin                    |
+| Server-side CAPI (Meta + TikTok)    | Yes — fires on order even when browser pixel is blocked by ad-blockers                                    | Via Shopify Audiences (Plus) or app                                                                                          | Not available                                                 | Not available                                                 | Via extension               | Via plugin                    |
 | Multi-tenant / agency model         | Yes — one codebase, N merchant stores                                                                     | No                                                                                                                           | No                                                            | No                                                            | Possible but complex        | No                            |
 | PWA (installable on phone)          | Per-store feature flag, built-in                                                                          | No (requires headless setup or app)                                                                                          | Yes                                                           | No                                                            | Via extension               | Via plugin                    |
 | App marketplace                     | No — everything is first-party                                                                            | ~8,000 apps ([Shopify App Store](https://apps.shopify.com))                                                                  | Limited                                                       | ~700 apps                                                     | Large extension marketplace | Large plugin marketplace      |
@@ -56,37 +94,74 @@ Beyond content generation, AI runs the **WhatsApp DM ordering bot** — a natura
 
 ---
 
-## Per-Competitor Deep Dive
+## Per-Platform Context
 
 ### Shopify
 
-Shopify is the most mature general-purpose e-commerce platform available to Kuwait merchants, and its strengths are real. The Basic plan ($39/mo) ([shopify.com/pricing](https://www.shopify.com/pricing)) gives you a solid foundation with inventory management, abandoned cart, and good mobile checkout. The app ecosystem — roughly 8,000 apps — means almost any integration you need exists. Shopify's Translate & Adapt app is now free and supports auto-translation for up to two languages (100,000 characters per year limit), which covers the EN/AR use case for smaller catalogues ([Shopify Translate & Adapt](https://apps.shopify.com/translate-and-adapt)).
+Shopify is the most mature general-purpose e-commerce platform available to Kuwait merchants, and
+its strengths are real. The Basic plan ($39/mo) gives you a solid foundation with inventory
+management, abandoned cart, and good mobile checkout. The app ecosystem — roughly 8,000 apps —
+means almost any integration you need exists. Shopify's Translate & Adapt app is now free and
+supports auto-translation for up to two languages (100,000 characters per year limit), which covers
+the EN/AR use case for smaller catalogues.
 
-Where Shopify falls short for Kuwait merchants specifically: on product pricing, Shopify only offers a manual "compare-at-price" field — there is no per-product discount dropdown or live discounted-price preview in the editor. Force AI Store's discount engine (None / Percentage % / Fixed KWD with live preview) removes the risk of stale markup pricing and matches how Kuwait merchants actually think about promotional pricing. KNET is also not natively supported. You need to install a third-party KNET app or configure MyFatoorah/Tap through the payment gateways section, which adds setup time and in some cases a separate monthly fee on top of Shopify's own transaction fee (2.9% + 30¢ on Basic, dropping with higher plans). WhatsApp order notifications — the communication channel Kuwaiti customers expect — require a separate app costing $15–50/mo. The Translate & Adapt 100k-character annual limit becomes a real constraint for a merchant with 200+ products with full descriptions in both languages; beyond that limit, auto-translation stops and manual work or a paid third-party translation app takes over. Shopify Magic AI content is English-only and not available on the Basic plan, so the AI advantage evaporates for most Kuwait-tier merchants. The net effect is that a Kuwait merchant on Shopify Basic ends up layering apps to reach parity with what Force AI Store includes by default.
+Where it falls short for Kuwait specifically: KNET is not natively supported. WhatsApp order
+notifications require a separate app at $15–50/mo. The Translate & Adapt 100k-character annual
+limit becomes a real constraint for a merchant with 200+ products with full descriptions in both
+languages. Shopify Magic AI content is English-only and not available on the Basic plan. Accounting
+requires an external integration. Multi-warehouse and barcode scanning are Shopify Plus features.
+The net effect: a Kuwait merchant on Shopify Basic ends up layering several apps to reach parity
+with what Force AI Store includes natively.
 
 ### Salla
 
-Salla is a legitimate force in Saudi Arabia and has a meaningful user base in the Gulf. Its pricing is accessible — the Advanced plan at roughly SAR 99/month (~$26) ([salla.com/en/plans](https://salla.com/en/plans/)) makes it one of the most affordable hosted options in the region, and the platform is genuinely Arabic-native. If your business is primarily targeting Saudi Arabia and you sell in SAR, Salla is a strong choice: it integrates natively with Mada and STC Pay, which are Saudi-dominant payment methods.
+Salla is a legitimate force in Saudi Arabia and has a meaningful user base in the Gulf. Its pricing
+is accessible — the Advanced plan at roughly SAR 99/month (~$26) makes it one of the most
+affordable hosted options in the region, and the platform is genuinely Arabic-native. If your
+business is primarily targeting Saudi Arabia and you sell in SAR, Salla is a strong choice: it
+integrates natively with Mada and STC Pay.
 
-The Kuwait-specific problem with Salla is the payment stack. KNET is not natively supported — Salla is architected around the Saudi payment ecosystem. A Kuwait merchant on Salla faces the same third-party-app overhead as on Shopify for KNET acceptance, which is the dominant payment method in Kuwait. Salla's storefront customization is section-based but limited in per-section control compared to what Force AI Store exposes to merchants without developer access. AI-assisted content tools are not currently a core Salla feature. If your customer base is primarily Kuwaiti and KNET is your main payment rail, Salla's Saudi-first DNA is a structural mismatch.
+The Kuwait-specific issue is the payment stack. KNET is not natively supported — Salla is
+architected around the Saudi payment ecosystem. A Kuwait merchant on Salla faces the same
+third-party-app overhead as on Shopify for KNET acceptance. AI-assisted content tools are not
+currently a core Salla feature.
 
 ### Wix
 
-Wix is a capable website builder with e-commerce added on. For a merchant who primarily needs a visual presence with a small product catalogue and doesn't require deep stock management or Kuwait-specific payments, the Core plan ($29/mo annual) ([wix.com/plans](https://www.wix.com/plans)) is an honest entry point. The drag-and-drop editor is genuinely accessible to non-technical merchants.
+Wix is a capable website builder with e-commerce added on. For a merchant who primarily needs a
+visual presence with a small product catalogue and doesn't require deep stock management or
+Kuwait-specific payments, the Core plan ($29/mo annual) is an honest entry point.
 
-The limits show quickly for serious e-commerce in Kuwait. Arabic support requires plugins; RTL layout is partial and inconsistent across Wix's hundreds of third-party templates — a template that looks clean in English may look broken in Arabic until manually fixed. KNET requires a third-party integration. The Business plan ($39/mo annual) is needed for multi-currency support, which matters for GCC merchants quoting in KWD. The platform's e-commerce depth — inventory, accounting, order management — does not match what dedicated commerce platforms provide. Wix is a good fit for a service business, a restaurant with an online menu, or a brand-first site that happens to sell a few products. It is not a fit for a merchant whose entire business runs through their online store.
+The limits show quickly for serious e-commerce in Kuwait. Arabic support requires plugins; RTL
+layout is partial and inconsistent across third-party templates. KNET requires a third-party
+integration. The platform's e-commerce depth — inventory, accounting, order management — does not
+match what dedicated commerce platforms provide. Wix is a good fit for a service business or a
+brand-first site that happens to sell a few products. It is not a fit for a merchant whose entire
+business runs through their online store.
 
-### Magento (Open Source)
+### Magento Open Source
 
-Magento Open Source is free to download. For a developer or a business with in-house technical staff, it offers the most configuration depth of any platform on this list. There is no feature it cannot theoretically implement, no payment gateway it cannot eventually integrate, and no design constraint it cannot remove.
+Magento Open Source is free to download. For a developer or a business with in-house technical
+staff, it offers the most configuration depth of any platform on this list.
 
-The caveat is total cost of ownership. Realistic annual running costs for a production Magento Open Source store — hosting, a developer for maintenance and updates, security patches, extensions for missing features — range from roughly $5,000 to $90,000 per year depending on store complexity ([Elogic, 2026](https://elogic.co/blog/magento-pricing-explained/)). A Kuwait merchant doing $50,000/year in GMV will spend more on platform maintenance than they earn from the store. Magento makes sense at significant scale (millions in GMV) or when a business has engineering staff on payroll. For the SMB merchant the platform is over-engineered and under-supported. Adobe Commerce (the paid tier starting at ~$22,000/year) pushes those economics even further out of SMB range.
+The caveat is total cost of ownership. Realistic annual running costs for a production Magento Open
+Source store — hosting, a developer for maintenance and updates, security patches, extensions for
+missing features — range from roughly $5,000 to $90,000 per year depending on store complexity
+([Elogic, 2026](https://elogic.co/blog/magento-pricing-explained/)). Magento makes sense at
+significant scale (millions in GMV) or when a business has engineering staff on payroll.
 
 ### WooCommerce
 
-WooCommerce is the WordPress-native e-commerce plugin and is, in principle, free. Its appeal is full control over code and a massive ecosystem of themes and plugins. For a merchant or developer who already runs WordPress and wants to add shopping, the entry point is low.
+WooCommerce is the WordPress-native e-commerce plugin and is, in principle, free. Its appeal is
+full control over code and a massive ecosystem of themes and plugins.
 
-In practice, a production WooCommerce store for a Kuwait merchant accumulates costs quickly: quality hosting ($10–50/mo), an Arabic-capable theme or RTL plugin, WPML for bilingual content (~$99/yr) ([omnisend.com](https://www.omnisend.com/blog/woocommerce-pricing/)), a KNET payment extension (custom or third-party cost), security updates, and ongoing maintenance. Estimates for a credible mid-sized WooCommerce setup range from $1,400 to $6,500/yr in direct costs, plus the time cost of managing WordPress core + WooCommerce + plugin updates. That time cost is real: a WooCommerce merchant is also a WordPress administrator. The platform is honest value for a merchant with developer skills or a developer on retainer. It is not an appropriate choice for a merchant who wants to focus on their products and customers rather than platform maintenance.
+In practice, a production WooCommerce store for a Kuwait merchant accumulates costs quickly:
+quality hosting ($10–50/mo), an Arabic-capable theme or RTL plugin, WPML for bilingual content
+(~$99/yr), a KNET payment extension, security updates, and ongoing maintenance. Estimates for a
+credible mid-sized WooCommerce setup range from $1,400 to $6,500/yr in direct costs, plus the time
+cost of managing WordPress core + WooCommerce + plugin updates. The platform is honest value for a
+merchant with developer skills. It is not an appropriate choice for a merchant who wants to focus
+on their products and customers rather than platform maintenance.
 
 ---
 
@@ -94,21 +169,34 @@ In practice, a production WooCommerce store for a Kuwait merchant accumulates co
 
 Being honest about this matters.
 
-**Very large catalogues (100,000+ SKUs).** Force AI Store's current architecture runs a shared API instance. At extreme catalogue scale — think a distributor with 100,000+ products — the platform hasn't been load-tested for that volume. Magento or a custom Shopify Plus build would be more appropriate.
+**Very large catalogues (100,000+ SKUs).** Force AI Store's current architecture runs a shared API
+instance. At extreme catalogue scale — think a distributor with 100,000+ products — the platform
+hasn't been load-tested for that volume. Magento or a custom Shopify Plus build would be more
+appropriate.
 
-**B2B with complex contract pricing.** If your business sells wholesale with per-customer negotiated price lists, tiered volume discounts, net-30 payment terms, and purchase-order workflows, Force AI Store does not have those features built out. Platforms with dedicated B2B modules (Shopify B2B on Plus, Magento) are a better match.
+**B2B with complex contract pricing.** If your business sells wholesale with per-customer
+negotiated price lists, tiered volume discounts, net-30 payment terms, and purchase-order
+workflows, Force AI Store does not have those features built out. Platforms with dedicated B2B
+modules are a better match.
 
-**Dropshipping with AliExpress or Oberlo-style supplier sync.** Force AI Store does not have an automated product-import pipeline from dropshipping supplier catalogues. A merchant whose entire model is importing products from AliExpress and fulfilling through a third-party dropshipper should use Shopify + DSers or a similar dropshipping-optimised stack.
+**Dropshipping with AliExpress or Oberlo-style supplier sync.** Force AI Store does not have an
+automated product-import pipeline from dropshipping supplier catalogues.
 
-**Merchants who need a large theme gallery before deciding.** If choosing from dozens of visual styles is important to your decision, Shopify's 100+ paid themes offer far more variety than Force AI Store's 5 themes. Each Force AI Store theme is deeply configurable, but the starting-point variety is narrower.
+**Merchants who need a large theme gallery before deciding.** If choosing from dozens of visual
+styles is important, other platforms offer far more variety than Force AI Store's 5 themes. Each
+Force AI Store theme is deeply configurable, but the starting-point variety is narrower.
 
-**Self-hosted / full data sovereignty requirements.** Force AI Store is a managed SaaS platform. If regulatory or legal requirements mandate that all merchant data reside on self-owned infrastructure, WooCommerce or self-hosted Magento are the appropriate answer.
+**Self-hosted / full data sovereignty requirements.** Force AI Store is a managed SaaS platform.
+If regulatory or legal requirements mandate that all merchant data reside on self-owned
+infrastructure, WooCommerce or self-hosted Magento are the appropriate answer.
 
 ---
 
 ## Total Cost of Ownership — Typical Kuwait Merchant, $50,000/yr GMV
 
-This is an estimate for a merchant selling physical goods in Kuwait, needing bilingual EN/AR content, KNET payment acceptance, and WhatsApp order notifications. All figures are annual at current list prices.
+This is an estimate for a merchant selling physical goods in Kuwait, needing bilingual EN/AR
+content, KNET payment acceptance, and WhatsApp order notifications. All figures are annual at
+current list prices.
 
 | Cost Item                     | Force AI Store                       | Shopify Basic                        | Salla Advanced                  | Wix Business                   | WooCommerce (managed hosting)      |
 | ----------------------------- | ------------------------------------ | ------------------------------------ | ------------------------------- | ------------------------------ | ---------------------------------- |
@@ -122,14 +210,23 @@ This is an estimate for a merchant selling physical goods in Kuwait, needing bil
 | On $50k GMV transaction fees  | ~$1,000–$1,500                       | ~$1,450+ (Basic rate + gateway)      | Gateway-only (~$1,000–$1,500)   | ~$1,000–$1,450                 | ~$1,000–$1,500                     |
 | **Approximate annual all-in** | **Contact Force Media**              | **~$2,220–$2,800**                   | **~$1,600–$2,400 (SA-focused)** | **~$2,000–$3,000**             | **~$1,500–$3,000**                 |
 
-**Notes on this table:** Force AI Store is sold as a **managed e-commerce service** — every client gets a custom proposal, not a self-serve subscription. The comparison above shows what the equivalent capability basket costs on other platforms. Transaction fees on competitor platforms are gateway fees paid to the merchant's chosen processor. Under Force AI Store, your KNET/card payment provider (Tap, MyFatoorah, Hesabe, or UPayments) charges its standard 2-3.5% directly to you — Force AI Store doesn't take a cut. Shopify's 2.9% rate applies when using Shopify Payments, which is not available in Kuwait; actual rates depend on third-party gateway terms. WooCommerce totals vary heavily based on hosting choice and required plugins; the range above reflects a credible managed-hosting setup, not a discount shared host.
+**Notes on this table:** Force AI Store is sold as a **managed e-commerce service** — every client
+gets a custom proposal, not a self-serve subscription. The comparison above shows what the
+equivalent capability basket costs on other platforms. Transaction fees on competitor platforms are
+gateway fees paid to the merchant's chosen processor. Under Force AI Store, your KNET/card payment
+provider (Tap, MyFatoorah, Hesabe, or UPayments) charges its standard 2-3.5% directly to you —
+Force AI Store doesn't take a cut. Shopify's 2.9% rate applies when using Shopify Payments, which
+is not available in Kuwait; actual rates depend on third-party gateway terms. WooCommerce totals
+vary heavily based on hosting choice and required plugins; the range above reflects a credible
+managed-hosting setup, not a discount shared host.
 
 ---
 
 _Sources referenced in this document:_
 
 - [Shopify Pricing](https://www.shopify.com/pricing) — verified 2026-05-22
-- [Shopify Translate & Adapt app](https://apps.shopify.com/translate-and-adapt) — free, 100k char/yr auto-translation limit
+- [Shopify Translate & Adapt app](https://apps.shopify.com/translate-and-adapt) — free, 100k
+  char/yr auto-translation limit
 - [KNET on Shopify App Store](https://apps.shopify.com/knet) — third-party app required
 - [Salla Pricing Plans](https://salla.com/en/plans/) — verified 2026-05-22
 - [Wix Plans](https://www.wix.com/plans) — verified 2026-05-22
