@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 30 20% 98%;
+    --foreground: 20 14% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 12%;
+    --primary: 26 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 40% 96%;
+    --secondary-foreground: 26 80% 25%;
+    --muted: 30 15% 95%;
+    --muted-foreground: 20 10% 45%;
+    --accent: 30 60% 95%;
+    --accent-foreground: 26 90% 25%;
+    --success: 158 64% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 43 96% 50%;
+    --warning-foreground: 43 96% 15%;
+    --info: 210 100% 50%;
+    --info-foreground: 0 0% 100%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 15% 90%;
+    --input: 30 15% 90%;
+    --ring: 26 100% 50%;
+    --radius: 0.875rem;
+  }
+
+  .dark {
+    --background: 222.2 47.4% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 47.4% 8%;
+    --card-foreground: 210 40% 98%;
+    --primary: 26 100% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 26 40% 12%;
+    --secondary-foreground: 30 100% 90%;
+    --muted: 217.2 32.6% 12%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 26 40% 12%;
+    --accent-foreground: 30 100% 90%;
+    --success: 158 64% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 43 96% 55%;
+    --warning-foreground: 43 96% 10%;
+    --info: 210 100% 60%;
+    --info-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 26 100% 55%;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Honor the safe-area on notched iOS for the bottom nav. */
+  :root {
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

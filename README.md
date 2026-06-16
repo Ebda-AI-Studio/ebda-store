@@ -62,25 +62,26 @@ Major capabilities added across this session (commit SHAs for reference):
 
 ## Tech Stack
 
-| Layer               | Technology                                            |
-| ------------------- | ----------------------------------------------------- |
-| **API**             | Express.js 4 + TypeScript                             |
-| **Admin Dashboard** | Next.js 16 (App Router)                               |
-| **Storefront**      | Next.js 16 (App Router)                               |
-| **Database**        | Neon PostgreSQL (serverless) + Prisma ORM (83 models) |
-| **Cache & Queues**  | Redis                                                 |
-| **Storage**         | Cloudflare R2 (S3-compatible)                         |
-| **Real-time**       | Socket.io (WebSocket notifications)                   |
-| **Auth**            | Custom JWT (HTTP-only cookies, cross-origin)          |
-| **Validation**      | Zod                                                   |
-| **UI**              | Tailwind CSS + shared component library (@force/ui)   |
-| **Async Jobs**      | Inngest (30+ functions, cloud-hosted step functions)  |
-| **Push**            | OneSignal + Web Push (VAPID dual-stack)               |
-| **Email**           | Resend (transactional)                                |
-| **Error Tracking**  | Sentry (three projects: api / admin / web)            |
-| **Logging**         | Pino + Axiom drain (30-day retention)                 |
-| **Analytics**       | PostHog (storefront + admin)                          |
-| **Testing**         | Vitest (497+ tests)                                   |
+| Layer               | Technology                                                 |
+| ------------------- | ---------------------------------------------------------- |
+| **API**             | Express.js 4 + TypeScript                                  |
+| **Admin Dashboard** | Next.js 16 (App Router)                                    |
+| **Orders PWA**      | Next.js 16 (App Router) — installable focus-mode order app |
+| **Storefront**      | Next.js 16 (App Router)                                    |
+| **Database**        | Neon PostgreSQL (serverless) + Prisma ORM (83 models)      |
+| **Cache & Queues**  | Redis                                                      |
+| **Storage**         | Cloudflare R2 (S3-compatible)                              |
+| **Real-time**       | Socket.io (WebSocket notifications)                        |
+| **Auth**            | Custom JWT (HTTP-only cookies, cross-origin)               |
+| **Validation**      | Zod                                                        |
+| **UI**              | Tailwind CSS + shared component library (@force/ui)        |
+| **Async Jobs**      | Inngest (30+ functions, cloud-hosted step functions)       |
+| **Push**            | OneSignal + Web Push (VAPID dual-stack)                    |
+| **Email**           | Resend (transactional)                                     |
+| **Error Tracking**  | Sentry (three projects: api / admin / web)                 |
+| **Logging**         | Pino + Axiom drain (30-day retention)                      |
+| **Analytics**       | PostHog (storefront + admin)                               |
+| **Testing**         | Vitest (497+ tests)                                        |
 
 ## Project Structure
 
