@@ -72,11 +72,29 @@ export interface Store {
   };
 }
 
-// Module-scope caches dedupe concurrent calls and avoid refetching on
-// route transitions within the same admin session. The cache is cleared
-// manually via refetch() or by a full page reload.
-const cache = new Map<string, Store>();
+// Module-scope caches dedupe concurrent calls and avoid re-fetching on
+// route transitions within the same admin session. Each entry has a
+// 5-minute TTL so the dashboard counts (orders, products) don't go stale
+// for the entire browser session after new orders/products come in.
+// Using in-memory TTL (not Redis) so there is no sub-120s Redis-TTL
+// penalty — this cache never touches Neon directly.
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const cache = new Map<string, { store: Store; expiresAt: number }>();
 const inFlight = new Map<string, Promise<Store | null>>();
+
+function cacheGet(storeId: string): Store | undefined {
+  const entry = cache.get(storeId);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    cache.delete(storeId);
+    return undefined;
+  }
+  return entry.store;
+}
+
+function cacheSet(storeId: string, store: Store): void {
+  cache.set(storeId, { store, expiresAt: Date.now() + CACHE_TTL_MS });
+}
 
 async function fetchStore(storeId: string): Promise<Store | null> {
   const existing = inFlight.get(storeId);
@@ -84,7 +102,7 @@ async function fetchStore(storeId: string): Promise<Store | null> {
 
   const promise = apiGet<{ store: Store }>(`/api/v1/stores/${storeId}`).then(res => {
     if (res.error || !res.data?.store) return null;
-    cache.set(storeId, res.data.store);
+    cacheSet(storeId, res.data.store);
     return res.data.store;
   });
   inFlight.set(storeId, promise);
@@ -108,11 +126,9 @@ async function fetchStore(storeId: string): Promise<Store | null> {
  */
 export function useCurrentStore(storeId: string | null | undefined) {
   const [store, setStore] = useState<Store | null>(() =>
-    storeId && cache.has(storeId) ? cache.get(storeId)! : null
+    storeId ? (cacheGet(storeId) ?? null) : null
   );
-  const [isLoading, setIsLoading] = useState<boolean>(() =>
-    storeId ? !cache.has(storeId) : false
-  );
+  const [isLoading, setIsLoading] = useState<boolean>(() => (storeId ? !cacheGet(storeId) : false));
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
@@ -122,8 +138,9 @@ export function useCurrentStore(storeId: string | null | undefined) {
       return;
     }
 
-    if (cache.has(storeId)) {
-      setStore(cache.get(storeId)!);
+    const cached = cacheGet(storeId);
+    if (cached) {
+      setStore(cached);
       setIsLoading(false);
       return;
     }

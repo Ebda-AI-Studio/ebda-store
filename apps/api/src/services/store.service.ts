@@ -469,32 +469,36 @@ export class StoreService {
     // worker hasn't moved the order forward yet). Without the paymentStatus
     // arm, dashboards showed Revenue=0 even when KWDs had been collected.
     // Ahmad 2026-05-21 — Wadyaljuz had 23 orders, KWD 0.000 revenue.
-    const [productCount, orderCount, totalRevenue, recentOrders] = await Promise.all([
-      prisma.product.count({ where: { storeId, status: 'active' } }),
-      prisma.order.count({ where: { storeId } }),
-      prisma.order.aggregate({
-        where: {
-          storeId,
-          OR: [
-            { status: { in: ['confirmed', 'processing', 'shipped', 'delivered'] } },
-            { paymentStatus: 'paid' },
-          ],
-        },
-        _sum: { total: true },
-      }),
-      prisma.order.findMany({
-        where: { storeId },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          customer: { select: { firstName: true, lastName: true, email: true } },
-        },
-      }),
-    ]);
+    const [productCount, orderCount, customerCount, totalRevenue, recentOrders] = await Promise.all(
+      [
+        prisma.product.count({ where: { storeId, status: 'active' } }),
+        prisma.order.count({ where: { storeId } }),
+        prisma.customer.count({ where: { storeId } }),
+        prisma.order.aggregate({
+          where: {
+            storeId,
+            OR: [
+              { status: { in: ['confirmed', 'processing', 'shipped', 'delivered'] } },
+              { paymentStatus: 'paid' },
+            ],
+          },
+          _sum: { total: true },
+        }),
+        prisma.order.findMany({
+          where: { storeId },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            customer: { select: { firstName: true, lastName: true, email: true } },
+          },
+        }),
+      ]
+    );
 
     return {
       productCount,
       orderCount,
+      customerCount,
       totalRevenue: totalRevenue._sum.total || 0,
       recentOrders,
     };

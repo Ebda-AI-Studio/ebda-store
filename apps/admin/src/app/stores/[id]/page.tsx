@@ -124,7 +124,7 @@ export default function StoreDetailPage() {
         </div>
       }
     >
-      <StatsGrid store={store} />
+      <StatsGrid storeId={store.id} />
 
       <div className="mt-8">
         <DashboardAccountingSummary storeId={storeId} />
