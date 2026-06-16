@@ -9,7 +9,7 @@ export interface AuthUser {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'super_admin' | 'store_admin' | 'customer';
+  role: 'super_admin' | 'store_admin' | 'staff' | 'customer';
   /** Forward-compat: explicit per-staff permission array once the API returns one. */
   permissions?: string[];
 }
@@ -26,7 +26,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL = `${getApiUrl()}/api/v1`;
 
-const ADMIN_ROLES = ['super_admin', 'store_admin'];
+// The Orders PWA is a staff tool: store_admin/super_admin own it, and `staff`
+// members (StoreStaff) are provisioned specifically to run it. Customers are
+// rejected (ADMIN_ONLY). Without `staff` here, a freshly created staff account
+// could never log in.
+const ADMIN_ROLES = ['super_admin', 'store_admin', 'staff'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
