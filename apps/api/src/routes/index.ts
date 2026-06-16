@@ -48,6 +48,7 @@ import insightsRoutes from './insights.routes';
 import suppliersRoutes from './suppliers.routes';
 import purchaseOrdersRoutes from './purchase-orders.routes';
 import stockAdjustmentsRoutes from './stock-adjustments.routes';
+import warehouseRoutes from './warehouse.routes';
 import expensesRoutes from './expenses.routes';
 import backordersRoutes from './backorders.routes';
 import botAnalyticsRoutes from './bot-analytics.routes';
@@ -175,6 +176,9 @@ router.use('/stores', tenantContext, purchaseOrdersRoutes);
 
 // Stock Adjustment CRUD + post (Batch 2 accounting)
 router.use('/stores', tenantContext, stockAdjustmentsRoutes);
+
+// Multi-Warehouse stock + order routing (Enterprise — inventory.multi_warehouse)
+router.use('/stores', tenantContext, warehouseRoutes);
 
 // Expense CRUD + approve/post/reject (Batch 2 accounting)
 router.use('/stores', tenantContext, expensesRoutes);

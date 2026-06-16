@@ -409,6 +409,8 @@ model Store {
   customerRfmSnapshots     CustomerRfmSnapshot[]
   whatsAppTemplates        WhatsAppTemplate[]
   paymentEvents            PaymentEvent[]
+  warehouses               Warehouse[]
+  warehouseStock           WarehouseStock[]
   countSessions            CountSession[]
   staffMembers             StoreStaff[]               @relation("StoreStaffMembers")
 
@@ -718,6 +720,7 @@ model Product {
   backorderLines       BackorderLine[]
   reorderSuggestions   ReorderSuggestion[]
   deadstockFlags       DeadStockFlag[]
+  warehouseStock       WarehouseStock[]
   countLines           CountLine[]
 
   @@unique([storeId, slug])
@@ -909,6 +912,7 @@ model ProductVariant {
   backorderLines       BackorderLine[]
   reorderSuggestions   ReorderSuggestion[]
   deadstockFlags       DeadStockFlag[]
+  warehouseStock       WarehouseStock[]
   countLines           CountLine[]
 
   @@index([productId])
@@ -3052,4 +3056,62 @@ model WhatsAppTemplate {
   @@unique([storeId, sourceKey, language])
   @@index([storeId, status])
   @@map("whatsapp_templates")
+}
+
+// ==========================================
+// Multi-Warehouse Inventory (Enterprise)
+// 2026-06-15: feat/multi-warehouse
+// ==========================================
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  name      String
+  nameAr    String?  @map("name_ar")
+  code      String   // Short code e.g. "MAIN", "KWT-2"
+  isDefault Boolean  @default(false) @map("is_default")
+  priority  Int      @default(0) // Higher = preferred in priority routing
+  lat       Float?   // Optional: enables proximity routing
+  lng       Float?   // Optional: enables proximity routing
+  address   String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store          Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  warehouseStock WarehouseStock[]
+
+  @@unique([storeId, code])
+  @@index([storeId])
+  @@index([storeId, isDefault])
+  @@index([storeId, priority(sort: Desc)])
+  @@map("warehouses")
+}
+
+// Per-warehouse stock level for a product (or a specific variant).
+// variant_id = null means the base product (no variants), or
+// the product-level aggregate for a product WITH variants.
+model WarehouseStock {
+  id          String   @id @default(uuid())
+  warehouseId String   @map("warehouse_id")
+  productId   String   @map("product_id")
+  variantId   String?  @map("variant_id") // null = base-product stock
+  quantity    Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Store FK for RLS — denormalised from warehouse to avoid a subquery in every policy.
+  storeId String @map("store_id")
+
+  warehouse Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  store     Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, productId, variantId])
+  @@index([warehouseId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([storeId])
+  @@map("warehouse_stock")
 }

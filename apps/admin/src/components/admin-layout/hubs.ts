@@ -33,6 +33,7 @@ export type HubLabels = {
   // Stock tabs
   stockDashboard: string;
   inventory: string;
+  warehouses: string;
   adjustments: string;
   suppliers: string;
   purchaseOrders: string;
@@ -123,6 +124,7 @@ export const HUBS: HubDefinition[] = [
     buildTabs: (storeId, labels) => [
       { label: labels.stockDashboard, href: `/stores/${storeId}/stock/dashboard` },
       { label: labels.inventory, href: `/stores/${storeId}/stock/inventory` },
+      { label: labels.warehouses, href: `/stores/${storeId}/stock/warehouses` },
       { label: labels.scan, href: `/stores/${storeId}/stock/scan` },
       { label: labels.adjustments, href: `/stores/${storeId}/stock/adjustments` },
       { label: labels.suppliers, href: `/stores/${storeId}/stock/suppliers` },

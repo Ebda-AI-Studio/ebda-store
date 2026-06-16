@@ -1,0 +1,415 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { AdminLayout } from '@/components/AdminLayout';
+import { SearchInput } from '@/components/SearchInput';
+import { useT } from '@/i18n/useT';
+import { apiGet, apiPost, apiPut } from '@/lib/api';
+import { Button, useToast } from '@force/ui';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface StockRow {
+  id: string;
+  productId: string;
+  variantId: string | null;
+  quantity: number;
+  updatedAt: string;
+  productName: string;
+  productSku: string | null;
+  variantTitle: string | null;
+  variantSku: string | null;
+}
+
+interface Warehouse {
+  id: string;
+  name: string;
+  code: string;
+  isDefault: boolean;
+  totalSkus: number;
+  totalUnits: number;
+}
+
+interface AdjustModal {
+  row: StockRow;
+  delta: number;
+  reason: string;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function WarehouseStockPage() {
+  const params = useParams();
+  const storeId = params?.id as string;
+  const warehouseId = params?.warehouseId as string;
+  const router = useRouter();
+  const t = useT('stock.warehouseStock');
+  const tc = useT('common');
+  const { success: toastSuccess, error: toastError } = useToast();
+
+  const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
+  const [rows, setRows] = useState<StockRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Inline quantity edit state: rowId → pending value
+  const [editing, setEditing] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+
+  // Adjust modal
+  const [adjustModal, setAdjustModal] = useState<AdjustModal | null>(null);
+  const [adjustSaving, setAdjustSaving] = useState(false);
+
+  const LIMIT = 50;
+
+  async function loadWarehouse() {
+    const { data } = await apiGet<{ warehouse: Warehouse }>(
+      `/api/v1/stores/${storeId}/warehouses/${warehouseId}`
+    );
+    if (data?.warehouse) {
+      setWarehouse(data.warehouse);
+    }
+  }
+
+  async function loadStock() {
+    setLoading(true);
+    setErr(null);
+    const qs = new URLSearchParams({
+      page: String(page),
+      limit: String(LIMIT),
+      ...(search && { search }),
+    });
+    const { data, error: apiError } = await apiGet<{ rows: StockRow[]; total: number }>(
+      `/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock?${qs}`
+    );
+    if (apiError) {
+      setErr(apiError.message);
+    } else {
+      setRows(data?.rows ?? []);
+      setTotal(data?.total ?? 0);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    if (storeId && warehouseId) {
+      loadWarehouse();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, warehouseId]);
+
+  useEffect(() => {
+    if (storeId && warehouseId) {
+      loadStock();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, warehouseId, page, search]);
+
+  async function handleSetQty(row: StockRow) {
+    const val = editing[row.id];
+    if (val === undefined) return;
+    const qty = parseInt(val);
+    if (isNaN(qty) || qty < 0) {
+      toastError(t('invalidQty'));
+      return;
+    }
+    setSaving(s => ({ ...s, [row.id]: true }));
+    try {
+      await apiPut(`/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock`, {
+        productId: row.productId,
+        variantId: row.variantId,
+        quantity: qty,
+      });
+      toastSuccess(t('qtyUpdated'));
+      setEditing(e => {
+        const copy = { ...e };
+        delete copy[row.id];
+        return copy;
+      });
+      await loadStock();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Save failed';
+      toastError(msg);
+    } finally {
+      setSaving(s => ({ ...s, [row.id]: false }));
+    }
+  }
+
+  async function handleAdjust() {
+    if (!adjustModal) return;
+    if (adjustModal.delta === 0) {
+      toastError(t('zeroDelta'));
+      return;
+    }
+    setAdjustSaving(true);
+    try {
+      await apiPost(`/api/v1/stores/${storeId}/warehouses/${warehouseId}/stock/adjust`, {
+        productId: adjustModal.row.productId,
+        variantId: adjustModal.row.variantId,
+        delta: adjustModal.delta,
+        reason: adjustModal.reason || undefined,
+      });
+      toastSuccess(t('adjustDone'));
+      setAdjustModal(null);
+      await loadStock();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Adjust failed';
+      toastError(msg);
+    } finally {
+      setAdjustSaving(false);
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <AdminLayout
+      title={warehouse ? `${t('title')} — ${warehouse.name}` : t('title')}
+      subtitle={
+        warehouse ? t('subtitle', { code: warehouse.code, units: warehouse.totalUnits }) : undefined
+      }
+      actions={
+        <Button
+          variant="ghost"
+          onClick={() => router.push(`/stores/${storeId}/stock/warehouses`)}
+          className="min-h-[44px]"
+        >
+          ← {t('backToWarehouses')}
+        </Button>
+      }
+    >
+      {/* Search */}
+      <div className="mb-4">
+        <SearchInput value={search} onSearch={setSearch} placeholder={t('searchPlaceholder')} />
+      </div>
+
+      {/* Error */}
+      {err && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {err}{' '}
+          <button className="underline" onClick={loadStock}>
+            {tc('retry')}
+          </button>
+        </div>
+      )}
+
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
+          ))}
+        </div>
+      )}
+
+      {/* Empty */}
+      {!loading && !err && rows.length === 0 && (
+        <div className="py-16 text-center text-muted-foreground">
+          {search ? t('noResults') : t('empty')}
+        </div>
+      )}
+
+      {/* Table */}
+      {!loading && rows.length > 0 && (
+        <>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-4 py-3 text-start">{t('colProduct')}</th>
+                  <th className="px-4 py-3 text-start">{t('colSku')}</th>
+                  <th className="px-4 py-3 text-start">{t('colVariant')}</th>
+                  <th className="px-4 py-3 text-end">{t('colQty')}</th>
+                  <th className="px-4 py-3 text-end">{tc('actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map(row => {
+                  const isEditing = editing[row.id] !== undefined;
+                  const isSaving = saving[row.id] === true;
+
+                  return (
+                    <tr key={row.id} className="transition-colors hover:bg-muted/30">
+                      <td className="px-4 py-3 font-medium">{row.productName}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {row.variantSku ?? row.productSku ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{row.variantTitle ?? '—'}</td>
+                      <td className="px-4 py-3 text-end">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            min={0}
+                            className="w-20 rounded border border-input bg-background px-2 py-1 text-end text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            value={editing[row.id]}
+                            onChange={e => setEditing(ed => ({ ...ed, [row.id]: e.target.value }))}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleSetQty(row);
+                              if (e.key === 'Escape')
+                                setEditing(ed => {
+                                  const c = { ...ed };
+                                  delete c[row.id];
+                                  return c;
+                                });
+                            }}
+                            autoFocus
+                          />
+                        ) : (
+                          <span
+                            className="cursor-pointer tabular-nums hover:underline"
+                            onClick={() =>
+                              setEditing(ed => ({ ...ed, [row.id]: String(row.quantity) }))
+                            }
+                            title={t('clickToEdit')}
+                          >
+                            {row.quantity}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-end">
+                        <div className="flex items-center justify-end gap-1">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={() => handleSetQty(row)}
+                                disabled={isSaving}
+                                className="min-h-[44px] rounded-md px-3 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+                              >
+                                {isSaving ? tc('saving') : tc('save')}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setEditing(ed => {
+                                    const c = { ...ed };
+                                    delete c[row.id];
+                                    return c;
+                                  })
+                                }
+                                className="min-h-[44px] rounded-md px-3 text-xs hover:bg-muted"
+                              >
+                                {tc('cancel')}
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setAdjustModal({ row, delta: 0, reason: '' })}
+                              className="min-h-[44px] rounded-md px-3 text-xs hover:bg-muted"
+                            >
+                              {t('adjust')}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+              <span>
+                {t('showing', {
+                  from: (page - 1) * LIMIT + 1,
+                  to: Math.min(page * LIMIT, total),
+                  total,
+                })}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  disabled={page === 1}
+                  onClick={() => setPage(p => p - 1)}
+                  className="min-h-[44px] rounded-md px-3 hover:bg-muted disabled:opacity-40"
+                >
+                  ←
+                </button>
+                <button
+                  disabled={page === totalPages}
+                  onClick={() => setPage(p => p + 1)}
+                  className="min-h-[44px] rounded-md px-3 hover:bg-muted disabled:opacity-40"
+                >
+                  →
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Adjust Delta Modal */}
+      {adjustModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={e => {
+            if (e.target === e.currentTarget) setAdjustModal(null);
+          }}
+        >
+          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="mb-1 text-base font-semibold">{t('adjustTitle')}</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              {adjustModal.row.productName}
+              {adjustModal.row.variantTitle ? ` / ${adjustModal.row.variantTitle}` : ''}
+            </p>
+
+            <div className="space-y-4">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                  {t('deltaLabel')} {t('deltaHint')}
+                </span>
+                <input
+                  type="number"
+                  value={adjustModal.delta}
+                  onChange={e =>
+                    setAdjustModal(m => m && { ...m, delta: parseInt(e.target.value) || 0 })
+                  }
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  placeholder="+10 or -5"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('newQtyPreview', {
+                    new: Math.max(0, adjustModal.row.quantity + (adjustModal.delta || 0)),
+                  })}
+                </p>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                  {t('reasonLabel')}
+                </span>
+                <input
+                  type="text"
+                  value={adjustModal.reason}
+                  onChange={e => setAdjustModal(m => m && { ...m, reason: e.target.value })}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  placeholder={t('reasonPlaceholder')}
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => setAdjustModal(null)}
+                disabled={adjustSaving}
+                className="min-h-[44px]"
+              >
+                {tc('cancel')}
+              </Button>
+              <Button onClick={handleAdjust} disabled={adjustSaving} className="min-h-[44px]">
+                {adjustSaving ? tc('saving') : t('applyAdjust')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </AdminLayout>
+  );
+}

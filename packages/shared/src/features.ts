@@ -348,8 +348,14 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     key: 'inventory.multi_warehouse',
     name: 'Inventory — Multi-Warehouse',
     nameAr: 'المخزون — مستودعات متعددة',
-    description: 'Track stock counts per warehouse and route orders by proximity or rule.',
-    descriptionAr: 'تتبع المخزون لكل مستودع وتوجيه الطلبات حسب القرب أو حسب قاعدة محددة.',
+    description:
+      'Track stock counts per warehouse location and route orders to the closest or highest-priority warehouse that has sufficient stock. ' +
+      'Includes per-warehouse stock views, delta adjustments with audit trail, and a cross-warehouse order-routing API (priority rule or proximity/Haversine rule). ' +
+      'Existing Product.inventory aggregates are kept in sync automatically — single-warehouse stores are unaffected when the flag is off.',
+    descriptionAr:
+      'تتبع مستويات المخزون لكل مستودع وتوجيه الطلبات تلقائياً إلى أقرب مستودع أو الأعلى أولوية الذي يحتوي على مخزون كافٍ. ' +
+      'يشمل عرض المخزون لكل مستودع وتعديلات بمسار تدقيق، وواجهة برمجية لتوجيه الطلبات (قاعدة الأولوية أو قاعدة القرب الجغرافي). ' +
+      'تظل إجماليات مخزون المنتجات محدّثة تلقائياً — المتاجر ذات المستودع الواحد لا تتأثر عند إيقاف الميزة.',
     category: 'operations',
     tier: 'addon',
   },
