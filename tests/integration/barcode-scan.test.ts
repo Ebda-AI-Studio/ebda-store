@@ -104,6 +104,10 @@ afterAll(async () => {
   await prisma.countLine.deleteMany({ where: { session: { storeId } } });
   await prisma.countSession.deleteMany({ where: { storeId } });
   await prisma.inventoryHistory.deleteMany({ where: { storeId } });
+  // reconcileCountSession posts cycle_count adjustments whose stock_adjustment_items
+  // FK-reference products (RESTRICT, no cascade). Delete adjustments first (items
+  // cascade) so the product delete below doesn't hit stock_adjustment_items_product_id_fkey.
+  await prisma.stockAdjustment.deleteMany({ where: { storeId } });
   await prisma.productVariant.deleteMany({ where: { productId: variantProductId } });
   await prisma.product.deleteMany({ where: { storeId } });
   await prisma.store.deleteMany({ where: { id: storeId } });

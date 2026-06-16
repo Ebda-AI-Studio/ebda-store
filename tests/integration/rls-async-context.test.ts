@@ -1,25 +1,59 @@
 /**
  * RLS async-context regression guard
  *
- * Verifies that FORCE row-level security (migration complete_force_rls_coverage)
- * correctly filters reads to zero when no tenant GUC is set, and that
- * runInTenantContext / withRlsBypass restore visibility.
+ * Verifies the tenant-isolation contract that FORCE row-level security gives
+ * orders, and that the async-context helpers (runInTenantContext / withRlsBypass)
+ * behave as the production API + Inngest/webhook paths rely on.
  *
- * Why this matters: Inngest jobs and webhook handlers run outside the HTTP
- * request lifecycle and therefore outside the tenant-context middleware. Any
- * direct prisma.* call from these paths sees zero rows if the GUC is unset.
- * This test is the regression guard for the whole class.
+ * The current, intentional policy shape is **allow-contextless**:
+ *   USING ( current_store_id() IS NULL OR store_id = current_store_id() )
+ * i.e. a query with NO `app.current_store_id` set sees all rows (so webhook /
+ * system-job paths that legitimately run outside tenant context are not
+ * silently 0-rowed — see feedback-rls-force-cutover-breaks-preauth, the WBS P0).
+ * The real isolation guarantee is therefore **cross-tenant denial**: a query
+ * scoped to store B must NOT see store A's rows.
+ *
+ * CI role note: DATABASE_URL connects as a superuser (table owner), and
+ * superusers bypass FORCE RLS entirely. So — exactly like
+ * tenant-isolation.test.ts — `runAsForceApp` drops to the `force_app` role
+ * (SET LOCAL ROLE, reverts on COMMIT) so the policy is actually evaluated.
  *
  * Runs only when DATABASE_URL is set (integration / CI environment). The
  * test creates its own store + order and cleans up after itself.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import type { PrismaClient } from '@prisma/client';
 import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 
 // Skip when there is no real DB (unit-test environment)
 const hasDb =
   !!process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost:5432/test_db');
+
+// A store id the test order does NOT belong to — used to prove cross-tenant denial.
+const FOREIGN_STORE_ID = '00000000-0000-0000-0000-000000000000';
+
+/**
+ * Execute fn as the `force_app` role with `app.current_store_id` = storeCtx
+ * (null/'' → contextless). Both GUC changes are LOCAL and revert on COMMIT, so
+ * Postgres evaluates the `TO force_app` policies exactly as production does,
+ * even though DATABASE_URL is a superuser connection.
+ */
+async function runAsForceApp<T>(
+  storeCtx: string | null,
+  fn: (tx: PrismaClient) => Promise<T>
+): Promise<T> {
+  return prisma.$transaction(
+    async tx => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE force_app`);
+      await tx.$executeRawUnsafe(
+        `SET LOCAL app.current_store_id = '${(storeCtx ?? '').replace(/'/g, "''")}'`
+      );
+      return fn(tx as unknown as PrismaClient);
+    },
+    { maxWait: 10000, timeout: 30000 }
+  ) as Promise<T>;
+}
 
 describe.skipIf(!hasDb)('RLS async-context guard', () => {
   let storeId: string;
@@ -108,6 +142,7 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
           total: 1000,
           currency: 'KWD',
           shippingAddress: {},
+          billingAddress: {},
         },
       });
       orderId = order.id;
@@ -130,15 +165,47 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
     }
   });
 
-  it('raw prisma.order.findUnique returns null without tenant context (RLS filters it)', async () => {
-    // This is the core regression check: a bare prisma call from an
-    // async context (no SET LOCAL app.current_store_id) must return null.
-    // If this test starts failing it means RLS was disabled — re-enable it.
-    const row = await prisma.order.findUnique({ where: { id: orderId } });
+  it('as force_app, a read scoped to a FOREIGN store cannot see the order (cross-tenant RLS denial)', async () => {
+    // The core isolation guarantee: store B context must not see store A rows.
+    // If this starts returning the row, the tenant RLS policy has regressed.
+    const row = await runAsForceApp(FOREIGN_STORE_ID, tx =>
+      tx.order.findUnique({ where: { id: orderId } })
+    );
     expect(row).toBeNull();
   });
 
-  it('prisma.order.findUnique returns the row inside runInTenantContext', async () => {
+  it('as force_app, a write scoped to a FOREIGN store matches zero rows (cross-tenant write denial)', async () => {
+    // RLS filters the WHERE to zero rows → Prisma throws P2025 (record not found).
+    await expect(
+      runAsForceApp(FOREIGN_STORE_ID, tx =>
+        tx.order.update({ where: { id: orderId }, data: { customerNotes: 'should-not-land' } })
+      )
+    ).rejects.toThrow();
+  });
+
+  it('as force_app WITH the order’s store context, the order is visible (and writable)', async () => {
+    const row = await runAsForceApp(storeId, tx => tx.order.findUnique({ where: { id: orderId } }));
+    expect(row?.id).toBe(orderId);
+
+    const updated = await runAsForceApp(storeId, tx =>
+      tx.order.update({ where: { id: orderId }, data: { customerNotes: 'rls-context-write' } })
+    );
+    expect(updated.customerNotes).toBe('rls-context-write');
+
+    // Reset
+    await withRlsBypass(tx =>
+      tx.order.update({ where: { id: orderId }, data: { customerNotes: null } })
+    );
+  });
+
+  it('as force_app with NO context, the order is visible — allow-contextless (webhook/system-job safe)', async () => {
+    // Deliberate design: current_store_id() IS NULL → policy allows, so a
+    // legitimate no-context caller (Inngest job, payment webhook) is NOT 0-rowed.
+    const row = await runAsForceApp(null, tx => tx.order.findUnique({ where: { id: orderId } }));
+    expect(row?.id).toBe(orderId);
+  });
+
+  it('runInTenantContext returns the row (production tenant-scoped path)', async () => {
     const row = await runInTenantContext(storeId, () =>
       prisma.order.findUnique({ where: { id: orderId } })
     );
@@ -146,33 +213,9 @@ describe.skipIf(!hasDb)('RLS async-context guard', () => {
     expect(row?.id).toBe(orderId);
   });
 
-  it('prisma.order.findUnique returns the row inside withRlsBypass', async () => {
+  it('withRlsBypass returns the row regardless of context (cross-tenant system path)', async () => {
     const row = await withRlsBypass(tx => tx.order.findUnique({ where: { id: orderId } }));
     expect(row).not.toBeNull();
     expect(row?.id).toBe(orderId);
-  });
-
-  it('an order write from a no-context caller succeeds only inside runInTenantContext', async () => {
-    // A bare update must fail (RLS filters the WHERE to zero rows → Prisma throws P2025).
-    await expect(
-      prisma.order.update({
-        where: { id: orderId },
-        data: { customerNotes: 'should-not-land' },
-      })
-    ).rejects.toThrow();
-
-    // The same update inside runInTenantContext must succeed.
-    const updated = await runInTenantContext(storeId, () =>
-      prisma.order.update({
-        where: { id: orderId },
-        data: { customerNotes: 'rls-context-write' },
-      })
-    );
-    expect(updated.customerNotes).toBe('rls-context-write');
-
-    // Reset
-    await runInTenantContext(storeId, () =>
-      prisma.order.update({ where: { id: orderId }, data: { customerNotes: null } })
-    );
   });
 });

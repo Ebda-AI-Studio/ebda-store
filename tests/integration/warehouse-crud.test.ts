@@ -172,7 +172,7 @@ describe('WarehouseService — CRUD', () => {
           priority: 0,
         })
       )
-    ).rejects.toThrow('WAREHOUSE_CODE_EXISTS');
+    ).rejects.toMatchObject({ code: 'WAREHOUSE_CODE_EXISTS' });
   });
 
   it('blocks deactivating the last active warehouse', async () => {
@@ -181,7 +181,7 @@ describe('WarehouseService — CRUD', () => {
 
     await expect(
       withRlsBypass(() => WarehouseService.deactivateWarehouse(storeId, mainWarehouseId))
-    ).rejects.toThrow('WAREHOUSE_LAST_ACTIVE');
+    ).rejects.toMatchObject({ code: 'WAREHOUSE_LAST_ACTIVE' });
 
     // Re-activate SOUTH (update isActive=true) for subsequent tests
     await withRlsBypass(() =>

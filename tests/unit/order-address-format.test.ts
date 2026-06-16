@@ -86,19 +86,34 @@ describe('formatAddressLines — locale-aware labels', () => {
     expect(formatAddressLines(undefined)).toEqual([]);
   });
 
-  it('shows bilingual city/area when both EN and AR values differ', () => {
+  it('selects English city/area on the EN locale (one language, not both)', () => {
     const addr = {
       city: 'Capital',
       cityAr: 'العاصمة',
       area: 'Salmiya',
       areaAr: 'السالمية',
     };
-    const lines = formatAddressLines(addr, EN_LABELS);
-    const head = lines[0];
+    const head = formatAddressLines(addr, EN_LABELS, 'en')[0];
     expect(head).toContain('Capital');
-    expect(head).toContain('العاصمة');
     expect(head).toContain('Salmiya');
+    // locale-selective: the AR values are NOT shown on the EN locale
+    expect(head).not.toContain('العاصمة');
+    expect(head).not.toContain('السالمية');
+  });
+
+  it('selects Arabic city/area on the AR locale (one language, not both)', () => {
+    const addr = {
+      city: 'Capital',
+      cityAr: 'العاصمة',
+      area: 'Salmiya',
+      areaAr: 'السالمية',
+    };
+    const head = formatAddressLines(addr, AR_LABELS, 'ar')[0];
+    expect(head).toContain('العاصمة');
     expect(head).toContain('السالمية');
+    // locale-selective: the EN values are NOT shown on the AR locale
+    expect(head).not.toContain('Capital');
+    expect(head).not.toContain('Salmiya');
   });
 
   it('falls back to streetAr when street is absent (with AR labels)', () => {
