@@ -60,19 +60,19 @@ model User {
   tokenVersion   Int       @default(0) @map("token_version")
 
   // Relations
-  authStore              Store?                  @relation("StoreCustomers", fields: [storeId], references: [id], onDelete: Cascade)
-  stores                 Store[]
-  orders                 Order[]
-  carts                  Cart[]
-  addresses              Address[]
-  refreshTokens          RefreshToken[]
-  verificationTokens     VerificationToken[]
-  auditLogs              AuditLog[]
-  wishlists              Wishlist[]
-  reviews                Review[]
-  returns                Return[]
-  loyaltyPoints          LoyaltyPoints[]
-  loyaltyTransactions    LoyaltyTransaction[]
+  authStore                Store?                  @relation("StoreCustomers", fields: [storeId], references: [id], onDelete: Cascade)
+  stores                   Store[]
+  orders                   Order[]
+  carts                    Cart[]
+  addresses                Address[]
+  refreshTokens            RefreshToken[]
+  verificationTokens       VerificationToken[]
+  auditLogs                AuditLog[]
+  wishlists                Wishlist[]
+  reviews                  Review[]
+  returns                  Return[]
+  loyaltyPoints            LoyaltyPoints[]
+  loyaltyTransactions      LoyaltyTransaction[]
   featureToggles           StoreFeature[]          @relation("FeatureToggledBy")
   pushSubscriptions        PushSubscription[]      @relation("UserPushSubscriptions")
   onesignalSubscriptions   OneSignalSubscription[] @relation("UserOneSignalSubscriptions")
@@ -217,15 +217,15 @@ model Store {
   socialLinks Json @default("{}") @map("social_links") // StoreSocialLinks JSON
 
   // Contact Information
-  email          String?
-  phone          String?
-  phoneAr        String? @map("phone_ar")
-  whatsapp       String?
-  address        String?
-  addressAr      String? @map("address_ar")
+  email         String?
+  phone         String?
+  phoneAr       String? @map("phone_ar")
+  whatsapp      String?
+  address       String?
+  addressAr     String? @map("address_ar")
   // Used by WhatsApp bot "Locations & Hours" branch (Phase D.6 / Wave 2A)
-  businessHours  String? @map("business_hours")  // free-text, e.g. "Sat–Thu 9am–10pm"
-  googleMapsUrl  String? @map("google_maps_url")  // full Maps URL for the store location
+  businessHours String? @map("business_hours") // free-text, e.g. "Sat–Thu 9am–10pm"
+  googleMapsUrl String? @map("google_maps_url") // full Maps URL for the store location
 
   // Announcement Bar
   announcementBar Json? @map("announcement_bar") // AnnouncementBar JSON
@@ -303,9 +303,9 @@ model Store {
   // GEO (Generative Engine Optimization) — LLM-search visibility fields.
   // Written by bulk-ai-geo Inngest sweep. Merchantscan edit via admin.
   /// LLMs.txt content for this store — served at /<slug>/llms.txt by the storefront.
-  llmsTxt                   String? @map("llms_txt")
+  llmsTxt   String? @map("llms_txt")
   /// Structured brand facts: { foundedYear?, location?, categories[], certifications?, languages[], contact? }
-  aboutJson                 Json?   @map("about_json")
+  aboutJson Json?   @map("about_json")
 
   // Accounting Settings (Batch 1)
   accountingEnabled    Boolean @default(true) @map("accounting_enabled")
@@ -329,20 +329,20 @@ model Store {
   //   native_catalog                 — Meta Commerce Catalog send + pre-catalog greeting flow
   //   native_catalog_with_gemini_agent — native_catalog + Gemini AI agent on Agent path
   // Flip via Admin → WhatsApp → Bot Mode dropdown. No automatic cutover on existing stores.
-  botMode           String  @default("legacy_chat")  @map("bot_mode")
+  botMode         String  @default("legacy_chat") @map("bot_mode")
   /// Service menu configuration (JSON). Shape:
   /// { orderNow: bool, subscriptionBoxes: bool, locationsHours: bool, chatWithAgent: bool,
   ///   labels: { en: { orderNow?, subscriptionBoxes?, locationsHours?, chatWithAgent? },
   ///              ar: { ... } } }
   /// Absent = WBS uses canonical defaults.
-  botServiceMenu    Json?   @map("bot_service_menu")
+  botServiceMenu  Json?   @map("bot_service_menu")
   /// FB Commerce Catalog ID (per-merchant, obtained from Meta Business Manager)
-  metaCatalogId     String? @map("meta_catalog_id")
+  metaCatalogId   String? @map("meta_catalog_id")
   /// FB Business Manager ID
-  metaBusinessId    String? @map("meta_business_id")
+  metaBusinessId  String? @map("meta_business_id")
   /// Long-lived User Access Token for the Meta Catalog API, encrypted via
   /// CREDENTIAL_ENCRYPTION_KEY (same pattern as wbsApiKey). NEVER returned plain.
-  metaAccessToken   String? @map("meta_access_token")
+  metaAccessToken String? @map("meta_access_token")
 
   // Relations
   owner                    User                       @relation(fields: [ownerId], references: [id])
@@ -409,6 +409,8 @@ model Store {
   customerRfmSnapshots     CustomerRfmSnapshot[]
   whatsAppTemplates        WhatsAppTemplate[]
   paymentEvents            PaymentEvent[]
+  bankStatements           BankStatement[]
+  bankTransactions         BankTransaction[]
   warehouses               Warehouse[]
   warehouseStock           WarehouseStock[]
   countSessions            CountSession[]
@@ -437,7 +439,7 @@ model StoreStaff {
   createdAt DateTime @default(now()) @map("created_at")
 
   store Store @relation("StoreStaffMembers", fields: [storeId], references: [id], onDelete: Cascade)
-  user  User  @relation("StaffUser",          fields: [userId],  references: [id], onDelete: Cascade)
+  user  User  @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, storeId])
   @@index([storeId])
@@ -598,29 +600,29 @@ enum StoreTemplate {
 // ==========================================
 
 model Category {
-  id                String    @id @default(uuid())
-  storeId           String    @map("store_id")
-  name              String
-  nameAr            String?   @map("name_ar")
-  slug              String
-  description       String?
-  descriptionAr     String?   @map("description_ar")
-  image             String?
-  parentId          String?   @map("parent_id")
-  position          Int       @default(0)
-  isActive          Boolean   @default(true) @map("is_active")
+  id                   String    @id @default(uuid())
+  storeId              String    @map("store_id")
+  name                 String
+  nameAr               String?   @map("name_ar")
+  slug                 String
+  description          String?
+  descriptionAr        String?   @map("description_ar")
+  image                String?
+  parentId             String?   @map("parent_id")
+  position             Int       @default(0)
+  isActive             Boolean   @default(true) @map("is_active")
   // SEO meta — set per-category in admin or via the AI bulk sweep.
-  metaTitle         String?   @map("meta_title")
-  metaTitleAr       String?   @map("meta_title_ar")
-  metaDescription   String?   @map("meta_description")
-  metaDescriptionAr String?   @map("meta_description_ar")
+  metaTitle            String?   @map("meta_title")
+  metaTitleAr          String?   @map("meta_title_ar")
+  metaDescription      String?   @map("meta_description")
+  metaDescriptionAr    String?   @map("meta_description_ar")
   // AEO — conversational answer-engine copy. Written by bulk-ai-meta-aeo
   // sweep. Storefront coalesces at render time: AEO > SEO > null.
-  metaDescriptionAeo   String? @map("meta_description_aeo")
-  metaDescriptionAeoAr String? @map("meta_description_aeo_ar")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  deletedAt         DateTime? @map("deleted_at") // Soft delete support
+  metaDescriptionAeo   String?   @map("meta_description_aeo")
+  metaDescriptionAeoAr String?   @map("meta_description_aeo_ar")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at") // Soft delete support
 
   // Relations
   store    Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -636,60 +638,60 @@ model Category {
 }
 
 model Product {
-  id                String        @id @default(uuid())
-  storeId           String        @map("store_id")
-  name              String
-  nameAr            String?       @map("name_ar")
-  slug              String
-  description       String?
-  descriptionAr     String?       @map("description_ar")
-  price             Int // Price in fils (1 KWD = 1000 fils)
-  compareAtPrice    Int?          @map("compare_at_price")
-  costPrice         Int?          @map("cost_price")
-  sku               String?
-  barcode           String?
-  inventory         Int           @default(0)
-  lowStockThreshold Int           @default(5) @map("low_stock_threshold")
-  trackInventory    Boolean       @default(true) @map("track_inventory")
-  weight            Float?
-  dimensions        Json? // { length, width, height }
-  status            ProductStatus @default(draft)
-  featured          Boolean       @default(false)
-  isNew             Boolean       @default(false) @map("is_new")
+  id                   String        @id @default(uuid())
+  storeId              String        @map("store_id")
+  name                 String
+  nameAr               String?       @map("name_ar")
+  slug                 String
+  description          String?
+  descriptionAr        String?       @map("description_ar")
+  price                Int // Price in fils (1 KWD = 1000 fils)
+  compareAtPrice       Int?          @map("compare_at_price")
+  costPrice            Int?          @map("cost_price")
+  sku                  String?
+  barcode              String?
+  inventory            Int           @default(0)
+  lowStockThreshold    Int           @default(5) @map("low_stock_threshold")
+  trackInventory       Boolean       @default(true) @map("track_inventory")
+  weight               Float?
+  dimensions           Json? // { length, width, height }
+  status               ProductStatus @default(draft)
+  featured             Boolean       @default(false)
+  isNew                Boolean       @default(false) @map("is_new")
   // Manually curated by the store admin — drives the storefront's
   // "Best Sellers" carousel. Independent of actual order data so a merchant
   // can stage products at launch before any sales data exists.
-  isBestSeller      Boolean       @default(false) @map("is_best_seller")
-  viewCount         Int           @default(0) @map("view_count")
-  metaTitle         String?       @map("meta_title")
-  metaTitleAr       String?       @map("meta_title_ar")
-  metaDescription   String?       @map("meta_description")
-  metaDescriptionAr String?       @map("meta_description_ar")
+  isBestSeller         Boolean       @default(false) @map("is_best_seller")
+  viewCount            Int           @default(0) @map("view_count")
+  metaTitle            String?       @map("meta_title")
+  metaTitleAr          String?       @map("meta_title_ar")
+  metaDescription      String?       @map("meta_description")
+  metaDescriptionAr    String?       @map("meta_description_ar")
   // AEO — conversational answer-engine copy. Written by bulk-ai-meta-aeo
   // sweep. Storefront coalesces at render time: AEO > SEO > null.
-  metaDescriptionAeo   String?    @map("meta_description_aeo")
-  metaDescriptionAeoAr String?    @map("meta_description_aeo_ar")
+  metaDescriptionAeo   String?       @map("meta_description_aeo")
+  metaDescriptionAeoAr String?       @map("meta_description_aeo_ar")
   // GEO — LLM citation copy. Written by bulk-ai-citation-copy sweep.
   // Format: "Definitive first sentence. Key specs bullet block."
-  citationCopy   String? @map("citation_copy")
-  citationCopyAr String? @map("citation_copy_ar")
+  citationCopy         String?       @map("citation_copy")
+  citationCopyAr       String?       @map("citation_copy_ar")
   // Per-field AI provenance: { "<field>": "ai" | "human" }. Absent key =
   // never set. Drives the AI-first autofill override guarantee — the engine
   // never overwrites a field marked "human". See @force/shared
   // AI_AUTOFILL_FIELDS / fieldsNeedingRefresh.
-  aiFieldSources Json @default("{}") @map("ai_field_sources")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  deletedAt         DateTime?     @map("deleted_at") // Soft delete support
-  allowBackorder    Boolean       @default(false) @map("allow_backorder")
-  lastCostUpdateAt  DateTime?     @map("last_cost_update_at")
+  aiFieldSources       Json          @default("{}") @map("ai_field_sources")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  deletedAt            DateTime?     @map("deleted_at") // Soft delete support
+  allowBackorder       Boolean       @default(false) @map("allow_backorder")
+  lastCostUpdateAt     DateTime?     @map("last_cost_update_at")
   // Discount input columns — the admin enters a REGULAR (RRP) price plus a
   // discount, and the service derives price/compareAtPrice from them.
   // percentage: value is basis points (percent×100; e.g. 12.5% → 1250, range 0–10000).
   // fixed:      value is fils (1 KWD = 1000 fils).
   // When null the product has no admin-authored discount (legacy or no discount).
-  discountType      DiscountType? @map("discount_type")
-  discountValue     Int?          @map("discount_value")
+  discountType         DiscountType? @map("discount_type")
+  discountValue        Int?          @map("discount_value")
 
   // Variants
   hasVariants Boolean @default(false) @map("has_variants")
@@ -756,7 +758,7 @@ enum ProductStatus {
 // compareAtPrice from these two columns at save time.
 enum DiscountType {
   percentage // value is basis points (percent×100; 12.5% → 1250)
-  fixed      // value is fils (1 KWD = 1000 fils)
+  fixed // value is fils (1 KWD = 1000 fils)
 }
 
 // ==========================================
@@ -986,45 +988,45 @@ model CartItem {
 // ==========================================
 
 model Order {
-  id                  String             @id @default(uuid())
-  storeId             String             @map("store_id")
-  customerId          String?            @map("customer_id")
-  orderNumber         String             @unique @map("order_number")
-  status              OrderStatus        @default(pending)
-  paymentStatus       OrderPaymentStatus @default(unpaid) @map("payment_status")
-  subtotal            Int
-  tax                 Int                @default(0)
-  shipping            Int                @default(0)
-  discount            Int                @default(0)
-  total               Int
+  id                    String             @id @default(uuid())
+  storeId               String             @map("store_id")
+  customerId            String?            @map("customer_id")
+  orderNumber           String             @unique @map("order_number")
+  status                OrderStatus        @default(pending)
+  paymentStatus         OrderPaymentStatus @default(unpaid) @map("payment_status")
+  subtotal              Int
+  tax                   Int                @default(0)
+  shipping              Int                @default(0)
+  discount              Int                @default(0)
+  total                 Int
   // Extra out-of-catalog amount used by merchant-initiated payment
   // links — a custom service fee, deposit, or quote that doesn't map
   // to a Product. Baked into `total` at order creation; rendered as
   // a synthetic line in admin order detail. extraAmountNote captures
   // what the charge is for ("Photography deposit", "Rush fee", etc.).
-  extraAmount         Int                @default(0) @map("extra_amount")
-  extraAmountNote     String?            @map("extra_amount_note")
-  currency            String             @default("KWD")
-  couponCode          String?            @map("coupon_code")
-  couponDiscount      Int                @default(0) @map("coupon_discount")
+  extraAmount           Int                @default(0) @map("extra_amount")
+  extraAmountNote       String?            @map("extra_amount_note")
+  currency              String             @default("KWD")
+  couponCode            String?            @map("coupon_code")
+  couponDiscount        Int                @default(0) @map("coupon_discount")
   // Loyalty redemption applied at checkout. loyaltyPointsRedeemed is the
   // number of points the customer spent on this order (NULL = none redeemed
   // / pre-feature order); loyaltyDiscount is the resulting discount amount in
   // FILS that was folded into `discount` + `total`. Both are written
   // atomically with LoyaltyService.redeemPoints inside the order-create
   // transaction, and read by reverseRedeemedPointsFromOrder on refund/cancel.
-  loyaltyPointsRedeemed Int?             @map("loyalty_points_redeemed")
-  loyaltyDiscount     Int                @default(0) @map("loyalty_discount")
-  notes               String?
-  customerNotes       String?            @map("customer_notes")
-  shippingAddress     Json               @map("shipping_address")
-  billingAddress      Json               @map("billing_address")
-  shippedAt           DateTime?          @map("shipped_at")
-  deliveredAt         DateTime?          @map("delivered_at")
-  reviewRequestSentAt DateTime?          @map("review_request_sent_at")
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
-  deletedAt           DateTime?          @map("deleted_at") // Soft delete support
+  loyaltyPointsRedeemed Int?               @map("loyalty_points_redeemed")
+  loyaltyDiscount       Int                @default(0) @map("loyalty_discount")
+  notes                 String?
+  customerNotes         String?            @map("customer_notes")
+  shippingAddress       Json               @map("shipping_address")
+  billingAddress        Json               @map("billing_address")
+  shippedAt             DateTime?          @map("shipped_at")
+  deliveredAt           DateTime?          @map("delivered_at")
+  reviewRequestSentAt   DateTime?          @map("review_request_sent_at")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  deletedAt             DateTime?          @map("deleted_at") // Soft delete support
 
   // Buyer's UI locale at checkout time ('en' | 'ar'). Used to send
   // transactional emails in the customer's language regardless of the
@@ -1165,41 +1167,41 @@ model Payment {
 ///   - Reconciliation gap (Tap settled vs we received):
 ///       compare `provider_payload->>'settlement_id'` to your bank statement
 model PaymentEvent {
-  id           String   @id @default(uuid())
-  paymentId    String   @map("payment_id")
+  id                String         @id @default(uuid())
+  paymentId         String         @map("payment_id")
   /// Denormalized so we can scope by store without joining payments → orders.
-  storeId      String   @map("store_id")
+  storeId           String         @map("store_id")
   /// Denormalized for convenience in audit queries.
-  orderId      String   @map("order_id")
+  orderId           String         @map("order_id")
   /// 'created' | 'status_change' | 'webhook' | 'refund' | 'admin_action' | 'reconciliation'
   /// Free-form to avoid migration churn when we add a new event type.
-  eventType    String   @map("event_type")
+  eventType         String         @map("event_type")
   /// Null on the very first event ('created').
-  fromStatus   PaymentStatus? @map("from_status")
+  fromStatus        PaymentStatus? @map("from_status")
   /// Null when an event was informational (e.g. webhook received but no
   /// state change — duplicate, signature replay, etc.).
-  toStatus     PaymentStatus? @map("to_status")
+  toStatus          PaymentStatus? @map("to_status")
   /// Provider name when the event is webhook-driven: 'tap' | 'myfatoorah' | 'hesabe' | 'upayments'.
-  provider     String?
+  provider          String?
   /// Raw provider POST body when event_type='webhook'. Lets us replay
   /// a dispute 6+ months later even if metadata on Payment has been
   /// overwritten by a later event.
-  providerPayload Json? @map("provider_payload")
+  providerPayload   Json?          @map("provider_payload")
   /// Free-form details: idempotency key, signature hash, refund reason,
   /// admin notes, reconciliation diff — whatever the writer wants
   /// preserved without bloating the columns. Always non-null (default {}).
-  details      Json     @default("{}")
+  details           Json           @default("{}")
   /// User who triggered the event (admin refund, customer cancel, etc.).
   /// Null for webhook + system events.
-  triggeredByUserId String? @map("triggered_by_user_id")
+  triggeredByUserId String?        @map("triggered_by_user_id")
   /// Time the event actually occurred (provider timestamp if known,
   /// else server clock). Indexed for time-range queries.
-  occurredAt   DateTime @default(now()) @map("occurred_at")
-  createdAt    DateTime @default(now()) @map("created_at")
+  occurredAt        DateTime       @default(now()) @map("occurred_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
 
-  payment       Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  store         Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  triggeredBy   User?   @relation(fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+  payment     Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  store       Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  triggeredBy User?   @relation(fields: [triggeredByUserId], references: [id], onDelete: SetNull)
 
   @@index([paymentId, occurredAt])
   @@index([storeId, occurredAt(sort: Desc)])
@@ -2407,6 +2409,7 @@ model Account {
   expensesByCategory Expense[]       @relation("ExpenseCategoryAccount")
   expensesPaidFrom   Expense[]       @relation("ExpensePaidFromAccount")
   purchaseOrders     PurchaseOrder[] @relation("PoApAccount")
+  bankStatements     BankStatement[] @relation("BankStatementAccount")
 
   @@unique([storeId, code])
   @@index([storeId, type])
@@ -2427,10 +2430,11 @@ model JournalEntry {
   postedBy     String?            @map("posted_by")
   createdAt    DateTime           @default(now()) @map("created_at")
 
-  store      Store         @relation(fields: [storeId], references: [id], onDelete: Restrict)
-  lines      JournalLine[]
-  reversedBy JournalEntry? @relation("Reversal", fields: [reversedById], references: [id])
-  reverses   JournalEntry? @relation("Reversal")
+  store         Store             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  lines         JournalLine[]
+  reversedBy    JournalEntry?     @relation("Reversal", fields: [reversedById], references: [id])
+  reverses      JournalEntry?     @relation("Reversal")
+  bankTxMatches BankTransaction[] @relation("BankTxJournalMatch")
 
   @@unique([storeId, entryNumber])
   @@index([storeId, postedAt(sort: Desc)])
@@ -2471,29 +2475,26 @@ model JournalLine {
 
 /**
  * FX Rate Registry — merchant-maintained log of exchange rates for a date.
- *
  * Rate meaning: 1 unit of `currency` = `rate` KWD.
  * Example: { currency: 'USD', rate: 0.307, rateDate: '2026-06-15' }
- *   means 1 USD was worth 0.307 KWD on that date.
- *
+ * means 1 USD was worth 0.307 KWD on that date.
  * There is no unique constraint on (storeId, currency, rateDate) by design —
  * merchants may record multiple rates for the same date (intraday corrections).
  * The most recently created row for a given date is the effective rate.
- *
  * Feature gate: accounting.multi_currency (Enterprise).
  * RLS: standard store_id-scoped policy.
  */
 model FxRateEntry {
-  id          String   @id @default(uuid())
-  storeId     String   @map("store_id")
+  id         String   @id @default(uuid())
+  storeId    String   @map("store_id")
   /// ISO-4217 currency code (e.g. 'USD', 'EUR'). Always uppercase.
-  currency    String
+  currency   String
   /// Rate: 1 unit of `currency` = rate KWD. numeric(16,8) — exact decimal.
-  rate        Decimal  @db.Decimal(16, 8)
+  rate       Decimal  @db.Decimal(16, 8)
   /// Date the rate applies to. Stored as a date-only timestamp (UTC midnight).
-  rateDate    DateTime @map("rate_date") @db.Date
-  recordedBy  String?  @map("recorded_by")
-  createdAt   DateTime @default(now()) @map("created_at")
+  rateDate   DateTime @map("rate_date") @db.Date
+  recordedBy String?  @map("recorded_by")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -3056,6 +3057,74 @@ model WhatsAppTemplate {
   @@unique([storeId, sourceKey, language])
   @@index([storeId, status])
   @@map("whatsapp_templates")
+}
+
+// ==========================================
+// Bank Reconciliation (Enterprise)
+// ==========================================
+
+enum BankStatementStatus {
+  pending
+  reconciling
+  reconciled
+}
+
+enum BankTransactionDirection {
+  debit
+  credit
+}
+
+enum BankMatchStatus {
+  unmatched
+  auto_matched
+  manual_matched
+  ignored
+}
+
+model BankStatement {
+  id          String              @id @default(uuid())
+  storeId     String              @map("store_id")
+  glAccountId String              @map("gl_account_id")
+  fileName    String              @map("file_name")
+  importedAt  DateTime            @default(now()) @map("imported_at")
+  periodStart DateTime?           @map("period_start")
+  periodEnd   DateTime?           @map("period_end")
+  status      BankStatementStatus @default(pending)
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  store        Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  glAccount    Account           @relation("BankStatementAccount", fields: [glAccountId], references: [id], onDelete: Restrict)
+  transactions BankTransaction[]
+
+  @@index([storeId, status])
+  @@index([storeId, importedAt(sort: Desc)])
+  @@map("bank_statements")
+}
+
+model BankTransaction {
+  id                    String                   @id @default(uuid())
+  statementId           String                   @map("statement_id")
+  storeId               String                   @map("store_id")
+  date                  DateTime
+  description           String
+  amountFils            Int                      @map("amount_fils")
+  direction             BankTransactionDirection
+  externalRef           String?                  @map("external_ref")
+  rowHash               String                   @map("row_hash") @db.VarChar(64)
+  matchedJournalEntryId String?                  @map("matched_journal_entry_id")
+  matchStatus           BankMatchStatus          @default(unmatched) @map("match_status")
+  confidence            Int                      @default(0)
+  createdAt             DateTime                 @default(now()) @map("created_at")
+
+  statement           BankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  store               Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  matchedJournalEntry JournalEntry? @relation("BankTxJournalMatch", fields: [matchedJournalEntryId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, rowHash])
+  @@index([statementId])
+  @@index([storeId, matchStatus])
+  @@index([storeId, date])
+  @@map("bank_transactions")
 }
 
 // ==========================================

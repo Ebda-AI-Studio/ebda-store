@@ -46,19 +46,19 @@ async-job gate / service-layer dual-check).
 
 ### Enterprise plan additions
 
-| Feature Key                  | Prisma Model(s)                               | UI  | API                                                                                                             | Async                                                                      | Service                     |
-| ---------------------------- | --------------------------------------------- | --- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------- |
-| `inventory.multi_warehouse`  | Warehouse, WarehouseStock                     | ✅  | ⏭ multi-warehouse routes not yet built (scaffold only)                                                         | ⏭                                                                         | ⏭                          |
-| `inventory.barcode`          | Product.barcode (metadata)                    | ✅  | ⏭ barcode scanning is client-side (mobile app not built)                                                       | ⏭                                                                         | ⏭                          |
-| `inventory.purchase_orders`  | PurchaseOrder, PurchaseOrderItem              | ✅  | ✅ `requireFeature('inventory.purchase_orders')` on all PO routes (this PR)                                     | ✅ accounting-post-po-receive-journal + stock-reorder-scan gated (this PR) | ✅ PO service               |
-| `inventory.bulk_adjustments` | StockAdjustment                               | ✅  | ✅ `requireFeature('inventory.bulk_adjustments')` on stock-adjustments + inventory.bulk-adjust routes (this PR) | ✅ accounting-post-stock-adjustment-journal gated (this PR)                | ✅ stock-adjustment service |
-| `accounting.tax_reports`     | JournalEntry (tax-coded lines)                | ✅  | ⏭ tax report route needs audit (finance dashboard uses accounting.basic)                                       | ⏭                                                                         | ⏭                          |
-| `accounting.multi_currency`  | JournalEntry.currency                         | ✅  | ⏭ multi-currency entries flow through finance routes (gated by accounting.basic)                               | ⏭                                                                         | ⏭                          |
-| `accounting.profit_anomaly`  | ProfitAnomaly                                 | ✅  | ⏭ no dedicated route yet (reports in finance dashboard)                                                        | ✅ accounting-profit-anomaly-cron gated (this PR)                          | ✅ profit-anomaly service   |
-| `accounting.bank_reconcile`  | BankStatement                                 | ✅  | ⏭ bank reconcile routes not yet built                                                                          | ⏭                                                                         | ⏭                          |
-| `affiliate`                  | Affiliate, AffiliateReferral, AffiliatePayout | ✅  | ✅ `requireFeature('affiliate')` on all affiliate routes                                                        | ⏭ no async jobs for affiliate                                             | ✅ `affiliateService`       |
-| `sms`                        | NotificationLog (channel=sms)                 | ✅  | ⏭ SMS config via generic notification config routes                                                            | ⏭ `notificationDispatcher` already checks `isFeatureEnabled('sms')`       | ✅ dispatcher gate          |
-| `floating_widget`            | Store.theme.floatingWidget                    | ✅  | ⏭ widget config via store theme (no dedicated route)                                                           | ⏭                                                                         | ⏭                          |
+| Feature Key                  | Prisma Model(s)                               | UI  | API                                                                                                              | Async                                                                      | Service                     |
+| ---------------------------- | --------------------------------------------- | --- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------- |
+| `inventory.multi_warehouse`  | Warehouse, WarehouseStock                     | ✅  | ⏭ multi-warehouse routes not yet built (scaffold only)                                                          | ⏭                                                                         | ⏭                          |
+| `inventory.barcode`          | Product.barcode (metadata)                    | ✅  | ⏭ barcode scanning is client-side (mobile app not built)                                                        | ⏭                                                                         | ⏭                          |
+| `inventory.purchase_orders`  | PurchaseOrder, PurchaseOrderItem              | ✅  | ✅ `requireFeature('inventory.purchase_orders')` on all PO routes (this PR)                                      | ✅ accounting-post-po-receive-journal + stock-reorder-scan gated (this PR) | ✅ PO service               |
+| `inventory.bulk_adjustments` | StockAdjustment                               | ✅  | ✅ `requireFeature('inventory.bulk_adjustments')` on stock-adjustments + inventory.bulk-adjust routes (this PR)  | ✅ accounting-post-stock-adjustment-journal gated (this PR)                | ✅ stock-adjustment service |
+| `accounting.tax_reports`     | JournalEntry (tax-coded lines)                | ✅  | ⏭ tax report route needs audit (finance dashboard uses accounting.basic)                                        | ⏭                                                                         | ⏭                          |
+| `accounting.multi_currency`  | JournalEntry.currency                         | ✅  | ⏭ multi-currency entries flow through finance routes (gated by accounting.basic)                                | ⏭                                                                         | ⏭                          |
+| `accounting.profit_anomaly`  | ProfitAnomaly                                 | ✅  | ⏭ no dedicated route yet (reports in finance dashboard)                                                         | ✅ accounting-profit-anomaly-cron gated (this PR)                          | ✅ profit-anomaly service   |
+| `accounting.bank_reconcile`  | BankStatement, BankTransaction                | ✅  | ✅ requireFeature('accounting.bank_reconcile') on all /finance/bank-statements routes (feat/bank-reconciliation) | ✅ import + auto-match + manual-override service                           | ✅ bank-reconcile.service   |
+| `affiliate`                  | Affiliate, AffiliateReferral, AffiliatePayout | ✅  | ✅ `requireFeature('affiliate')` on all affiliate routes                                                         | ⏭ no async jobs for affiliate                                             | ✅ `affiliateService`       |
+| `sms`                        | NotificationLog (channel=sms)                 | ✅  | ⏭ SMS config via generic notification config routes                                                             | ⏭ `notificationDispatcher` already checks `isFeatureEnabled('sms')`       | ✅ dispatcher gate          |
+| `floating_widget`            | Store.theme.floatingWidget                    | ✅  | ⏭ widget config via store theme (no dedicated route)                                                            | ⏭                                                                         | ⏭                          |
 
 ---
 
@@ -115,17 +115,17 @@ async-job gate / service-layer dual-check).
 
 ## Not-applicable features (⏭)
 
-| Feature                     | Reason                                                                                    |
-| --------------------------- | ----------------------------------------------------------------------------------------- |
-| `seo`                       | Platform-level — every storefront emits SEO metadata regardless; toggle did nothing       |
-| `search_autocomplete`       | Platform-level — typeahead built into every storefront; no per-store enforcement point    |
-| `customer_wallet`           | Hidden (`hidden: true` in FEATURE_REGISTRY), no backing model or service yet              |
-| `email_campaigns`           | Hidden, no campaign builder yet                                                           |
-| `staff_accounts`            | Hidden, no Staff model yet                                                                |
-| `inventory.multi_warehouse` | Routes not yet built (scaffold only)                                                      |
-| `inventory.barcode`         | Mobile-only client-side feature; no server-side enforcement needed                        |
-| `accounting.tax_reports`    | Reports flow through finance routes (gated by accounting.basic); dedicated route deferred |
-| `accounting.multi_currency` | Entries flow through finance routes (gated by accounting.basic)                           |
-| `accounting.bank_reconcile` | Routes not yet built                                                                      |
-| `floating_widget`           | Config via store theme JSON (no dedicated route); storefront conditionally renders        |
-| `accounting.daily-close`    | Platform-level integrity check (not a merchant feature, runs regardless of flag)          |
+| Feature                     | Reason                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| `seo`                       | Platform-level — every storefront emits SEO metadata regardless; toggle did nothing        |
+| `search_autocomplete`       | Platform-level — typeahead built into every storefront; no per-store enforcement point     |
+| `customer_wallet`           | Hidden (`hidden: true` in FEATURE_REGISTRY), no backing model or service yet               |
+| `email_campaigns`           | Hidden, no campaign builder yet                                                            |
+| `staff_accounts`            | Hidden, no Staff model yet                                                                 |
+| `inventory.multi_warehouse` | Routes not yet built (scaffold only)                                                       |
+| `inventory.barcode`         | Mobile-only client-side feature; no server-side enforcement needed                         |
+| `accounting.tax_reports`    | Reports flow through finance routes (gated by accounting.basic); dedicated route deferred  |
+| `accounting.multi_currency` | Entries flow through finance routes (gated by accounting.basic)                            |
+| `accounting.bank_reconcile` | Built in feat/bank-reconciliation: import + auto-match + manual-override routes + admin UI |
+| `floating_widget`           | Config via store theme JSON (no dedicated route); storefront conditionally renders         |
+| `accounting.daily-close`    | Platform-level integrity check (not a merchant feature, runs regardless of flag)           |

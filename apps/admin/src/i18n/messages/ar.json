@@ -3791,6 +3791,7 @@
         "journal": "اليومية",
         "expenses": "المصروفات",
         "reports": "التقارير",
+        "bankRec": "مطابقة كشف البنك",
         "analyticsOverview": "التحليلات",
         "insightsDashboard": "الإحصاءات",
         "insightsCohorts": "الشرائح الزمنية",
@@ -4067,6 +4068,78 @@
         "byRateBreakdown": "التفصيل حسب النسبة",
         "transactions": "المعاملات",
         "noTransactions": "لا توجد معاملات خاضعة للضريبة في هذه الفترة."
+      }
+    },
+    "bankRec": {
+      "title": "مطابقة كشف البنك",
+      "description": "استيراد كشوف البنك (CSV أو OFX) ومطابقة المعاملات مع دفتر اليومية.",
+      "importButton": "استيراد كشف",
+      "noStatements": "لا توجد كشوف بنكية مستوردة بعد.",
+      "fileName": "الملف",
+      "account": "حساب البنك",
+      "imported": "تاريخ الاستيراد",
+      "period": "الفترة",
+      "status": "الحالة",
+      "transactions": "المعاملات",
+      "actions": "إجراءات",
+      "view": "عرض",
+      "delete": "حذف",
+      "statusLabels": {
+        "pending": "قيد الانتظار",
+        "reconciling": "جارٍ المطابقة",
+        "reconciled": "تمت المطابقة"
+      },
+      "summary": {
+        "total": "إجمالي المعاملات",
+        "autoMatched": "مطابق تلقائياً",
+        "manualMatched": "مطابق يدوياً",
+        "unmatched": "غير مطابق",
+        "ignored": "متجاهل",
+        "matchedAmount": "المبلغ المطابق (د.ك)",
+        "unmatchedAmount": "المبلغ غير المطابق (د.ك)"
+      },
+      "import": {
+        "title": "استيراد كشف البنك",
+        "selectFile": "اختر ملف CSV أو OFX",
+        "selectAccount": "اختر حساب البنك",
+        "accountPlaceholder": "— اختر حساباً —",
+        "preview": "معاينة ({count} صف)",
+        "importing": "جارٍ الاستيراد…",
+        "importButton": "استيراد",
+        "parseErrors": "تحذيرات التحليل",
+        "success": "تم استيراد {count} معاملة.",
+        "error": "فشل الاستيراد."
+      },
+      "tx": {
+        "date": "التاريخ",
+        "description": "البيان",
+        "amount": "المبلغ (د.ك)",
+        "direction": "الاتجاه",
+        "ref": "المرجع",
+        "matchStatus": "حالة المطابقة",
+        "confidence": "الثقة",
+        "matchedEntry": "القيد المطابق",
+        "actions": "إجراءات",
+        "match": "ربط",
+        "unmatch": "إلغاء الربط",
+        "ignore": "تجاهل",
+        "debit": "مدين",
+        "credit": "دائن",
+        "statusLabels": {
+          "unmatched": "غير مطابق",
+          "auto_matched": "مطابق تلقائياً",
+          "manual_matched": "مطابق يدوياً",
+          "ignored": "متجاهل"
+        }
+      },
+      "autoMatch": "تشغيل المطابقة التلقائية",
+      "autoMatching": "جارٍ التشغيل…",
+      "autoMatchResult": "تمت مطابقة {matched}، غير مطابق {unmatched}، غامض {ambiguous}.",
+      "manualMatchModal": {
+        "title": "ربط بقيد يومية",
+        "entryId": "معرّف القيد",
+        "confirm": "ربط",
+        "cancel": "إلغاء"
       }
     }
   },

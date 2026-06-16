@@ -32,6 +32,13 @@ import { postEntry } from '../services/accounting/journal.service';
 import { trialBalance, profitAndLoss, balanceSheet } from '../services/accounting/reports.service';
 import { generateTaxReport } from '../services/accounting/tax-report.service';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
+import multer from 'multer';
+import {
+  importBankStatement,
+  runAutoMatch,
+  applyManualMatch,
+  getReconciliationSummary,
+} from '../services/accounting/bank-reconcile.service';
 
 const router = Router({ mergeParams: true });
 
@@ -985,6 +992,342 @@ router.post(
         })
       );
       res.status(201).json({ data: entry });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Bank Reconciliation Routes (Enterprise — accounting.bank_reconcile)
+// ═══════════════════════════════════════════════════════════════════════════════
+// All routes gated behind:
+//   authenticate → requireMfaEnrolled → authorize(store_admin, super_admin)
+//   → requireStoreAccess → requireFeature('accounting.bank_reconcile')
+
+const statementUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_req, file, cb) => {
+    const ok =
+      file.mimetype === 'text/csv' ||
+      file.mimetype === 'text/plain' ||
+      file.originalname.toLowerCase().endsWith('.csv') ||
+      file.originalname.toLowerCase().endsWith('.ofx') ||
+      file.mimetype === 'application/x-ofx' ||
+      file.mimetype === 'application/ofx';
+    cb(null, ok);
+  },
+});
+
+const bankRecMiddleware = [
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('accounting.bank_reconcile'),
+] as const;
+
+// ─── POST /:storeId/finance/bank-statements ───────────────────────────────────
+// Import a bank statement file (CSV or OFX).
+
+const importBodySchema = z.object({
+  glAccountId: z.string().uuid(),
+});
+
+router.post(
+  '/:storeId/finance/bank-statements',
+  ...bankRecMiddleware,
+  statementUpload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        res.status(422).json({ error: 'file_required', message: 'Upload a CSV or OFX file' });
+        return;
+      }
+
+      const bodyParsed = importBodySchema.safeParse(req.body);
+      if (!bodyParsed.success) {
+        res.status(422).json({ error: 'validation_failed', details: bodyParsed.error.flatten() });
+        return;
+      }
+
+      const fileName = req.file.originalname;
+      const ext = fileName.toLowerCase().split('.').pop();
+      const fileType = ext === 'ofx' ? 'ofx' : 'csv';
+
+      const result = await importBankStatement({
+        storeId: req.params.storeId,
+        glAccountId: bodyParsed.data.glAccountId,
+        fileName,
+        buffer: req.file.buffer,
+        fileType,
+      });
+
+      res.status(201).json({ data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /:storeId/finance/bank-statements ────────────────────────────────────
+// Paginated list of imported statements.
+
+const statementsListSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  perPage: z.coerce.number().int().positive().max(100).default(20),
+  status: z.enum(['pending', 'reconciling', 'reconciled']).optional(),
+});
+
+router.get(
+  '/:storeId/finance/bank-statements',
+  ...bankRecMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const q = statementsListSchema.parse(req.query);
+      const where: any = { storeId: req.params.storeId };
+      if (q.status) where.status = q.status;
+
+      const [items, total] = await runInTenantContext(req.params.storeId, () =>
+        Promise.all([
+          prisma.bankStatement.findMany({
+            where,
+            select: {
+              id: true,
+              fileName: true,
+              importedAt: true,
+              periodStart: true,
+              periodEnd: true,
+              status: true,
+              glAccount: { select: { code: true, nameEn: true, nameAr: true } },
+              _count: { select: { transactions: true } },
+            },
+            orderBy: { importedAt: 'desc' },
+            skip: (q.page - 1) * q.perPage,
+            take: q.perPage,
+          }),
+          prisma.bankStatement.count({ where }),
+        ])
+      );
+
+      res.json({
+        data: items,
+        meta: { page: q.page, perPage: q.perPage, total, totalPages: Math.ceil(total / q.perPage) },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /:storeId/finance/bank-statements/:sid ──────────────────────────────
+// Statement detail with reconciliation summary.
+
+router.get(
+  '/:storeId/finance/bank-statements/:sid',
+  ...bankRecMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const stmt = await runInTenantContext(req.params.storeId, () =>
+        prisma.bankStatement.findFirst({
+          where: { id: req.params.sid, storeId: req.params.storeId },
+          select: {
+            id: true,
+            fileName: true,
+            importedAt: true,
+            periodStart: true,
+            periodEnd: true,
+            status: true,
+            glAccount: { select: { id: true, code: true, nameEn: true, nameAr: true } },
+          },
+        })
+      );
+
+      if (!stmt) {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+
+      const summary = await getReconciliationSummary(req.params.sid, req.params.storeId);
+      res.json({ data: { ...stmt, summary } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /:storeId/finance/bank-statements/:sid/transactions ─────────────────
+// Paginated transaction list for a statement with optional match status filter.
+
+const txListSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  perPage: z.coerce.number().int().positive().max(200).default(50),
+  matchStatus: z.enum(['unmatched', 'auto_matched', 'manual_matched', 'ignored']).optional(),
+});
+
+router.get(
+  '/:storeId/finance/bank-statements/:sid/transactions',
+  ...bankRecMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Verify statement belongs to this store
+      const stmt = await runInTenantContext(req.params.storeId, () =>
+        prisma.bankStatement.findFirst({
+          where: { id: req.params.sid, storeId: req.params.storeId },
+          select: { id: true },
+        })
+      );
+      if (!stmt) {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+
+      const q = txListSchema.parse(req.query);
+      const where: any = { statementId: req.params.sid, storeId: req.params.storeId };
+      if (q.matchStatus) where.matchStatus = q.matchStatus;
+
+      const [items, total] = await runInTenantContext(req.params.storeId, () =>
+        Promise.all([
+          prisma.bankTransaction.findMany({
+            where,
+            select: {
+              id: true,
+              date: true,
+              description: true,
+              amountFils: true,
+              direction: true,
+              externalRef: true,
+              matchStatus: true,
+              confidence: true,
+              matchedJournalEntryId: true,
+              matchedJournalEntry: {
+                select: {
+                  id: true,
+                  entryNumber: true,
+                  postedAt: true,
+                  memo: true,
+                  source: true,
+                },
+              },
+            },
+            orderBy: { date: 'asc' },
+            skip: (q.page - 1) * q.perPage,
+            take: q.perPage,
+          }),
+          prisma.bankTransaction.count({ where }),
+        ])
+      );
+
+      res.json({
+        data: items,
+        meta: { page: q.page, perPage: q.perPage, total, totalPages: Math.ceil(total / q.perPage) },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /:storeId/finance/bank-statements/:sid/auto-match ──────────────────
+// (Re-)run automatic matching for all unmatched transactions.
+
+router.post(
+  '/:storeId/finance/bank-statements/:sid/auto-match',
+  ...bankRecMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Verify statement ownership
+      const stmt = await runInTenantContext(req.params.storeId, () =>
+        prisma.bankStatement.findFirst({
+          where: { id: req.params.sid, storeId: req.params.storeId },
+          select: { id: true },
+        })
+      );
+      if (!stmt) {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+
+      const result = await runAutoMatch(req.params.sid, req.params.storeId);
+      res.json({ data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── PATCH /:storeId/finance/bank-statements/:sid/transactions/:tid ──────────
+// Manual match / unmatch / ignore override.
+
+const manualMatchSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('match'), journalEntryId: z.string().uuid() }),
+  z.object({ action: z.literal('unmatch') }),
+  z.object({ action: z.literal('ignore') }),
+]);
+
+router.patch(
+  '/:storeId/finance/bank-statements/:sid/transactions/:tid',
+  ...bankRecMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const bodyParsed = manualMatchSchema.safeParse(req.body);
+      if (!bodyParsed.success) {
+        res.status(422).json({ error: 'validation_failed', details: bodyParsed.error.flatten() });
+        return;
+      }
+
+      const body = bodyParsed.data;
+      const updated = await applyManualMatch({
+        storeId: req.params.storeId,
+        transactionId: req.params.tid,
+        action: body.action,
+        journalEntryId: body.action === 'match' ? body.journalEntryId : undefined,
+      });
+
+      res.json({ data: updated });
+    } catch (err: any) {
+      if (err.statusCode === 404) {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+      if (err.statusCode === 409) {
+        res.status(409).json({ error: err.message });
+        return;
+      }
+      if (err.statusCode === 400) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+      next(err);
+    }
+  }
+);
+
+// ─── DELETE /:storeId/finance/bank-statements/:sid ───────────────────────────
+// Delete a statement and all its transactions (cascade).
+
+router.delete(
+  '/:storeId/finance/bank-statements/:sid',
+  ...bankRecMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const stmt = await runInTenantContext(req.params.storeId, () =>
+        prisma.bankStatement.findFirst({
+          where: { id: req.params.sid, storeId: req.params.storeId },
+          select: { id: true },
+        })
+      );
+      if (!stmt) {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+
+      await runInTenantContext(req.params.storeId, () =>
+        prisma.bankStatement.delete({ where: { id: req.params.sid } })
+      );
+
+      res.status(204).send();
     } catch (err) {
       next(err);
     }

@@ -3791,6 +3791,7 @@
         "journal": "Journal",
         "expenses": "Expenses",
         "reports": "Reports",
+        "bankRec": "Bank Reconciliation",
         "analyticsOverview": "Analytics",
         "insightsDashboard": "Insights",
         "insightsCohorts": "Cohorts",
@@ -4067,6 +4068,78 @@
         "byRateBreakdown": "Breakdown by Rate",
         "transactions": "Transactions",
         "noTransactions": "No taxable transactions in this period."
+      }
+    },
+    "bankRec": {
+      "title": "Bank Reconciliation",
+      "description": "Import bank statements (CSV or OFX) and match transactions against your ledger.",
+      "importButton": "Import Statement",
+      "noStatements": "No bank statements imported yet.",
+      "fileName": "File",
+      "account": "GL Account",
+      "imported": "Imported",
+      "period": "Period",
+      "status": "Status",
+      "transactions": "Transactions",
+      "actions": "Actions",
+      "view": "View",
+      "delete": "Delete",
+      "statusLabels": {
+        "pending": "Pending",
+        "reconciling": "Reconciling",
+        "reconciled": "Reconciled"
+      },
+      "summary": {
+        "total": "Total transactions",
+        "autoMatched": "Auto-matched",
+        "manualMatched": "Manual-matched",
+        "unmatched": "Unmatched",
+        "ignored": "Ignored",
+        "matchedAmount": "Matched amount (KWD)",
+        "unmatchedAmount": "Unmatched amount (KWD)"
+      },
+      "import": {
+        "title": "Import Bank Statement",
+        "selectFile": "Select CSV or OFX file",
+        "selectAccount": "Select GL bank account",
+        "accountPlaceholder": "— choose account —",
+        "preview": "Preview ({count} rows)",
+        "importing": "Importing…",
+        "importButton": "Import",
+        "parseErrors": "Parse warnings",
+        "success": "Imported {count} transactions.",
+        "error": "Import failed."
+      },
+      "tx": {
+        "date": "Date",
+        "description": "Description",
+        "amount": "Amount (KWD)",
+        "direction": "Direction",
+        "ref": "Ref",
+        "matchStatus": "Match Status",
+        "confidence": "Confidence",
+        "matchedEntry": "Matched Entry",
+        "actions": "Actions",
+        "match": "Match",
+        "unmatch": "Unmatch",
+        "ignore": "Ignore",
+        "debit": "Debit",
+        "credit": "Credit",
+        "statusLabels": {
+          "unmatched": "Unmatched",
+          "auto_matched": "Auto-matched",
+          "manual_matched": "Manual-matched",
+          "ignored": "Ignored"
+        }
+      },
+      "autoMatch": "Run Auto-match",
+      "autoMatching": "Running…",
+      "autoMatchResult": "Auto-matched {matched}, unmatched {unmatched}, ambiguous {ambiguous}.",
+      "manualMatchModal": {
+        "title": "Link to Journal Entry",
+        "entryId": "Journal Entry ID",
+        "confirm": "Link",
+        "cancel": "Cancel"
       }
     }
   },

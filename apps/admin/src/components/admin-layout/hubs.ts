@@ -47,6 +47,7 @@ export type HubLabels = {
   journal: string;
   expenses: string;
   reports: string;
+  bankRec: string;
   // Analytics tabs — Overview is the legacy /analytics dashboard; the rest
   // are the former /insights subroutes folded into the analytics hub
   // (Ahmad 2026-05-20: "insights and analytics are not the same, remove one
@@ -143,6 +144,7 @@ export const HUBS: HubDefinition[] = [
       { label: labels.journal, href: `/stores/${storeId}/finance/journal` },
       { label: labels.expenses, href: `/stores/${storeId}/finance/expenses` },
       { label: labels.reports, href: `/stores/${storeId}/finance/reports` },
+      { label: labels.bankRec, href: `/stores/${storeId}/finance/bank-reconciliation` },
     ],
   },
   {
