@@ -227,7 +227,12 @@ router.get(
       // /wa-bridge/templates/status webhooks. Union + dedupe by
       // name+language. If FWB has own-approved rows we also clear the
       // wbs_unavailable error since the connection is functionally
-      // healthy (the merchant still has approved templates to choose).
+      // healthy (the merchant still has approved templates to choose.
+      //
+      // NOTE: this augmentation populates connectedTenant from local DB data
+      // even when the live WBS call failed. That is intentional for the
+      // ConnectionTab's template-list display — but it must NOT be used to
+      // infer "the WBS connection is live". Use wbsLiveVerified for that.
       const ownApproved = await prisma.whatsAppTemplate.findMany({
         where: { storeId, status: 'approved' },
         select: { metaName: true, language: true, category: true },
