@@ -116,6 +116,14 @@ export const createOrderSchema = z.object({
   /** Buyer's UI locale. Stored on the order so transactional emails
    *  arrive in the buyer's language regardless of the store default. */
   locale: z.enum(['en', 'ar']).optional(),
+  /**
+   * Explicit SMS marketing consent captured from the checkout opt-in checkbox.
+   * When true the customer has agreed to receive PROMOTIONAL SMS messages.
+   * Transactional notifications (order shipped/delivered/cancelled/refunded)
+   * are never gated on this — only promotional SMS is.
+   * Defaults to false when omitted (no silent opt-in).
+   */
+  smsOptIn: z.boolean().optional().default(false),
 });
 
 // GET /products - List all public products (cached 30s)
@@ -150,7 +158,11 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         : undefined;
 
     // Cache key includes cursor + ids — different cursor positions / id sets get distinct entries.
-    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${search || ''}:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${validCursor || ''}:${idsParam?.sort().join(',') ?? ''}`;
+    const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${
+      search || ''
+    }:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${
+      validCursor || ''
+    }:${idsParam?.sort().join(',') ?? ''}`;
 
     const result = await getCached(cacheKey, 120, () =>
       ProductService.listPublic(storeId, {

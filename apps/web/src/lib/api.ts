@@ -226,6 +226,8 @@ interface CreateOrderData {
   paymentMethod: string;
   notes?: string;
   couponCode?: string;
+  /** Customer SMS marketing opt-in captured from the checkout checkbox. */
+  smsOptIn?: boolean;
   /** Loyalty points the customer requests to redeem. Re-validated server-side
    *  against the real balance + store caps; ignored for guest checkout. */
   pointsToRedeem?: number;

@@ -453,7 +453,7 @@ Let influencers, partners, or loyal customers earn a commission for every order 
 
 ### SMS Notifications — الرسائل القصيرة (Enterprise+)
 
-Send transactional and promotional SMS messages to customers who opt in. SMS reaches customers who don't have push notifications enabled and don't open emails.
+Send transactional SMS messages to customers (order confirmed, shipped, delivered, cancelled, refunded) via Unifonic. Customers who tick the SMS opt-in checkbox at checkout also receive promotional SMS messages (cart reminders, back-in-stock alerts). Consent is captured per-order at checkout and stored on the order record — customers are never opted in silently.
 
 ### Floating Widget — الزر العائم (Enterprise+)
 

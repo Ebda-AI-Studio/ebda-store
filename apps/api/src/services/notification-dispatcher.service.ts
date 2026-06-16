@@ -34,6 +34,25 @@ const RATE_LIMIT_WINDOW_SECONDS = 3600; // 1 hour
 const RATE_LIMIT_MAX_PER_WINDOW = 100; // 100 notifications per hour per store per channel
 
 // ==========================================
+// Event Classification
+// ==========================================
+
+/**
+ * Events classified as PROMOTIONAL — sent only to customers who have
+ * explicitly opted in to SMS marketing (data.smsOptIn === true).
+ *
+ * Transactional events (order_confirmed, order_shipped, order_delivered,
+ * order_cancelled, refund_processed, payment_success) are NOT in this set
+ * and may send regardless of smsOptIn as long as the channel is configured.
+ */
+export const PROMOTIONAL_SMS_EVENTS: ReadonlySet<NotificationEvent> = new Set([
+  'cart_abandoned_step1',
+  'cart_abandoned_step2',
+  'cart_abandoned_step3',
+  'back_in_stock',
+] as const);
+
+// ==========================================
 // Notification Dispatcher
 // ==========================================
 
@@ -183,6 +202,11 @@ class NotificationDispatcherService {
     // 4. Dispatch to each channel — wrapped individually so one failure doesn't block others
 
     // ── SMS ───────────────────────────────────────────────────────────────────
+    // Promotional events (cart_abandoned_*, back_in_stock) require explicit
+    // opt-in consent from the customer. Transactional events (order_confirmed,
+    // order_shipped, order_delivered, order_cancelled, refund_processed) send
+    // whenever the channel is configured — no opt-in gate.
+    const isPromotionalSmsEvent = PROMOTIONAL_SMS_EVENTS.has(event);
     if (!smsEnabled) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: feature_disabled');
     } else if (!eventConfig.sms) {
@@ -191,6 +215,11 @@ class NotificationDispatcherService {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: not_configured');
     } else if (!data.customerPhone) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: no_phone');
+    } else if (isPromotionalSmsEvent && !data.smsOptIn) {
+      logger.debug(
+        { storeId, event },
+        '[NotificationDispatcher] SMS skipped: promotional_no_optin'
+      );
     } else if (!(await this.checkRateLimit(storeId, 'sms'))) {
       logger.debug({ storeId, event }, '[NotificationDispatcher] SMS skipped: rate_limited');
     } else {

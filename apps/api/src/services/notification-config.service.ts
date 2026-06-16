@@ -1,6 +1,8 @@
 import { prisma, withRlsBypass } from '@force/database';
 import { redis } from './redis.service';
 import { encryption } from './encryption.service';
+import { smsService } from './sms.service';
+import type { SmsConfig } from './sms.service';
 import logger from '../lib/logger';
 
 // ==========================================
@@ -265,13 +267,52 @@ class NotificationConfigService {
   }
 
   /**
-   * Placeholder for testing provider connectivity.
-   * Actual provider testing will be added when WhatsApp/SMS services are created.
+   * Tests real provider connectivity for a notification channel.
+   *
+   * SMS: calls the Unifonic Account/info read-only endpoint with the stored
+   *      credentials — no SMS is sent. Returns {success: false, message} with
+   *      a sanitized error (no credential values) when creds are missing or
+   *      rejected by the provider.
+   *
+   * Other channels: returns {success: true} until their providers are wired.
    */
-  async testConnection(storeId: string, channel: string): Promise<{ success: boolean }> {
+  async testConnection(
+    storeId: string,
+    channel: string
+  ): Promise<{ success: boolean; message?: string }> {
+    logger.debug({ storeId, channel }, '[NotificationConfigService] testConnection called');
+
+    if (channel === 'sms') {
+      const config = await this.getConfig(storeId, 'sms');
+
+      if (!config || !config.enabled) {
+        return { success: false, message: 'SMS channel is not configured or is disabled.' };
+      }
+
+      const creds = config.credentials as Partial<SmsConfig>;
+      if (!creds.appSid || !creds.senderId) {
+        return {
+          success: false,
+          message: 'SMS credentials are incomplete (appSid or senderId missing).',
+        };
+      }
+
+      const result = await smsService.verifyCredentials({
+        appSid: creds.appSid,
+        senderId: creds.senderId,
+      });
+
+      if (!result.ok) {
+        return { success: false, message: result.reason ?? 'SMS provider verification failed.' };
+      }
+
+      return { success: true };
+    }
+
+    // Other channels (push, whatsapp) — no provider test wired yet.
     logger.debug(
       { storeId, channel },
-      '[NotificationConfigService] testConnection called (placeholder)'
+      '[NotificationConfigService] testConnection: channel not yet wired, returning true'
     );
     return { success: true };
   }

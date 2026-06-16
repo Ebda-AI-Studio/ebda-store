@@ -59,6 +59,12 @@ interface CreateOrderData {
   /** Buyer's UI locale at checkout time. Stored on the order so
    *  transactional emails are sent in the buyer's language. */
   locale?: 'en' | 'ar';
+  /**
+   * Customer SMS marketing opt-in captured at checkout. When true the customer
+   * has explicitly consented to PROMOTIONAL SMS. Transactional SMS (shipped,
+   * delivered, cancelled, refunded) are always allowed regardless of this flag.
+   */
+  smsOptIn?: boolean;
 }
 
 export class OrderService {
@@ -237,7 +243,9 @@ export class OrderService {
         throw new AppError(
           400,
           'MIN_ORDER_NOT_MET',
-          `Minimum order amount of ${(appliedCoupon.minOrderAmount / 1000).toFixed(3)} KWD required for this coupon`
+          `Minimum order amount of ${(appliedCoupon.minOrderAmount / 1000).toFixed(
+            3
+          )} KWD required for this coupon`
         );
       }
       if (appliedCoupon.type !== 'free_shipping') {
@@ -427,6 +435,7 @@ export class OrderService {
           loyaltyDiscount,
           total,
           locale: data.locale ?? null,
+          smsOptIn: data.smsOptIn ?? false,
           shippingAddress: data.shippingAddress,
           billingAddress: data.billingAddress || data.shippingAddress,
           notes: data.notes,
@@ -1264,7 +1273,9 @@ export class OrderService {
         throw new AppError(
           400,
           'MIN_ORDER_NOT_MET',
-          `Minimum order amount of ${(coupon.minOrderAmount / 1000).toFixed(3)} KWD required for this coupon`
+          `Minimum order amount of ${(coupon.minOrderAmount / 1000).toFixed(
+            3
+          )} KWD required for this coupon`
         );
       }
       if (coupon.type === 'free_shipping') {

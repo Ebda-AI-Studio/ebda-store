@@ -1020,6 +1020,13 @@ model Order {
   // email service falls back to store.settings.defaultLanguage.
   locale String?
 
+  // Customer SMS marketing consent captured at checkout. When true the
+  // customer has explicitly opted in to receiving promotional SMS messages
+  // (e.g. offers, campaigns). Transactional notifications (order shipped,
+  // delivered, cancelled, refunded) are unaffected by this flag.
+  // Defaults to false — never opt customers in silently.
+  smsOptIn Boolean @default(false) @map("sms_opt_in")
+
   // Webhook idempotency - prevents duplicate processing
   idempotencyKey     String?   @unique @map("idempotency_key")
   webhookProcessedAt DateTime? @map("webhook_processed_at")

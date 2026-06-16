@@ -188,6 +188,12 @@ export default function CheckoutClient() {
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
 
+  // Customer SMS marketing opt-in. Default false — never opt in silently.
+  // Only affects promotional SMS (cart reminders, back-in-stock alerts).
+  // Transactional notifications (order confirmed, shipped, etc.) are not
+  // gated on this and send whenever the channel is configured.
+  const [smsOptIn, setSmsOptIn] = useState(false);
+
   // Form data — persisted in sessionStorage so a page refresh mid-checkout
   // doesn't wipe what the customer already typed.
   const [formData, setFormData] = useState({
@@ -642,6 +648,7 @@ export default function CheckoutClient() {
         paymentMethod: selectedProvider,
         notes: formData.notes,
         couponCode: appliedCoupon?.code,
+        smsOptIn,
         // Only send a redemption request when the customer opted in AND the
         // amount clears the store minimum. The server re-validates against the
         // real balance + caps regardless.
@@ -891,10 +898,14 @@ export default function CheckoutClient() {
                   if (step > 1) setStep(1);
                 }}
                 disabled={step <= 1}
-                className={`flex items-center ${step > 1 ? 'cursor-pointer group' : 'cursor-default'}`}
+                className={`flex items-center ${
+                  step > 1 ? 'cursor-pointer group' : 'cursor-default'
+                }`}
               >
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${step >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'} ${step > 1 ? 'group-hover:bg-primary/80' : ''}`}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                    step >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                  } ${step > 1 ? 'group-hover:bg-primary/80' : ''}`}
                 >
                   {step > 1 ? (
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -910,7 +921,9 @@ export default function CheckoutClient() {
                   )}
                 </div>
                 <span
-                  className={`ms-2 text-sm font-medium transition-colors ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'} ${step > 1 ? 'group-hover:text-primary' : ''}`}
+                  className={`ms-2 text-sm font-medium transition-colors ${
+                    step >= 1 ? 'text-foreground' : 'text-muted-foreground'
+                  } ${step > 1 ? 'group-hover:text-primary' : ''}`}
                 >
                   {t('Shipping', translations['Shipping'])}
                 </span>
@@ -919,12 +932,16 @@ export default function CheckoutClient() {
               {/* Step 2: Payment -- current or future step, not clickable */}
               <div className="flex items-center">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full ${step >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                    step >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                  }`}
                 >
                   2
                 </div>
                 <span
-                  className={`ms-2 text-sm font-medium ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}
+                  className={`ms-2 text-sm font-medium ${
+                    step >= 2 ? 'text-foreground' : 'text-muted-foreground'
+                  }`}
                 >
                   {t('Payment', '\u0627\u0644\u062f\u0641\u0639')}
                 </span>
@@ -1139,6 +1156,27 @@ export default function CheckoutClient() {
                         />
                       </div>
                     </div>
+
+                    {/* SMS marketing opt-in \u2014 shown only when the phone field
+                        has a value so the checkbox is contextually relevant. */}
+                    {formData.phone.trim() && (
+                      <div className="pt-2">
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={smsOptIn}
+                            onChange={e => setSmsOptIn(e.target.checked)}
+                            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                          />
+                          <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                            {t(
+                              'I agree to receive promotional SMS messages (offers, alerts). You can unsubscribe at any time.',
+                              '\u0623\u0648\u0627\u0641\u0642 \u0639\u0644\u0649 \u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0631\u0633\u0627\u0626\u0644 SMS \u062a\u0631\u0648\u064a\u062c\u064a\u0629 (\u0639\u0631\u0648\u0636\u060c \u062a\u0646\u0628\u064a\u0647\u0627\u062a). \u064a\u0645\u0643\u0646\u0643 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0627\u0634\u062a\u0631\u0627\u0643 \u0641\u064a \u0623\u064a \u0648\u0642\u062a.'
+                            )}
+                          </span>
+                        </label>
+                      </div>
+                    )}
 
                     <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <Link

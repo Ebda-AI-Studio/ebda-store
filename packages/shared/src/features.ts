@@ -197,8 +197,10 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     key: 'sms',
     name: 'SMS Notifications',
     nameAr: 'إشعارات الرسائل القصيرة',
-    description: 'Send transactional and promotional SMS messages to customers.',
-    descriptionAr: 'إرسال رسائل قصيرة للمعاملات والعروض الترويجية للعملاء.',
+    description:
+      'Send transactional SMS messages to customers (order confirmed, shipped, delivered, cancelled, refunded) via Unifonic. Customers who tick the opt-in checkbox at checkout also receive promotional SMS (cart reminders, back-in-stock alerts).',
+    descriptionAr:
+      'إرسال رسائل قصيرة للمعاملات (تأكيد الطلب، الشحن، التسليم، الإلغاء، الاسترداد) عبر Unifonic. العملاء الذين يوافقون على استقبال الرسائل عند الدفع يتلقون أيضاً رسائل ترويجية (تذكير بالسلة، إشعار توفر المنتج).',
     category: 'marketing',
     tier: 'addon',
   },

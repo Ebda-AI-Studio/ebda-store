@@ -36,6 +36,14 @@ export interface NotificationData {
   couponCode?: string;
   productName?: string;
   productUrl?: string;
+  /**
+   * Customer SMS marketing opt-in consent captured at checkout.
+   * When false (or undefined), PROMOTIONAL SMS events (cart_abandoned_*,
+   * back_in_stock) are skipped. Transactional events (order_confirmed,
+   * order_shipped, order_delivered, order_cancelled, refund_processed)
+   * are unaffected — they require channel config but not explicit opt-in.
+   */
+  smsOptIn?: boolean;
 }
 
 // ─── SMS Templates ────────────────────────────────────────────────────────────
