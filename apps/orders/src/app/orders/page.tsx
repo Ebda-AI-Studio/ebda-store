@@ -122,28 +122,58 @@ export default function OrdersListPage() {
         <InstallPrompt />
         <EnableNotifications />
 
-        {/* Status filter chips */}
-        <div className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1">
-          {STATUS_FILTERS.map(f => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={`inline-flex h-9 shrink-0 items-center rounded-full border px-4 text-sm font-semibold transition-colors ${
-                filter === f
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-card text-foreground'
-              }`}
+        {/* Filter row + manual refresh */}
+        <div className="mb-4 flex items-center gap-2">
+          {/* Status filter chips */}
+          <div className="-mx-1 flex flex-1 gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {STATUS_FILTERS.map(f => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={`inline-flex h-11 min-w-[44px] shrink-0 items-center rounded-full border px-4 text-sm font-semibold transition-colors active:opacity-80 ${
+                  filter === f
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-card text-foreground'
+                }`}
+              >
+                {t.filters[f]}
+              </button>
+            ))}
+          </div>
+          {/* Manual refresh — visible between polls */}
+          <button
+            type="button"
+            onClick={() => fetchOrders()}
+            aria-label={t.orders.refresh}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground active:bg-muted/60"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
             >
-              {t.filters[f]}
-            </button>
-          ))}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
         </div>
 
         {error && (
-          <div className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <span>{error}</span>
-            <button type="button" onClick={() => fetchOrders()} className="font-semibold underline">
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <span className="min-w-0">{error}</span>
+            <button
+              type="button"
+              onClick={() => fetchOrders()}
+              className="inline-flex h-11 min-w-[44px] shrink-0 items-center rounded-full border border-destructive/30 px-4 text-sm font-semibold text-destructive active:bg-destructive/10"
+            >
               {t.orders.retry}
             </button>
           </div>
@@ -161,8 +191,34 @@ export default function OrdersListPage() {
         )}
 
         {!isLoading && !blocked && visibleOrders.length === 0 && (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-            {filter === 'all' ? t.orders.empty : t.orders.emptyFiltered}
+          <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-6 py-12 text-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="mb-3 h-10 w-10 text-muted-foreground/50"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
+            </svg>
+            <p className="text-sm font-medium text-muted-foreground">
+              {filter === 'all' ? t.orders.empty : t.orders.emptyFiltered}
+            </p>
+            {filter !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setFilter('all')}
+                className="mt-4 inline-flex h-11 min-w-[44px] items-center rounded-full border border-border bg-card px-4 text-sm font-medium text-foreground active:bg-muted/60"
+              >
+                {t.filters.all}
+              </button>
+            )}
           </div>
         )}
 
@@ -181,7 +237,7 @@ export default function OrdersListPage() {
               type="button"
               disabled={pagination.page <= 1}
               onClick={() => goToPage(pagination.page - 1)}
-              className="inline-flex h-10 items-center rounded-full border border-border bg-card px-4 text-sm font-medium disabled:opacity-40"
+              className="inline-flex h-11 min-w-[44px] items-center rounded-full border border-border bg-card px-5 text-sm font-medium disabled:opacity-40 active:bg-muted/60"
             >
               ‹
             </button>
@@ -192,7 +248,7 @@ export default function OrdersListPage() {
               type="button"
               disabled={pagination.page >= pagination.totalPages}
               onClick={() => goToPage(pagination.page + 1)}
-              className="inline-flex h-10 items-center rounded-full border border-border bg-card px-4 text-sm font-medium disabled:opacity-40"
+              className="inline-flex h-11 min-w-[44px] items-center rounded-full border border-border bg-card px-5 text-sm font-medium disabled:opacity-40 active:bg-muted/60"
             >
               ›
             </button>

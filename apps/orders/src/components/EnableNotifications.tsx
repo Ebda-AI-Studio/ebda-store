@@ -129,7 +129,7 @@ export function EnableNotifications() {
             type="button"
             onClick={enable}
             disabled={busy}
-            className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            className="inline-flex h-11 min-w-[44px] items-center rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground active:opacity-80 disabled:opacity-50"
           >
             {busy ? t.notifications.enabling : t.notifications.enable}
           </button>
@@ -137,7 +137,7 @@ export function EnableNotifications() {
         <button
           type="button"
           onClick={dismiss}
-          className="inline-flex h-9 items-center rounded-full border border-border px-3 text-xs font-medium text-muted-foreground"
+          className="inline-flex h-11 min-w-[44px] items-center rounded-full border border-border px-3 text-xs font-medium text-muted-foreground active:bg-muted/60"
         >
           {t.notifications.dismiss}
         </button>

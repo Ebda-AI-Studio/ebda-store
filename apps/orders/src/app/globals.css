@@ -63,11 +63,23 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+    /* Suppress the default blue flash on tap — we apply our own active: states. */
     -webkit-tap-highlight-color: transparent;
+    /* Momentum scroll on iOS for the whole page. */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent rubber-band overscroll bouncing the page itself (each scroll
+       container opts in individually). */
+    overscroll-behavior-y: none;
   }
 
   /* Honor the safe-area on notched iOS for the bottom nav. */
   :root {
     --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Smooth momentum scroll in scrollable containers (filter chips row, etc.) */
+  .overflow-x-auto,
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
   }
 }

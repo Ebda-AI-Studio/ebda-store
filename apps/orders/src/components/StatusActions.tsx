@@ -36,7 +36,7 @@ export function StatusActions({
           type="button"
           disabled={isUpdating}
           onClick={() => onChange(s)}
-          className={`inline-flex h-11 min-w-[44px] items-center rounded-full border px-4 text-sm font-semibold transition-colors disabled:opacity-50 ${
+          className={`inline-flex h-11 flex-1 items-center justify-center rounded-full border px-4 text-sm font-semibold transition-colors active:opacity-80 disabled:opacity-50 ${
             s === 'cancelled' || s === 'refunded'
               ? 'border-destructive/40 bg-destructive/5 text-destructive'
               : 'border-primary/40 bg-primary/5 text-primary'

@@ -108,7 +108,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground disabled:opacity-60"
+              className="h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground active:opacity-90 disabled:opacity-60"
             >
               {submitting ? t.login.submitting : t.login.submit}
             </button>

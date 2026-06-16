@@ -41,14 +41,14 @@ export function InstallPrompt() {
             await deferred.userChoice;
             setDeferred(null);
           }}
-          className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground"
+          className="inline-flex h-11 min-w-[44px] items-center rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground active:opacity-80"
         >
           {t.install.cta}
         </button>
         <button
           type="button"
           onClick={() => setDismissed(true)}
-          className="inline-flex h-9 items-center rounded-full border border-border px-3 text-xs font-medium text-muted-foreground"
+          className="inline-flex h-11 min-w-[44px] items-center rounded-full border border-border px-3 text-xs font-medium text-muted-foreground active:bg-muted/60"
         >
           {t.install.dismiss}
         </button>

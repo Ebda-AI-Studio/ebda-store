@@ -114,13 +114,13 @@ export default function OrderDetailPage() {
         className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 pb-2 pt-2">
           <Link
             href="/orders"
             aria-label={t.detail.back}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground active:bg-muted/60"
           >
-            <span className={locale === 'ar' ? 'rotate-180' : ''}>‹</span>
+            <span className={locale === 'ar' ? 'rotate-180 inline-block' : 'inline-block'}>‹</span>
           </Link>
           <h1 className="truncate text-base font-bold text-foreground">
             {order?.orderNumber ?? '…'}
@@ -143,7 +143,11 @@ export default function OrderDetailPage() {
         {error && !isLoading && (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
             <p>{error}</p>
-            <button type="button" onClick={fetchOrder} className="mt-3 font-semibold underline">
+            <button
+              type="button"
+              onClick={fetchOrder}
+              className="mt-4 inline-flex h-11 min-w-[44px] items-center rounded-full border border-destructive/30 px-5 text-sm font-semibold text-destructive active:bg-destructive/10"
+            >
               {t.orders.retry}
             </button>
           </div>
@@ -270,14 +274,22 @@ export default function OrderDetailPage() {
             )}
 
             {/* Sticky action bar */}
-            <div className="sticky bottom-0 -mx-4 mt-4 border-t border-border bg-background/95 p-4 backdrop-blur">
+            <div
+              className="sticky bottom-0 -mx-4 mt-4 border-t border-border bg-background/95 backdrop-blur"
+              style={{
+                paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)',
+                paddingTop: '1rem',
+                paddingLeft: '1rem',
+                paddingRight: '1rem',
+              }}
+            >
               <div className="mx-auto max-w-2xl space-y-3">
                 {canManage && order.paymentStatus !== 'paid' && (
                   <button
                     type="button"
                     disabled={isUpdating}
                     onClick={handleMarkPaid}
-                    className="h-11 w-full rounded-full border border-success/40 bg-success/5 text-sm font-semibold text-success disabled:opacity-50"
+                    className="h-11 w-full rounded-full border border-success/40 bg-success/5 text-sm font-semibold text-success active:bg-success/10 disabled:opacity-50"
                   >
                     {isUpdating ? t.detail.updating : t.detail.markPaid}
                   </button>

@@ -16,7 +16,7 @@ export function StorePicker() {
       <select
         value={selectedStoreId ?? ''}
         onChange={e => setSelectedStoreId(e.target.value)}
-        className="h-9 max-w-[10rem] rounded-full border border-border bg-card px-3 text-sm font-medium text-foreground"
+        className="h-11 max-w-[10rem] rounded-full border border-border bg-card px-3 text-sm font-medium text-foreground"
       >
         {stores.map(s => (
           <option key={s.id} value={s.id}>
