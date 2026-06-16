@@ -1,6 +1,14 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  ReactNode,
+} from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getApiUrl } from './api';
 
@@ -36,40 +44,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  // Track whether the initial auth check has run so we only hit /auth/me
+  // once on mount — not on every pathname change. Subsequent navigations
+  // trust the in-memory user state; the 401-refresh path in api.ts handles
+  // keeping the access token alive for individual requests.
+  const authCheckedRef = useRef(false);
 
-  const refreshToken = useCallback(async (): Promise<boolean> => {
-    const refreshTokenValue = localStorage.getItem('refreshToken');
-    if (!refreshTokenValue) return false;
+  // Single-flight lock: prevents concurrent refresh calls from AuthProvider
+  // (checkAuth) and api.ts (apiRequest 401-retry) both rotating the same
+  // refresh token simultaneously, which would trip the server-side
+  // reuse-detection and log the admin out immediately.
+  const refreshInFlight = useRef<Promise<boolean> | null>(null);
 
-    try {
-      const response = await fetch(`${API_URL}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: refreshTokenValue }),
-      });
+  const refreshToken = useCallback((): Promise<boolean> => {
+    // Return the in-flight promise if one is already running so concurrent
+    // callers (e.g. checkAuth + an apiRequest 401-retry) share the result
+    // instead of independently rotating the token family.
+    if (refreshInFlight.current) return refreshInFlight.current;
 
-      if (response.ok) {
-        const data = await response.json();
-        // The new access token is set as an HTTP-only cookie by the API
-        // for browser-cookie clients, AND returned in the body so we can
-        // mirror it into localStorage for the iOS PWA path (where WebKit
-        // purges third-party cookies). lib/api.ts reads `accessToken`
-        // from localStorage and sends it as `Authorization: Bearer`.
-        if (data.data.accessToken) {
-          localStorage.setItem('accessToken', data.data.accessToken);
+    const promise = (async (): Promise<boolean> => {
+      const refreshTokenValue =
+        typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+      if (!refreshTokenValue) return false;
+
+      try {
+        const response = await fetch(`${API_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: refreshTokenValue }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // The new access token is set as an HTTP-only cookie by the API
+          // for browser-cookie clients, AND returned in the body so we can
+          // mirror it into localStorage for the iOS PWA path (where WebKit
+          // purges third-party cookies). lib/api.ts reads `accessToken`
+          // from localStorage and sends it as `Authorization: Bearer`.
+          if (data.data?.accessToken) {
+            localStorage.setItem('accessToken', data.data.accessToken);
+          }
+          if (data.data?.refreshToken) {
+            localStorage.setItem('refreshToken', data.data.refreshToken);
+          }
+          if (data.data?.user) {
+            setUser(data.data.user);
+          }
+          return true;
         }
-        if (data.data.refreshToken) {
-          localStorage.setItem('refreshToken', data.data.refreshToken);
-        }
-        setUser(data.data.user);
-        return true;
+      } catch (error) {
+        console.error('Token refresh failed:', error);
       }
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-    }
 
-    return false;
+      return false;
+    })().finally(() => {
+      refreshInFlight.current = null;
+    });
+
+    refreshInFlight.current = promise;
+    return promise;
   }, []);
 
   const checkAuth = useCallback(async () => {
@@ -93,13 +127,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.data.user);
       } else if (response.status === 401) {
         // Access token is dead (expired or never set on this device).
-        // Try the refresh flow, which uses the long-lived refresh token
-        // from localStorage and is independent of cookie state.
+        // Use the single-flight refreshToken() so this path and any
+        // concurrent apiRequest 401-retries share one rotation instead of
+        // racing and tripping reuse-detection.
         const refreshed = await refreshToken();
         if (!refreshed) {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
         }
+        // refreshToken() already called setUser when successful; nothing
+        // more to do here for the happy path.
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -108,14 +145,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshToken]);
 
-  // Check auth on mount (skip on login page — no session to check)
+  // Check auth ONCE on mount (skip on login page — no session to check).
+  // We deliberately do NOT include `pathname` in the dependency array:
+  // re-running /auth/me on every navigation is wasteful and, worse, creates
+  // a race where the checkAuth refresh and the api.ts 401-retry refresh fire
+  // concurrently, rotate the same token twice, and trip reuse-detection →
+  // instant logout. In-memory `user` state already reflects the session;
+  // individual API calls handle their own 401→refresh→retry via api.ts.
   useEffect(() => {
     if (pathname === '/login') {
       setIsLoading(false);
       return;
     }
+    if (authCheckedRef.current) return;
+    authCheckedRef.current = true;
     checkAuth();
-  }, [checkAuth, pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {
