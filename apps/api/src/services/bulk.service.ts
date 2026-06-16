@@ -26,6 +26,15 @@ interface ProductImportRow {
   metaTitleAr?: string;
   metaDescription?: string;
   metaDescriptionAr?: string;
+  // Variant columns (OSOSS-style). A row with a non-empty parentSku is a
+  // variant of the product whose `sku` equals parentSku — see classifyRow.
+  parentSku?: string;
+  option1Name?: string;
+  option1Value?: string;
+  option2Name?: string;
+  option2Value?: string;
+  option3Name?: string;
+  option3Value?: string;
 }
 
 interface ImportResult {
@@ -33,7 +42,149 @@ interface ImportResult {
   created: number;
   updated: number;
   failed: number;
+  variantsCreated: number;
   errors: Array<{ row: number; error: string }>;
+}
+
+/**
+ * A parsed variant row, grouped under its parent product by parentSku.
+ * Numeric fields are already in fils / ints (the xlsx converter pre-multiplies
+ * price; CSV callers pass fils directly).
+ */
+export interface VariantImportRow {
+  parentSku: string;
+  sku?: string;
+  barcode?: string;
+  price?: number;
+  compareAtPrice?: number;
+  costPrice?: number;
+  inventory?: number;
+  weight?: number;
+  imageUrl?: string;
+  option1Name?: string;
+  option1Value?: string;
+  option2Name?: string;
+  option2Value?: string;
+  option3Name?: string;
+  option3Value?: string;
+}
+
+export interface CollectedOption {
+  name: string;
+  values: string[]; // distinct, first-seen order
+}
+
+/** A row is a variant when it carries a non-empty parentSku, else a base product. */
+export function classifyRow(row: { parentSku?: string }): 'base' | 'variant' {
+  return row.parentSku && String(row.parentSku).trim() ? 'variant' : 'base';
+}
+
+/**
+ * Collect the distinct option axes + values across a product's variant rows,
+ * preserving first-seen order for both axis and value (stable variant titles).
+ */
+export function collectOptions(variants: VariantImportRow[]): CollectedOption[] {
+  const order: string[] = [];
+  const byName = new Map<string, CollectedOption>();
+  for (const v of variants) {
+    for (const i of [1, 2, 3] as const) {
+      const name = (v[`option${i}Name`] as string | undefined)?.toString().trim();
+      const value = (v[`option${i}Value`] as string | undefined)?.toString().trim();
+      if (!name || !value) continue;
+      if (!byName.has(name)) {
+        byName.set(name, { name, values: [] });
+        order.push(name);
+      }
+      const opt = byName.get(name)!;
+      if (!opt.values.includes(value)) opt.values.push(value);
+    }
+  }
+  return order.map(n => byName.get(n)!);
+}
+
+/** Variant title = option values joined by " / " (e.g. "1 Kg" or "S / Red"). */
+export function buildVariantTitle(values: string[]): string {
+  return values.join(' / ');
+}
+
+/**
+ * Create a product's options, option values, variants and the variant↔value
+ * junction rows INSIDE the given transaction client, then flag the product as
+ * having variants. We deliberately do NOT call variant.service here — it uses
+ * its own prisma connection, which would create the variants outside this
+ * transaction and break atomicity if the batch rolls back.
+ *
+ * Replace-semantics: any existing options/variants for the product are cleared
+ * first (mirrors how categories/tags/images are replaced on re-import).
+ */
+async function createVariantsForProductTx(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  variants: VariantImportRow[]
+): Promise<number> {
+  if (variants.length === 0) return 0;
+
+  // Clear existing options/variants (cascades to values + junction rows).
+  await tx.productVariant.deleteMany({ where: { productId } });
+  await tx.productOption.deleteMany({ where: { productId } });
+
+  // 1) Options + values → (name|value) -> valueId map.
+  const collected = collectOptions(variants);
+  const valueIdByKey = new Map<string, string>();
+  for (let oi = 0; oi < collected.length; oi++) {
+    const opt = collected[oi];
+    const option = await tx.productOption.create({
+      data: { productId, name: opt.name, position: oi },
+    });
+    for (let vi = 0; vi < opt.values.length; vi++) {
+      const value = await tx.productOptionValue.create({
+        data: { optionId: option.id, value: opt.values[vi], position: vi },
+      });
+      valueIdByKey.set(`${opt.name}|${opt.values[vi]}`, value.id);
+    }
+  }
+
+  // 2) Variants + junction rows.
+  let count = 0;
+  for (let vi = 0; vi < variants.length; vi++) {
+    const v = variants[vi];
+    const pairs: Array<{ name: string; value: string }> = [];
+    for (const i of [1, 2, 3] as const) {
+      const name = (v[`option${i}Name`] as string | undefined)?.toString().trim();
+      const value = (v[`option${i}Value`] as string | undefined)?.toString().trim();
+      if (name && value) pairs.push({ name, value });
+    }
+    if (pairs.length === 0) continue; // malformed variant row — skip
+
+    const variant = await tx.productVariant.create({
+      data: {
+        productId,
+        title: buildVariantTitle(pairs.map(p => p.value)),
+        sku: v.sku || null,
+        barcode: v.barcode || null,
+        price: v.price ?? null,
+        compareAtPrice: v.compareAtPrice ?? null,
+        costPrice: v.costPrice ?? null,
+        inventory: v.inventory ?? 0,
+        weight: v.weight ?? null,
+        imageUrl: v.imageUrl || null,
+        position: vi,
+      },
+    });
+
+    for (const p of pairs) {
+      const valueId = valueIdByKey.get(`${p.name}|${p.value}`);
+      if (!valueId) continue;
+      await tx.productVariantOption.create({
+        data: { variantId: variant.id, valueId },
+      });
+    }
+    count++;
+  }
+
+  // 3) We bypass variant.service, so we own the hasVariants flag.
+  await tx.product.update({ where: { id: productId }, data: { hasVariants: true } });
+  return count;
 }
 
 interface ExportOptions {
@@ -76,6 +227,10 @@ export class BulkService {
         images: { orderBy: { position: 'asc' } },
         categories: { include: { category: true } },
         tags: { include: { tag: true } },
+        variants: {
+          orderBy: { position: 'asc' },
+          include: { options: { include: { value: { include: { option: true } } } } },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 10000,
@@ -108,15 +263,25 @@ export class BulkService {
       'metaTitleAr',
       'metaDescription',
       'metaDescriptionAr',
+      'parentSku',
+      'option1Name',
+      'option1Value',
+      'option2Name',
+      'option2Value',
+      'option3Name',
+      'option3Value',
     ];
 
-    // Build CSV rows
-    const rows = products.map(product => {
+    const blanks = (n: number) => Array(n).fill('');
+
+    // Build CSV rows — one base row per product, then one row per variant
+    // (parentSku = product.sku) so the export round-trips back through import.
+    const rows = products.flatMap(product => {
       const categories = product.categories.map(c => c.category.name).join(',');
       const tags = product.tags.map(t => t.tag.name).join(',');
       const images = product.images.map(i => i.url).join(',');
 
-      return [
+      const baseRow = [
         product.id,
         this.escapeCSV(product.name),
         this.escapeCSV(product.nameAr || ''),
@@ -142,7 +307,47 @@ export class BulkService {
         this.escapeCSV(product.metaTitleAr || ''),
         this.escapeCSV(product.metaDescription || ''),
         this.escapeCSV(product.metaDescriptionAr || ''),
+        ...blanks(7), // parentSku + option{1,2,3}Name/Value — empty on base rows
       ].join(',');
+
+      const variantRows = product.variants.map(variant => {
+        // Up to 3 option axes, ordered by the option's position.
+        const opts = variant.options
+          .map(o => o.value)
+          .sort((a, b) => a.option.position - b.option.position)
+          .slice(0, 3);
+        const optionCols: string[] = [];
+        for (let i = 0; i < 3; i++) {
+          optionCols.push(
+            opts[i] ? this.escapeCSV(opts[i].option.name) : '',
+            opts[i] ? this.escapeCSV(opts[i].value) : ''
+          );
+        }
+        return [
+          '', // id (new variant on re-import)
+          ...blanks(5), // name..descriptionAr (inherited from parent)
+          variant.price ?? '',
+          variant.compareAtPrice ?? '',
+          variant.costPrice ?? '',
+          variant.sku || '',
+          variant.barcode || '',
+          variant.inventory,
+          '', // lowStockThreshold
+          product.trackInventory,
+          variant.weight ?? '',
+          product.status,
+          '', // featured
+          '', // isNew
+          '', // categories (inherited)
+          '', // tags
+          this.escapeCSV(variant.imageUrl || ''),
+          ...blanks(4), // meta fields (inherited)
+          product.sku || '', // parentSku
+          ...optionCols, // option1Name/Value, option2..., option3...
+        ].join(',');
+      });
+
+      return [baseRow, ...variantRows];
     });
 
     return [headers.join(','), ...rows].join('\n');
@@ -177,6 +382,13 @@ export class BulkService {
       'metaTitleAr',
       'metaDescription',
       'metaDescriptionAr',
+      'parentSku',
+      'option1Name',
+      'option1Value',
+      'option2Name',
+      'option2Value',
+      'option3Name',
+      'option3Value',
     ];
 
     // Example row
@@ -205,9 +417,53 @@ export class BulkService {
       'عنوان SEO',
       'SEO Description',
       'وصف SEO',
+      '', // parentSku — empty on a base product row
+      '', // option1Name
+      '', // option1Value
+      '',
+      '',
+      '',
+      '',
     ].join(',');
 
-    return `${headers.join(',')}\n${exampleRow}`;
+    // Example VARIANT row: a 1 Kg size of the product above (parentSku = its
+    // sku). Name/description/categories are inherited from the parent; the
+    // variant carries its own sku/price/barcode/inventory + the option value.
+    const exampleVariantRow = [
+      '', // name (inherited)
+      '', // nameAr
+      '', // slug
+      '', // description
+      '', // descriptionAr
+      '5500', // variant price (5.5 KWD in fils)
+      '', // compareAtPrice
+      '', // costPrice
+      'SKU-001-1KG', // variant sku
+      '1234567890124', // variant barcode
+      '40', // variant inventory
+      '', // lowStockThreshold
+      'true', // trackInventory
+      '1', // weight
+      'active',
+      'false',
+      'false',
+      '', // categories (inherited)
+      '', // tags
+      '', // images (inherited unless variant has its own)
+      '',
+      '',
+      '',
+      '',
+      'SKU-001', // parentSku → links to the base product above
+      'Size', // option1Name
+      '1 Kg', // option1Value
+      '',
+      '',
+      '',
+      '',
+    ].join(',');
+
+    return `${headers.join(',')}\n${exampleRow}\n${exampleVariantRow}`;
   }
 
   /**
@@ -229,10 +485,14 @@ export class BulkService {
       created: 0,
       updated: 0,
       failed: 0,
+      variantsCreated: 0,
       errors: [],
     };
 
-    const lines = csvData.split('\n').filter(line => line.trim());
+    // Split into records respecting quoted fields that may contain embedded
+    // newlines (e.g. a product description with line breaks). A naive
+    // split('\n') shatters such records into broken rows.
+    const lines = this.splitCsvRecords(csvData).filter(line => line.trim());
     if (lines.length < 2) {
       throw new AppError(
         400,
@@ -298,11 +558,59 @@ export class BulkService {
     }
     const validRows: ParsedRow[] = [];
 
+    // Variant rows (identified by parentSku) grouped under their parent sku.
+    // Consumed in Phase 4 as each parent product is created/updated; any
+    // leftover groups (parent already in the store) are reconciled after.
+    const variantsByParent = new Map<string, VariantImportRow[]>();
+    const toFils = (v: unknown): number | undefined => {
+      if (v === undefined || v === null || String(v).trim() === '') return undefined;
+      const n = parseInt(String(v), 10);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
     for (let i = 0; i < dataRows.length; i++) {
       const rowIndex = i + 2; // 1-based, accounting for header
       try {
         const values = this.parseCSVLine(dataRows[i]);
         const row = this.mapRowToObject(headers, values);
+
+        // Variant rows are handled separately — they inherit name/desc/etc.
+        // from their parent and only contribute option + variant-level data.
+        if (classifyRow(row) === 'variant') {
+          const parentSku = String(row.parentSku).trim();
+          if (!row.option1Name || !row.option1Value) {
+            result.failed++;
+            result.errors.push({
+              row: rowIndex,
+              error: 'Variant row requires option1Name and option1Value',
+            });
+            continue;
+          }
+          const variant: VariantImportRow = {
+            parentSku,
+            sku: row.sku?.toString().trim() || undefined,
+            barcode: row.barcode?.toString().trim() || undefined,
+            price: toFils(row.price),
+            compareAtPrice: toFils(row.compareAtPrice),
+            costPrice: toFils(row.costPrice),
+            inventory: toFils(row.inventory),
+            weight:
+              row.weight !== undefined && String(row.weight).trim() !== ''
+                ? parseFloat(String(row.weight))
+                : undefined,
+            imageUrl: row.images ? String(row.images).split(',')[0].trim() : undefined,
+            option1Name: row.option1Name,
+            option1Value: row.option1Value,
+            option2Name: row.option2Name,
+            option2Value: row.option2Value,
+            option3Name: row.option3Name,
+            option3Value: row.option3Value,
+          };
+          const list = variantsByParent.get(parentSku) ?? [];
+          list.push(variant);
+          variantsByParent.set(parentSku, list);
+          continue;
+        }
 
         // Validate required fields
         if (!row.name) {
@@ -443,6 +751,9 @@ export class BulkService {
 
     for (let batchStart = 0; batchStart < validRows.length; batchStart += BATCH_SIZE) {
       const batch = validRows.slice(batchStart, batchStart + BATCH_SIZE);
+      // Variants created in this batch — only folded into the result after the
+      // transaction commits, so a rollback doesn't leave a phantom count.
+      let batchVariants = 0;
 
       try {
         await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
@@ -576,6 +887,19 @@ export class BulkService {
                   });
                 }
               }
+
+              // Attach any variant rows that referenced this product's sku.
+              // Created in the SAME transaction so a batch rollback also
+              // rolls back the variants.
+              if (productFields.sku && variantsByParent.has(productFields.sku)) {
+                const made = await createVariantsForProductTx(
+                  tx,
+                  productId,
+                  variantsByParent.get(productFields.sku)!
+                );
+                batchVariants += made;
+                variantsByParent.delete(productFields.sku); // mark consumed
+              }
             } catch (error) {
               // Re-throw to roll back the batch transaction; per-row errors
               // are only possible for validation issues caught in Phase 2.
@@ -585,6 +909,8 @@ export class BulkService {
             }
           }
         });
+        // Transaction committed — safe to count this batch's variants.
+        result.variantsCreated += batchVariants;
       } catch (error) {
         // If the batch transaction fails, mark all rows in the batch as failed
         const rowIndex =
@@ -610,6 +936,34 @@ export class BulkService {
                 : `Rolled back (batch failure at row ${rowIndex})`,
           });
         }
+      }
+    }
+
+    // Reconcile variant groups whose parent product was NOT in this file but
+    // already exists in the store. Each runs in its own transaction.
+    for (const [parentSku, variants] of variantsByParent.entries()) {
+      const existing = productBySku.get(parentSku);
+      if (!existing) {
+        result.failed += variants.length;
+        result.errors.push({
+          row: 0,
+          error: `Variant parent sku not found in file or store: ${parentSku}`,
+        });
+        continue;
+      }
+      try {
+        await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+          const made = await createVariantsForProductTx(tx, existing.id, variants);
+          result.variantsCreated += made;
+        });
+      } catch (error) {
+        result.failed += variants.length;
+        result.errors.push({
+          row: 0,
+          error: `Failed to create variants for ${parentSku}: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
+        });
       }
     }
 
@@ -707,6 +1061,41 @@ export class BulkService {
       return `"${value.replace(/"/g, '""')}"`;
     }
     return value;
+  }
+
+  /**
+   * Split raw CSV text into records, honoring quoted fields that may span
+   * multiple lines. Splitting only happens on newlines encountered OUTSIDE a
+   * quoted field. Doubled quotes ("") inside a field are preserved for
+   * parseCSVLine to collapse. Handles both \n and \r\n line endings.
+   */
+  static splitCsvRecords(csvData: string): string[] {
+    const records: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < csvData.length; i++) {
+      const char = csvData[i];
+
+      if (char === '"') {
+        if (inQuotes && csvData[i + 1] === '"') {
+          current += '""'; // escaped quote inside a field
+          i++;
+          continue;
+        }
+        inQuotes = !inQuotes;
+        current += char;
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (char === '\r' && csvData[i + 1] === '\n') i++; // CRLF → one boundary
+        records.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+
+    if (current.length > 0) records.push(current);
+    return records;
   }
 
   private static parseCSVLine(line: string): string[] {

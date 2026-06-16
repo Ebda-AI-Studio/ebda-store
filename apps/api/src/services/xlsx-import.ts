@@ -126,6 +126,14 @@ type CanonicalKey =
   | 'metaTitleAr'
   | 'metaDescription'
   | 'metaDescriptionAr'
+  // Variant columns (OSOSS-style). A row carrying a parentSku is a variant.
+  | 'parentSku'
+  | 'option1Name'
+  | 'option1Value'
+  | 'option2Name'
+  | 'option2Value'
+  | 'option3Name'
+  | 'option3Value'
   // Pseudo-keys that don't map 1:1 — we fold these into description.
   | '_sequenceNumber'
   | '_origin'
@@ -173,6 +181,23 @@ const HEADER_ALIASES: Record<string, CanonicalKey> = {
   'meta description': 'metaDescription',
   metadescriptionar: 'metaDescriptionAr',
 
+  // Variant columns (English + OSOSS export header)
+  parentsku: 'parentSku',
+  'parent sku': 'parentSku',
+  parent_sku: 'parentSku',
+  option1name: 'option1Name',
+  'option1 name': 'option1Name',
+  option1value: 'option1Value',
+  'option1 value': 'option1Value',
+  option2name: 'option2Name',
+  'option2 name': 'option2Name',
+  option2value: 'option2Value',
+  'option2 value': 'option2Value',
+  option3name: 'option3Name',
+  'option3 name': 'option3Name',
+  option3value: 'option3Value',
+  'option3 value': 'option3Value',
+
   // Arabic synonyms (trimmed + lowercased)
   الصنف: 'nameAr',
   'الصنف عربي': 'nameAr',
@@ -206,6 +231,8 @@ const HEADER_ALIASES: Record<string, CanonicalKey> = {
   المنشأ: '_origin',
   'بلد المنشأ': '_origin',
   الوزن: '_weightText',
+  'الصنف الأب': 'parentSku',
+  'المنتج الأب': 'parentSku',
 };
 
 function normaliseHeader(h: string): string {
@@ -246,8 +273,9 @@ function rowToProduct(
     if (!raw[key]) raw[key] = v;
   });
 
-  // A row needs at least a name of some kind to be importable.
-  if (!raw.name && !raw.nameAr) return null;
+  // A row needs at least a name of some kind to be importable — EXCEPT variant
+  // rows (identified by parentSku), which inherit their name from the parent.
+  if (!raw.name && !raw.nameAr && !raw.parentSku) return null;
 
   const out: Partial<ProductRowOut> = { ...raw };
 
@@ -338,6 +366,13 @@ const CSV_COLUMNS: CanonicalKey[] = [
   'metaTitleAr',
   'metaDescription',
   'metaDescriptionAr',
+  'parentSku',
+  'option1Name',
+  'option1Value',
+  'option2Name',
+  'option2Value',
+  'option3Name',
+  'option3Value',
 ];
 
 function buildCsv(rows: ProductRowOut[]): string {
