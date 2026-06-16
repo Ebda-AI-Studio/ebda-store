@@ -122,7 +122,7 @@ Full inventory management without needing a separate system. Features are tiered
 - **Multi-Warehouse** — Track stock counts per warehouse and route orders by proximity or rule. (`inventory.multi_warehouse`)
 - **Barcode Scanning** — Scan barcodes from mobile to receive stock, pick orders, and audit inventory counts. (`inventory.barcode`) — **Implemented 2026-06-15**: barcode lookup (GET /inventory/lookup), scan-to-receive, scan-to-pick, cycle-count sessions + reconcile. Admin UI at Stock → Scan. BarcodeDetector Web API with manual-entry fallback.
 - **Purchase Orders** — Supplier purchase-order workflow with cost capture, receive-against-PO, and supplier ledger. (`inventory.purchase_orders`)
-- **Bulk Adjustments** — CSV/Excel import for stock reconciliation across hundreds of products at once. (`inventory.bulk_adjustments`)
+- **Bulk Adjustments** — CSV import for stock reconciliation across hundreds of products at once. Upload a file with SKU or Barcode + **New Quantity** (absolute cycle-count) or **Delta** (signed +/− for found/damaged units). Arabic column headers are supported. The admin previews parsed rows and per-row validation errors before applying; the import posts as a single auditable Stock Adjustment with a GL journal entry. (`inventory.bulk_adjustments`)
 
 **Available on all plans:**
 

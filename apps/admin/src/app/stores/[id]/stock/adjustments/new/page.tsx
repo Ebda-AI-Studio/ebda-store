@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { HelpTip } from '@/components/HelpTip';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { parseStockAdjustCsv, generateStockAdjustCsvTemplate } from '@force/shared';
+import type { StockAdjustParseResult, StockAdjustParsedRow } from '@force/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,8 +29,21 @@ interface ItemDraft {
 
 interface AdjustmentCreated {
   id: string;
+  adjustmentNumber: string;
   status: string;
 }
+
+interface CsvImportResult {
+  adjustmentId: string;
+  adjustmentNumber: string;
+  posted: boolean;
+  totalRows: number;
+  importedRows: number;
+  skippedRows: number;
+  errors?: Record<number, string[]>;
+}
+
+type TabMode = 'manual' | 'csv';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -44,7 +59,375 @@ const ADJUSTMENT_TYPES = [
 
 const EMPTY_ITEM: ItemDraft = { productId: '', newQty: '' };
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── CSV Upload Component ─────────────────────────────────────────────────────
+
+interface CsvUploadTabProps {
+  storeId: string;
+  onSuccess: () => void;
+}
+
+function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
+  const tNew = useT('stock.adjustments.new');
+  const t = useT('stock.adjustments');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [csvContent, setCsvContent] = useState('');
+  const [selectedFileName, setSelectedFileName] = useState('');
+  const [parseResult, setParseResult] = useState<StockAdjustParseResult | null>(null);
+  const [type, setType] = useState<string>('cycle_count');
+  const [reason, setReason] = useState('');
+  const [reasonAr, setReasonAr] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFileName(file.name);
+    setImportResult(null);
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = event => {
+      const content = event.target?.result as string;
+      setCsvContent(content);
+      const result = parseStockAdjustCsv(content);
+      setParseResult(result);
+    };
+    reader.readAsText(file);
+  }
+
+  function handleClear() {
+    setCsvContent('');
+    setSelectedFileName('');
+    setParseResult(null);
+    setImportResult(null);
+    setError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function downloadTemplate() {
+    const csv = generateStockAdjustCsvTemplate();
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stock-adjustment-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleSubmit() {
+    if (!csvContent || !parseResult?.hasValidRows) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { data, error: apiError } = await apiPost<{ data: CsvImportResult }>(
+        `/api/v1/stores/${storeId}/stock-adjustments/csv-import`,
+        {
+          csvContent,
+          type,
+          reason: reason || undefined,
+          reasonAr: reasonAr || undefined,
+          postImmediately: true,
+        }
+      );
+      if (apiError) {
+        setError(apiError.message);
+        return;
+      }
+      if (data?.data) {
+        setImportResult(data.data);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const validRowCount = parseResult
+    ? parseResult.rows.filter(r => !parseResult.errors[r.rowNumber]).length
+    : 0;
+  const errorRowCount = parseResult ? Object.keys(parseResult.errors).length : 0;
+
+  return (
+    <div className="space-y-5">
+      {/* Instructions card */}
+      <div className="rounded-xl border bg-info/5 p-5">
+        <h3 className="font-semibold text-info text-sm">How to use CSV import</h3>
+        <ol className="mt-2 list-decimal list-inside space-y-1 text-sm text-info">
+          <li>Download the template below and fill in your stock counts.</li>
+          <li>
+            Each row needs a <strong>SKU</strong> or <strong>Barcode</strong> to identify the
+            product.
+          </li>
+          <li>
+            Use <strong>New Quantity</strong> for absolute stock counts (cycle count), or{' '}
+            <strong>Delta</strong> (+/−) for signed adjustments (found/damaged units).
+          </li>
+          <li>Upload the filled file and review the preview before applying.</li>
+        </ol>
+        <button
+          type="button"
+          onClick={downloadTemplate}
+          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 border border-info/40 rounded text-xs text-info hover:bg-info/10"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+            />
+          </svg>
+          Download template (.csv)
+        </button>
+      </div>
+
+      {/* Adjustment type */}
+      <div className="space-y-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium">{tNew('typeLabel')}</span>
+          <HelpTip text={tNew('typeTip')} />
+        </div>
+        <select
+          value={type}
+          onChange={e => setType(e.target.value)}
+          className="w-full max-w-xs border border-border rounded px-3 py-2 text-base sm:text-sm"
+        >
+          {ADJUSTMENT_TYPES.map(at => (
+            <option key={at} value={at}>
+              {t(`types.${at}`)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Reason */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label className="space-y-1">
+          <span className="text-sm font-medium">{tNew('reasonLabel')}</span>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={2}
+            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+            placeholder="Optional reason in English"
+          />
+        </label>
+        <label className="space-y-1" dir="rtl">
+          <span className="text-sm font-medium">{tNew('reasonArLabel')}</span>
+          <textarea
+            value={reasonAr}
+            onChange={e => setReasonAr(e.target.value)}
+            rows={2}
+            dir="rtl"
+            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+            placeholder="سبب التسوية بالعربية (اختياري)"
+          />
+        </label>
+      </div>
+
+      {/* File upload */}
+      <div
+        className="border-2 border-dashed rounded-xl p-8 text-center hover:border-primary transition cursor-pointer"
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,text/csv,text/plain"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <svg
+          className="mx-auto h-10 w-10 text-muted-foreground"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+          />
+        </svg>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {selectedFileName ? (
+            <span className="font-medium text-foreground">{selectedFileName}</span>
+          ) : (
+            'Click to choose a CSV file, or drag and drop'
+          )}
+        </p>
+        {parseResult && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {parseResult.totalRows} rows parsed —{' '}
+            <span className="text-[hsl(var(--success))]">{validRowCount} valid</span>
+            {errorRowCount > 0 && (
+              <span className="text-destructive">, {errorRowCount} with errors</span>
+            )}
+          </p>
+        )}
+      </div>
+
+      {/* Parse preview */}
+      {parseResult && parseResult.rows.length > 0 && (
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="px-3 py-2 bg-muted/30 border-b border-border text-xs font-medium text-muted-foreground">
+            Preview — first {Math.min(parseResult.rows.length, 50)} rows
+            {parseResult.rows.length > 50 && ` (of ${parseResult.rows.length})`}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border/40">
+                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">#</th>
+                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">SKU</th>
+                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">
+                    Barcode
+                  </th>
+                  <th className="text-end px-3 py-2 text-muted-foreground font-medium">New Qty</th>
+                  <th className="text-end px-3 py-2 text-muted-foreground font-medium">Delta</th>
+                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">Reason</th>
+                  <th className="text-start px-3 py-2 text-muted-foreground font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parseResult.rows.slice(0, 50).map((row: StockAdjustParsedRow) => {
+                  const rowErrors = parseResult.errors[row.rowNumber];
+                  const isError = Boolean(rowErrors?.length);
+                  return (
+                    <tr
+                      key={row.rowNumber}
+                      className={`border-t border-border/30 ${isError ? 'bg-destructive/5' : ''}`}
+                    >
+                      <td className="px-3 py-1.5 text-muted-foreground">{row.rowNumber}</td>
+                      <td className="px-3 py-1.5 font-mono">{row.sku ?? '—'}</td>
+                      <td className="px-3 py-1.5 font-mono">{row.barcode ?? '—'}</td>
+                      <td className="px-3 py-1.5 text-end font-mono">
+                        {row.newQuantity !== null ? row.newQuantity : '—'}
+                      </td>
+                      <td className="px-3 py-1.5 text-end font-mono">
+                        {row.delta !== null ? (row.delta >= 0 ? `+${row.delta}` : row.delta) : '—'}
+                      </td>
+                      <td className="px-3 py-1.5 truncate max-w-[120px]">{row.reason ?? '—'}</td>
+                      <td className="px-3 py-1.5">
+                        {isError ? (
+                          <span
+                            className="text-destructive font-medium"
+                            title={rowErrors?.join('; ')}
+                          >
+                            Error
+                          </span>
+                        ) : (
+                          <span className="text-[hsl(var(--success))]">OK</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {/* Row-level errors */}
+          {errorRowCount > 0 && (
+            <div className="border-t border-border p-3 bg-destructive/5">
+              <p className="text-xs font-medium text-destructive mb-1">
+                Row errors (skipped during import):
+              </p>
+              <ul className="text-xs text-destructive space-y-0.5 max-h-36 overflow-y-auto">
+                {Object.entries(parseResult.errors).map(([rn, msgs]) => (
+                  <li key={rn}>
+                    <span className="font-mono">Row {rn}:</span> {(msgs as string[]).join('; ')}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Import result */}
+      {importResult && (
+        <div className="rounded-xl border border-border p-4 bg-muted/20 space-y-2">
+          <p className="text-sm font-semibold text-foreground">
+            Import complete — adjustment #{importResult.adjustmentNumber}
+          </p>
+          <ul className="text-sm space-y-1 text-muted-foreground">
+            <li>
+              Total rows in file:{' '}
+              <span className="text-foreground font-medium">{importResult.totalRows}</span>
+            </li>
+            <li>
+              Imported:{' '}
+              <span className="text-[hsl(var(--success))] font-medium">
+                {importResult.importedRows}
+              </span>
+            </li>
+            {importResult.skippedRows > 0 && (
+              <li>
+                Skipped (errors):{' '}
+                <span className="text-destructive font-medium">{importResult.skippedRows}</span>
+              </li>
+            )}
+            <li>
+              Status:{' '}
+              <span className="font-medium">{importResult.posted ? 'Posted' : 'Draft'}</span>
+            </li>
+          </ul>
+          {importResult.errors && Object.keys(importResult.errors).length > 0 && (
+            <details className="text-xs text-destructive">
+              <summary className="cursor-pointer">Show row errors</summary>
+              <ul className="mt-1 space-y-0.5 pl-2">
+                {Object.entries(importResult.errors).map(([rn, msgs]) => (
+                  <li key={rn}>
+                    Row {rn}: {(msgs as string[]).join('; ')}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <button
+            type="button"
+            onClick={onSuccess}
+            className="mt-1 px-4 py-2 bg-primary text-primary-foreground rounded text-sm"
+          >
+            View all adjustments
+          </button>
+        </div>
+      )}
+
+      {error && <div className="text-red-600 text-sm">{error}</div>}
+
+      {/* Actions */}
+      {!importResult && (
+        <div className="flex gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting || !parseResult?.hasValidRows}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
+          >
+            {submitting ? 'Importing…' : `Import & Post (${validRowCount} rows)`}
+          </button>
+          {selectedFileName && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="px-4 py-2 border border-border rounded text-sm"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function NewStockAdjustmentPage() {
   const params = useParams();
@@ -57,6 +440,9 @@ export default function NewStockAdjustmentPage() {
   // Pre-fill from query params (linked from inventory page)
   const prefillProductId = searchParams?.get('productId') ?? '';
   const prefillNewQty = searchParams?.get('newQty') ?? '';
+
+  // Tab state — default to CSV if no pre-fill
+  const [activeTab, setActiveTab] = useState<TabMode>(prefillProductId ? 'manual' : 'csv');
 
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [type, setType] = useState<string>('cycle_count');
@@ -173,168 +559,206 @@ export default function NewStockAdjustmentPage() {
   return (
     <AdminLayout title={tNew('title')} subtitle={tNew('description')}>
       <div className="max-w-4xl space-y-5">
-        {/* Type */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium">{tNew('typeLabel')}</span>
-            <HelpTip text={tNew('typeTip')} />
-          </div>
-          <select
-            value={type}
-            onChange={e => setType(e.target.value)}
-            className="w-full max-w-xs border border-border rounded px-3 py-2 text-base sm:text-sm"
+        {/* Tab switcher */}
+        <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1 w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab('csv')}
+            className={`px-4 py-1.5 rounded text-sm font-medium transition ${
+              activeTab === 'csv'
+                ? 'bg-background shadow text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
-            {ADJUSTMENT_TYPES.map(at => (
-              <option key={at} value={at}>
-                {t(`types.${at}`)}
-              </option>
-            ))}
-          </select>
+            CSV Import
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('manual')}
+            className={`px-4 py-1.5 rounded text-sm font-medium transition ${
+              activeTab === 'manual'
+                ? 'bg-background shadow text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Manual entry
+          </button>
         </div>
 
-        {/* Reason + ReasonAr */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="space-y-1">
-            <span className="text-sm font-medium">{tNew('reasonLabel')}</span>
-            <textarea
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              rows={3}
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-              placeholder="Optional reason in English"
-            />
-          </label>
-          <label className="space-y-1" dir="rtl">
-            <span className="text-sm font-medium">{tNew('reasonArLabel')}</span>
-            <textarea
-              value={reasonAr}
-              onChange={e => setReasonAr(e.target.value)}
-              rows={3}
-              dir="rtl"
-              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
-              placeholder="سبب التسوية بالعربية (اختياري)"
-            />
-          </label>
-        </div>
-
-        {/* Evidence URL */}
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">{tNew('evidenceLabel')}</span>
-          <input
-            type="url"
-            value={evidenceUrl}
-            onChange={e => setEvidenceUrl(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
-            placeholder="https://… (paste R2 upload URL; file uploader coming in Batch 3)"
+        {/* CSV Import tab */}
+        {activeTab === 'csv' && (
+          <CsvUploadTab
+            storeId={storeId}
+            onSuccess={() => router.push(`/stores/${storeId}/stock/adjustments`)}
           />
-        </label>
+        )}
 
-        {/* Items table */}
-        <div className="rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/30">
-              <tr>
-                <th className="text-start px-3 py-2 font-medium text-muted-foreground">
-                  {tNew('selectProduct')}
-                </th>
-                <th className="text-end px-3 py-2 w-36 font-medium text-muted-foreground">
-                  {tNew('newQty')}
-                </th>
-                <th className="w-12" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, i) => (
-                <tr key={i} className="border-t border-border/40">
-                  <td className="px-3 py-2">
-                    <select
-                      value={item.productId}
-                      onChange={e => updateItem(i, { productId: e.target.value })}
-                      className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
-                    >
-                      <option value="">— {tNew('selectProduct')} —</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.sku ? `[${p.sku}] ` : ''}
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={item.newQty}
-                      onChange={e => updateItem(i, { newQty: e.target.value })}
-                      className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => removeItem(i)}
-                      disabled={items.length <= 1}
-                      className="text-red-600 disabled:opacity-30 hover:underline text-xs"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* Manual entry tab */}
+        {activeTab === 'manual' && (
+          <div className="space-y-5">
+            {/* Type */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium">{tNew('typeLabel')}</span>
+                <HelpTip text={tNew('typeTip')} />
+              </div>
+              <select
+                value={type}
+                onChange={e => setType(e.target.value)}
+                className="w-full max-w-xs border border-border rounded px-3 py-2 text-base sm:text-sm"
+              >
+                {ADJUSTMENT_TYPES.map(at => (
+                  <option key={at} value={at}>
+                    {t(`types.${at}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Add product row */}
-        <div>
-          <button
-            type="button"
-            onClick={addItem}
-            className="px-3 py-1.5 border border-border rounded text-sm"
-          >
-            {tNew('addItem')}
-          </button>
-        </div>
+            {/* Reason + ReasonAr */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="space-y-1">
+                <span className="text-sm font-medium">{tNew('reasonLabel')}</span>
+                <textarea
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  rows={3}
+                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                  placeholder="Optional reason in English"
+                />
+              </label>
+              <label className="space-y-1" dir="rtl">
+                <span className="text-sm font-medium">{tNew('reasonArLabel')}</span>
+                <textarea
+                  value={reasonAr}
+                  onChange={e => setReasonAr(e.target.value)}
+                  rows={3}
+                  dir="rtl"
+                  className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm resize-none"
+                  placeholder="سبب التسوية بالعربية (اختياري)"
+                />
+              </label>
+            </div>
 
-        {error && <div className="text-red-600 text-sm">{error}</div>}
+            {/* Evidence URL */}
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">{tNew('evidenceLabel')}</span>
+              <input
+                type="url"
+                value={evidenceUrl}
+                onChange={e => setEvidenceUrl(e.target.value)}
+                className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+                placeholder="https://… (paste R2 upload URL)"
+              />
+            </label>
 
-        {/* Submit buttons */}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={submitDraft}
-            disabled={submitting}
-            className="px-4 py-2 border border-border rounded text-sm disabled:opacity-50"
-          >
-            {submitting ? 'Saving…' : tNew('submitDraft')}
-          </button>
-          <button
-            type="button"
-            onClick={submitPost}
-            disabled={submitting}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
-          >
-            {submitting ? 'Saving…' : tNew('submitPost')}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(`/stores/${storeId}/stock/adjustments`)}
-            className="px-4 py-2 border border-border rounded text-sm"
-          >
-            {/* Cancel */}
-            Cancel
-          </button>
-        </div>
+            {/* Items table */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/30">
+                  <tr>
+                    <th className="text-start px-3 py-2 font-medium text-muted-foreground">
+                      {tNew('selectProduct')}
+                    </th>
+                    <th className="text-end px-3 py-2 w-36 font-medium text-muted-foreground">
+                      {tNew('newQty')}
+                    </th>
+                    <th className="w-12" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, i) => (
+                    <tr key={i} className="border-t border-border/40">
+                      <td className="px-3 py-2">
+                        <select
+                          value={item.productId}
+                          onChange={e => updateItem(i, { productId: e.target.value })}
+                          className="w-full border border-border rounded px-2 py-1 text-base sm:text-sm"
+                        >
+                          <option value="">— {tNew('selectProduct')} —</option>
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.sku ? `[${p.sku}] ` : ''}
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={item.newQty}
+                          onChange={e => updateItem(i, { newQty: e.target.value })}
+                          className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(i)}
+                          disabled={items.length <= 1}
+                          className="text-red-600 disabled:opacity-30 hover:underline text-xs"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-        <div className="flex items-start gap-1.5">
-          <p className="text-xs text-muted-foreground">
-            Posting is irreversible — it applies inventory mutations and posts a GL journal entry.
-            Save as draft to review first.
-          </p>
-          <HelpTip text={tNew('glJournalTip')} />
-        </div>
+            {/* Add product row */}
+            <div>
+              <button
+                type="button"
+                onClick={addItem}
+                className="px-3 py-1.5 border border-border rounded text-sm"
+              >
+                {tNew('addItem')}
+              </button>
+            </div>
+
+            {error && <div className="text-red-600 text-sm">{error}</div>}
+
+            {/* Submit buttons */}
+            <div className="flex gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={submitDraft}
+                disabled={submitting}
+                className="px-4 py-2 border border-border rounded text-sm disabled:opacity-50"
+              >
+                {submitting ? 'Saving…' : tNew('submitDraft')}
+              </button>
+              <button
+                type="button"
+                onClick={submitPost}
+                disabled={submitting}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm disabled:opacity-50"
+              >
+                {submitting ? 'Saving…' : tNew('submitPost')}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/stores/${storeId}/stock/adjustments`)}
+                className="px-4 py-2 border border-border rounded text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="flex items-start gap-1.5">
+              <p className="text-xs text-muted-foreground">
+                Posting is irreversible — it applies inventory mutations and posts a GL journal
+                entry. Save as draft to review first.
+              </p>
+              <HelpTip text={tNew('glJournalTip')} />
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

@@ -378,8 +378,15 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     key: 'inventory.bulk_adjustments',
     name: 'Inventory — Bulk Adjustments',
     nameAr: 'المخزون — التعديلات المجمّعة',
-    description: 'CSV/Excel import for stock reconciliation across hundreds of products at once.',
-    descriptionAr: 'استيراد من CSV/Excel لمطابقة المخزون عبر مئات المنتجات دفعةً واحدة.',
+    description:
+      'CSV import for stock reconciliation across hundreds of products at once. ' +
+      'Upload a CSV with SKU or Barcode + New Quantity (absolute) or Delta (signed +/−). ' +
+      'Arabic column headers are supported. Rows are resolved to products, previewed before ' +
+      'apply, and posted as a single auditable StockAdjustment with a GL journal entry.',
+    descriptionAr:
+      'استيراد CSV لمطابقة المخزون عبر مئات المنتجات دفعةً واحدة. ' +
+      'ارفع ملف CSV يحتوي على رمز المنتج أو الباركود مع الكمية الجديدة (مطلقة) أو التغيير (موجب/سالب). ' +
+      'تُدعم رؤوس الأعمدة العربية. يُحوَّل كل صف إلى تسوية مخزون موحّدة مع قيد دفتر يومية.',
     category: 'operations',
     tier: 'addon',
   },
