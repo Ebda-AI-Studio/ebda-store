@@ -3805,7 +3805,8 @@
         "newsletter": "النشرة البريدية",
         "affiliates": "التسويق بالعمولة",
         "abandonedCarts": "العربات المتروكة",
-        "whatsapp": "واتساب"
+        "whatsapp": "واتساب",
+        "locations": "الفروع"
       },
       "superAdmin": "مدير عام",
       "superAdminHint": "صلاحية كاملة على المنصة",

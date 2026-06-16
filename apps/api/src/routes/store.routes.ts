@@ -66,6 +66,7 @@ const updateStoreSchema = createStoreSchema.partial().extend({
   heroCtaLink: heroCtaLinkSchema,
   heroImage: heroNullableStr(1000),
   blogEnabled: z.boolean().optional(),
+  locationsEnabled: z.boolean().optional(),
 });
 
 const themeSchema = z.record(z.string(), z.unknown()).refine(

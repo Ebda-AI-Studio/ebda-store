@@ -3805,7 +3805,8 @@
         "notifications": "Notifications",
         "newsletter": "Newsletter",
         "affiliates": "Affiliates",
-        "abandonedCarts": "Abandoned Carts"
+        "abandonedCarts": "Abandoned Carts",
+        "locations": "Locations"
       },
       "superAdmin": "Super Admin",
       "superAdminHint": "Full platform access",

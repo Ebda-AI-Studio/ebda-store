@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Locations | PecannBee</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .soft-lift {
+            box-shadow: 0 4px 20px rgba(33, 37, 41, 0.04);
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(131, 76, 48, 0.08);
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary": "#834C30",
+                      "espresso": "#5B3928",
+                      "background": "#FFFCF7",
+                      "on-surface": "#212529",
+                      "gold-accent": "#C9A24B",
+                      "hairline": "#E7E1D8",
+                      "surface-container": "#F8EBE7",
+                      "outline-variant": "#E7E1D8",
+                      "on-surface-variant": "#52443D"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "16px",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "margin-mobile": "16px",
+                      "md": "16px",
+                      "gutter": "24px",
+                      "unit": "4px",
+                      "sm": "8px",
+                      "xs": "4px",
+                      "xxl": "64px",
+                      "lg": "24px",
+                      "xl": "40px",
+                      "container-max": "1200px"
+              },
+              "fontFamily": {
+                      "sans": ["IBM Plex Sans", "sans-serif"],
+                      "display-lg-mobile": ["IBM Plex Sans"],
+                      "body-lg": ["IBM Plex Sans"],
+                      "label-sm": ["IBM Plex Sans"],
+                      "body-md": ["IBM Plex Sans"],
+                      "label-md": ["IBM Plex Sans"],
+                      "display-lg": ["IBM Plex Sans"],
+                      "headline-sm": ["IBM Plex Sans"],
+                      "headline-md": ["IBM Plex Sans"]
+              },
+              "fontSize": {
+                      "display-lg-mobile": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "500"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-surface font-sans antialiased">
+<!-- Header Section -->
+<header class="bg-[#FFFCF7]/90 backdrop-blur-md sticky top-0 z-50 border-b border-hairline">
+<nav class="flex flex-row justify-between items-center px-margin-mobile md:px-xl h-14 w-full max-w-container-max mx-auto">
+<!-- Trailing Icons (Left in RTL) -->
+<div class="flex items-center gap-md">
+<button class="p-2 rounded-full hover:bg-surface-container transition-all text-primary">
+<span class="material-symbols-outlined text-[20px]">person</span>
+</button>
+<button class="p-2 rounded-full hover:bg-surface-container transition-all relative text-primary">
+<span class="material-symbols-outlined text-[20px]">shopping_cart</span>
+</button>
+</div>
+<!-- Navigation Links (Center) -->
+<div class="hidden md:flex items-center gap-xl">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-md" href="#">Home</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-md" href="#">Shop</a>
+<a class="text-primary font-semibold relative py-1 font-body-md after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-primary" href="#">Locations</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-md" href="#">Contact</a>
+</div>
+<!-- Brand Logo (Right in RTL) -->
+<div class="text-headline-md font-bold text-primary tracking-tight">
+                PecannBee
+            </div>
+</nav>
+</header>
+<main class="w-full">
+<!-- Hero Section -->
+<section class="py-xxl px-margin-mobile text-center max-w-container-max mx-auto">
+<h1 class="font-display-lg text-display-lg text-on-surface mb-xs">Locations</h1>
+<h2 class="font-headline-md text-headline-md text-primary mb-sm">فروعنا</h2>
+<div class="w-12 h-[2px] bg-gold-accent mx-auto mb-lg"></div>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
+                Visit a PecannBee store — tap a branch for directions, to call, or to message us on WhatsApp.
+            </p>
+</section>
+<!-- Kuwait Section -->
+<section class="pb-xxl px-margin-mobile max-w-container-max mx-auto">
+<div class="flex items-center gap-sm mb-xl">
+<span class="text-primary px-sm py-xs font-label-md uppercase tracking-widest flex items-center gap-2">
+                    KUWAIT <span class="text-lg">🇰🇼</span>
+</span>
+<div class="flex-grow h-px bg-hairline"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter lg:max-w-4xl mx-auto">
+<!-- Kuwait Location 1 -->
+<div class="bg-white border border-hairline rounded-xl overflow-hidden soft-lift card-hover group">
+<div class="h-48 w-full bg-surface-container overflow-hidden">
+<img alt="Map view" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDAH4Oiz46RKgNtfA4U2ByHiGidV_3yqvBxP_Til5VcziSGGjYMxLWuNRcGeAm5I7bk5YkRLyIjSx1egyqoebGUBSGNKsfZlsjXcPITrBeeZ8E4UvjeVMC7FVNRCpiNJ0ouY8V6nveekAD1glCmMGe834f1pXvbK3BG_WfbZgTVkZbTOK79m-jU3mb2eI80pShXATDnHvD4-1xneNvXWSBDvMBivV5ID586jOJKDAXZSQB-k23OKNVdDZMKuxEHoEkiW-JBfaLgJug"/>
+</div>
+<div class="p-lg">
+<h3 class="font-headline-sm text-headline-sm text-espresso font-bold mb-xs">Avenues Mall — First Floor (F-152)</h3>
+<p class="font-body-md text-on-surface-variant mb-lg">Al Rai, Sheikh Zayed Bin Sultan Al Nahyan Rd, Kuwait City</p>
+<div class="flex flex-wrap gap-sm">
+<button class="flex items-center gap-xs bg-primary text-white px-md py-2.5 rounded-full font-label-md transition-all hover:bg-espresso active:scale-95 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+                                Open in Maps
+                            </button>
+<button class="flex items-center gap-xs border border-hairline text-primary px-md py-2.5 rounded-full font-label-md hover:bg-background transition-all">
+<span class="material-symbols-outlined text-[18px]">call</span>
+                                Call
+                            </button>
+<button class="flex items-center gap-xs border border-hairline text-primary px-md py-2.5 rounded-full font-label-md hover:bg-background transition-all">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+                                WhatsApp
+                            </button>
+</div>
+</div>
+</div>
+<!-- Kuwait Location 2 -->
+<div class="bg-white border border-hairline rounded-xl overflow-hidden soft-lift card-hover group">
+<div class="h-48 w-full bg-surface-container overflow-hidden">
+<img alt="Map view" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAR2iafTYhWnnZNnwIuww4pyGWCmRm4levSsrrHuQov0fOOWlOiltt3g5bSdB89-Pt2yOUKqlXd7ZnLJWLbEL4owEkwaIutAIMQ7nDcFpZXTPuH31_b9nM2D8SHd6JIkLruiKelFNMHo_e82DYm8sW39TMsIFswcOMssqqLmrb0ueaQIST4eQFAgCKZoREFYcgjNhKrea4uIURd7QOXXkI6JF5624SRz4uKQIgCBqTQmHpqxr9BEB9XBeJ1rSA6g_cCeNGCaFUXBSw"/>
+</div>
+<div class="p-lg">
+<h3 class="font-headline-sm text-headline-sm text-espresso font-bold mb-xs">Avenues Mall — Ground Floor (Phase 2)</h3>
+<p class="font-body-md text-on-surface-variant mb-lg">Grand Avenue District, The Avenues Mall, Kuwait City</p>
+<div class="flex flex-wrap gap-sm">
+<button class="flex items-center gap-xs bg-primary text-white px-md py-2.5 rounded-full font-label-md transition-all hover:bg-espresso active:scale-95 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+                                Open in Maps
+                            </button>
+<button class="flex items-center gap-xs border border-hairline text-primary px-md py-2.5 rounded-full font-label-md hover:bg-background transition-all">
+<span class="material-symbols-outlined text-[18px]">call</span>
+                                Call
+                            </button>
+<button class="flex items-center gap-xs border border-hairline text-primary px-md py-2.5 rounded-full font-label-md hover:bg-background transition-all">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+                                WhatsApp
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- UAE Section -->
+<section class="pb-xxl px-margin-mobile max-w-container-max mx-auto">
+<div class="flex items-center gap-sm mb-xl">
+<span class="text-primary px-sm py-xs font-label-md uppercase tracking-widest flex items-center gap-2">
+                    U.A.E. <span class="text-lg">🇦🇪</span>
+</span>
+<div class="flex-grow h-px bg-hairline"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- UAE Loop -->
+<div class="bg-white border border-hairline rounded-xl overflow-hidden soft-lift card-hover group">
+<div class="h-48 w-full bg-surface-container overflow-hidden">
+<img alt="Map view" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4jvuEo-_ywyjA5Fzz0shSg_nL8_e6cAIV4Tp-Hl6_Q8jaRKI2coHiEZoRSnYazE5VbIATrqB1SY1ZnjAq7upLGzhQiWI5kykgSXpKEd3Vyg_ELTUBCh9vjqiU-gKRpSksDBc1hS0IKKP8m_iip1hSBeZQhowbGa8CWbKMa3GS7ip5NQrJd0o7d7MOFxw_BRcfi4q6mAY95GPxja0NHNlqVqbokAv_l6FJkLFAF07BCB9HtUZZoxgsFO9OfmlJzn6drByeaVjDTGE"/>
+</div>
+<div class="p-lg">
+<h3 class="font-headline-sm text-headline-sm text-espresso font-bold mb-xs">Dubai Mall (Kiosk)</h3>
+<p class="font-body-md text-on-surface-variant mb-lg">Downtown Dubai, Near Aquarium, Dubai</p>
+<div class="flex flex-wrap gap-sm">
+<button class="flex items-center gap-xs bg-primary text-white px-md py-2.5 rounded-full font-label-md transition-all hover:bg-espresso shadow-sm">
+<span class="material-symbols-outlined text-[18px]">location_on</span> Open in Maps
+                            </button>
+<button class="flex items-center gap-xs border border-hairline text-primary px-md py-2.5 rounded-full font-label-md hover:bg-background transition-all">
+<span class="material-symbols-outlined text-[18px]">call</span> Call
+                            </button>
+</div>
+</div>
+</div>
+<div class="bg-white border border-hairline rounded-xl overflow-hidden soft-lift card-hover group">
+<div class="h-48 w-full bg-surface-container overflow-hidden">
+<img alt="Map view" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC354K1BGDMw2k_miyU-bFS33g5CUQPBJCUDrEFz7l4WsXZarG4NdumIC4xcGShM5WZUsaQnwqTYZENmPzquY9Ip4MIn_2K5PZWTcdO-CURVF5xjjCp_NSW4JeDHJHy9Rmbm0nqGiOoZRPk2OB1vF4tA1gO28filojJA73VTYBOY1jATbZmx1zOKLVGpvDdKRH3c8PMwOuHHamgEqTMjRKfSkfs70E-QroveaEhwISNd16hwW0mfNAJWVLgPujl2ZcYcLEXuBsnXQ0"/>
+</div>
+<div class="p-lg">
+<h3 class="font-headline-sm text-headline-sm text-espresso font-bold mb-xs">Al Wahda Mall (Kiosk)</h3>
+<p class="font-body-md text-on-surface-variant mb-lg">Al Wahda, Abu Dhabi City, Abu Dhabi</p>
+<div class="flex flex-wrap gap-sm">
+<button class="flex items-center gap-xs bg-primary text-white px-md py-2.5 rounded-full font-label-md transition-all hover:bg-espresso shadow-sm">
+<span class="material-symbols-outlined text-[18px]">location_on</span> Open in Maps
+                            </button>
+<button class="flex items-center gap-xs border border-hairline text-primary px-md py-2.5 rounded-full font-label-md hover:bg-background transition-all">
+<span class="material-symbols-outlined text-[18px]">chat</span> WhatsApp
+                            </button>
+</div>
+</div>
+</div>
+<div class="bg-white border border-hairline rounded-xl overflow-hidden soft-lift card-hover group">
+<div class="h-48 w-full bg-surface-container overflow-hidden">
+<img alt="Map view" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWQ2wdqXkEiYFNTXtkETDStrnrRDLjTEpVdAteIw5e7Om9Okjx3KgP8YTbUR2EitYUTcsXgKaGvVmrmlSYnT67qwoD3pAPFkv8P0ICQkFg3gFrd_SLYJY-Kzuk8gL1oVq16SfVP1yIQkyyEBegnkyXIFivcB-oqrSg9Vepo6VQWqTlcpTCR718kcG-6SPwVmaoErUX6Mz1B3qJkdfRrKgdZy3tcyaySok0A_bF40zild5QzCWJMi6X0iCTuTfgRK2xsCC2OAJwrrU"/>
+</div>
+<div class="p-lg">
+<h3 class="font-headline-sm text-headline-sm text-espresso font-bold mb-xs">Arabian Center</h3>
+<p class="font-body-md text-on-surface-variant mb-lg">Al Khawaneej Road, Al Mizhar, Dubai</p>
+<div class="flex flex-wrap gap-sm">
+<button class="flex items-center gap-xs bg-primary text-white px-md py-2.5 rounded-full font-label-md transition-all hover:bg-espresso shadow-sm">
+<span class="material-symbols-outlined text-[18px]">location_on</span> Open in Maps
+                            </button>
+</div>
+</div>
+</div>
+<div class="bg-white border border-hairline rounded-xl overflow-hidden soft-lift card-hover group">
+<div class="h-48 w-full bg-surface-container overflow-hidden">
+<img alt="Map view" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDD8H3CVNF-_85y9KnUxRhBHPLIwvsVUK8mawaZtpCv_IucnPLMe3hUw_n4--KbuTwtDX2XnpEJQu94fkZyA2LFT2TyIPuObZb4z4-EC6JHBjlP17tu40LBI2lPfbChu1kA8qQfcskI4MgKIRuPbUfhdf883Ljgg8OwiklNokP57akyRz_Vqok5k4edOrLR16c1oSIdmJMMy-wMFN0zcmYjxsbllSi7nejWCvDVPgkoIV1WP4Om61muT7OVMv5svGvdWBKKYkOan2M"/>
+</div>
+<div class="p-lg">
+<h3 class="font-headline-sm text-headline-sm text-espresso font-bold mb-xs">Fujairah City Centre</h3>
+<p class="font-body-md text-on-surface-variant mb-lg">Fujairah - Dubai Rd, Fujairah</p>
+<div class="flex flex-wrap gap-sm">
+<button class="flex items-center gap-xs bg-primary text-white px-md py-2.5 rounded-full font-label-md transition-all hover:bg-espresso shadow-sm">
+<span class="material-symbols-outlined text-[18px]">location_on</span> Open in Maps
+                            </button>
+<button class="flex items-center gap-xs border border-hairline text-primary px-md py-2.5 rounded-full font-label-md hover:bg-background transition-all">
+<span class="material-symbols-outlined text-[18px]">call</span> Call
+                            </button>
+</div>
+</div>
+</div>
+<div class="bg-white border border-hairline rounded-xl overflow-hidden soft-lift card-hover group">
+<div class="h-48 w-full bg-surface-container overflow-hidden">
+<img alt="Map view" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDa1n8aiqkxGFZK0gVXblUq34L4U0i3dCwhl-VbePx5UnGxk_W2HfQg5O8366bckl33DTvDe5NTyz-0lh_jHAjmF616Lp7eFGHXX3Xv6_Oy9_c3EopvsimeSDtbXN8Qa02vKrpdRYiomr5uQQJnehETOVZg77PQEk6OBlTHIAxSYwcdvxZ5uNcDnzIj6cqlULZV1MhjuFHjWQXfnyYosm1tj_jB5vyGVYuaOxAjQN6A_lfSg0CAD2CvPGQ-4FXLYCqRw3C32yf5cD4"/>
+</div>
+<div class="p-lg">
+<h3 class="font-headline-sm text-headline-sm text-espresso font-bold mb-xs">Festival Plaza</h3>
+<p class="font-body-md text-on-surface-variant mb-lg">Jebel Ali Village, Dubai</p>
+<div class="flex flex-wrap gap-sm">
+<button class="flex items-center gap-xs bg-primary text-white px-md py-2.5 rounded-full font-label-md transition-all hover:bg-espresso shadow-sm">
+<span class="material-symbols-outlined text-[18px]">location_on</span> Open in Maps
+                            </button>
+</div>
+</div>
+</div>
+<div class="bg-white border border-hairline rounded-xl overflow-hidden soft-lift card-hover group">
+<div class="h-48 w-full bg-surface-container overflow-hidden">
+<img alt="Map view" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBde08APCGzW3499QTtYo7rablSVOXrHAJyh0xVsx0wHlmgbmemEUhHcHZd6l02O1CkCFaCskDcWdfBnndn-qu1sMwcCuK98McXdXryPW5FBlgMJN661lwfNLhQ01a9c08606Ssp_MG13QMGjCvovF1neF0eIVf31ZqmCq0Iq_PFO7O3R28JbczPsShueuevDyby6mE7yqZsVtKdVE3zKxuVs4lADBG_oxaIUSlrC2rNtE-C-phWTj1loeDxNj1g9oN66YxozkB9GE"/>
+</div>
+<div class="p-lg">
+<h3 class="font-headline-sm text-headline-sm text-espresso font-bold mb-xs">Dubai Festival City Mall</h3>
+<p class="font-body-md text-on-surface-variant mb-lg">Crescent Dr, Dubai Festival City, Dubai</p>
+<div class="flex flex-wrap gap-sm">
+<button class="flex items-center gap-xs bg-primary text-white px-md py-2.5 rounded-full font-label-md transition-all hover:bg-espresso shadow-sm">
+<span class="material-symbols-outlined text-[18px]">location_on</span> Open in Maps
+                            </button>
+<button class="flex items-center gap-xs border border-hairline text-primary px-md py-2.5 rounded-full font-label-md hover:bg-background transition-all">
+<span class="material-symbols-outlined text-[18px]">chat</span> WhatsApp
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer Section -->
+<footer class="bg-white border-t border-hairline pt-xxl pb-xl">
+<div class="flex flex-col items-center gap-lg px-margin-mobile w-full max-w-container-max mx-auto text-center">
+<div class="text-headline-md font-bold text-primary tracking-tight">PecannBee</div>
+<p class="font-body-md text-on-surface-variant max-w-md">The destination for artisanal gourmet pecans and hand-crafted dates.</p>
+<div class="flex gap-lg">
+<a class="text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">brand_family</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">chat</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">language</span>
+</a>
+</div>
+<div class="flex flex-col gap-xs font-body-md text-on-surface-variant mt-md">
+<a class="hover:text-primary transition-colors font-medium" href="mailto:info@pecannbee.com">info@pecannbee.com</a>
+<span class="font-medium" dir="ltr">+965 2220 9079</span>
+</div>
+<div class="flex flex-wrap justify-center gap-md font-label-md text-on-surface-variant mt-lg">
+<a class="hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<span class="text-hairline">•</span>
+<a class="hover:text-primary transition-colors" href="#">Terms of Service</a>
+<span class="text-hairline">•</span>
+<a class="hover:text-primary transition-colors" href="#">Shipping &amp; Returns</a>
+</div>
+<p class="font-body-md text-on-surface-variant opacity-60 mt-lg">© 2026 PecannBee. All Rights Reserved.</p>
+</div>
+</footer>
+<script>
+        // Smooth hover micro-interactions for map images
+        document.querySelectorAll('img').forEach(img => {
+            const container = img.parentElement;
+            if (container) {
+                container.addEventListener('mouseenter', () => {
+                    img.style.transform = 'scale(1.04)';
+                });
+                container.addEventListener('mouseleave', () => {
+                    img.style.transform = 'scale(1)';
+                });
+            }
+        });
+    </script>
+</body></html>

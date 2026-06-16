@@ -3,6 +3,7 @@ import authRoutes from './auth.routes';
 import mfaRoutes from './mfa.routes';
 import storeRoutes from './store.routes';
 import blogRoutes from './blog.routes';
+import locationsRoutes from './locations.routes';
 import productRoutes from './product.routes';
 import cartRoutes from './cart.routes';
 import orderRoutes from './order.routes';
@@ -125,6 +126,11 @@ router.use('/', tenantContext, pagesRoutes);
 // Admin CRUD under /stores/:storeId/blog, public reads under
 // /public/:storeId/blog. Both 404 when the store hasn't opted in.
 router.use('/', tenantContext, blogRoutes);
+
+// Locations / Branches (2026-06-16) — same dual-surface pattern.
+// Admin CRUD under /stores/:storeId/locations, public reads under
+// /public/:storeId/locations. Both 404 when locationsEnabled=false.
+router.use('/', tenantContext, locationsRoutes);
 
 // Notification routes (admin + public push)
 router.use('/stores', tenantContext, notificationRoutes);

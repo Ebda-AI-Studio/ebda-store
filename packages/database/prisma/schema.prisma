@@ -272,6 +272,10 @@ model Store {
   // /blog routes return 404 and BlogCarousel hides on the homepage.
   blogEnabled Boolean @default(false) @map("blog_enabled")
 
+  // Store Locations / Branches — opt-in per store. When false the
+  // /locations routes return 404 and the locations admin page is hidden.
+  locationsEnabled Boolean @default(false) @map("locations_enabled")
+
   // Force AI WhatsApp Business Platform integration (opt-in per store)
   // wbsApiKey is encrypted via AES-GCM using apps/api/src/services/encryption.service.ts
   // wbsTemplates shape: { orderPaid?, orderShipped?, orderDelivered? }
@@ -391,6 +395,7 @@ model Store {
   faqs                     StoreFaq[]
   howtos                   StoreHowto[]
   blogPosts                BlogPost[]
+  locations                StoreLocation[]
   accounts                 Account[]
   journalEntries           JournalEntry[]
   sequences                Sequence[]
@@ -481,6 +486,35 @@ model BlogPost {
   @@unique([storeId, slug])
   @@index([storeId, isPublished, publishedAt])
   @@map("blog_posts")
+}
+
+// Per-store physical locations / branches. Opt-in via `Store.locationsEnabled`.
+// When false the /locations route returns 404. Content is bilingual (EN/AR).
+// Positions within a store are set by the `position` field (0-indexed).
+model StoreLocation {
+  id           String   @id @default(uuid())
+  storeId      String   @map("store_id")
+  name         String
+  nameAr       String?  @map("name_ar")
+  country      String                       // e.g. "Kuwait" | "U.A.E."
+  countryAr    String?  @map("country_ar")
+  address      String
+  addressAr    String?  @map("address_ar")
+  phone        String?                      // tel: target, e.g. "+96522209079"
+  whatsapp     String?                      // wa.me number, digits only or +<intl>
+  mapsUrl      String?  @map("maps_url")    // Google Maps "search" link (button target)
+  mapsEmbedUrl String?  @map("maps_embed_url") // optional ...&output=embed iframe src
+  hours        String?
+  hoursAr      String?  @map("hours_ar")
+  isPublished  Boolean  @default(true) @map("is_published")
+  position     Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, isPublished, position])
+  @@map("store_locations")
 }
 
 // ==========================================

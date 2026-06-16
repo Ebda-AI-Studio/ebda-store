@@ -202,6 +202,17 @@ export const translations = {
   'Full Name': 'الاسم الكامل',
   Phone: 'الهاتف',
 
+  // Locations page
+  Locations: 'الفروع',
+  'Our Locations': 'فروعنا',
+  'Visit a store — tap a branch for directions, to call, or to message us.':
+    'زر أحد فروعنا — اضغط على الفرع للاتجاهات أو الاتصال أو المراسلة.',
+  'Open in Maps': 'افتح في الخرائط',
+  Call: 'اتصال',
+  WhatsApp: 'واتساب',
+  Address: 'العنوان',
+  Hours: 'ساعات العمل',
+
   // Maintenance / suspended store branded page. Surfaced by
   // `StoreMaintenance` when the resolved store has `status === 'suspended'`.
   // Keep copy short — this is the merchant's last impression on a customer

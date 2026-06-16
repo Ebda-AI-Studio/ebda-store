@@ -567,6 +567,29 @@ class ApiClient {
     }>(`/public/${storeId}/blog?limit=${limit}`);
   }
 
+  // Locations (store branches)
+  async listLocations(storeId: string) {
+    return this.request<{
+      locations: Array<{
+        id: string;
+        name: string;
+        nameAr?: string | null;
+        country: string;
+        countryAr?: string | null;
+        address: string;
+        addressAr?: string | null;
+        phone?: string | null;
+        whatsapp?: string | null;
+        mapsUrl?: string | null;
+        mapsEmbedUrl?: string | null;
+        hours?: string | null;
+        hoursAr?: string | null;
+        isPublished: boolean;
+        position: number;
+      }>;
+    }>(`/public/${storeId}/locations`);
+  }
+
   async getBlogPost(storeId: string, slug: string) {
     return this.request<{
       post: {
