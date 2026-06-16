@@ -118,6 +118,7 @@ export function AdminLayout({
     // Stock tabs
     stockDashboard: t('hubTabs.stockDashboard'),
     inventory: t('hubTabs.inventory'),
+    scan: t('hubTabs.scan'),
     adjustments: t('hubTabs.adjustments'),
     suppliers: t('hubTabs.suppliers'),
     purchaseOrders: t('hubTabs.purchaseOrders'),

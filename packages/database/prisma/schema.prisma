@@ -409,6 +409,7 @@ model Store {
   customerRfmSnapshots     CustomerRfmSnapshot[]
   whatsAppTemplates        WhatsAppTemplate[]
   paymentEvents            PaymentEvent[]
+  countSessions            CountSession[]
   staffMembers             StoreStaff[]               @relation("StoreStaffMembers")
 
   @@index([ownerId])
@@ -717,6 +718,7 @@ model Product {
   backorderLines       BackorderLine[]
   reorderSuggestions   ReorderSuggestion[]
   deadstockFlags       DeadStockFlag[]
+  countLines           CountLine[]
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -734,6 +736,9 @@ model Product {
   // Storefront list query: store-scoped, soft-delete-aware, newest-first.
   // Created in 20260501030000_perf_indexes.
   @@index([storeId, deletedAt, createdAt(sort: Desc)])
+  // Barcode lookup index — barcode scan resolves within a store scope.
+  // Added 2026-06-15 for inventory.barcode Enterprise feature.
+  @@index([storeId, barcode])
   @@map("products")
 }
 
@@ -904,9 +909,12 @@ model ProductVariant {
   backorderLines       BackorderLine[]
   reorderSuggestions   ReorderSuggestion[]
   deadstockFlags       DeadStockFlag[]
+  countLines           CountLine[]
 
   @@index([productId])
   @@index([sku])
+  // Barcode lookup — scan resolves to a variant within a product.
+  @@index([productId, barcode])
   @@map("product_variants")
 }
 
@@ -1090,6 +1098,12 @@ model OrderItem {
   costPrice         Int?    @map("cost_price")
   total             Int
   costPriceDeferred Boolean @default(false) @map("cost_price_deferred")
+
+  // Scan-to-pick fulfilment state. pickedQty tracks how many units of this
+  // line have been physically scanned/picked. Default 0 so existing rows are
+  // unaffected. pickedAt is set when pickedQty reaches quantity.
+  pickedQty Int       @default(0) @map("picked_qty")
+  pickedAt  DateTime? @map("picked_at")
 
   order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product        Product         @relation(fields: [productId], references: [id])
@@ -2944,6 +2958,68 @@ model CustomerRfmSnapshot {
   @@index([storeId, segment])
   @@index([storeId, rfmScore(sort: Desc)])
   @@map("customer_rfm_snapshots")
+}
+
+// ==========================================
+// Barcode Scanning — Cycle-count Sessions
+// ==========================================
+//
+// A CountSession is an open or closed inventory count/audit session.
+// The admin opens a session, scans products and enters counted quantities
+// (CountLine rows), then closes and optionally reconciles variances into
+// a StockAdjustment (type=cycle_count). The reconcile path reuses the
+// existing postAdjustment service so GL journal posting is automatic.
+//
+// RLS: same store_id pattern (see migration 20260615000000_barcode_scanning).
+
+enum CountSessionStatus {
+  open
+  closed
+  reconciled
+}
+
+model CountSession {
+  id          String             @id @default(uuid())
+  storeId     String             @map("store_id")
+  status      CountSessionStatus @default(open)
+  note        String?
+  createdBy   String?            @map("created_by")
+  closedAt    DateTime?          @map("closed_at")
+  reconciledAt DateTime?         @map("reconciled_at")
+  /// Linked StockAdjustment (type=cycle_count) created at reconcile time.
+  adjustmentId String?           @unique @map("adjustment_id")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  store      Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  lines      CountLine[]
+
+  @@index([storeId, status])
+  @@index([storeId, createdAt(sort: Desc)])
+  @@map("count_sessions")
+}
+
+model CountLine {
+  id          String   @id @default(uuid())
+  sessionId   String   @map("session_id")
+  productId   String   @map("product_id")
+  variantId   String?  @map("variant_id")
+  /// Counted quantity entered by the operator during the scan.
+  countedQty  Int      @map("counted_qty")
+  /// System quantity snapshotted at the time the line was submitted.
+  systemQty   Int      @map("system_qty")
+  /// Positive = more stock found; negative = stock missing.
+  variance    Int
+  scannedAt   DateTime @default(now()) @map("scanned_at")
+
+  session CountSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+
+  /// One count line per product/variant per session (last scan wins via upsert).
+  @@unique([sessionId, productId, variantId])
+  @@index([sessionId])
+  @@map("count_lines")
 }
 
 /// Phase 7: FWB-driven WhatsApp template management.
