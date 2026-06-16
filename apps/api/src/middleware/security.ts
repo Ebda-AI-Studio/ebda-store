@@ -549,7 +549,15 @@ export function sanitizeInput(req: Request, _res: Response, next: NextFunction) 
 // Maximum allowed length for any single input string before it is truncated.
 const MAX_INPUT_STRING_LENGTH = 10_000;
 
-function sanitizeString(str: string): string {
+// Fields that legitimately carry large payloads (bulk-import CSV text and
+// base64-encoded XLSX uploads). These are exempt from the per-string length
+// truncation \u2014 silently slicing them to 10k chars corrupts an import to ~21
+// rows. They still get control-char / invisible-unicode stripping (which also
+// protects the Postgres TEXT column from NUL bytes) and their own size limits
+// come from express.json's 10mb body cap + route-level validation.
+const LARGE_CONTENT_KEYS = new Set(['csvData', 'xlsxBase64']);
+
+function sanitizeString(str: string, enforceMaxLength = true): string {
   // Strip null bytes and non-printable control characters (preserve newline \n, tab \t, carriage return \r)
   let cleaned = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
@@ -557,7 +565,7 @@ function sanitizeString(str: string): string {
   cleaned = cleaned.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF\uFFF9-\uFFFB]/g, '');
 
   // Enforce maximum length to prevent excessively large payloads slipping through body parsers
-  if (cleaned.length > MAX_INPUT_STRING_LENGTH) {
+  if (enforceMaxLength && cleaned.length > MAX_INPUT_STRING_LENGTH) {
     cleaned = cleaned.slice(0, MAX_INPUT_STRING_LENGTH);
   }
 
@@ -573,7 +581,7 @@ function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
 
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
-      sanitized[key] = sanitizeString(value);
+      sanitized[key] = sanitizeString(value, !LARGE_CONTENT_KEYS.has(key));
     } else if (Array.isArray(value)) {
       sanitized[key] = value.map(item =>
         typeof item === 'object' && item !== null
