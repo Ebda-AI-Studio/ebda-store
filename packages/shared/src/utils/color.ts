@@ -237,7 +237,15 @@ export function contrastRatio(bg: string, fg: string): number {
  * Priority:
  *   explicitInvert === true  → force white logo  (brightness(0) invert(1))
  *   explicitInvert === false → keep original color (none)
- *   undefined (AUTO)         → dark bg → white logo; light bg → black logo
+ *   undefined (AUTO)         → dark bg → white logo; light bg → keep as-is
+ *
+ * AUTO deliberately NEVER crushes a logo to black. A `brightness(0)` filter
+ * destroys all colour and turned every full-colour brand logo into a black
+ * silhouette on the default (white) footer. On a light background a colour
+ * logo is already readable, so we leave it untouched; we only force WHITE on a
+ * genuinely dark footer (where a colour/dark logo would vanish). Merchants who
+ * want a forced-mono logo can still opt in via the explicit invert toggle or by
+ * uploading a dedicated `footerLogo`.
  *
  * Only call this for the BRAND-LOGO FALLBACK path — a custom uploaded
  * `footerLogo` is assumed correct and must never be filtered.
@@ -257,9 +265,10 @@ export function footerLogoContrastFilter(
   if (explicitInvert === false) return 'none';
   // AUTO path: derive optimal logo color from bg luminance.
   const readable = pickReadableForeground(footerBg); // '#ffffff' | '#000000' | undefined
-  if (readable === '#ffffff') return 'brightness(0) invert(1)'; // dark bg → white logo
-  if (readable === '#000000') return 'brightness(0)'; // light bg → black logo
-  return 'none'; // unparseable bg → leave logo as-is
+  if (readable === '#ffffff') return 'brightness(0) invert(1)'; // dark bg → force white logo
+  // light bg ('#000000' readable) OR unparseable → leave the logo as-is.
+  // Never apply brightness(0): it would crush a colour logo to a black blob.
+  return 'none';
 }
 
 // Task 15d: lightenColor / darkenColor / rgbToHex / generateSectionPalette
@@ -325,6 +334,112 @@ export function darkenColor(input: string, amount: number): string {
   const t = Math.max(0, Math.min(1, amount));
   const mix = (c: number) => Math.round(c * (1 - t));
   return rgbToHex({ r: mix(rgb.r), g: mix(rgb.g), b: mix(rgb.b) });
+}
+
+// ─── Core brand token derivation (Task 3: Smart Palette fills all tokens) ───
+
+export interface CoreBrandTokens {
+  /** HSL triplets (e.g. '26 100% 50%') matching StoreTheme field names. */
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  backgroundColor: string;
+  foregroundColor: string;
+  cardColor: string;
+  mutedColor: string;
+  borderColor: string;
+  primaryForeground: string;
+  secondaryForeground: string;
+  accentForeground: string;
+  cardForeground: string;
+}
+
+/**
+ * Derive all core brand token HSL triplets from up to three seed hex values.
+ *
+ * `primary`  — the brand's dominant color (required, must be a raw hex).
+ * `accent`   — optional complementary color (falls back to a lightened primary).
+ * `neutral`  — optional neutral/background tint (falls back to pure white).
+ *
+ * Returns a partial StoreTheme-compatible object with every core color key.
+ * Foregrounds are auto-computed via WCAG luminance (pickReadableForeground).
+ *
+ * Callers should merge the result into the existing theme (shallow-merge PUT)
+ * so only the changed keys are sent to the server.
+ */
+export function deriveCoreBrandTokens(seeds: {
+  primary: string;
+  accent?: string;
+  neutral?: string;
+}): CoreBrandTokens {
+  const { primary, accent, neutral } = seeds;
+
+  // Neutral fallback: white.
+  const neutralHex = neutral && neutral !== '' ? neutral : '#FFFFFF';
+  // Accent fallback: lighter shade of primary.
+  const accentHex = accent && accent !== '' ? accent : lightenColor(primary, 0.5);
+
+  /** Convert a hex color to the bare 'H S% L%' triplet used by StoreTheme. */
+  function hexToTriple(hex: string): string {
+    const rgb = parseColorToRgb(hex);
+    if (!rgb) return '0 0% 50%'; // safe fallback
+    // Convert RGB to HSL
+    const r = rgb.r / 255;
+    const g = rgb.g / 255;
+    const b = rgb.b / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    if (max === min) return `0 0% ${Math.round(l * 100)}%`;
+    const d = max - min;
+    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    let h = 0;
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+  }
+
+  /** Auto foreground for a hex bg ('0 0% 100%' or '0 0% 0%'). */
+  function autoFg(bgHex: string): string {
+    const pick = pickReadableForeground(bgHex);
+    if (pick === '#ffffff') return '0 0% 100%';
+    return '0 0% 0%';
+  }
+
+  // Derive secondary: a desaturated/lightened version of the primary for a
+  // calm secondary surface (e.g. badges, secondary buttons).
+  const secondaryHex = lightenColor(primary, 0.75);
+
+  // Background: derive from neutral — near-white tint.
+  const backgroundHex = neutralHex === '#FFFFFF' ? '#FFFFFF' : lightenColor(neutralHex, 0.5);
+
+  // Foreground: high-contrast text color against the background.
+  const foregroundHex = autoFg(backgroundHex) === '0 0% 100%' ? '#FFFFFF' : '#0A0A0A';
+
+  // Card: slightly off-white variant of the neutral.
+  const cardHex = lightenColor(neutralHex, 0.3);
+
+  // Muted: a very light tint of primary for subtle secondary surfaces.
+  const mutedHex = lightenColor(primary, 0.88);
+
+  // Border: subtle neutral border.
+  const borderHex = lightenColor(neutralHex === '#FFFFFF' ? primary : neutralHex, 0.78);
+
+  return {
+    primaryColor: hexToTriple(primary),
+    secondaryColor: hexToTriple(secondaryHex),
+    accentColor: hexToTriple(accentHex),
+    backgroundColor: hexToTriple(backgroundHex),
+    foregroundColor: foregroundHex === '#FFFFFF' ? '0 0% 100%' : '224 71% 4%',
+    cardColor: hexToTriple(cardHex),
+    mutedColor: hexToTriple(mutedHex),
+    borderColor: hexToTriple(borderHex),
+    primaryForeground: autoFg(primary),
+    secondaryForeground: autoFg(secondaryHex),
+    accentForeground: autoFg(accentHex),
+    cardForeground: foregroundHex === '#FFFFFF' ? '0 0% 100%' : '224 71% 4%',
+  };
 }
 
 export type PalettePattern = 'alternating' | 'monochrome' | 'triad' | 'single-bg';

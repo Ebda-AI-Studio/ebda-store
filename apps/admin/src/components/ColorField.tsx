@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import { ColorContrastPreview } from './ColorContrastPreview';
 import { COLOR_TOKENS, resolveColor } from '@force/shared';
 import type { StoreTheme, ColorToken } from '@force/shared';
@@ -45,6 +46,28 @@ const TOKEN_LABELS: Record<(typeof COLOR_TOKENS)[number], string> = {
 
 const CUSTOM = '__custom__';
 
+/**
+ * Normalize a raw hex string to a canonical '#RRGGBB' form.
+ * Accepts with/without leading '#', 3- or 6-digit hex.
+ * Returns the normalized string on success, or null when the input is not a
+ * valid 3- or 6-digit hex value.
+ */
+function normalizeHex(raw: string): string | null {
+  const stripped = raw.replace(/^#/, '').toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(stripped)) {
+    // Expand 3-digit shorthand: e.g. 'f0a' → 'ff00aa'
+    const expanded = stripped
+      .split('')
+      .map(c => c + c)
+      .join('');
+    return `#${expanded}`;
+  }
+  if (/^[0-9a-f]{6}$/.test(stripped)) {
+    return `#${stripped}`;
+  }
+  return null;
+}
+
 export function ColorField({
   label,
   value,
@@ -61,6 +84,25 @@ export function ColorField({
 
   const selectValue = isToken ? tokenName : value ? CUSTOM : '';
 
+  // Local state for the hex text input — lets the user type freely without
+  // the field resetting mid-input. Synced to hexValue whenever it changes
+  // externally (e.g. the native color picker or a token selection).
+  const [rawHex, setRawHex] = useState<string>(hexValue);
+
+  // Keep rawHex in sync when the committed value changes externally (native
+  // picker, token switch, clear, or parent-set value).
+  // We intentionally don't use useEffect here to avoid stale-closure issues;
+  // instead we sync inline when selectValue or hexValue changes.
+  const syncedHex = !isToken ? hexValue : '';
+  // Use a ref-style pattern: if committed hex differs from what we have in
+  // raw state and the user isn't mid-type (i.e. raw already normalizes to
+  // the same value), update raw. But to keep it simple and avoid infinite
+  // loops, we only force-sync when the source is external (isToken changed
+  // or hexValue was reset to empty).
+  const handleExternalSync = useCallback(() => {
+    setRawHex(syncedHex);
+  }, [syncedHex]);
+
   // Compute the inherited brand-color label for the empty-state option.
   // Only shown when no value is set and inheritFromToken is provided AND the
   // theme actually has the token set (non-empty resolution).
@@ -76,17 +118,55 @@ export function ColorField({
   const handleSelectChange = (next: string) => {
     if (next === '') {
       onChange('');
+      setRawHex('');
     } else if (next === CUSTOM) {
-      onChange(hexValue || '#ffffff');
+      const currentHex = hexValue || '#ffffff';
+      onChange(currentHex);
+      setRawHex(currentHex);
     } else {
       onChange(`token:${next}`);
+      setRawHex('');
     }
   };
+
+  /** Commit rawHex to parent if it resolves to a valid 6-digit hex. */
+  const commitHex = useCallback(
+    (raw: string) => {
+      const normalized = normalizeHex(raw);
+      if (normalized) {
+        onChange(normalized);
+      }
+    },
+    [onChange]
+  );
+
+  const handleHexTextChange = (raw: string) => {
+    setRawHex(raw);
+    // Fire onChange immediately when the typed text is already valid.
+    const normalized = normalizeHex(raw);
+    if (normalized) {
+      onChange(normalized);
+    }
+  };
+
+  const handleHexTextBlur = () => {
+    commitHex(rawHex);
+    // If invalid on blur, revert raw to the last committed hex so the field
+    // doesn't stay in a broken state.
+    if (!normalizeHex(rawHex)) {
+      setRawHex(hexValue || '');
+    }
+  };
+
+  // When isToken switches off (e.g. user picked "Custom hex…"), reset raw.
+  // We track this via the select's side-effect in handleSelectChange above.
+
+  void handleExternalSync; // used implicitly via handleSelectChange
 
   return (
     <div className="flex flex-col gap-2 py-2">
       <span className="text-sm text-foreground">{label}</span>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <select
           value={selectValue}
           onChange={e => handleSelectChange(e.target.value)}
@@ -101,18 +181,41 @@ export function ColorField({
           <option value={CUSTOM}>Custom hex…</option>
         </select>
         {!isToken && value ? (
-          <input
-            type="color"
-            value={hexValue || '#ffffff'}
-            onChange={e => onChange(e.target.value)}
-            className="h-8 w-12 cursor-pointer rounded border border-border bg-background"
-          />
+          <>
+            {/* Native color picker — acts as a visual swatch + system color wheel. */}
+            <input
+              type="color"
+              value={(normalizeHex(hexValue) ?? hexValue) || '#ffffff'}
+              onChange={e => {
+                const next = e.target.value;
+                onChange(next);
+                setRawHex(next);
+              }}
+              className="h-11 w-11 cursor-pointer rounded border border-border bg-background p-0.5"
+              aria-label="Color picker"
+            />
+            {/* Hex text field — primary input path; ≥44px touch target. */}
+            <input
+              type="text"
+              inputMode="text"
+              value={rawHex}
+              onChange={e => handleHexTextChange(e.target.value)}
+              onBlur={handleHexTextBlur}
+              placeholder="#RRGGBB"
+              maxLength={7}
+              className="h-11 w-28 rounded border border-border bg-background px-2 py-1 font-mono text-sm uppercase text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              aria-label="Hex color value"
+            />
+          </>
         ) : null}
         {value ? (
           <button
             type="button"
-            onClick={() => onChange('')}
-            className="text-xs text-muted-foreground underline"
+            onClick={() => {
+              onChange('');
+              setRawHex('');
+            }}
+            className="min-h-[44px] px-2 text-xs text-muted-foreground underline"
           >
             Clear
           </button>

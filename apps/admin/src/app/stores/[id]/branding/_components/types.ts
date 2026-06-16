@@ -1,9 +1,17 @@
 export interface StoreTheme {
+  // Core brand colors (HSL triplets e.g. '26 100% 50%')
   primaryColor: string;
   primaryForeground: string;
   secondaryColor: string;
+  secondaryForeground: string;
+  accentColor: string;
+  accentForeground: string;
   backgroundColor: string;
   foregroundColor: string;
+  cardColor: string;
+  cardForeground: string;
+  mutedColor: string;
+  borderColor: string;
   fontFamily: string;
   borderRadius: string;
   /**
@@ -107,8 +115,15 @@ export const DEFAULT_THEME: StoreTheme = {
   primaryColor: '26 100% 50%',
   primaryForeground: '0 0% 100%',
   secondaryColor: '220 14% 96%',
+  secondaryForeground: '220 9% 46%',
+  accentColor: '26 100% 95%',
+  accentForeground: '26 100% 25%',
   backgroundColor: '0 0% 100%',
   foregroundColor: '224 71% 4%',
+  cardColor: '0 0% 100%',
+  cardForeground: '224 71% 4%',
+  mutedColor: '220 14% 96%',
+  borderColor: '220 13% 91%',
   fontFamily: 'default',
   borderRadius: 'md',
   backgroundPreset: 'none',

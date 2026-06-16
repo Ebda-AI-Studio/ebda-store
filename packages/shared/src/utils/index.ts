@@ -20,8 +20,14 @@ export {
   footerLogoContrastFilter,
 } from './color';
 export type { ColorValue, ColorToken, Rgb } from './color';
-export { lightenColor, darkenColor, generateSectionPalette } from './color';
-export type { PaletteSeeds, SectionPaletteEntry, SectionKey, PalettePattern } from './color';
+export { lightenColor, darkenColor, generateSectionPalette, deriveCoreBrandTokens } from './color';
+export type {
+  PaletteSeeds,
+  SectionPaletteEntry,
+  SectionKey,
+  PalettePattern,
+  CoreBrandTokens,
+} from './color';
 // Brand engine — palette → contrast-safe storefront CSS vars
 export { deriveBrandRoles } from './brand-roles';
 // URL-scheme safety (XSS guard for merchant-supplied link fields)

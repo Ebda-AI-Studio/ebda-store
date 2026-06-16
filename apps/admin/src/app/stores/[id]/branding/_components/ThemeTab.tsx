@@ -1,9 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { BrandPreview } from './BrandPreview';
 import { ImageUpload } from '../../../../../components/ImageUpload';
-import type { StoreBranding } from './types';
+import { ColorField } from '../../../../../components/ColorField';
+import { SmartPaletteModal } from '../../../../../components/SmartPaletteModal';
+import type { StoreBranding, StoreTheme } from './types';
+import type { StoreTheme as SharedStoreTheme } from '@force/shared';
 
 interface ThemeTabProps {
   branding: StoreBranding;
@@ -12,28 +16,194 @@ interface ThemeTabProps {
 }
 
 /**
- * Theme & colors tab. Brand colors, fonts, and section backgrounds are
- * configured in the Page Builder (Smart Palette / per-zone Typography /
- * per-section bgColor). This tab owns the remaining Branding fields:
- * blog toggle and footer logo options, plus a live preview.
+ * Cast the local StoreTheme (admin/branding types.ts) to the shared
+ * StoreTheme for passing to ColorField and SmartPaletteModal.
+ * The local type is a strict subset; casting is safe.
+ */
+function asSharedTheme(t: StoreTheme): SharedStoreTheme {
+  return t as unknown as SharedStoreTheme;
+}
+
+/**
+ * Update a single theme color key on the branding object (shallow merge).
+ * Only the changed key is included in the update so the server-side
+ * shallow-merge PUT doesn't clobber unrelated theme keys.
+ */
+function patchTheme(
+  branding: StoreBranding,
+  onChange: (b: StoreBranding) => void,
+  key: keyof StoreTheme,
+  value: string
+) {
+  onChange({
+    ...branding,
+    theme: { ...branding.theme, [key]: value },
+  });
+}
+
+/**
+ * Theme & colors tab. Exposes the core brand color tokens as individual
+ * ColorFields (primary/secondary/accent/background/foreground/card/muted/border
+ * + foreground overrides) so merchants can tune every color directly.
+ * Smart Palette remains available as a generator that fills all fields.
+ *
+ * Footer logo options and blog toggle are also here.
  */
 export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
   const t = useT('branding.theme');
+  const tColors = useT('branding.theme.brandColors');
+
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [textColorsExpanded, setTextColorsExpanded] = useState(false);
+
+  const theme = branding.theme;
+  const sharedTheme = asSharedTheme(theme);
 
   return (
-    <div className="bg-card rounded-xl border p-6 space-y-6">
-      {/* Brand badge + Quick add card-level toggles REMOVED 2026-05-20:
-          moved to Page Builder → Product Card Defaults section card.
-          They affect every product card on the store, not just the
-          theme-level visual identity, so they belong with the other
-          catalog-wide product card controls. */}
+    <div className="space-y-6 rounded-xl border bg-card p-6">
+      {/* ── Brand colors ─────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{tColors('title')}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{tColors('hint')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/10"
+          >
+            ✨ {tColors('smartPaletteButton')}
+          </button>
+        </div>
 
-      {/* Bucket E1 (2026-05-17) — opt-in blog feature toggle. Sits on the
-          Theme tab alongside the other store-level on/off flags so the
-          merchant has a single discovery surface. Storefront `/blog`
-          routes 404 + homepage BlogCarousel hides when this is off. */}
-      <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-        <span className="flex-1 min-w-0">
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+          <ColorField
+            label={tColors('primary')}
+            value={theme.primaryColor}
+            onChange={v => patchTheme(branding, onChange, 'primaryColor', v)}
+            hint={tColors('primaryHint')}
+            theme={sharedTheme}
+          />
+          <ColorField
+            label={tColors('secondary')}
+            value={theme.secondaryColor}
+            onChange={v => patchTheme(branding, onChange, 'secondaryColor', v)}
+            hint={tColors('secondaryHint')}
+            theme={sharedTheme}
+          />
+          <ColorField
+            label={tColors('accent')}
+            value={theme.accentColor}
+            onChange={v => patchTheme(branding, onChange, 'accentColor', v)}
+            hint={tColors('accentHint')}
+            theme={sharedTheme}
+          />
+          <ColorField
+            label={tColors('background')}
+            value={theme.backgroundColor}
+            onChange={v => patchTheme(branding, onChange, 'backgroundColor', v)}
+            hint={tColors('backgroundHint')}
+            theme={sharedTheme}
+          />
+          <ColorField
+            label={tColors('foreground')}
+            value={theme.foregroundColor}
+            onChange={v => patchTheme(branding, onChange, 'foregroundColor', v)}
+            hint={tColors('foregroundHint')}
+            theme={sharedTheme}
+          />
+          <ColorField
+            label={tColors('card')}
+            value={theme.cardColor}
+            onChange={v => patchTheme(branding, onChange, 'cardColor', v)}
+            hint={tColors('cardHint')}
+            theme={sharedTheme}
+          />
+          <ColorField
+            label={tColors('muted')}
+            value={theme.mutedColor}
+            onChange={v => patchTheme(branding, onChange, 'mutedColor', v)}
+            hint={tColors('mutedHint')}
+            theme={sharedTheme}
+          />
+          <ColorField
+            label={tColors('border')}
+            value={theme.borderColor}
+            onChange={v => patchTheme(branding, onChange, 'borderColor', v)}
+            hint={tColors('borderHint')}
+            theme={sharedTheme}
+          />
+        </div>
+
+        {/* Collapsible text-colors subgroup */}
+        <div className="rounded-lg border border-border">
+          <button
+            type="button"
+            onClick={() => setTextColorsExpanded(v => !v)}
+            className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/40"
+            aria-expanded={textColorsExpanded}
+          >
+            <span>{tColors('textColors')}</span>
+            <span className="text-muted-foreground">{textColorsExpanded ? '▲' : '▼'}</span>
+          </button>
+          {textColorsExpanded && (
+            <div className="grid grid-cols-1 gap-1 border-t border-border px-4 pb-4 sm:grid-cols-2">
+              <ColorField
+                label={tColors('primaryForeground')}
+                value={theme.primaryForeground}
+                onChange={v => patchTheme(branding, onChange, 'primaryForeground', v)}
+                hint={tColors('primaryForegroundHint')}
+                theme={sharedTheme}
+              />
+              <ColorField
+                label={tColors('secondaryForeground')}
+                value={theme.secondaryForeground}
+                onChange={v => patchTheme(branding, onChange, 'secondaryForeground', v)}
+                hint={tColors('secondaryForegroundHint')}
+                theme={sharedTheme}
+              />
+              <ColorField
+                label={tColors('accentForeground')}
+                value={theme.accentForeground}
+                onChange={v => patchTheme(branding, onChange, 'accentForeground', v)}
+                hint={tColors('accentForegroundHint')}
+                theme={sharedTheme}
+              />
+              <ColorField
+                label={tColors('cardForeground')}
+                value={theme.cardForeground}
+                onChange={v => patchTheme(branding, onChange, 'cardForeground', v)}
+                hint={tColors('cardForegroundHint')}
+                theme={sharedTheme}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Smart Palette modal ───────────────────────────────────────── */}
+      <SmartPaletteModal
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        theme={sharedTheme}
+        storeId={storeId}
+        onApply={(_palette, themeUpdates) => {
+          // Merge all derived core brand token HSL values into the local
+          // branding state. The parent's Save button commits them via the
+          // shallow-merge PUT /stores/:id/theme.
+          const { showBrandBadge: _sb, showQuickAdd: _sq, ...colorUpdates } = themeUpdates;
+          onChange({
+            ...branding,
+            theme: { ...branding.theme, ...(colorUpdates as Partial<StoreTheme>) },
+          });
+          setPaletteOpen(false);
+        }}
+      />
+
+      {/* ── Blog ─────────────────────────────────────────────────────── */}
+      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
+        <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-foreground">{t('blog.title')}</span>
           <span className="mt-0.5 block text-xs text-muted-foreground">{t('blog.hint')}</span>
         </span>
@@ -45,18 +215,8 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         />
       </label>
 
-      {/* Brand Story + Trust Strip enable/disable + Trust Strip layout/size
-          REMOVED 2026-05-20: page-builder owns these per-section settings.
-          Theme-tab versions were redundant. Storefront still honors
-          theme.showBrandStory / showTrustStrip / trustStripLayout / size as
-          legacy fallback for stores saved before the page-builder section
-          landed (see TrustStrip.tsx + HomePageContent.tsx). */}
-
-      {/* Footer-specific logo. Ahmad 2026-05-20: dark footer bgs need a
-          white/inverted logo. Two paths: (a) upload a separate footer logo
-          here, OR (b) toggle the invert filter on the main logo. The custom
-          upload wins when both are set. */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      {/* ── Footer logo ───────────────────────────────────────────────── */}
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>
           <p className="text-sm font-semibold text-foreground">Footer logo (optional)</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -83,7 +243,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
           accept="image/*"
           label="Upload footer logo"
         />
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className="flex cursor-pointer items-center gap-2">
           <input
             type="checkbox"
             checked={branding.theme.footerLogoInvert === true}
@@ -101,7 +261,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
             above.
           </span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className="flex cursor-pointer items-center gap-2">
           <input
             type="checkbox"
             checked={branding.theme.hideFooterLogoMobile === true}

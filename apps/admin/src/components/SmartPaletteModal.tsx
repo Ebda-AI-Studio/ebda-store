@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   generateSectionPalette,
+  deriveCoreBrandTokens,
   DEFAULT_THEME,
   getTemplatePresets,
   getVibePreset,
@@ -27,10 +28,23 @@ import { apiPost } from '../lib/api';
  * Brand-color updates the parent should persist to StoreTheme on apply.
  * Only populated when the merchant explicitly typed/picked a raw hex value —
  * if they selected an existing token ('token:primary') no theme update is needed.
+ *
+ * Includes all core brand token keys so the Smart Palette can fill the full
+ * Branding color editor (2026-06-16: deriveCoreBrandTokens writes all tokens).
  */
 export interface ThemeUpdates {
   primaryColor?: string;
+  secondaryColor?: string;
   accentColor?: string;
+  backgroundColor?: string;
+  foregroundColor?: string;
+  cardColor?: string;
+  mutedColor?: string;
+  borderColor?: string;
+  primaryForeground?: string;
+  secondaryForeground?: string;
+  accentForeground?: string;
+  cardForeground?: string;
   /** Card-level toggles staged from the page-builder "Product Cards" section
    *  card (Ahmad 2026-05-20: moved from branding/ThemeTab). */
   showBrandBadge?: boolean;
@@ -540,14 +554,22 @@ export function SmartPaletteModal({
               if (!confirm('This overwrites the current section bg + frame colors. Proceed?'))
                 return;
 
-              // Build theme updates: only include when the merchant entered a
-              // raw hex value (not a token ref). Convert hex → HSL triplet to
-              // match the format StoreTheme stores (e.g. '26 100% 50%').
+              // Build theme updates: only when the merchant entered a raw hex
+              // (not a token ref). Convert hex → HSL triplet to match the
+              // format StoreTheme stores (e.g. '26 100% 50%').
+              //
+              // When a concrete primary hex is available, derive ALL core brand
+              // tokens so the Branding color editor fields get filled on apply.
               const themeUpdates: ThemeUpdates = {};
               if (primary && !primary.startsWith('token:')) {
-                themeUpdates.primaryColor = hexToHsl(primary);
-              }
-              if (accent && !accent.startsWith('token:')) {
+                const coreTokens = deriveCoreBrandTokens({
+                  primary,
+                  accent: accent && !accent.startsWith('token:') ? accent : undefined,
+                  neutral: neutral && !neutral.startsWith('token:') ? neutral : undefined,
+                });
+                Object.assign(themeUpdates, coreTokens);
+              } else if (accent && !accent.startsWith('token:')) {
+                // Primary is a token ref but accent is concrete — just write accent.
                 themeUpdates.accentColor = hexToHsl(accent);
               }
 

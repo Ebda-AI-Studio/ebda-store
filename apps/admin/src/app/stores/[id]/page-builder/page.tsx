@@ -2103,8 +2103,9 @@ export default function StoreLayoutPage() {
           //    matches every other admin form's "edit locally, save explicitly"
           //    behavior — Ahmad 2026-05-20: "smart palette does apply
           //    automatically i don't want this".
-          const hasThemeUpdates =
-            themeUpdates.primaryColor !== undefined || themeUpdates.accentColor !== undefined;
+          const hasThemeUpdates = Object.keys(themeUpdates).some(
+            k => !['showBrandBadge', 'showQuickAdd'].includes(k)
+          );
           if (hasThemeUpdates) {
             setPendingThemeUpdates(prev => ({ ...prev, ...themeUpdates }));
           }
