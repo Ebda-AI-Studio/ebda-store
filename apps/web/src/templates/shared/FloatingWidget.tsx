@@ -19,8 +19,18 @@ interface FloatingWidgetProps {
    *  phone when the merchant didn't set one explicitly on the button.
    *  Saves them re-typing data that lives in /branding > contact. */
   contact?: Pick<StoreContact, 'whatsapp' | 'phone'>;
-  /** Store-level socials — fallback for Instagram handle extraction. */
-  socials?: Pick<StoreSocials, 'instagram' | 'whatsapp'>;
+  /** Store-level socials — fallback for social platform handles/URLs. */
+  socials?: Pick<
+    StoreSocials,
+    | 'instagram'
+    | 'whatsapp'
+    | 'tiktok'
+    | 'snapchat'
+    | 'youtube'
+    | 'facebook'
+    | 'twitter'
+    | 'telegram'
+  >;
 }
 
 /** Extract an Instagram handle from a URL or @handle string. Returns null
@@ -34,6 +44,55 @@ function instagramHandleFromUrl(input: string | undefined): string | null {
   if (!/^https?:|\//.test(trimmed)) return trimmed.replace(/^@/, '');
   const match = trimmed.match(/instagram\.com\/([^/?#]+)/i);
   return match ? match[1] : null;
+}
+
+/** Extract a bare TikTok handle from a @handle string or a tiktok.com URL.
+ *  Returns null when no handle can be recovered. */
+function tiktokHandleFromAny(input: string | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  // Bare handle or @handle — no slash / protocol
+  if (!/^https?:|\//.test(trimmed)) return trimmed.replace(/^@/, '');
+  const match = trimmed.match(/tiktok\.com\/@([^/?#]+)/i);
+  return match ? match[1] : null;
+}
+
+/** Extract a bare Snapchat username from a @handle string or a snapchat.com URL. */
+function snapchatHandleFromAny(input: string | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (!/^https?:|\//.test(trimmed)) return trimmed.replace(/^@/, '');
+  const match = trimmed.match(/snapchat\.com\/add\/([^/?#]+)/i);
+  return match ? match[1] : null;
+}
+
+/** Extract a bare X (Twitter) handle from a @handle string or an x.com / twitter.com URL. */
+function xHandleFromAny(input: string | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (!/^https?:|\//.test(trimmed)) return trimmed.replace(/^@/, '');
+  const match = trimmed.match(/(?:x|twitter)\.com\/([^/?#]+)/i);
+  return match ? match[1] : null;
+}
+
+/** Extract a bare Telegram handle from a @handle string or a t.me URL. */
+function telegramHandleFromAny(input: string | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (!/^https?:|\//.test(trimmed)) return trimmed.replace(/^@/, '');
+  const match = trimmed.match(/t\.me\/([^/?#]+)/i);
+  return match ? match[1] : null;
+}
+
+/** Validate that a URL is http(s). Returns the URL unchanged when valid, else null. */
+function safeHttpUrl(input: string | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  return /^https?:\/\/.+/.test(trimmed) ? trimmed : null;
 }
 
 /** Extract digits-only phone from a wa.me URL or raw phone string. */
@@ -72,13 +131,29 @@ const KIND_DEFAULTS: Record<
   email: { bg: '#6366F1', icon: '#ffffff', label: 'Email', labelAr: 'البريد' },
   music: { bg: '#F59E0B', icon: '#ffffff', label: 'Music', labelAr: 'موسيقى' },
   custom: { bg: '#6B7280', icon: '#ffffff', label: 'Link', labelAr: 'رابط' },
+  tiktok: { bg: '#000000', icon: '#ffffff', label: 'TikTok', labelAr: 'تيك توك' },
+  snapchat: { bg: '#FFFC00', icon: '#000000', label: 'Snapchat', labelAr: 'سناب شات' },
+  youtube: { bg: '#FF0000', icon: '#ffffff', label: 'YouTube', labelAr: 'يوتيوب' },
+  facebook: { bg: '#1877F2', icon: '#ffffff', label: 'Facebook', labelAr: 'فيسبوك' },
+  x: { bg: '#000000', icon: '#ffffff', label: 'X', labelAr: 'إكس' },
+  telegram: { bg: '#26A5E4', icon: '#ffffff', label: 'Telegram', labelAr: 'تيليغرام' },
 };
 
 function resolveButtonHref(
   b: FloatingButton,
   fallback: {
     contact?: Pick<StoreContact, 'whatsapp' | 'phone'>;
-    socials?: Pick<StoreSocials, 'instagram' | 'whatsapp'>;
+    socials?: Pick<
+      StoreSocials,
+      | 'instagram'
+      | 'whatsapp'
+      | 'tiktok'
+      | 'snapchat'
+      | 'youtube'
+      | 'facebook'
+      | 'twitter'
+      | 'telegram'
+    >;
   }
 ): string | null {
   switch (b.kind) {
@@ -118,6 +193,40 @@ function resolveButtonHref(
       return b.customHref ?? null;
     case 'music':
       return null; // music doesn't navigate — toggles audio
+    case 'tiktok': {
+      const handle =
+        tiktokHandleFromAny(b.tiktokHandle) ?? tiktokHandleFromAny(fallback.socials?.tiktok);
+      if (!handle) return null;
+      return `https://tiktok.com/@${encodeURIComponent(handle)}`;
+    }
+    case 'snapchat': {
+      const handle =
+        snapchatHandleFromAny(b.snapchatHandle) ??
+        snapchatHandleFromAny(fallback.socials?.snapchat);
+      if (!handle) return null;
+      return `https://snapchat.com/add/${encodeURIComponent(handle)}`;
+    }
+    case 'youtube': {
+      const url = safeHttpUrl(b.youtubeUrl) ?? safeHttpUrl(fallback.socials?.youtube);
+      return url;
+    }
+    case 'facebook': {
+      const url = safeHttpUrl(b.facebookUrl) ?? safeHttpUrl(fallback.socials?.facebook);
+      return url;
+    }
+    case 'x': {
+      // StoreSocials uses `twitter` field name; 'x' kind maps to it.
+      const handle = xHandleFromAny(b.xHandle) ?? xHandleFromAny(fallback.socials?.twitter);
+      if (!handle) return null;
+      return `https://x.com/${encodeURIComponent(handle)}`;
+    }
+    case 'telegram': {
+      const handle =
+        telegramHandleFromAny(b.telegramHandle) ??
+        telegramHandleFromAny(fallback.socials?.telegram);
+      if (!handle) return null;
+      return `https://t.me/${encodeURIComponent(handle)}`;
+    }
   }
 }
 
@@ -197,6 +306,48 @@ function KindIcon({
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
       );
+    case 'tiktok':
+      // TikTok musical-note glyph (simplified)
+      return (
+        <svg viewBox="0 0 24 24" className={ICON_BOX_CLASS} fill={color}>
+          <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.34 6.34 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.79 1.52V6.76a4.86 4.86 0 0 1-1.02-.07z" />
+        </svg>
+      );
+    case 'snapchat':
+      // Snapchat ghost glyph
+      return (
+        <svg viewBox="0 0 24 24" className={ICON_BOX_CLASS} fill={color}>
+          <path d="M12.166 2c.93 0 4.04.256 5.524 3.516.44.975.334 2.633.253 3.9l-.012.189c.023.013.06.027.115.038.23.046.539.037.87-.117a1.17 1.17 0 0 1 .493-.109c.156 0 .31.034.447.1.402.19.645.53.645.904 0 .554-.443.984-1.316 1.279-.08.027-.165.054-.254.08-.389.12-.875.27-1.038.583-.083.16-.066.37.053.625l.007.016c.34.789 1.376 2.652 3.472 3.001.172.03.297.18.297.356 0 .04-.006.079-.018.116-.155.47-.972.819-2.498 1.066-.063.01-.122.094-.173.243-.06.178-.097.395-.132.595-.035.205-.073.419-.143.583a.52.52 0 0 1-.488.33c-.138 0-.284-.039-.458-.096-.376-.125-.887-.296-1.66-.296-.473 0-.956.053-1.433.158-.848.187-1.558.75-2.175 1.24-.509.4-1.048.82-1.727.82-.014 0-.028 0-.043-.002-.639-.03-1.145-.418-1.614-.791-.614-.49-1.32-1.046-2.163-1.23a6.62 6.62 0 0 0-1.433-.158c-.776 0-1.289.172-1.665.297-.173.057-.32.096-.46.096a.52.52 0 0 1-.487-.33c-.07-.165-.108-.38-.143-.585-.035-.199-.072-.416-.133-.593-.05-.149-.109-.232-.168-.242-1.527-.248-2.344-.598-2.499-1.069a.436.436 0 0 1-.018-.115c0-.176.125-.326.297-.356 2.096-.348 3.132-2.21 3.472-3.001l.007-.016c.119-.255.136-.465.053-.625-.163-.313-.649-.463-1.037-.583-.09-.027-.175-.053-.255-.08C3.443 11.484 3 11.054 3 10.5c0-.374.244-.714.645-.904a1.07 1.07 0 0 1 .447-.1c.185 0 .358.044.493.109.338.157.648.162.87.117.058-.012.097-.027.118-.04l-.012-.188c-.08-1.267-.186-2.924.254-3.9C7.296 2.257 10.34 2 11.27 2h.896z" />
+        </svg>
+      );
+    case 'youtube':
+      // YouTube play-button glyph
+      return (
+        <svg viewBox="0 0 24 24" className={ICON_BOX_CLASS} fill={color}>
+          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+        </svg>
+      );
+    case 'facebook':
+      // Facebook 'f' glyph
+      return (
+        <svg viewBox="0 0 24 24" className={ICON_BOX_CLASS} fill={color}>
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+        </svg>
+      );
+    case 'x':
+      // X (Twitter) 'X' glyph
+      return (
+        <svg viewBox="0 0 24 24" className={ICON_BOX_CLASS} fill={color}>
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+        </svg>
+      );
+    case 'telegram':
+      // Telegram paper-plane glyph
+      return (
+        <svg viewBox="0 0 24 24" className={ICON_BOX_CLASS} fill={color}>
+          <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+        </svg>
+      );
   }
 }
 
@@ -215,7 +366,17 @@ function ButtonRender({
   onMusicToggle: (b: FloatingButton) => void;
   musicPlaying: string | null;
   contact?: Pick<StoreContact, 'whatsapp' | 'phone'>;
-  socials?: Pick<StoreSocials, 'instagram' | 'whatsapp'>;
+  socials?: Pick<
+    StoreSocials,
+    | 'instagram'
+    | 'whatsapp'
+    | 'tiktok'
+    | 'snapchat'
+    | 'youtube'
+    | 'facebook'
+    | 'twitter'
+    | 'telegram'
+  >;
 }) {
   const defaults = KIND_DEFAULTS[button.kind];
   // Every kind uses merchant pick OR the kind's default color. For brand

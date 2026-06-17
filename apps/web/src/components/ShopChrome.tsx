@@ -369,6 +369,12 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           socials={{
             instagram: contact.socialLinks?.instagram,
             whatsapp: contact.socialLinks?.whatsapp,
+            tiktok: contact.socialLinks?.tiktok,
+            snapchat: contact.socialLinks?.snapchat,
+            youtube: contact.socialLinks?.youtube,
+            facebook: contact.socialLinks?.facebook,
+            twitter: contact.socialLinks?.twitter,
+            telegram: contact.socialLinks?.telegram,
           }}
         />
       )}

@@ -10,7 +10,19 @@
  * `Store.settings.floatingWidget`.
  */
 
-export type FloatingButtonKind = 'whatsapp' | 'instagram' | 'phone' | 'email' | 'music' | 'custom';
+export type FloatingButtonKind =
+  | 'whatsapp'
+  | 'instagram'
+  | 'phone'
+  | 'email'
+  | 'music'
+  | 'custom'
+  | 'tiktok'
+  | 'snapchat'
+  | 'youtube'
+  | 'facebook'
+  | 'x'
+  | 'telegram';
 
 export type FloatingPosition = 'br' | 'bl' | 'tr' | 'tl';
 export type FloatingExpandDirection = 'up' | 'down' | 'left' | 'right';
@@ -56,6 +68,19 @@ export interface FloatingButton {
   musicLoop?: boolean;
   /** kind=custom: target URL. Opens in new tab. */
   customHref?: string;
+  /** kind=tiktok: TikTok handle without the @ (e.g. "wadyaljuz"). */
+  tiktokHandle?: string;
+  /** kind=snapchat: Snapchat username without the @ (e.g. "wadyaljuz"). */
+  snapchatHandle?: string;
+  /** kind=youtube: Full YouTube channel / video URL (https://youtube.com/...). */
+  youtubeUrl?: string;
+  /** kind=facebook: Full Facebook page URL (https://facebook.com/...). */
+  facebookUrl?: string;
+  /** kind=x: X (Twitter) handle without the @ (e.g. "wadyaljuz"). */
+  xHandle?: string;
+  /** kind=telegram: Telegram handle without the @ (e.g. "wadyaljuz").
+   *  Opens https://t.me/<handle>. */
+  telegramHandle?: string;
 }
 
 export interface FloatingWidgetConfig {

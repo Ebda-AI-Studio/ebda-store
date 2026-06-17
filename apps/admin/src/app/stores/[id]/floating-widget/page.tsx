@@ -17,21 +17,46 @@ import type {
 } from '@force/shared';
 import { DEFAULT_FLOATING_WIDGET_CONFIG } from '@force/shared';
 
+interface StoreSocialLinks {
+  instagram?: string;
+  twitter?: string;
+  facebook?: string;
+  tiktok?: string;
+  youtube?: string;
+  snapchat?: string;
+  linkedin?: string;
+  whatsapp?: string;
+  telegram?: string;
+  pinterest?: string;
+}
+
 interface StoreInfo {
   id: string;
   name: string;
   theme?: StoreTheme;
   settings?: Record<string, unknown>;
   enabledFeatures?: string[];
+  /** Store-level WhatsApp number (store.whatsapp column). */
+  whatsapp?: string;
+  /** Store-level phone number. */
+  phone?: string;
+  /** Store-level social links (socialLinks column). */
+  socialLinks?: StoreSocialLinks;
 }
 
-const KIND_LABELS: Record<FloatingButtonKind, string> = {
-  whatsapp: 'WhatsApp',
-  instagram: 'Instagram',
-  phone: 'Phone',
-  email: 'Email',
-  music: 'Background music',
-  custom: 'Custom link',
+const KIND_LABELS: Record<FloatingButtonKind, { en: string; ar: string }> = {
+  whatsapp: { en: 'WhatsApp', ar: 'واتساب' },
+  instagram: { en: 'Instagram', ar: 'إنستغرام' },
+  phone: { en: 'Phone', ar: 'هاتف' },
+  email: { en: 'Email', ar: 'البريد' },
+  music: { en: 'Background music', ar: 'موسيقى' },
+  custom: { en: 'Custom link', ar: 'رابط مخصص' },
+  tiktok: { en: 'TikTok', ar: 'تيك توك' },
+  snapchat: { en: 'Snapchat', ar: 'سناب شات' },
+  youtube: { en: 'YouTube', ar: 'يوتيوب' },
+  facebook: { en: 'Facebook', ar: 'فيسبوك' },
+  x: { en: 'X (Twitter)', ar: 'إكس' },
+  telegram: { en: 'Telegram', ar: 'تيليغرام' },
 };
 
 const POSITION_LABELS: Record<FloatingPosition, string> = {
@@ -354,7 +379,7 @@ export default function FloatingWidgetPage() {
                           >
                             {Object.entries(KIND_LABELS).map(([k, v]) => (
                               <option key={k} value={k}>
-                                {v}
+                                {v.en} / {v.ar}
                               </option>
                             ))}
                           </select>
@@ -389,7 +414,11 @@ export default function FloatingWidgetPage() {
                               type="text"
                               value={b.whatsappPhone ?? ''}
                               onChange={e => updateButton(b.id, { whatsappPhone: e.target.value })}
-                              placeholder="96522668490"
+                              placeholder={
+                                store?.whatsapp
+                                  ? `Using store WhatsApp: ${store.whatsapp}`
+                                  : '96522668490'
+                              }
                               className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                             />
                           </label>
@@ -418,7 +447,11 @@ export default function FloatingWidgetPage() {
                             type="text"
                             value={b.instagramHandle ?? ''}
                             onChange={e => updateButton(b.id, { instagramHandle: e.target.value })}
-                            placeholder="wadyaljuz"
+                            placeholder={
+                              store?.socialLinks?.instagram
+                                ? `Using store Instagram: ${store.socialLinks.instagram}`
+                                : 'wadyaljuz'
+                            }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                         </label>
@@ -432,7 +465,117 @@ export default function FloatingWidgetPage() {
                             type="text"
                             value={b.phoneNumber ?? ''}
                             onChange={e => updateButton(b.id, { phoneNumber: e.target.value })}
-                            placeholder="+96522668490"
+                            placeholder={
+                              store?.phone ? `Using store phone: ${store.phone}` : '+96522668490'
+                            }
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                        </label>
+                      )}
+                      {b.kind === 'tiktok' && (
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            TikTok handle (no @) / تيك توك (بدون @)
+                          </span>
+                          <input
+                            type="text"
+                            value={b.tiktokHandle ?? ''}
+                            onChange={e => updateButton(b.id, { tiktokHandle: e.target.value })}
+                            placeholder={
+                              store?.socialLinks?.tiktok
+                                ? `Using store TikTok: ${store.socialLinks.tiktok}`
+                                : 'mystore'
+                            }
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                        </label>
+                      )}
+                      {b.kind === 'snapchat' && (
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Snapchat username / سناب شات
+                          </span>
+                          <input
+                            type="text"
+                            value={b.snapchatHandle ?? ''}
+                            onChange={e => updateButton(b.id, { snapchatHandle: e.target.value })}
+                            placeholder={
+                              store?.socialLinks?.snapchat
+                                ? `Using store Snapchat: ${store.socialLinks.snapchat}`
+                                : 'mystore'
+                            }
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                        </label>
+                      )}
+                      {b.kind === 'youtube' && (
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            YouTube channel URL / رابط يوتيوب
+                          </span>
+                          <input
+                            type="url"
+                            value={b.youtubeUrl ?? ''}
+                            onChange={e => updateButton(b.id, { youtubeUrl: e.target.value })}
+                            placeholder={
+                              store?.socialLinks?.youtube
+                                ? `Using store YouTube: ${store.socialLinks.youtube}`
+                                : 'https://youtube.com/@mystore'
+                            }
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                        </label>
+                      )}
+                      {b.kind === 'facebook' && (
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Facebook page URL / رابط فيسبوك
+                          </span>
+                          <input
+                            type="url"
+                            value={b.facebookUrl ?? ''}
+                            onChange={e => updateButton(b.id, { facebookUrl: e.target.value })}
+                            placeholder={
+                              store?.socialLinks?.facebook
+                                ? `Using store Facebook: ${store.socialLinks.facebook}`
+                                : 'https://facebook.com/mystore'
+                            }
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                        </label>
+                      )}
+                      {b.kind === 'x' && (
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            X handle (no @) / إكس (بدون @)
+                          </span>
+                          <input
+                            type="text"
+                            value={b.xHandle ?? ''}
+                            onChange={e => updateButton(b.id, { xHandle: e.target.value })}
+                            placeholder={
+                              store?.socialLinks?.twitter
+                                ? `Using store X: ${store.socialLinks.twitter}`
+                                : 'mystore'
+                            }
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                          />
+                        </label>
+                      )}
+                      {b.kind === 'telegram' && (
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Telegram handle (no @) / تيليغرام (بدون @)
+                          </span>
+                          <input
+                            type="text"
+                            value={b.telegramHandle ?? ''}
+                            onChange={e => updateButton(b.id, { telegramHandle: e.target.value })}
+                            placeholder={
+                              store?.socialLinks?.telegram
+                                ? `Using store Telegram: ${store.socialLinks.telegram}`
+                                : 'mystore'
+                            }
                             className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                           />
                         </label>
