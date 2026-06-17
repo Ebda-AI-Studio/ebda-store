@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
@@ -54,6 +54,10 @@ export default function StoreCategoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CategoryFormData>(emptyForm);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  // Scroll target so clicking Edit on a row lower in the list brings the
+  // add/edit form (rendered at the top) into view instead of leaving the
+  // merchant scrolled down wondering where it went.
+  const formRef = useRef<HTMLDivElement | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -144,6 +148,13 @@ export default function StoreCategoriesPage() {
         });
     }
   }, [fetchCategories, fetchBestSellersImage, storeId]);
+
+  // Bring the form into view whenever it opens or switches between add/edit.
+  useEffect(() => {
+    if (showForm) {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [showForm, editingId]);
 
   function openAddForm() {
     setEditingId(null);
@@ -311,19 +322,21 @@ export default function StoreCategoriesPage() {
 
       {/* Add/Edit Form */}
       {showForm && (
-        <CategoryForm
-          editingId={editingId}
-          form={form}
-          formErrors={formErrors}
-          isSaving={isSaving}
-          saveMessage={saveMessage}
-          onFormChange={setForm}
-          onFormErrorChange={setFormErrors}
-          onSubmit={handleSubmit}
-          onClose={closeForm}
-          slugify={slugify}
-          storeId={storeId}
-        />
+        <div ref={formRef} className="scroll-mt-24">
+          <CategoryForm
+            editingId={editingId}
+            form={form}
+            formErrors={formErrors}
+            isSaving={isSaving}
+            saveMessage={saveMessage}
+            onFormChange={setForm}
+            onFormErrorChange={setFormErrors}
+            onSubmit={handleSubmit}
+            onClose={closeForm}
+            slugify={slugify}
+            storeId={storeId}
+          />
+        </div>
       )}
 
       {/* Best Sellers virtual category cover. The storefront treats
