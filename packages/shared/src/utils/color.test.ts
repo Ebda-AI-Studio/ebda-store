@@ -10,6 +10,8 @@ import {
   lightenColor,
   darkenColor,
   footerLogoContrastFilter,
+  deriveCoreBrandTokens,
+  hslToRgb,
 } from './color';
 import type { PalettePattern } from './color';
 import type { StoreTheme } from '../types/store-theme';
@@ -164,11 +166,13 @@ describe('footerLogoContrastFilter', () => {
     expect(footerLogoContrastFilter('#1a1a1a')).toBe('brightness(0) invert(1)');
   });
 
-  it('auto: light bg → black logo filter (brightness(0))', () => {
-    // White footer — logo must be black.
-    expect(footerLogoContrastFilter('#FFFFFF')).toBe('brightness(0)');
+  it('auto: light bg → leave logo as-is (never crush a colour logo to black)', () => {
+    // White footer — AUTO deliberately returns 'none' so a full-colour brand
+    // logo isn't crushed to a black silhouette (the "footer logo is black" fix).
+    // Merchants who want a forced-mono logo opt in via explicitInvert.
+    expect(footerLogoContrastFilter('#FFFFFF')).toBe('none');
     // Typical light section-alt bg (bare HSL triplet format used by bgSectionAlt).
-    expect(footerLogoContrastFilter('0 0% 98%')).toBe('brightness(0)');
+    expect(footerLogoContrastFilter('0 0% 98%')).toBe('none');
   });
 
   it('auto: unparseable bg → no filter (leave logo as-is)', () => {
@@ -322,5 +326,85 @@ describe('generateSectionPalette patterns', () => {
     for (const k of ['hero', 'categories', 'newArrivals', 'bestSellers', 'testimonials'] as const) {
       expect(p[k].cardFrameSize).toBe('spacious');
     }
+  });
+});
+
+describe('deriveCoreBrandTokens — brand-tinted neutral recipe', () => {
+  // Parse a bare 'H S% L%' triplet into numbers.
+  const parse = (t: string): { h: number; s: number; l: number } => {
+    const m = t.match(/^(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)%\s+(-?\d+(?:\.\d+)?)%$/);
+    if (!m) throw new Error(`not a triplet: ${t}`);
+    return { h: Number(m[1]), s: Number(m[2]), l: Number(m[3]) };
+  };
+  // Build a hex from a triplet (the admin ColorField bridges triplet↔hex).
+  const toHex = (t: string): string => {
+    const { h, s, l } = parse(t);
+    const { r, g, b } = hslToRgb(h, s, l);
+    const hx = (c: number) => Math.round(c).toString(16).padStart(2, '0');
+    return `#${hx(r)}${hx(g)}${hx(b)}`;
+  };
+
+  // An arbitrary brand — NOT any production store — to prove the recipe
+  // generalises to any hue rather than hard-coding one merchant's palette.
+  const PRIMARY = '265 60% 35%'; // a deep violet
+  const SECONDARY = '190 45% 55%'; // a teal second colour
+  const Hp = 265;
+
+  const tokens = deriveCoreBrandTokens({ primary: toHex(PRIMARY), secondary: toHex(SECONDARY) });
+
+  it('tints every neutral with the PRIMARY hue (±2°), not generic grey', () => {
+    for (const key of [
+      'foregroundColor',
+      'cardForeground',
+      'mutedForeground',
+      'borderColor',
+      'mutedColor',
+    ] as const) {
+      expect(Math.abs(parse(tokens[key]).h - Hp)).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('lays neutrals on a monotonic dark→light lightness ladder', () => {
+    const fgL = parse(tokens.foregroundColor).l; // body text — darkest
+    const mutedFgL = parse(tokens.mutedForeground).l; // supporting text
+    const borderL = parse(tokens.borderColor).l; // hairlines
+    const mutedL = parse(tokens.mutedColor).l; // placeholders — lightest neutral
+    expect(fgL).toBeLessThan(mutedFgL);
+    expect(mutedFgL).toBeLessThan(borderL);
+    expect(borderL).toBeLessThan(mutedL);
+    expect(mutedL).toBeLessThan(100);
+  });
+
+  it('keeps card + page background white so product images read cleanly', () => {
+    expect(tokens.cardColor).toBe('0 0% 100%');
+    expect(tokens.backgroundColor).toBe('0 0% 100%');
+  });
+
+  it('body text stays high-contrast on white (AA for normal text)', () => {
+    expect(contrastRatio(`hsl(${tokens.foregroundColor})`, '#ffffff')).toBeGreaterThan(4.5);
+  });
+
+  it('accent is a LIGHT wash of a CHOSEN hue (secondary here), never invented', () => {
+    const accent = parse(tokens.accentColor);
+    // Reuses the merchant's secondary hue (teal ~190), not a hue-math invention.
+    expect(Math.abs(accent.h - 190)).toBeLessThanOrEqual(3);
+    expect(accent.l).toBeGreaterThanOrEqual(88); // a light wash, not a bold fill
+  });
+
+  it('regression: brown primary + light-blue secondary never derives a green accent', () => {
+    // The exact failure Ahmad hit: brown #906c51 + light-blue #b4ceee whose
+    // hue-average landed on green (~150°). The accent must follow the secondary
+    // hue (blue), never the green band.
+    const t = deriveCoreBrandTokens({ primary: '#906c51', secondary: '#b4ceee' });
+    const accentH = parse(t.accentColor).h;
+    expect(accentH).toBeGreaterThan(180); // blue-ish, the chosen secondary hue
+    expect(accentH < 90 || accentH > 160).toBe(true); // never green
+  });
+
+  it('a near-neutral secondary falls back to the primary hue for the accent', () => {
+    // wadyaljuz-shaped case (secondary is a near-grey surface): accent must
+    // still harmonise by borrowing the PRIMARY hue rather than going chromatic.
+    const t = deriveCoreBrandTokens({ primary: toHex(PRIMARY), secondary: '0 8% 95%' });
+    expect(Math.abs(parse(t.accentColor).h - Hp)).toBeLessThanOrEqual(2);
   });
 });

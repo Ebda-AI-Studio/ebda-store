@@ -116,10 +116,12 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         // Accent is an optional seed: keep the merchant's value if they set one,
         // otherwise use the auto-generated accent.
         accentColor: isUsableColor(theme.accentColor) ? theme.accentColor : derived.accentColor,
+        backgroundColor: derived.backgroundColor,
         foregroundColor: derived.foregroundColor,
         cardColor: derived.cardColor,
         cardForeground: derived.cardForeground,
         mutedColor: derived.mutedColor,
+        mutedForeground: derived.mutedForeground,
         borderColor: derived.borderColor,
         primaryForeground: derived.primaryForeground,
         secondaryForeground: derived.secondaryForeground,

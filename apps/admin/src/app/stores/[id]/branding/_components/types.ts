@@ -11,6 +11,7 @@ export interface StoreTheme {
   cardColor: string;
   cardForeground: string;
   mutedColor: string;
+  mutedForeground: string;
   borderColor: string;
   fontFamily: string;
   borderRadius: string;
@@ -130,6 +131,7 @@ export const DEFAULT_THEME: StoreTheme = {
   cardColor: '0 0% 100%',
   cardForeground: '224 71% 4%',
   mutedColor: '220 14% 96%',
+  mutedForeground: '220 9% 46%',
   borderColor: '220 13% 91%',
   fontFamily: 'default',
   borderRadius: 'md',

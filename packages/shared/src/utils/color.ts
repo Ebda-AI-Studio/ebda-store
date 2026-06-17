@@ -395,6 +395,8 @@ export interface CoreBrandTokens {
   secondaryForeground: string;
   accentForeground: string;
   cardForeground: string;
+  /** Supporting/secondary text — a mid-lightness tint of the brand hue. */
+  mutedForeground: string;
   /** Near-white page background derived from the palette hue. */
   bgPage: string;
   /** Subtly deeper tint used by alternating sections. */
@@ -481,67 +483,85 @@ export function deriveCoreBrandTokens(seeds: {
 
   if (isNewMode) {
     // ── New mode: seed from primary + secondary ──────────────────────────
+    //
+    // Recipe reverse-engineered from wadyaljuz's hand-tuned palette (the one
+    // Ahmad chose by hand in the page builder) + the OSOSS reference set
+    // (pecannbee). The governing principle in BOTH: every neutral is a tint of
+    // the PRIMARY hue at low saturation, laid out on a lightness ladder —
+    // NOT generic Tailwind greys, and NOT a hardcoded blue-black foreground.
+    // That single rule is what makes a palette read as cohesive / designed.
+    //
+    // wadyaljuz ground truth (primary 348 68% 25%):
+    //   foreground/cardFg  348 30% 12%   ← darkest, body text
+    //   secondaryFg        348 60% 18%   ← emphasis text
+    //   mutedFg            348 12% 38%   ← supporting text / counts
+    //   border / input     348 12% 88%   ← hairlines / card strokes
+    //   muted              0/348 10% 96% ← image placeholders / input bg
+    //   card / background  white         ← clean product photography
+    //   accent             47 90% 92%    ← a LIGHT harmonious wash
     const secondaryHex = secondary!;
-
-    // Accent must FIT + MATCH the brand. Reuse the merchant's SECONDARY hue (a
-    // colour they actually chose), only deepened to a usable accent — NOT a
-    // hue-average of primary+secondary, which landed on a foreign colour (a
-    // brown #906c51 + light-blue #b4ceee brand averaged to green ~150°). Falls
-    // back to the primary hue when no secondary is provided.
-    const pParts = hslPartsFromHex(primary);
+    const pParts = hslPartsFromHex(primary) ?? { h: 0, s: 0, l: 30 };
     const sParts = hslPartsFromHex(secondaryHex);
-    const accentBase = sParts ?? pParts;
-    let accentHex: string;
-    if (accentBase) {
-      const accentH = accentBase.h; // keep the chosen hue — never shift it
-      const accentS = Math.min(85, Math.max(55, accentBase.s)); // vivid but not harsh
-      // Pull a very-light seed down to a usable accent lightness; otherwise keep.
-      const accentL = accentBase.l > 70 ? 50 : Math.min(55, Math.max(42, accentBase.l));
-      const accentRgb = hslToRgb(accentH, accentS, accentL);
-      const toHex = (c: number) => c.toString(16).padStart(2, '0');
-      accentHex = `#${toHex(accentRgb.r)}${toHex(accentRgb.g)}${toHex(accentRgb.b)}`;
-    } else {
-      accentHex = lightenColor(primary, 0.5);
-    }
 
-    // Page backgrounds: derive hue/sat from primary at very high lightness.
-    // Both are LIGHT, distinct enough to read as alternating sections.
+    const Hp = Math.round(pParts.h);
+    const Sp = pParts.s;
+
+    // Brand-hue-tinted neutral on the lightness ladder. Anchored at safe
+    // lightness extremes (very dark for text, very light for surfaces) so the
+    // result is contrast-safe at ANY hue — the hue only tints.
+    const tinted = (sat: number, l: number): string => `${Hp} ${Math.round(sat)}% ${l}%`;
+
+    const foregroundTriplet = tinted(30, 12); // body text — most-used, darkest
+    const secondaryFgTriplet = tinted(60, 18); // emphasis text
+    const mutedFgTriplet = tinted(12, 38); // supporting text / counts / labels
+    const mutedTriplet = tinted(10, 96); // image placeholders / input bg
+    const borderTriplet = tinted(12, 88); // hairlines / card strokes
+
+    // Card + page background stay essentially white so product images read
+    // cleanly (wadyaljuz + pecannbee both float cards on near-white).
+    const cardTriplet = '0 0% 100%';
+    const backgroundTriplet = '0 0% 100%';
+
+    // ── Accent: a LIGHT, harmonious WASH ─────────────────────────────────
+    // Reuse a hue the merchant ACTUALLY CHOSE — secondary when it is genuinely
+    // chromatic, else the primary hue — so the accent can never clash. This
+    // kills the "where did the green come from?" bug: there is no hue math that
+    // invents a new, unrelated colour (the old +30°/averaging path produced a
+    // foreign green). Rendered very light (L92) as a subtle highlight/badge
+    // wash, with the primary colour as its readable foreground.
+    const secIsChromatic = !!(sParts && sParts.s >= 18 && sParts.l <= 85);
+    const accentHue = secIsChromatic ? Math.round(sParts!.h) : Hp;
+    const accentSat = Math.round(Math.min(60, Math.max(25, secIsChromatic ? sParts!.s : Sp)));
+    const accentTriplet = `${accentHue} ${accentSat}% 92%`;
+
+    // Secondary foreground: wadyaljuz pairs a DARK brand tint on its LIGHT
+    // secondary surface. When the merchant's secondary is itself dark/saturated,
+    // flip to an auto-contrast foreground instead.
+    const secondaryFg =
+      secIsChromatic && sParts!.l < 50 ? autoFgTriplet(secondaryHex) : secondaryFgTriplet;
+
+    // Page backgrounds for alternating sections — faint brand-tinted lights.
     const bgTriplet = (l: number): string => {
-      if (pParts) {
-        const cappedS = Math.min(20, pParts.s * 0.15);
-        return `${Math.round(pParts.h)} ${Math.round(cappedS)}% ${l}%`;
-      }
-      return `0 0% ${l}%`;
+      const cappedS = Math.min(14, Sp * 0.18);
+      return `${Hp} ${Math.round(cappedS)}% ${l}%`;
     };
     const bgPage = bgTriplet(98); // near-white tint
     const bgSectionAlt = bgTriplet(94); // subtly deeper tint
 
-    // Card: very light secondary tint.
-    const cardHex = lightenColor(secondaryHex, 0.88);
-
-    // Muted: very light primary tint.
-    const mutedHex = lightenColor(primary, 0.88);
-
-    // Border: light tint of secondary.
-    const borderHex = lightenColor(secondaryHex, 0.78);
-
-    // Background / foreground: white page, dark text.
-    const backgroundHex = '#FFFFFF';
-    const foregroundTriplet = '224 71% 4%';
-
     return {
       primaryColor: hexToTriple(primary),
       secondaryColor: hexToTriple(secondaryHex),
-      accentColor: hexToTriple(accentHex),
-      backgroundColor: hexToTriple(backgroundHex),
+      accentColor: accentTriplet,
+      backgroundColor: backgroundTriplet,
       foregroundColor: foregroundTriplet,
-      cardColor: hexToTriple(cardHex),
-      mutedColor: hexToTriple(mutedHex),
-      borderColor: hexToTriple(borderHex),
+      cardColor: cardTriplet,
+      mutedColor: mutedTriplet,
+      borderColor: borderTriplet,
       primaryForeground: autoFgTriplet(primary),
-      secondaryForeground: autoFgTriplet(secondaryHex),
-      accentForeground: autoFgTriplet(accentHex),
+      secondaryForeground: secondaryFg,
+      accentForeground: hexToTriple(primary), // brand text on the light wash
       cardForeground: foregroundTriplet,
+      mutedForeground: mutedFgTriplet,
       bgPage,
       bgSectionAlt,
     };
@@ -553,19 +573,28 @@ export function deriveCoreBrandTokens(seeds: {
 
   const secondaryHex = lightenColor(primary, 0.75);
   const backgroundHex = neutralHex === '#FFFFFF' ? '#FFFFFF' : lightenColor(neutralHex, 0.5);
-  const foregroundHex = autoFgTriplet(backgroundHex) === '0 0% 100%' ? '#FFFFFF' : '#0A0A0A';
   const cardHex = lightenColor(neutralHex, 0.3);
-  const mutedHex = lightenColor(primary, 0.88);
-  const borderHex = lightenColor(neutralHex === '#FFFFFF' ? primary : neutralHex, 0.78);
 
-  // Derive bgPage/bgSectionAlt from primary hue even in legacy mode.
-  const pParts = hslPartsFromHex(primary);
+  // Same brand-hue-tinted neutral recipe as new mode, so SmartPaletteModal
+  // palettes also read as cohesive instead of "brand color + grey". The
+  // foreground tints with the primary hue (dark on light bg) rather than the
+  // legacy hardcoded blue-black '224 71% 4%'.
+  const pParts = hslPartsFromHex(primary) ?? { h: 0, s: 0, l: 30 };
+  const Hp = Math.round(pParts.h);
+  const Sp = pParts.s;
+  const tinted = (sat: number, l: number): string => `${Hp} ${Math.round(sat)}% ${l}%`;
+
+  // On a light page (the SmartPalette default) use brand-tinted dark text; only
+  // a genuinely dark neutral background flips the foreground to white.
+  const bgIsDark = autoFgTriplet(backgroundHex) === '0 0% 100%';
+  const foregroundTriplet = bgIsDark ? '0 0% 100%' : tinted(30, 12);
+  const mutedFgTriplet = bgIsDark ? '0 0% 80%' : tinted(12, 38);
+  const mutedTriplet = bgIsDark ? tinted(8, 18) : tinted(10, 96);
+  const borderTriplet = bgIsDark ? tinted(10, 28) : tinted(12, 88);
+
   const bgTriplet = (l: number): string => {
-    if (pParts) {
-      const cappedS = Math.min(20, pParts.s * 0.15);
-      return `${Math.round(pParts.h)} ${Math.round(cappedS)}% ${l}%`;
-    }
-    return `0 0% ${l}%`;
+    const cappedS = Math.min(14, Sp * 0.18);
+    return `${Hp} ${Math.round(cappedS)}% ${l}%`;
   };
 
   return {
@@ -573,14 +602,15 @@ export function deriveCoreBrandTokens(seeds: {
     secondaryColor: hexToTriple(secondaryHex),
     accentColor: hexToTriple(accentHex),
     backgroundColor: hexToTriple(backgroundHex),
-    foregroundColor: foregroundHex === '#FFFFFF' ? '0 0% 100%' : '224 71% 4%',
+    foregroundColor: foregroundTriplet,
     cardColor: hexToTriple(cardHex),
-    mutedColor: hexToTriple(mutedHex),
-    borderColor: hexToTriple(borderHex),
+    mutedColor: mutedTriplet,
+    borderColor: borderTriplet,
     primaryForeground: autoFgTriplet(primary),
     secondaryForeground: autoFgTriplet(secondaryHex),
     accentForeground: autoFgTriplet(accentHex),
-    cardForeground: foregroundHex === '#FFFFFF' ? '0 0% 100%' : '224 71% 4%',
+    cardForeground: foregroundTriplet,
+    mutedForeground: mutedFgTriplet,
     bgPage: bgTriplet(98),
     bgSectionAlt: bgTriplet(94),
   };
