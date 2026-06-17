@@ -3,6 +3,7 @@
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import type { TrustStripSettings } from '@force/shared';
+import { sectionSpacingClasses } from './section-spacing';
 import { sectionBgStyle } from './section-bg';
 
 /**
@@ -68,6 +69,8 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
   // fallback covers stores saved before the page-builder section landed.
   const layout = settings?.layout ?? store.theme?.trustStripLayout ?? 'horizontal';
   const size = settings?.size ?? store.theme?.trustStripSize ?? 'md';
+  // `settings` already extends SectionPaddingMaxWidthVisibility — read spacing directly.
+  const { wrapperClass, innerContainerClass } = sectionSpacingClasses(settings);
   const listClass =
     layout === 'vertical' ? 'grid grid-cols-1 gap-6' : 'grid grid-cols-3 gap-2 sm:gap-8';
 
@@ -115,10 +118,10 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
     <section
       aria-label={isRtl ? 'لماذا تتسوق معنا' : 'Why shop with us'}
       dir={isRtl ? 'rtl' : 'ltr'}
-      className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
+      className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
       style={sectionBgStyle(settings?.bgColor, store.theme)}
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className={innerContainerClass}>
         <ul className={listClass}>
           {DEFAULT_TRUST_ITEMS.map(item => (
             <li

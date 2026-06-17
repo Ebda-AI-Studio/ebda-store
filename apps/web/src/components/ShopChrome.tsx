@@ -11,6 +11,7 @@ import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/
 import type { FloatingWidgetConfig } from '@force/shared';
 import { resolveColor, footerLogoContrastFilter, resolveBackgroundPreset } from '@force/shared';
 import type { StoreLayoutSettings } from '@force/shared';
+import { sectionVisibilityClass } from '../templates/shared/section-spacing';
 import type {
   FooterBottomBarConfig,
   FooterLinkSection,
@@ -259,7 +260,10 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           over the legacy store.announcementBar.bgColor. */}
       {(layout?.announcement?.enabled ?? store.announcementBar?.enabled) &&
         store.announcementBar?.text && (
-          <div data-zone="beforeHeader">
+          <div
+            data-zone="beforeHeader"
+            className={sectionVisibilityClass(layout?.announcement) ?? undefined}
+          >
             <T.AnnouncementBar
               text={store.announcementBar.text}
               textAr={store.announcementBar.textAr}
@@ -280,7 +284,14 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
       <header
         role="banner"
         data-zone="header"
-        className={layout?.header?.sticky ? 'sticky top-0 z-40' : undefined}
+        className={
+          [
+            layout?.header?.sticky ? 'sticky top-0 z-40' : undefined,
+            sectionVisibilityClass(layout?.header),
+          ]
+            .filter(Boolean)
+            .join(' ') || undefined
+        }
       >
         <T.Header
           branding={branding}
@@ -311,7 +322,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           prop instead so the theme can replace its default bg class with
           the merchant's inline color. Ahmad 2026-05-20: footer bg save was
           not landing because of this nested-bg paint-over. */}
-      <div data-zone="footer">
+      <div data-zone="footer" className={sectionVisibilityClass(layout?.footer) ?? undefined}>
         <T.Footer
           branding={branding}
           contact={{

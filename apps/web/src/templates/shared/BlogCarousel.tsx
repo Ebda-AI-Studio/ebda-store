@@ -4,6 +4,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
+import { sectionSpacingClasses } from './section-spacing';
+import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
 
 export interface BlogCarouselPost {
   id: string;
@@ -19,6 +21,8 @@ export interface BlogCarouselPost {
 
 interface BlogCarouselProps {
   posts: BlogCarouselPost[];
+  /** Per-section spacing/visibility controls from page-builder. */
+  spacingSettings?: SectionPaddingMaxWidthVisibility;
 }
 
 /**
@@ -30,18 +34,20 @@ interface BlogCarouselProps {
  * Section background uses `--bg-page` so it alternates with the
  * Trust strip / Brand story / footer rhythm above and below.
  */
-export function BlogCarousel({ posts }: BlogCarouselProps) {
+export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
   const { isRtl } = useLanguage();
   const storeUrl = useStoreUrl();
   if (!posts || posts.length === 0) return null;
+
+  const { wrapperClass, innerContainerClass } = sectionSpacingClasses(spacingSettings);
 
   return (
     <section
       aria-label={isRtl ? 'المدونة' : 'Blog'}
       dir={isRtl ? 'rtl' : 'ltr'}
-      className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
+      className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className={innerContainerClass}>
         <div className="mb-6 flex items-end justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[hsl(var(--accent-soft))]">

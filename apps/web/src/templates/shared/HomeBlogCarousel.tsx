@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { BlogCarousel, type BlogCarouselPost } from './BlogCarousel';
 import { useStore } from '../../contexts/StoreContext';
 import { api } from '../../lib/api';
+import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
 
 /**
  * Homepage container for the blog carousel — fetches posts client-side
@@ -16,7 +17,11 @@ import { api } from '../../lib/api';
  * Server-side prefetch could land later via page.tsx; client-side keeps
  * the section non-blocking on first render.
  */
-export function HomeBlogCarousel() {
+export function HomeBlogCarousel({
+  spacingSettings,
+}: {
+  spacingSettings?: SectionPaddingMaxWidthVisibility;
+} = {}) {
   const { store } = useStore();
   const [posts, setPosts] = useState<BlogCarouselPost[] | null>(null);
 
@@ -39,5 +44,5 @@ export function HomeBlogCarousel() {
 
   if (!store.blogEnabled) return null;
   if (!posts || posts.length === 0) return null;
-  return <BlogCarousel posts={posts} />;
+  return <BlogCarousel posts={posts} spacingSettings={spacingSettings} />;
 }

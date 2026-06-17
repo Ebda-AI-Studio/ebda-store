@@ -15,6 +15,7 @@ import { getHomepageTemplate } from '../lib/serverTemplate';
 import type { TemplateId, StoreLayoutSettings } from '@force/shared';
 import { sanitizeUrl } from '@force/shared';
 import { sectionBgStyle } from '../templates/shared/section-bg';
+import { sectionSpacingClasses, sectionVisibilityClass } from '../templates/shared/section-spacing';
 import { resolveSectionZone } from '../templates/shared/section-typography';
 
 /**
@@ -321,8 +322,16 @@ export function HomePageContent({
         // ── Per-section JSX nodes ─────────────────────────────────────────
 
         // Hero — toggleable + mode-aware. bgColor overrides the theme bg when set.
+        // Spacing: paddingTop/paddingBottom don't apply to the hero wrapper because
+        // hero components (HeroSlider/HeroBanner/T.Hero) manage their own internal
+        // layout and aspect ratio. Only visibility (hideOnMobile/hideOnDesktop) applies.
+        const heroVisClass = sectionVisibilityClass(layout.hero);
         const heroJSX = (
-          <div data-section="hero" style={sectionBgStyle(layout.hero.bgColor, store.theme)}>
+          <div
+            data-section="hero"
+            style={sectionBgStyle(layout.hero.bgColor, store.theme)}
+            className={heroVisClass}
+          >
             {layout.hero.enabled && sliderEligible && T.HeroSlider && (
               <T.HeroSlider
                 slides={layout.hero.slides}
@@ -381,7 +390,7 @@ export function HomePageContent({
             {layout.categories.enabled && templateCategories.length > 0 && (
               <section
                 data-section="categories"
-                className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
+                className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(layout.categories).wrapperClass}`}
                 style={sectionBgStyle(layout.categories.bgColor, store.theme)}
               >
                 {(() => {
@@ -392,6 +401,9 @@ export function HomePageContent({
                   // stores); when they differ we render both and toggle with
                   // md: visibility so e.g. mobile=grid + desktop=horizontal works.
                   // md (768px) is the platform mobile/desktop boundary.
+                  const categoriesInnerClass = sectionSpacingClasses(
+                    layout.categories
+                  ).innerContainerClass;
                   const common = {
                     categories: templateCategories,
                     title: categoriesTitle,
@@ -425,7 +437,7 @@ export function HomePageContent({
                   };
                   type Caption = typeof layout.categories.captionPosition;
                   const renderGrid = (caption: Caption, vis?: string) => (
-                    <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${vis ?? ''}`}>
+                    <div className={`${categoriesInnerClass} ${vis ?? ''}`.trim()}>
                       <T.CategoryGrid
                         {...common}
                         captionPosition={caption}
@@ -487,7 +499,7 @@ export function HomePageContent({
             {layout.newArrivals.enabled && templateNewArrivals.length > 0 && (
               <section
                 data-section="newArrivals"
-                className="bg-[hsl(var(--bg-section-alt))] py-12 sm:py-16 lg:py-20"
+                className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.newArrivals).wrapperClass}`}
                 style={sectionBgStyle(layout.newArrivals.bgColor, store.theme)}
               >
                 {T.ProductCarousel ? (
@@ -536,7 +548,7 @@ export function HomePageContent({
                     sectionBgColor={layout.newArrivals.bgColor}
                   />
                 ) : (
-                  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                  <div className={sectionSpacingClasses(layout.newArrivals).innerContainerClass}>
                     <T.ProductGrid
                       products={templateNewArrivals}
                       title={newArrivalsTitle}
@@ -571,7 +583,7 @@ export function HomePageContent({
             {layout.bestSellers.enabled && templateBestSellers.length > 0 && (
               <section
                 data-section="bestSellers"
-                className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
+                className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(layout.bestSellers).wrapperClass}`}
                 style={sectionBgStyle(layout.bestSellers.bgColor, store.theme)}
               >
                 {T.ProductCarousel ? (
@@ -620,7 +632,7 @@ export function HomePageContent({
                     sectionBgColor={layout.bestSellers.bgColor}
                   />
                 ) : (
-                  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                  <div className={sectionSpacingClasses(layout.bestSellers).innerContainerClass}>
                     <T.ProductGrid
                       products={templateBestSellers}
                       title={bestSellersTitle}
@@ -653,6 +665,7 @@ export function HomePageContent({
                 image={store.heroImage ?? undefined}
                 body={store.description ?? undefined}
                 bodyAr={store.descriptionAr ?? undefined}
+                spacingSettings={layout.brandStory}
               />
             </>
           ) : null;
@@ -666,7 +679,7 @@ export function HomePageContent({
                 settings={resolveSlotDividerSettings(layout.blogCarousel?.dividers, 'above')}
                 hideForExplicitBg={!!layout.blogCarousel?.bgColor}
               />
-              <HomeBlogCarousel />
+              <HomeBlogCarousel spacingSettings={layout.blogCarousel} />
             </>
           ) : null;
 
@@ -700,7 +713,7 @@ export function HomePageContent({
             {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
               <section
                 data-section="testimonials"
-                className="bg-[hsl(var(--bg-section-alt))] py-12 sm:py-16 lg:py-20"
+                className={`bg-[hsl(var(--bg-section-alt))] ${sectionSpacingClasses(layout.testimonials).wrapperClass}`}
                 style={sectionBgStyle(layout.testimonials.bgColor, store.theme)}
               >
                 <T.TestimonialRow
@@ -792,7 +805,7 @@ export function HomePageContent({
               )}
               <section
                 data-section={`extra:${extra.id}`}
-                className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
+                className={`bg-[hsl(var(--bg-page))] ${sectionSpacingClasses(extra).wrapperClass}`}
                 style={sectionBgStyle(extra.bgColor, store.theme)}
               >
                 <T.ProductCarousel

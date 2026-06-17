@@ -2,6 +2,8 @@
 
 import Image from 'next/image';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { sectionSpacingClasses } from './section-spacing';
+import type { SectionPaddingMaxWidthVisibility } from '@force/shared';
 
 /**
  * Bucket E (2026-05-17): inline editorial brand story block — image on
@@ -28,6 +30,8 @@ interface BrandStoryBlockProps {
   ctaHref?: string;
   ctaTextEn?: string;
   ctaTextAr?: string;
+  /** Per-section spacing/visibility controls from page-builder. */
+  spacingSettings?: SectionPaddingMaxWidthVisibility;
 }
 
 export function BrandStoryBlock({
@@ -39,18 +43,21 @@ export function BrandStoryBlock({
   ctaHref,
   ctaTextEn = 'Read More',
   ctaTextAr = 'اقرأ المزيد',
+  spacingSettings,
 }: BrandStoryBlockProps) {
   const { isRtl } = useLanguage();
   const text = isRtl ? (bodyAr ?? body) : (body ?? bodyAr);
   if (!image && !text) return null;
 
+  const { wrapperClass, innerContainerClass } = sectionSpacingClasses(spacingSettings);
+
   return (
     <section
       aria-label={isRtl ? headingAr : headingEn}
       dir={isRtl ? 'rtl' : 'ltr'}
-      className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
+      className={`bg-[hsl(var(--bg-page))] ${wrapperClass}`}
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className={innerContainerClass}>
         <div className="grid grid-cols-1 gap-6 sm:gap-10 lg:grid-cols-2 lg:items-center">
           {image && (
             <div className="relative w-full aspect-[4/3] sm:aspect-[3/2] overflow-hidden rounded-lg bg-foreground/5">
