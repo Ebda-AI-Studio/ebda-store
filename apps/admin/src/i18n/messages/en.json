@@ -1468,7 +1468,7 @@
       },
       "brandColors": {
         "title": "Brand colors",
-        "hint": "Set the core colors for your storefront. Smart Palette can generate a starting palette — you can then adjust each color individually.",
+        "hint": "Set your 2–3 core brand colors. We generate the rest of the palette from them — then fine-tune any individual color in the Page Builder.",
         "smartPaletteButton": "Generate from Smart Palette",
         "primary": "Primary",
         "secondary": "Secondary",
@@ -1504,7 +1504,10 @@
           "background1Hint": "Main page background (most sections).",
           "background2": "Background 2",
           "background2Hint": "Alternating section background."
-        }
+        },
+        "accentOptionalHint": "Optional — leave empty and we'll generate it from Primary & Secondary.",
+        "generateButton": "Generate palette from brand colors",
+        "pageBuilderLink": "Fine-tune colors in Page Builder"
       }
     },
     "preview": {
