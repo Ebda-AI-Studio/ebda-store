@@ -85,6 +85,20 @@ const DEFAULT_UTILITY_LINKS: UtilityBarLink[] = [
   { label: 'Wishlist', labelAr: 'المفضلة', href: '/wishlist', enabled: true },
 ];
 
+/** Snapshot of current footer-links + utility-bar state for the preview bundle. */
+export interface FooterLinksEditorState {
+  footerLinks: {
+    shop: FooterLink[];
+    support: FooterLink[];
+    company: FooterLink[];
+    newsletterEnabled: boolean;
+  };
+  utilityBar: {
+    enabled: boolean;
+    links: UtilityBarLink[];
+  };
+}
+
 interface FooterLinksEditorProps {
   storeId: string;
   /** When 'embedded' the editor renders without its outer help banner
@@ -106,6 +120,12 @@ interface FooterLinksEditorProps {
    * the main Save runs them sequentially. Default 'all' (standalone page).
    */
   section?: 'all' | 'utility' | 'links';
+  /**
+   * When provided, the editor keeps this ref up-to-date with the current
+   * (unsaved) state so the Page Builder can include it in the preview-draft
+   * bundle without requiring a save first.
+   */
+  stateRef?: React.MutableRefObject<FooterLinksEditorState | null>;
 }
 
 /* ── SectionShell ──────────────────────────────────────────────────────
@@ -301,6 +321,7 @@ export function FooterLinksEditor({
   variant = 'standalone',
   saveRef,
   section = 'all',
+  stateRef,
 }: FooterLinksEditorProps) {
   const t = useT('pages.page');
   const { success, error: showError } = useToast();
@@ -367,6 +388,33 @@ export function FooterLinksEditor({
       cancelled = true;
     };
   }, [storeId]);
+
+  // Keep stateRef in sync with live editor state so the page-builder can read
+  // the current (unsaved) values for the preview-draft bundle.
+  useEffect(() => {
+    if (stateRef) {
+      stateRef.current = {
+        footerLinks: {
+          shop: shopLinks,
+          support: supportLinks,
+          company: companyLinks,
+          newsletterEnabled,
+        },
+        utilityBar: {
+          enabled: utilityBarEnabled,
+          links: utilityLinks,
+        },
+      };
+    }
+  }, [
+    shopLinks,
+    supportLinks,
+    companyLinks,
+    newsletterEnabled,
+    utilityBarEnabled,
+    utilityLinks,
+    stateRef,
+  ]);
 
   async function handleSave(opts?: { silent?: boolean }): Promise<boolean> {
     // A unified (silent) save fired before this editor finished loading would

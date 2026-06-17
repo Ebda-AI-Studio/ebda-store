@@ -17,7 +17,7 @@ import { apiPut } from '../lib/api';
 import { useCurrentStore } from '../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
 
-interface NavItem {
+export interface NavItem {
   label: string;
   labelAr?: string;
   href: string;
@@ -61,9 +61,15 @@ interface NavMenuEditorProps {
    * valid to save, so it never blocks the unified save).
    */
   saveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
+  /**
+   * When provided, the editor keeps this ref up-to-date with the current
+   * (unsaved) nav menu state so the Page Builder can include it in the
+   * preview-draft bundle without requiring a save first.
+   */
+  stateRef?: React.MutableRefObject<NavItem[] | null>;
 }
 
-export function NavMenuEditor({ storeId, variant, saveRef }: NavMenuEditorProps) {
+export function NavMenuEditor({ storeId, variant, saveRef, stateRef }: NavMenuEditorProps) {
   const toast = useToast();
   const t = useT('navigation.page');
 
@@ -89,6 +95,12 @@ export function NavMenuEditor({ storeId, variant, saveRef }: NavMenuEditorProps)
   useEffect(() => {
     if (fetchError) toast.error(t('toastFailedLoad'), fetchError.message);
   }, [fetchError, toast, t]);
+
+  // Keep stateRef in sync with the live items so the page-builder can read
+  // the current (unsaved) nav menu for the preview-draft bundle.
+  useEffect(() => {
+    if (stateRef) stateRef.current = items;
+  }, [items, stateRef]);
 
   function update(index: number, field: keyof NavItem, value: string) {
     setItems(prev => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)));

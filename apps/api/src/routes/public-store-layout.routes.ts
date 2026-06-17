@@ -52,8 +52,13 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
         // side; here we accept either shape for safety.
         const draftBundle =
           draft && typeof draft === 'object' && ('layout' in draft || 'typography' in draft)
-            ? (draft as { layout?: unknown; typography?: unknown; theme?: unknown })
-            : { layout: draft, typography: undefined, theme: undefined };
+            ? (draft as {
+                layout?: unknown;
+                typography?: unknown;
+                theme?: unknown;
+                settings?: unknown;
+              })
+            : { layout: draft, typography: undefined, theme: undefined, settings: undefined };
         const layout = resolveLayoutSettings(draftBundle.layout, templateId);
         res.setHeader('Cache-Control', 'private, no-store');
         res.json({
@@ -62,6 +67,11 @@ router.get('/stores/:storeId/layout', async (req: Request, res: Response, next: 
             layout,
             typography: draftBundle.typography,
             theme: draftBundle.theme,
+            // settings carries navMenu / footerLinks / utilityBar from the
+            // page-builder preview POST so the storefront can render nav/footer
+            // changes before the merchant saves them. Only present on fresh
+            // drafts that include the settings bundle (2026-06-17+).
+            settings: draftBundle.settings,
             isDraft: true,
           },
         });

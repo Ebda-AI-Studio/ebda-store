@@ -125,6 +125,18 @@ export default function StoreLayoutPage() {
   const navSaveRef = useRef<(() => Promise<boolean>) | null>(null);
   const utilityBarSaveRef = useRef<(() => Promise<boolean>) | null>(null);
   const footerLinksSaveRef = useRef<(() => Promise<boolean>) | null>(null);
+  // State refs — each editor keeps these current with its UNSAVED state so the
+  // "Preview unsaved" POST can include nav/footer/utility in the draft bundle.
+  const navStateRef = useRef<import('../../../../components/NavMenuEditor').NavItem[] | null>(null);
+  // Two separate stateRefs: one for the utility-section instance (top utility bar)
+  // and one for the links-section instance (footer columns). Both share the same
+  // FooterLinksEditorState shape — we pick the relevant sub-keys from each.
+  const utilityStateRef = useRef<
+    import('../../../../components/FooterLinksEditor').FooterLinksEditorState | null
+  >(null);
+  const footerLinksStateRef = useRef<
+    import('../../../../components/FooterLinksEditor').FooterLinksEditorState | null
+  >(null);
   // Global typography zones — fetched from the same typography endpoint as
   // the standalone /typography page. Populated in fetchData and used as
   // (a) placeholder "inherit" hints in per-section ZoneEditors and
@@ -379,15 +391,33 @@ export default function StoreLayoutPage() {
                 // (with any pending palette / card-flag updates merged in).
                 // Without bundling, merchant tweaks to global zones or
                 // theme didn't show in the iframe until Save committed.
+                //
+                // 2026-06-17: also include the current store.settings keys
+                // (navMenu / footerLinks / utilityBar) so nav, footer links,
+                // and the utility bar preview unsaved changes too. The state
+                // refs are kept current by each embedded editor component.
                 const themeForPreview = storeInfo?.theme
                   ? { ...storeInfo.theme, ...pendingThemeUpdates }
                   : pendingThemeUpdates;
+                const draftSettings: Record<string, unknown> = {};
+                if (navStateRef.current) {
+                  draftSettings.navMenu = navStateRef.current;
+                }
+                // footerLinksStateRef covers the "links" section (shop/support/company columns).
+                if (footerLinksStateRef.current) {
+                  draftSettings.footerLinks = footerLinksStateRef.current.footerLinks;
+                }
+                // utilityStateRef covers the "utility" section (top bar links + enabled toggle).
+                if (utilityStateRef.current) {
+                  draftSettings.utilityBar = utilityStateRef.current.utilityBar;
+                }
                 const res = await apiPost<{ token: string }>(
                   `/api/v1/admin/stores/${storeId}/layout/preview`,
                   {
                     layout,
                     typography: { fonts: typographyFonts, zones: globalZones },
                     theme: themeForPreview,
+                    ...(Object.keys(draftSettings).length > 0 ? { settings: draftSettings } : {}),
                   }
                 );
                 if (res.data?.token) {
@@ -1706,6 +1736,7 @@ export default function StoreLayoutPage() {
                   variant="embedded"
                   section="utility"
                   saveRef={utilityBarSaveRef}
+                  stateRef={utilityStateRef}
                 />
               </SectionCard>
 
@@ -1718,7 +1749,12 @@ export default function StoreLayoutPage() {
                 defaultExpanded={false}
                 alwaysOn
               >
-                <NavMenuEditor storeId={storeId} variant="embedded" saveRef={navSaveRef} />
+                <NavMenuEditor
+                  storeId={storeId}
+                  variant="embedded"
+                  saveRef={navSaveRef}
+                  stateRef={navStateRef}
+                />
               </SectionCard>
 
               {/* Footer — bg, dividers, padding + typography zones
@@ -1771,6 +1807,7 @@ export default function StoreLayoutPage() {
                     variant="embedded"
                     section="links"
                     saveRef={footerLinksSaveRef}
+                    stateRef={footerLinksStateRef}
                   />
                 </div>
               </ExtraSectionCard>

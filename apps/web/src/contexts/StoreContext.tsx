@@ -175,6 +175,13 @@ interface StoreContextValue {
    * this lazy fetch (no race between SSR-fetched-on-server vs lazy-on-client).
    */
   layout: import('@force/shared').StoreLayoutSettings | null;
+  /**
+   * Draft-only store.settings overrides (navMenu / footerLinks / utilityBar).
+   * Present only when a preview-draft token is active AND the bundle includes
+   * settings. ShopChrome prefers these over the committed store.settings so
+   * nav/footer/utility changes preview before save. Null for normal visitors.
+   */
+  draftSettings: Record<string, unknown> | null;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -233,6 +240,10 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
   const [isLoading] = useState(!initialStore);
   const [error] = useState<Error | null>(null);
   const [layout, setLayout] = useState<import('@force/shared').StoreLayoutSettings | null>(null);
+  // Draft-only settings (navMenu / footerLinks / utilityBar). Populated from
+  // the layout-draft bundle when a preview token is active; null otherwise so
+  // the live path (no draft) is completely unchanged.
+  const [draftSettings, setDraftSettings] = useState<Record<string, unknown> | null>(null);
 
   // Lazy-fetch layout settings for non-homepage routes so ShopChrome can apply
   // header / footer / announcement chrome overrides everywhere, not only home.
@@ -255,10 +266,21 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
         });
         if (!res.ok) return;
         const data = (await res.json()) as {
-          data?: { layout?: import('@force/shared').StoreLayoutSettings };
+          data?: {
+            layout?: import('@force/shared').StoreLayoutSettings;
+            settings?: Record<string, unknown>;
+            isDraft?: boolean;
+          };
         };
         if (cancelled) return;
         if (data.data?.layout) setLayout(data.data.layout);
+        // When the response is from a draft bundle AND carries settings, expose
+        // them as draftSettings so ShopChrome can prefer them over store.settings.
+        if (data.data?.isDraft && data.data.settings && typeof data.data.settings === 'object') {
+          setDraftSettings(data.data.settings);
+        } else {
+          setDraftSettings(null);
+        }
       } catch {
         // Silent: layout chrome is a nice-to-have, fallback is the default chrome.
       }
@@ -295,7 +317,7 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
   }, [store.favicon]);
 
   return (
-    <StoreContext.Provider value={{ store, isLoading, error, layout }}>
+    <StoreContext.Provider value={{ store, isLoading, error, layout, draftSettings }}>
       {children}
     </StoreContext.Provider>
   );

@@ -41,7 +41,7 @@ interface ShopChromeProps {
  */
 export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   const router = useRouter();
-  const { store, layout: ctxLayout } = useStore();
+  const { store, layout: ctxLayout, draftSettings } = useStore();
   // Prop wins (homepage server-fetches layout for SSR correctness); context
   // layout is the lazy-fetched fallback for other routes.
   const layout = layoutProp ?? ctxLayout ?? undefined;
@@ -59,13 +59,15 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   // or absolute ("https://..."); relative hrefs are run through storeUrl() so
   // multi-tenant platform URLs get the right slug prefix. Falls back to the
   // default 4-item menu when the setting is missing or malformed.
+  // When a page-builder preview draft is active, prefer draftSettings.navMenu
+  // over the committed store.settings so unsaved nav changes preview immediately.
   const defaultNav: NavItem[] = [
     { label: 'Products', labelAr: 'المنتجات', href: storeUrl('/products') },
     { label: 'Categories', labelAr: 'الفئات', href: storeUrl('/categories') },
     { label: 'About', labelAr: 'من نحن', href: storeUrl('/about') },
     { label: 'Contact', labelAr: 'تواصل معنا', href: storeUrl('/contact') },
   ];
-  const customNav = store.settings?.navMenu;
+  const customNav = draftSettings?.navMenu ?? store.settings?.navMenu;
   const navigation: NavItem[] = Array.isArray(customNav)
     ? customNav
         .filter(
@@ -100,7 +102,8 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   // relative hrefs through storeUrl() so multi-tenant platform URLs get the
   // correct slug prefix. Each template handles a missing/empty config by
   // falling back to its built-in default layout.
-  const rawFooterLinks = store.settings?.footerLinks;
+  // Draft preview: prefer draftSettings.footerLinks when active.
+  const rawFooterLinks = draftSettings?.footerLinks ?? store.settings?.footerLinks;
   const footerLinks: FooterLinksConfig | undefined =
     rawFooterLinks && typeof rawFooterLinks === 'object' && !Array.isArray(rawFooterLinks)
       ? (() => {
@@ -170,7 +173,8 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
   // packs fall back to their built-in default bar (preserves legacy stores
   // that never touched the setting). When the merchant explicitly toggles
   // `enabled: false`, we forward that so the pack hides the bar.
-  const rawUtilityBar = store.settings?.utilityBar;
+  // Draft preview: prefer draftSettings.utilityBar when active.
+  const rawUtilityBar = draftSettings?.utilityBar ?? store.settings?.utilityBar;
   const utilityBar: ResolvedUtilityBar | undefined =
     rawUtilityBar && typeof rawUtilityBar === 'object' && !Array.isArray(rawUtilityBar)
       ? (() => {
