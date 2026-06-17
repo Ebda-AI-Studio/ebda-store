@@ -82,14 +82,17 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         }))
     : defaultNav;
 
-  // Surface the physical-locations page automatically when the store opts in,
-  // so the merchant doesn't have to hand-add a nav/footer link. Feeds both the
-  // header nav and the footer (which render this same `navigation` list across
-  // all 5 themes). Skip if the merchant already added a /locations link.
-  const locationsHref = storeUrl('/locations');
-  if (store.locationsEnabled && !navigation.some(n => n.href === locationsHref)) {
-    navigation.push({ label: 'Locations', labelAr: 'الفروع', href: locationsHref });
-  }
+  // When locationsEnabled is off, suppress any Locations link the merchant may
+  // have manually added to nav / footer / utility bar — avoids a live 404 if
+  // the merchant placed the link and later toggled the feature off. The link is
+  // NOT auto-injected; merchants place it themselves via Page Builder → header
+  // nav / footer links / utility bar.
+  const isLocationsHref = (href: string) =>
+    href === storeUrl('/locations') || href.endsWith('/locations');
+
+  const filteredNavigation: NavItem[] = store.locationsEnabled
+    ? navigation
+    : navigation.filter(n => !isLocationsHref(n.href));
 
   // Per-store footer columns are saved in `store.settings.footerLinks` by the
   // admin's pages settings UI. Mirror the navMenu treatment: only forward if
@@ -119,7 +122,10 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
                 nameAr: typeof item.nameAr === 'string' ? item.nameAr : undefined,
                 href: item.href.startsWith('http') ? item.href : storeUrl(item.href),
                 enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
-              }));
+              }))
+              // Suppress any Locations link when the feature is disabled so a
+              // merchant-placed footer link doesn't 404.
+              .filter(item => store.locationsEnabled || !isLocationsHref(item.href));
             return items.length ? items : undefined;
           };
           const newsletter =
@@ -188,6 +194,9 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
                   href: item.href.startsWith('http') ? item.href : storeUrl(item.href),
                   enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
                 }))
+                // Suppress any Locations link when the feature is disabled so a
+                // merchant-placed utility bar link doesn't 404.
+                .filter(item => store.locationsEnabled || !isLocationsHref(item.href))
             : [];
           return { enabled, links };
         })()
@@ -276,7 +285,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
       >
         <T.Header
           branding={branding}
-          navigation={navigation}
+          navigation={filteredNavigation}
           isRtl={isRtl}
           cartItemCount={itemCount}
           onSearch={handleSearch}
@@ -312,7 +321,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
             addressLink,
           }}
           socials={contact.socialLinks}
-          navigation={navigation}
+          navigation={filteredNavigation}
           footerLinks={footerLinks}
           // Pages the merchant explicitly disabled in /content/<slug>.
           // The footer hides matching legal links so a disabled Privacy

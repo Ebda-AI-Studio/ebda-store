@@ -98,6 +98,12 @@ export function NavMenuEditor({ storeId, variant, saveRef }: NavMenuEditorProps)
     setItems(prev => [...prev, { label: '', labelAr: '', href: '' }]);
   }
 
+  function addLocationsLink() {
+    // Only add if no /locations entry is already present.
+    if (items.some(it => it.href === '/locations')) return;
+    setItems(prev => [...prev, { label: 'Locations', labelAr: 'الفروع', href: '/locations' }]);
+  }
+
   function removeItem(index: number) {
     setItems(prev => prev.filter((_, i) => i !== index));
   }
@@ -250,6 +256,14 @@ export function NavMenuEditor({ storeId, variant, saveRef }: NavMenuEditorProps)
       <div className={`flex flex-wrap items-center gap-3 ${isEmbedded ? 'mt-3' : 'mt-6'}`}>
         <Button onClick={addItem} variant="outline" size={isEmbedded ? 'sm' : 'default'}>
           {t('addItem')}
+        </Button>
+        <Button
+          onClick={addLocationsLink}
+          variant="outline"
+          size={isEmbedded ? 'sm' : 'default'}
+          disabled={items.some(it => it.href === '/locations')}
+        >
+          {t('addLocationsLink')}
         </Button>
         <Button onClick={resetToDefault} variant="ghost" size={isEmbedded ? 'sm' : 'default'}>
           {t('resetDefault')}

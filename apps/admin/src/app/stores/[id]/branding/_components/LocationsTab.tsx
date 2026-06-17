@@ -248,6 +248,17 @@ export function LocationsTab({ storeId }: { storeId: string }) {
         </div>
       )}
 
+      {/* Nav placement hint */}
+      {store && isEnabled && (
+        <p className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Add the Locations link to your storefront via Page Builder → header navigation, footer
+          links, or top utility bar. |{' '}
+          <span lang="ar" dir="rtl" className="inline">
+            أضف رابط الفروع من منشئ الصفحات ← تنقل الترويسة أو روابط التذييل أو الشريط العلوي.
+          </span>
+        </p>
+      )}
+
       {/* Top actions bar */}
       {formMode === null && (
         <div className="flex items-center justify-between">

@@ -457,7 +457,28 @@ export function FooterLinksEditor({
     setUtilityLinks(prev => prev.filter((_, i) => i !== index));
   }
 
+  // One-click helpers: insert a Locations link into the relevant list when
+  // not already present. The merchant placed it by choice — they can edit/
+  // remove it like any other link.
+  function addLocationsFooterLink(section: 'shop' | 'support' | 'company') {
+    const links =
+      section === 'shop' ? shopLinks : section === 'support' ? supportLinks : companyLinks;
+    if (links.some(l => l.href === '/locations')) return;
+    getSetter(section)(prev => [
+      ...prev,
+      { name: 'Locations', nameAr: 'الفروع', href: '/locations', enabled: true },
+    ]);
+  }
+  function addLocationsUtilityLink() {
+    if (utilityLinks.some(l => l.href === '/locations')) return;
+    setUtilityLinks(prev => [
+      ...prev,
+      { label: 'Locations', labelAr: 'الفروع', href: '/locations', enabled: true },
+    ]);
+  }
+
   function renderLinkList(section: 'shop' | 'support' | 'company', links: FooterLink[]): ReactNode {
+    const hasLocations = links.some(l => l.href === '/locations');
     return (
       <div className="space-y-3">
         {links.length === 0 ? (
@@ -484,6 +505,12 @@ export function FooterLinksEditor({
           ))
         )}
         <AddLinkButton label={t('addLink')} onClick={() => addLink(section)} />
+        {!hasLocations && (
+          <AddLinkButton
+            label={t('addLocationsLink')}
+            onClick={() => addLocationsFooterLink(section)}
+          />
+        )}
       </div>
     );
   }
@@ -536,6 +563,9 @@ export function FooterLinksEditor({
               ))
             )}
             <AddLinkButton label={t('addLink')} onClick={addUtilityLink} />
+            {!utilityLinks.some(l => l.href === '/locations') && (
+              <AddLinkButton label={t('addLocationsLink')} onClick={addLocationsUtilityLink} />
+            )}
           </div>
         </SectionShell>
       )}
