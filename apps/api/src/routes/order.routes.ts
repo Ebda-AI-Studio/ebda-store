@@ -357,22 +357,25 @@ const getSessionId = (req: Request): string => {
 
 // GET /stores/:storeId/orders - List orders.
 //
-// Mixed-audience route: admins paginate every order in the store;
-// customers see only their own. We can't blanket-apply
-// `requireStoreAccess` because that rejects customers (they don't own
-// the store). Instead, branch by role:
-//   - admin → require ownership of this store via inline check
+// Mixed-audience route: store viewers (super_admin / store_admin /
+// staff) paginate every order in the store; customers see only their
+// own. We can't blanket-apply `requireStoreAccess` because that rejects
+// customers (they don't own the store). Instead, branch by role:
+//   - store viewer → require store access via checkStoreAccess (which
+//     validates super_admin / store_admin ownership AND store_staff
+//     membership IDOR-safely)
 //   - customer → constrain the query to their own customerId
 // Without this branch, ANY store_admin token used to be able to read
-// any other tenant's orders by changing :storeId in the URL.
+// any other tenant's orders by changing :storeId in the URL. Staff must
+// be in the viewer set or the Orders PWA (staff-only) shows zero orders.
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
     const { page, limit, status, from, to } = req.query;
     const role = req.user?.role;
-    const isAdmin = role === 'store_admin' || role === 'super_admin';
+    const isStoreViewer = role === 'store_admin' || role === 'super_admin' || role === 'staff';
 
-    if (isAdmin) {
+    if (isStoreViewer) {
       const access = await checkStoreAccess(storeId, req.user!);
       if (!access.ok) {
         res
@@ -386,7 +389,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
       status: status as string,
-      customerId: isAdmin ? undefined : req.user?.userId,
+      customerId: isStoreViewer ? undefined : req.user?.userId,
       from: from ? new Date(String(from) + 'T00:00:00') : undefined,
       to: to ? new Date(String(to) + 'T23:59:59') : undefined,
     });
@@ -401,16 +404,18 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 });
 
 // GET /stores/:storeId/orders/:id - Get order. Mixed-audience like the
-// list above: admin needs store ownership; customer needs to own the
-// order. Without the admin-side check, ANY store_admin token used to
-// read any other tenant's individual orders.
+// list above: a store viewer (super_admin / store_admin / staff) needs
+// store access; a customer needs to own the order. Without the
+// store-access check, ANY store_admin token used to read any other
+// tenant's individual orders. Staff must be in the viewer set or the
+// Orders PWA returns 403 on every order detail.
 router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId, id } = req.params;
     const role = req.user?.role;
-    const isAdmin = role === 'store_admin' || role === 'super_admin';
+    const isStoreViewer = role === 'store_admin' || role === 'super_admin' || role === 'staff';
 
-    if (isAdmin) {
+    if (isStoreViewer) {
       const access = await checkStoreAccess(storeId, req.user!);
       if (!access.ok) {
         res
@@ -422,7 +427,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
 
     const order = await OrderService.getById(storeId, id);
 
-    if (!isAdmin && order.customerId !== req.user?.userId) {
+    if (!isStoreViewer && order.customerId !== req.user?.userId) {
       res.status(403).json({
         success: false,
         error: { code: 'FORBIDDEN', message: 'Not authorized to view this order' },
@@ -1524,17 +1529,18 @@ router.get(
       const { storeId, orderId } = req.params;
       const user = (req as any).user;
 
-      // Resolve caller role — try admin middleware first, then customer check.
-      let isAdmin = false;
-      if (user) {
-        if (user.role === 'super_admin' || user.role === 'store_admin') {
-          // Verify the admin actually owns this store (reuse prisma check)
-          const store = await prisma.store.findFirst({
-            where: { id: storeId, ...(user.role !== 'super_admin' ? { userId: user.userId } : {}) },
-            select: { id: true },
-          });
-          if (store) isAdmin = true;
-        }
+      // Resolve caller role — a store viewer (super_admin / store_admin /
+      // staff) is verified via checkStoreAccess (ownership for admins,
+      // store_staff membership for staff, IDOR-safe); customers fall
+      // through to the ownership check below. Staff must be a viewer or
+      // the Orders PWA timeline 403s.
+      let isStoreViewer = false;
+      if (
+        user &&
+        (user.role === 'super_admin' || user.role === 'store_admin' || user.role === 'staff')
+      ) {
+        const access = await checkStoreAccess(storeId, user);
+        if (access.ok) isStoreViewer = true;
       }
 
       // Fetch the order to get customerId + synthetic event dates
@@ -1558,8 +1564,8 @@ router.get(
         return;
       }
 
-      // For non-admin callers verify ownership
-      if (!isAdmin) {
+      // For non-viewer callers verify ownership
+      if (!isStoreViewer) {
         if (!user || order.customerId !== user.userId) {
           res.status(403).json({ success: false, error: { message: 'Forbidden' } });
           return;
@@ -1588,7 +1594,7 @@ router.get(
           toStatus: d?.toStatus ?? d?.to,
           details: d?.notes ?? d?.description,
           actorName:
-            isAdmin && a.user
+            isStoreViewer && a.user
               ? `${a.user.firstName ?? ''} ${a.user.lastName ?? ''}`.trim()
               : undefined,
         });
