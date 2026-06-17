@@ -501,6 +501,23 @@ export interface CategoriesPageSettings {
 }
 
 /**
+ * Standalone background + typography for the LOCATIONS page.
+ */
+export interface LocationsPageSettings {
+  /** Background colour for the locations page. Undefined = theme default. */
+  bgColor?: string;
+  /** Light/dark surface override for the auto-contrast system. Default 'auto'. */
+  colorScheme?: PageColorScheme;
+  /** Spacing density — scales the page's vertical padding. Default 'normal'. */
+  density?: PageDensity;
+  /** Text-size scale — scales all of this page's typography controls. Default 'normal'. */
+  textScale?: PageTextScale;
+  /** Page heading uses `heading`, address / hours text uses `subtitle`,
+   *  branch name uses `body`. Applied inline. */
+  typography?: SectionTypographyOverride;
+}
+
+/**
  * Standalone background + typography for the CHECKOUT / payment page.
  */
 export interface CheckoutPageSettings {
@@ -773,6 +790,8 @@ export interface StoreLayoutSettings {
   productDetailPage?: ProductDetailPageSettings;
   /** Categories listing page — background + typography. */
   categoriesPage?: CategoriesPageSettings;
+  /** Locations listing page — background + typography. */
+  locationsPage?: LocationsPageSettings;
   /** Checkout / payment page — background + typography. */
   checkoutPage?: CheckoutPageSettings;
   /** Cart page settings (standalone background + typography). Page-builder configurable. */
@@ -831,6 +850,7 @@ export const DEFAULT_LAYOUT_SETTINGS: StoreLayoutSettings = {
   productsPage: {},
   productDetailPage: {},
   categoriesPage: {},
+  locationsPage: {},
   checkoutPage: {},
   cartPage: {},
   testimonials: {
@@ -888,6 +908,7 @@ export function resolveLayoutSettings(
       ...(raw.productDetailPage ?? {}),
     },
     categoriesPage: { ...base.categoriesPage, ...(raw.categoriesPage ?? {}) },
+    locationsPage: { ...base.locationsPage, ...(raw.locationsPage ?? {}) },
     checkoutPage: { ...base.checkoutPage, ...(raw.checkoutPage ?? {}) },
     cartPage: { ...base.cartPage, ...(raw.cartPage ?? {}) },
     testimonials: { ...base.testimonials, ...(raw.testimonials ?? {}) },

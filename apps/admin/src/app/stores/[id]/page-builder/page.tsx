@@ -155,6 +155,7 @@ export default function StoreLayoutPage() {
     | 'productsPage'
     | 'productDetailPage'
     | 'categoriesPage'
+    | 'locationsPage'
     | 'checkoutPage'
     | 'cartPage';
   const pageDesign = (key: PageDesignKey) => ({
@@ -1369,6 +1370,38 @@ export default function StoreLayoutPage() {
                   <SectionCard
                     title="Categories page"
                     description="The /categories listing page — background + heading / subtitle / category-label typography."
+                    defaultExpanded={false}
+                    alwaysOn
+                  >
+                    <ColorField
+                      label="Page background"
+                      value={pg.bgColor}
+                      onChange={pg.onBg}
+                      theme={storeInfo?.theme}
+                    />
+                    <SchemeSelect value={pg.colorScheme} onChange={pg.onScheme} />
+                    <DensitySelect value={pg.density} onChange={pg.onDensity} />
+                    <TextScaleSelect value={pg.textScale} onChange={pg.onTextScale} />
+                    <SectionTypographyBlock
+                      roles={roles}
+                      typography={pg.typography}
+                      globalZones={pg.globalZonesFor(roles)}
+                      onChangeRole={pg.onChangeRole}
+                      onResetRole={pg.onResetRole}
+                      theme={storeInfo?.theme}
+                    />
+                  </SectionCard>
+                );
+              })()}
+
+              {/* Locations page (/locations) */}
+              {(() => {
+                const pg = pageDesign('locationsPage');
+                const roles = ['heading', 'subtitle'] as const;
+                return (
+                  <SectionCard
+                    title="Locations page"
+                    description="The /locations branches page — background + heading / subtitle typography."
                     defaultExpanded={false}
                     alwaysOn
                   >

@@ -87,15 +87,65 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
 
   // When locationsEnabled is off, suppress any Locations link the merchant may
   // have manually added to nav / footer / utility bar — avoids a live 404 if
-  // the merchant placed the link and later toggled the feature off. The link is
-  // NOT auto-injected; merchants place it themselves via Page Builder → header
-  // nav / footer links / utility bar.
+  // the merchant placed the link and later toggled the feature off.
   const isLocationsHref = (href: string) =>
     href === storeUrl('/locations') || href.endsWith('/locations');
 
-  const filteredNavigation: NavItem[] = store.locationsEnabled
+  // FIX A — safe fallback: if locationsEnabled but no link exists anywhere,
+  // auto-append "Locations" to the header nav so it's never silently lost.
+  // When the merchant HAS explicitly placed a /locations link in nav, footer
+  // columns, or utility bar, do NOT add a duplicate (respect their placement).
+  const hasExplicitLocations =
+    navigation.some(n => isLocationsHref(n.href)) ||
+    (() => {
+      const rawFooter = store.settings?.footerLinks;
+      if (!rawFooter || typeof rawFooter !== 'object' || Array.isArray(rawFooter)) return false;
+      const src = rawFooter as Record<string, unknown>;
+      for (const col of ['shop', 'company', 'support'] as const) {
+        const section = src[col];
+        if (Array.isArray(section)) {
+          for (const item of section) {
+            if (
+              item &&
+              typeof item === 'object' &&
+              typeof (item as { href?: unknown }).href === 'string' &&
+              isLocationsHref((item as { href: string }).href)
+            )
+              return true;
+          }
+        }
+      }
+      return false;
+    })() ||
+    (() => {
+      const rawBar = store.settings?.utilityBar;
+      if (!rawBar || typeof rawBar !== 'object' || Array.isArray(rawBar)) return false;
+      const barLinks = (rawBar as Record<string, unknown>).links;
+      if (!Array.isArray(barLinks)) return false;
+      return barLinks.some(
+        item =>
+          item &&
+          typeof item === 'object' &&
+          typeof (item as { href?: unknown }).href === 'string' &&
+          isLocationsHref((item as { href: string }).href)
+      );
+    })();
+
+  const baseNavigation: NavItem[] = store.locationsEnabled
     ? navigation
     : navigation.filter(n => !isLocationsHref(n.href));
+
+  const filteredNavigation: NavItem[] =
+    store.locationsEnabled && !hasExplicitLocations
+      ? [
+          ...baseNavigation,
+          {
+            label: 'Locations',
+            labelAr: 'الفروع',
+            href: storeUrl('/locations'),
+          },
+        ]
+      : baseNavigation;
 
   // Per-store footer columns are saved in `store.settings.footerLinks` by the
   // admin's pages settings UI. Mirror the navMenu treatment: only forward if
