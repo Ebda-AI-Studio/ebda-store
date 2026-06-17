@@ -629,16 +629,21 @@ router.get(
       const filenameSafe = (store.slug || store.name || 'customers').replace(/[^a-z0-9-]/gi, '-');
       const filename = `${filenameSafe}-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
 
+      // Build the workbook into an in-memory buffer BEFORE touching the
+      // response.  This bounds all DB work to the fast fetch+build window and
+      // ensures the tenant tx (held by tenantContext middleware until res.finish)
+      // is not kept open across the slow client download that follows.
+      // Using writeBuffer() here means the stream to the client carries no open
+      // DB connection at all — a much safer pattern for large exports.
+      const xlsxBuffer = await workbook.xlsx.writeBuffer();
+
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       );
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-      // exceljs.write() returns a Promise<void> when given a writable
-      // stream; piping into res lets the response close cleanly.
-      await workbook.xlsx.write(res);
-      res.end();
+      res.setHeader('Content-Length', xlsxBuffer.byteLength);
+      res.send(Buffer.from(xlsxBuffer));
     } catch (error) {
       next(error);
     }

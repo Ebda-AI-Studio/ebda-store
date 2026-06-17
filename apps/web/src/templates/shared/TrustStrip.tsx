@@ -1,8 +1,10 @@
 'use client';
 
+import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import type { TrustStripSettings } from '@force/shared';
+import { resolveColor, pickReadableForeground } from '@force/shared';
 import { sectionSpacingClasses } from './section-spacing';
 import { sectionBgStyle } from './section-bg';
 
@@ -114,6 +116,21 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
   const titleClass = tokens.title;
   const subClass = layout === 'vertical' ? tokens.sub : `hidden sm:block ${tokens.sub}`;
 
+  // Auto-contrast: when the merchant sets a custom bgColor, the icon, title,
+  // and subtitle tokens (--primary, --foreground) may become unreadable against
+  // that background. Resolve the effective bg to a hex/hsl value and pick a
+  // readable black or white foreground to override inline. When bgColor is
+  // unset, `autoFg` stays undefined and the existing token-based classes win —
+  // no regression for stores that never set a custom bg.
+  const resolvedBg = settings?.bgColor ? resolveColor(settings.bgColor, store.theme) : undefined;
+  const autoFg: string | undefined = resolvedBg
+    ? (pickReadableForeground(resolvedBg) ?? undefined)
+    : undefined;
+  const autoFgStyle = autoFg ? ({ color: autoFg } as React.CSSProperties) : undefined;
+  const autoIconBg = autoFg
+    ? ({ backgroundColor: `${autoFg}1a`, color: autoFg } as React.CSSProperties)
+    : undefined;
+
   return (
     <section
       aria-label={isRtl ? 'لماذا تتسوق معنا' : 'Why shop with us'}
@@ -130,6 +147,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
             >
               <span
                 className={`inline-flex items-center justify-center rounded-full bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] ${iconWrapClass}`}
+                style={autoIconBg}
                 aria-hidden
               >
                 <svg className={iconSvgClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,8 +159,12 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
                   />
                 </svg>
               </span>
-              <h3 className={titleClass}>{isRtl ? item.titleAr : item.titleEn}</h3>
-              <p className={subClass}>{isRtl ? item.subAr : item.subEn}</p>
+              <h3 className={titleClass} style={autoFgStyle}>
+                {isRtl ? item.titleAr : item.titleEn}
+              </h3>
+              <p className={subClass} style={autoFgStyle}>
+                {isRtl ? item.subAr : item.subEn}
+              </p>
             </li>
           ))}
         </ul>

@@ -9,7 +9,12 @@ import { BottomTabBar } from '../templates/shared/BottomTabBar';
 import { FloatingWidget } from '../templates/shared/FloatingWidget';
 import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/SectionDivider';
 import type { FloatingWidgetConfig } from '@force/shared';
-import { resolveColor, footerLogoContrastFilter, resolveBackgroundPreset } from '@force/shared';
+import {
+  resolveColor,
+  footerLogoContrastFilter,
+  resolveBackgroundPreset,
+  sanitizeUrl,
+} from '@force/shared';
 import type { StoreLayoutSettings } from '@force/shared';
 import { sectionVisibilityClass } from '../templates/shared/section-spacing';
 import type {
@@ -81,7 +86,10 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         .map(item => ({
           label: item.label,
           labelAr: item.labelAr,
-          href: item.href.startsWith('http') ? item.href : storeUrl(item.href),
+          // Scheme-validate every merchant-supplied href before rendering as <a>.
+          // sanitizeUrl allows http/https/mailto/tel and site-relative paths;
+          // javascript:, data:, vbscript: and other unsafe schemes fall back to '#'.
+          href: sanitizeUrl(item.href.startsWith('http') ? item.href : storeUrl(item.href), '#'),
         }))
     : defaultNav;
 
@@ -174,7 +182,11 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
               .map(item => ({
                 name: item.name,
                 nameAr: typeof item.nameAr === 'string' ? item.nameAr : undefined,
-                href: item.href.startsWith('http') ? item.href : storeUrl(item.href),
+                // Scheme-validate every merchant-supplied href — same rule as nav.
+                href: sanitizeUrl(
+                  item.href.startsWith('http') ? item.href : storeUrl(item.href),
+                  '#'
+                ),
                 enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
               }))
               // Suppress any Locations link when the feature is disabled so a
@@ -246,7 +258,11 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
                 .map(item => ({
                   label: item.label,
                   labelAr: typeof item.labelAr === 'string' ? item.labelAr : undefined,
-                  href: item.href.startsWith('http') ? item.href : storeUrl(item.href),
+                  // Scheme-validate every merchant-supplied href — same rule as nav.
+                  href: sanitizeUrl(
+                    item.href.startsWith('http') ? item.href : storeUrl(item.href),
+                    '#'
+                  ),
                   enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
                 }))
                 // Suppress any Locations link when the feature is disabled so a
