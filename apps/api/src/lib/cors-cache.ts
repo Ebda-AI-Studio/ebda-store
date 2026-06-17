@@ -42,13 +42,16 @@ export function isPlatformOrigin(
   // index.ts so a missing/forgotten env var doesn't downgrade trust.
   if (origin === 'https://store.forcemediakw.com') return true;
   if (origin === 'https://app.forcemediakw.com') return true;
+  // Orders PWA (staff order-management app) — a distinct origin from admin.
+  if (origin === 'https://orders.forcemediakw.com') return true;
 
   // Vercel preview / production deployments for the project (strict
   // prefix match, same regex as the CORS handler).
   if (
     origin.endsWith('.vercel.app') &&
     (/^https:\/\/force-web(-[a-z0-9]+)?\.vercel\.app$/.test(origin) ||
-      /^https:\/\/force-admin(-[a-z0-9]+)?\.vercel\.app$/.test(origin))
+      /^https:\/\/force-admin(-[a-z0-9]+)?\.vercel\.app$/.test(origin) ||
+      /^https:\/\/force-orders(-[a-z0-9]+)?\.vercel\.app$/.test(origin))
   ) {
     return true;
   }
