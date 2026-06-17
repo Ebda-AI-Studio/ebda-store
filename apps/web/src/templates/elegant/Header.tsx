@@ -17,6 +17,7 @@ export default function ElegantHeader({
   onSearch,
   urlPrefix = '',
   utilityBar,
+  headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -65,6 +66,7 @@ export default function ElegantHeader({
   return (
     <header
       className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border"
+      style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="container mx-auto px-4">

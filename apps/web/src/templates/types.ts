@@ -138,6 +138,15 @@ export interface HeaderProps {
   onSearch?: (query: string) => void;
   urlPrefix?: string;
   /**
+   * Resolved header background color (concrete CSS color), from the Page
+   * Builder Header card's `layout.header.bgColor`. When set, the theme header
+   * applies it as an inline `background-color` on its own root <header> so it
+   * actually paints — the theme's default `bg-background` class would otherwise
+   * cover any color set on the ShopChrome wrapper. Undefined = keep the theme
+   * default background.
+   */
+  headerBgColor?: string;
+  /**
    * Resolved pre-header utility bar config. Only consumed by packs that
    * render a utility bar (Elegant + Classic). When undefined, the pack
    * falls back to its built-in defaults so legacy stores don't lose

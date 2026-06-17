@@ -17,6 +17,7 @@ export default function ClassicHeader({
   onSearch,
   urlPrefix = '',
   utilityBar,
+  headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -56,6 +57,7 @@ export default function ClassicHeader({
   return (
     <header
       className="sticky top-0 z-50 bg-background/95 backdrop-blur-md shadow-sm"
+      style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* Top utility bar — links sourced from `store.settings.utilityBar`

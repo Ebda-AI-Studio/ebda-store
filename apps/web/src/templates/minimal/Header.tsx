@@ -16,6 +16,7 @@ export default function MinimalHeader({
   isLoggedIn = false,
   onSearch,
   urlPrefix = '',
+  headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -59,6 +60,7 @@ export default function MinimalHeader({
       className={`sticky top-0 z-50 bg-background transition-transform duration-300 ease-in-out ${
         isVisible ? 'translate-y-0' : '-translate-y-full'
       }`}
+      style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="container mx-auto px-6">

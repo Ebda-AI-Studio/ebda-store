@@ -277,11 +277,6 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         role="banner"
         data-zone="header"
         className={layout?.header?.sticky ? 'sticky top-0 z-40' : undefined}
-        style={
-          layout?.header?.bgColor
-            ? { backgroundColor: resolveColor(layout.header.bgColor, store.theme) ?? undefined }
-            : undefined
-        }
       >
         <T.Header
           branding={branding}
@@ -291,6 +286,11 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           onSearch={handleSearch}
           urlPrefix={urlPrefix}
           utilityBar={utilityBar}
+          headerBgColor={
+            layout?.header?.bgColor
+              ? (resolveColor(layout.header.bgColor, store.theme) ?? undefined)
+              : undefined
+          }
         />
       </header>
       <main role="main" className="flex-1">

@@ -16,6 +16,7 @@ export default function ModernHeader({
   isLoggedIn = false,
   onSearch,
   urlPrefix = '',
+  headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -57,6 +58,7 @@ export default function ModernHeader({
     <>
       <header
         className={`sticky top-0 z-50 bg-background/85 backdrop-blur-lg border-b border-border/60 transition-shadow duration-200 ${isScrolled ? 'shadow-sm' : 'shadow-none'}`}
+        style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       >
         <div className="container mx-auto px-4">
           {/* Row 1: hamburger | logo | actions — pecannbee mobile layout.

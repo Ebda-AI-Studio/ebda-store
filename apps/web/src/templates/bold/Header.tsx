@@ -16,6 +16,7 @@ export default function BoldHeader({
   isLoggedIn = false,
   onSearch,
   urlPrefix = '',
+  headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -48,7 +49,10 @@ export default function BoldHeader({
 
   return (
     <>
-      <header className="bg-gray-950 text-white sticky top-0 z-50 border-b border-white/10">
+      <header
+        className="bg-gray-950 text-white sticky top-0 z-50 border-b border-white/10"
+        style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
+      >
         <div className="container mx-auto px-4">
           {/* Row 1: hamburger | logo | actions — pecannbee-aligned mobile
               layout. Logo absolute-centered on mobile, normal flex on md+. */}
