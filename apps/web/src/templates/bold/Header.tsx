@@ -65,7 +65,7 @@ export default function BoldHeader({
                   alt={displayName}
                   width={320}
                   height={120}
-                  className="h-24 max-h-24 w-auto max-w-full object-contain brightness-0 invert md:h-36 md:max-h-36"
+                  className="h-16 max-h-16 w-auto max-w-full object-contain brightness-0 invert md:h-24 md:max-h-24"
                   priority
                 />
               ) : (

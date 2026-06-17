@@ -41,8 +41,8 @@ for size baselines (product card 180-220px desktop / 150-180px mobile,
 category card 140-180px, etc.). Anti-patterns and the "still too big"
 diagnosis recipe are documented there too.
 
-**Logo sizing exception (2026-05-17 night, Ahmad explicit override):** logo
-defaults to **h-24 mobile / md:h-36 desktop** (was h-14/h-20 in design.md
+**Logo sizing (updated 2026-06-17, Ahmad "very huge" → reduced):** logo
+defaults to **h-16 mobile / md:h-24 desktop** (was h-24/md:h-36) (was h-14/h-20 in design.md
 — Ahmad bumped this after "still not bigger" + "md sizes are very small
 in reality" feedback). Row container is **h-32 / md:h-44** with
 **`overflow-hidden`** in modern + bold headers so the absolute-positioned

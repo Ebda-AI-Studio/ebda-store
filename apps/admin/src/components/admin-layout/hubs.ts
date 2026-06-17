@@ -69,8 +69,6 @@ export type HubLabels = {
   newsletter: string;
   affiliates: string;
   abandonedCarts: string;
-  // Settings tabs
-  locations: string;
 };
 
 export const HUBS: HubDefinition[] = [
@@ -204,11 +202,9 @@ export const HUBS: HubDefinition[] = [
       '/language',
       '/template',
       '/announcement',
-      '/locations',
     ],
-    buildTabs: (storeId, labels) => [
-      { label: labels.locations, href: `/stores/${storeId}/locations` },
-    ],
+    // Settings pages share one hub for nav highlighting; they have no sub-tabs.
+    buildTabs: () => [],
   },
 ];
 

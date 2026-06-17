@@ -152,7 +152,6 @@ export function AdminLayout({
     affiliates: t('hubTabs.affiliates'),
     abandonedCarts: t('hubTabs.abandonedCarts'),
     // Settings tabs
-    locations: t('hubTabs.locations'),
   };
 
   // Sync dark mode with localStorage and system preference
