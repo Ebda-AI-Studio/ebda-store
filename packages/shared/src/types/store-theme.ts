@@ -219,6 +219,21 @@ export interface StoreTheme {
    */
   aiAutopilot?: boolean;
 
+  /**
+   * Explicit page background HSL triplet (e.g. '26 5% 98%'). When both
+   * `bgPage` and `bgSectionAlt` are set, `resolveBackgroundPreset` returns
+   * them directly instead of falling back to the named-preset logic. This
+   * lets the admin set two fully custom alternating background tones via
+   * Branding → Brand colors (Branding v2, 2026-06-17). Stores that still
+   * use a `backgroundPreset` are unaffected — the fallback path is intact.
+   */
+  bgPage?: string;
+  /**
+   * Explicit alternate-section background HSL triplet. Paired with `bgPage`
+   * — both must be non-empty for the explicit path to activate.
+   */
+  bgSectionAlt?: string;
+
   // Custom CSS (for advanced users)
   customCss?: string;
 }
@@ -462,6 +477,14 @@ export function resolveBackgroundPreset(theme: StoreTheme): {
   bgPage: string;
   bgSectionAlt: string;
 } {
+  // When the admin has set explicit custom background values (Branding v2,
+  // 2026-06-17), use them directly — strip any `hsl(...)` wrapper to keep
+  // the bare triplet format expected by `--bg-page` / `--bg-section-alt`.
+  if (theme.bgPage && theme.bgPage !== '' && theme.bgSectionAlt && theme.bgSectionAlt !== '') {
+    const strip = (v: string) => v.replace(/^hsl\(\s*/, '').replace(/\s*\)$/, '');
+    return { bgPage: strip(theme.bgPage), bgSectionAlt: strip(theme.bgSectionAlt) };
+  }
+
   switch (theme.backgroundPreset) {
     case 'warmSand':
       // #FAF7F2 / #F0EAE0

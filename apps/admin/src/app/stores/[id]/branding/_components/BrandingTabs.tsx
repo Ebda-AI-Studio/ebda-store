@@ -14,6 +14,7 @@ const TABS: Array<{ id: BrandingTabId; key: string }> = [
   { id: 'theme', key: 'theme' },
   { id: 'contact', key: 'contact' },
   { id: 'social', key: 'social' },
+  { id: 'locations', key: 'locations' },
 ];
 
 export function BrandingTabs({ activeTab, onTabChange }: BrandingTabsProps) {

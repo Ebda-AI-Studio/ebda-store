@@ -352,79 +352,177 @@ export interface CoreBrandTokens {
   secondaryForeground: string;
   accentForeground: string;
   cardForeground: string;
+  /** Near-white page background derived from the palette hue. */
+  bgPage: string;
+  /** Subtly deeper tint used by alternating sections. */
+  bgSectionAlt: string;
+}
+
+/** Convert a hex color to the bare 'H S% L%' triplet used by StoreTheme. */
+function hexToTriple(hex: string): string {
+  const rgb = parseColorToRgb(hex);
+  if (!rgb) return '0 0% 50%'; // safe fallback
+  const r = rgb.r / 255;
+  const g = rgb.g / 255;
+  const b = rgb.b / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return `0 0% ${Math.round(l * 100)}%`;
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+/** Auto foreground for a hex bg — returns bare HSL triplet string. */
+function autoFgTriplet(bgHex: string): string {
+  const pick = pickReadableForeground(bgHex);
+  if (pick === '#ffffff') return '0 0% 100%';
+  return '0 0% 0%';
 }
 
 /**
- * Derive all core brand token HSL triplets from up to three seed hex values.
+ * Derive all core brand token HSL triplets from primary + secondary seeds.
  *
- * `primary`  — the brand's dominant color (required, must be a raw hex).
- * `accent`   — optional complementary color (falls back to a lightened primary).
- * `neutral`  — optional neutral/background tint (falls back to pure white).
+ * `primary`   — the brand's dominant color (required, raw hex).
+ * `secondary` — the complementary/secondary brand color (raw hex). When
+ *               provided, accent is blended from both; otherwise it falls
+ *               back to the legacy `accent`/`neutral` parameters so
+ *               SmartPaletteModal (which passes `{primary, accent, neutral}`)
+ *               continues to compile and work unchanged.
+ * `accent`    — legacy parameter (SmartPaletteModal back-compat). Ignored
+ *               when `secondary` is set.
+ * `neutral`   — legacy parameter (SmartPaletteModal back-compat). Ignored
+ *               when `secondary` is set.
  *
- * Returns a partial StoreTheme-compatible object with every core color key.
- * Foregrounds are auto-computed via WCAG luminance (pickReadableForeground).
+ * Returns a full StoreTheme-compatible object including `bgPage` and
+ * `bgSectionAlt` — two near-white page background HSL triplets distinct
+ * enough to read as alternating sections (bgPage L≈98%, bgSectionAlt L≈94%).
  *
  * Callers should merge the result into the existing theme (shallow-merge PUT)
  * so only the changed keys are sent to the server.
  */
 export function deriveCoreBrandTokens(seeds: {
   primary: string;
+  secondary?: string;
   accent?: string;
   neutral?: string;
 }): CoreBrandTokens {
-  const { primary, accent, neutral } = seeds;
+  const { primary, secondary, accent, neutral } = seeds;
 
-  // Neutral fallback: white.
-  const neutralHex = neutral && neutral !== '' ? neutral : '#FFFFFF';
-  // Accent fallback: lighter shade of primary.
-  const accentHex = accent && accent !== '' ? accent : lightenColor(primary, 0.5);
+  const isNewMode = !!(secondary && secondary !== '');
 
-  /** Convert a hex color to the bare 'H S% L%' triplet used by StoreTheme. */
-  function hexToTriple(hex: string): string {
+  // ── Shared helper: extract H+S from a hex color ─────────────────────────
+  function hslPartsFromHex(hex: string): { h: number; s: number; l: number } | null {
     const rgb = parseColorToRgb(hex);
-    if (!rgb) return '0 0% 50%'; // safe fallback
-    // Convert RGB to HSL
+    if (!rgb) return null;
     const r = rgb.r / 255;
     const g = rgb.g / 255;
     const b = rgb.b / 255;
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     const l = (max + min) / 2;
-    if (max === min) return `0 0% ${Math.round(l * 100)}%`;
+    if (max === min) return { h: 0, s: 0, l };
     const d = max - min;
     const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     let h = 0;
     if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
     else if (max === g) h = ((b - r) / d + 2) / 6;
     else h = ((r - g) / d + 4) / 6;
-    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+    return { h: h * 360, s: s * 100, l: l * 100 };
   }
 
-  /** Auto foreground for a hex bg ('0 0% 100%' or '0 0% 0%'). */
-  function autoFg(bgHex: string): string {
-    const pick = pickReadableForeground(bgHex);
-    if (pick === '#ffffff') return '0 0% 100%';
-    return '0 0% 0%';
+  if (isNewMode) {
+    // ── New mode: seed from primary + secondary ──────────────────────────
+    const secondaryHex = secondary!;
+
+    // Accent: blend the hue of primary and secondary shifted by ~30°.
+    // This produces a pleasing triadic-adjacent tone without being garish.
+    const pParts = hslPartsFromHex(primary);
+    const sParts = hslPartsFromHex(secondaryHex);
+    let accentHex: string;
+    if (pParts && sParts) {
+      // Mid-hue between primary and secondary, shifted 30° toward the shorter arc.
+      // Saturation = average of both, lightness = 55% for a vivid but not harsh accent.
+      const midH = (pParts.h + sParts.h) / 2;
+      const accentH = (midH + 30) % 360;
+      const accentS = Math.min(90, (pParts.s + sParts.s) / 2 + 10);
+      const accentL = 52;
+      // Build a hex from the HSL values to reuse hexToTriple.
+      const accentRgb = hslToRgb(accentH, accentS, accentL);
+      const toHex = (c: number) => c.toString(16).padStart(2, '0');
+      accentHex = `#${toHex(accentRgb.r)}${toHex(accentRgb.g)}${toHex(accentRgb.b)}`;
+    } else {
+      accentHex = lightenColor(primary, 0.5);
+    }
+
+    // Page backgrounds: derive hue/sat from primary at very high lightness.
+    // Both are LIGHT, distinct enough to read as alternating sections.
+    const bgTriplet = (l: number): string => {
+      if (pParts) {
+        const cappedS = Math.min(20, pParts.s * 0.15);
+        return `${Math.round(pParts.h)} ${Math.round(cappedS)}% ${l}%`;
+      }
+      return `0 0% ${l}%`;
+    };
+    const bgPage = bgTriplet(98); // near-white tint
+    const bgSectionAlt = bgTriplet(94); // subtly deeper tint
+
+    // Card: very light secondary tint.
+    const cardHex = lightenColor(secondaryHex, 0.88);
+
+    // Muted: very light primary tint.
+    const mutedHex = lightenColor(primary, 0.88);
+
+    // Border: light tint of secondary.
+    const borderHex = lightenColor(secondaryHex, 0.78);
+
+    // Background / foreground: white page, dark text.
+    const backgroundHex = '#FFFFFF';
+    const foregroundTriplet = '224 71% 4%';
+
+    return {
+      primaryColor: hexToTriple(primary),
+      secondaryColor: hexToTriple(secondaryHex),
+      accentColor: hexToTriple(accentHex),
+      backgroundColor: hexToTriple(backgroundHex),
+      foregroundColor: foregroundTriplet,
+      cardColor: hexToTriple(cardHex),
+      mutedColor: hexToTriple(mutedHex),
+      borderColor: hexToTriple(borderHex),
+      primaryForeground: autoFgTriplet(primary),
+      secondaryForeground: autoFgTriplet(secondaryHex),
+      accentForeground: autoFgTriplet(accentHex),
+      cardForeground: foregroundTriplet,
+      bgPage,
+      bgSectionAlt,
+    };
   }
 
-  // Derive secondary: a desaturated/lightened version of the primary for a
-  // calm secondary surface (e.g. badges, secondary buttons).
+  // ── Legacy mode: seed from primary + accent + neutral (SmartPaletteModal) ──
+  const neutralHex = neutral && neutral !== '' ? neutral : '#FFFFFF';
+  const accentHex = accent && accent !== '' ? accent : lightenColor(primary, 0.5);
+
   const secondaryHex = lightenColor(primary, 0.75);
-
-  // Background: derive from neutral — near-white tint.
   const backgroundHex = neutralHex === '#FFFFFF' ? '#FFFFFF' : lightenColor(neutralHex, 0.5);
-
-  // Foreground: high-contrast text color against the background.
-  const foregroundHex = autoFg(backgroundHex) === '0 0% 100%' ? '#FFFFFF' : '#0A0A0A';
-
-  // Card: slightly off-white variant of the neutral.
+  const foregroundHex = autoFgTriplet(backgroundHex) === '0 0% 100%' ? '#FFFFFF' : '#0A0A0A';
   const cardHex = lightenColor(neutralHex, 0.3);
-
-  // Muted: a very light tint of primary for subtle secondary surfaces.
   const mutedHex = lightenColor(primary, 0.88);
-
-  // Border: subtle neutral border.
   const borderHex = lightenColor(neutralHex === '#FFFFFF' ? primary : neutralHex, 0.78);
+
+  // Derive bgPage/bgSectionAlt from primary hue even in legacy mode.
+  const pParts = hslPartsFromHex(primary);
+  const bgTriplet = (l: number): string => {
+    if (pParts) {
+      const cappedS = Math.min(20, pParts.s * 0.15);
+      return `${Math.round(pParts.h)} ${Math.round(cappedS)}% ${l}%`;
+    }
+    return `0 0% ${l}%`;
+  };
 
   return {
     primaryColor: hexToTriple(primary),
@@ -435,10 +533,12 @@ export function deriveCoreBrandTokens(seeds: {
     cardColor: hexToTriple(cardHex),
     mutedColor: hexToTriple(mutedHex),
     borderColor: hexToTriple(borderHex),
-    primaryForeground: autoFg(primary),
-    secondaryForeground: autoFg(secondaryHex),
-    accentForeground: autoFg(accentHex),
+    primaryForeground: autoFgTriplet(primary),
+    secondaryForeground: autoFgTriplet(secondaryHex),
+    accentForeground: autoFgTriplet(accentHex),
     cardForeground: foregroundHex === '#FFFFFF' ? '0 0% 100%' : '224 71% 4%',
+    bgPage: bgTriplet(98),
+    bgSectionAlt: bgTriplet(94),
   };
 }
 

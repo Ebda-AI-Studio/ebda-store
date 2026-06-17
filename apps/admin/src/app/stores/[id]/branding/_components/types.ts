@@ -57,6 +57,13 @@ export interface StoreTheme {
   /** Hide the mobile-only footer logo when true. Desktop footer logo
    *  unaffected. Ahmad 2026-05-21. */
   hideFooterLogoMobile?: boolean;
+  /**
+   * Explicit page background HSL triplet. When both bgPage and bgSectionAlt
+   * are set, resolveBackgroundPreset uses them directly (Branding v2, 2026-06-17).
+   */
+  bgPage?: string;
+  /** Paired with bgPage — alternate-section background HSL triplet. */
+  bgSectionAlt?: string;
 }
 
 export interface StoreBranding {
@@ -109,7 +116,7 @@ export interface StoreBranding {
   blogEnabled?: boolean;
 }
 
-export type BrandingTabId = 'branding' | 'theme' | 'contact' | 'social';
+export type BrandingTabId = 'branding' | 'theme' | 'contact' | 'social' | 'locations';
 
 export const DEFAULT_THEME: StoreTheme = {
   primaryColor: '26 100% 50%',

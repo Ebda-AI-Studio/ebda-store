@@ -1375,7 +1375,8 @@
       "branding": "Branding",
       "theme": "Theme & Colors",
       "contact": "Contact Info",
-      "social": "Social Links"
+      "social": "Social Links",
+      "locations": "Locations"
     },
     "identity": {
       "storeName": "Store Name",
@@ -1493,7 +1494,17 @@
         "primaryForegroundHint": "Text on top of your primary color.",
         "secondaryForegroundHint": "Text on top of your secondary color.",
         "accentForegroundHint": "Text on top of your accent color.",
-        "cardForegroundHint": "Text on top of card surfaces."
+        "cardForegroundHint": "Text on top of card surfaces.",
+        "advancedTitle": "Advanced colors (auto-generated — edit to override)",
+        "regenerateButton": "Regenerate from Primary & Secondary",
+        "backgrounds": {
+          "title": "Page backgrounds",
+          "hint": "Sections alternate between these two colors so the page doesn't look uniform.",
+          "background1": "Background 1",
+          "background1Hint": "Main page background (most sections).",
+          "background2": "Background 2",
+          "background2Hint": "Alternating section background."
+        }
       }
     },
     "preview": {

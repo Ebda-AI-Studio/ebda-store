@@ -10,6 +10,7 @@ import { BrandingTabs } from './_components/BrandingTabs';
 import { ContactInfoTab } from './_components/ContactInfoTab';
 import { SocialLinksTab } from './_components/SocialLinksTab';
 import { ThemeTab } from './_components/ThemeTab';
+import { LocationsTab } from './_components/LocationsTab';
 import type { BrandingTabId } from './_components/types';
 import { useBranding } from './_hooks/useBranding';
 
@@ -101,6 +102,8 @@ export default function StoreBrandingPage() {
         {activeTab === 'contact' && <ContactInfoTab branding={branding} onChange={setBranding} />}
 
         {activeTab === 'social' && <SocialLinksTab branding={branding} onChange={setBranding} />}
+
+        {activeTab === 'locations' && <LocationsTab storeId={storeId} />}
       </div>
     </AdminLayout>
   );
