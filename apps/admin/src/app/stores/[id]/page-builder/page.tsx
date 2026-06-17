@@ -1775,6 +1775,61 @@ export default function StoreLayoutPage() {
                 </div>
               </ExtraSectionCard>
 
+              {/* Bottom bar (mobile) — 3 optional color knobs: bar bg, active
+                  icon/label, inactive icon/label. All default unset so existing
+                  stores see zero visual change. Page-builder 2026-06-17.
+                  EN: "Bottom bar (mobile)" / AR: "شريط التنقل السفلي (جوال)" */}
+              <SectionCard
+                title="Bottom bar (mobile) / شريط التنقل السفلي (جوال)"
+                description="Color the mobile tab bar at the bottom of the screen. Leave fields empty to keep the theme default."
+                defaultExpanded={false}
+              >
+                <div className="space-y-1">
+                  <ColorField
+                    label="Bar background / خلفية الشريط"
+                    value={layout.bottomBar?.bgColor}
+                    onChange={v =>
+                      setLayout(prev =>
+                        prev
+                          ? { ...prev, bottomBar: { ...(prev.bottomBar ?? {}), bgColor: v } }
+                          : prev
+                      )
+                    }
+                    hint="Overrides the default bar background (theme section-alt) when set."
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                    inheritFromToken="card"
+                  />
+                  <ColorField
+                    label="Active icon & label color / لون الأيقونة والتسمية النشطة"
+                    value={layout.bottomBar?.activeColor}
+                    onChange={v =>
+                      setLayout(prev =>
+                        prev
+                          ? { ...prev, bottomBar: { ...(prev.bottomBar ?? {}), activeColor: v } }
+                          : prev
+                      )
+                    }
+                    hint="Color for the active tab's icon, label, and pill tint. Default: theme foreground."
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                    inheritFromToken="primary"
+                  />
+                  <ColorField
+                    label="Inactive icon & label color / لون الأيقونة والتسمية الغير نشطة"
+                    value={layout.bottomBar?.inactiveColor}
+                    onChange={v =>
+                      setLayout(prev =>
+                        prev
+                          ? { ...prev, bottomBar: { ...(prev.bottomBar ?? {}), inactiveColor: v } }
+                          : prev
+                      )
+                    }
+                    hint="Color for inactive tabs. Default: theme foreground at 60% opacity."
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                    inheritFromToken="muted"
+                  />
+                </div>
+              </SectionCard>
+
               {/* Extra duplicated product carousels (section duplication 2026-05-20).
                   Renders one card per entry + a "+ add carousel" button at the
                   bottom. Up to 8 extras. */}

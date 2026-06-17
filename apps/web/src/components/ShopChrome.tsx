@@ -359,8 +359,9 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
       {/* Sprint 3 (2026-05-17): mobile sticky bottom tab bar. Hides
           itself on PDP / checkout / auth routes via usePathname inside
           the component. Mounts last so its fixed positioning sits above
-          everything else in the chrome. */}
-      <BottomTabBar />
+          everything else in the chrome. Merchant color overrides from
+          layout.bottomBar are threaded in (page-builder 2026-06-17). */}
+      <BottomTabBar bottomBar={layout?.bottomBar} theme={store.theme} />
 
       {/* Floating Widget — opt-in engagement feature 2026-05-21. Renders
           only when:

@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
+import type { BottomBarSettings, StoreTheme } from '@force/shared';
+import { resolveColor, DEFAULT_THEME } from '@force/shared';
 
 /**
  * Sprint 3 (2026-05-17): Mobile sticky bottom tab bar with 4 destinations
@@ -33,7 +35,16 @@ import { useStoreUrl } from '../../contexts/StoreContext';
  *    icon — same `useCart().itemCount` source.
  *  - Safe-area inset reserved for iOS notch via `pb-[env(safe-area-inset-bottom)]`.
  */
-export function BottomTabBar() {
+interface BottomTabBarProps {
+  /** Merchant-controlled color overrides from `layout.bottomBar`. All optional —
+   *  when unset the tab bar falls back to its class-based defaults (no regression
+   *  for existing stores). Values are hex or `token:*`, resolved via resolveColor. */
+  bottomBar?: BottomBarSettings;
+  /** Store theme — needed to resolve `token:*` color values. */
+  theme?: StoreTheme;
+}
+
+export function BottomTabBar({ bottomBar, theme }: BottomTabBarProps = {}) {
   const { isRtl } = useLanguage();
   const { itemCount } = useCart();
   const storeUrl = useStoreUrl();
@@ -136,30 +147,72 @@ export function BottomTabBar() {
     return lowered.includes(href.toLowerCase().replace(/\/$/, ''));
   };
 
+  // Resolve merchant color overrides. Undefined when not set → class-based
+  // defaults apply, keeping exact existing behavior for stores that haven't
+  // touched these settings (no regression).
+  // `theme ?? DEFAULT_THEME` ensures resolveColor always receives a non-undefined
+  // StoreTheme — `theme` is optional here because BottomTabBar can mount before
+  // ShopChrome has resolved the store, but DEFAULT_THEME still paints tokens
+  // sensibly and the prop is always populated at runtime.
+  const effectiveTheme: StoreTheme = theme ?? DEFAULT_THEME;
+  const resolvedBg = bottomBar?.bgColor
+    ? (resolveColor(bottomBar.bgColor, effectiveTheme) ?? undefined)
+    : undefined;
+  const resolvedActive = bottomBar?.activeColor
+    ? (resolveColor(bottomBar.activeColor, effectiveTheme) ?? undefined)
+    : undefined;
+  const resolvedInactive = bottomBar?.inactiveColor
+    ? (resolveColor(bottomBar.inactiveColor, effectiveTheme) ?? undefined)
+    : undefined;
+
+  // Active pill: use resolved active color at ~10% opacity when set, else the
+  // class-based `bg-[hsl(var(--primary))]/10` default takes over via className.
+  // We express 10% opacity as a CSS color-mix when a custom color is provided.
+  const activePillStyle: React.CSSProperties | undefined = resolvedActive
+    ? { backgroundColor: `color-mix(in srgb, ${resolvedActive} 10%, transparent)` }
+    : undefined;
+
   const bar = (
     <nav
       aria-label={isRtl ? 'شريط التنقل' : 'Bottom navigation'}
       dir={isRtl ? 'rtl' : 'ltr'}
       className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-[hsl(var(--bg-section-alt))] border-t border-foreground/10 pb-[env(safe-area-inset-bottom)]"
+      style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}
     >
       <ul className="grid grid-cols-4 max-w-md mx-auto">
         {tabs.map(tab => {
           const active = isActive(tab.href);
           const label = isRtl ? tab.labelAr : tab.labelEn;
+          // Per-tab color: active uses resolvedActive, inactive uses resolvedInactive.
+          // When neither applies, the className handles color as before (no regression).
+          const tabColorStyle: React.CSSProperties | undefined =
+            active && resolvedActive
+              ? { color: resolvedActive }
+              : !active && resolvedInactive
+                ? { color: resolvedInactive }
+                : undefined;
           return (
             <li key={tab.key} className="flex">
               <Link
                 href={tab.href}
                 prefetch={false}
                 className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[56px] transition-colors ${
-                  active ? 'text-foreground' : 'text-foreground/60 hover:text-foreground'
+                  active
+                    ? resolvedActive
+                      ? ''
+                      : 'text-foreground'
+                    : resolvedInactive
+                      ? ''
+                      : 'text-foreground/60 hover:text-foreground'
                 }`}
+                style={tabColorStyle}
                 aria-current={active ? 'page' : undefined}
               >
                 <span
                   className={`relative inline-flex h-9 w-12 items-center justify-center rounded-full transition-colors ${
-                    active ? 'bg-[hsl(var(--primary))]/10' : ''
+                    active && !activePillStyle ? 'bg-[hsl(var(--primary))]/10' : ''
                   }`}
+                  style={active ? activePillStyle : undefined}
                 >
                   {tab.icon}
                   {tab.key === 'cart' && itemCount > 0 && (

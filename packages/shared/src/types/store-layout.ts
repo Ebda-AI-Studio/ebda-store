@@ -677,6 +677,26 @@ export interface FooterSettings extends SectionBgOverride, SectionPaddingMaxWidt
 }
 
 /**
+ * Mobile bottom tab bar color overrides (page-builder 2026-06-17).
+ *
+ * All three fields are OPTIONAL. When unset, the tab bar falls back to its
+ * existing class-based defaults (bg-[hsl(var(--bg-section-alt))], active =
+ * foreground, inactive = foreground/60). There is NO visual change for stores
+ * that never touch these settings — the existing look is preserved exactly.
+ *
+ * Values are hex ('#RRGGBB') or 'token:<name>' — resolved on the storefront
+ * via `resolveColor(value, store.theme)` so brand tokens compose correctly.
+ */
+export interface BottomBarSettings {
+  /** Bar background. Overrides `bg-[hsl(var(--bg-section-alt))]` when set. */
+  bgColor?: string;
+  /** Active icon / label color + active-pill tint (pill = activeColor at 10 % opacity). */
+  activeColor?: string;
+  /** Inactive icon / label color. Overrides `text-foreground/60` when set. */
+  inactiveColor?: string;
+}
+
+/**
  * Announcement bar — folded into page-builder 2026-05-20. Content (text +
  * link) still lives at `theme.announcement`. This layout entry controls
  * visibility + visual chrome only.
@@ -757,6 +777,9 @@ export interface StoreLayoutSettings {
   checkoutPage?: CheckoutPageSettings;
   /** Cart page settings (standalone background + typography). Page-builder configurable. */
   cartPage?: CartPageSettings;
+  /** Mobile bottom tab bar color overrides. Page-builder 2026-06-17. When unset,
+   *  the tab bar uses its existing class-based defaults (no visual change). */
+  bottomBar?: BottomBarSettings;
   /**
    * Drag-to-reorder data model (page-builder 2026-05-20, scaffolded for v2 ui).
    * When set, HomePageContent renders sections in this order instead of the
@@ -905,5 +928,9 @@ export function resolveLayoutSettings(
     ...((raw.sectionOrder ?? base.sectionOrder)
       ? { sectionOrder: raw.sectionOrder ?? base.sectionOrder }
       : {}),
+    // bottomBar: optional, saved wins, else inherit base. When neither is set,
+    // the field is omitted entirely (undefined) — storefront falls back to its
+    // class-based defaults and existing stores see no visual change.
+    ...((raw.bottomBar ?? base.bottomBar) ? { bottomBar: raw.bottomBar ?? base.bottomBar } : {}),
   };
 }
