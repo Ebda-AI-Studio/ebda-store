@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import ExcelJS from 'exceljs';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { OrderService } from '../services/order.service';
@@ -16,8 +17,276 @@ import { confirmPaymentFromProviderStatus } from '../services/payment-confirm.se
 import { runInTenantContext } from '@force/database';
 import { config } from '../config';
 import type { Currency } from '../services/payment-providers/types';
+import { AppError } from '../middleware/error-handler';
 
 const router = Router({ mergeParams: true });
+
+// ==========================================
+// XLSX Export
+// ==========================================
+
+/**
+ * Hard cap on the number of orders scanned for the export. Mirrors the
+ * customers export cap so both endpoints share the same memory budget.
+ * 20k orders × 2 sheets is well within a single request's limits for
+ * the overwhelming majority of stores.
+ */
+const MAX_ORDERS_SCANNED = 20_000;
+
+/** Admin-only middleware chain for store-scoped read endpoints. */
+const adminMiddleware = [
+  authenticate,
+  authorize('store_admin', 'super_admin', 'staff'),
+  requireStoreAccess,
+];
+
+interface ShippingAddressShape {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  area?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  block?: string;
+  street?: string;
+}
+
+/**
+ * GET /stores/:storeId/orders/export.xlsx
+ *
+ * Streams a two-sheet .xlsx workbook:
+ *   - "Orders"     — one row per order (newest first)
+ *   - "Line Items" — one row per order item
+ *
+ * Scoped strictly to the store (tenant-safe). Capped at MAX_ORDERS_SCANNED
+ * to protect against OOM on very large stores; a NOTE row is appended when
+ * the cap is hit. Auth: same adminMiddleware chain as the rest of the order
+ * routes (store_admin / super_admin / staff + requireStoreAccess).
+ */
+router.get(
+  '/export.xlsx',
+  ...adminMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, slug: true },
+      });
+      if (!store) {
+        throw new AppError(404, 'NOT_FOUND', 'Store not found');
+      }
+
+      // Fetch up to cap+1 to detect truncation. Include items + first payment
+      // for the Line Items sheet and the payment provider/method columns.
+      const fetched = await prisma.order.findMany({
+        where: { storeId, deletedAt: null },
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          paymentStatus: true,
+          subtotal: true,
+          tax: true,
+          shipping: true,
+          discount: true,
+          couponDiscount: true,
+          total: true,
+          currency: true,
+          couponCode: true,
+          customerNotes: true,
+          shippingAddress: true,
+          createdAt: true,
+          customer: {
+            select: { firstName: true, lastName: true, email: true, phone: true },
+          },
+          payments: {
+            select: { provider: true, method: true },
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+          },
+          items: {
+            select: {
+              productName: true,
+              sku: true,
+              variantName: true,
+              quantity: true,
+              price: true,
+              total: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: MAX_ORDERS_SCANNED + 1,
+      });
+
+      const truncated = fetched.length > MAX_ORDERS_SCANNED;
+      const orders = truncated ? fetched.slice(0, MAX_ORDERS_SCANNED) : fetched;
+
+      // ---- Build workbook ----
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Force Website Builder';
+      workbook.created = new Date();
+
+      const headerStyle: Partial<ExcelJS.Style> = {
+        font: { bold: true },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } },
+      };
+
+      // ---- Sheet 1: Orders ----
+      const ordersSheet = workbook.addWorksheet('Orders');
+      ordersSheet.columns = [
+        { header: 'Store Name', key: 'storeName', width: 22 },
+        { header: 'Order #', key: 'orderNumber', width: 22 },
+        { header: 'Order Date', key: 'orderDate', width: 18 },
+        { header: 'Customer', key: 'customer', width: 24 },
+        { header: 'Email', key: 'email', width: 28 },
+        { header: 'Phone', key: 'phone', width: 18 },
+        { header: 'Status', key: 'status', width: 14 },
+        { header: 'Payment Status', key: 'paymentStatus', width: 16 },
+        { header: 'Pay Provider', key: 'payProvider', width: 16 },
+        { header: 'Pay Method', key: 'payMethod', width: 16 },
+        { header: 'Items', key: 'itemCount', width: 8 },
+        { header: 'Subtotal (KWD)', key: 'subtotal', width: 16 },
+        { header: 'Discount (KWD)', key: 'discount', width: 16 },
+        { header: 'Coupon', key: 'coupon', width: 14 },
+        { header: 'Shipping (KWD)', key: 'shipping', width: 16 },
+        { header: 'Tax (KWD)', key: 'tax', width: 12 },
+        { header: 'Total (KWD)', key: 'total', width: 14 },
+        { header: 'Area', key: 'area', width: 18 },
+        { header: 'City', key: 'city', width: 16 },
+        { header: 'Country', key: 'country', width: 14 },
+        { header: 'Block', key: 'block', width: 10 },
+        { header: 'Street', key: 'street', width: 16 },
+        { header: 'Customer Notes', key: 'customerNotes', width: 30 },
+      ];
+
+      // Bold + shaded header row
+      const ordersHeader = ordersSheet.getRow(1);
+      ordersHeader.font = headerStyle.font as ExcelJS.Font;
+      ordersHeader.fill = headerStyle.fill as ExcelJS.Fill;
+
+      // ---- Sheet 2: Line Items ----
+      const itemsSheet = workbook.addWorksheet('Line Items');
+      itemsSheet.columns = [
+        { header: 'Store Name', key: 'storeName', width: 22 },
+        { header: 'Order #', key: 'orderNumber', width: 22 },
+        { header: 'Order Date', key: 'orderDate', width: 18 },
+        { header: 'Customer', key: 'customer', width: 24 },
+        { header: 'Email', key: 'email', width: 28 },
+        { header: 'Status', key: 'status', width: 14 },
+        { header: 'Payment Status', key: 'paymentStatus', width: 16 },
+        { header: 'Product', key: 'product', width: 28 },
+        { header: 'SKU', key: 'sku', width: 16 },
+        { header: 'Variant', key: 'variant', width: 20 },
+        { header: 'Qty', key: 'qty', width: 8 },
+        { header: 'Unit Price (KWD)', key: 'unitPrice', width: 18 },
+        { header: 'Line Total (KWD)', key: 'lineTotal', width: 18 },
+      ];
+
+      const itemsHeader = itemsSheet.getRow(1);
+      itemsHeader.font = headerStyle.font as ExcelJS.Font;
+      itemsHeader.fill = headerStyle.fill as ExcelJS.Fill;
+
+      const storeName = store.name ?? '';
+
+      for (const order of orders) {
+        const addr = (order.shippingAddress ?? null) as ShippingAddressShape | null;
+        const firstName = order.customer?.firstName ?? addr?.firstName ?? '';
+        const lastName = order.customer?.lastName ?? addr?.lastName ?? '';
+        const customerName = `${firstName} ${lastName}`.trim();
+        const email = order.customer?.email ?? addr?.email ?? '';
+        const phone = order.customer?.phone ?? addr?.phone ?? '';
+        const payment = order.payments?.[0];
+
+        // Orders sheet row
+        ordersSheet.addRow({
+          storeName,
+          orderNumber: order.orderNumber,
+          orderDate: order.createdAt,
+          customer: customerName,
+          email,
+          phone,
+          status: order.status ?? '',
+          paymentStatus: order.paymentStatus ?? '',
+          payProvider: payment?.provider ?? '',
+          payMethod: payment?.method ?? '',
+          itemCount: order.items?.length ?? 0,
+          subtotal: Number((order.subtotal / 1000).toFixed(3)),
+          discount: Number(((order.discount + order.couponDiscount) / 1000).toFixed(3)),
+          coupon: order.couponCode ?? '',
+          shipping: Number((order.shipping / 1000).toFixed(3)),
+          tax: Number((order.tax / 1000).toFixed(3)),
+          total: Number((order.total / 1000).toFixed(3)),
+          area: addr?.area ?? addr?.state ?? '',
+          city: addr?.city ?? '',
+          country: addr?.country ?? '',
+          block: addr?.block ?? '',
+          street: addr?.street ?? '',
+          customerNotes: order.customerNotes ?? '',
+        });
+
+        // Line Items sheet — one row per item
+        for (const item of order.items ?? []) {
+          itemsSheet.addRow({
+            storeName,
+            orderNumber: order.orderNumber,
+            orderDate: order.createdAt,
+            customer: customerName,
+            email,
+            status: order.status ?? '',
+            paymentStatus: order.paymentStatus ?? '',
+            product: item.productName,
+            sku: item.sku ?? '',
+            variant: item.variantName ?? '',
+            qty: item.quantity,
+            unitPrice: Number((item.price / 1000).toFixed(3)),
+            lineTotal: Number((item.total / 1000).toFixed(3)),
+          });
+        }
+      }
+
+      // Append truncation notice row on the Orders sheet when cap was hit
+      if (truncated) {
+        const noteRow = ordersSheet.addRow({
+          storeName: `NOTE: export truncated — only the most recent ${orders.length.toLocaleString()} orders were exported. Contact support for a full export of larger stores.`,
+        });
+        noteRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
+      }
+
+      // Apply numeric and date formats
+      for (const col of ['subtotal', 'discount', 'shipping', 'tax', 'total']) {
+        ordersSheet.getColumn(col).numFmt = '0.000';
+      }
+      ordersSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
+
+      for (const col of ['unitPrice', 'lineTotal']) {
+        itemsSheet.getColumn(col).numFmt = '0.000';
+      }
+      itemsSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
+
+      const filenameSafe = (store.slug || store.name || 'orders').replace(/[^a-z0-9-]/gi, '-');
+      const filename = `${filenameSafe}-orders-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // Validation schemas
 //

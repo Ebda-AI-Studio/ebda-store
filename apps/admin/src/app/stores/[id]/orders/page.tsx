@@ -65,6 +65,7 @@ export default function StoreOrdersPage() {
     type: 'markPaid',
   });
   const { success: toastSuccess, error: showError } = useToast();
+  const [isExporting, setIsExporting] = useState(false);
 
   function toDateStr(d: Date): string {
     const yyyy = d.getFullYear();
@@ -117,6 +118,42 @@ export default function StoreOrdersPage() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  /**
+   * Trigger the server-side XLSX export. Uses apiFetch (which forwards the
+   * Authorization Bearer header from localStorage) to download the binary
+   * stream, then blobs → object URL → anchor click to save the file.
+   * Mirrors the customers page export pattern exactly.
+   */
+  const handleExport = useCallback(async () => {
+    if (!storeId || isExporting) return;
+    setIsExporting(true);
+    try {
+      const res = await apiFetch(`/api/v1/stores/${storeId}/orders/export.xlsx`);
+      if (!res.ok) {
+        showError(t('export.failed'));
+        return;
+      }
+      const blob = await res.blob();
+      const filename = (() => {
+        const cd = res.headers.get('content-disposition') ?? '';
+        const match = cd.match(/filename="?([^"]+)"?/i);
+        return match?.[1] ?? `orders-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      })();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      showError(t('export.failed'));
+    } finally {
+      setIsExporting(false);
+    }
+  }, [storeId, isExporting, t, showError]);
 
   const handleStatusChange = async (order: Order, newStatus: string) => {
     setUpdatingId(order.id);
@@ -316,6 +353,29 @@ export default function StoreOrdersPage() {
       subtitle={t('subtitle')}
       actions={
         <div className="flex items-center gap-2">
+          {/* Export orders to Excel */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleExport}
+            disabled={isLoading || isExporting}
+          >
+            <svg
+              className="h-4 w-4 me-2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
+            </svg>
+            {isExporting ? t('export.exporting') : t('export.button')}
+          </Button>
           {/* Admin phone-order entry. Lets merchants take an order over
               the phone, then issue a MyFatoorah payment link from the
               order detail page (Ahmad 2026-05-16). */}

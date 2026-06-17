@@ -859,6 +859,11 @@
         "bulkUpdateTitle": "Bulk Update",
         "bulkUpdateDescription": "{count} order(s) marked as paid."
       },
+      "export": {
+        "button": "Export orders",
+        "exporting": "Exporting...",
+        "failed": "Export failed"
+      },
       "errors": {
         "fetchFailed": "Failed to fetch orders",
         "connection": "Unable to connect to the server. Please check your connection and try again.",

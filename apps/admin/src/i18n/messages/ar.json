@@ -859,6 +859,11 @@
         "bulkUpdateTitle": "تحديث جماعي",
         "bulkUpdateDescription": "تم تعليم {count} طلب كمدفوع."
       },
+      "export": {
+        "button": "تصدير الطلبات",
+        "exporting": "جارٍ التصدير...",
+        "failed": "فشل التصدير"
+      },
       "errors": {
         "fetchFailed": "تعذّر جلب الطلبات",
         "connection": "تعذّر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
