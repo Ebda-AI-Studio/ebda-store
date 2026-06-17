@@ -11,9 +11,10 @@
  *    is the in-foreground complement to these background notifications.
  */
 
-// Bumped to v2 alongside the real push-delivery handlers — the activate step
-// purges the old `force-orders-v1` shell cache so the updated SW takes over.
-const CACHE = 'force-orders-v2';
+// Bumped to v3 — purges the pre-fix `force-orders-v2` shell so an already-
+// installed PWA stops serving a stale app build (the old build had broken push
+// env baked in). The activate step deletes every cache key != CACHE.
+const CACHE = 'force-orders-v3';
 const APP_SHELL = ['/orders', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {

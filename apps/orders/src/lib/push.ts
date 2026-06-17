@@ -46,12 +46,43 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return out;
 }
 
+/**
+ * Resolve the active service-worker registration, but NEVER hang.
+ *
+ * `navigator.serviceWorker.ready` is a promise that stays pending FOREVER when
+ * no SW ever activates for the scope (registration failed, a stale install is
+ * stuck, the SW file 404s). Awaiting it bare is what froze the "Enabling…"
+ * button indefinitely. We:
+ *   1. kick a registration in case the post-load `registerServiceWorker()` ran
+ *      before the SW file was reachable (idempotent — register resolves to the
+ *      existing registration if one exists);
+ *   2. race `ready` against a timeout so the caller always gets an answer.
+ * Returns null on timeout/failure so callers surface a real error instead of
+ * spinning.
+ */
+async function readyRegistration(timeoutMs = 8000): Promise<ServiceWorkerRegistration | null> {
+  try {
+    // Best-effort (re)register; harmless if already registered.
+    await navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => undefined);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<null>(resolve => {
+      timer = setTimeout(() => resolve(null), timeoutMs);
+    });
+    const reg = await Promise.race([navigator.serviceWorker.ready, timeout]);
+    if (timer) clearTimeout(timer);
+    return reg ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** True only when a usable push subscription is already active for this device. */
 export async function isSubscribed(): Promise<boolean> {
   if (pushSupport() !== 'supported') return false;
   if (Notification.permission !== 'granted') return false;
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await readyRegistration();
+    if (!reg) return false;
     const sub = await reg.pushManager.getSubscription();
     return !!sub;
   } catch {
@@ -78,7 +109,16 @@ export async function subscribeToOrderPush(
       Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
     if (permission !== 'granted') return 'denied';
 
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await readyRegistration();
+    if (!reg) {
+      // The service worker never became ready (failed/stale registration). Bail
+      // with a real error instead of leaving the caller's button spinning.
+      console.warn(
+        '[push] service worker not ready — push subscribe aborted. ' +
+          'Fully close and reopen the app to pick up the latest build.'
+      );
+      return 'error';
+    }
 
     // Reuse an existing subscription if present, else create one.
     const existing = await reg.pushManager.getSubscription();
@@ -103,6 +143,7 @@ export async function subscribeToOrderPush(
     });
 
     if (error) {
+      console.warn('[push] server-side subscribe failed:', error);
       // Registration failed server-side — roll back the local subscription so
       // we don't end up with a device the API doesn't know about (it would
       // never receive pushes and would block re-subscribe attempts).
@@ -120,7 +161,8 @@ export async function subscribeToOrderPush(
 export async function unsubscribeFromOrderPush(storeId: string): Promise<void> {
   if (pushSupport() !== 'supported') return;
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await readyRegistration();
+    if (!reg) return;
     const sub = await reg.pushManager.getSubscription();
     if (!sub) return;
     const endpoint = sub.endpoint;
