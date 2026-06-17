@@ -12,6 +12,7 @@ import {
   FONT_FAMILY_MAP,
   resolveBackgroundPreset,
   deriveBrandRoles,
+  colorToHslTriplet,
 } from '@force/shared';
 
 /**
@@ -22,7 +23,7 @@ import {
  */
 function themeToCssVars(theme: StoreTheme): Record<string, string> {
   const bg = resolveBackgroundPreset(theme);
-  return {
+  const vars: Record<string, string> = {
     '--primary': theme.primaryColor,
     '--primary-foreground': theme.primaryForeground,
     '--secondary': theme.secondaryColor,
@@ -57,6 +58,16 @@ function themeToCssVars(theme: StoreTheme): Record<string, string> {
     // readable foregrounds (wadyaljuz) pass through verbatim.
     ...deriveBrandRoles(theme),
   };
+
+  // Normalize colour vars to bare HSL triplets (resolve token:* + hex→triplet)
+  // so the client-applied vars match the SSR-emitted ones and hex-stored colours
+  // render. MUST stay in sync with the shared themeToCssVars.
+  const NON_COLOR_VARS = new Set(['--radius', '--font-family']);
+  for (const key of Object.keys(vars)) {
+    if (NON_COLOR_VARS.has(key)) continue;
+    vars[key] = colorToHslTriplet(vars[key], theme);
+  }
+  return vars;
 }
 
 /**

@@ -4,6 +4,7 @@
 // Value import is safe: brand-roles.ts → color.ts both import StoreTheme
 // type-only, so there is no runtime circular dependency back to this file.
 import { deriveBrandRoles } from '../utils/brand-roles';
+import { colorToHslTriplet } from '../utils/color';
 
 /**
  * Available store templates
@@ -613,7 +614,7 @@ export function getProductCardTextSizes(cardSize: ProductCardSize | undefined): 
  */
 export function themeToCssVars(theme: StoreTheme): Record<string, string> {
   const bg = resolveBackgroundPreset(theme);
-  return {
+  const vars: Record<string, string> = {
     // Core colors
     '--primary': theme.primaryColor,
     '--primary-foreground': theme.primaryForeground,
@@ -667,6 +668,18 @@ export function themeToCssVars(theme: StoreTheme): Record<string, string> {
     // Spread LAST so it wins over the raw values above. See utils/brand-roles.ts.
     ...deriveBrandRoles(theme),
   };
+
+  // Normalize EVERY colour var to a bare HSL triplet so values stored as hex
+  // (e.g. `#906c51` from an older editor) or as `token:*` references still
+  // render — Tailwind consumes each as `hsl(var(--token))`, which is invalid
+  // for a hex/token value and would otherwise drop the colour (→ black).
+  // Non-colour vars (--radius, --font-family) are left untouched.
+  const NON_COLOR_VARS = new Set(['--radius', '--font-family']);
+  for (const key of Object.keys(vars)) {
+    if (NON_COLOR_VARS.has(key)) continue;
+    vars[key] = colorToHslTriplet(vars[key], theme);
+  }
+  return vars;
 }
 
 /**

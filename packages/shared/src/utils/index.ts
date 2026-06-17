@@ -18,6 +18,8 @@ export {
   relativeLuminance,
   COLOR_TOKENS,
   footerLogoContrastFilter,
+  colorToHslTriplet,
+  rgbToHslTriplet,
 } from './color';
 export type { ColorValue, ColorToken, Rgb } from './color';
 export { lightenColor, darkenColor, generateSectionPalette, deriveCoreBrandTokens } from './color';

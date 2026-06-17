@@ -179,6 +179,49 @@ export function resolveColor(value: ColorValue | undefined, theme: StoreTheme): 
   return value;
 }
 
+/** Convert an Rgb to the bare Tailwind HSL triplet "H S% L%" the CSS vars use. */
+export function rgbToHslTriplet(rgb: Rgb): string {
+  const r = rgb.r / 255;
+  const g = rgb.g / 255;
+  const b = rgb.b / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return `0 0% ${Math.round(l * 100)}%`;
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+/**
+ * Normalize ANY stored color value to the bare Tailwind HSL triplet that the
+ * storefront CSS vars require (they are consumed as `hsl(var(--token))`).
+ *
+ * Resolves `token:*` references first, then converts hex / `hsl(...)` /
+ * bare-triplet into a triplet. Empty values and unresolvable `hsl(var(...))`
+ * references pass through unchanged. This makes stores whose colors were saved
+ * as hex (e.g. via an older editor) render correctly, instead of producing an
+ * invalid `hsl(#rrggbb)` that the browser silently drops (→ everything black).
+ */
+export function colorToHslTriplet(value: string | undefined, theme: StoreTheme): string {
+  if (!value || value.trim() === '') return value ?? '';
+  let v = value.trim();
+  if (v.startsWith('token:')) {
+    const resolved = resolveColor(v, theme);
+    if (!resolved) return '';
+    v = resolved.trim();
+  }
+  // An unresolvable CSS-var reference can't be flattened to a triplet — leave it.
+  if (v.startsWith('hsl(var(')) return v;
+  const rgb = parseColorToRgb(v);
+  if (!rgb) return value; // unparseable — leave the original
+  return rgbToHslTriplet(rgb);
+}
+
 // Task 5: pickReadableForeground
 
 /**
@@ -440,19 +483,20 @@ export function deriveCoreBrandTokens(seeds: {
     // ── New mode: seed from primary + secondary ──────────────────────────
     const secondaryHex = secondary!;
 
-    // Accent: blend the hue of primary and secondary shifted by ~30°.
-    // This produces a pleasing triadic-adjacent tone without being garish.
+    // Accent must FIT + MATCH the brand. Reuse the merchant's SECONDARY hue (a
+    // colour they actually chose), only deepened to a usable accent — NOT a
+    // hue-average of primary+secondary, which landed on a foreign colour (a
+    // brown #906c51 + light-blue #b4ceee brand averaged to green ~150°). Falls
+    // back to the primary hue when no secondary is provided.
     const pParts = hslPartsFromHex(primary);
     const sParts = hslPartsFromHex(secondaryHex);
+    const accentBase = sParts ?? pParts;
     let accentHex: string;
-    if (pParts && sParts) {
-      // Mid-hue between primary and secondary, shifted 30° toward the shorter arc.
-      // Saturation = average of both, lightness = 55% for a vivid but not harsh accent.
-      const midH = (pParts.h + sParts.h) / 2;
-      const accentH = (midH + 30) % 360;
-      const accentS = Math.min(90, (pParts.s + sParts.s) / 2 + 10);
-      const accentL = 52;
-      // Build a hex from the HSL values to reuse hexToTriple.
+    if (accentBase) {
+      const accentH = accentBase.h; // keep the chosen hue — never shift it
+      const accentS = Math.min(85, Math.max(55, accentBase.s)); // vivid but not harsh
+      // Pull a very-light seed down to a usable accent lightness; otherwise keep.
+      const accentL = accentBase.l > 70 ? 50 : Math.min(55, Math.max(42, accentBase.l));
       const accentRgb = hslToRgb(accentH, accentS, accentL);
       const toHex = (c: number) => c.toString(16).padStart(2, '0');
       accentHex = `#${toHex(accentRgb.r)}${toHex(accentRgb.g)}${toHex(accentRgb.b)}`;
