@@ -101,6 +101,8 @@ export interface StoreData {
   pwaEnabled?: boolean;
   /** Bucket E1 (2026-05-17): opt-in blog feature toggle. */
   blogEnabled?: boolean;
+  /** Opt-in physical-locations feature toggle (gates the /locations page + footer link). */
+  locationsEnabled?: boolean;
   /**
    * Per-store typography overrides (font family, size, color per zone).
    * Shape mirrors `ResolvedStore.typography` and `Store.typography` JSON.

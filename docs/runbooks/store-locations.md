@@ -66,8 +66,14 @@ i18n strings live in `apps/web/src/contexts/LanguageContext.tsx`.
 `text-foreground/muted-foreground/primary-foreground`, `border-border`. Same page renders
 pecan-brown for pecannbee and each store's own palette for them.
 
-Merchants surface the page by adding a footer/nav link to `/locations`
-(`store.settings.footerLinks`).
+**Discoverability:** when `locationsEnabled` is on, `ShopChrome` auto-appends a
+bilingual **"Locations / الفروع"** item to the store's `navigation` list — which feeds
+both the header nav and the footer across all 5 themes — so a visitor always has a
+link to `/locations`. No manual config needed (it's skipped if the merchant already
+added a `/locations` link via `store.settings.navMenu`). Merchants can still add
+extra footer columns via `store.settings.footerLinks`. Requires the API to expose
+`locationsEnabled` on the public store payload (`public.routes.ts`) and the web
+`StoreContext` store type.
 
 ## Seed (pecannbee)
 

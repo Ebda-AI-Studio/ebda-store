@@ -82,6 +82,15 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
         }))
     : defaultNav;
 
+  // Surface the physical-locations page automatically when the store opts in,
+  // so the merchant doesn't have to hand-add a nav/footer link. Feeds both the
+  // header nav and the footer (which render this same `navigation` list across
+  // all 5 themes). Skip if the merchant already added a /locations link.
+  const locationsHref = storeUrl('/locations');
+  if (store.locationsEnabled && !navigation.some(n => n.href === locationsHref)) {
+    navigation.push({ label: 'Locations', labelAr: 'الفروع', href: locationsHref });
+  }
+
   // Per-store footer columns are saved in `store.settings.footerLinks` by the
   // admin's pages settings UI. Mirror the navMenu treatment: only forward if
   // the saved value is a plain object, drop malformed sections, and rewrite
