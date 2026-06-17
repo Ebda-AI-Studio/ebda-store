@@ -13,12 +13,22 @@ import { stampHumanEdits } from './ai-autofill.service';
  * inventory counts. Called on the public list + detail paths only — admin
  * routes return raw Prisma rows without these computed fields.
  *
- * Rules:
- *   inStock          = inventory > 0
- *   acceptsBackorder = inventory <= 0 && allowBackorder
- *   lowStock         = inStock && inventory <= lowStockThreshold
- *   availableQty     = exact qty when (lowStock || acceptsBackorder); null otherwise
- *                      (avoids leaking exact stock counts for normal in-stock products)
+ * Rules (product level):
+ *   effectiveInventory = product has variants ? SUM(variant.inventory) : product.inventory
+ *   inStock            = effectiveInventory > 0
+ *   acceptsBackorder   = effectiveInventory <= 0 && (allowBackorder || any variant allows it)
+ *   lowStock           = inStock && effectiveInventory <= lowStockThreshold
+ *   availableQty       = exact qty when (lowStock || acceptsBackorder); null otherwise
+ *                        (avoids leaking exact stock counts for normal in-stock products)
+ *
+ * IMPORTANT — variant aggregation: for a product WITH variants, the stock lives
+ * on the variants and the product-level `inventory` column is unused (0). Using
+ * it directly made variant products with in-stock variants show as "Sold Out".
+ * So we aggregate variant inventory into the product's effective stock and also
+ * overwrite the serialized `inventory` with that aggregate, so every storefront
+ * surface that reads `p.inventory` (cards, PDP fallback, structured data) is
+ * correct without each one needing variant data. This serializer runs on the
+ * PUBLIC paths only — admin routes return raw rows.
  *
  * Variants inherit the parent's lowStockThreshold (no per-variant threshold).
  * Variants also inherit the parent's allowBackorder flag when their own is false.
@@ -36,12 +46,26 @@ function enrichStockFlags<
     [key: string]: unknown;
   },
 >(product: P): P {
-  const inStock = product.inventory > 0;
-  const lowStock = inStock && product.inventory <= product.lowStockThreshold;
-  const acceptsBackorder = product.inventory <= 0 && product.allowBackorder;
-  const availableQty = lowStock || acceptsBackorder ? product.inventory : null;
+  const variants = product.variants ?? [];
+  const hasVariants = variants.length > 0;
 
-  const enrichedVariants = (product.variants ?? []).map(v => {
+  // Variant products: effective stock = sum of variant inventory. Single-SKU
+  // products keep their own product-level inventory.
+  const effectiveInventory = hasVariants
+    ? variants.reduce((sum, v) => sum + (v.inventory ?? 0), 0)
+    : product.inventory;
+
+  // Backorder is allowed when the product flag is set, or (for variant products)
+  // any variant permits backorder.
+  const productAllowsBackorder =
+    product.allowBackorder || (hasVariants && variants.some(v => v.allowBackorder === true));
+
+  const inStock = effectiveInventory > 0;
+  const lowStock = inStock && effectiveInventory <= product.lowStockThreshold;
+  const acceptsBackorder = effectiveInventory <= 0 && productAllowsBackorder;
+  const availableQty = lowStock || acceptsBackorder ? effectiveInventory : null;
+
+  const enrichedVariants = variants.map(v => {
     const vInStock = v.inventory > 0;
     const vLowStock = vInStock && v.inventory <= product.lowStockThreshold;
     const vAcceptsBackorder =
@@ -58,6 +82,9 @@ function enrichStockFlags<
 
   return {
     ...product,
+    // Surface the variant-aware aggregate as `inventory` so storefront cards,
+    // structured data, and the PDP fallback all read the correct stock.
+    inventory: effectiveInventory,
     inStock,
     lowStock,
     acceptsBackorder,
