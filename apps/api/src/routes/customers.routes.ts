@@ -60,9 +60,12 @@ interface ShippingAddressShape {
   address2?: string;
   city?: string;
   area?: string;
+  governorate?: string;
   state?: string;
   country?: string;
   postalCode?: string;
+  block?: string;
+  street?: string;
 }
 
 function formatShippingAddress(addr: ShippingAddressShape | null): string {
@@ -95,9 +98,40 @@ const MAX_ORDERS_SCANNED = 20000;
  * truncation, then aggregate only the capped slice. Orders are newest-first,
  * so a truncated result keeps the most recent activity.
  */
-async function aggregateCustomers(
-  storeId: string
-): Promise<{ customers: AggregatedCustomer[]; truncated: boolean; ordersScanned: number }> {
+/** Shape of each order returned by aggregateCustomers (includes items for the Purchases sheet). */
+interface OrderWithItems {
+  id: string;
+  orderNumber: string;
+  total: number;
+  status: string;
+  paymentStatus: string;
+  createdAt: Date;
+  shippingAddress: unknown;
+  payments: Array<{ provider: string; method: string | null }>;
+  customer: {
+    id: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    phone: string | null;
+  } | null;
+  items: Array<{
+    id: string;
+    productName: string;
+    sku: string | null;
+    variantName: string | null;
+    quantity: number;
+    price: number;
+    total: number;
+  }>;
+}
+
+async function aggregateCustomers(storeId: string): Promise<{
+  customers: AggregatedCustomer[];
+  truncated: boolean;
+  ordersScanned: number;
+  orders: OrderWithItems[];
+}> {
   const fetched = await prisma.order.findMany({
     where: { storeId, deletedAt: null },
     select: {
@@ -109,11 +143,23 @@ async function aggregateCustomers(
       createdAt: true,
       shippingAddress: true,
       // Payment method lives on the Payment row(s), not the Order. Pull
-      // the provider field via the relation; first payment wins for the
+      // the provider + method via the relation; first payment wins for the
       // summary string.
-      payments: { select: { provider: true } },
+      payments: { select: { provider: true, method: true } },
       customer: {
         select: { id: true, email: true, firstName: true, lastName: true, phone: true },
+      },
+      // Include line items for the Purchases sheet.
+      items: {
+        select: {
+          id: true,
+          productName: true,
+          sku: true,
+          variantName: true,
+          quantity: true,
+          price: true,
+          total: true,
+        },
       },
     },
     orderBy: { createdAt: 'desc' },
@@ -235,7 +281,7 @@ async function aggregateCustomers(
   }
 
   const customers = Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
-  return { customers, truncated, ordersScanned: orders.length };
+  return { customers, truncated, ordersScanned: orders.length, orders: orders as OrderWithItems[] };
 }
 
 /**
@@ -257,14 +303,17 @@ router.get(
         throw new AppError(404, 'NOT_FOUND', 'Store not found');
       }
 
-      const { customers, truncated, ordersScanned } = await aggregateCustomers(storeId);
+      const { customers, truncated, ordersScanned, orders } = await aggregateCustomers(storeId);
 
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Force Website Builder';
       workbook.created = new Date();
       const sheet = workbook.addWorksheet('Customers');
 
+      // Store Name is the first column so multi-store exports are immediately
+      // filterable in Excel without moving columns.
       sheet.columns = [
+        { header: 'Store Name', key: 'storeName', width: 20 },
         { header: 'First Name', key: 'firstName', width: 18 },
         { header: 'Last Name', key: 'lastName', width: 18 },
         { header: 'Email', key: 'email', width: 30 },
@@ -302,6 +351,7 @@ router.get(
 
       for (const c of customers) {
         sheet.addRow({
+          storeName: store.name,
           firstName: c.firstName,
           lastName: c.lastName,
           email: c.email,
@@ -339,7 +389,7 @@ router.get(
       // silently believing it's the complete customer history.
       if (truncated) {
         const noticeRow = sheet.addRow({
-          firstName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were aggregated. Contact support for a full export of larger stores.`,
+          storeName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were aggregated. Contact support for a full export of larger stores.`,
         });
         noticeRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
       }
@@ -351,6 +401,230 @@ router.get(
       sheet.getColumn('lastOrderTotal').numFmt = '0.000';
       sheet.getColumn('lastOrderDate').numFmt = 'yyyy-mm-dd';
       sheet.getColumn('firstOrderDate').numFmt = 'yyyy-mm-dd';
+
+      // ----------------------------------------------------------------
+      // "Purchases" worksheet — one row per order line-item.
+      // Uses the same capped order set already fetched; zero extra queries.
+      // ----------------------------------------------------------------
+      const purchasesSheet = workbook.addWorksheet('Purchases');
+      purchasesSheet.columns = [
+        { header: 'Store Name', key: 'storeName', width: 20 },
+        { header: 'Customer', key: 'customer', width: 24 },
+        { header: 'Email', key: 'email', width: 30 },
+        { header: 'Phone', key: 'phone', width: 18 },
+        { header: 'Order #', key: 'orderNumber', width: 22 },
+        { header: 'Order Date', key: 'orderDate', width: 14 },
+        { header: 'Order Status', key: 'orderStatus', width: 16 },
+        { header: 'Payment Status', key: 'paymentStatus', width: 16 },
+        { header: 'Pay Provider', key: 'payProvider', width: 14 },
+        { header: 'Pay Method', key: 'payMethod', width: 14 },
+        { header: 'Product', key: 'product', width: 32 },
+        { header: 'SKU', key: 'sku', width: 16 },
+        { header: 'Variant', key: 'variant', width: 20 },
+        { header: 'Qty', key: 'qty', width: 8 },
+        { header: 'Unit Price (KWD)', key: 'unitPrice', width: 18 },
+        { header: 'Line Total (KWD)', key: 'lineTotal', width: 18 },
+        { header: 'Area', key: 'area', width: 18 },
+        { header: 'City', key: 'city', width: 18 },
+        { header: 'Country', key: 'country', width: 16 },
+        { header: 'Block', key: 'block', width: 10 },
+        { header: 'Street', key: 'street', width: 18 },
+      ];
+      purchasesSheet.getRow(1).font = { bold: true };
+      purchasesSheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF1F5F9' },
+      };
+
+      // Sort orders newest-first (already that way from the query), then
+      // within each order iterate items in insertion order.
+      for (const order of orders) {
+        const shipping = (order.shippingAddress ?? null) as ShippingAddressShape | null;
+        const customerName = [
+          order.customer?.firstName ?? shipping?.firstName ?? '',
+          order.customer?.lastName ?? shipping?.lastName ?? '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+        const email = order.customer?.email ?? shipping?.email ?? '';
+        const phone = order.customer?.phone ?? shipping?.phone ?? '';
+        const area = shipping?.area ?? shipping?.governorate ?? '';
+        const city = shipping?.city ?? '';
+        const country = shipping?.country ?? '';
+        const block = shipping?.block ?? '';
+        const street = shipping?.street ?? '';
+        const payProvider = order.payments?.[0]?.provider ?? '';
+        const payMethod = order.payments?.[0]?.method ?? '';
+
+        for (const item of order.items) {
+          purchasesSheet.addRow({
+            storeName: store.name,
+            customer: customerName,
+            email,
+            phone,
+            orderNumber: order.orderNumber,
+            orderDate: order.createdAt,
+            orderStatus: order.status ?? '',
+            paymentStatus: order.paymentStatus ?? '',
+            payProvider,
+            payMethod,
+            product: item.productName,
+            sku: item.sku ?? '',
+            variant: item.variantName ?? '',
+            qty: item.quantity,
+            unitPrice: Number((item.price / 1000).toFixed(3)),
+            lineTotal: Number((item.total / 1000).toFixed(3)),
+            area,
+            city,
+            country,
+            block,
+            street,
+          });
+        }
+      }
+
+      purchasesSheet.getColumn('unitPrice').numFmt = '0.000';
+      purchasesSheet.getColumn('lineTotal').numFmt = '0.000';
+      purchasesSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
+
+      if (truncated) {
+        const noticeRow = purchasesSheet.addRow({
+          storeName: `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were included.`,
+        });
+        noticeRow.font = { bold: true, color: { argb: 'FFB91C1C' } };
+      }
+
+      // ----------------------------------------------------------------
+      // "Summary" worksheet — top products + spend per customer.
+      // Computed in-memory from the same line-items; no extra query.
+      // ----------------------------------------------------------------
+      const summarySheet = workbook.addWorksheet('Summary');
+
+      // Aggregate products: sum qty + revenue (in fils, convert at write time).
+      const productMap = new Map<string, { qty: number; revenue: number }>();
+      for (const order of orders) {
+        for (const item of order.items) {
+          const existing = productMap.get(item.productName);
+          if (existing) {
+            existing.qty += item.quantity;
+            existing.revenue += item.total;
+          } else {
+            productMap.set(item.productName, { qty: item.quantity, revenue: item.total });
+          }
+        }
+      }
+      const topProducts = Array.from(productMap.entries())
+        .map(([product, { qty, revenue }]) => ({ product, qty, revenue }))
+        .sort((a, b) => b.revenue - a.revenue);
+
+      // Aggregate per-customer: distinct order count + total items + spend.
+      interface CustomerSummary {
+        name: string;
+        email: string;
+        orderIds: Set<string>;
+        items: number;
+        spend: number;
+      }
+      const customerSummaryMap = new Map<string, CustomerSummary>();
+      for (const order of orders) {
+        const shipping = (order.shippingAddress ?? null) as ShippingAddressShape | null;
+        const customerName = [
+          order.customer?.firstName ?? shipping?.firstName ?? '',
+          order.customer?.lastName ?? shipping?.lastName ?? '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+        const email = order.customer?.email ?? shipping?.email ?? '';
+        const key =
+          order.customer?.id || email.toLowerCase() || shipping?.phone || `guest:${order.id}`;
+        const totalItemQty = order.items.reduce((s, i) => s + i.quantity, 0);
+        const orderSpend = order.items.reduce((s, i) => s + i.total, 0);
+
+        const existing = customerSummaryMap.get(key);
+        if (existing) {
+          existing.orderIds.add(order.id);
+          existing.items += totalItemQty;
+          existing.spend += orderSpend;
+        } else {
+          customerSummaryMap.set(key, {
+            name: customerName,
+            email,
+            orderIds: new Set([order.id]),
+            items: totalItemQty,
+            spend: orderSpend,
+          });
+        }
+      }
+      const customerSpendRows = Array.from(customerSummaryMap.values())
+        .map(({ name, email: customerEmail, orderIds, items, spend }) => ({
+          name,
+          email: customerEmail,
+          orders: orderIds.size,
+          items,
+          spend,
+        }))
+        .sort((a, b) => b.spend - a.spend);
+
+      // --- Write "TOP PRODUCTS" block ---
+      const topProductsTitle = summarySheet.addRow(['TOP PRODUCTS']);
+      topProductsTitle.getCell(1).font = { bold: true, size: 12 };
+      summarySheet.addRow([]); // blank spacer
+      const productsHeaderRow = summarySheet.addRow(['Product', 'Total Qty', 'Revenue (KWD)']);
+      productsHeaderRow.font = { bold: true };
+      productsHeaderRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF1F5F9' },
+      };
+      for (const p of topProducts) {
+        summarySheet.addRow([p.product, p.qty, Number((p.revenue / 1000).toFixed(3))]);
+      }
+
+      summarySheet.addRow([]); // blank row between sections
+      summarySheet.addRow([]); // extra spacer
+
+      // --- Write "SPEND PER CUSTOMER" block ---
+      const spendTitle = summarySheet.addRow(['SPEND PER CUSTOMER']);
+      spendTitle.getCell(1).font = { bold: true, size: 12 };
+      summarySheet.addRow([]); // blank spacer
+      const spendHeaderRow = summarySheet.addRow([
+        'Customer',
+        'Email',
+        'Orders',
+        'Items',
+        'Total Spent (KWD)',
+      ]);
+      spendHeaderRow.font = { bold: true };
+      spendHeaderRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF1F5F9' },
+      };
+      for (const r of customerSpendRows) {
+        summarySheet.addRow([
+          r.name || r.email,
+          r.email,
+          r.orders,
+          r.items,
+          Number((r.spend / 1000).toFixed(3)),
+        ]);
+      }
+
+      // Column widths for readability.
+      summarySheet.getColumn(1).width = 36;
+      summarySheet.getColumn(2).width = 30;
+      summarySheet.getColumn(3).width = 10;
+      summarySheet.getColumn(4).width = 10;
+      summarySheet.getColumn(5).width = 18;
+
+      if (truncated) {
+        summarySheet.addRow([]);
+        const noticeRow = summarySheet.addRow([
+          `NOTE: export truncated — only the most recent ${ordersScanned.toLocaleString()} orders were included.`,
+        ]);
+        noticeRow.getCell(1).font = { bold: true, color: { argb: 'FFB91C1C' } };
+      }
 
       const filenameSafe = (store.slug || store.name || 'customers').replace(/[^a-z0-9-]/gi, '-');
       const filename = `${filenameSafe}-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
