@@ -390,7 +390,7 @@ Storefront rendering stays **structurally uniform** across all 5 templates — `
 - **Per-section heading-line toggles** (`showKickerLines` / `showSubtitleLines` per section — `CategoriesSettings` / `ProductCarouselSettings`) work across all 5 themes' shared SectionHeading paths. Per-theme `CategoryGrid` chip-style headings ignore the toggle (no lines to hide).
 - **Background preset + Section divider** mutex still applies (see CLAUDE.md). Persona doesn't change the rule.
 - **Cart icon** stays the canonical SVG across all 5 themes (see CLAUDE.md).
-- **Logo sizing override** stays h-24 mobile / md:h-36 desktop across all 5 themes (CLAUDE.md).
+- **Logo sizing override** is a firm max bounding box: h-14/max-w-[150px] mobile / md:h-20/md:max-w-[210px] desktop, object-contain (updated 2026-06-17 'still very huge' — the missing WIDTH cap was the real cause; see CLAUDE.md).
 
 ### Token-name conventions (FWB house style)
 

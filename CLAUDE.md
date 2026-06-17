@@ -41,13 +41,16 @@ for size baselines (product card 180-220px desktop / 150-180px mobile,
 category card 140-180px, etc.). Anti-patterns and the "still too big"
 diagnosis recipe are documented there too.
 
-**Logo sizing (updated 2026-06-17, Ahmad "very huge" → reduced):** logo
-defaults to **h-16 mobile / md:h-24 desktop** (was h-24/md:h-36) (was h-14/h-20 in design.md
-— Ahmad bumped this after "still not bigger" + "md sizes are very small
-in reality" feedback). Row container is **h-32 / md:h-44** with
-**`overflow-hidden`** in modern + bold headers so the absolute-positioned
-mobile-centered logo can never visually clip into the hero below.
-Applied platform-wide across all 5 theme headers.
+**Logo sizing (updated 2026-06-17, Ahmad "still very huge" → bounding-box cap):**
+logo is now a **firm max bounding box**: `h-14 max-h-14 max-w-[150px]` mobile /
+`md:h-20 md:max-h-20 md:max-w-[210px]` desktop, with `w-auto object-contain`. The
+real "still huge" cause was the **missing width cap** — the old class used
+`max-w-full` (effectively no bound), so a wide wordmark or a SQUARE logo rendered
+oversized regardless of the height class. Capping BOTH dimensions makes any
+uploaded logo fit compactly. (History: h-24/md:h-36 → h-16/md:h-24 → this.)
+Row container stays **h-32 / md:h-44** with **`overflow-hidden`** in modern +
+bold headers so the absolute-positioned mobile-centered logo can never visually
+clip into the hero below. Applied platform-wide across all 5 theme headers.
 
 If `design.md` is missing from a future session's project root, recreate it
 from the project memory `feedback-fwb-sizing-rules.md` (or ask Ahmad to point

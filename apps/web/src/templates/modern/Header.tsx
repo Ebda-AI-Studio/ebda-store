@@ -108,7 +108,7 @@ export default function ModernHeader({
                   alt={displayName}
                   width={320}
                   height={120}
-                  className="h-16 max-h-16 w-auto max-w-full object-contain md:h-24 md:max-h-24"
+                  className="h-14 max-h-14 w-auto max-w-[150px] object-contain md:h-20 md:max-h-20 md:max-w-[210px]"
                   priority
                 />
               ) : (
