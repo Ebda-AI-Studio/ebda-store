@@ -240,7 +240,23 @@ const marketingPixelsSchema = z.record(z.string(), z.unknown());
 const floatingButtonSchema = z
   .object({
     id: z.string().max(64),
-    kind: z.enum(['whatsapp', 'instagram', 'phone', 'email', 'music', 'custom']),
+    // Keep in sync with FloatingButtonKind in @force/shared. The social kinds
+    // inherit their value from the store's contact/socialLinks at render time
+    // when left blank (so a merchant can save them empty on purpose).
+    kind: z.enum([
+      'whatsapp',
+      'instagram',
+      'phone',
+      'email',
+      'music',
+      'custom',
+      'tiktok',
+      'snapchat',
+      'youtube',
+      'facebook',
+      'x',
+      'telegram',
+    ]),
     label: optionalStr(200),
     labelAr: optionalStr(200),
     bgColor: optionalStr(50),
@@ -255,6 +271,14 @@ const floatingButtonSchema = z
     musicUrl: optionalStr(500),
     musicLoop: z.boolean().optional(),
     customHref: optionalStr(500),
+    // New social kinds (must be listed explicitly — the schema uses .strip(),
+    // so an un-listed field would be silently dropped on save).
+    tiktokHandle: optionalStr(100),
+    snapchatHandle: optionalStr(100),
+    youtubeUrl: optionalStr(500),
+    facebookUrl: optionalStr(500),
+    xHandle: optionalStr(100),
+    telegramHandle: optionalStr(100),
   })
   .strip();
 
