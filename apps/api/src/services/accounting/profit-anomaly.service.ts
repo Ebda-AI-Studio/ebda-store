@@ -146,20 +146,29 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
       : costVolume7d; // no prior data → no spike
 
   // ---- 5. Build metric array ----
-  // Skip cost_spike when the 7d window has zero inventory movement AND the
-  // baseline is thin (<50 units/week). The metric reads InventoryHistory.quantity
-  // (movement VOLUME, not cost dollars), so a quiet week on a low-velocity store
-  // produces a -100% delta that always trips P0 — that's noise, not signal.
+  // cost_spike reads InventoryHistory.quantity (movement VOLUME, not cost
+  // dollars), so on a thin-data store the percentage delta is pure noise: a
+  // near-zero baseline makes ANY small absolute movement explode into a
+  // multi-thousand-percent "spike". A single stock count of 12 units against a
+  // 0.33-units/week baseline reads as 3500% and pages P0 — that is not signal.
+  //
+  // The fix: cost_spike is only trustworthy when there is a MEANINGFUL ABSOLUTE
+  // movement floor in EITHER the current week OR the baseline. Below the floor in
+  // both windows, suppress the metric entirely.
+  //   - thin-data store (both windows < floor)  → suppressed (the false positive)
+  //   - real spike (current ≥ floor)            → fires
+  //   - genuine cost-data outage on a real-volume
+  //     store (baseline ≥ floor, current drops) → fires (catches the −100% drop)
   //
   // Threshold history:
-  //   v1 (2026-05-25): <10 — too tight, missed Wady Aljuz at baseline=12.67
-  //   v2 (2026-05-27): <50 — covers pilot-stage merchants (5-10 movements/day);
-  //                          a genuine cost-data outage on a real-volume store
-  //                          (50+ movements/week) still fires correctly.
-  //
-  // For TRUE merchant-launched stores, baseline will be hundreds/week,
-  // so this skip won't apply. We only suppress for thin-data stores.
-  const includeCostSpike = !(costVolume7d === 0 && costVolumeBaseline < 50);
+  //   v1 (2026-05-25): skip only when current==0 && baseline<10 — too tight.
+  //   v2 (2026-05-27): skip only when current==0 && baseline<50 — still missed
+  //                    the LOW-but-nonzero current case (Wady Aljuz: current=12,
+  //                    baseline=0.33 → 3500% P0 false positive, 2026-06-17).
+  //   v3 (2026-06-17): absolute floor in EITHER window (direction-agnostic).
+  const COST_SPIKE_MIN_UNITS = 50;
+  const includeCostSpike =
+    costVolume7d >= COST_SPIKE_MIN_UNITS || costVolumeBaseline >= COST_SPIKE_MIN_UNITS;
   const rawMetrics: Array<{ metric: AnomalyMetric; current: number; baseline: number }> = [
     { metric: 'margin_drop', current: margin7d, baseline: margin28d },
     ...(includeCostSpike

@@ -129,12 +129,14 @@ Products: ${JSON.stringify(products)}`;
 export async function runDeadstockScan(storeId: string): Promise<DeadstockScanResult> {
   const scanStartedAt = new Date();
 
-  // Wrap the entire scan in withRlsBypass so Inngest jobs (which run with no
-  // tenant GUC) can read RLS-protected tables: deadstock_flags, products,
-  // order_items. The bypass GUC is SET LOCAL so it is transaction-scoped
-  // — no leak to other connections.
+  // --- Phase 1: DB reads/writes inside a SHORT RLS-bypass transaction ---------
+  // Only DB work here (expire stale flags, list products, collect candidates).
+  // The slow Gemini clearance-copy reasoning (phase 2) runs OUTSIDE any open
+  // transaction so it can never blow the 30s interactive-tx timeout — same fix
+  // as reorder-scan.service.ts (the prior single-tx-around-everything design
+  // timed out at ~112s on stores with many candidates + the 2.5s throttle).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return withRlsBypass(async (tx: any) => {
+  const { expiredCount, candidates, scanned } = await withRlsBypass(async (tx: any) => {
     // -------------------------------------------------------------------------
     // Step 1: Expire old open flags (>30 days)
     // -------------------------------------------------------------------------
@@ -147,7 +149,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         AND status = 'open'
         AND scanned_at < ${expireThreshold}
     `;
-    const expiredCount = Number(expiredResult);
+    const expired = Number(expiredResult);
 
     // -------------------------------------------------------------------------
     // Step 2: List active products with trackInventory=true, inventory>0, costPrice>0
@@ -173,7 +175,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
     // -------------------------------------------------------------------------
     // Steps 3–4: Compute metrics and collect candidates
     // -------------------------------------------------------------------------
-    const candidates: DeadstockCandidate[] = [];
+    const collected: DeadstockCandidate[] = [];
 
     for (const product of products) {
       const days = await daysSinceLastSale(product.id, storeId, tx);
@@ -182,7 +184,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
       if (days < DEADSTOCK_DAYS_THRESHOLD) continue;
       if (stockValueFils < DEADSTOCK_VALUE_FILS_THRESHOLD) continue;
 
-      candidates.push({
+      collected.push({
         productId: product.id,
         name: product.name,
         nameAr: product.nameAr,
@@ -193,69 +195,70 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
       });
     }
 
-    const scanned = products.length;
+    return { expiredCount: expired, candidates: collected, scanned: products.length };
+  });
 
-    if (candidates.length === 0) {
-      logger.info({ storeId, scanned, flagged: 0, expiredCount }, 'deadstock-scan: no candidates');
-      return { scanned, flagged: 0, expiredCount };
+  if (candidates.length === 0) {
+    logger.info({ storeId, scanned, flagged: 0, expiredCount }, 'deadstock-scan: no candidates');
+    return { scanned, flagged: 0, expiredCount };
+  }
+
+  // --- Phase 2: Gemini clearance copy OUTSIDE any transaction -----------------
+  // Pure network + in-memory; the 2.5s per-chunk throttle no longer holds a tx.
+  const copyMap = new Map<
+    string,
+    { discountPercent: number; copyEn: string; copyAr: string | null }
+  >();
+
+  const chunks: DeadstockCandidate[][] = [];
+  for (let i = 0; i < candidates.length; i += GEMINI_CHUNK_SIZE) {
+    chunks.push(candidates.slice(i, i + GEMINI_CHUNK_SIZE));
+  }
+
+  for (let ci = 0; ci < chunks.length; ci++) {
+    if (ci > 0) {
+      await new Promise<void>(resolve => setTimeout(resolve, GEMINI_THROTTLE_MS));
     }
-
-    // -------------------------------------------------------------------------
-    // Step 5: Batch-call Gemini for bilingual clearance copy (max 20/call)
-    // -------------------------------------------------------------------------
-    const copyMap = new Map<
-      string,
-      { discountPercent: number; copyEn: string; copyAr: string | null }
-    >();
-
-    const chunks: DeadstockCandidate[][] = [];
-    for (let i = 0; i < candidates.length; i += GEMINI_CHUNK_SIZE) {
-      chunks.push(candidates.slice(i, i + GEMINI_CHUNK_SIZE));
-    }
-
-    for (let ci = 0; ci < chunks.length; ci++) {
-      if (ci > 0) {
-        await new Promise<void>(resolve => setTimeout(resolve, GEMINI_THROTTLE_MS));
-      }
-      const chunk = chunks[ci];
-      try {
-        const response = await callGemini<GeminiClearanceResponse>({
-          prompt: buildGeminiPrompt(chunk),
-          feature: 'deadstock-scan',
-          storeId,
+    const chunk = chunks[ci];
+    try {
+      const response = await callGemini<GeminiClearanceResponse>({
+        prompt: buildGeminiPrompt(chunk),
+        feature: 'deadstock-scan',
+        storeId,
+      });
+      for (const item of response.items ?? []) {
+        copyMap.set(item.productId, {
+          discountPercent: Math.max(10, Math.min(50, Math.round(item.discountPercent ?? 20))),
+          copyEn: item.copyEn?.slice(0, 80) || 'Clearance — limited time offer!',
+          copyAr: item.copyAr?.slice(0, 80) || null,
         });
-        for (const item of response.items ?? []) {
-          copyMap.set(item.productId, {
-            discountPercent: Math.max(10, Math.min(50, Math.round(item.discountPercent ?? 20))),
-            copyEn: item.copyEn?.slice(0, 80) || 'Clearance — limited time offer!',
-            copyAr: item.copyAr?.slice(0, 80) || null,
+      }
+    } catch (err) {
+      logger.warn(
+        { err, storeId, chunkIndex: ci },
+        'deadstock-scan: Gemini call failed for chunk — proceeding with fallback copy'
+      );
+      for (const c of chunk) {
+        if (!copyMap.has(c.productId)) {
+          copyMap.set(c.productId, {
+            discountPercent: 20,
+            copyEn: 'Clearance — limited time offer!',
+            copyAr: null,
           });
         }
-      } catch (err) {
-        logger.warn(
-          { err, storeId, chunkIndex: ci },
-          'deadstock-scan: Gemini call failed for chunk — proceeding with fallback copy'
-        );
-        for (const c of chunk) {
-          if (!copyMap.has(c.productId)) {
-            copyMap.set(c.productId, {
-              discountPercent: 20,
-              copyEn: 'Clearance — limited time offer!',
-              copyAr: null,
-            });
-          }
-        }
       }
     }
+  }
 
-    // -------------------------------------------------------------------------
-    // Step 6: findFirst+create/update DeadStockFlag rows (using tx for RLS bypass)
-    //
-    // Prisma's compound-unique where clause doesn't support null members in the
-    // generated type (variantId: string is required). Use findFirst+create/update
-    // to handle null variantId correctly — same pattern as reorder-scan.service.ts.
-    // -------------------------------------------------------------------------
-    let rowsUpserted = 0;
+  // --- Phase 3: upsert DeadStockFlag rows in a SHORT RLS-bypass tx ------------
+  // DB writes only — no network, so this stays well under the 30s timeout.
+  //
+  // Prisma's compound-unique where clause doesn't support null members in the
+  // generated type (variantId: string is required). Use findFirst+create/update
+  // to handle null variantId correctly — same pattern as reorder-scan.service.ts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rowsUpserted = await withRlsBypass(async (tx: any) => {
+    let upserted = 0;
 
     for (const candidate of candidates) {
       const copy = copyMap.get(candidate.productId) ?? {
@@ -298,7 +301,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
             },
           });
         }
-        rowsUpserted += 1;
+        upserted += 1;
       } catch (err) {
         logger.error(
           { err, storeId, productId: candidate.productId },
@@ -307,13 +310,15 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
       }
     }
 
-    logger.info(
-      { storeId, scanned, flagged: rowsUpserted, expiredCount },
-      'deadstock-scan completed'
-    );
-
-    return { scanned, flagged: rowsUpserted, expiredCount };
+    return upserted;
   });
+
+  logger.info(
+    { storeId, scanned, flagged: rowsUpserted, expiredCount },
+    'deadstock-scan completed'
+  );
+
+  return { scanned, flagged: rowsUpserted, expiredCount };
 }
 
 // ---------------------------------------------------------------------------

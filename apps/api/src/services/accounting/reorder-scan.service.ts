@@ -162,12 +162,16 @@ const EXPIRE_AFTER_DAYS = 30;
 export async function runReorderScan(storeId: string): Promise<ReorderScanResult> {
   const scanStartedAt = new Date();
 
-  // Wrap the entire scan in withRlsBypass so Inngest jobs (which run with no
-  // tenant GUC) can read RLS-protected tables: reorder_suggestions,
-  // purchase_order_items, backorder_lines, and products. The bypass GUC is
-  // SET LOCAL so it is transaction-scoped — no leak to other connections.
+  // --- Phase 1: DB reads/writes inside a SHORT RLS-bypass transaction ---------
+  // The bypass GUC is SET LOCAL (transaction-scoped) so all RLS-protected reads
+  // (reorder_suggestions, purchase_order_items, backorder_lines, products) must
+  // happen inside a withRlsBypass tx. We do ONLY the DB work here and return the
+  // candidates — the slow Gemini reasoning (phase 2) runs OUTSIDE any open
+  // transaction so it can never blow the 30s interactive-tx timeout or starve
+  // the connection pool (the prior single-tx-around-everything design timed out
+  // at ~112s on stores with many candidates + the 2.5s per-chunk throttle).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return withRlsBypass(async (tx: any) => {
+  const { expiredCount, candidates } = await withRlsBypass(async (tx: any) => {
     // -------------------------------------------------------------------------
     // Step 1: Mark stale open suggestions as expired
     // -------------------------------------------------------------------------
@@ -180,7 +184,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
         AND status = 'open'
         AND scanned_at < ${expireThreshold}
     `;
-    const expiredCount = Number(expiredResult);
+    const expired = Number(expiredResult);
 
     // -------------------------------------------------------------------------
     // Step 2: List active trackInventory products
@@ -216,7 +220,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
     // -------------------------------------------------------------------------
     // Steps 3–4: Compute metrics and collect candidates
     // -------------------------------------------------------------------------
-    const candidates: ReorderCandidate[] = [];
+    const collected: ReorderCandidate[] = [];
 
     for (const product of products) {
       const qty7d = await sumOrderQty(product.id, storeId, 7, tx);
@@ -277,7 +281,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       const supplierId =
         rule?.preferredSupplierId ?? (await pickLastSupplierForProduct(product.id, tx));
 
-      candidates.push({
+      collected.push({
         productId: product.id,
         name: product.name,
         nameAr: product.nameAr,
@@ -296,62 +300,63 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       });
     }
 
-    if (candidates.length === 0) {
-      logger.info(
-        { storeId, scanned: 0, suggested: 0, expiredCount },
-        'reorder-scan: no candidates'
-      );
-      return { scanned: 0, suggested: 0, expiredCount };
+    return { expiredCount: expired, candidates: collected };
+  });
+
+  if (candidates.length === 0) {
+    logger.info({ storeId, scanned: 0, suggested: 0, expiredCount }, 'reorder-scan: no candidates');
+    return { scanned: 0, suggested: 0, expiredCount };
+  }
+
+  // --- Phase 2: Gemini reasoning OUTSIDE any transaction ----------------------
+  // Pure network + in-memory. The 2.5s per-chunk throttle sleeps live here, so
+  // they no longer hold a DB transaction open.
+  const reasoningMap = new Map<string, { reasoningEn: string; reasoningAr: string | null }>();
+
+  const chunks: ReorderCandidate[][] = [];
+  for (let i = 0; i < candidates.length; i += GEMINI_CHUNK_SIZE) {
+    chunks.push(candidates.slice(i, i + GEMINI_CHUNK_SIZE));
+  }
+
+  for (let ci = 0; ci < chunks.length; ci++) {
+    if (ci > 0) {
+      await new Promise<void>(resolve => setTimeout(resolve, GEMINI_THROTTLE_MS));
     }
-
-    // -------------------------------------------------------------------------
-    // Step 5: Batch-call Gemini for bilingual reasoning
-    // -------------------------------------------------------------------------
-    const reasoningMap = new Map<string, { reasoningEn: string; reasoningAr: string | null }>();
-
-    const chunks: ReorderCandidate[][] = [];
-    for (let i = 0; i < candidates.length; i += GEMINI_CHUNK_SIZE) {
-      chunks.push(candidates.slice(i, i + GEMINI_CHUNK_SIZE));
-    }
-
-    for (let ci = 0; ci < chunks.length; ci++) {
-      if (ci > 0) {
-        await new Promise<void>(resolve => setTimeout(resolve, GEMINI_THROTTLE_MS));
-      }
-      const chunk = chunks[ci];
-      try {
-        const response = await callGemini<GeminiReasoningResponse>({
-          prompt: buildGeminiPrompt(chunk),
-          feature: 'reorder-scan',
-          storeId,
+    const chunk = chunks[ci];
+    try {
+      const response = await callGemini<GeminiReasoningResponse>({
+        prompt: buildGeminiPrompt(chunk),
+        feature: 'reorder-scan',
+        storeId,
+      });
+      for (const item of response.items ?? []) {
+        reasoningMap.set(item.productId, {
+          reasoningEn: item.reasoningEn ?? 'AI reasoning unavailable — manual review suggested',
+          reasoningAr: item.reasoningAr ?? null,
         });
-        for (const item of response.items ?? []) {
-          reasoningMap.set(item.productId, {
-            reasoningEn: item.reasoningEn ?? 'AI reasoning unavailable — manual review suggested',
-            reasoningAr: item.reasoningAr ?? null,
+      }
+    } catch (err) {
+      logger.warn(
+        { err, storeId, chunkIndex: ci },
+        'reorder-scan: Gemini call failed for chunk — proceeding without AI reasoning'
+      );
+      // Set fallback reasoning for all products in this chunk
+      for (const c of chunk) {
+        if (!reasoningMap.has(c.productId)) {
+          reasoningMap.set(c.productId, {
+            reasoningEn: 'AI reasoning unavailable — manual review suggested',
+            reasoningAr: null,
           });
         }
-      } catch (err) {
-        logger.warn(
-          { err, storeId, chunkIndex: ci },
-          'reorder-scan: Gemini call failed for chunk — proceeding without AI reasoning'
-        );
-        // Set fallback reasoning for all products in this chunk
-        for (const c of chunk) {
-          if (!reasoningMap.has(c.productId)) {
-            reasoningMap.set(c.productId, {
-              reasoningEn: 'AI reasoning unavailable — manual review suggested',
-              reasoningAr: null,
-            });
-          }
-        }
       }
     }
+  }
 
-    // -------------------------------------------------------------------------
-    // Step 6: Upsert ReorderSuggestion rows (using tx for RLS bypass)
-    // -------------------------------------------------------------------------
-    let rowsUpserted = 0;
+  // --- Phase 3: Upsert ReorderSuggestion rows in a SHORT RLS-bypass tx --------
+  // DB writes only — no network, so this stays well under the 30s timeout.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rowsUpserted = await withRlsBypass(async (tx: any) => {
+    let upserted = 0;
 
     for (const candidate of candidates) {
       const reasoning = reasoningMap.get(candidate.productId) ?? {
@@ -400,7 +405,7 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
             },
           });
         }
-        rowsUpserted += 1;
+        upserted += 1;
       } catch (err) {
         logger.error(
           { err, storeId, productId: candidate.productId },
@@ -409,11 +414,13 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       }
     }
 
-    logger.info(
-      { storeId, scanned: candidates.length, suggested: rowsUpserted, expiredCount },
-      'reorder-scan completed'
-    );
-
-    return { scanned: candidates.length, suggested: rowsUpserted, expiredCount };
+    return upserted;
   });
+
+  logger.info(
+    { storeId, scanned: candidates.length, suggested: rowsUpserted, expiredCount },
+    'reorder-scan completed'
+  );
+
+  return { scanned: candidates.length, suggested: rowsUpserted, expiredCount };
 }
