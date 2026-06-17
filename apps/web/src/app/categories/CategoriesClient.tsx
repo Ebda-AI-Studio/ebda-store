@@ -15,12 +15,21 @@ import {
   pageTextScale,
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
+import type { CategoriesPageSettings } from '@force/shared';
 
 interface CategoriesClientProps {
   categories: Category[];
+  /** Server-fetched categoriesPage layout settings. When provided, these are
+   *  used instead of the client-side lazy-fetched context layout so the
+   *  page surface styles (bgColor, colorScheme, density, textScale) render
+   *  on the SSR pass without a layout-flash. */
+  categoriesPage?: CategoriesPageSettings;
 }
 
-export default function CategoriesClient({ categories }: CategoriesClientProps) {
+export default function CategoriesClient({
+  categories,
+  categoriesPage: categoriesPageProp,
+}: CategoriesClientProps) {
   const storeUrl = useStoreUrl();
   const { store, layout } = useStore();
   const { language, t } = useLanguage();
@@ -28,27 +37,23 @@ export default function CategoriesClient({ categories }: CategoriesClientProps) 
   const isRtl = language === 'ar';
   const urlPrefix = storeUrl('');
 
+  // Prefer the server-fetched prop (SSR-safe, no layout-flash) over the
+  // client-side lazy-fetched context layout (available after hydration only).
+  const catPage = categoriesPageProp ?? layout?.categoriesPage;
+
   // Categories page design (page-builder → Categories page).
-  const catHeadingZone = resolveSectionZone(
-    layout?.categoriesPage?.typography?.heading,
-    undefined,
-    store.theme
-  );
+  const catHeadingZone = resolveSectionZone(catPage?.typography?.heading, undefined, store.theme);
   // Category card labels — the theme CategoryGrid/CategoryCard already accept
   // a categoryLabelZone (built for the homepage block); feed it the per-page
   // categoryLabel override so the grid labels follow the Categories-page control.
   const catLabelZone = resolveSectionZone(
-    layout?.categoriesPage?.typography?.categoryLabel,
+    catPage?.typography?.categoryLabel,
     undefined,
     store.theme
   );
-  const catBgStyle = pageSurfaceStyle(
-    layout?.categoriesPage?.bgColor,
-    store.theme,
-    layout?.categoriesPage?.colorScheme
-  );
-  const catScale = pageTextScale(layout?.categoriesPage?.textScale);
-  const catDensity = pageDensityStyle(layout?.categoriesPage?.density);
+  const catBgStyle = pageSurfaceStyle(catPage?.bgColor, store.theme, catPage?.colorScheme);
+  const catScale = pageTextScale(catPage?.textScale);
+  const catDensity = pageDensityStyle(catPage?.density);
 
   const templateCategories = categories.map(toTemplateCategory);
 

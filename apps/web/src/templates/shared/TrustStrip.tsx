@@ -3,6 +3,7 @@
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import type { TrustStripSettings } from '@force/shared';
+import { sectionBgStyle } from './section-bg';
 
 /**
  * Sprint 3 (2026-05-17): 3-up trust badge strip rendered on the homepage
@@ -115,6 +116,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
       aria-label={isRtl ? 'لماذا تتسوق معنا' : 'Why shop with us'}
       dir={isRtl ? 'rtl' : 'ltr'}
       className="bg-[hsl(var(--bg-page))] py-12 sm:py-16 lg:py-20"
+      style={sectionBgStyle(settings?.bgColor, store.theme)}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <ul className={listClass}>

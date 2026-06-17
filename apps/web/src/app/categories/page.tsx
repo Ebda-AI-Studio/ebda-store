@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { API_URL, type Category } from '@/lib/api';
+import { getPreviewDraftToken, publicLayoutUrl } from '../../lib/preview-draft';
+import { resolveLayoutSettings, type CategoriesPageSettings } from '@force/shared';
 import { breadcrumbJsonLd, itemList, getSiteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import CategoriesClient from './CategoriesClient';
@@ -9,6 +11,27 @@ export const metadata: Metadata = {
   title: 'Categories',
   description: 'Explore product categories and find exactly what you are looking for.',
 };
+
+/** Fetch the categoriesPage layout settings for SSR so bgColor/colorScheme/
+ *  density/textScale paint on the first server render without a layout-flash. */
+async function fetchCategoriesPageSettings(store: {
+  id: string;
+}): Promise<CategoriesPageSettings | undefined> {
+  if (!store.id || store.id === 'demo') return undefined;
+  try {
+    const draftToken = await getPreviewDraftToken();
+    const res = await fetch(
+      publicLayoutUrl(API_URL, store.id, draftToken),
+      draftToken ? { cache: 'no-store' } : { next: { revalidate: 60 } }
+    );
+    if (!res.ok) return undefined;
+    const json = await res.json();
+    const layout = resolveLayoutSettings(json?.data?.layout ?? {});
+    return layout.categoriesPage ? { ...layout.categoriesPage } : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Fetch categories server-side so the page renders with data immediately,
@@ -50,7 +73,10 @@ async function fetchCategories(store: { id: string; domain?: string }): Promise<
 
 export default async function CategoriesPage() {
   const store = await getStoreOrNotFound();
-  const categories = await fetchCategories(store);
+  const [categories, categoriesPage] = await Promise.all([
+    fetchCategories(store),
+    fetchCategoriesPageSettings(store),
+  ]);
 
   const siteUrl = getSiteUrl(store);
 
@@ -79,7 +105,7 @@ export default async function CategoriesPage() {
       {/* JSON-LD: Breadcrumb + optional ItemList of categories */}
       <JsonLd data={categoriesBreadcrumb} />
       {categoriesItemList && <JsonLd data={categoriesItemList} />}
-      <CategoriesClient categories={categories} />
+      <CategoriesClient categories={categories} categoriesPage={categoriesPage} />
     </>
   );
 }
