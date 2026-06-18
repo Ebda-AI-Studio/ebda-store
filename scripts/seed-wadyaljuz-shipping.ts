@@ -29,7 +29,7 @@ const SEED_ENTRIES: [string, string, number][] = [
   ['Capital', 'Rawda', 1500],
   ['Capital', 'Khaldiya', 1500],
   ['Capital', 'Yarmouk', 1500],
-  ['Capital', 'Qortuba', 1500],
+  ['Capital', 'Qortuba', 2000],
   ['Capital', 'Abdullah Al-Salem', 1500],
   ['Capital', 'Shaab', 1500],
   ['Capital', 'Surra', 1500],
@@ -83,7 +83,7 @@ const SEED_ENTRIES: [string, string, number][] = [
 
   // Jahra — الجهراء
   ['Jahra', 'Jahra', 3000],
-  ['Jahra', 'Naeem', 3000],
+  ['Jahra', 'Naeem', 3500],
   ['Jahra', 'Saad Al-Abdullah', 3000],
   ['Jahra', 'Sulaibiya Residential', 3000],
 ];

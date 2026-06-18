@@ -166,6 +166,11 @@ export default function CheckoutClient() {
   const [ratedGovernorates, setRatedGovernorates] = useState<Set<string>>(new Set());
   const [rateByArea, setRateByArea] = useState<Map<string, AreaRate>>(new Map());
   const [shippingUnavailable, setShippingUnavailable] = useState(false);
+  // Whether the store configured per-area shipping rates at all. When false,
+  // the store has no shipping config → legacy free-shipping behavior (cost 0),
+  // NOT "unavailable". A `matched:false` result only means "not available"
+  // when the store DOES have area rates but this specific area isn't covered.
+  const [storeHasAreaRates, setStoreHasAreaRates] = useState(false);
 
   // Shipping & discount
   const [selectedArea, setSelectedArea] = useState('');
@@ -444,17 +449,25 @@ export default function CheckoutClient() {
         shippingCost: number;
         freeShipping: boolean;
         matched?: boolean;
+        storeHasAreaRates?: boolean;
       }>(`/stores/public/${store.id}/shipping/calculate`, {
         area: selectedArea,
         orderTotal: cart.subtotal,
         governorate: formData.governorate,
       });
       if (result.success && result.data) {
-        if (result.data.matched === false) {
+        const hasAreaRates = result.data.storeHasAreaRates === true;
+        setStoreHasAreaRates(hasAreaRates);
+        // "Not available for delivery" applies ONLY when the store configured
+        // per-area rates but this specific area isn't covered. A store with no
+        // shipping config at all (storeHasAreaRates === false) falls back to
+        // the resolved cost (typically 0 = free) and must never block checkout.
+        if (hasAreaRates && result.data.matched === false) {
           setShippingUnavailable(true);
           setShippingCost(0);
           setFreeShipping(false);
         } else {
+          setShippingUnavailable(false);
           setShippingCost(result.data.shippingCost || 0);
           setFreeShipping(result.data.freeShipping || false);
         }
@@ -744,6 +757,12 @@ export default function CheckoutClient() {
         // Scroll to first error
         const firstError = document.querySelector('[data-error="true"]');
         firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      // The ONLY shipping condition that blocks checkout: the store configured
+      // per-area rates and this area is genuinely not covered. Free / zero-cost
+      // shipping (incl. unconfigured stores) must always be allowed through.
+      if (shippingUnavailable) {
         return;
       }
       setStep(2);
@@ -1252,9 +1271,6 @@ export default function CheckoutClient() {
                           {t('Country', '\u0627\u0644\u0628\u0644\u062f')}
                         </label>
                         <div className="flex items-center rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
-                          <span className="me-2" aria-hidden="true">
-                            \ud83c\uddf0\ud83c\uddfc
-                          </span>
                           {t('Kuwait', '\u0627\u0644\u0643\u0648\u064a\u062a')}
                         </div>
                       </div>
@@ -1310,10 +1326,12 @@ export default function CheckoutClient() {
                                   ? formatPrice(shippingCost)
                                   : rateByArea.has(formData.area)
                                     ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
-                                    : t(
-                                        'Calculating...',
-                                        '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0633\u0627\u0628...'
-                                      )}
+                                    : !storeHasAreaRates
+                                      ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
+                                      : t(
+                                          'Calculating...',
+                                          '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0633\u0627\u0628...'
+                                        )}
                             </span>
                           </div>
                         )}
@@ -1508,7 +1526,12 @@ export default function CheckoutClient() {
                           ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0633\u0644\u0629 \u2192'
                           : '\u2190 Return to cart'}
                       </Link>
-                      <Button type="submit" className="w-full sm:w-auto" size="lg">
+                      <Button
+                        type="submit"
+                        className="w-full sm:w-auto"
+                        size="lg"
+                        disabled={shippingUnavailable}
+                      >
                         {t(
                           'Continue to Payment',
                           '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
