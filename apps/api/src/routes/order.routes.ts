@@ -1529,7 +1529,7 @@ interface ShipmentHistoryEntry {
  * redacted for non-admin callers.
  */
 router.get(
-  '/:storeId/orders/:orderId/timeline',
+  '/:orderId/timeline',
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

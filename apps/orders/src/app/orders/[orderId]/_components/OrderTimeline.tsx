@@ -84,12 +84,10 @@ function TimelineDot({ type }: { type: IconType }) {
  * Read-only order lifecycle timeline — mirrors the admin OrderLifecycleTimeline,
  * collapsible and lazy-fetched on first expand.
  *
- * URL note: the API timeline route is registered as
- * `/:storeId/orders/:orderId/timeline` on a router already mounted at
- * `/stores/:storeId/orders` (apps/api/src/routes/index.ts), so the path that
- * actually matches has a DOUBLE `…/orders/{storeId}/orders/…` segment. The
- * admin's single-segment URL does not match this registration; the PWA uses the
- * double-segment URL so the timeline returns data. Failures are swallowed
+ * The API timeline route is registered as `/:orderId/timeline` on a router
+ * already mounted at `/stores/:storeId/orders` (apps/api/src/routes/index.ts),
+ * so the full matched path is the clean `/stores/:storeId/orders/:orderId/timeline`.
+ * Both the admin and the PWA use this single-segment URL. Failures are swallowed
  * (timeline is supplementary).
  */
 export function OrderTimeline({ storeId, orderId }: OrderTimelineProps) {
@@ -104,7 +102,7 @@ export function OrderTimeline({ storeId, orderId }: OrderTimelineProps) {
     setLoading(true);
     try {
       const { data } = await apiGet<{ timeline: TimelineRow[] }>(
-        `/api/v1/stores/${storeId}/orders/${storeId}/orders/${orderId}/timeline`
+        `/api/v1/stores/${storeId}/orders/${orderId}/timeline`
       );
       if (data?.timeline) setRows(data.timeline);
     } catch {
