@@ -113,6 +113,8 @@
     "tmp": "0.2.7",
     "uuid": ">=11.1.1",
     "js-yaml": "4.2.0",
+    "nodemailer": "9.0.1",
+    "dompurify": "3.4.11",
     "exceljs": {
       "uuid": ">=11.1.1",
       "tmp": "0.2.7"
