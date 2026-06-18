@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@force/ui';
 import { KUWAIT_GOVERNORATES } from '@force/shared';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiPut } from '../../../../../lib/api';
+import { apiGet, apiPut, apiFetch, apiPost } from '../../../../../lib/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +49,116 @@ function rowKey(governorate: string, area: string) {
   return `${governorate}||${area}`;
 }
 
+// ─── CSV parsing (quote-aware) ──────────────────────────────────────────────
+// Mirrors the API's splitCsvRecords / parseCSVLine: split on newlines OUTSIDE
+// quotes, and parse fields honoring doubled-quote ("") escapes. Area names
+// won't have embedded newlines, but a quoted Arabic name containing a comma
+// would shatter under a naive split — so we parse correctly regardless.
+
+function splitCsvRecords(csv: string): string[] {
+  const records: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < csv.length; i++) {
+    const char = csv[i];
+    if (char === '"') {
+      if (inQuotes && csv[i + 1] === '"') {
+        current += '""';
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      current += char;
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && csv[i + 1] === '\n') i++;
+      records.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.length > 0) records.push(current);
+  return records;
+}
+
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === '"' && !inQuotes) {
+      inQuotes = true;
+    } else if (char === '"' && inQuotes) {
+      if (next === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = false;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+// Header → row-field mapping (tolerant of the exported xlsx header names).
+function headerKey(h: string): string | null {
+  const n = h.trim().toLowerCase();
+  if (n.startsWith('governorate (ar')) return null; // not sent; derived server-side
+  if (n.startsWith('governorate')) return 'governorate';
+  if (n.startsWith('area (ar')) return 'areaAr';
+  if (n.startsWith('area')) return 'area';
+  if (n.startsWith('delivery fee')) return 'deliveryFee';
+  if (n.startsWith('free shipping') || n.startsWith('free over')) return 'freeShippingThreshold';
+  if (n.startsWith('active')) return 'isActive';
+  return null;
+}
+
+interface ImportRowInput {
+  governorate?: string;
+  area: string;
+  areaAr?: string;
+  deliveryFee?: string;
+  freeShippingThreshold?: string;
+  isActive?: string;
+}
+
+function parseCsvToRows(csv: string): ImportRowInput[] {
+  const records = splitCsvRecords(csv).filter(r => r.trim() !== '');
+  if (records.length < 2) return [];
+  const headers = parseCsvLine(records[0]).map(headerKey);
+  const rows: ImportRowInput[] = [];
+  for (let i = 1; i < records.length; i++) {
+    const cells = parseCsvLine(records[i]);
+    const obj: Record<string, string> = {};
+    headers.forEach((key, idx) => {
+      if (key) obj[key] = cells[idx] ?? '';
+    });
+    if (!obj.area) continue;
+    rows.push(obj as unknown as ImportRowInput);
+  }
+  return rows;
+}
+
+interface ImportPreview {
+  valid: Array<{
+    governorate: string;
+    area: string;
+    deliveryFee: number;
+    freeShippingThreshold: number | null;
+    isActive: boolean;
+  }>;
+  errors: Array<{ row: number; area: string; reason: string }>;
+  wouldUpsert: number;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function AreaRateEditor({ storeId }: Props) {
@@ -64,6 +174,13 @@ export function AreaRateEditor({ storeId }: Props) {
 
   // Bulk-apply per-governorate input value
   const [bulkFeeKwd, setBulkFeeKwd] = useState<Record<string, string>>({});
+
+  // Import/export
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [pendingRows, setPendingRows] = useState<ImportRowInput[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Fetch existing rates ──────────────────────────────────────────────────
 
@@ -186,6 +303,108 @@ export function AreaRateEditor({ storeId }: Props) {
     }
   }
 
+  // ── Export ──────────────────────────────────────────────────────────────
+  // Binary stream → Blob → object URL → anchor click. Uses apiFetch (not
+  // apiGet) for the Bearer-aware download path (iOS admin PWA).
+
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const res = await apiFetch(`/api/v1/stores/${storeId}/shipping/area-rates/export.xlsx`);
+      if (!res.ok) {
+        toastError(t('errorTitle'), t('exportFailed'));
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get('content-disposition') ?? '';
+      const match = cd.match(/filename="?([^"]+)"?/i);
+      const filename = match?.[1] ?? 'shipping-area-rates.xlsx';
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toastError(t('errorTitle'), t('exportFailed'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  // ── Import ──────────────────────────────────────────────────────────────
+  // Parse CSV client-side → POST dryRun:true → show preview → confirm →
+  // POST dryRun:false → reload.
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset so re-selecting the same file fires onChange again.
+    e.target.value = '';
+    if (!file) return;
+
+    let rows: ImportRowInput[];
+    try {
+      const text = await file.text();
+      rows = parseCsvToRows(text);
+    } catch {
+      toastError(t('errorTitle'), t('parseFailed'));
+      return;
+    }
+    if (rows.length === 0) {
+      toastError(t('errorTitle'), t('noRowsFound'));
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const { data, error } = await apiPost<ImportPreview>(
+        `/api/v1/stores/${storeId}/shipping/area-rates/import`,
+        { rows, dryRun: true }
+      );
+      if (error || !data) {
+        toastError(t('errorTitle'), t('importFailed'));
+        return;
+      }
+      setPreview(data);
+      setPendingRows(rows);
+    } catch {
+      toastError(t('errorTitle'), t('importFailed'));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function confirmImport() {
+    if (importing || pendingRows.length === 0) return;
+    setImporting(true);
+    try {
+      const { data, error } = await apiPost<{ upserted: number }>(
+        `/api/v1/stores/${storeId}/shipping/area-rates/import`,
+        { rows: pendingRows, dryRun: false }
+      );
+      if (error || !data) {
+        toastError(t('errorTitle'), t('importFailed'));
+        return;
+      }
+      toastSuccess(t('importedTitle'), t('importedDescription', { count: data.upserted }));
+      setPreview(null);
+      setPendingRows([]);
+      fetchRates();
+    } catch {
+      toastError(t('errorTitle'), t('importFailed'));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function cancelImport() {
+    setPreview(null);
+    setPendingRows([]);
+  }
+
   // ── Counts for accordion header ────────────────────────────────────────────
 
   function feeCount(govEn: string): number {
@@ -209,6 +428,97 @@ export function AreaRateEditor({ storeId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Import / Export toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground max-w-md">{t('importHint')}</p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            className="px-3 py-1.5 text-sm font-medium border border-border rounded-lg bg-background hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {exporting && (
+              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            )}
+            {exporting ? t('exporting') : t('exportBtn')}
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="px-3 py-1.5 text-sm font-medium border border-border rounded-lg bg-background hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {importing && !preview && (
+              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            )}
+            {t('importBtn')}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx"
+            onChange={handleFileSelected}
+            className="hidden"
+          />
+        </div>
+      </div>
+
+      {/* Import preview modal */}
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-background p-5 shadow-xl space-y-4">
+            <h3 className="text-lg font-semibold text-foreground">{t('previewTitle')}</h3>
+
+            {preview.wouldUpsert > 0 ? (
+              <p className="text-sm text-foreground">
+                {t('previewWillUpdate', { count: preview.wouldUpsert })}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t('previewNoValid')}</p>
+            )}
+
+            {preview.errors.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-destructive">
+                  {t('previewErrors', { count: preview.errors.length })}
+                </p>
+                <ul className="max-h-40 overflow-y-auto text-xs text-muted-foreground space-y-0.5 border border-border rounded-lg p-2">
+                  {preview.errors.map((err, i) => (
+                    <li key={i}>
+                      {t('rowLabel')} {err.row}: <span className="text-foreground">{err.area}</span>{' '}
+                      — {err.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={cancelImport}
+                disabled={importing}
+                className="px-4 py-2 text-sm font-medium border border-border rounded-lg bg-background hover:bg-muted/60 transition-colors disabled:opacity-50"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={confirmImport}
+                disabled={importing || preview.wouldUpsert === 0}
+                className="px-4 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {importing && (
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                )}
+                {importing ? t('importing') : t('confirmImport')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Governorate accordion */}
       <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
         {KUWAIT_GOVERNORATES.map(gov => {

@@ -1834,7 +1834,25 @@
       "savedDescription": "Area delivery fees updated.",
       "errorTitle": "Error",
       "fetchFailed": "Failed to load area rates.",
-      "saveFailed": "Failed to save area rates."
+      "saveFailed": "Failed to save area rates.",
+      "exportBtn": "Export (xlsx)",
+      "importBtn": "Import (CSV)",
+      "exporting": "Exporting…",
+      "importHint": "Export the xlsx, fill in the fees, save it as CSV, then import.",
+      "importFailed": "Failed to import area rates.",
+      "exportFailed": "Failed to export area rates.",
+      "parseFailed": "Could not read that file. Please upload a CSV with the expected columns.",
+      "noRowsFound": "No rows found in that file.",
+      "previewTitle": "Import preview",
+      "previewWillUpdate": "{count} area(s) will be updated.",
+      "previewErrors": "{count} row(s) have errors and will be skipped:",
+      "previewNoValid": "No valid rows to import.",
+      "rowLabel": "Row",
+      "confirmImport": "Confirm import",
+      "importing": "Importing…",
+      "cancel": "Cancel",
+      "importedTitle": "Imported",
+      "importedDescription": "{count} area rate(s) updated."
     }
   },
   "tax": {

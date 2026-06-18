@@ -1834,7 +1834,25 @@
       "savedDescription": "تم تحديث رسوم توصيل المناطق.",
       "errorTitle": "خطأ",
       "fetchFailed": "تعذّر تحميل رسوم المناطق.",
-      "saveFailed": "تعذّر حفظ رسوم المناطق."
+      "saveFailed": "تعذّر حفظ رسوم المناطق.",
+      "exportBtn": "تصدير (xlsx)",
+      "importBtn": "استيراد (CSV)",
+      "exporting": "جارٍ التصدير…",
+      "importHint": "صدّر ملف xlsx، عبّئ الرسوم، احفظه بصيغة CSV، ثم استورده.",
+      "importFailed": "فشل استيراد رسوم المناطق.",
+      "exportFailed": "فشل تصدير رسوم المناطق.",
+      "parseFailed": "تعذّر قراءة الملف. يُرجى رفع ملف CSV بالأعمدة المتوقعة.",
+      "noRowsFound": "لا توجد صفوف في الملف.",
+      "previewTitle": "معاينة الاستيراد",
+      "previewWillUpdate": "سيتم تحديث {count} منطقة.",
+      "previewErrors": "{count} صف به أخطاء وسيتم تجاهله:",
+      "previewNoValid": "لا توجد صفوف صالحة للاستيراد.",
+      "rowLabel": "صف",
+      "confirmImport": "تأكيد الاستيراد",
+      "importing": "جارٍ الاستيراد…",
+      "cancel": "إلغاء",
+      "importedTitle": "تم الاستيراد",
+      "importedDescription": "تم تحديث {count} رسم منطقة."
     }
   },
   "tax": {
