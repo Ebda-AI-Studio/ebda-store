@@ -148,9 +148,9 @@ export default function StockAdjustmentsPage() {
                     return (
                       <tr key={adj.id} className="border-t border-border/40">
                         <td className="px-3 py-2 font-mono text-xs">{adj.adjustmentNumber}</td>
-                        <td className="px-3 py-2 text-muted-foreground capitalize">
-                          {/* Use the types sub-key; fall back to raw value */}
-                          {adj.type.replace(/_/g, ' ')}
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {/* Localized adjustment-type label. */}
+                          {t(`types.${adj.type}`)}
                         </td>
                         <td className="px-3 py-2">
                           <span

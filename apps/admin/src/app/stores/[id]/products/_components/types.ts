@@ -7,6 +7,8 @@ export interface Product {
   /** Cost-of-goods in fils. Optional — older rows may not have this set. */
   costPrice?: number | null;
   inventory: number;
+  /** Variant-aware stock total from the API (variant sum for variant products, else `inventory`). */
+  totalInventory?: number;
   status: string;
   images: { url: string }[];
   hasVariants: boolean;

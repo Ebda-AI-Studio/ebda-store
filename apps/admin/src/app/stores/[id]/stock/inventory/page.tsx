@@ -16,6 +16,9 @@ interface ProductRow {
   name: string;
   sku: string | null;
   inventory: number;
+  /** Variant-aware stock total from the API (variant sum for variant products, else `inventory`). */
+  totalInventory?: number;
+  hasVariants?: boolean;
   lowStockThreshold: number;
   allowBackorder: boolean;
   status: string;
@@ -42,9 +45,9 @@ interface FlagListResponse {
   meta?: { total: number };
 }
 
-// Hard cap on rows fetched per inventory load. The server allows up to 500;
-// 100 keeps the single-page table responsive. Stores above this are surfaced
-// via a "showing N of M" indicator + notice rather than silently truncated.
+// Rows fetched per inventory page. The server allows up to 500; 100 keeps the
+// table responsive. Larger catalogues are paginated (Prev/Next below the table)
+// rather than silently truncated.
 const INVENTORY_PAGE_LIMIT = 100;
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -61,6 +64,10 @@ export default function StockInventoryPage() {
   // "showing N of M" indicator + a truncation notice — the list is hard-capped
   // at INVENTORY_PAGE_LIMIT so larger catalogues used to truncate silently.
   const [totalSkus, setTotalSkus] = useState(0);
+  // Pagination — the API returns meta.totalPages; we render Prev/Next below the
+  // table. Resets to page 1 whenever the search term changes.
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [suggestedSet, setSuggestedSet] = useState<Set<string>>(new Set());
   const [deadSet, setDeadSet] = useState<Set<string>>(new Set());
   // Per-fetch error: products failure used to trigger an early-return blank page.
@@ -78,9 +85,10 @@ export default function StockInventoryPage() {
 
   // Build the inventory list URL. Lists ALL items (no status filter) so the
   // merchant sees draft/archived stock too; opts into the sold-units aggregate.
-  const buildListUrl = (term: string) => {
+  const buildListUrl = (term: string, page: number) => {
     const qs = new URLSearchParams({
       limit: String(INVENTORY_PAGE_LIMIT),
+      page: String(page),
       withSalesQuantity: 'true',
     });
     if (term) qs.set('search', term);
@@ -127,19 +135,26 @@ export default function StockInventoryPage() {
     }
   };
 
+  // Reset to the first page whenever the search term changes so the merchant
+  // never lands on an out-of-range page for a narrower result set.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
   useEffect(() => {
     if (!storeId) return;
 
-    // Products list — re-fetches when the debounced search term changes.
+    // Products list — re-fetches when the debounced search term or page changes.
     setProducts(null);
     setSelectedIds([]);
-    apiGet<ProductsResponse>(buildListUrl(search))
+    apiGet<ProductsResponse>(buildListUrl(search, currentPage))
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setProductsErr(apiError.message);
         } else {
           setProducts(data?.products ?? []);
           setTotalSkus(data?.meta?.total ?? data?.products?.length ?? 0);
+          setTotalPages(data?.meta?.totalPages ?? 1);
         }
       })
       .catch(() => setProductsErr('Failed to load inventory'));
@@ -162,20 +177,21 @@ export default function StockInventoryPage() {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, search]);
+  }, [storeId, search, currentPage]);
 
   // Retry handler — clears the error and re-fires the products fetch
   const retryProducts = () => {
     if (!storeId) return;
     setProductsErr(null);
     setProducts(null);
-    apiGet<ProductsResponse>(buildListUrl(search))
+    apiGet<ProductsResponse>(buildListUrl(search, currentPage))
       .then(({ data, error: apiError }) => {
         if (apiError) {
           setProductsErr(apiError.message);
         } else {
           setProducts(data?.products ?? []);
           setTotalSkus(data?.meta?.total ?? data?.products?.length ?? 0);
+          setTotalPages(data?.meta?.totalPages ?? 1);
         }
       })
       .catch(() => setProductsErr('Failed to load inventory'));
@@ -306,8 +322,8 @@ export default function StockInventoryPage() {
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>{t('showingCount', { shown: products.length, total: totalSkus })}</span>
             </div>
-            {totalSkus > products.length && (
-              <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
+            {totalPages > 1 && (
+              <div className="mb-3 rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
                 {t('truncatedNotice', { shown: products.length, total: totalSkus })}
               </div>
             )}
@@ -353,7 +369,11 @@ export default function StockInventoryPage() {
                 </thead>
                 <tbody>
                   {products.map(p => {
-                    const isLow = p.inventory > 0 && p.inventory <= p.lowStockThreshold;
+                    // Variant products carry their stock on the variants, so the
+                    // API returns a variant-aware `totalInventory`. Resolve On-Hand
+                    // + low-stock colouring against that value.
+                    const onHand = p.hasVariants ? (p.totalInventory ?? 0) : p.inventory;
+                    const isLow = onHand > 0 && onHand <= p.lowStockThreshold;
                     const hasReorder = suggestedSet.has(p.id);
                     const hasDead = deadSet.has(p.id);
                     return (
@@ -387,10 +407,10 @@ export default function StockInventoryPage() {
                         </td>
                         <td
                           className={`px-3 py-2 text-end font-mono text-xs font-semibold ${
-                            p.inventory === 0 ? 'text-red-600' : isLow ? 'text-amber-600' : ''
+                            onHand === 0 ? 'text-red-600' : isLow ? 'text-amber-600' : ''
                           }`}
                         >
-                          {p.inventory}
+                          {onHand}
                         </td>
                         <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
                           {p.lowStockThreshold}
@@ -424,6 +444,30 @@ export default function StockInventoryPage() {
                 </tbody>
               </table>
             </div>
+            {/* Paginator — Prev/Next + "page X of N". Disabled at the ends. */}
+            {totalPages > 1 && (
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                >
+                  {tc('previous')}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {t('pageOf', { page: currentPage, total: totalPages })}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                >
+                  {tc('next')}
+                </Button>
+              </div>
+            )}
           </>
         )}
       </div>

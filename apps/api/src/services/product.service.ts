@@ -248,14 +248,38 @@ export class ProductService {
       prisma.product.count({ where }),
     ]);
 
+    // Variant-aware stock total. For variant products the live stock lives on the
+    // variants, not on `product.inventory` (which stays 0). One groupBy over the
+    // page's product ids sums active-variant inventory — NOT a per-row query (no
+    // N+1). `totalInventory` resolves to that sum for variant products, else to
+    // the product's own inventory, so the admin list + inventory page show the
+    // real on-hand figure.
+    const variantSumByProduct = new Map<string, number>();
+    if (products.length > 0) {
+      const productIds = products.map(p => p.id);
+      const variantGrouped = await prisma.productVariant.groupBy({
+        by: ['productId'],
+        where: { productId: { in: productIds }, isActive: true },
+        _sum: { inventory: true },
+      });
+      for (const row of variantGrouped) {
+        variantSumByProduct.set(row.productId, row._sum.inventory ?? 0);
+      }
+    }
+    const withTotalInventory = products.map(p => ({
+      ...p,
+      totalInventory: p.hasVariants ? (variantSumByProduct.get(p.id) ?? 0) : p.inventory,
+    }));
+
     // Sales quantity = SUM(order_items.quantity) per product, restricted to the
     // products on THIS page and to realized-sale order statuses. One groupBy for
     // the whole page window — NOT a per-row query (no N+1). Off by default so the
     // catalogue list path stays cheap; only the Inventory page opts in.
-    let productsOut: typeof products | Array<(typeof products)[number] & { soldQuantity: number }> =
-      products;
-    if (withSalesQuantity && products.length > 0) {
-      const productIds = products.map(p => p.id);
+    let productsOut:
+      | typeof withTotalInventory
+      | Array<(typeof withTotalInventory)[number] & { soldQuantity: number }> = withTotalInventory;
+    if (withSalesQuantity && withTotalInventory.length > 0) {
+      const productIds = withTotalInventory.map(p => p.id);
       const grouped = await prisma.orderItem.groupBy({
         by: ['productId'],
         where: {
@@ -268,7 +292,10 @@ export class ProductService {
       for (const row of grouped) {
         soldByProduct.set(row.productId, row._sum.quantity ?? 0);
       }
-      productsOut = products.map(p => ({ ...p, soldQuantity: soldByProduct.get(p.id) ?? 0 }));
+      productsOut = withTotalInventory.map(p => ({
+        ...p,
+        soldQuantity: soldByProduct.get(p.id) ?? 0,
+      }));
     }
 
     return {

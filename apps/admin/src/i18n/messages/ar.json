@@ -8,6 +8,7 @@
     "confirm": "تأكيد",
     "back": "رجوع",
     "next": "التالي",
+    "previous": "السابق",
     "search": "بحث",
     "loading": "جارٍ التحميل…",
     "saving": "جارٍ الحفظ…",
@@ -4261,7 +4262,16 @@
       "badgeDeadstock": "بضاعة راكدة",
       "searchPlaceholder": "ابحث بالاسم أو الرمز…",
       "showingCount": "عرض {shown} من {total} منتج",
-      "truncatedNotice": "يتم عرض أول {shown} من {total} منتج. استخدم البحث لتضييق القائمة، أو تواصل مع الدعم لعرض الباقي."
+      "truncatedNotice": "عرض {shown} من {total} — استخدم الصفحات أدناه لعرض الباقي.",
+      "pageOf": "صفحة {page} من {total}",
+      "cost": "التكلفة",
+      "price": "السعر",
+      "salesQuantity": "الكمية المباعة",
+      "selectAll": "تحديد الكل",
+      "selectedCount": "{count} محدد",
+      "bulkSetThreshold": "تحديد الحد",
+      "bulkThresholdFailed": "فشل تحديث الحد",
+      "bulkThresholdDone": "تم تحديث {count} منتج"
     },
     "scan": {
       "title": "مسح الباركود",
@@ -4333,7 +4343,14 @@
         "loss": "ضياع",
         "write_off": "شطب",
         "found": "مخزون مُستعاد",
-        "return_to_supplier": "إرجاع للمورد"
+        "return_to_supplier": "إرجاع للمورد",
+        "cycle_count_desc": "جرد دوري روتيني — يضبط المخزون على الكمية الفعلية المحسوبة.",
+        "damage_desc": "وحدات تعرّضت للتلف ولم تعد صالحة للبيع.",
+        "theft_desc": "مخزون مفقود بسبب السرقة أو الفاقد.",
+        "loss_desc": "مخزون ضائع أو في غير مكانه (ليس سرقة ولا تلفاً).",
+        "write_off_desc": "إزالة متعمّدة — منتهي الصلاحية أو قديم.",
+        "found_desc": "تم العثور على مخزون كان مفقوداً — يزيد الكمية.",
+        "return_to_supplier_desc": "تمت إعادته إلى المورد — يقلّل الكمية."
       },
       "new": {
         "title": "تسوية مخزون جديدة",

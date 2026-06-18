@@ -202,6 +202,8 @@ function CsvUploadTab({ storeId, onSuccess }: CsvUploadTabProps) {
             </option>
           ))}
         </select>
+        {/* One-line explanation of the currently-selected type. */}
+        <p className="text-xs text-muted-foreground mt-1">{t(`types.${type}_desc`)}</p>
       </div>
 
       {/* Reason */}
@@ -613,6 +615,8 @@ export default function NewStockAdjustmentPage() {
                   </option>
                 ))}
               </select>
+              {/* One-line explanation of the currently-selected type. */}
+              <p className="text-xs text-muted-foreground mt-1">{t(`types.${type}_desc`)}</p>
             </div>
 
             {/* Reason + ReasonAr */}

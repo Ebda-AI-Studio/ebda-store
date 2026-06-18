@@ -150,19 +150,27 @@ export function ProductsTable({
     },
     {
       header: t('table.inventory'),
-      cell: product => (
-        <span
-          className={`text-sm font-medium ${
-            product.inventory === 0
-              ? 'text-destructive'
-              : product.inventory < 10
-                ? 'text-warning'
-                : 'text-[hsl(var(--success))]'
-          }`}
-        >
-          {product.inventory}
-        </span>
-      ),
+      cell: product => {
+        // Variant products carry their stock on the variants, so the API returns
+        // a variant-aware `totalInventory`. Resolve + colour against that value so
+        // a variant product with stock isn't shown as a red zero.
+        const resolvedInventory = product.hasVariants
+          ? (product.totalInventory ?? 0)
+          : product.inventory;
+        return (
+          <span
+            className={`text-sm font-medium ${
+              resolvedInventory === 0
+                ? 'text-destructive'
+                : resolvedInventory < 10
+                  ? 'text-warning'
+                  : 'text-[hsl(var(--success))]'
+            }`}
+          >
+            {resolvedInventory}
+          </span>
+        );
+      },
     },
     {
       header: t('table.status'),

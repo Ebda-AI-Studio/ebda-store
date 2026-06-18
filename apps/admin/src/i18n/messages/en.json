@@ -8,6 +8,7 @@
     "confirm": "Confirm",
     "back": "Back",
     "next": "Next",
+    "previous": "Previous",
     "search": "Search",
     "loading": "Loading…",
     "saving": "Saving…",
@@ -4261,7 +4262,16 @@
       "badgeDeadstock": "Dead stock",
       "searchPlaceholder": "Search by name or SKU…",
       "showingCount": "Showing {shown} of {total} SKUs",
-      "truncatedNotice": "Showing the first {shown} of {total} SKUs. Use search to narrow the list, or contact support to view the rest."
+      "truncatedNotice": "Showing {shown} of {total} — use the pages below to see the rest.",
+      "pageOf": "Page {page} of {total}",
+      "cost": "Cost",
+      "price": "Price",
+      "salesQuantity": "Sales Qty",
+      "selectAll": "Select all",
+      "selectedCount": "{count} selected",
+      "bulkSetThreshold": "Set threshold",
+      "bulkThresholdFailed": "Threshold update failed",
+      "bulkThresholdDone": "{count} products updated"
     },
     "scan": {
       "title": "Barcode Scan",
@@ -4333,7 +4343,14 @@
         "loss": "Loss",
         "write_off": "Write-off",
         "found": "Found Stock",
-        "return_to_supplier": "Return to Supplier"
+        "return_to_supplier": "Return to Supplier",
+        "cycle_count_desc": "Routine recount — sets stock to the actual physical count.",
+        "damage_desc": "Units physically damaged and no longer sellable.",
+        "theft_desc": "Stock lost to theft or shrinkage.",
+        "loss_desc": "Lost or misplaced stock (not theft or damage).",
+        "write_off_desc": "Deliberately removed — expired or obsolete.",
+        "found_desc": "Previously-missing stock located — increases quantity.",
+        "return_to_supplier_desc": "Sent back to the supplier — decreases quantity."
       },
       "new": {
         "title": "New Stock Adjustment",
