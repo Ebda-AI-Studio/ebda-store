@@ -15,18 +15,34 @@ export interface OrderCustomer {
 }
 
 export interface OrderPayment {
+  id?: string;
   provider: string;
+  /** Specific method within the provider (e.g. knet, visa, mastercard). */
+  method?: string | null;
   status: string;
+  amount?: number;
+  /** Provider-side transaction id, useful for reconciliation. */
+  transactionId?: string | null;
+  /** Provider's hosted-checkout URL (MyFatoorah / Tap / Hesabe / UPayments). */
+  paymentUrl?: string | null;
+  /** Legacy alias for paymentUrl kept for backwards compatibility. */
+  paymentLink?: string | null;
+  createdAt?: string;
 }
 
 export interface OrderLineItem {
   id: string;
+  productId?: string;
   productName: string;
   variantName?: string | null;
   sku?: string | null;
   quantity: number;
   price?: number;
   total?: number;
+  product?: {
+    id: string;
+    images?: Array<{ url: string; alt?: string | null }>;
+  };
 }
 
 export interface Order {
@@ -58,6 +74,13 @@ export interface AddressJson {
   floor?: string;
   apartment?: string;
   notes?: string;
+  // Governorate (top-level KW administrative division).
+  governorate?: string;
+  governorateAr?: string;
+  // Bilingual fallback fields stored as the customer entered them.
+  cityAr?: string;
+  areaAr?: string;
+  streetAr?: string;
 }
 
 export interface OrderDetail extends Order {
@@ -69,10 +92,12 @@ export interface OrderDetail extends Order {
   notes: string | null;
   customerNotes: string | null;
   shippingAddress: AddressJson | null;
+  billingAddress?: AddressJson | null;
   shippedAt: string | null;
   deliveredAt: string | null;
   updatedAt: string;
   items: OrderLineItem[];
+  payments?: OrderPayment[];
 }
 
 export interface Pagination {

@@ -13,6 +13,25 @@ const nextConfig = {
 
   transpilePackages: ['@force/shared'],
 
+  // Product image thumbnails on the order detail page come from the same R2 /
+  // CDN hosts the admin + storefront use. Mirror the admin's allowlist so
+  // next/image can optimize them (CSP already permits https: img-src).
+  images: {
+    remotePatterns: [
+      ...(process.env.NODE_ENV !== 'production'
+        ? [
+            { protocol: 'http', hostname: 'localhost', port: '', pathname: '/**' },
+            { protocol: 'http', hostname: 'localhost', port: '9000', pathname: '/**' },
+          ]
+        : []),
+      { protocol: 'https', hostname: 'cdn.forcemediakw.com', port: '', pathname: '/**' },
+      { protocol: 'https', hostname: '*.supabase.co', port: '', pathname: '/storage/**' },
+      { protocol: 'https', hostname: '*.r2.cloudflarestorage.com', port: '', pathname: '/**' },
+      { protocol: 'https', hostname: '*.r2.dev', port: '', pathname: '/**' },
+    ],
+    formats: ['image/avif', 'image/webp'],
+  },
+
   async headers() {
     return [
       {
