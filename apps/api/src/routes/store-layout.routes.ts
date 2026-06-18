@@ -137,7 +137,7 @@ const sectionPaddingMaxWidthVisibility = {
   hideOnDesktop: z.boolean().optional(),
 } as const;
 
-const layoutSchema = z
+const layoutSchemaInternal = z
   .object({
     hero: z.object({
       enabled: z.boolean(),
@@ -584,6 +584,21 @@ const layoutSchema = z
       })
       .partial()
       .optional(),
+    // Standalone locations-page settings (background + typography). Same strip
+    // trap as the other per-page keys — the top-level object has no
+    // .passthrough(), so without this entry every PUT silently drops the
+    // merchant's locations-page edits ("saved but never rendered"). Keep in
+    // sync with LocationsPageSettings in packages/shared.
+    locationsPage: z
+      .object({
+        bgColor: colorValue,
+        colorScheme: z.enum(['auto', 'light', 'dark']).optional(),
+        density: z.enum(['compact', 'normal', 'spacious']).optional(),
+        textScale: z.enum(['sm', 'normal', 'lg', 'xl']).optional(),
+        typography: sectionTypographyOverride,
+      })
+      .partial()
+      .optional(),
     checkoutPage: z
       .object({
         bgColor: colorValue,
@@ -606,10 +621,38 @@ const layoutSchema = z
       })
       .partial()
       .optional(),
+    // Mobile bottom tab-bar color overrides (page-builder 2026-06-17). Same
+    // Mobile bottom tab-bar color overrides (page-builder 2026-06-17). Same
+    // strip trap — the top-level object has no .passthrough(), so without this
+    // entry every PUT silently dropped the merchant's bottom-bar colors and the
+    // control looked like it "did nothing". Keep in sync with BottomBarSettings.
+    bottomBar: z
+      .object({
+        bgColor: colorValue,
+        activeColor: colorValue,
+        inactiveColor: colorValue,
+      })
+      .partial()
+      .optional(),
   })
   // Allow partial bodies so the admin UI can patch a single section without
   // re-sending every field. We re-merge with the existing JSON before save.
   .partial();
+
+/**
+ * Exported for the layout-schema-parity unit test.
+ *
+ * The test uses `.shape` to enumerate the schema's top-level accepted keys and
+ * asserts they cover every key in `LAYOUT_TOP_LEVEL_KEYS` (the runtime mirror
+ * of `StoreLayoutSettings`). This catches the silent-strip bug class at CI time
+ * instead of after a merchant reports "my changes don't save".
+ *
+ * Cast to `z.ZodObject<Record<string, z.ZodTypeAny>>` to avoid TS7056
+ * ("inferred type exceeds maximum length") — the inferred Zod type is too deep
+ * for tsc to serialize on an export. The test only needs `.shape`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const layoutSchema: z.ZodObject<Record<string, z.ZodTypeAny>> = layoutSchemaInternal;
 
 /**
  * GET /admin/stores/:storeId/layout

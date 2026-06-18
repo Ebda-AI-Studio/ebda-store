@@ -1853,6 +1853,14 @@ export default function StoreLayoutPage() {
                 title="Bottom bar (mobile) / شريط التنقل السفلي (جوال)"
                 description="Color the mobile tab bar at the bottom of the screen. Leave fields empty to keep the theme default."
                 defaultExpanded={false}
+                // alwaysOn — this is a content-only card (color knobs, no
+                // on/off toggle). Without it SectionCard gates `children` on
+                // (alwaysOn || enabled); both are falsy here, so the card
+                // expanded to an EMPTY body — the 3 ColorFields never rendered
+                // and the control read as dead / "not pressable" (merchant
+                // complaint 2026-06-18). Mirrors every other per-page design
+                // card (Locations / Products / Cart / Checkout), all `alwaysOn`.
+                alwaysOn
               >
                 <div className="space-y-1">
                   <ColorField

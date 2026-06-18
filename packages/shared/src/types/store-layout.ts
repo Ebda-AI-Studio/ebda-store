@@ -818,6 +818,65 @@ export interface StoreLayoutSettings {
 }
 
 /**
+ * Runtime tuple of every top-level key on `StoreLayoutSettings`.
+ *
+ * This array is the guard against the recurring silent-strip bug: the API
+ * `layoutSchema` is a strict `z.object({...}).partial()` with NO
+ * `.passthrough()`. Any top-level key NOT listed in that Zod shape is silently
+ * dropped on every PUT, so a merchant's save "succeeds" but the field is
+ * quietly gone. (History: productsPage, cartPage, locationsPage, bottomBar
+ * each recurred ~4 times because there was no automated check.)
+ *
+ * The compile-time assertions below keep this array in sync with the interface:
+ *   _AssertKeysCover  → every array entry IS a key on StoreLayoutSettings
+ *   _AssertKeysComplete → every key on StoreLayoutSettings IS in the array
+ * Adding a key to the interface without adding it here is a TypeScript error.
+ *
+ * The runtime test at `tests/unit/layout-schema-parity.test.ts` consumes this
+ * array to assert that EVERY key here is also in the API's Zod schema.
+ */
+export const LAYOUT_TOP_LEVEL_KEYS = [
+  'hero',
+  'categories',
+  'newArrivals',
+  'bestSellers',
+  'filterSidebar',
+  'testimonials',
+  'reviewSection',
+  'brandStory',
+  'trustStrip',
+  'blogCarousel',
+  'announcement',
+  'header',
+  'footer',
+  'extraCarousels',
+  'sizing',
+  'productCardDefaults',
+  'productsPage',
+  'productDetailPage',
+  'categoriesPage',
+  'locationsPage',
+  'checkoutPage',
+  'cartPage',
+  'bottomBar',
+  'sectionOrder',
+] as const;
+
+// Compile-time assertions — both must remain true.
+// Adding a key to StoreLayoutSettings without adding it to the array above is
+// a TypeScript error ("Type 'false' is not assignable to type 'true'").
+type _AssertKeysCover = (typeof LAYOUT_TOP_LEVEL_KEYS)[number] extends keyof StoreLayoutSettings
+  ? true
+  : false;
+type _AssertKeysComplete = keyof StoreLayoutSettings extends (typeof LAYOUT_TOP_LEVEL_KEYS)[number]
+  ? true
+  : false;
+/** @internal compile-time assertion — do not use at runtime */
+export const _layoutKeysCoversInterface: _AssertKeysCover = true;
+/** @internal compile-time assertion — do not use at runtime */
+export const _layoutInterfaceCoversKeys: _AssertKeysComplete = true;
+
+/**
  * Pecannbee flow defaults. When a tenant's `layout_settings` column is `{}`
  * (the column default), `resolveLayoutSettings` returns this verbatim.
  */
