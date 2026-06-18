@@ -1817,6 +1817,24 @@
       "cancel": "Cancel",
       "createZone": "Create Zone",
       "updateZone": "Update Zone"
+    },
+    "areaRates": {
+      "sectionTitle": "Delivery areas & fees",
+      "sectionSubtitle": "Set a fee per Kuwait area. This is the recommended way to price per-area delivery.",
+      "applyAll": "Apply fee to all areas:",
+      "applyBtn": "Apply",
+      "feeLabel": "Delivery fee",
+      "freeOver": "Free over",
+      "freeOverLabel": "Free-shipping threshold",
+      "optional": "optional",
+      "currency": "KWD",
+      "save": "Save area rates",
+      "saving": "Saving…",
+      "savedTitle": "Saved",
+      "savedDescription": "Area delivery fees updated.",
+      "errorTitle": "Error",
+      "fetchFailed": "Failed to load area rates.",
+      "saveFailed": "Failed to save area rates."
     }
   },
   "tax": {

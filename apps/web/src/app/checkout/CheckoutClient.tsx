@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, Input, Select } from '@force/ui';
+import { Button, Input } from '@force/ui';
 import { MinimalChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useCart } from '../../contexts/CartContext';
@@ -12,7 +12,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
-import { isValidEmail } from '@force/shared';
+import { isValidEmail, KUWAIT_GOVERNORATES, findGovernorateByArea } from '@force/shared';
+import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
+import { saveCheckoutInfo, loadCheckoutInfo, clearCheckoutInfo } from './_lib/savedCheckout';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import {
   resolveSectionZone,
@@ -54,17 +56,15 @@ interface ShippingZone {
   estimatedDaysMax: number | null;
 }
 
-const KUWAIT_AREAS = [
-  { en: 'Capital', ar: '\u0627\u0644\u0639\u0627\u0635\u0645\u0629' },
-  { en: 'Hawalli', ar: '\u062d\u0648\u0644\u064a' },
-  { en: 'Farwaniya', ar: '\u0627\u0644\u0641\u0631\u0648\u0627\u0646\u064a\u0629' },
-  {
-    en: 'Mubarak Al-Kabeer',
-    ar: '\u0645\u0628\u0627\u0631\u0643 \u0627\u0644\u0643\u0628\u064a\u0631',
-  },
-  { en: 'Ahmadi', ar: '\u0627\u0644\u0623\u062d\u0645\u062f\u064a' },
-  { en: 'Jahra', ar: '\u0627\u0644\u062c\u0647\u0631\u0627\u0621' },
-];
+// Area-rate shape returned by the public shipping rates endpoint
+interface AreaRate {
+  governorate: string;
+  governorateAr: string;
+  area: string;
+  areaAr: string;
+  deliveryFee: number;
+  freeShippingThreshold: number | null;
+}
 
 export default function CheckoutClient() {
   const router = useRouter();
@@ -161,6 +161,12 @@ export default function CheckoutClient() {
   const [, setShippingZones] = useState<ShippingZone[]>([]);
   const [paymentProviders, setPaymentProviders] = useState<PaymentProvider[]>([]);
 
+  // Area-rate data fetched once on mount from the public endpoint
+  const [ratedAreas, setRatedAreas] = useState<Set<string>>(new Set());
+  const [ratedGovernorates, setRatedGovernorates] = useState<Set<string>>(new Set());
+  const [rateByArea, setRateByArea] = useState<Map<string, AreaRate>>(new Map());
+  const [shippingUnavailable, setShippingUnavailable] = useState(false);
+
   // Shipping & discount
   const [selectedArea, setSelectedArea] = useState('');
   const [shippingCost, setShippingCost] = useState(0);
@@ -194,6 +200,10 @@ export default function CheckoutClient() {
   // gated on this and send whenever the channel is configured.
   const [smsOptIn, setSmsOptIn] = useState(false);
 
+  // "Save my info" — persists contact + address to localStorage (device-local,
+  // store-scoped). Default false. Never stores payment data.
+  const [saveInfo, setSaveInfo] = useState(false);
+
   // Form data — persisted in sessionStorage so a page refresh mid-checkout
   // doesn't wipe what the customer already typed.
   const [formData, setFormData] = useState({
@@ -201,10 +211,18 @@ export default function CheckoutClient() {
     firstName: '',
     lastName: '',
     phone: '',
-    address: '',
-    apartment: '',
-    area: '',
+    // Kuwaiti structured address fields
+    governorate: '', // EN canonical (e.g. 'Hawalli')
+    area: '', // EN canonical (e.g. 'Salmiya')
+    block: '', // قطعة *
+    street: '', // الشارع *
+    avenue: '', // الجادة (optional)
+    house: '', // منزل *
+    floor: '', // الطابق (optional)
+    apartment: '', // شقة (optional)
     notes: '',
+    // kept for back-compat with sessionStorage / PaymentStep display
+    address: '',
   });
 
   const checkoutStorageKey = store?.id ? `force-checkout-form-${store.id}` : null;
@@ -290,13 +308,45 @@ export default function CheckoutClient() {
     }
   }, [formData.phone]);
 
+  // On mount: prefill from localStorage ("Save my info" persistence).
+  // Runs once when the store id is known. If saved data exists, merge it
+  // over the default form state and turn the saveInfo checkbox on.
+  useEffect(() => {
+    if (!store?.id || typeof window === 'undefined') return;
+    const saved = loadCheckoutInfo(store.id);
+    if (!saved) return;
+    setFormData(prev => ({
+      ...prev,
+      firstName: saved.firstName || prev.firstName,
+      lastName: saved.lastName || prev.lastName,
+      phone: saved.phone || prev.phone,
+      email: saved.email || prev.email,
+      governorate: saved.governorate || prev.governorate,
+      area: saved.area || prev.area,
+      block: saved.block || prev.block,
+      street: saved.street || prev.street,
+      avenue: saved.avenue || prev.avenue,
+      house: saved.house || prev.house,
+      floor: saved.floor || prev.floor,
+      apartment: saved.apartment || prev.apartment,
+      notes: saved.notes || prev.notes,
+    }));
+    if (saved.area) setSelectedArea(saved.area);
+    setSaveInfo(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store?.id]);
+
   // Form validation errors
   const [formErrors, setFormErrors] = useState<{
     email?: string;
     firstName?: string;
     lastName?: string;
     phone?: string;
+    governorate?: string;
     area?: string;
+    block?: string;
+    street?: string;
+    house?: string;
     address?: string;
   }>({});
 
@@ -322,6 +372,27 @@ export default function CheckoutClient() {
 
         if (shippingResult?.success && shippingResult.data) {
           setShippingZones(shippingResult.data.zones || []);
+        }
+
+        // Fetch per-area rates for the hide-unpriced filter + inline fee display.
+        // This is best-effort — if it fails, the full canonical list is shown.
+        if (store?.id) {
+          try {
+            const ratesResult = await api.get<{ rates: AreaRate[] }>(
+              `/stores/public/${store.id}/shipping/area-rates`
+            );
+            if (ratesResult.success && ratesResult.data?.rates?.length) {
+              const rates = ratesResult.data.rates;
+              const areaSet = new Set(rates.map(r => r.area));
+              const govSet = new Set(rates.map(r => r.governorate));
+              const byArea = new Map(rates.map(r => [r.area, r]));
+              setRatedAreas(areaSet);
+              setRatedGovernorates(govSet);
+              setRateByArea(byArea);
+            }
+          } catch {
+            // Non-fatal — fall back to showing all areas
+          }
         }
 
         if (paymentResult.success && paymentResult.data) {
@@ -367,19 +438,31 @@ export default function CheckoutClient() {
   const calculateShipping = useCallback(async () => {
     if (!selectedArea || !store?.id || !cart?.subtotal) return;
 
+    setShippingUnavailable(false);
     try {
-      const result = await api.post<{ shippingCost: number; freeShipping: boolean }>(
-        `/stores/public/${store.id}/shipping/calculate`,
-        { area: selectedArea, orderTotal: cart.subtotal }
-      );
+      const result = await api.post<{
+        shippingCost: number;
+        freeShipping: boolean;
+        matched?: boolean;
+      }>(`/stores/public/${store.id}/shipping/calculate`, {
+        area: selectedArea,
+        orderTotal: cart.subtotal,
+        governorate: formData.governorate,
+      });
       if (result.success && result.data) {
-        setShippingCost(result.data.shippingCost || 0);
-        setFreeShipping(result.data.freeShipping || false);
+        if (result.data.matched === false) {
+          setShippingUnavailable(true);
+          setShippingCost(0);
+          setFreeShipping(false);
+        } else {
+          setShippingCost(result.data.shippingCost || 0);
+          setFreeShipping(result.data.freeShipping || false);
+        }
       }
     } catch (error) {
       console.error('Failed to calculate shipping:', error);
     }
-  }, [selectedArea, store?.id, cart?.subtotal]);
+  }, [selectedArea, store?.id, cart?.subtotal, formData.governorate]);
 
   useEffect(() => {
     calculateShipping();
@@ -394,6 +477,15 @@ export default function CheckoutClient() {
     if (formErrors[field as keyof typeof formErrors]) {
       setFormErrors(prev => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  // Handler for GovernorateAreaSelect onChange — updates both governorate and area
+  const handleGovernorateAreaChange = (govEn: string, areaEn: string) => {
+    setFormData(prev => ({ ...prev, governorate: govEn, area: areaEn }));
+    setSelectedArea(areaEn);
+    setShippingUnavailable(false);
+    // Clear related errors
+    setFormErrors(prev => ({ ...prev, governorate: undefined, area: undefined }));
   };
 
   // Validate form data
@@ -442,16 +534,27 @@ export default function CheckoutClient() {
       }
     }
 
-    // Area validation
+    // Governorate + Area validation
+    if (!formData.governorate) {
+      errors.governorate = t('Please select a governorate', 'يرجى اختيار المحافظة');
+    }
     if (!formData.area) {
       errors.area = t('Please select a delivery area', 'يرجى اختيار منطقة التوصيل');
     }
 
-    // Address validation
-    if (!formData.address.trim()) {
-      errors.address = t('Block & Street address is required', 'عنوان القطعة والشارع مطلوب');
-    } else if (formData.address.trim().length < 5) {
-      errors.address = t('Please enter a complete address', 'يرجى إدخال عنوان كامل');
+    // Block validation (required)
+    if (!formData.block.trim()) {
+      errors.block = t('Block is required', 'القطعة مطلوبة');
+    }
+
+    // Street validation (required)
+    if (!formData.street.trim()) {
+      errors.street = t('Street is required', 'الشارع مطلوب');
+    }
+
+    // House validation (required)
+    if (!formData.house.trim()) {
+      errors.house = t('House / building number is required', 'رقم المنزل أو المبنى مطلوب');
     }
 
     setFormErrors(errors);
@@ -506,6 +609,29 @@ export default function CheckoutClient() {
   );
 
   const handleApplyCoupon = () => applyCouponCode();
+
+  // Clear saved checkout info and reset the relevant form fields to blank.
+  const handleClearSavedData = () => {
+    if (store?.id) clearCheckoutInfo(store.id);
+    setSaveInfo(false);
+    setFormData(prev => ({
+      ...prev,
+      firstName: '',
+      lastName: '',
+      phone: '',
+      email: '',
+      governorate: '',
+      area: '',
+      block: '',
+      street: '',
+      avenue: '',
+      house: '',
+      floor: '',
+      apartment: '',
+      notes: '',
+    }));
+    setSelectedArea('');
+  };
 
   const removeCoupon = () => {
     setAppliedCoupon(null);
@@ -627,27 +753,73 @@ export default function CheckoutClient() {
     setIsProcessing(true);
     setCheckoutError(null);
 
+    // Persist or clear saved info based on the saveInfo checkbox.
+    if (store?.id) {
+      const selectedGovForSave = KUWAIT_GOVERNORATES.find(g => g.en === formData.governorate);
+      const selectedAreaForSave =
+        selectedGovForSave?.areas.find(a => a.en === formData.area) ??
+        findGovernorateByArea(formData.area)?.areas.find(a => a.en === formData.area);
+      if (saveInfo) {
+        saveCheckoutInfo(store.id, {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          email: formData.email,
+          governorate: selectedGovForSave?.en ?? formData.governorate,
+          governorateAr: selectedGovForSave?.ar ?? '',
+          area: selectedAreaForSave?.en ?? formData.area,
+          areaAr: selectedAreaForSave?.ar ?? '',
+          block: formData.block,
+          street: formData.street,
+          avenue: formData.avenue,
+          house: formData.house,
+          floor: formData.floor,
+          apartment: formData.apartment,
+          notes: formData.notes,
+        });
+      } else {
+        clearCheckoutInfo(store.id);
+      }
+    }
+
     try {
       // Create order. Include the form's email on the shipping address so
       // the invoice / order confirmation can show the *buyer's* contact email
       // — not the authenticated user's profile email (which can differ when
       // a logged-in admin checks out for someone else).
-      // Resolve both English and Arabic area names from the selected value
-      // (formData.area is always the English key from the KUWAIT_AREAS list).
-      const selectedKuwaitArea = KUWAIT_AREAS.find(a => a.en === formData.area);
+      // Resolve both English and Arabic names from the canonical dataset.
+      const selectedGov = KUWAIT_GOVERNORATES.find(g => g.en === formData.governorate);
+      const selectedKuwaitArea =
+        selectedGov?.areas.find(a => a.en === formData.area) ??
+        findGovernorateByArea(formData.area)?.areas.find(a => a.en === formData.area);
+
+      // Compose address1 from structured fields for back-compat with
+      // existing order display / admin views.
+      const address1Parts = [
+        formData.block ? `Block ${formData.block}` : '',
+        formData.street ? `Street ${formData.street}` : '',
+        formData.avenue ? `Avenue ${formData.avenue}` : '',
+        formData.house ? `House ${formData.house}` : '',
+      ].filter(Boolean);
+      const composedAddress1 = address1Parts.join(', ') || formData.address;
+
       const orderResult = await api.createOrder({
         shippingAddress: {
           firstName: formData.firstName,
           lastName: formData.lastName,
-          address1: formData.address,
+          address1: composedAddress1,
           address2: formData.apartment,
-          // Use `area` (structured KW governorate field) instead of generic
-          // `state` so the admin delivery card can display it with proper labels.
+          // Structured Kuwait address fields
           area: selectedKuwaitArea?.en ?? formData.area,
-          // Store the Arabic name so the admin UI can render it in Arabic
-          // when the admin locale is AR — without this, only the English
-          // name is available and the address always shows in English.
           areaAr: selectedKuwaitArea?.ar ?? '',
+          governorate: selectedGov?.en ?? formData.governorate,
+          governorateAr: selectedGov?.ar ?? '',
+          // Additional structured fields for delivery logistics
+          block: formData.block,
+          street: formData.street,
+          avenue: formData.avenue,
+          house: formData.house,
+          floor: formData.floor,
           city: '',
           country: 'KW',
           phone: formData.phone,
@@ -749,6 +921,11 @@ export default function CheckoutClient() {
           'shippingAddress.phone': 'phone',
           'shippingAddress.address1': 'address',
           'shippingAddress.state': 'area',
+          'shippingAddress.area': 'area',
+          'shippingAddress.governorate': 'governorate',
+          'shippingAddress.block': 'block',
+          'shippingAddress.street': 'street',
+          'shippingAddress.house': 'house',
         };
         const inlineErrors: typeof formErrors = {};
         for (const [path, msgs] of Object.entries(details)) {
@@ -1069,73 +1246,170 @@ export default function CheckoutClient() {
                         )}
                       </div>
 
-                      <div data-error={!!formErrors.area}>
-                        <Select
-                          label={t(
-                            'Delivery Area',
-                            '\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u062a\u0648\u0635\u064a\u0644'
+                      {/* Country row \u2014 fixed Kuwait, shown for UX context */}
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-1">
+                          {t('Country', '\u0627\u0644\u0628\u0644\u062f')}
+                        </label>
+                        <div className="flex items-center rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
+                          <span className="me-2" aria-hidden="true">
+                            \ud83c\uddf0\ud83c\uddfc
+                          </span>
+                          {t('Kuwait', '\u0627\u0644\u0643\u0648\u064a\u062a')}
+                        </div>
+                      </div>
+
+                      {/* Governorate \u2192 Area typeahead cascade */}
+                      <GovernorateAreaSelect
+                        governorate={formData.governorate}
+                        area={formData.area}
+                        onChange={handleGovernorateAreaChange}
+                        locale={language as 'ar' | 'en'}
+                        ratedAreas={ratedAreas.size > 0 ? ratedAreas : undefined}
+                        ratedGovernorates={
+                          ratedGovernorates.size > 0 ? ratedGovernorates : undefined
+                        }
+                        governorateError={formErrors.governorate}
+                        areaError={formErrors.area}
+                      />
+
+                      {/* Delivery method panel */}
+                      <div className="rounded-lg border border-border bg-muted/30 p-4">
+                        <p className="text-sm font-medium text-foreground mb-2">
+                          {t(
+                            'Delivery method',
+                            '\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062a\u0648\u0635\u064a\u0644'
                           )}
-                          value={formData.area}
-                          onChange={e => updateField('area', e.target.value)}
-                          aria-invalid={formErrors.area ? true : undefined}
-                          options={[
-                            {
-                              value: '',
-                              label: t(
-                                'Select area...',
-                                '\u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0646\u0637\u0642\u0629...'
-                              ),
-                            },
-                            ...KUWAIT_AREAS.map(a => ({
-                              value: a.en,
-                              label: language === 'ar' ? `${a.ar} / ${a.en}` : `${a.en} / ${a.ar}`,
-                            })),
-                          ]}
-                          className={
-                            formErrors.area
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
-                        />
-                        {formErrors.area && (
-                          <p role="alert" className="mt-1 text-sm text-destructive">
-                            {formErrors.area}
+                        </p>
+                        {!formData.area ? (
+                          <p className="text-sm text-muted-foreground">
+                            {t(
+                              'Select your address to see delivery options',
+                              '\u062d\u062f\u062f \u0639\u0646\u0648\u0627\u0646\u0643 \u0644\u0639\u0631\u0636 \u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u062a\u0648\u0635\u064a\u0644'
+                            )}
                           </p>
+                        ) : shippingUnavailable ? (
+                          <p className="text-sm text-destructive">
+                            {t(
+                              'Not available for delivery to this area',
+                              '\u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u0644\u0644\u062a\u0648\u0635\u064a\u0644 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u0646\u0637\u0642\u0629'
+                            )}
+                          </p>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-foreground">
+                              {t(
+                                'Standard delivery',
+                                '\u062a\u0648\u0635\u064a\u0644 \u0639\u0627\u062f\u064a'
+                              )}
+                            </span>
+                            <span className="text-sm font-medium text-foreground">
+                              {freeShipping
+                                ? t('Free', '\u0645\u062c\u0627\u0646\u064a')
+                                : shippingCost > 0
+                                  ? formatPrice(shippingCost)
+                                  : rateByArea.has(formData.area)
+                                    ? formatPrice(rateByArea.get(formData.area)!.deliveryFee)
+                                    : t(
+                                        'Calculating...',
+                                        '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0633\u0627\u0628...'
+                                      )}
+                            </span>
+                          </div>
                         )}
                       </div>
 
-                      <div data-error={!!formErrors.address}>
+                      {/* Structured Kuwaiti address fields */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div data-error={!!formErrors.block}>
+                          <Input
+                            label={t('Block *', '\u0642\u0637\u0639\u0629 *')}
+                            value={formData.block}
+                            onChange={e => updateField('block', e.target.value)}
+                            aria-invalid={formErrors.block ? true : undefined}
+                            className={
+                              formErrors.block
+                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                                : ''
+                            }
+                          />
+                          {formErrors.block && (
+                            <p role="alert" className="mt-1 text-sm text-destructive">
+                              {formErrors.block}
+                            </p>
+                          )}
+                        </div>
+                        <div data-error={!!formErrors.street}>
+                          <Input
+                            label={t('Street *', '\u0627\u0644\u0634\u0627\u0631\u0639 *')}
+                            value={formData.street}
+                            onChange={e => updateField('street', e.target.value)}
+                            aria-invalid={formErrors.street ? true : undefined}
+                            className={
+                              formErrors.street
+                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                                : ''
+                            }
+                          />
+                          {formErrors.street && (
+                            <p role="alert" className="mt-1 text-sm text-destructive">
+                              {formErrors.street}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
                         <Input
                           label={t(
-                            'Block & Street',
-                            '\u0627\u0644\u0642\u0637\u0639\u0629 \u0648\u0627\u0644\u0634\u0627\u0631\u0639'
+                            'Avenue (optional)',
+                            '\u0627\u0644\u062c\u0627\u062f\u0629 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
                           )}
-                          autoComplete="street-address"
-                          value={formData.address}
-                          onChange={e => updateField('address', e.target.value)}
-                          aria-invalid={formErrors.address ? true : undefined}
-                          className={
-                            formErrors.address
-                              ? 'border-destructive focus:border-destructive focus:ring-destructive'
-                              : ''
-                          }
+                          value={formData.avenue}
+                          onChange={e => updateField('avenue', e.target.value)}
                         />
-                        {formErrors.address && (
-                          <p role="alert" className="mt-1 text-sm text-destructive">
-                            {formErrors.address}
-                          </p>
-                        )}
+                        <div data-error={!!formErrors.house}>
+                          <Input
+                            label={t(
+                              'House / Building *',
+                              '\u0645\u0646\u0632\u0644 / \u0645\u0628\u0646\u0649 *'
+                            )}
+                            value={formData.house}
+                            onChange={e => updateField('house', e.target.value)}
+                            aria-invalid={formErrors.house ? true : undefined}
+                            className={
+                              formErrors.house
+                                ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                                : ''
+                            }
+                          />
+                          {formErrors.house && (
+                            <p role="alert" className="mt-1 text-sm text-destructive">
+                              {formErrors.house}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
-                      <Input
-                        label={t(
-                          'Building / House / Apartment',
-                          '\u0627\u0644\u0645\u0628\u0646\u0649 / \u0627\u0644\u0645\u0646\u0632\u0644 / \u0627\u0644\u0634\u0642\u0629'
-                        )}
-                        autoComplete="address-line2"
-                        value={formData.apartment}
-                        onChange={e => updateField('apartment', e.target.value)}
-                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input
+                          label={t(
+                            'Floor (optional)',
+                            '\u0627\u0644\u0637\u0627\u0628\u0642 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
+                          )}
+                          value={formData.floor}
+                          onChange={e => updateField('floor', e.target.value)}
+                        />
+                        <Input
+                          label={t(
+                            'Apartment (optional)',
+                            '\u0634\u0642\u0629 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)'
+                          )}
+                          autoComplete="address-line2"
+                          value={formData.apartment}
+                          onChange={e => updateField('apartment', e.target.value)}
+                        />
+                      </div>
 
                       <div>
                         <label
@@ -1185,6 +1459,45 @@ export default function CheckoutClient() {
                         </label>
                       </div>
                     )}
+
+                    {/* Save my info \u2014 device-local localStorage persistence.
+                        NO payment data stored. Store-scoped key. */}
+                    <div className="pt-3 border-t border-border">
+                      <label className="flex items-start gap-3 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={saveInfo}
+                          onChange={e => setSaveInfo(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-2 focus:ring-primary/20"
+                        />
+                        <span className="flex flex-col gap-0.5">
+                          <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                            {t(
+                              'Save my info to speed up checkout next time',
+                              '\u0627\u062d\u0641\u0638 \u0628\u064a\u0627\u0646\u0627\u062a\u064a \u0644\u062a\u0633\u0631\u064a\u0639 \u0627\u0644\u062f\u0641\u0639 \u0641\u064a \u0627\u0644\u0645\u0631\u0629 \u0627\u0644\u0642\u0627\u062f\u0645\u0629'
+                            )}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {t(
+                              'Your info is stored securely on this device. You can delete it anytime.',
+                              '\u0633\u064a\u062a\u0645 \u062a\u062e\u0632\u064a\u0646 \u0645\u0639\u0644\u0648\u0645\u0627\u062a\u0643 \u0628\u0623\u0645\u0627\u0646 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u062c\u0647\u0627\u0632. \u064a\u0645\u0643\u0646\u0643 \u062d\u0630\u0641\u0647\u0627 \u0641\u064a \u0623\u064a \u0648\u0642\u062a.'
+                            )}
+                          </span>
+                        </span>
+                      </label>
+                      {saveInfo && (
+                        <button
+                          type="button"
+                          onClick={handleClearSavedData}
+                          className="mt-2 ms-7 text-xs text-destructive hover:underline"
+                        >
+                          {t(
+                            'Clear saved data',
+                            '\u062d\u0630\u0641 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629'
+                          )}
+                        </button>
+                      )}
+                    </div>
 
                     <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <Link

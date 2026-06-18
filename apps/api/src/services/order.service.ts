@@ -210,15 +210,44 @@ export class OrderService {
     // shipping cost) using the address's `area` field. When no zone
     // matches, the calculator returns 0 — same outcome as before for
     // stores with zero shipping zones configured.
+    // Prefer explicit sub-area → governorate → legacy city/state fallback so
+    // orders created before the cascade selector (where the governorate lived
+    // in `area` or `state`) still match shipping zones correctly.
+    const addr = data.shippingAddress as Record<string, unknown>;
     const shippingArea =
-      typeof (data.shippingAddress as Record<string, unknown>).area === 'string'
-        ? (data.shippingAddress as Record<string, string>).area
-        : (data.shippingAddress.city ?? data.shippingAddress.state ?? '');
+      (typeof addr.area === 'string' && addr.area) ||
+      (typeof addr.governorate === 'string' && addr.governorate) ||
+      data.shippingAddress.city ||
+      data.shippingAddress.state ||
+      '';
+    // Pass the governorate so the server-side charge resolves the SAME
+    // per-area rate the storefront /calculate displayed (display=charge
+    // parity; disambiguates same-named areas across governorates).
+    const shippingGovernorate = typeof addr.governorate === 'string' ? addr.governorate : undefined;
     let shipping = 0;
     try {
-      const result = await ShippingService.calculateShipping(storeId, shippingArea, subtotal);
+      const result = await ShippingService.calculateShipping(
+        storeId,
+        shippingArea,
+        subtotal,
+        shippingGovernorate
+      );
+      // Guard: if the store configured per-area rates and the chosen area
+      // matches none of them, refuse the order rather than silently ship at
+      // 0 (the storefront hides unpriced areas, but a direct API POST could
+      // submit one — this prevents an undercharge).
+      if (!result.matched && result.storeHasAreaRates) {
+        throw new AppError(
+          400,
+          'AREA_NOT_DELIVERABLE',
+          'Delivery is not available for the selected area'
+        );
+      }
       shipping = result.freeShipping ? 0 : result.shippingCost;
     } catch (err) {
+      // The not-deliverable guard is a deliberate rejection — re-throw it so
+      // the order is refused (don't swallow it into a 0-shipping fallback).
+      if (err instanceof AppError) throw err;
       // Defensive: if the shipping lookup throws, fall back to 0 rather
       // than fail the entire checkout. Worst case is a one-off undercharge
       // that surfaces in the merchant's order detail with shipping=0
@@ -1252,9 +1281,22 @@ export class OrderService {
       typeof data.shippingAddress.area === 'string'
         ? (data.shippingAddress.area as string)
         : ((data.shippingAddress.city as string) ?? '');
+    const shippingGovernorate =
+      typeof data.shippingAddress.governorate === 'string'
+        ? (data.shippingAddress.governorate as string)
+        : undefined;
     let shipping = 0;
     try {
-      const res = await ShippingService.calculateShipping(storeId, shippingArea, subtotal);
+      // NOTE: this is the ADMIN manual-order path (createAdminOrder). Unlike
+      // the customer checkout, it is intentionally NOT guarded against an
+      // unpriced area — an authenticated admin may legitimately create an
+      // order for any area and set/adjust shipping themselves.
+      const res = await ShippingService.calculateShipping(
+        storeId,
+        shippingArea,
+        subtotal,
+        shippingGovernorate
+      );
       shipping = res.freeShipping ? 0 : res.shippingCost;
     } catch (err) {
       logger.warn(

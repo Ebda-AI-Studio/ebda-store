@@ -361,6 +361,7 @@ model Store {
   paymentConfigs           PaymentConfig[]
   coupons                  Coupon[]
   shippingZones            ShippingZone[]
+  shippingAreaRates        ShippingAreaRate[]
   taxRates                 TaxRate[]
   loyaltyPoints            LoyaltyPoints[]
   loyaltyTransactions      LoyaltyTransaction[]
@@ -496,13 +497,13 @@ model StoreLocation {
   storeId      String   @map("store_id")
   name         String
   nameAr       String?  @map("name_ar")
-  country      String                       // e.g. "Kuwait" | "U.A.E."
+  country      String // e.g. "Kuwait" | "U.A.E."
   countryAr    String?  @map("country_ar")
   address      String
   addressAr    String?  @map("address_ar")
-  phone        String?                      // tel: target, e.g. "+96522209079"
-  whatsapp     String?                      // wa.me number, digits only or +<intl>
-  mapsUrl      String?  @map("maps_url")    // Google Maps "search" link (button target)
+  phone        String? // tel: target, e.g. "+96522209079"
+  whatsapp     String? // wa.me number, digits only or +<intl>
+  mapsUrl      String?  @map("maps_url") // Google Maps "search" link (button target)
   mapsEmbedUrl String?  @map("maps_embed_url") // optional ...&output=embed iframe src
   hours        String?
   hoursAr      String?  @map("hours_ar")
@@ -2030,6 +2031,26 @@ model ShippingZone {
   @@map("shipping_zones")
 }
 
+model ShippingAreaRate {
+  id                    String   @id @default(uuid())
+  storeId               String   @map("store_id")
+  governorate           String
+  governorateAr         String   @map("governorate_ar")
+  area                  String
+  areaAr                String   @map("area_ar")
+  deliveryFee           Int      @default(0) @map("delivery_fee")
+  freeShippingThreshold Int?     @map("free_shipping_threshold")
+  isActive              Boolean  @default(true) @map("is_active")
+  position              Int      @default(0)
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  store                 Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, governorate, area])
+  @@index([storeId, isActive])
+  @@map("shipping_area_rates")
+}
+
 // ==========================================
 // Tax Rates
 // ==========================================
@@ -3023,20 +3044,20 @@ enum CountSessionStatus {
 }
 
 model CountSession {
-  id          String             @id @default(uuid())
-  storeId     String             @map("store_id")
-  status      CountSessionStatus @default(open)
-  note        String?
-  createdBy   String?            @map("created_by")
-  closedAt    DateTime?          @map("closed_at")
-  reconciledAt DateTime?         @map("reconciled_at")
+  id           String             @id @default(uuid())
+  storeId      String             @map("store_id")
+  status       CountSessionStatus @default(open)
+  note         String?
+  createdBy    String?            @map("created_by")
+  closedAt     DateTime?          @map("closed_at")
+  reconciledAt DateTime?          @map("reconciled_at")
   /// Linked StockAdjustment (type=cycle_count) created at reconcile time.
-  adjustmentId String?           @unique @map("adjustment_id")
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
+  adjustmentId String?            @unique @map("adjustment_id")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
 
-  store      Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  lines      CountLine[]
+  store Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  lines CountLine[]
 
   @@index([storeId, status])
   @@index([storeId, createdAt(sort: Desc)])
@@ -3044,20 +3065,20 @@ model CountSession {
 }
 
 model CountLine {
-  id          String   @id @default(uuid())
-  sessionId   String   @map("session_id")
-  productId   String   @map("product_id")
-  variantId   String?  @map("variant_id")
+  id         String   @id @default(uuid())
+  sessionId  String   @map("session_id")
+  productId  String   @map("product_id")
+  variantId  String?  @map("variant_id")
   /// Counted quantity entered by the operator during the scan.
-  countedQty  Int      @map("counted_qty")
+  countedQty Int      @map("counted_qty")
   /// System quantity snapshotted at the time the line was submitted.
-  systemQty   Int      @map("system_qty")
+  systemQty  Int      @map("system_qty")
   /// Positive = more stock found; negative = stock missing.
-  variance    Int
-  scannedAt   DateTime @default(now()) @map("scanned_at")
+  variance   Int
+  scannedAt  DateTime @default(now()) @map("scanned_at")
 
-  session CountSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  product Product        @relation(fields: [productId], references: [id])
+  session CountSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id])
   variant ProductVariant? @relation(fields: [variantId], references: [id])
 
   /// One count line per product/variant per session (last scan wins via upsert).
@@ -3171,11 +3192,11 @@ model Warehouse {
   storeId   String   @map("store_id")
   name      String
   nameAr    String?  @map("name_ar")
-  code      String   // Short code e.g. "MAIN", "KWT-2"
+  code      String // Short code e.g. "MAIN", "KWT-2"
   isDefault Boolean  @default(false) @map("is_default")
   priority  Int      @default(0) // Higher = preferred in priority routing
-  lat       Float?   // Optional: enables proximity routing
-  lng       Float?   // Optional: enables proximity routing
+  lat       Float? // Optional: enables proximity routing
+  lng       Float? // Optional: enables proximity routing
   address   String?
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")

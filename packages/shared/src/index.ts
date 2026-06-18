@@ -7,3 +7,4 @@ export * from './features';
 export * from './plan-baselines';
 export * from './notifications';
 export * from './schemas/location';
+export * from './data/kuwait-areas';

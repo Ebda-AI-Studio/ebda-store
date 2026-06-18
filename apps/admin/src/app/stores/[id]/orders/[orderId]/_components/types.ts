@@ -14,6 +14,9 @@ export interface AddressJson {
   floor?: string;
   apartment?: string;
   notes?: string;
+  // Governorate (top-level KW administrative division) — added 2026-06-18.
+  governorate?: string;
+  governorateAr?: string;
   // Bilingual fallback fields stored as the customer entered them
   cityAr?: string;
   areaAr?: string;

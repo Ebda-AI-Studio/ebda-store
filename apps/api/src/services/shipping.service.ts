@@ -1,6 +1,108 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 
+// ─── Pure fee resolver (no DB) ────────────────────────────────────────────────
+
+interface AreaRate {
+  area: string;
+  governorate: string;
+  deliveryFee: number;
+  freeShippingThreshold: number | null;
+  isActive: boolean;
+}
+
+interface ZoneLike {
+  areas: string[] | unknown;
+  deliveryFee: number;
+  freeShippingThreshold: number | null;
+}
+
+interface ResolveInput {
+  governorate: string;
+  area: string;
+  orderTotal: number;
+}
+
+export interface ResolvedShippingFee {
+  shippingCost: number;
+  freeShipping: boolean;
+  matched: boolean;
+  source: 'area-rate' | 'zone' | 'none';
+  /** The matched ZoneLike object when source==='zone'; null otherwise. */
+  matchedZone: ZoneLike | null;
+}
+
+/**
+ * Pure function — no DB calls.
+ *
+ * Priority:
+ *  1. Exact per-area rate (case-insensitive EN match on area name).
+ *     When governorate is provided/non-empty, also matches rate.governorate
+ *     case-insensitively to disambiguate same-named areas across governorates.
+ *  2. Legacy ShippingZone match (existing substring/exact logic)
+ *  3. Nothing matched → { shippingCost:0, freeShipping:false, matched:false, source:'none' }
+ */
+export function resolveShippingFee(
+  rates: AreaRate[],
+  zones: ZoneLike[],
+  { governorate, area, orderTotal }: ResolveInput
+): ResolvedShippingFee {
+  // Priority 1 — per-area rate
+  const activeRates = rates.filter(r => r.isActive);
+  const matchedRate = activeRates.find(r => {
+    const areaMatch = r.area.toLowerCase() === area.toLowerCase();
+    if (!areaMatch) return false;
+    // Governorate disambiguation: when caller supplies a non-empty governorate,
+    // require it to match so same-named areas in different governorates resolve
+    // to the correct rate (e.g. "Rumaithiya" exists in both Hawalli and Ahmadi).
+    if (governorate && governorate.trim() !== '') {
+      return r.governorate.toLowerCase() === governorate.toLowerCase();
+    }
+    return true;
+  });
+  if (matchedRate) {
+    const freeShipping =
+      matchedRate.freeShippingThreshold != null && orderTotal >= matchedRate.freeShippingThreshold;
+    return {
+      shippingCost: freeShipping ? 0 : matchedRate.deliveryFee,
+      freeShipping,
+      matched: true,
+      source: 'area-rate',
+      matchedZone: null,
+    };
+  }
+
+  // Priority 2 — legacy zone matching (mirrors existing calculateShipping logic)
+  const matchedZone = zones.find(zone => {
+    const areas = zone.areas as string[];
+    return areas.some(
+      a => a.toLowerCase() === area.toLowerCase() || area.toLowerCase().includes(a.toLowerCase())
+    );
+  });
+  if (matchedZone) {
+    const freeShipping =
+      matchedZone.freeShippingThreshold != null && orderTotal >= matchedZone.freeShippingThreshold;
+    return {
+      shippingCost: freeShipping ? 0 : matchedZone.deliveryFee,
+      freeShipping,
+      matched: true,
+      source: 'zone',
+      matchedZone,
+    };
+  }
+
+  // Priority 3 — nothing matched
+  return {
+    shippingCost: 0,
+    freeShipping: false,
+    matched: false,
+    source: 'none',
+    matchedZone: null,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface CreateShippingZoneData {
   name: string;
   nameAr?: string;
@@ -160,53 +262,108 @@ export class ShippingService {
   }
 
   /**
-   * Calculate shipping cost for an order based on delivery area
+   * Calculate shipping cost for an order based on delivery area.
+   *
+   * Fee resolution priority:
+   *  1. Exact per-area ShippingAreaRate (case-insensitive EN match)
+   *  2. Legacy ShippingZone substring/exact match
+   *  3. Fallback to first zone when no area rates exist (legacy behaviour, unchanged)
+   *  4. Nothing matched → shippingCost:0, no zone
+   *
+   * The `governorate` parameter is optional for backward compatibility.
+   * Existing callers that only pass (storeId, area, orderTotal) continue to work.
    */
-  static async calculateShipping(storeId: string, area: string, orderTotal: number) {
-    // Find matching zone by area
-    const zones = await prisma.shippingZone.findMany({
-      where: { storeId, isActive: true },
-      orderBy: { position: 'asc' },
+  static async calculateShipping(
+    storeId: string,
+    area: string,
+    orderTotal: number,
+    governorate?: string
+  ) {
+    // Fetch active zones and per-area rates in parallel
+    const [zones, areaRates] = await Promise.all([
+      prisma.shippingZone.findMany({
+        where: { storeId, isActive: true },
+        orderBy: { position: 'asc' },
+      }),
+      prisma.shippingAreaRate.findMany({
+        where: { storeId, isActive: true },
+      }),
+    ]);
+
+    // Try the priority resolver (area-rate → zone match)
+    const resolved = resolveShippingFee(areaRates, zones, {
+      governorate: governorate ?? '',
+      area,
+      orderTotal,
     });
 
-    // Try to find exact match for area
-    let matchedZone = zones.find(zone => {
-      const areas = zone.areas as string[];
-      return areas.some(
-        a => a.toLowerCase() === area.toLowerCase() || area.toLowerCase().includes(a.toLowerCase())
-      );
-    });
+    if (resolved.matched) {
+      if (resolved.source === 'area-rate') {
+        // No zone metadata for area-rate resolution
+        return {
+          matched: true,
+          storeHasAreaRates: areaRates.length > 0,
+          zone: null,
+          shippingCost: resolved.shippingCost,
+          freeShipping: resolved.freeShipping,
+          estimatedDays: null,
+          estimatedDaysMin: null,
+          estimatedDaysMax: null,
+        };
+      }
 
-    // If no match, use the first zone as default (usually "All Areas")
-    if (!matchedZone && zones.length > 0) {
-      matchedZone = zones[0];
-    }
-
-    if (!matchedZone) {
+      // source === 'zone' — resolver already captured the matched zone object
+      const matchedZone = resolved.matchedZone as (typeof zones)[0];
       return {
-        zone: null,
-        shippingCost: 0,
-        freeShipping: false,
-        estimatedDays: null,
+        matched: true,
+        storeHasAreaRates: areaRates.length > 0,
+        zone: {
+          id: matchedZone.id,
+          name: matchedZone.name,
+          nameAr: matchedZone.nameAr,
+        },
+        shippingCost: resolved.shippingCost,
+        freeShipping: resolved.freeShipping,
+        estimatedDays: matchedZone.estimatedDays,
+        estimatedDaysMin: matchedZone.estimatedDaysMin,
+        estimatedDaysMax: matchedZone.estimatedDaysMax,
       };
     }
 
-    // Check if order qualifies for free shipping
-    const freeShipping = matchedZone.freeShippingThreshold
-      ? orderTotal >= matchedZone.freeShippingThreshold
-      : false;
+    // No area rates exist and no zone matched the area — apply the legacy
+    // fallback-to-first-zone behaviour ONLY when no area rates are configured
+    // (preserves existing behaviour for stores with zones only).
+    if (areaRates.length === 0 && zones.length > 0) {
+      const fallbackZone = zones[0];
+      const freeShipping =
+        fallbackZone.freeShippingThreshold != null &&
+        orderTotal >= fallbackZone.freeShippingThreshold;
+      return {
+        matched: true,
+        storeHasAreaRates: false,
+        zone: {
+          id: fallbackZone.id,
+          name: fallbackZone.name,
+          nameAr: fallbackZone.nameAr,
+        },
+        shippingCost: freeShipping ? 0 : fallbackZone.deliveryFee,
+        freeShipping,
+        estimatedDays: fallbackZone.estimatedDays,
+        estimatedDaysMin: fallbackZone.estimatedDaysMin,
+        estimatedDaysMax: fallbackZone.estimatedDaysMax,
+      };
+    }
 
+    // Nothing matched
     return {
-      zone: {
-        id: matchedZone.id,
-        name: matchedZone.name,
-        nameAr: matchedZone.nameAr,
-      },
-      shippingCost: freeShipping ? 0 : matchedZone.deliveryFee,
-      freeShipping,
-      estimatedDays: matchedZone.estimatedDays,
-      estimatedDaysMin: matchedZone.estimatedDaysMin,
-      estimatedDaysMax: matchedZone.estimatedDaysMax,
+      matched: false,
+      storeHasAreaRates: areaRates.length > 0,
+      zone: null,
+      shippingCost: 0,
+      freeShipping: false,
+      estimatedDays: null,
+      estimatedDaysMin: null,
+      estimatedDaysMax: null,
     };
   }
 

@@ -4,21 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
+import { KUWAIT_GOVERNORATES } from '@force/shared';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../lib/api';
 import { ShippingZonesTable, type ShippingZone } from './_components/ShippingZonesTable';
 import { ShippingZoneFormModal, type ZoneFormData } from './_components/ShippingZoneFormModal';
 import { ShippingEmptyState } from './_components/ShippingEmptyState';
 import { useFeatures } from '../../../../hooks/useFeatures';
-
-const KUWAIT_GOVERNORATES = [
-  { en: 'Capital', ar: 'العاصمة' },
-  { en: 'Hawalli', ar: 'حولي' },
-  { en: 'Farwaniya', ar: 'الفروانية' },
-  { en: 'Mubarak Al-Kabeer', ar: 'مبارك الكبير' },
-  { en: 'Ahmadi', ar: 'الأحمدي' },
-  { en: 'Jahra', ar: 'الجهراء' },
-];
+import { AreaRateEditor } from './_components/AreaRateEditor';
 
 const DEFAULT_FORM: ZoneFormData = {
   name: '',
@@ -252,37 +245,61 @@ export default function ShippingSettingsPage() {
           </div>
         )}
 
-        <div className="flex gap-2 mb-6">
-          {(['all', 'active', 'inactive'] as const).map(f => (
-            <button
-              type="button"
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === f
-                  ? 'bg-primary text-white'
-                  : 'bg-muted text-foreground hover:bg-muted/80'
-              }`}
-            >
-              {filterLabels[f]}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        {/* ── Area rates editor (primary / recommended) ─────────────────── */}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              Delivery areas &amp; fees{' '}
+              <span className="font-arabic font-normal text-muted-foreground">
+                / مناطق التوصيل والرسوم
+              </span>
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Set per-area delivery fees for every Kuwait district.
+            </p>
           </div>
-        ) : zones.length === 0 ? (
-          <ShippingEmptyState onCreate={() => handleOpenModal()} />
-        ) : (
-          <ShippingZonesTable
-            zones={zones}
-            onEdit={handleOpenModal}
-            onToggle={handleToggle}
-            onDelete={handleDelete}
-          />
-        )}
+          <AreaRateEditor storeId={storeId} />
+        </section>
+
+        {/* ── Legacy shipping zones (kept for backward compat) ───────────── */}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">{tPage('title')}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">{tPage('subtitle')}</p>
+          </div>
+
+          <div className="flex gap-2">
+            {(['all', 'active', 'inactive'] as const).map(f => (
+              <button
+                type="button"
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  filter === f
+                    ? 'bg-primary text-white'
+                    : 'bg-muted text-foreground hover:bg-muted/80'
+                }`}
+              >
+                {filterLabels[f]}
+              </button>
+            ))}
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : zones.length === 0 ? (
+            <ShippingEmptyState onCreate={() => handleOpenModal()} />
+          ) : (
+            <ShippingZonesTable
+              zones={zones}
+              onEdit={handleOpenModal}
+              onToggle={handleToggle}
+              onDelete={handleDelete}
+            />
+          )}
+        </section>
 
         {showModal && (
           <ShippingZoneFormModal

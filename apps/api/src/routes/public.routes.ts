@@ -89,6 +89,15 @@ export const shippingAddressSchema = z.object({
   // always sends city:'' (KW model), so requiring it here 400'd EVERY order
   // ("خطأ في الدفع" → bounce back to the info step). Accept empty.
   city: z.string().trim().max(150).optional().default(''),
+  // Governorate (محافظة) — top-level KW administrative division (Capital, Hawally,
+  // Farwaniya, Ahmadi, Jahra, Mubarak Al-Kabeer). Explicit field added 2026-06-18
+  // alongside sub-area; legacy orders used `state` or `area` for this concept.
+  governorate: z.string().max(60).optional().default(''),
+  governorateAr: z.string().max(60).optional().default(''),
+  // Sub-area / district (منطقة) within the governorate, e.g. Salmiya, Rumaithiya.
+  // The shipping-fee calculator matches on this value first, then falls back to governorate.
+  area: z.string().max(150).optional().default(''),
+  areaAr: z.string().max(150).optional().default(''),
   state: z.string().max(150).optional().default(''),
   postalCode: z.string().max(30).optional().default(''),
   country: z.string().trim().min(2).max(60),

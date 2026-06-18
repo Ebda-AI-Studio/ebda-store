@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { ShippingService } from '../services/shipping.service';
+import { prisma } from '@force/database';
 
 const router = Router();
 
@@ -47,6 +48,34 @@ router.get(
       res.json({
         success: true,
         data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /:storeId/shipping/area-rates — list all area rates for the store.
+// MUST be defined before `/:storeId/shipping/:id` or Express matches the
+// literal `area-rates` segment as a zone id and 404s (caught by the
+// integration test).
+router.get(
+  '/:storeId/shipping/area-rates',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const rates = await prisma.shippingAreaRate.findMany({
+        where: { storeId },
+        orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
+      });
+
+      res.json({
+        success: true,
+        data: { rates },
       });
     } catch (error) {
       next(error);
@@ -189,6 +218,155 @@ router.put(
   }
 );
 
+// ─── ShippingAreaRate schemas ──────────────────────────────────────────────
+
+const areaRateSchema = z.object({
+  governorate: z.string().min(1).max(60),
+  governorateAr: z.string().min(1).max(60),
+  area: z.string().min(1).max(60),
+  areaAr: z.string().min(1).max(60),
+  deliveryFee: z.number().int().min(0),
+  freeShippingThreshold: z.number().int().min(0).optional().nullable(),
+  isActive: z.boolean().optional(),
+  position: z.number().int().min(0).optional(),
+});
+
+const updateAreaRateSchema = areaRateSchema.partial();
+
+const bulkAreaRateSchema = z.object({ rates: z.array(areaRateSchema).max(300) });
+
+// ─── ShippingAreaRate authed CRUD ──────────────────────────────────────────
+// (GET list lives above the `/:id` zone route to avoid the route-shadowing 404.)
+
+// PUT /:storeId/shipping/area-rates/bulk — upsert all area rates (admin "save all")
+router.put(
+  '/:storeId/shipping/area-rates/bulk',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { rates } = bulkAreaRateSchema.parse(req.body);
+
+      await prisma.$transaction(
+        rates.map(rate =>
+          prisma.shippingAreaRate.upsert({
+            where: {
+              storeId_governorate_area: {
+                storeId,
+                governorate: rate.governorate,
+                area: rate.area,
+              },
+            },
+            create: {
+              storeId,
+              governorate: rate.governorate,
+              governorateAr: rate.governorateAr,
+              area: rate.area,
+              areaAr: rate.areaAr,
+              deliveryFee: rate.deliveryFee,
+              freeShippingThreshold: rate.freeShippingThreshold ?? null,
+              isActive: rate.isActive ?? true,
+              position: rate.position ?? 0,
+            },
+            update: {
+              governorateAr: rate.governorateAr,
+              areaAr: rate.areaAr,
+              deliveryFee: rate.deliveryFee,
+              freeShippingThreshold: rate.freeShippingThreshold ?? null,
+              isActive: rate.isActive ?? true,
+              position: rate.position ?? 0,
+            },
+          })
+        )
+      );
+
+      const rates_result = await prisma.shippingAreaRate.findMany({
+        where: { storeId },
+        orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
+      });
+
+      res.json({
+        success: true,
+        data: { rates: rates_result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PATCH /:storeId/shipping/area-rates/:id — partial update a single area rate
+router.patch(
+  '/:storeId/shipping/area-rates/:id',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id } = req.params;
+      const data = updateAreaRateSchema.parse(req.body);
+
+      const rate = await prisma.shippingAreaRate.updateMany({
+        where: { id, storeId },
+        data,
+      });
+
+      if (rate.count === 0) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Area rate not found' },
+        });
+        return;
+      }
+
+      const updated = await prisma.shippingAreaRate.findFirst({
+        where: { id, storeId },
+      });
+
+      res.json({
+        success: true,
+        data: { rate: updated },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /:storeId/shipping/area-rates/:id — delete a single area rate
+router.delete(
+  '/:storeId/shipping/area-rates/:id',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id } = req.params;
+
+      const deleted = await prisma.shippingAreaRate.deleteMany({
+        where: { id, storeId },
+      });
+
+      if (deleted.count === 0) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Area rate not found' },
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: { message: 'Area rate deleted successfully' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // Public endpoint: Get shipping zones for storefront
 // GET /public/:storeId/shipping
 router.get('/public/:storeId/shipping', async (req: Request, res: Response, next: NextFunction) => {
@@ -213,21 +391,62 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { area, orderTotal } = req.body;
-
-      if (!area) {
+      const calcSchema = z.object({
+        area: z.string().trim().min(1).max(150),
+        orderTotal: z.number().int().min(0).optional().default(0),
+        governorate: z.string().trim().max(60).optional().default(''),
+      });
+      const parsed = calcSchema.safeParse(req.body);
+      if (!parsed.success) {
         res.status(400).json({
           success: false,
           error: { code: 'MISSING_AREA', message: 'Delivery area is required' },
         });
         return;
       }
+      const { area, orderTotal, governorate } = parsed.data;
 
-      const result = await ShippingService.calculateShipping(storeId, area, orderTotal || 0);
+      const result = await ShippingService.calculateShipping(
+        storeId,
+        area,
+        orderTotal,
+        governorate || undefined
+      );
 
       res.json({
         success: true,
         data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Public endpoint: Get area rates for storefront (active only, no sensitive fields)
+// GET /public/:storeId/shipping/area-rates
+router.get(
+  '/public/:storeId/shipping/area-rates',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const rates = await prisma.shippingAreaRate.findMany({
+        where: { storeId, isActive: true },
+        orderBy: [{ position: 'asc' }, { governorate: 'asc' }, { area: 'asc' }],
+        select: {
+          governorate: true,
+          governorateAr: true,
+          area: true,
+          areaAr: true,
+          deliveryFee: true,
+          freeShippingThreshold: true,
+        },
+      });
+
+      res.json({
+        success: true,
+        data: { rates },
       });
     } catch (error) {
       next(error);

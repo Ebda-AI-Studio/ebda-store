@@ -19,9 +19,18 @@ const kwAddress = {
   lastName: 'Sharaf',
   address1: 'Block 4, Street 1, House 10',
   city: '', // KW model: city is always blank
-  state: 'Hawally', // the area/district lives here
+  state: 'Hawally', // legacy: area/district used to live here
   country: 'KW',
   phone: '+96512345678',
+};
+
+// Extended payload with the new governorate + sub-area fields.
+const kwAddressWithGovernorates = {
+  ...kwAddress,
+  governorate: 'Hawally',
+  governorateAr: 'حولي',
+  area: 'Salmiya',
+  areaAr: 'السالمية',
 };
 
 describe('public checkout order schema (KW contract regression)', () => {
@@ -65,6 +74,17 @@ describe('public checkout order schema (KW contract regression)', () => {
       expect(shippingAddressSchema.safeParse({ ...kwAddress, address1: '' }).success).toBe(false);
       const { country: _omit, ...noCountry } = kwAddress;
       expect(shippingAddressSchema.safeParse(noCountry).success).toBe(false);
+    });
+
+    it('passes through governorate+governorateAr+area+areaAr (not stripped)', () => {
+      const r = shippingAddressSchema.safeParse(kwAddressWithGovernorates);
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.governorate).toBe('Hawally');
+        expect(r.data.governorateAr).toBe('حولي');
+        expect(r.data.area).toBe('Salmiya');
+        expect(r.data.areaAr).toBe('السالمية');
+      }
     });
   });
 

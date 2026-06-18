@@ -48,7 +48,10 @@ interface ShippingAddressShape {
   address1?: string;
   address2?: string;
   city?: string;
+  governorate?: string;
+  governorateAr?: string;
   area?: string;
+  areaAr?: string;
   state?: string;
   country?: string;
   postalCode?: string;
@@ -310,10 +313,14 @@ const addressSchema = z.object({
   address1: z.string().trim().min(1).max(500),
   address2: z.string().max(500).optional(),
   city: z.string().max(150).optional().default(''),
-  // Structured Kuwait delivery area (governorate/district), English name.
+  // Governorate (محافظة) — top-level KW administrative division.
+  // Added 2026-06-18 alongside sub-area to support the cascade selector.
+  governorate: z.string().max(60).optional().default(''),
+  governorateAr: z.string().max(60).optional().default(''),
+  // Structured Kuwait sub-area / district, English name.
   // Preferred over generic `state`; both are accepted for backwards compat.
   area: z.string().max(150).optional().default(''),
-  // Arabic name of the Kuwait delivery area — stored so the admin UI can
+  // Arabic name of the Kuwait delivery sub-area — stored so the admin UI can
   // render the address in Arabic without a client-side lookup table.
   areaAr: z.string().max(150).optional().default(''),
   state: z.string().max(150).optional().default(''),
