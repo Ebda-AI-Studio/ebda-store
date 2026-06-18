@@ -12,12 +12,15 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const REMEMBER_EMAIL_KEY = 'force-orders-remember-email';
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading } = useAuth();
   const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,6 +28,16 @@ export default function LoginPage() {
   useEffect(() => {
     if (!isLoading && isAuthenticated) router.replace('/orders');
   }, [isLoading, isAuthenticated, router]);
+
+  // On mount: prefill email + check box if a remembered email exists.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = localStorage.getItem(REMEMBER_EMAIL_KEY);
+    if (saved) {
+      setEmail(saved);
+      setRememberMe(true);
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,6 +53,14 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(parsed.data.email, parsed.data.password);
+      // Login succeeded — persist or clear the remembered email.
+      if (typeof window !== 'undefined') {
+        if (rememberMe) {
+          localStorage.setItem(REMEMBER_EMAIL_KEY, parsed.data.email);
+        } else {
+          localStorage.removeItem(REMEMBER_EMAIL_KEY);
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       setError(msg === 'ADMIN_ONLY' ? t.login.adminOnly : msg || t.login.failed);
@@ -97,6 +118,20 @@ export default function LoginPage() {
                 className="h-12 w-full rounded-xl border border-input bg-card px-4 text-base text-foreground outline-none focus:border-primary"
                 required
               />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="remember-me"
+                name="rememberMe"
+                type="checkbox"
+                className="h-4 w-4 rounded border-input accent-primary"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+              />
+              <label htmlFor="remember-me" className="text-sm text-muted-foreground">
+                {t.login.rememberMe}
+              </label>
             </div>
 
             {error && (

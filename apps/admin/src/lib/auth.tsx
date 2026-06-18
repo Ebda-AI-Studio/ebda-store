@@ -10,7 +10,7 @@ import {
   ReactNode,
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getApiUrl } from './api';
+import { getApiUrl, refreshAccessToken } from './api';
 
 interface User {
   id: string;
@@ -50,60 +50,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // keeping the access token alive for individual requests.
   const authCheckedRef = useRef(false);
 
-  // Single-flight lock: prevents concurrent refresh calls from AuthProvider
-  // (checkAuth) and api.ts (apiRequest 401-retry) both rotating the same
-  // refresh token simultaneously, which would trip the server-side
-  // reuse-detection and log the admin out immediately.
-  const refreshInFlight = useRef<Promise<boolean> | null>(null);
-
-  const refreshToken = useCallback((): Promise<boolean> => {
-    // Return the in-flight promise if one is already running so concurrent
-    // callers (e.g. checkAuth + an apiRequest 401-retry) share the result
-    // instead of independently rotating the token family.
-    if (refreshInFlight.current) return refreshInFlight.current;
-
-    const promise = (async (): Promise<boolean> => {
-      const refreshTokenValue =
-        typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-      if (!refreshTokenValue) return false;
-
-      try {
-        const response = await fetch(`${API_URL}/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: refreshTokenValue }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          // The new access token is set as an HTTP-only cookie by the API
-          // for browser-cookie clients, AND returned in the body so we can
-          // mirror it into localStorage for the iOS PWA path (where WebKit
-          // purges third-party cookies). lib/api.ts reads `accessToken`
-          // from localStorage and sends it as `Authorization: Bearer`.
-          if (data.data?.accessToken) {
-            localStorage.setItem('accessToken', data.data.accessToken);
-          }
-          if (data.data?.refreshToken) {
-            localStorage.setItem('refreshToken', data.data.refreshToken);
-          }
-          if (data.data?.user) {
-            setUser(data.data.user);
-          }
-          return true;
-        }
-      } catch (error) {
-        console.error('Token refresh failed:', error);
-      }
-
+  // Delegate to the SAME single-flight refreshAccessToken() used by
+  // apiRequest() in api.ts so concurrent callers (checkAuth on mount +
+  // a 401-retry from an in-flight API request) share ONE /auth/refresh
+  // rotation instead of racing and tripping server-side reuse-detection.
+  // The module-level refreshInFlight in api.ts IS the single-flight guard —
+  // no separate ref is needed here.
+  const refreshToken = useCallback(async (): Promise<boolean> => {
+    if (typeof window !== 'undefined' && !localStorage.getItem('refreshToken')) return false;
+    try {
+      const newAccessToken = await refreshAccessToken();
+      return newAccessToken !== null;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
       return false;
-    })().finally(() => {
-      refreshInFlight.current = null;
-    });
-
-    refreshInFlight.current = promise;
-    return promise;
+    }
   }, []);
 
   const checkAuth = useCallback(async () => {
@@ -127,16 +88,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.data.user);
       } else if (response.status === 401) {
         // Access token is dead (expired or never set on this device).
-        // Use the single-flight refreshToken() so this path and any
-        // concurrent apiRequest 401-retries share one rotation instead of
-        // racing and tripping reuse-detection.
+        // refreshToken() delegates to the same single-flight in api.ts so
+        // this path and any concurrent apiRequest 401-retries share ONE
+        // rotation instead of racing and tripping reuse-detection.
         const refreshed = await refreshToken();
-        if (!refreshed) {
+        if (refreshed) {
+          // Re-verify with the new access token to populate user state.
+          const newAccessToken =
+            typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+          const retryHeaders: Record<string, string> = {};
+          if (newAccessToken) retryHeaders.Authorization = `Bearer ${newAccessToken}`;
+          const retryResponse = await fetch(`${API_URL}/auth/me`, {
+            credentials: 'include',
+            headers: retryHeaders,
+          });
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            setUser(retryData.data.user);
+          } else {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+          }
+        } else {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
         }
-        // refreshToken() already called setUser when successful; nothing
-        // more to do here for the happy path.
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -144,6 +120,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   }, [refreshToken]);
+
+  // Request persistent storage so iOS ITP doesn't evict localStorage (and the
+  // refresh token) after ~7 days of inactivity. Best-effort: no-ops on
+  // unsupported browsers, never throws.
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
+  }, []);
 
   // Check auth ONCE on mount (skip on login page — no session to check).
   // We deliberately do NOT include `pathname` in the dependency array:

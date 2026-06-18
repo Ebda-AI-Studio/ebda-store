@@ -21,6 +21,7 @@ export interface Messages {
     passwordRequired: string;
     failed: string;
     adminOnly: string;
+    rememberMe: string;
   };
   store: {
     pick: string;
@@ -101,6 +102,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       passwordRequired: 'Password is required.',
       failed: 'Sign in failed. Check your credentials.',
       adminOnly: 'This app is for store staff. Customer accounts cannot sign in here.',
+      rememberMe: 'Remember me',
     },
     store: {
       pick: 'Store',
@@ -194,6 +196,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       passwordRequired: 'كلمة المرور مطلوبة.',
       failed: 'فشل تسجيل الدخول. تحقّق من بياناتك.',
       adminOnly: 'هذا التطبيق لموظفي المتجر. لا يمكن لحسابات العملاء تسجيل الدخول هنا.',
+      rememberMe: 'تذكّرني',
     },
     store: {
       pick: 'المتجر',

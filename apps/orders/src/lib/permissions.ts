@@ -13,13 +13,15 @@
  * array directly with zero further changes.
  */
 
-export type Role = 'customer' | 'store_admin' | 'super_admin';
+export type Role = 'customer' | 'staff' | 'store_admin' | 'super_admin';
 
 export type OrderPermission = 'orders:read' | 'orders:write' | 'orders:manage';
 
 // Subset of apps/api/src/middleware/rbac.ts relevant to this app.
 const ROLE_ORDER_PERMISSIONS: Record<Role, OrderPermission[]> = {
   customer: ['orders:read'],
+  // staff: the PWA's primary audience — mirrors API rbac.ts staff entry exactly.
+  staff: ['orders:read', 'orders:write', 'orders:manage'],
   store_admin: ['orders:read', 'orders:write', 'orders:manage'],
   super_admin: ['orders:read', 'orders:write', 'orders:manage'],
 };

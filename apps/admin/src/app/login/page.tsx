@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { Button, Input } from '@force/ui';
 import { useAuth, type MfaChallenge } from '../../lib/auth';
 import { useT } from '@/i18n/useT';
+
+const REMEMBER_EMAIL_KEY = 'force-admin-remember-email';
 
 export default function LoginPage() {
   const t = useT('auth.login');
@@ -12,8 +14,19 @@ export default function LoginPage() {
   const { login, completeMfaLogin, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // On mount: prefill email + check box if a remembered email exists.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = localStorage.getItem(REMEMBER_EMAIL_KEY);
+    if (saved) {
+      setEmail(saved);
+      setRememberMe(true);
+    }
+  }, []);
 
   // MFA step state
   const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null);
@@ -29,6 +42,15 @@ export default function LoginPage() {
       const result = await login(email, password);
       if (result && result.mfaRequired) {
         setMfaChallenge(result);
+      } else {
+        // Login succeeded — persist or clear the remembered email.
+        if (typeof window !== 'undefined') {
+          if (rememberMe) {
+            localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+          } else {
+            localStorage.removeItem(REMEMBER_EMAIL_KEY);
+          }
+        }
       }
       // If result is void the login succeeded and router.push('/') was called inside login()
     } catch (err) {
@@ -227,6 +249,20 @@ export default function LoginPage() {
                 className="mt-1"
                 placeholder={t('passwordPlaceholder')}
               />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="remember-me"
+                name="rememberMe"
+                type="checkbox"
+                className="h-4 w-4 rounded border-input accent-primary"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+              />
+              <label htmlFor="remember-me" className="text-sm text-muted-foreground">
+                {t('rememberMe')}
+              </label>
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>

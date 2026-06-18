@@ -3690,7 +3690,8 @@
       "mfaBackupLink": "Use a backup code instead",
       "mfaBackupSubtitle": "Enter one of your saved backup codes",
       "mfaTotpLink": "Use authenticator app instead",
-      "mfaInvalid": "Invalid or expired code. Please try again."
+      "mfaInvalid": "Invalid or expired code. Please try again.",
+      "rememberMe": "Remember me"
     }
   },
   "users": {

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getApiUrl } from './api';
+import { getApiUrl, refreshAccessToken } from './api';
 
 export interface AuthUser {
   id: string;
@@ -38,26 +38,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Silent refresh using the long-lived rotating refresh token. Independent of
-  // cookie state — required for the iOS PWA path where WebKit purges the
-  // cross-origin cookie.
+  // Silent refresh using the long-lived rotating refresh token. Delegates to
+  // the SAME single-flight refreshAccessToken() used by apiRequest() in
+  // api.ts so concurrent callers (checkAuth + a 401-retry from an in-flight
+  // API request) share ONE /auth/refresh rotation instead of racing and
+  // tripping the server-side reuse-detection.
   const refreshToken = useCallback(async (): Promise<boolean> => {
-    const refreshTokenValue =
-      typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-    if (!refreshTokenValue) return false;
+    if (typeof window !== 'undefined' && !localStorage.getItem('refreshToken')) return false;
     try {
-      const response = await fetch(`${API_URL}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: refreshTokenValue }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data?.accessToken) localStorage.setItem('accessToken', data.data.accessToken);
-        if (data.data?.refreshToken) localStorage.setItem('refreshToken', data.data.refreshToken);
-        if (data.data?.csrfToken) localStorage.setItem('csrfToken', data.data.csrfToken);
-        if (data.data?.user) setUser(data.data.user);
+      const newAccessToken = await refreshAccessToken();
+      if (newAccessToken) {
+        // Token rotation writes accessToken + refreshToken + csrfToken to
+        // localStorage inside refreshAccessToken(). Read back the user from
+        // the updated access token by calling /auth/me (or trust that the
+        // checkAuth caller will do so). For the common path (checkAuth on
+        // mount) the caller re-reads the user after this returns true, so
+        // we don't need a separate /me call here.
         return true;
       }
     } catch (error) {
@@ -83,7 +79,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.data.user);
       } else if (response.status === 401) {
         const refreshed = await refreshToken();
-        if (!refreshed) {
+        if (refreshed) {
+          // Re-verify with the new access token so we can set the user object.
+          const newAccessToken =
+            typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+          const retryHeaders: Record<string, string> = {};
+          if (newAccessToken) retryHeaders.Authorization = `Bearer ${newAccessToken}`;
+          const retryResponse = await fetch(`${API_URL}/auth/me`, {
+            credentials: 'include',
+            headers: retryHeaders,
+          });
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            setUser(retryData.data.user);
+          } else {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+          }
+        } else {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
         }
@@ -94,6 +107,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   }, [refreshToken]);
+
+  // Request persistent storage so iOS ITP doesn't evict localStorage (and the
+  // refresh token) after ~7 days of inactivity. Best-effort: no-ops on
+  // unsupported browsers, never throws.
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (pathname === '/login') {
