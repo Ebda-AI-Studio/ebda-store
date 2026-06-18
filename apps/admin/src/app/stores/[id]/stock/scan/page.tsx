@@ -128,9 +128,10 @@ function useBarcodeDetectorSupported(): boolean {
 interface CameraScannerProps {
   onDetected: (barcode: string) => void;
   onStop: () => void;
+  onError?: (msg: string) => void;
 }
 
-function CameraScanner({ onDetected, onStop }: CameraScannerProps) {
+function CameraScanner({ onDetected, onStop, onError }: CameraScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number>(0);
@@ -175,7 +176,10 @@ function CameraScanner({ onDetected, onStop }: CameraScannerProps) {
         rafRef.current = requestAnimationFrame(scan);
       })
       .catch(() => {
-        // Camera access denied or unavailable
+        // Camera access denied or unavailable — surface a visible message
+        if (onError) {
+          onError('camera-permission');
+        }
         onStop();
       });
 
@@ -217,6 +221,8 @@ interface BarcodeInputProps {
   cameraSupported: boolean;
   onOpenCamera: () => void;
   disabled?: boolean;
+  cameraError?: string | null;
+  t: (key: string) => string;
 }
 
 function BarcodeInput({
@@ -227,37 +233,47 @@ function BarcodeInput({
   cameraSupported,
   onOpenCamera,
   disabled,
+  cameraError,
+  t,
 }: BarcodeInputProps) {
   return (
-    <div className="flex gap-2 items-center">
-      <input
-        type="text"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' && value.trim()) {
-            e.preventDefault();
-            onSubmit(value.trim());
-          }
-        }}
-        placeholder={placeholder}
-        className="flex-1 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-        disabled={disabled}
-        autoComplete="off"
-        autoCorrect="off"
-        spellCheck={false}
-        inputMode="text"
-      />
-      {cameraSupported && (
-        <button
-          type="button"
-          onClick={onOpenCamera}
+    <div className="space-y-1.5">
+      <div className="flex gap-2 items-center">
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && value.trim()) {
+              e.preventDefault();
+              onSubmit(value.trim());
+            }
+          }}
+          placeholder={placeholder}
+          className="flex-1 min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           disabled={disabled}
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground hover:bg-muted/80 text-lg disabled:opacity-50"
-          title="Scan with camera"
-        >
-          📷
-        </button>
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          inputMode="text"
+        />
+        {cameraSupported && (
+          <button
+            type="button"
+            onClick={onOpenCamera}
+            disabled={disabled}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground hover:bg-muted/80 text-lg disabled:opacity-50"
+            title="Scan with camera"
+          >
+            📷
+          </button>
+        )}
+      </div>
+      {!cameraSupported && (
+        <p className="text-xs text-muted-foreground">{t('cameraNotSupported')}</p>
+      )}
+      {cameraError === 'camera-permission' && (
+        <p className="text-xs text-destructive">{t('cameraPermission')}</p>
       )}
     </div>
   );
@@ -274,6 +290,7 @@ function ReceiveMode({ storeId }: { storeId: string }) {
   const [lookup, setLookup] = useState<LookupResult | null>(null);
   const [lookupErr, setLookupErr] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ReceiveResult | null>(null);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
@@ -327,7 +344,14 @@ function ReceiveMode({ storeId }: { storeId: string }) {
   return (
     <div className="space-y-4">
       {cameraOpen ? (
-        <CameraScanner onDetected={handleBarcodeSubmit} onStop={() => setCameraOpen(false)} />
+        <CameraScanner
+          onDetected={handleBarcodeSubmit}
+          onStop={() => setCameraOpen(false)}
+          onError={msg => {
+            setCameraError(msg);
+            setCameraOpen(false);
+          }}
+        />
       ) : (
         <BarcodeInput
           value={barcode}
@@ -337,8 +361,11 @@ function ReceiveMode({ storeId }: { storeId: string }) {
           cameraSupported={cameraSupported}
           onOpenCamera={() => {
             setCameraOpen(true);
+            setCameraError(null);
             setBarcode('');
           }}
+          cameraError={cameraError}
+          t={t}
         />
       )}
 
@@ -412,6 +439,7 @@ function PickMode({ storeId }: { storeId: string }) {
   const [orderLoading, setOrderLoading] = useState(false);
   const [barcode, setBarcode] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [pickResult, setPickResult] = useState<PickResult | null>(null);
   const [pickErr, setPickErr] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
@@ -569,7 +597,14 @@ function PickMode({ storeId }: { storeId: string }) {
           {!order.fullyPicked && (
             <div className="space-y-3">
               {cameraOpen ? (
-                <CameraScanner onDetected={handlePickScan} onStop={() => setCameraOpen(false)} />
+                <CameraScanner
+                  onDetected={handlePickScan}
+                  onStop={() => setCameraOpen(false)}
+                  onError={msg => {
+                    setCameraError(msg);
+                    setCameraOpen(false);
+                  }}
+                />
               ) : (
                 <BarcodeInput
                   value={barcode}
@@ -579,9 +614,12 @@ function PickMode({ storeId }: { storeId: string }) {
                   cameraSupported={cameraSupported}
                   onOpenCamera={() => {
                     setCameraOpen(true);
+                    setCameraError(null);
                     setBarcode('');
                   }}
                   disabled={picking}
+                  cameraError={cameraError}
+                  t={t}
                 />
               )}
 
@@ -621,6 +659,7 @@ function CountMode({ storeId }: { storeId: string }) {
   const [sessionLoading, setSessionLoading] = useState(false);
   const [barcode, setBarcode] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
   const [countQty, setCountQty] = useState(0);
   const [lineErr, setLineErr] = useState<string | null>(null);
@@ -821,7 +860,14 @@ function CountMode({ storeId }: { storeId: string }) {
       {activeSession.status === 'open' && (
         <div className="space-y-3">
           {cameraOpen ? (
-            <CameraScanner onDetected={handleBarcodeForCount} onStop={() => setCameraOpen(false)} />
+            <CameraScanner
+              onDetected={handleBarcodeForCount}
+              onStop={() => setCameraOpen(false)}
+              onError={msg => {
+                setCameraError(msg);
+                setCameraOpen(false);
+              }}
+            />
           ) : (
             <BarcodeInput
               value={barcode}
@@ -831,8 +877,11 @@ function CountMode({ storeId }: { storeId: string }) {
               cameraSupported={cameraSupported}
               onOpenCamera={() => {
                 setCameraOpen(true);
+                setCameraError(null);
                 setBarcode('');
               }}
+              cameraError={cameraError}
+              t={t}
             />
           )}
 
@@ -1007,6 +1056,22 @@ export default function BarcodeScanPage() {
               {m.label}
             </button>
           ))}
+        </div>
+
+        {/* What this page does — bilingual explainer of the 3 modes */}
+        <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground space-y-1.5">
+          <p className="font-semibold text-foreground">{t('helpTitle')}</p>
+          <p>
+            <span className="font-medium text-foreground">{t('modeReceive')}:</span>{' '}
+            {t('helpReceive')}
+          </p>
+          <p>
+            <span className="font-medium text-foreground">{t('modePick')}:</span> {t('helpPick')}
+          </p>
+          <p>
+            <span className="font-medium text-foreground">{t('modeCount')}:</span> {t('helpCount')}
+          </p>
+          <p className="pt-1 border-t border-border/60">{t('helpCamera')}</p>
         </div>
 
         {/* Mode content */}

@@ -4275,7 +4275,7 @@
     },
     "scan": {
       "title": "Barcode Scan",
-      "description": "Scan barcodes to receive stock, pick orders, or audit inventory counts.",
+      "description": "Scan product barcodes to receive incoming stock, pick orders, or run a cycle count.",
       "modeReceive": "Receive",
       "modePick": "Pick",
       "modeCount": "Count",
@@ -4325,7 +4325,12 @@
       "cameraPermission": "Allow camera access to scan barcodes, or enter manually below.",
       "cameraNotSupported": "Camera scanning not supported in this browser. Use manual entry.",
       "startCamera": "Start Camera",
-      "stopCamera": "Stop Camera"
+      "stopCamera": "Stop Camera",
+      "helpTitle": "What this page does",
+      "helpReceive": "Scan a product barcode and enter a quantity to record incoming stock (a delivery from a supplier).",
+      "helpPick": "Load an order by its number, then scan each item to mark it picked and track fulfillment.",
+      "helpCount": "Run a cycle count: scan items on a shelf and enter the counted quantity — the system auto-adjusts any difference from the recorded stock.",
+      "helpCamera": "Camera scanning works in Chrome (Android/desktop) and Safari on iPhone (iOS 17+). On other browsers, type the barcode manually. Products must have a barcode set to be found."
     },
     "adjustments": {
       "title": "Stock Adjustments",
@@ -4469,6 +4474,10 @@
         "urgencyDays": "{days} days",
         "draftPo": "Draft PO",
         "dismiss": "Dismiss"
+      },
+      "draftPo": {
+        "created": "Draft PO created.",
+        "failed": "Could not draft PO"
       }
     },
     "deadstock": {

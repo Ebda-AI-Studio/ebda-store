@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
+import { useToast } from '@force/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -171,6 +172,7 @@ export default function ReorderPage() {
   const tc = useT('common');
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [items, setItems] = useState<ReorderSuggestion[]>([]);
   const [meta, setMeta] = useState<ListMeta | null>(null);
@@ -212,8 +214,11 @@ export default function ReorderPage() {
       `/api/v1/stores/${storeId}/stock/reorder-suggestions/${id}/accept`,
       {}
     );
-    if (!apiError) {
+    if (apiError) {
+      toastError(t('draftPo.failed'), apiError.message || '');
+    } else {
       setItems(prev => prev.filter(s => s.id !== id));
+      toastSuccess(t('draftPo.created'));
     }
   }
 

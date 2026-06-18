@@ -4,6 +4,7 @@ import { nextSequence } from '../sequence.service';
 import { getSystemAccountIdByCode } from './account.service';
 import { inngest } from '../../lib/inngest/client';
 import logger from '../../lib/logger';
+import { AppError } from '../../middleware/error-handler';
 
 export interface CreatePoInput {
   storeId: string;
@@ -324,9 +325,10 @@ export async function createPoFromSuggestion(
 
   const supplierId = sug.supplierId ?? (await pickLastSupplierForProduct(sug.productId));
   if (!supplierId) {
-    throw new Error(
-      `No supplier on suggestion + no prior PO supplier for product ${sug.productId}. ` +
-        `Set ReorderRule.preferredSupplierId or place a manual PO first.`
+    throw new AppError(
+      400,
+      'SUPPLIER_REQUIRED',
+      'This product has no supplier yet. Add a supplier (Inventory → Suppliers) or set the product’s reorder rule preferred supplier, then draft the PO.'
     );
   }
 
