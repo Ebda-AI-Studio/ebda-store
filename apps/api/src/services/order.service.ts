@@ -19,6 +19,7 @@ import { ShippingService } from './shipping.service';
 import { LoyaltyService, computeRedemption } from './loyalty.service';
 import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
+import { hasCapturedPayment } from './order-refund-gating';
 import logger from '../lib/logger';
 
 interface CreateOrderData {
@@ -811,11 +812,30 @@ export class OrderService {
     const orderLocale = (updatedOrder.locale ?? undefined) as 'en' | 'ar' | undefined;
 
     // Refund / cancellation side-effects: inventory restore + coupon
-    // decrement + affiliate-commission reversal. Centralised in
-    // applyRefundEffects so gateway-driven refunds (which bypass this
-    // method) get the exact same treatment.
+    // decrement + affiliate-commission reversal + the order/refunded fanout
+    // (which sends the merchant the "Refund issued" push + the customer the
+    // refund email). Centralised in applyRefundEffects so gateway-driven
+    // refunds (which bypass this method) get the exact same treatment.
+    //
+    // GATE: only run the refund reversal + "Refund issued" notification when
+    // the order actually had a CAPTURED payment. Cancelling an UNPAID order
+    // (e.g. an online order whose payment link was never completed, or an
+    // auto-cancel of a stale unpaid order) must NOT fire a refund — there was
+    // never any money to give back. Firing applyRefundEffects on an unpaid
+    // cancel was sending merchants a spurious "Refund issued" push. We treat
+    // an order as paid when its durable paymentStatus is 'paid' OR a Payment
+    // row reached 'completed' (the two are kept in lock-step, but check both
+    // so a partially-reconciled order is never mis-classified as unpaid).
+    const hadCapturedPayment = hasCapturedPayment(order);
     if (status === 'cancelled' || status === 'refunded') {
-      await this.applyRefundEffects(storeId, orderId);
+      // ALWAYS reverse stock/coupons/loyalty on a cancel/refund (the order
+      // reserved them) — but only fire the refund notification ("Refund
+      // issued" push + customer refund email) when the order was actually
+      // paid. This is the fix for cancelling an UNPAID order wrongly pushing
+      // "Refund issued".
+      await this.applyRefundEffects(storeId, orderId, {
+        fireRefundNotification: hadCapturedPayment,
+      });
     }
 
     // Process affiliate commission on delivery (fire-and-forget)
@@ -930,7 +950,10 @@ export class OrderService {
         },
         orderLocale
       ).catch(err => logger.error({ err }, 'Failed to send payment success email'));
-    } else if (status === 'refunded') {
+    } else if (status === 'refunded' && hadCapturedPayment) {
+      // Gated on a captured payment — same reasoning as the refund_processed
+      // dispatch + applyRefundEffects above. No money captured ⇒ no refund ⇒
+      // no admin refund email.
       void EmailService.sendAdminRefund({
         orderNumber: updatedOrder.orderNumber,
         amount: updatedOrder.total,
@@ -987,7 +1010,14 @@ export class OrderService {
               })
               .catch(err => logger.error({ err }, 'Notification dispatch failed (cancelled)'));
           }
-          // status === 'refunded'
+          // status === 'refunded'.
+          // Only tell the customer "refund processed" when there was an
+          // actual captured payment to refund. A `refunded` status on an
+          // order that never collected money (defensive — the normal path
+          // gates applyRefundEffects above) must not claim a refund happened.
+          if (!hadCapturedPayment) {
+            return Promise.resolve();
+          }
           return notificationDispatcher
             .dispatch(storeId, 'refund_processed', {
               customerName,
@@ -1031,9 +1061,14 @@ export class OrderService {
   static async applyRefundEffects(
     storeId: string,
     orderId: string,
-    options: { restoreInventory?: boolean } = {}
+    options: { restoreInventory?: boolean; fireRefundNotification?: boolean } = {}
   ): Promise<void> {
     const restoreInventory = options.restoreInventory ?? true;
+    // Whether to fire the `order/refunded` fanout (the "Refund issued" merchant
+    // push + customer refund email). Defaults true for genuine provider refunds.
+    // Cancelling an UNPAID order still restores inventory/coupons/loyalty (the
+    // stock was reserved) but must NOT claim a refund happened.
+    const fireRefundNotification = options.fireRefundNotification ?? true;
     const order = await prisma.order.findFirst({
       where: { id: orderId, storeId },
       include: { items: true },
@@ -1119,15 +1154,18 @@ export class OrderService {
       );
     }
 
-    // Fire the refund fanout AFTER all reversals committed. Same event
-    // shape as order/created so the Inngest handler can mirror that
-    // function's structure (email + push + dispatcher) without juggling
-    // mid-refund state.
-    inngest
-      .send({ name: 'order/refunded', data: { orderId, storeId } })
-      .catch((err: unknown) =>
-        logger.error({ err, orderId, storeId }, '[OrderService] Failed to enqueue order/refunded')
-      );
+    // Fire the refund fanout AFTER all reversals committed — ONLY when there
+    // was a real captured payment to refund. Same event shape as order/created
+    // so the Inngest handler mirrors that function's structure (email + push +
+    // dispatcher). Skipped for an unpaid cancel (no money refunded → no
+    // "Refund issued" push), even though the reversals above still ran.
+    if (fireRefundNotification) {
+      inngest
+        .send({ name: 'order/refunded', data: { orderId, storeId } })
+        .catch((err: unknown) =>
+          logger.error({ err, orderId, storeId }, '[OrderService] Failed to enqueue order/refunded')
+        );
+    }
 
     // Auto-cancel any open BackorderLines for this order. A refunded order
     // will never be fulfilled, so outstanding backorder demand must be

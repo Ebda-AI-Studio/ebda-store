@@ -28,10 +28,11 @@
  * idempotency) is only enqueued on the first transition into `paid`.
  */
 
-import { prisma } from '@force/database';
+import { prisma, runInTenantContext } from '@force/database';
 import type { PaymentStatus } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
+import { OneSignalService } from './onesignal.service';
 import { recordPaymentEvent } from './payment-event.service';
 import type { PaymentStatusResponse } from './payment-providers/types';
 
@@ -159,6 +160,59 @@ export async function confirmPaymentFromProviderStatus(
           '[PAYMENT CONFIRM] Failed to enqueue post-payment order/created'
         )
       );
+
+    // Distinct "Payment received" merchant push, fired ONLY on this real
+    // pending→paid transition (we're inside the statusChanged branch — the
+    // !statusChanged early-return above guards re-firing). This is the answer
+    // to "did the resent / stuck payment link get paid?": the merchant gets a
+    // clear "Payment received" ping the moment the money lands, separate from
+    // the "New order" push that fired at order creation.
+    //
+    // COD never reaches here (no provider confirm step), so this never
+    // double-fires for cash orders. Fire-and-forget inside runInTenantContext
+    // so the order lookup survives FORCE RLS (no HTTP middleware on the admin
+    // refresh / guest verify paths' provider callbacks) and a push glitch
+    // never affects the reconciliation result we return to the caller.
+    void runInTenantContext(order.storeId, async () => {
+      const detail = await prisma.order.findUnique({
+        where: { id: order.id },
+        select: {
+          orderNumber: true,
+          total: true,
+          currency: true,
+          customer: { select: { firstName: true, lastName: true, email: true } },
+          shippingAddress: true,
+        },
+      });
+      if (!detail) return;
+      const shippingAddress = detail.shippingAddress as Record<string, unknown> | null;
+      const guestFirstName =
+        typeof shippingAddress?.firstName === 'string' ? shippingAddress.firstName : '';
+      const guestLastName =
+        typeof shippingAddress?.lastName === 'string' ? shippingAddress.lastName : '';
+      const customerName =
+        `${detail.customer?.firstName || guestFirstName} ${detail.customer?.lastName || guestLastName}`.trim() ||
+        detail.customer?.email ||
+        'Customer';
+      const store = await prisma.store
+        .findUnique({ where: { id: order.storeId }, select: { name: true } })
+        .catch(() => null);
+      await OneSignalService.notifyAdminsOfPaymentSuccess({
+        orderId: order.id,
+        orderNumber: detail.orderNumber,
+        storeId: order.storeId,
+        storeName: store?.name ?? order.storeId,
+        customerName,
+        total: detail.total,
+        currency: detail.currency,
+        paymentMethod: payment.provider,
+      });
+    }).catch((err: unknown) =>
+      logger.error(
+        { err, orderId: order.id, source },
+        '[PAYMENT CONFIRM] payment-received push failed'
+      )
+    );
 
     return { paymentStatus: 'paid', providerStatus: status, statusChanged: true };
   }

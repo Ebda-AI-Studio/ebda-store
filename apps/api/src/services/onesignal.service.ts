@@ -278,6 +278,198 @@ export class OneSignalService {
   }
 
   /**
+   * Push a "Payment received" notification to admins of the store +
+   * super_admins. Fired from `confirmPaymentFromProviderStatus` on a real
+   * pending→paid transition (statusChanged === true) — so when a customer
+   * pays a resent / previously-stuck payment link, the merchant gets a
+   * distinct "Payment received" ping (answering "did the resend work?").
+   * Distinct from the "New order" push (which fires on order creation) — this
+   * confirms the MONEY landed, not just that an order exists.
+   *
+   * Fire-and-forget: failures are logged but never propagate to the caller
+   * because payment reconciliation must not roll back over a push glitch.
+   */
+  static async notifyAdminsOfPaymentSuccess(input: NotifyOrderInput): Promise<void> {
+    if (!isAdminConfigured()) {
+      logger.warn(
+        {
+          hasAppId: !!config.onesignalAdminAppId,
+          hasRestKey: !!config.onesignalAdminRestApiKey,
+        },
+        'Admin OneSignal not configured — skipping payment-received notification'
+      );
+      return;
+    }
+
+    const url = adminOrderUrl(input.storeId, input.orderId);
+    const dataPayload = {
+      type: 'order.payment_received',
+      orderId: input.orderId,
+      storeId: input.storeId,
+      storeName: input.storeName,
+    };
+    const sharedFields = {
+      app_id: config.onesignalAdminAppId,
+      url,
+      web_buttons: [{ id: 'view-order', text: 'View order', url }],
+      data: dataPayload,
+    };
+
+    const moneyText = formatMoney(input.total, input.currency);
+    const paymentLabel = formatPaymentMethod(input.paymentMethod);
+
+    const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
+      this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
+      this.getAdminPlayerIds({ role: 'super_admin' }),
+    ]);
+
+    const storeAdminBody = {
+      ...sharedFields,
+      headings: { en: 'Payment received', ar: 'تم استلام الدفع' },
+      contents: {
+        en: `Order ${input.orderNumber} — ${moneyText} paid`,
+        ar: `الطلب ${input.orderNumber} — تم دفع ${moneyText}`,
+      },
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
+    };
+
+    const superAdminBody = {
+      ...sharedFields,
+      headings: { en: 'Payment received', ar: 'تم استلام الدفع' },
+      contents: {
+        en: `${input.storeName} — Order ${input.orderNumber} — ${moneyText} paid · ${paymentLabel}`,
+        ar: `${input.storeName} — الطلب ${input.orderNumber} — تم دفع ${moneyText} · ${paymentLabel}`,
+      },
+      ...(superAdminPlayerIds.length > 0
+        ? { include_player_ids: superAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'super_admin' }] }),
+    };
+
+    const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Key ${config.onesignalAdminRestApiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
+        const responseText = await res.text().catch(() => '');
+        if (!res.ok) {
+          logger.error(
+            { status: res.status, body: responseText, audience },
+            'OneSignal payment-received push failed'
+          );
+          return;
+        }
+        logger.info({ audience }, 'OneSignal payment-received push sent');
+      } catch (err) {
+        logger.error({ err, audience }, 'OneSignal payment-received push threw');
+      }
+    };
+
+    await Promise.all([send(storeAdminBody, 'store_admin'), send(superAdminBody, 'super_admin')]);
+  }
+
+  /**
+   * Push a "Payment pending — follow up" notification to admins of the store +
+   * super_admins. Fired from the stuck-payment Inngest sweep when an online
+   * order has sat status=pending / paymentStatus=unpaid past
+   * STUCK_PAYMENT_MINUTES so the merchant can contact the customer before the
+   * (2-day) payment link expires. Deduped via Order.stuckPaymentAlertedAt so it
+   * fires at most ONCE per order.
+   *
+   * Fire-and-forget at the call-site; the sweep marks the order alerted only
+   * after this resolves so a thrown send is retried on the next sweep tick.
+   */
+  static async notifyAdminsOfStuckPayment(input: NotifyOrderInput): Promise<void> {
+    if (!isAdminConfigured()) {
+      logger.warn(
+        {
+          hasAppId: !!config.onesignalAdminAppId,
+          hasRestKey: !!config.onesignalAdminRestApiKey,
+        },
+        'Admin OneSignal not configured — skipping stuck-payment notification'
+      );
+      return;
+    }
+
+    const url = adminOrderUrl(input.storeId, input.orderId);
+    const dataPayload = {
+      type: 'order.payment_stuck',
+      orderId: input.orderId,
+      storeId: input.storeId,
+      storeName: input.storeName,
+    };
+    const sharedFields = {
+      app_id: config.onesignalAdminAppId,
+      url,
+      web_buttons: [{ id: 'view-order', text: 'View order', url }],
+      data: dataPayload,
+    };
+
+    const moneyText = formatMoney(input.total, input.currency);
+
+    const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
+      this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
+      this.getAdminPlayerIds({ role: 'super_admin' }),
+    ]);
+
+    const storeAdminBody = {
+      ...sharedFields,
+      headings: { en: 'Payment pending — follow up', ar: 'دفعة معلّقة — تواصل مع العميل' },
+      contents: {
+        en: `Order ${input.orderNumber} placed but not paid — contact the customer`,
+        ar: `الطلب ${input.orderNumber} تم تقديمه ولم يُدفع — تواصل مع العميل`,
+      },
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
+    };
+
+    const superAdminBody = {
+      ...sharedFields,
+      headings: { en: 'Payment pending — follow up', ar: 'دفعة معلّقة — تواصل مع العميل' },
+      contents: {
+        en: `${input.storeName} — Order ${input.orderNumber} (${moneyText}) placed but not paid — contact the customer`,
+        ar: `${input.storeName} — الطلب ${input.orderNumber} (${moneyText}) تم تقديمه ولم يُدفع — تواصل مع العميل`,
+      },
+      ...(superAdminPlayerIds.length > 0
+        ? { include_player_ids: superAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'super_admin' }] }),
+    };
+
+    const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Key ${config.onesignalAdminRestApiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
+        const responseText = await res.text().catch(() => '');
+        if (!res.ok) {
+          logger.error(
+            { status: res.status, body: responseText, audience },
+            'OneSignal stuck-payment push failed'
+          );
+          return;
+        }
+        logger.info({ audience }, 'OneSignal stuck-payment push sent');
+      } catch (err) {
+        logger.error({ err, audience }, 'OneSignal stuck-payment push threw');
+      }
+    };
+
+    await Promise.all([send(storeAdminBody, 'store_admin'), send(superAdminBody, 'super_admin')]);
+  }
+
+  /**
    * Push a payment-failure notification to admins of the store + super_admins.
    * Fired from PaymentService.handleWebhook on status: failed / expired /
    * cancelled. Customer is NOT notified — they see the failure inline at the

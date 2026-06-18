@@ -19,12 +19,21 @@ vi.mock('@api/lib/inngest/client', () => ({
 const paymentUpdate = vi.fn().mockResolvedValue({});
 const orderUpdate = vi.fn().mockResolvedValue({});
 const txn = vi.fn().mockResolvedValue([{}, {}]);
+// Returns the order detail the "Payment received" push reads; null is fine for
+// the reconciliation tests (the push is best-effort and never affects the result).
+const orderFindUnique = vi.fn().mockResolvedValue(null);
 vi.mock('@force/database', () => ({
   prisma: {
     payment: { update: (...a: unknown[]) => paymentUpdate(...a) },
-    order: { update: (...a: unknown[]) => orderUpdate(...a) },
+    order: {
+      update: (...a: unknown[]) => orderUpdate(...a),
+      findUnique: (...a: unknown[]) => orderFindUnique(...a),
+    },
     $transaction: (...a: unknown[]) => txn(...a),
   },
+  // The "Payment received" merchant push wraps a lookup in runInTenantContext;
+  // mock it as a pass-through that just runs the callback.
+  runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
 }));
 
 // Mock the append-only event log — assert it's written, don't hit a DB.

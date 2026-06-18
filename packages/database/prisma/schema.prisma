@@ -1080,6 +1080,13 @@ model Order {
   idempotencyKey     String?   @unique @map("idempotency_key")
   webhookProcessedAt DateTime? @map("webhook_processed_at")
 
+  // Stuck-payment merchant alert dedupe. Set when the stuck-payment sweep
+  // (Inngest cron) has pushed the merchant a "payment pending — follow up"
+  // alert for this order so it never fires twice. NULL = not yet alerted.
+  // Only relevant to online-payment orders left status=pending /
+  // paymentStatus=unpaid past STUCK_PAYMENT_MINUTES.
+  stuckPaymentAlertedAt DateTime? @map("stuck_payment_alerted_at")
+
   // Relations
   store               Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
   customer            User?                @relation(fields: [customerId], references: [id], onDelete: SetNull)

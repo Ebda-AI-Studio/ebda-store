@@ -41,6 +41,8 @@ import { aiAutofillProduct } from './ai-autofill-product';
 import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
 import { orderCapiConversion } from './order-capi-conversion';
+import { orderStuckPaymentSweep } from './order-stuck-payment-sweep';
+import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -103,4 +105,9 @@ export const inngestFunctions: InngestFunction.Any[] = [
   aiAutofillSweep,
   // Server-side conversion API: Meta CAPI + TikTok Events API on purchase
   orderCapiConversion,
+  // Stuck-payment merchant alert: 15-min sweep for online orders placed but
+  // unpaid past STUCK_PAYMENT_MINUTES — pushes the merchant to follow up.
+  orderStuckPaymentSweep,
+  // Auto-cancel stale unpaid orders past AUTO_CANCEL_UNPAID_DAYS (daily cron).
+  orderAutoCancelUnpaid,
 ];

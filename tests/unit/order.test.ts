@@ -545,6 +545,9 @@ describe('OrderService', () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,
           status: 'pending',
+          // Refund effects (inventory restore) only fire when the order was
+          // actually paid — cancelling an UNPAID order must NOT refund.
+          paymentStatus: 'paid',
         } as any);
 
         await OrderService.updateStatus(mockStoreId, 'order-123', 'cancelled');
@@ -558,6 +561,7 @@ describe('OrderService', () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,
           status: 'delivered',
+          paymentStatus: 'paid',
         } as any);
 
         await OrderService.updateStatus(mockStoreId, 'order-123', 'refunded');
@@ -608,6 +612,7 @@ describe('OrderService', () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,
           status: 'delivered',
+          paymentStatus: 'paid',
         } as any);
         vi.mocked(prisma.order.update).mockResolvedValue({
           ...mockOrder,
