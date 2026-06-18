@@ -111,6 +111,13 @@ export default function StoreLayoutPage() {
   // becomes the source) or by clicking "Reset preview".
   const [previewDraftToken, setPreviewDraftToken] = useState<string | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  // Preview device toggle. The preview pane sits in a ~480px grid column, an
+  // in-between width BELOW the storefront's `sm` (640px) breakpoint — so a
+  // `w-full` iframe renders the MOBILE hero asset at a non-phone width and
+  // crops/shifts it (a real phone at 390px is fine). 'mobile' pins the iframe
+  // to a true phone width (390px, centered); 'desktop' renders a wide canvas
+  // (1280px) scaled to fit the pane so the desktop layout is shown un-cropped.
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
   // Smart Palette + future brand-token edits stage their theme updates here
   // instead of writing immediately to /theme. The main Save button flushes
   // these alongside layout + typography so the merchant has one source of
@@ -2150,33 +2157,87 @@ export default function StoreLayoutPage() {
           <div className="sticky top-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-foreground">Live preview</h3>
-              {previewUrl && (
-                <a
-                  href={previewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] font-semibold text-primary hover:underline"
-                >
-                  Open in new tab ↗
-                </a>
-              )}
+              <div className="flex items-center gap-2">
+                {/* Device toggle — mobile (true 390px phone width) / desktop
+                    (1280px canvas scaled to fit). Defaults to mobile so the
+                    hero isn't shown at the pane's broken in-between width. */}
+                <div className="inline-flex rounded-lg border border-border bg-card p-0.5 text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice('mobile')}
+                    aria-pressed={previewDevice === 'mobile'}
+                    className={`rounded-md px-2.5 py-1 transition-colors ${
+                      previewDevice === 'mobile'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    📱 {t('preview.mobile') /* Mobile / جوال */}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice('desktop')}
+                    aria-pressed={previewDevice === 'desktop'}
+                    className={`rounded-md px-2.5 py-1 transition-colors ${
+                      previewDevice === 'desktop'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    🖥 {t('preview.desktop') /* Desktop / سطح المكتب */}
+                  </button>
+                </div>
+                {previewUrl && (
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-semibold text-primary hover:underline"
+                  >
+                    Open in new tab ↗
+                  </a>
+                )}
+              </div>
             </div>
             {previewUrl ? (
-              <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                <iframe
-                  key={`${previewUrl}#${previewRefreshTick}#${previewDraftToken ?? ''}`}
-                  src={(() => {
-                    const sep = previewUrl.includes('?') ? '&' : '?';
-                    const draft = previewDraftToken
-                      ? `&_layoutDraft=${encodeURIComponent(previewDraftToken)}`
-                      : '';
-                    return `${previewUrl}${sep}_preview=${previewRefreshTick}${draft}`;
-                  })()}
-                  title="Storefront preview"
-                  className="block h-[calc(100vh-160px)] w-full bg-background"
-                  loading="lazy"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                />
+              <div className="flex justify-center overflow-hidden rounded-2xl border border-border bg-card">
+                {(() => {
+                  const sep = previewUrl.includes('?') ? '&' : '?';
+                  const draft = previewDraftToken
+                    ? `&_layoutDraft=${encodeURIComponent(previewDraftToken)}`
+                    : '';
+                  const src = `${previewUrl}${sep}_preview=${previewRefreshTick}${draft}`;
+                  const iframeKey = `${previewUrl}#${previewRefreshTick}#${previewDraftToken ?? ''}#${previewDevice}`;
+                  if (previewDevice === 'mobile') {
+                    // True phone width — 390px (iPhone logical width), centered.
+                    return (
+                      <iframe
+                        key={iframeKey}
+                        src={src}
+                        title="Storefront preview (mobile)"
+                        className="block h-[calc(100vh-200px)] w-[390px] max-w-full bg-background"
+                        loading="lazy"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                      />
+                    );
+                  }
+                  // Desktop — render a wide 1280px canvas and let the pane scroll
+                  // it horizontally. This shows the real desktop layout (≥ the
+                  // `lg` breakpoint) instead of the storefront wrapping down to
+                  // the narrow ~480px pane width. The merchant scrolls to pan.
+                  return (
+                    <div className="w-full overflow-x-auto">
+                      <iframe
+                        key={iframeKey}
+                        src={src}
+                        title="Storefront preview (desktop)"
+                        className="block h-[calc(100vh-200px)] w-[1280px] max-w-none bg-background"
+                        loading="lazy"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <div className="rounded-2xl border border-border bg-card p-6 text-center text-xs text-muted-foreground">

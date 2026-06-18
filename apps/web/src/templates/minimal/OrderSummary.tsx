@@ -10,6 +10,7 @@ export default function MinimalOrderSummary({
   discountLabel,
   shipping = 0,
   freeShipping = false,
+  shippingPending = false,
   tax = 0,
   total,
   currency = 'KWD',
@@ -52,7 +53,11 @@ export default function MinimalOrderSummary({
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="text-foreground tabular-nums" style={typography?.price}>
-            {freeShipping ? (
+            {shippingPending ? (
+              <span className="text-muted-foreground">
+                {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
+              </span>
+            ) : freeShipping ? (
               <span className="text-success">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
               fmt(shipping)

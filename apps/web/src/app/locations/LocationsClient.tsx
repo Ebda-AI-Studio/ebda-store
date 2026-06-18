@@ -13,6 +13,7 @@ import {
   pageTextScale,
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
+import { mapsEmbedSrc } from '@force/shared';
 import type { LocationsPageSettings } from '@force/shared';
 
 interface StoreLocation {
@@ -193,21 +194,45 @@ export default function LocationsClient({
                         const hours = tx(loc.hours, loc.hoursAr);
                         const waNumber = loc.whatsapp ? loc.whatsapp.replace(/[^0-9]/g, '') : null;
 
+                        // Build a key-free, frame-able Google Maps embed src.
+                        // Prefers an explicit embed URL, then coords/query parsed
+                        // from the share link, then geocodes the branch address.
+                        // A plain share link can't go in an <iframe> directly
+                        // (X-Frame-Options → blank box) — this converts it.
+                        const embedSrc = mapsEmbedSrc({
+                          mapsUrl: loc.mapsUrl,
+                          mapsEmbedUrl: loc.mapsEmbedUrl,
+                          fallbackQuery:
+                            [loc.name, loc.address, loc.country].filter(Boolean).join(', ') ||
+                            undefined,
+                        });
+
                         return (
                           <div
                             key={loc.id}
                             className="rounded-2xl border border-border bg-card p-4"
                           >
-                            {/* FIX C — replace broken Google Maps iframe with a tidy
-                                map-pin placeholder. The mapsEmbedUrl ?output=embed URL
-                                is refused by Google without a Maps Embed API key so
-                                it renders as an empty white box in production. We show
-                                a branded pin icon + keep the working "Open in Maps"
-                                button (mapsUrl uses /maps/search/?api=1 which works
-                                without a key). */}
-                            {isSafeHttpUrl(loc.mapsUrl) && (
+                            {/* Inline Google Maps preview. mapsEmbedSrc converts the
+                                merchant's share link / coords / address into a key-free
+                                `?output=embed` src that Google serves frame-able (a raw
+                                share link can't go in an iframe — X-Frame-Options blanks
+                                it). isSafeHttpUrl guards https-only. When no map data is
+                                resolvable, fall back to a tidy pin placeholder. */}
+                            {embedSrc && isSafeHttpUrl(embedSrc) ? (
+                              <div className="mb-3 h-36 w-full overflow-hidden rounded-lg bg-muted">
+                                <iframe
+                                  src={embedSrc}
+                                  title={name ? `${name} — map` : 'Branch location map'}
+                                  className="h-full w-full border-0"
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer-when-downgrade"
+                                  allowFullScreen
+                                />
+                              </div>
+                            ) : (
                               <div className="mb-3 flex h-36 w-full items-center justify-center overflow-hidden rounded-lg bg-muted">
-                                {/* Simple map-pin SVG — text-muted-foreground */}
+                                {/* Pin placeholder — shown only when there's no
+                                    resolvable map data for this branch. */}
                                 <svg
                                   xmlns="http://www.w3.org/2000/svg"
                                   viewBox="0 0 24 24"

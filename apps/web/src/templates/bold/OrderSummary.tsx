@@ -10,6 +10,7 @@ export default function BoldOrderSummary({
   discountLabel,
   shipping = 0,
   freeShipping = false,
+  shippingPending = false,
   tax = 0,
   total,
   currency = 'KWD',
@@ -70,7 +71,11 @@ export default function BoldOrderSummary({
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="font-black text-foreground tabular-nums" style={typography?.price}>
-            {freeShipping ? (
+            {shippingPending ? (
+              <span className="text-muted-foreground">
+                {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
+              </span>
+            ) : freeShipping ? (
               <span className="text-success">{isRtl ? 'مجاني' : 'FREE'}</span>
             ) : (
               fmt(shipping)

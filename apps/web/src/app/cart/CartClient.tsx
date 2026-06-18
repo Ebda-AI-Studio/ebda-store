@@ -613,6 +613,12 @@ export default function CartClient() {
                         }
                         shipping={shipping}
                         freeShipping={shipping === 0}
+                        // On the cart, shipping isn't resolved yet — the real
+                        // per-area fee is only known at checkout once the
+                        // customer picks a governorate/area. Show a neutral
+                        // "Calculated at checkout" label instead of a
+                        // misleading "Free".
+                        shippingPending
                         total={total}
                         currency={store.currency}
                         isRtl={language === 'ar'}
@@ -800,31 +806,20 @@ export default function CartClient() {
                               >
                                 {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
                               </span>
-                              {shipping === 0 ? (
-                                <span
-                                  className="font-medium text-[hsl(var(--success))]"
-                                  style={cartZoneStyle(cartLabelZone)}
-                                >
-                                  {t('Free', '\u0645\u062c\u0627\u0646\u064a')}
-                                </span>
-                              ) : (
-                                <span
-                                  className="font-medium text-foreground"
-                                  style={cartZoneStyle(cartPriceZone)}
-                                >
-                                  {formatPrice(shipping)}
-                                </span>
-                              )}
-                            </div>
-                            {shipping === 0 && (
-                              <p className="text-xs text-muted-foreground">
+                              {/* Shipping is resolved at checkout (per delivery
+                                  area), not on the cart \u2014 show a neutral
+                                  "Calculated at checkout" label rather than a
+                                  premature "Free". */}
+                              <span
+                                className="font-medium text-muted-foreground"
+                                style={cartZoneStyle(cartLabelZone)}
+                              >
                                 {t(
-                                  'Free shipping on orders over',
-                                  '\u0634\u062d\u0646 \u0645\u062c\u0627\u0646\u064a \u0644\u0644\u0637\u0644\u0628\u0627\u062a \u0641\u0648\u0642'
-                                )}{' '}
-                                {formatPrice(freeShippingThreshold)}
-                              </p>
-                            )}
+                                  'Calculated at checkout',
+                                  '\u064a\u062d\u0633\u0628 \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639'
+                                )}
+                              </span>
+                            </div>
                             <div className="border-t border-border pt-3">
                               <div className="flex justify-between">
                                 <span

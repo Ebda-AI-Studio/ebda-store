@@ -10,6 +10,7 @@ export default function ClassicOrderSummary({
   discountLabel,
   shipping = 0,
   freeShipping = false,
+  shippingPending = false,
   tax = 0,
   total,
   currency = 'KWD',
@@ -62,7 +63,11 @@ export default function ClassicOrderSummary({
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="tracking-tight text-foreground tabular-nums" style={typography?.price}>
-            {freeShipping ? (
+            {shippingPending ? (
+              <span className="text-muted-foreground">
+                {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
+              </span>
+            ) : freeShipping ? (
               <span className="text-success uppercase text-xs">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
               fmt(shipping)

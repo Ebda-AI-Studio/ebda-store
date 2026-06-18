@@ -10,6 +10,7 @@ export default function ElegantOrderSummary({
   discountLabel,
   shipping = 0,
   freeShipping = false,
+  shippingPending = false,
   tax = 0,
   total,
   currency = 'KWD',
@@ -64,7 +65,11 @@ export default function ElegantOrderSummary({
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="tracking-wide text-foreground tabular-nums" style={typography?.price}>
-            {freeShipping ? (
+            {shippingPending ? (
+              <span className="text-muted-foreground">
+                {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
+              </span>
+            ) : freeShipping ? (
               <span className="text-success uppercase tracking-[0.2em] text-xs">
                 {isRtl ? 'مجاني' : 'Complimentary'}
               </span>

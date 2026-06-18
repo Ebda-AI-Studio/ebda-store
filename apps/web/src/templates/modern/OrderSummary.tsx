@@ -10,6 +10,7 @@ export default function ModernOrderSummary({
   discountLabel,
   shipping = 0,
   freeShipping = false,
+  shippingPending = false,
   tax = 0,
   total,
   currency = 'KWD',
@@ -62,7 +63,11 @@ export default function ModernOrderSummary({
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="font-medium text-foreground tabular-nums" style={typography?.price}>
-            {freeShipping ? (
+            {shippingPending ? (
+              <span className="text-muted-foreground">
+                {isRtl ? 'يحسب عند الدفع' : 'Calculated at checkout'}
+              </span>
+            ) : freeShipping ? (
               <span className="text-success">{isRtl ? 'مجاني' : 'Free'}</span>
             ) : (
               fmt(shipping)

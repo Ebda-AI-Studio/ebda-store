@@ -787,6 +787,13 @@ export interface OrderSummaryProps {
   shipping?: number;
   /** If true, render shipping row as "Free" regardless of the shipping value. */
   freeShipping?: boolean;
+  /**
+   * If true, shipping has NOT been resolved yet (e.g. the cart page, before the
+   * customer picks a delivery area at checkout). The shipping row shows a
+   * neutral "Calculated at checkout" label instead of a (misleading) "Free" or
+   * amount. Takes precedence over `freeShipping`/`shipping`. Default false.
+   */
+  shippingPending?: boolean;
   tax?: number;
   total: number;
   currency?: string;
