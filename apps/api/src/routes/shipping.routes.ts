@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
+import multer from 'multer';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { ShippingService } from '../services/shipping.service';
@@ -313,6 +314,155 @@ router.put(
   }
 );
 
+// ─── Multer: area-rate file upload (xlsx or csv, ≤2MB) ────────────────────
+
+const areaRateUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const name = file.originalname.toLowerCase();
+    const ok =
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.mimetype === 'text/csv' ||
+      file.mimetype === 'text/plain' ||
+      name.endsWith('.xlsx') ||
+      name.endsWith('.csv');
+    cb(null, ok);
+  },
+});
+
+// ─── CSV helpers (quote-aware, mirrors the admin component) ───────────────
+
+function splitCsvRecords(csv: string): string[] {
+  const records: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < csv.length; i++) {
+    const char = csv[i];
+    if (char === '"') {
+      if (inQuotes && csv[i + 1] === '"') {
+        current += '""';
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      current += char;
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && csv[i + 1] === '\n') i++;
+      records.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.length > 0) records.push(current);
+  return records;
+}
+
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === '"' && !inQuotes) {
+      inQuotes = true;
+    } else if (char === '"' && inQuotes) {
+      if (next === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = false;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+/** Map a header cell to the internal import field key (case/space-tolerant). */
+function headerKey(h: string): string | null {
+  const n = h.trim().toLowerCase();
+  if (n.startsWith('governorate (ar') || n.startsWith('governorate(ar')) return null;
+  if (n.startsWith('governorate')) return 'governorate';
+  if (n.startsWith('area (ar') || n.startsWith('area(ar')) return 'areaAr';
+  if (n.startsWith('area')) return 'area';
+  if (n.startsWith('delivery fee')) return 'deliveryFee';
+  if (n.startsWith('free shipping') || n.startsWith('free over')) return 'freeShippingThreshold';
+  if (n.startsWith('active')) return 'isActive';
+  return null;
+}
+
+/** Parse a CSV buffer into raw import row objects. */
+function parseCsvBufferToRows(buf: Buffer): Record<string, string>[] {
+  const records = splitCsvRecords(buf.toString('utf8')).filter(r => r.trim() !== '');
+  if (records.length < 2) return [];
+  const headers = parseCsvLine(records[0]).map(headerKey);
+  const rows: Record<string, string>[] = [];
+  for (let i = 1; i < records.length; i++) {
+    const cells = parseCsvLine(records[i]);
+    const obj: Record<string, string> = {};
+    headers.forEach((key, idx) => {
+      if (key) obj[key] = cells[idx] ?? '';
+    });
+    if (!obj.area) continue;
+    rows.push(obj);
+  }
+  return rows;
+}
+
+/** Parse an xlsx buffer into raw import row objects using ExcelJS. */
+async function parseXlsxBufferToRows(buf: Buffer): Promise<Record<string, string>[]> {
+  const wb = new ExcelJS.Workbook();
+  // ExcelJS expects an ArrayBuffer / Buffer — cast via ArrayBuffer to satisfy
+  // strict type constraints across different Node Buffer type declarations.
+  await wb.xlsx.load(
+    buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+  );
+  const sheet = wb.worksheets[0];
+  if (!sheet) return [];
+
+  const rows: Record<string, string>[] = [];
+  let headers: (string | null)[] = [];
+  let headerRowFound = false;
+
+  sheet.eachRow((row, rowNumber) => {
+    const cells = row.values as (ExcelJS.CellValue | undefined)[];
+    // row.values is 1-indexed — normalise to 0-indexed strings
+    const cellStrings: string[] = [];
+    for (let i = 1; i < cells.length; i++) {
+      const v = cells[i];
+      cellStrings.push(v === null || v === undefined ? '' : String(v));
+    }
+
+    if (!headerRowFound) {
+      // First non-empty row is the header
+      if (cellStrings.some(c => c.trim() !== '')) {
+        headers = cellStrings.map(headerKey);
+        headerRowFound = true;
+      }
+      return;
+    }
+
+    if (cellStrings.every(c => c.trim() === '')) return; // skip blank rows
+
+    const obj: Record<string, string> = {};
+    headers.forEach((key, idx) => {
+      if (key) obj[key] = (cellStrings[idx] ?? '').trim();
+    });
+    if (!obj.area) return;
+    rows.push(obj);
+  });
+
+  return rows;
+}
+
 // ─── ShippingAreaRate schemas ──────────────────────────────────────────────
 
 const areaRateSchema = z.object({
@@ -537,18 +687,78 @@ router.put(
 );
 
 // POST /:storeId/shipping/area-rates/import — validate rows (from an uploaded
-// CSV/xlsx parsed in the admin) and bulk-upsert. With { dryRun: true } returns
-// a preview WITHOUT writing. Rows resolve to canonical Kuwait areas; fees are
+// CSV/xlsx file OR a JSON body) and bulk-upsert. With dryRun=true returns a
+// preview WITHOUT writing. Rows resolve to canonical Kuwait areas; fees are
 // KWD → fils. Same upsert key (storeId, governorate, area) as the bulk PUT.
+//
+// Two call shapes (both produce the same response):
+//   (a) multipart/form-data: file=<xlsx|csv>, dryRun=<true|false>  ← admin now uses this
+//   (b) application/json:    { rows: [...], dryRun: true|false }    ← backward-compat
 router.post(
   '/:storeId/shipping/area-rates/import',
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  areaRateUpload.single('file'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
-      const { rows, dryRun } = importAreaRatesSchema.parse(req.body);
+
+      let rows: ImportRow[];
+      let dryRun: boolean;
+
+      if (req.file) {
+        // ── Multipart upload path (xlsx or csv) ──────────────────────────
+        const name = req.file.originalname.toLowerCase();
+        const isXlsx =
+          req.file.mimetype ===
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+          name.endsWith('.xlsx');
+
+        let rawRows: Record<string, string>[];
+        try {
+          rawRows = isXlsx
+            ? await parseXlsxBufferToRows(req.file.buffer)
+            : parseCsvBufferToRows(req.file.buffer);
+        } catch {
+          res.status(422).json({
+            success: false,
+            error: { code: 'PARSE_ERROR', message: 'Could not parse the uploaded file.' },
+          });
+          return;
+        }
+
+        if (rawRows.length === 0) {
+          res.status(422).json({
+            success: false,
+            error: { code: 'NO_ROWS', message: 'No rows found in that file.' },
+          });
+          return;
+        }
+
+        // Validate row count cap
+        if (rawRows.length > AREA_RATE_IMPORT_ROW_LIMIT) {
+          res.status(422).json({
+            success: false,
+            error: {
+              code: 'TOO_MANY_ROWS',
+              message: `Too many rows (max ${AREA_RATE_IMPORT_ROW_LIMIT}).`,
+            },
+          });
+          return;
+        }
+
+        // Validate each raw row through the import row schema
+        rows = rawRows.map(r => importRowSchema.parse(r));
+        // dryRun form field comes as a string
+        const drField = req.body?.dryRun;
+        dryRun = drField === 'true' || drField === true;
+      } else {
+        // ── JSON body path (backward-compat) ─────────────────────────────
+        const parsed = importAreaRatesSchema.parse(req.body);
+        rows = parsed.rows;
+        dryRun = parsed.dryRun ?? false;
+      }
 
       const resolved: ResolvedAreaRate[] = [];
       const errors: RowError[] = [];
