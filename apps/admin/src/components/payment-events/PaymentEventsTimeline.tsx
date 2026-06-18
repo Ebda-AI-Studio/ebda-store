@@ -14,7 +14,11 @@ interface PaymentEvent {
   fromStatus: string | null;
   toStatus: string | null;
   provider: string | null;
-  details: string | null;
+  // The API stores `details` as either a plain string OR a JSON object
+  // (e.g. payment-confirm writes `{ source, reason, providerStatus }`).
+  // Rendering it raw throws React error #31 — always pass it through
+  // `formatDetails` before putting it in JSX.
+  details: string | Record<string, unknown> | null;
   triggeredByUserId: string | null;
   occurredAt: string;
   createdAt: string;
@@ -52,6 +56,28 @@ function getLabel(eventType: string): { en: string; ar: string } {
       ar: eventType.replace(/_/g, ' '),
     }
   );
+}
+
+// `details` may be a string OR a JSON object (payment-confirm writes
+// `{ source, reason, providerStatus }`). Reduce it to a human-readable
+// string so it can never be rendered as a raw React child (error #31).
+function formatDetails(details: unknown): string | null {
+  if (details == null) return null;
+  if (typeof details === 'string') return details.trim() || null;
+  if (typeof details === 'object') {
+    const d = details as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof d.reason === 'string') parts.push(d.reason.replace(/_/g, ' '));
+    if (typeof d.providerStatus === 'string') parts.push(`(${d.providerStatus})`);
+    if (typeof d.source === 'string') parts.push(`· ${d.source}`);
+    if (parts.length) return parts.join(' ');
+    try {
+      return JSON.stringify(d);
+    } catch {
+      return null;
+    }
+  }
+  return String(details);
 }
 
 // ---------------------------------------------------------------------------
@@ -269,6 +295,7 @@ function EventRow({ event, isLast, isSuperAdmin }: EventRowProps) {
   const [showPayload, setShowPayload] = useState(false);
   const label = getLabel(event.eventType);
   const iconVariant = getIconVariant(event.eventType);
+  const detailsText = formatDetails(event.details);
 
   return (
     <li className="relative flex gap-3">
@@ -305,7 +332,7 @@ function EventRow({ event, isLast, isSuperAdmin }: EventRowProps) {
         </div>
 
         {/* details note if present */}
-        {event.details && <p className="mt-1 text-xs text-muted-foreground">{event.details}</p>}
+        {detailsText && <p className="mt-1 text-xs text-muted-foreground">{detailsText}</p>}
 
         {/* Super-admin raw payload button */}
         {isSuperAdmin && (

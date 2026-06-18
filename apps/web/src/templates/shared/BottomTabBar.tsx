@@ -9,6 +9,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
 import type { BottomBarSettings, StoreTheme } from '@force/shared';
 import { resolveColor, DEFAULT_THEME } from '@force/shared';
+import type { NavItem } from '../types';
 
 /**
  * Sprint 3 (2026-05-17): Mobile sticky bottom tab bar with 4 destinations
@@ -42,13 +43,30 @@ interface BottomTabBarProps {
   bottomBar?: BottomBarSettings;
   /** Store theme — needed to resolve `token:*` color values. */
   theme?: StoreTheme;
+  /**
+   * Resolved storefront navigation (same list the header + footer receive from
+   * ShopChrome — already scheme-validated, slug-prefixed, and Locations-aware).
+   * Rendered inside the bottom-bar "Menu" drawer so mobile shoppers can reach
+   * every merchant-placed nav link (Products / Categories / About / Contact /
+   * Locations / any custom link) without the desktop header. When empty the
+   * Menu tab still opens but shows only the built-in destinations.
+   */
+  navigation?: NavItem[];
 }
 
-export function BottomTabBar({ bottomBar, theme }: BottomTabBarProps = {}) {
+export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBarProps = {}) {
   const { isRtl } = useLanguage();
   const { itemCount } = useCart();
   const storeUrl = useStoreUrl();
   const pathname = usePathname() ?? '/';
+  // Menu-drawer open state. The drawer lists the store's full navigation so the
+  // mobile bottom bar finally has a working, pressable "Menu" that OPENS (the
+  // bar previously had no menu affordance at all — merchant complaint 2026-06-18).
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Close the drawer on route change so a tapped link doesn't leave it open.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
   // Render into <body> via a portal. `position: fixed` is relative to the
   // nearest ancestor with a transform/filter/will-change/contain — and the
   // storefront page wrappers animate sections (transform), which was trapping
@@ -172,6 +190,26 @@ export function BottomTabBar({ bottomBar, theme }: BottomTabBarProps = {}) {
     ? { backgroundColor: `color-mix(in srgb, ${resolvedActive} 10%, transparent)` }
     : undefined;
 
+  // Menu-tab icon (hamburger). Rendered as a button, not a Link, because it
+  // toggles the nav drawer instead of navigating.
+  const menuIcon = (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 6h16M4 12h16M4 18h16"
+      />
+    </svg>
+  );
+  const menuLabel = isRtl ? 'القائمة' : 'Menu';
+  const menuColorStyle: React.CSSProperties | undefined =
+    menuOpen && resolvedActive
+      ? { color: resolvedActive }
+      : !menuOpen && resolvedInactive
+        ? { color: resolvedInactive }
+        : undefined;
+
   const bar = (
     <nav
       aria-label={isRtl ? 'شريط التنقل' : 'Bottom navigation'}
@@ -179,7 +217,7 @@ export function BottomTabBar({ bottomBar, theme }: BottomTabBarProps = {}) {
       className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-[hsl(var(--bg-section-alt))] border-t border-foreground/10 pb-[env(safe-area-inset-bottom)]"
       style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}
     >
-      <ul className="grid grid-cols-4 max-w-md mx-auto">
+      <ul className="grid grid-cols-5 max-w-md mx-auto">
         {tabs.map(tab => {
           const active = isActive(tab.href);
           const label = isRtl ? tab.labelAr : tab.labelEn;
@@ -226,11 +264,101 @@ export function BottomTabBar({ bottomBar, theme }: BottomTabBarProps = {}) {
             </li>
           );
         })}
+        {/* Menu tab — opens the nav drawer. A real <button> with an onClick so
+            it is pressable and actually OPENS (the prior 4-tab bar had no menu
+            at all). aria-expanded + aria-controls wire it to the drawer. */}
+        <li className="flex">
+          <button
+            type="button"
+            onClick={() => setMenuOpen(v => !v)}
+            aria-expanded={menuOpen}
+            aria-controls="bottom-nav-menu-drawer"
+            aria-label={menuLabel}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[56px] transition-colors ${
+              menuOpen
+                ? resolvedActive
+                  ? ''
+                  : 'text-foreground'
+                : resolvedInactive
+                  ? ''
+                  : 'text-foreground/60 hover:text-foreground'
+            }`}
+            style={menuColorStyle}
+          >
+            <span
+              className={`relative inline-flex h-9 w-12 items-center justify-center rounded-full transition-colors ${
+                menuOpen && !activePillStyle ? 'bg-[hsl(var(--primary))]/10' : ''
+              }`}
+              style={menuOpen ? activePillStyle : undefined}
+            >
+              {menuIcon}
+            </span>
+            <span className="text-[10px] font-medium leading-none">{menuLabel}</span>
+          </button>
+        </li>
       </ul>
     </nav>
   );
 
+  // Slide-up nav drawer anchored above the bar. Lists the store's full
+  // navigation (Products / Categories / About / Contact / Locations / custom).
+  // z-50 sits above the bar (z-40); the backdrop closes on tap.
+  const drawer = (
+    <div
+      className={`fixed inset-0 z-50 md:hidden transition-opacity duration-200 ${
+        menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      }`}
+      aria-hidden={!menuOpen}
+    >
+      <button
+        type="button"
+        aria-label={isRtl ? 'إغلاق القائمة' : 'Close menu'}
+        tabIndex={menuOpen ? 0 : -1}
+        onClick={() => setMenuOpen(false)}
+        className="absolute inset-0 h-full w-full bg-black/40 backdrop-blur-sm"
+      />
+      <div
+        id="bottom-nav-menu-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={menuLabel}
+        dir={isRtl ? 'rtl' : 'ltr'}
+        className={`absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-foreground/10 bg-[hsl(var(--bg-section-alt))] pb-[calc(56px+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-200 ${
+          menuOpen ? 'translate-y-0' : 'translate-y-full'
+        }`}
+        style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}
+      >
+        <div className="mx-auto flex max-w-md flex-col px-4 pt-3">
+          <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-foreground/20" aria-hidden />
+          <span className="mb-1 text-xs font-semibold uppercase tracking-wider text-foreground/50">
+            {menuLabel}
+          </span>
+          <ul className="flex flex-col">
+            {navigation.map(item => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  prefetch={false}
+                  onClick={() => setMenuOpen(false)}
+                  className="block border-b border-foreground/5 py-3 text-sm font-medium text-foreground hover:text-[hsl(var(--primary))]"
+                >
+                  {isRtl ? (item.labelAr ?? item.label) : item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+
   // Portal to body so no transformed ancestor can trap the fixed positioning.
   if (!mounted) return null;
-  return createPortal(bar, document.body);
+  return createPortal(
+    <>
+      {bar}
+      {drawer}
+    </>,
+    document.body
+  );
 }

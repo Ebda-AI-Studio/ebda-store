@@ -442,7 +442,11 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           the component. Mounts last so its fixed positioning sits above
           everything else in the chrome. Merchant color overrides from
           layout.bottomBar are threaded in (page-builder 2026-06-17). */}
-      <BottomTabBar bottomBar={layout?.bottomBar} theme={store.theme} />
+      <BottomTabBar
+        bottomBar={layout?.bottomBar}
+        theme={store.theme}
+        navigation={filteredNavigation}
+      />
 
       {/* Floating Widget — opt-in engagement feature 2026-05-21. Renders
           only when:

@@ -91,11 +91,14 @@ export function PushNotificationPrompt() {
   const logo = (isRtl ? store.logoAr : null) || store.logo || null;
   const storeName = isRtl ? store.nameAr || store.name : store.name;
 
+  // Lift above the mobile BottomTabBar (56px, fixed bottom-0) so this prompt
+  // never overlaps / blocks the bar's tabs on mobile (rule 6: other fixed-bottom
+  // UI lifts above the primary bar). Desktop has no bar → bottom-4 at md+.
   return (
     <div
       role="dialog"
       aria-label={t('Enable push notifications', 'تفعيل الإشعارات')}
-      className="fixed bottom-4 left-1/2 z-[9999] flex w-[min(92vw,420px)] -translate-x-1/2 items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-2xl"
+      className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] md:bottom-4 left-1/2 z-[9999] flex w-[min(92vw,420px)] -translate-x-1/2 items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-2xl"
     >
       {logo ? (
         <Image

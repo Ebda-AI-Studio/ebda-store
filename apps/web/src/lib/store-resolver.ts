@@ -84,6 +84,13 @@ export interface ResolvedStore {
   // General Settings (footer links, etc.)
   settings?: Record<string, unknown>;
 
+  // Locations feature flag — gates the storefront Locations nav/footer/utility
+  // links + the /locations route. Sourced from Store.locationsEnabled. Without
+  // this mapped through, ShopChrome reads `store.locationsEnabled` as undefined
+  // and filters out every merchant-placed Locations link (the link never
+  // renders on any surface). Keep in lock-step with the API select.
+  locationsEnabled?: boolean;
+
   // Tax — when taxIncludedInPrice is true the storefront should label
   // prices with "Includes VAT" so customers don't expect the tax to be
   // added on top at checkout. taxEnabled is mirrored for parity.
@@ -279,6 +286,8 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
           ? (storeData.pwaSettings as Record<string, unknown>)
           : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+      locationsEnabled:
+        typeof storeData.locationsEnabled === 'boolean' ? storeData.locationsEnabled : undefined,
       taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
       taxIncludedInPrice:
         typeof storeData.taxIncludedInPrice === 'boolean'
@@ -415,6 +424,8 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
           ? (storeData.pwaSettings as Record<string, unknown>)
           : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+      locationsEnabled:
+        typeof storeData.locationsEnabled === 'boolean' ? storeData.locationsEnabled : undefined,
       taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
       taxIncludedInPrice:
         typeof storeData.taxIncludedInPrice === 'boolean'
@@ -613,6 +624,8 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
           ? (storeData.pwaSettings as Record<string, unknown>)
           : undefined,
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
+      locationsEnabled:
+        typeof storeData.locationsEnabled === 'boolean' ? storeData.locationsEnabled : undefined,
       taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
       taxIncludedInPrice:
         typeof storeData.taxIncludedInPrice === 'boolean'
