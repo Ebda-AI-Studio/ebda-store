@@ -726,6 +726,23 @@ class ApiClient {
   }
 
   /**
+   * Enrol the authenticated customer in the loyalty program for `storeId`.
+   * The server creates the loyalty record and awards the signup bonus
+   * (configured per-store; default 100 pts). Requires an authenticated
+   * customer session — admin tokens are rejected by the API.
+   *
+   * Returns the new `CustomerPointsInfo` record on success.
+   *
+   * Maps to: POST /public/:storeId/loyalty/join
+   */
+  async joinLoyalty(storeId: string) {
+    return this.request<{ points: Record<string, unknown> }>(`/public/${storeId}/loyalty/join`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  /**
    * Storefront search typeahead. Returns up to 8 active products matching
    * `q` against either English or Arabic name. Empty / sub-2-char queries
    * resolve to an empty list without a network round-trip — callers can

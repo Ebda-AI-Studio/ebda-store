@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { API_URL } from '../../../lib/api';
+import { useFeatures } from '../../../contexts/FeatureContext';
+import { api, API_URL } from '../../../lib/api';
 import { formatDate as formatStoreDate } from '../../../lib/format-date';
+import { useToast } from '@force/ui';
 
 interface LoyaltyPoints {
   points: number;
@@ -31,6 +33,8 @@ async function authFetch(url: string) {
 export default function LoyaltyClient() {
   const { store } = useStore();
   const { t, language } = useLanguage();
+  const { isEnabled } = useFeatures();
+  const { success: toastSuccess, error: toastError } = useToast();
   const storeId = store.id;
 
   // Tenant-aware wrapper around the shared formatter so the JSX below
@@ -50,6 +54,9 @@ export default function LoyaltyClient() {
   const [pointsError, setPointsError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [loyaltyDisabled, setLoyaltyDisabled] = useState(false);
+  /** true when the customer has no loyalty record yet (not yet enrolled) */
+  const [notEnrolled, setNotEnrolled] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     // Guard: do not attempt to fetch until we have a real store id
@@ -58,6 +65,7 @@ export default function LoyaltyClient() {
     async function fetchPoints() {
       setIsLoadingPoints(true);
       setPointsError(null);
+      setNotEnrolled(false);
       try {
         const res = await authFetch(`${API_URL}/public/${storeId}/loyalty/my-points`);
         const json = await res.json();
@@ -68,7 +76,19 @@ export default function LoyaltyClient() {
         }
 
         if (res.ok && json.success) {
-          setLoyaltyPoints(json.data ?? json);
+          const pointsData = json.data?.points ?? json.data ?? json;
+          if (pointsData === null || pointsData === undefined) {
+            // Loyalty is enabled for this store (feature gate in layout ensures
+            // this page is only reachable when loyalty is active) but the
+            // customer has no loyalty record yet — show the join CTA.
+            if (isEnabled('loyalty')) {
+              setNotEnrolled(true);
+            } else {
+              setLoyaltyDisabled(true);
+            }
+          } else {
+            setLoyaltyPoints(pointsData);
+          }
         } else {
           setPointsError(json.error?.message || 'Failed to load loyalty points.');
         }
@@ -106,7 +126,8 @@ export default function LoyaltyClient() {
 
     fetchPoints();
     fetchHistory();
-  }, [storeId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, isEnabled]);
 
   // Derive tier badge color
   function tierColor(tier?: string) {
@@ -119,6 +140,61 @@ export default function LoyaltyClient() {
         return 'bg-info/10 text-info';
       default:
         return 'bg-[hsl(var(--info))]/20 text-[hsl(var(--info))]';
+    }
+  }
+
+  /** Enrol the customer in the loyalty program and refresh the page state. */
+  async function handleJoin() {
+    if (!storeId || storeId === 'demo' || isJoining) return;
+    setIsJoining(true);
+    try {
+      const result = await api.joinLoyalty(storeId);
+      if (result.success && result.data) {
+        toastSuccess(
+          t('Welcome to the loyalty program!', '!مرحباً بك في برنامج الولاء'),
+          t(
+            'Your points balance has been created. Start earning on every order.',
+            'تم إنشاء رصيدك من النقاط. ابدأ في الكسب مع كل طلب.'
+          )
+        );
+        // Re-fetch to pick up the new record (includes the signup bonus).
+        setNotEnrolled(false);
+        setIsLoadingPoints(true);
+        setIsLoadingHistory(true);
+        const res = await authFetch(`${API_URL}/public/${storeId}/loyalty/my-points`);
+        const json = await res.json();
+        if (res.ok && json.success) {
+          const pointsData = json.data?.points ?? json.data ?? json;
+          if (pointsData !== null && pointsData !== undefined) {
+            setLoyaltyPoints(pointsData);
+          }
+        }
+        setIsLoadingPoints(false);
+        // Refresh transaction history too so the signup-bonus row appears.
+        const txRes = await authFetch(`${API_URL}/public/${storeId}/loyalty/my-transactions`);
+        const txJson = await txRes.json();
+        if (txRes.ok && txJson.success) {
+          const txns =
+            txJson.data?.transactions ?? txJson.data?.history ?? txJson.transactions ?? [];
+          setTransactions(txns);
+        }
+        setIsLoadingHistory(false);
+      } else {
+        const msg =
+          result.error?.message ||
+          t('Failed to join. Please try again.', 'فشل الانضمام. يرجى المحاولة مرة أخرى.');
+        toastError(t('Could not join', 'تعذّر الانضمام'), msg);
+      }
+    } catch {
+      toastError(
+        t('Could not join', 'تعذّر الانضمام'),
+        t(
+          'An unexpected error occurred. Please try again.',
+          'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.'
+        )
+      );
+    } finally {
+      setIsJoining(false);
     }
   }
 
@@ -184,6 +260,143 @@ export default function LoyaltyClient() {
     );
   }
 
+  // Customer is authenticated and loyalty is active for this store, but they
+  // have no loyalty record yet \u2014 show the enrolment CTA.
+  if (notEnrolled && !isLoadingPoints) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t(
+              'Loyalty Program',
+              '\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u0648\u0644\u0627\u0621'
+            )}
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            {t(
+              'Earn points on every purchase and redeem them at checkout',
+              '\u0627\u0643\u0633\u0628 \u0646\u0642\u0627\u0637\u0627\u064b \u0639\u0644\u0649 \u0643\u0644 \u0634\u0631\u0627\u0621 \u0648\u0627\u0633\u062a\u0628\u062f\u0644\u0647\u0627 \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639'
+            )}
+          </p>
+        </div>
+
+        {/* Join CTA card */}
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 text-center">
+            {/* Star / reward icon */}
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <svg
+                className="h-8 w-8 text-primary"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                />
+              </svg>
+            </div>
+
+            <h2 className="mt-5 text-2xl font-bold text-foreground">
+              {t(
+                'Join Our Loyalty Program',
+                '\u0627\u0646\u0636\u0645 \u0625\u0644\u0649 \u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u0648\u0644\u0627\u0621'
+              )}
+            </h2>
+            <p className="mt-2 text-muted-foreground max-w-sm mx-auto">
+              {t(
+                'Sign up today and start earning points on every order. Redeem your points for discounts at checkout.',
+                '\u0633\u062c\u0651\u0644 \u0627\u0644\u064a\u0648\u0645 \u0648\u0627\u0628\u062f\u0623 \u0628\u0643\u0633\u0628 \u0646\u0642\u0627\u0637 \u0639\u0644\u0649 \u0643\u0644 \u0637\u0644\u0628. \u0627\u0633\u062a\u0628\u062f\u0644 \u0646\u0642\u0627\u0637\u0643 \u0644\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u062e\u0635\u0648\u0645\u0627\u062a \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639.'
+              )}
+            </p>
+
+            {/* Benefits list */}
+            <ul className="mt-6 space-y-2 text-sm text-start max-w-xs mx-auto">
+              <li className="flex items-center gap-2 text-foreground">
+                <svg
+                  className="h-4 w-4 flex-shrink-0 text-[hsl(var(--success))]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                {t(
+                  'Earn points on every purchase',
+                  '\u0627\u0643\u0633\u0628 \u0646\u0642\u0627\u0637\u0627\u064b \u0639\u0644\u0649 \u0643\u0644 \u0639\u0645\u0644\u064a\u0629 \u0634\u0631\u0627\u0621'
+                )}
+              </li>
+              <li className="flex items-center gap-2 text-foreground">
+                <svg
+                  className="h-4 w-4 flex-shrink-0 text-[hsl(var(--success))]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                {t(
+                  'Redeem points for discounts at checkout',
+                  '\u0627\u0633\u062a\u0628\u062f\u0644 \u0627\u0644\u0646\u0642\u0627\u0637 \u0644\u062e\u0635\u0648\u0645\u0627\u062a \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639'
+                )}
+              </li>
+              <li className="flex items-center gap-2 text-foreground">
+                <svg
+                  className="h-4 w-4 flex-shrink-0 text-[hsl(var(--success))]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                {t(
+                  'Unlock higher tiers with more rewards',
+                  '\u0627\u0646\u0636\u0645 \u0625\u0644\u0649 \u0645\u0633\u062a\u0648\u064a\u0627\u062a \u0623\u0639\u0644\u0649 \u0648\u0627\u062d\u0635\u0644 \u0639\u0644\u0649 \u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u0645\u0643\u0627\u0641\u0622\u062a'
+                )}
+              </li>
+            </ul>
+
+            <button
+              onClick={handleJoin}
+              disabled={isJoining}
+              className="mt-8 inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isJoining ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  {t(
+                    'Joining\u2026',
+                    '\u062c\u0627\u0631\u064a \u0627\u0644\u0627\u0646\u0636\u0645\u0627\u0645\u2026'
+                  )}
+                </>
+              ) : (
+                t('Join Now', '\u0627\u0646\u0636\u0645 \u0627\u0644\u0622\u0646')
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -237,7 +450,9 @@ export default function LoyaltyClient() {
                     )}
                   </p>
                   <span
-                    className={`inline-block rounded-full px-4 py-1 text-sm font-semibold ${tierColor(loyaltyPoints.tier)}`}
+                    className={`inline-block rounded-full px-4 py-1 text-sm font-semibold ${tierColor(
+                      loyaltyPoints.tier
+                    )}`}
                   >
                     {loyaltyPoints.tier.charAt(0).toUpperCase() + loyaltyPoints.tier.slice(1)}
                   </span>

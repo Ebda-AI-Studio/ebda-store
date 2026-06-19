@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useFeatures } from '../../contexts/FeatureContext';
 import { formatPrice } from '@/lib/format';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
 
@@ -12,6 +13,7 @@ export default function AccountDashboardClient() {
   const storeUrl = useStoreUrl();
   const { store } = useStore();
   const { t, language } = useLanguage();
+  const { isEnabled } = useFeatures();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
@@ -247,7 +249,9 @@ export default function AccountDashboardClient() {
                 </div>
                 <div className="text-right">
                   <span
-                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${statusColors[order.status] || 'bg-muted text-foreground'}`}
+                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                      statusColors[order.status] || 'bg-muted text-foreground'
+                    }`}
                   >
                     {order.status}
                   </span>
@@ -363,6 +367,52 @@ export default function AccountDashboardClient() {
             </p>
           </div>
         </Link>
+
+        {/* Loyalty entry point \u2014 only shown when the store has loyalty enabled */}
+        {isEnabled('loyalty') && (
+          <Link
+            href={storeUrl('/account/loyalty')}
+            className="flex items-center gap-4 rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary hover:shadow-md sm:col-span-2"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <svg
+                className="h-5 w-5 text-primary"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground">
+                {t(
+                  'Loyalty Rewards',
+                  '\u0645\u0643\u0627\u0641\u0622\u062a \u0627\u0644\u0648\u0644\u0627\u0621'
+                )}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  'Earn points on every order and redeem for discounts',
+                  '\u0627\u0643\u0633\u0628 \u0646\u0642\u0627\u0637\u0627\u064b \u0639\u0644\u0649 \u0643\u0644 \u0637\u0644\u0628 \u0648\u0627\u0633\u062a\u0628\u062f\u0644\u0647\u0627 \u0644\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u062e\u0635\u0648\u0645\u0627\u062a'
+                )}
+              </p>
+            </div>
+            <svg
+              className="h-5 w-5 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        )}
       </div>
     </div>
   );
