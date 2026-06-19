@@ -22,7 +22,18 @@ const PLATFORM_HOSTS = new Set([
  * These are used for development/staging only. Production custom domains never
  * end with these suffixes.
  */
-const PLATFORM_SUFFIXES = ['vercel.app', 'netlify.app', 'ngrok.io', 'ngrok-free.app'];
+const PLATFORM_SUFFIXES = [
+  'vercel.app',
+  'netlify.app',
+  'ngrok.io',
+  'ngrok-free.app',
+  // Cloudflare Workers preview domain (the OpenNext deploy target). Like
+  // *.vercel.app, a `*.workers.dev` host is the platform's own preview URL,
+  // NOT a custom merchant domain — so the storefront serves the platform
+  // landing at root and resolves stores by slug (`/<slug>`). Production custom
+  // domains never end in workers.dev, so this is zero-impact on prod traffic.
+  'workers.dev',
+];
 
 /**
  * Check if a hostname is a platform domain (not a custom store domain)

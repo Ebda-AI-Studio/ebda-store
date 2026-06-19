@@ -10,11 +10,14 @@ const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAG
 const nextConfig = {
   reactStrictMode: true,
 
-  // `sharp` is a native module — kept external (not bundled) so the OpenNext/
-  // Cloudflare Worker build doesn't try to bundle the native binary. Harmless on
-  // Vercel/Node, which provides sharp at runtime from node_modules anyway. The
-  // OG route's sharp usage is additionally runtime-gated off Workers.
-  serverExternalPackages: ['sharp'],
+  // `sharp` is a native module. On Vercel/Node we mark it external so Next keeps
+  // it as a runtime require from node_modules (unchanged behavior). On the
+  // Cloudflare build we must NOT list it: `serverExternalPackages` makes
+  // Turbopack emit an `[externals]_sharp` stub chunk (`require("sharp-<hash>")`)
+  // that OpenNext's esbuild then can't resolve → build failure. The OG route's
+  // sharp import is non-literal + runtime-gated off Workers (see
+  // opengraph-image.tsx), so on Cloudflare sharp is never bundled or called.
+  serverExternalPackages: IS_CLOUDFLARE ? [] : ['sharp'],
 
   // Next 16 + Turbopack default: monorepo-root file-tracing so the bundler
   // walks up to root node_modules for workspace-hoisted deps. Sister to

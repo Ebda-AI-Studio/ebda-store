@@ -58,7 +58,13 @@ function isCloudflareRuntime(): boolean {
 async function rasterizeSvgToPng(svgBuf: Buffer): Promise<string | null> {
   if (isCloudflareRuntime()) return null;
   try {
-    const sharp = (await import('sharp')).default;
+    // Non-literal specifier: the Cloudflare bundler (esbuild) can't statically
+    // resolve a computed import, so it leaves `sharp` as a runtime require
+    // rather than trying to bundle the native binary (which errors). This path
+    // is unreachable on Workers anyway (isCloudflareRuntime guard above). On
+    // Node/Vercel it resolves normally at runtime.
+    const sharpModule = ['sh', 'arp'].join('');
+    const sharp = (await import(/* webpackIgnore: true */ sharpModule)).default;
     const png = await sharp(svgBuf, { density: 240 })
       .resize(600, 600, { fit: 'inside', withoutEnlargement: false })
       .png()

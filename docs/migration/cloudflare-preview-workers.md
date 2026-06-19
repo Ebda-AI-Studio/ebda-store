@@ -4,13 +4,41 @@
 
 ## Preview worker URLs
 
-| App                        | Worker                    | URL                                                        | Notes                                                                          |
-| -------------------------- | ------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `apps/web` (storefront)    | `force-web-cf-preview`    | https://force-web-cf-preview.ahmed0montaser.workers.dev    | Phase 1 (#314). Root renders Platform landing (workers.dev not domain-mapped). |
-| `apps/orders` (orders PWA) | `force-orders-cf-preview` | https://force-orders-cf-preview.ahmed0montaser.workers.dev | Clean — no blockers. SSR via OpenNext.                                         |
-| `apps/admin` (dashboard)   | `force-admin-cf-preview`  | https://force-admin-cf-preview.ahmed0montaser.workers.dev  | `instrumentation.ts` moved aside at build time (see below).                    |
+| App                        | Worker                    | URL                                                        | Notes                                                                                                    |
+| -------------------------- | ------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `apps/web` (storefront)    | `force-web-cf-preview`    | https://force-web-cf-preview.ahmed0montaser.workers.dev    | Root = Platform landing. Real stores render by slug: `/pecannbee`, `/wady-aljuz`, `/palora` (see below). |
+| `apps/orders` (orders PWA) | `force-orders-cf-preview` | https://force-orders-cf-preview.ahmed0montaser.workers.dev | Clean — no blockers. SSR via OpenNext.                                                                   |
+| `apps/admin` (dashboard)   | `force-admin-cf-preview`  | https://force-admin-cf-preview.ahmed0montaser.workers.dev  | `instrumentation.ts` moved aside at build time (see below).                                              |
 
-All three: `next: 16.2.9` under `@opennextjs/cloudflare@1.19.11`, `compatibility_flags: ["nodejs_compat"]`, deploy to **Workers + Static Assets** (the `ASSETS` binding), ~24–31 ms cold start.
+All three: `next: 16.2.9` under `@opennextjs/cloudflare@1.19.11`, `compatibility_flags: ["nodejs_compat"]`, deploy to **Workers + Static Assets** (the `ASSETS` binding), ~20–31 ms cold start.
+
+### See a real store on the worker (pre-DNS)
+
+The storefront is multi-tenant: a custom domain resolves one store; a **platform host** serves the Platform landing at root and resolves stores by **slug** (`/<slug>`). `*.workers.dev` is now classed as a platform host (fix below), so without any DNS change you can view live stores on the preview worker:
+
+- https://force-web-cf-preview.ahmed0montaser.workers.dev/ — Platform landing
+- https://force-web-cf-preview.ahmed0montaser.workers.dev/pecannbee — Pecannbee
+- https://force-web-cf-preview.ahmed0montaser.workers.dev/wady-aljuz — Wady Aljuz (وادي الجوز)
+- https://force-web-cf-preview.ahmed0montaser.workers.dev/palora — Palora (بالورا)
+
+After the DNS move, each store is served at its OWN domain (e.g. `wadyaljuz.com`) with no `/<slug>` prefix — the same code path, just resolved by domain instead of slug.
+
+### Required build env for `apps/web` (storefront)
+
+`NEXT_PUBLIC_*` vars are **inlined at build time**. Without `NEXT_PUBLIC_API_URL` the worker falls back to `http://localhost:4000/api/v1` and every store fails to resolve (→ Platform landing for every slug). Build web with at least:
+
+```bash
+export NEXT_PUBLIC_API_URL="https://api-production-c058.up.railway.app/api/v1"
+export NEXT_PUBLIC_SITE_URL="https://force-web-cf-preview.ahmed0montaser.workers.dev"  # optional (canonical/OG)
+bash scripts/cf-build.sh web && (cd apps/web && npx wrangler deploy)
+```
+
+(Match the Vercel `force-web` project env at cutover. The other `NEXT_PUBLIC_*` vars — ONESIGNAL / POSTHOG / VAPID — degrade gracefully; set them for full push/analytics parity.)
+
+### Fixes that made the web worker production-equivalent (this PR)
+
+1. **`*.workers.dev` → platform host** (`apps/web/middleware.ts` `PLATFORM_SUFFIXES` + `apps/web/src/contexts/StoreContext.tsx` `isPlatform`). It was missing the Cloudflare analog of `*.vercel.app`, so the preview URL was mis-read as a custom domain and no store ever resolved. Zero prod impact (real custom domains never end in `workers.dev`).
+2. **`sharp` CF build failure** (`apps/web/next.config.js` + `apps/web/src/app/opengraph-image.tsx`). `main` had the broken pair: `serverExternalPackages: ['sharp']` (made Turbopack emit an `[externals]_sharp` stub esbuild couldn't resolve) + a **literal** `import('sharp')`. Fixed: gate `serverExternalPackages` on `IS_CLOUDFLARE` (Vercel keeps `['sharp']`, byte-identical) + non-literal `import` specifier (esbuild leaves it as a runtime require; the OG route is runtime-gated off Workers anyway). The working fix had only ever lived in the unmerged Phase-1 spike worktree.
 
 ## What's committed vs local-only
 

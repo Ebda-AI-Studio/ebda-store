@@ -412,6 +412,10 @@ export function useStoreUrl() {
     const host = window.location.hostname;
     setIsPlatform(
       host.endsWith('.vercel.app') ||
+        // Cloudflare Workers preview host (OpenNext deploy) — same class as
+        // *.vercel.app: a platform host where store links need the /<slug>
+        // prefix. Must mirror PLATFORM_SUFFIXES in middleware.ts.
+        host.endsWith('.workers.dev') ||
         host === 'localhost' ||
         host === '127.0.0.1' ||
         host === 'store.forcemediakw.com'
