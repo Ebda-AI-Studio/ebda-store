@@ -43,16 +43,20 @@ export function MinimalChrome({
           className="border-b bg-background"
           aria-label={displayLabel || (isRtl ? 'التنقل' : 'Navigation')}
         >
-          <div className="mx-auto flex h-28 max-w-7xl items-center justify-between px-4 md:h-32 md:px-6 lg:px-8">
+          <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 md:h-24 md:px-6 lg:px-8">
             <Link href={storeUrl('/')} className="flex items-center gap-2">
               {store.logo ? (
                 <Image
                   src={store.logo}
                   alt={store.name}
-                  width={320}
-                  height={120}
+                  width={210}
+                  height={80}
                   priority
-                  className="h-24 w-auto max-w-[320px] object-contain md:h-28 md:max-w-[360px]"
+                  // Same firm bounding-box cap as the storefront theme headers
+                  // (h-14/max-w-[150px] mobile → h-20/max-w-[210px] desktop) so
+                  // the logo is identically sized on checkout / auth / share
+                  // pages and never renders oversized for wide or square logos.
+                  className="h-14 max-h-14 w-auto max-w-[150px] object-contain md:h-20 md:max-h-20 md:max-w-[210px]"
                 />
               ) : (
                 <span className="text-2xl font-bold text-primary sm:text-3xl">{store.name}</span>
