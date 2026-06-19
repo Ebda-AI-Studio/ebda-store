@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps, ResolvedUtilityBar } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
@@ -144,14 +144,7 @@ export default function ClassicHeader({
             className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0 flex items-center justify-center flex-shrink-0 max-w-[65%] md:max-w-none"
           >
             {displayLogo ? (
-              <Image
-                src={displayLogo}
-                alt={displayName}
-                width={320}
-                height={120}
-                className="h-14 max-h-14 w-auto max-w-[150px] object-contain md:h-20 md:max-h-20 md:max-w-[210px]"
-                priority
-              />
+              <StoreLogo src={displayLogo} alt={displayName} priority />
             ) : (
               <span
                 className="text-2xl font-serif font-bold tracking-wider text-foreground"

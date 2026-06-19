@@ -385,7 +385,7 @@ export function HomePageContent({
             {layout.categories.dividers?.above?.enabled && (
               <SectionDivider
                 settings={resolveSlotDividerSettings(layout.categories.dividers, 'above')}
-                hideForExplicitBg={!!layout.categories.bgColor}
+                hideForExplicitBg={!!(layout.hero.bgColor || layout.categories.bgColor)}
               />
             )}
             {layout.categories.enabled && templateCategories.length > 0 && (
@@ -678,7 +678,19 @@ export function HomePageContent({
             <>
               <SectionDivider
                 settings={resolveSlotDividerSettings(layout.blogCarousel?.dividers, 'above')}
-                hideForExplicitBg={!!layout.blogCarousel?.bgColor}
+                // Suppress when EITHER flanking section is colored. The
+                // preceding section (default order) is brandStory or
+                // bestSellers — checking only blogCarousel's own bgColor let a
+                // white divider band show over the white page bg between two
+                // brown sections (pecannbee). Mirrors the bestSellers/brandStory
+                // dividers which already check both sides.
+                hideForExplicitBg={
+                  !!(
+                    layout.bestSellers.bgColor ||
+                    layout.brandStory?.bgColor ||
+                    layout.blogCarousel?.bgColor
+                  )
+                }
               />
               <HomeBlogCarousel spacingSettings={layout.blogCarousel} />
             </>
@@ -693,7 +705,19 @@ export function HomePageContent({
             <>
               <SectionDivider
                 settings={resolveSlotDividerSettings(layout.trustStrip?.dividers, 'above')}
-                hideForExplicitBg={!!layout.trustStrip?.bgColor}
+                // Suppress when EITHER flanking section is colored. The trust
+                // strip's preceding section (default order) is blogCarousel /
+                // brandStory / bestSellers — checking only the trust strip's own
+                // bgColor left a white divider band between the brown
+                // best-sellers and the trust strip (pecannbee, 2026-06-20).
+                hideForExplicitBg={
+                  !!(
+                    layout.bestSellers.bgColor ||
+                    layout.brandStory?.bgColor ||
+                    layout.blogCarousel?.bgColor ||
+                    layout.trustStrip?.bgColor
+                  )
+                }
               />
               <TrustStrip settings={layout.trustStrip} />
             </>
@@ -709,7 +733,15 @@ export function HomePageContent({
           <>
             <SectionDivider
               settings={resolveSlotDividerSettings(layout.testimonials.dividers, 'above')}
-              hideForExplicitBg={!!layout.testimonials.bgColor}
+              hideForExplicitBg={
+                !!(
+                  layout.bestSellers.bgColor ||
+                  layout.brandStory?.bgColor ||
+                  layout.blogCarousel?.bgColor ||
+                  layout.trustStrip?.bgColor ||
+                  layout.testimonials.bgColor
+                )
+              }
             />
             {layout.testimonials.enabled && testimonials.length > 0 && T.TestimonialRow && (
               <section
@@ -770,7 +802,7 @@ export function HomePageContent({
           }
           return Array.from(map.values());
         })();
-        const extraJSX = extras.map(extra => {
+        const extraJSX = extras.map((extra, extraIdx) => {
           if (extra.enabled === false) return null;
           let sourceProducts: typeof templateNewArrivals;
           if (extra.productSource === 'best_seller') {
@@ -804,7 +836,19 @@ export function HomePageContent({
               {extra.dividers?.above?.enabled && (
                 <SectionDivider
                   settings={resolveSlotDividerSettings(extra.dividers, 'above')}
-                  hideForExplicitBg={!!extra.bgColor}
+                  // Suppress when the preceding rendered section is colored:
+                  // the previous extra carousel (extra-after-extra) or, for the
+                  // first extra, the tail named sections (testimonials/trust
+                  // strip). Plus the extra's own bgColor. Same one-sided→both-
+                  // sided fix as the named-section dividers above.
+                  hideForExplicitBg={
+                    !!(
+                      (extraIdx > 0
+                        ? extras[extraIdx - 1]?.bgColor
+                        : layout.testimonials.bgColor || layout.trustStrip?.bgColor) ||
+                      extra.bgColor
+                    )
+                  }
                 />
               )}
               <section

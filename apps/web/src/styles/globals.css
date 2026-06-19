@@ -962,3 +962,23 @@ html {
   outline: 2px solid hsl(var(--primary) / 0.6);
   outline-offset: 2px;
 }
+
+/* Adaptive store-logo sizing (StoreLogo.tsx). The component sets the CSS vars
+   per-store (theme.logoSize) + per-logo (measured aspect ratio); this utility
+   applies them with the mobile→desktop breakpoint that an inline style can't
+   express. Falls back to the historical base box (h-14/150 mobile, h-20/210
+   desktop) when the vars are unset, so the logo can never break the header. */
+.store-logo {
+  height: var(--logo-mh, 56px);
+  max-height: var(--logo-mh, 56px);
+  width: auto;
+  max-width: var(--logo-mw, 150px);
+  object-fit: contain;
+}
+@media (min-width: 768px) {
+  .store-logo {
+    height: var(--logo-mh-d, 80px);
+    max-height: var(--logo-mh-d, 80px);
+    max-width: var(--logo-mw-d, 210px);
+  }
+}

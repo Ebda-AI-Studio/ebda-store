@@ -380,7 +380,14 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
       {/* Footer divider (per-section opt-in) — renders between the last
           page section and the footer. Honors `layout.footer.dividers.above`. */}
       {layout?.footer?.dividers?.above?.enabled && (
-        <SectionDivider settings={resolveSlotDividerSettings(layout.footer.dividers, 'above')} />
+        <SectionDivider
+          settings={resolveSlotDividerSettings(layout.footer.dividers, 'above')}
+          // Suppress the divider's transparent padding band (which paints the
+          // page bg — white on per-section-colored stores) when the footer
+          // itself is colored, so it never shows as a white stripe above a
+          // colored footer. Same fix as the homepage section dividers.
+          hideForExplicitBg={!!layout?.footer?.bgColor}
+        />
       )}
       {/* Footer wrapper carries data-zone for typography emitter targeting.
           Background override is NOT applied here — the theme's <footer>

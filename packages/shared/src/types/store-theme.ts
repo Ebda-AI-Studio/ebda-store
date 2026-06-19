@@ -185,6 +185,19 @@ export interface StoreTheme {
   trustStripSize?: 'sm' | 'md' | 'lg';
 
   /**
+   * Header logo sizing (per-store, so changing one store's logo never affects
+   * another — the previous shared Tailwind class meant shrinking pecannbee
+   * shrank wady-aljuz too). Edited via Branding → Theme.
+   * - `auto` (default): the StoreLogo component fits each logo by its measured
+   *   aspect ratio within safe min/max thresholds — wide wordmarks get more
+   *   width so they don't render tiny; square/tall logos use the base box.
+   * - `sm` / `md` / `lg`: a per-store multiplier on the base bounding box for a
+   *   merchant who wants their logo a notch smaller/larger. Always clamped so
+   *   the header row can't break.
+   */
+  logoSize?: 'auto' | 'sm' | 'md' | 'lg';
+
+  /**
    * Footer logo override (R2 URL). When set, the storefront footer uses this
    * image instead of `branding.logo`. Useful when the footer has a dark bg
    * and the main logo doesn't read well — merchant uploads a white/inverted
