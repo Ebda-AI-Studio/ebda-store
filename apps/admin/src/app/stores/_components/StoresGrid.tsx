@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import { getStoreDisplayUrl } from '@/lib/store-url';
+import { StoreAvatar } from './StoreAvatar';
 import { formatDate, statusConfig, type Store } from './types';
 
 interface StoresGridProps {
@@ -37,9 +38,11 @@ export function StoresGrid({ stores }: StoresGridProps) {
 
             {/* Store Header */}
             <div className="flex items-start gap-4 mb-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 text-xl font-bold text-primary transition-transform group-hover:scale-110">
-                {store.name.charAt(0).toUpperCase()}
-              </div>
+              <StoreAvatar
+                name={store.name}
+                logo={store.logo}
+                className="h-14 w-14 text-xl transition-transform group-hover:scale-110"
+              />
               <div className="flex-1 min-w-0 pt-1">
                 <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                   {store.name}

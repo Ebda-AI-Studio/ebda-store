@@ -3,6 +3,7 @@ export interface Store {
   name: string;
   slug: string;
   domain: string | null;
+  logo?: string | null;
   status: 'active' | 'inactive' | 'suspended';
   plan: 'free' | 'starter' | 'professional' | 'enterprise';
   createdAt: string;

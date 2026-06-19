@@ -5,6 +5,7 @@ import { Button } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { getStoreDisplayUrl } from '@/lib/store-url';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { StoreAvatar } from './StoreAvatar';
 import { formatDate, statusConfig, type Store } from './types';
 
 interface StoresTableProps {
@@ -20,9 +21,8 @@ export function StoresTable({ stores }: StoresTableProps) {
       primaryOnMobile: true,
       cell: store => (
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 font-bold text-primary shrink-0">
-            {store.name.charAt(0).toUpperCase()}
-          </div>
+          <StoreAvatar name={store.name} logo={store.logo} className="h-10 w-10 shrink-0" />
+
           <div className="min-w-0">
             <p className="font-medium text-foreground truncate">{store.name}</p>
             <p className="text-sm text-muted-foreground truncate">{getStoreDisplayUrl(store)}</p>
