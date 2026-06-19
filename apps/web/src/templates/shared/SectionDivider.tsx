@@ -154,13 +154,22 @@ export function SectionDivider({ settings, hideForExplicitBg }: SectionDividerPr
     // because they're not affected by background alternation.
     const bgPreset = store.theme?.backgroundPreset ?? 'none';
     if (bgPreset !== 'none' && hideForExplicitBg !== undefined) return null;
-
-    // Per-section bgColor mutex (2026-05-19): merchants can color individual
-    // sections without changing the global backgroundPreset. When either
-    // flanking section has an explicit bgColor, the color shift already
-    // acts as a separator — suppress the <hr> to avoid double-separation.
-    if (hideForExplicitBg) return null;
   }
+
+  // Per-section bgColor mutex (2026-05-19): merchants can color individual
+  // sections without changing the global backgroundPreset. When either
+  // flanking section has an explicit bgColor, the color shift already acts as
+  // the separator — and a between-section hairline draws its vertical padding
+  // band on the PAGE background, which appears as a jarring white stripe
+  // between two brand-colored sections (pecannbee, 2026-06-19: brand-story
+  // disabled → an explicitly-enabled trust-strip divider rendered a white band
+  // between the brown best-sellers and brown trust-strip). This mutex applies
+  // even to an explicit per-section divider override — the explicit override
+  // still wins over the backgroundPreset mutex above (the wadyaljuz case, which
+  // has no per-section bgColor), but a flanking explicit bgColor always
+  // suppresses the band. Intra-section dividers (no hideForExplicitBg) are
+  // unaffected.
+  if (hideForExplicitBg) return null;
 
   // Color resolution — single source of truth so the admin live preview
   // and the storefront render stay in lockstep.

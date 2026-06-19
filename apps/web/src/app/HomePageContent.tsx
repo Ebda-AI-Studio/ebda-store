@@ -385,6 +385,7 @@ export function HomePageContent({
             {layout.categories.dividers?.above?.enabled && (
               <SectionDivider
                 settings={resolveSlotDividerSettings(layout.categories.dividers, 'above')}
+                hideForExplicitBg={!!layout.categories.bgColor}
               />
             )}
             {layout.categories.enabled && templateCategories.length > 0 && (
@@ -801,7 +802,10 @@ export function HomePageContent({
           return (
             <React.Fragment key={`extra:${extra.id}`}>
               {extra.dividers?.above?.enabled && (
-                <SectionDivider settings={resolveSlotDividerSettings(extra.dividers, 'above')} />
+                <SectionDivider
+                  settings={resolveSlotDividerSettings(extra.dividers, 'above')}
+                  hideForExplicitBg={!!extra.bgColor}
+                />
               )}
               <section
                 data-section={`extra:${extra.id}`}
