@@ -41,7 +41,7 @@ Other locality details that matter:
 - **Phone numbers** display correctly LTR even when the surrounding page is RTL
 - **Currency** defaults to KWD
 - **Tax** rules pre-configured for Kuwait's 0% VAT
-- **Shipping zones** templated for Kuwait districts (Hawalli, Salmiya, Jahra, etc.) with KNET-native couriers
+- **Delivery areas & fees** — checkout cascades governorate → area against the canonical Kuwait 6-governorate area list; the merchant sets a per-area delivery fee (governorate accordion in admin, bulk import/export) and can hide areas they don't price. KNET-native couriers (iCarry, Aramex) for rated shipping
 - **Bilingual customer-facing content** including reviews, FAQs, how-to guides, all translated by AI on submit
 
 ### 3. Kuwait payment stack as first-party

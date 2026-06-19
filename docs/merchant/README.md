@@ -9,9 +9,11 @@ Welcome. This guide covers everything you need to set up and run your store on F
 1. [Quickstart — البدء السريع](./quickstart.md) — get your store live in under an hour
 2. [Custom Domain Setup — ربط النطاق المخصص](./custom-domain.md) — point yourstore.com at Force AI Store
 3. [Payment Provider Setup — إعداد بوابات الدفع](./payment-providers.md) — Tap / MyFatoorah / Hesabe / UPayments
-4. [Delivery Areas & Fees — مناطق التوصيل والرسوم](./shipping-areas.md) — set per-area delivery fees with governorate → area cascade
-5. [FAQ — الأسئلة الشائعة](./faq.md) — answers to the questions every merchant asks
-6. [Troubleshooting — حل المشاكل](./troubleshooting.md) — when something looks wrong
+4. [Delivery Areas & Fees — مناطق التوصيل والرسوم](./shipping-areas.md) — set per-area delivery fees with governorate → area cascade + bulk import/export
+5. [Orders (and the Orders app) — الطلبات](./orders.md) — manage orders, payment links, refunds, invoices, and payment alerts
+6. [Inventory: variant stock, adjustments & scanning — المخزون](./inventory.md) — variant stock totals, stock adjustments, and barcode Receive/Pick/Count
+7. [FAQ — الأسئلة الشائعة](./faq.md) — answers to the questions every merchant asks
+8. [Troubleshooting — حل المشاكل](./troubleshooting.md) — when something looks wrong
 
 ## Need help? — تحتاج مساعدة؟
 

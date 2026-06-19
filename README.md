@@ -114,10 +114,12 @@ force-website-builder/
 
 ### Commerce
 
-- **Product Management** — Categories, variants, inventory tracking, image galleries
+- **Product Management** — Categories, variants, inventory tracking, image galleries. Products list + inventory page show **variant stock total** (sum of variant inventory) for variant products; the inventory page **paginates** (no hard cap)
 - **Product Discount Engine** — Per-product discount dropdown (None / Percentage % / Fixed KWD) with live discounted-price preview; `compareAtPrice` is derived automatically from the active discount
+- **Inventory adjustments + scanning** — adjustment types carry per-type explanations; a **Scan page** (Stock → Scan) drives Receive / Pick / Count barcode modes (Enterprise-gated `inventory.barcode`, BarcodeDetector Web API + manual-entry fallback)
 - **Accounting Module** — Chart of Accounts, double-entry journal entries (auto-posted on paid orders), P&L, expense tracking, invoicing (Professional+); advanced features — tax reports, multi-currency, profit anomaly watch, bank reconciliation — on Enterprise+
-- **Order Lifecycle** — Cart, checkout, payment processing, status transitions with notification triggers
+- **Order Lifecycle** — Cart, checkout, payment processing, status transitions with notification triggers. Cancelling an **unpaid** order no longer sends a false "Refund issued" (inventory still restores; a refund notification fires only when the order was paid). Merchant alerts on **"Payment received"** (pending → paid, incl. resent payment links) and **"Payment pending — follow up"** (stuck online orders, `STUCK_PAYMENT_MINUTES` default 60). Unpaid orders older than `AUTO_CANCEL_UNPAID_DAYS` (default 2) auto-cancel via a daily Inngest cron
+- **Orders PWA** — the installable Orders app now mirrors the admin order UI with full read/write CRUD: status changes, mark-paid, payment link, refund, refresh payment/refund status, invoice view/email, bulk mark-paid, plus an order activity timeline. Staff with order permissions can view/manage store orders. Orders list has date filter + search + bulk mark-paid
 - **Abandoned Cart Recovery** — Automated recovery flows via WhatsApp/SMS/Push
 - **Upsell & Cross-sell** — Product recommendations engine
 - **Affiliate / Influencer Program** — Tracking, commissions, referral links
@@ -151,11 +153,14 @@ The bot degrades gracefully: if `GEMINI_API_KEY` is unset in WBS, the bot revert
 
 ### Shipping
 
+- **Delivery Areas & Fees** — governorate → area cascade at checkout (canonical 6-governorate Kuwait area list in `@force/shared` `KUWAIT_GOVERNORATES`). Per-area fee, merchant-editable in **Settings → Shipping → "Delivery areas & fees"** (governorate accordion + bulk "apply to all areas"). Replaces the old per-zone "Shipping Zones" UI; the `ShippingZone` API stays as a fallback when a store has no area rates. "Hide unpriced areas" — a store with any area rate only shows priced areas. **Bulk import (xlsx/csv) + export (xlsx)** of area rates with a dry-run preview before upsert.
 - **Carrier Integrations** — iCarry and Aramex with rate calculation and tracking
 
 ### Storefront
 
 - **5 Pre-built Templates** — Modern, Classic, Minimal, Bold, Elegant — each with a distinct design identity
+- **Checkout** — searchable governorate → area typeahead + full Kuwaiti address (block / street / avenue / house / floor / apartment), device-local "Save my info", SMS promo opt-in (default off)
+- **Locations page** — real Google Maps embed (iframe-src host-allowlisted), editable colors/fonts in Page Builder, location nav link + mobile bottom-bar "Menu" drawer
 - **Dark Mode** — System `prefers-color-scheme` detection + manual toggle
 - **RTL / Bilingual** — Arabic + English with full RTL layout support
 - **PWA** — Service worker with push notification support

@@ -84,16 +84,19 @@ Cash on Delivery works out of the box — just enable the toggle. You can add a 
 
 ## 6. Configure shipping
 
-**Admin → Settings → Shipping**
+**Admin → Settings → Shipping → "Delivery areas & fees"**
 
-Set up shipping zones:
+Set a delivery fee per Kuwait **area**. At checkout the customer picks their governorate, then their area, and pays the fee you set for that area:
 
-- Within Kuwait — usually one zone with a flat rate (e.g. 2 KWD)
-- Outside Kuwait — optional, requires per-country rates
+- Expand a governorate (collapsible accordion) and enter a fee for each area you deliver to. Use **"Apply to all areas in this governorate"** to set one fee across a whole governorate, then tweak individual areas.
+- Areas you don't price are hidden from customers — so you can start with just the areas you serve today.
+- For many areas, **Export** an Excel template, fill it in, and **Import** it back (xlsx or CSV) with a preview before saving.
 
 If you ship via a known carrier (Aramex, iCarry), enter your API credentials so tracking numbers auto-update.
 
-أنشئ مناطق الشحن: عادةً منطقة واحدة داخل الكويت برسوم ثابتة. لو تستخدم Aramex أو iCarry، أدخل بيانات حساب التاجر لتحديث أرقام التتبّع تلقائيًا.
+اضبط رسوم التوصيل لكل **منطقة** في الكويت. عند الدفع يختار العميل المحافظة ثم المنطقة ويدفع الرسوم التي حددتها لها. وسّع المحافظة وأدخل رسوم كل منطقة تخدمها، أو استخدم "تطبيق على كل المناطق". المناطق غير المسعّرة تختفي عن العملاء. للمناطق الكثيرة، صدِّر قالب Excel وعبّئه واستورده (xlsx أو CSV) مع معاينة قبل الحفظ. لو تستخدم Aramex أو iCarry، أدخل بيانات حسابك لتحديث أرقام التتبّع تلقائيًا.
+
+> Full guide: [Delivery Areas & Fees](./shipping-areas.md).
 
 ## 7. Customize the storefront
 

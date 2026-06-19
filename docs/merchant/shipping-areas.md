@@ -31,6 +31,36 @@ At checkout, customers pick their **Governorate** (محافظة) then their **Ar
 
 ---
 
+## Bulk import & export — الاستيراد والتصدير بالجملة
+
+If you serve many areas, you don't have to type every fee by hand. You can edit them all in a spreadsheet and upload the file.
+
+إذا كنت تخدم مناطق كثيرة، لا داعي لإدخال كل رسم يدويًا. يمكنك تعديلها كلها في جدول بيانات ورفع الملف.
+
+### Export — التصدير
+
+1. In the **Delivery areas & fees** editor, click **Export**.
+   في محرر **مناطق التوصيل والرسوم**، اضغط **تصدير**.
+
+2. You receive an **Excel (.xlsx)** file. If you have already set fees, the file contains your current rates. If you haven't set any yet, the file is a **template** listing every Kuwait governorate and area with an empty fee column for you to fill in.
+   تحصل على ملف **Excel (.xlsx)**. إذا كنت قد ضبطت رسومًا، يحتوي الملف على أسعارك الحالية. وإذا لم تضبط أيًا بعد، يكون الملف **قالبًا** يسرد كل محافظة ومنطقة في الكويت مع خانة رسوم فارغة لتعبئتها.
+
+### Import — الاستيراد
+
+1. Fill in the fee for each area you serve in the spreadsheet (you can use the exported Excel file, or a CSV with the same columns).
+   عبّئ رسوم كل منطقة تخدمها في الجدول (يمكنك استخدام ملف Excel المُصدَّر، أو ملف CSV بنفس الأعمدة).
+
+2. Back in the editor, click **Import** and choose your **.xlsx or .csv** file. Arabic and English column headers are both accepted.
+   ارجع إلى المحرر، اضغط **استيراد** واختر ملف **.xlsx أو .csv**. تُقبل رؤوس الأعمدة بالعربية والإنجليزية.
+
+3. The platform shows a **preview** of exactly which areas will be added or changed **before** anything is saved. Review it, then confirm to apply.
+   تعرض المنصة **معاينة** للمناطق التي ستُضاف أو تتغيّر **قبل** الحفظ. راجعها ثم أكّد التطبيق.
+
+> The preview is a dry run — nothing changes on your store until you confirm.
+> المعاينة تجربة فقط — لا يتغيّر شيء في متجرك حتى تؤكّد.
+
+---
+
 ## How "hide unpriced areas" works — كيف يعمل إخفاء المناطق غير المسعَّرة
 
 | State                                   | Customer sees at checkout                            |

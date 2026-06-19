@@ -46,6 +46,10 @@ The search bar works in Arabic and English at the same time. A customer typing "
 
 Cart contents are saved whether the customer is logged in or browsing as a guest — and sync automatically when they sign in. Checkout is a guided multi-step flow: delivery address, then payment method selection. The checkout only shows payment options you have configured for your store.
 
+At the delivery step the customer picks their **Governorate** (المحافظة) then their **Area** (المنطقة) from a searchable typeahead — only areas that fall under the selected governorate appear — and fills a full Kuwaiti address (block, street, avenue, house, floor, apartment). The delivery fee shown is the fee you set for that specific area. A **"Save my info"** option stores the customer's address and selection **on their own device** (browser local storage, nothing on our servers) and pre-fills it next visit. The customer can also tick an **SMS promo opt-in** (off by default) to receive promotional SMS such as cart reminders and back-in-stock alerts.
+
+For stores that offer free shipping, the cart shows **"Calculated at checkout"** until the customer picks an area, then resolves to the real per-area fee.
+
 ### Wishlist (قائمة الأمنيات)
 
 Logged-in shoppers can save products to a wishlist and return to them later. A dedicated wishlist tab appears in the mobile bottom navigation bar alongside Home, Cart, and Search.
@@ -69,6 +73,10 @@ With the Progressive Web App feature enabled, shoppers on iOS and Android can ad
 ### Blog (المدونة)
 
 A built-in blog section lets you publish content that drives search traffic. Blog posts appear in a carousel on your homepage when the blog is enabled. You manage posts directly from the admin panel.
+
+### Locations (المواقع)
+
+A dedicated Locations page shows your physical branches on a real embedded Google Map, with your addresses and hours. The page is fully brandable — its colors and fonts are editable in Page Builder like any other section — and a Locations link appears in your storefront navigation and in the mobile bottom-bar **"Menu"** drawer so customers can find you in one tap. Map embeds are restricted to an allow-list of trusted map hosts for safety.
 
 ---
 
@@ -97,7 +105,8 @@ Everything related to what you sell:
 
 Everything that happens after a customer places an order:
 
-- **Orders** — Full order list with status tracking, order detail view, and the ability to create a manual order for phone/WhatsApp customers.
+- **Orders** — Full order list with status tracking, order detail view, and the ability to create a manual order for phone/WhatsApp customers. The orders list supports a date filter, search, and **bulk "mark paid"**. Each order detail offers status changes, mark-paid, generate/copy a payment link, issue a refund, refresh payment/refund status with the gateway, view or email the invoice, and an **order activity timeline**.
+- **Orders app (PWA)** — a separate installable, focus-mode order app that now **mirrors the admin order UI with full read/write control** — the same status changes, mark-paid, payment links, refunds, refresh payment/refund, invoice view/email, bulk mark-paid, and activity timeline. Staff members with order permissions can view and manage the store's orders from it, so order handling isn't tied to a desktop login.
 - **Customers** — A built-in CRM with every customer's order history, contact details, and lifetime value.
 - **Returns and Refunds** — Accept and process return requests, log the reason, and record the refund.
 
@@ -107,8 +116,8 @@ Full inventory management without needing a separate system. Features are tiered
 
 **Starter plan and above:**
 
-- **Inventory Dashboard** — See current stock levels across all products at a glance. (`inventory.basic`)
-- **Stock Adjustments** — Log any stock movement: received goods, damaged items, corrections.
+- **Inventory Dashboard** — See current stock levels across all products at a glance. Variant products show a **variant stock total** (the sum of every variant's stock) on both the products list and the inventory page, so a multi-variant product reads one true number. The inventory page **paginates** across your whole catalog — there is no product-count cap. (`inventory.basic`)
+- **Stock Adjustments** — Log any stock movement: received goods, damaged items, corrections. Each adjustment type carries a short plain-language explanation so staff pick the right one.
 - **Deadstock Reports** — See which products haven't moved in a defined period so you can act on them. (AI-powered via Gemini)
 
 **Professional plan and above:**
@@ -245,9 +254,15 @@ Stripe is not available in Kuwait. Platforms built for the US and UK market add 
 
 Every field in the database stores both Arabic and English content separately. The admin panel itself is bilingual — you switch between Arabic and English in one click without losing any data or formatting. Arabic text renders correctly in right-to-left without any plugins or workarounds, including product names, prices, categories, and the checkout flow.
 
-### Kuwait Shipping Zones
+### Kuwait Delivery Areas & Fees (مناطق التوصيل والرسوم)
 
-Shipping zones are configured for Kuwait's governorate and district structure — not a generic "country/state/city" hierarchy that doesn't match how Kuwaiti delivery works.
+Delivery is configured around Kuwait's real **governorate → area** structure — not a generic "country/state/city" hierarchy that doesn't match how Kuwaiti delivery works. The platform ships a canonical list of all six governorates and their areas.
+
+From **Settings → Shipping → "Delivery areas & fees"**, each governorate is a collapsible accordion; you set a delivery fee per area, or use **"Apply to all areas in this governorate"** to set one fee across a whole governorate at once and tweak individual areas afterwards. **Hide unpriced areas:** once you price at least one area, customers only see the areas you priced. A store that has set no area rates yet falls back to its legacy shipping zones with all areas visible.
+
+You can **export** your current rates as an Excel file (or, if you have none yet, an empty template of every Kuwait area) and **import** a filled-in Excel or CSV back — with a dry-run preview that shows exactly which rows will change before anything is saved. This replaces the old per-zone "Shipping Zones" editor; the zone API remains only as a fallback.
+
+> This is the dedicated merchant how-to: `docs/merchant/shipping-areas.md`.
 
 ---
 
@@ -354,6 +369,15 @@ For every order lifecycle event, you choose whether the notification fires by em
 | **Order Delivered** | You mark delivered           | Email, WhatsApp    |
 
 Turning off either toggle for an event means notifications for that event are completely silent on that channel. For example: turning off WhatsApp for "Order Shipped" still sends the email shipping confirmation.
+
+### Payment lifecycle alerts & auto-cancel — تنبيهات الدفع والإلغاء التلقائي
+
+Beyond the per-event order notifications above, the platform watches the **payment** state of online orders and keeps it honest:
+
+- **No false refund on unpaid cancel.** Cancelling an order that was never paid restores its inventory but **does not** tell the customer a refund was issued. A refund notification only fires when the order had actually been paid.
+- **"Payment received."** When an online order moves from pending to paid — including when a customer finally pays a resent payment link — you get a "Payment received" alert so you know to fulfil it.
+- **"Payment pending — follow up."** If an online order sits unpaid too long (default 60 minutes, configurable per deployment), you get a one-time "follow up" alert so it doesn't get forgotten. Cash-on-delivery orders never trigger this.
+- **Auto-cancel stale unpaid orders.** Online orders left unpaid beyond a configurable window (default 2 days, matching the payment-link validity) are cancelled automatically. The customer gets the standard order-cancelled notice; no refund is attempted because nothing was ever captured.
 
 **Origin-aware delivery:** orders placed on your website send via the configured channels (email + WhatsApp). Orders placed through WhatsApp DM ordering send **WhatsApp-only** — no synthetic placeholder email goes to the customer's inbox, because WhatsApp customers never registered an email address.
 

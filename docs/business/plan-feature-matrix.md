@@ -4,10 +4,15 @@
 > (the code that actually gates features at runtime). If this table and the code disagree, the code
 > wins — regenerate this doc.**
 >
-> **Last synced: 2026-06-15.** Multi-currency, bank reconciliation, barcode scanning, and
-> multi-warehouse are now shipped Enterprise features (not roadmap). Tax reports (XLSX export),
+> **Last synced: 2026-06-19.** Multi-currency, bank reconciliation, barcode scanning, and
+> multi-warehouse are shipped Enterprise features (not roadmap). Tax reports (XLSX export),
 > profit anomaly watch, loyalty redemption, low-stock alerts, backorders, and server-side CAPI
-> pixels are also real and confirmed against code.
+> pixels are also real and confirmed against code. The 2026-06 shipping/orders/payment-lifecycle
+> work (delivery-area rates + bulk import/export, Orders-PWA CRUD, payment-received / stuck-payment
+> alerts, auto-cancel-unpaid, variant stock totals, Stock → Scan) is **not** a new plan tier — see
+> the "Not plan-gated" section below for where each piece sits. The barcode **Scan** UI is gated by
+> the existing `inventory.barcode` Enterprise key (row already in the matrix); everything else is
+> core/platform and ungated.
 
 Plans are **layered (strict superset)**: Professional includes everything in Starter, Enterprise
 includes everything in Professional. `free` is a stripped grace/demo state, **not a sold tier**
@@ -58,6 +63,11 @@ self-serve signup and no free trial). Super-admin can override any feature per s
 - **AI Tools** (`ai_tools`) — admin AI-bulk-sweep pages are feature-gated as of 2026-06-09; only stores with `ai_tools` feature enabled see the AI Tools hub. This prevents unbounded Gemini API usage from stores that haven't been provisioned for it.
 - **Email campaigns** (`email_campaigns`), **customer wallet** (`customer_wallet`), **staff accounts** (`staff_accounts`) — present in the registry; enable per-store via override when sold. Not in baselines as of this sync.
 - The legacy parent `inventory` flag is **intentionally not in any baseline** — code reads the granular `inventory.*` sub-keys.
+- **Delivery areas & fees** (governorate → area cascade, per-area fee, bulk xlsx/csv import + xlsx export, hide-unpriced) — **core shipping, ungated.** Part of the checkout + Settings → Shipping for every plan; not a `FeatureKey`. The legacy `ShippingZone` API stays as a fallback when a store has no area rates.
+- **Orders + Orders PWA CRUD** (status, mark-paid, payment link, refund, refresh payment/refund, invoice view/email, bulk mark-paid, activity timeline, staff order permissions) — **core, ungated.** There is no `orders` feature key; order management is universal. Staff visibility is governed by the staff/role system, not a plan baseline.
+- **Order payment-lifecycle alerts** ("Payment received", "Payment pending — follow up" via `STUCK_PAYMENT_MINUTES`, auto-cancel-unpaid via `AUTO_CANCEL_UNPAID_DAYS`, no-false-refund-on-unpaid-cancel) — **platform-level, ungated.** Background Inngest jobs that run for every store; tuned by env, not by plan.
+- **Inventory variant stock totals + paginated inventory page + per-type adjustment explanations** — **part of `inventory.basic` (Starter+)**, the same row already in the matrix. The barcode **Scan** modes (Receive / Pick / Count) are gated by `inventory.barcode` (**Enterprise**, already in the matrix).
+- **Storefront Locations page** (Google Maps embed, Page-Builder-editable, nav + mobile "Menu" drawer link) — **core storefront, ungated.**
 
 ## Upgrade UX
 
