@@ -96,17 +96,26 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
       include: { items: true },
     });
     if (!po || po.storeId !== input.storeId)
-      throw new Error(`PO ${input.poId} not found in store ${input.storeId}`);
+      throw new AppError(404, 'PO_NOT_FOUND', 'Purchase order not found.');
     if (po.status === 'received' || po.status === 'cancelled')
-      throw new Error(`PO ${input.poId} cannot be received (status=${po.status})`);
+      throw new AppError(
+        409,
+        'PO_NOT_RECEIVABLE',
+        `This purchase order can no longer be received (status: ${po.status}).`
+      );
 
     for (const receipt of input.receipts) {
       if (receipt.qtyReceived <= 0) continue;
       const item = po.items.find(i => i.id === receipt.poItemId);
-      if (!item) throw new Error(`PO item ${receipt.poItemId} not in PO ${input.poId}`);
+      if (!item)
+        throw new AppError(400, 'PO_ITEM_NOT_FOUND', 'A receipt line does not match this PO.');
       const remainingAfter = item.qtyReceived + receipt.qtyReceived;
       if (remainingAfter > item.qty)
-        throw new Error(`Cannot receive ${receipt.qtyReceived}; would exceed PO qty ${item.qty}`);
+        throw new AppError(
+          400,
+          'RECEIVE_EXCEEDS_QTY',
+          `Cannot receive ${receipt.qtyReceived}; that would exceed the ordered quantity (${item.qty}).`
+        );
 
       let remainingToProcess = receipt.qtyReceived;
 
@@ -299,8 +308,13 @@ export async function getPurchaseOrder(storeId: string, id: string) {
 
 export async function cancelPurchaseOrder(storeId: string, id: string) {
   const po = await prisma.purchaseOrder.findFirst({ where: { id, storeId } });
-  if (!po) throw new Error(`PO ${id} not found in store ${storeId}`);
-  if (po.status === 'received') throw new Error('Cannot cancel a fully-received PO');
+  if (!po) throw new AppError(404, 'PO_NOT_FOUND', 'Purchase order not found.');
+  if (po.status === 'received')
+    throw new AppError(
+      409,
+      'PO_ALREADY_RECEIVED',
+      'A fully-received purchase order cannot be cancelled.'
+    );
   return prisma.purchaseOrder.update({ where: { id }, data: { status: 'cancelled' } });
 }
 
@@ -319,9 +333,13 @@ export async function createPoFromSuggestion(
     where: { id: suggestionId },
     include: { product: { select: { costPrice: true, name: true } } },
   });
-  if (!sug) throw new Error(`ReorderSuggestion ${suggestionId} not found`);
+  if (!sug) throw new AppError(404, 'SUGGESTION_NOT_FOUND', 'Reorder suggestion not found.');
   if (sug.status !== 'open')
-    throw new Error(`ReorderSuggestion ${suggestionId} already ${sug.status}`);
+    throw new AppError(
+      409,
+      'SUGGESTION_ALREADY_PROCESSED',
+      `This reorder suggestion was already ${sug.status}.`
+    );
 
   const supplierId = sug.supplierId ?? (await pickLastSupplierForProduct(sug.productId));
   if (!supplierId) {
