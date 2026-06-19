@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
+import { KUWAIT_GOVERNORATES, areasForGovernorate } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
 
@@ -33,6 +34,13 @@ interface CustomerSearchResult {
   phone?: string;
 }
 
+interface ShippingPreview {
+  shippingCost: number;
+  freeShipping: boolean;
+  matched: boolean;
+  source: 'area-rate' | 'zone' | 'none';
+}
+
 /**
  * Admin-side order creation. Phone-order MVP — merchant enters customer
  * info + picks products via search + sets quantities, submits. After
@@ -57,11 +65,22 @@ export default function NewOrderPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address1, setAddress1] = useState('');
-  const [city, setCity] = useState('');
+  // Governorate + area come from the cascade selects.
+  // "city" is kept for backward-compat with any downstream display
+  // that reads shippingAddress.city, but it mirrors the governorate.
+  const [governorate, setGovernorate] = useState('');
   const [area, setArea] = useState('');
   const [country, setCountry] = useState('Kuwait');
   const [notes, setNotes] = useState('');
   const [couponCode, setCouponCode] = useState('');
+
+  // Shipping preview state (live-computed after governorate+area chosen).
+  const [shippingPreview, setShippingPreview] = useState<ShippingPreview | null>(null);
+  const [shippingPreviewLoading, setShippingPreviewLoading] = useState(false);
+
+  // Manual fee override. Stored as the raw string the merchant types (KWD),
+  // converted to integer fils on submit.
+  const [shippingOverrideKwd, setShippingOverrideKwd] = useState('');
 
   // Product picker state.
   const [productSearch, setProductSearch] = useState('');
@@ -80,7 +99,9 @@ export default function NewOrderPage() {
       return;
     }
     apiGet<{ products: ProductSearchResult[] }>(
-      `/api/v1/stores/${storeId}/products?search=${encodeURIComponent(debouncedProductSearch)}&limit=10`
+      `/api/v1/stores/${storeId}/products?search=${encodeURIComponent(
+        debouncedProductSearch
+      )}&limit=10`
     ).then(({ data }) => {
       if (data?.products) setProductResults(data.products);
     });
@@ -106,6 +127,46 @@ export default function NewOrderPage() {
     () => items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0),
     [items]
   );
+
+  // Live shipping preview — fires whenever governorate+area are both set.
+  // Uses the public shipping-calculate endpoint (no auth required):
+  //   POST /api/v1/stores/public/:storeId/shipping/calculate
+  //   Body: { area: string, orderTotal: number, governorate: string }
+  //   Response: { success: true, data: { shippingCost, freeShipping, matched, source } }
+  // Note: admin apiPost prepends NEXT_PUBLIC_API_URL (no /api/v1 suffix),
+  // so we include /api/v1 in the path ourselves.
+  const debouncedArea = useDebounced(area, 300);
+  useEffect(() => {
+    if (!storeId || !governorate || !debouncedArea) {
+      setShippingPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setShippingPreviewLoading(true);
+    // apiPost unwraps the `{ success, data, error }` envelope:
+    // the returned `data` IS the inner `data` object from the response.
+    apiPost<ShippingPreview>(`/api/v1/stores/public/${storeId}/shipping/calculate`, {
+      area: debouncedArea,
+      orderTotal: subtotal,
+      governorate,
+    })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setShippingPreviewLoading(false);
+        if (!error && data) {
+          setShippingPreview(data);
+        } else {
+          setShippingPreview(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setShippingPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, governorate, debouncedArea, subtotal]);
 
   const addProduct = (p: ProductSearchResult) => {
     setItems(prev => {
@@ -145,6 +206,22 @@ export default function NewOrderPage() {
     setCustomerResults([]);
   };
 
+  // When governorate changes, reset area + shipping preview.
+  const handleGovernorateChange = (val: string) => {
+    setGovernorate(val);
+    setArea('');
+    setShippingPreview(null);
+  };
+
+  // Shipping override in fils (integer). Blank = use calculated.
+  const shippingOverrideFils = useMemo(() => {
+    const trimmed = shippingOverrideKwd.trim();
+    if (!trimmed) return undefined;
+    const parsed = parseFloat(trimmed);
+    if (isNaN(parsed) || parsed < 0) return undefined;
+    return Math.round(parsed * 1000);
+  }, [shippingOverrideKwd]);
+
   const handleSubmit = useCallback(async () => {
     if (items.length === 0) {
       toastError('Add at least one product before placing the order');
@@ -156,7 +233,7 @@ export default function NewOrderPage() {
     }
     setIsSubmitting(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         customerId: customerMode === 'existing' ? selectedCustomerId : undefined,
         shippingAddress: {
           firstName,
@@ -164,14 +241,20 @@ export default function NewOrderPage() {
           email,
           phone,
           address1,
-          city,
+          // city mirrors governorate for downstream display compatibility.
+          city: governorate,
           area,
+          governorate,
           country,
         },
         items: items.map(it => ({ productId: it.productId, quantity: it.quantity })),
         notes: notes || undefined,
         couponCode: couponCode || undefined,
       };
+      // shippingOverride — integer fils, omitted when blank.
+      if (typeof shippingOverrideFils === 'number') {
+        payload.shippingOverride = shippingOverrideFils;
+      }
       const { data, error: apiError } = await apiPost<{
         order: { id: string; orderNumber: string };
       }>(`/api/v1/stores/${storeId}/orders/admin`, payload);
@@ -195,16 +278,20 @@ export default function NewOrderPage() {
     email,
     phone,
     address1,
-    city,
+    governorate,
     area,
     country,
     items,
     notes,
     couponCode,
+    shippingOverrideFils,
     router,
     toastSuccess,
     toastError,
   ]);
+
+  // Area options for the currently selected governorate.
+  const areaOptions = useMemo(() => areasForGovernorate(governorate), [governorate]);
 
   return (
     <AdminLayout
@@ -326,9 +413,100 @@ export default function NewOrderPage() {
               onChange={setAddress1}
               className="sm:col-span-2"
             />
-            <Input label="Area / Block" value={area} onChange={setArea} />
-            <Input label="City" value={city} onChange={setCity} />
+
+            {/* Governorate select */}
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-muted-foreground">Governorate / المحافظة</span>
+              <select
+                value={governorate}
+                onChange={e => handleGovernorateChange(e.target.value)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">— Select governorate —</option>
+                {KUWAIT_GOVERNORATES.map(gov => (
+                  <option key={gov.en} value={gov.en}>
+                    {gov.en} / {gov.ar}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* Area select — filtered by selected governorate */}
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-muted-foreground">Area / المنطقة</span>
+              <select
+                value={area}
+                onChange={e => setArea(e.target.value)}
+                disabled={!governorate}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {governorate ? '— Select area —' : '— Select governorate first —'}
+                </option>
+                {areaOptions.map(a => (
+                  <option key={a.en} value={a.en}>
+                    {a.en} / {a.ar}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <Input label="Country" value={country} onChange={setCountry} />
+          </div>
+
+          {/* Live shipping preview */}
+          {(shippingPreview || shippingPreviewLoading) && (
+            <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Calculated shipping fee
+              </p>
+              {shippingPreviewLoading ? (
+                <p className="text-muted-foreground">Calculating…</p>
+              ) : shippingPreview ? (
+                shippingPreview.matched ? (
+                  shippingPreview.freeShipping ? (
+                    <p className="font-medium text-success">Free delivery</p>
+                  ) : (
+                    <p className="font-semibold text-foreground">
+                      {(shippingPreview.shippingCost / 1000).toFixed(3)} KWD
+                      <span className="ms-2 text-xs font-normal text-muted-foreground">
+                        (via {shippingPreview.source === 'area-rate' ? 'area rate' : 'zone'})
+                      </span>
+                    </p>
+                  )
+                ) : (
+                  <p className="text-warning">
+                    No rate configured for this area — set a fee below or the order will save with 0
+                    KWD shipping.
+                  </p>
+                )
+              ) : null}
+            </div>
+          )}
+
+          {/* Manual shipping override */}
+          <div className="mt-3">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-muted-foreground">
+                Shipping fee override (KWD) — leave blank to use the calculated fee
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                placeholder="e.g. 1.500"
+                value={shippingOverrideKwd}
+                onChange={e => setShippingOverrideKwd(e.target.value)}
+                dir="ltr"
+                className="w-48 rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              {typeof shippingOverrideFils === 'number' && (
+                <p className="text-xs text-primary">
+                  Override active: {(shippingOverrideFils / 1000).toFixed(3)} KWD (
+                  {shippingOverrideFils} fils) will be used instead of the calculated fee.
+                </p>
+              )}
+            </label>
           </div>
         </section>
 
@@ -405,8 +583,23 @@ export default function NewOrderPage() {
               {(subtotal / 1000).toFixed(3)} KWD
             </span>
           </div>
+          {/* Show projected total when shipping is known */}
+          {(shippingPreview?.matched || typeof shippingOverrideFils === 'number') && (
+            <div className="mt-1 flex items-center justify-end gap-3 text-sm">
+              <span className="text-muted-foreground">Shipping:</span>
+              <span className="font-medium text-foreground">
+                {typeof shippingOverrideFils === 'number'
+                  ? `${(shippingOverrideFils / 1000).toFixed(3)} KWD (override)`
+                  : shippingPreview?.freeShipping
+                    ? 'Free'
+                    : `${(shippingPreview!.shippingCost / 1000).toFixed(3)} KWD`}
+              </span>
+            </div>
+          )}
           <p className="mt-1 text-end text-xs text-muted-foreground">
-            Tax + shipping calculated on save based on store config.
+            {governorate && area
+              ? 'Shipping fee shown is a preview — tax is calculated on save.'
+              : 'Select governorate + area above to preview the shipping fee.'}
           </p>
         </section>
 

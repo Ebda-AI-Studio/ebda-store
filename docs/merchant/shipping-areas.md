@@ -97,3 +97,34 @@ When a customer completes checkout, the platform saves their selected governorat
 
 - Changes take effect immediately for new orders. Existing orders are not affected.
   التغييرات تسري فورًا على الطلبات الجديدة. الطلبات الموجودة لا تتأثر.
+
+---
+
+## Phone orders (Admin → New Order) — الطلبات الهاتفية
+
+When creating an order manually from **Admin → Orders → New Order**, the same
+governorate → area cascade applies. Select the governorate first; the area
+dropdown auto-filters to that governorate's areas. Once both are selected, the
+platform fetches the configured fee in real time and displays it as a **preview**
+below the address form.
+
+عند إنشاء طلب يدوي من **لوحة التحكم → الطلبات → طلب جديد**، يسري نفس نظام
+التسلسل: اختر المحافظة أولًا ثم تظهر مناطقها تلقائيًا. بعد الاختيار تعرض المنصة
+رسوم التوصيل المحسوبة فورًا كمعاينة أسفل نموذج العنوان.
+
+**If the area has no rate configured**, the preview shows a warning and the order
+saves with 0 KWD shipping. You can fix this by setting the rate in Shipping settings.
+
+**إذا لم تكن للمنطقة رسوم محددة**، يظهر تحذير ويُحفظ الطلب برسوم توصيل 0 د.ك.
+يمكن إصلاح ذلك بضبط الرسوم في إعدادات الشحن.
+
+**Shipping fee override (negotiated rates):** For phone orders where you agree on
+a custom delivery fee with the customer, enter the agreed amount (in KWD) in the
+**Shipping fee override** field. Leave it blank to use the configured area rate.
+The override replaces the calculated fee only for that single order; your shipping
+settings are not changed.
+
+**تجاوز رسوم الشحن (أسعار مفاوَضة):** للطلبات الهاتفية التي تتفق فيها على سعر
+توصيل مخصص مع العميل، أدخل المبلغ المتفق عليه (بالدينار الكويتي) في حقل
+**تجاوز رسوم الشحن**. اتركه فارغًا لاستخدام السعر المحدد للمنطقة. التجاوز يؤثر
+على هذا الطلب فقط ولا يغير إعدادات الشحن.

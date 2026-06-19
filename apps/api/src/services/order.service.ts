@@ -1253,6 +1253,12 @@ export class OrderService {
       notes?: string;
       couponCode?: string;
       currency?: string;
+      /**
+       * Optional shipping fee override in integer fils (KWD × 1000).
+       * When present, replaces the ShippingService-computed fee.
+       * Used for negotiated phone-order rates.
+       */
+      shippingOverride?: number;
     }
   ) {
     if (data.items.length === 0) {
@@ -1340,6 +1346,20 @@ export class OrderService {
       logger.warn(
         { err: err instanceof Error ? err.message : err, storeId, shippingArea },
         '[Admin-Order] shipping calculation failed; defaulting to 0'
+      );
+    }
+
+    // Manual override: if the admin specified a negotiated shipping fee
+    // (integer fils), it takes precedence over the calculated value.
+    // This is intentionally applied AFTER calculateShipping so that any
+    // future coupon type=free_shipping still runs against the base fee
+    // first (the coupon block below may zero it out regardless).
+    if (typeof data.shippingOverride === 'number') {
+      const calculatedShipping = shipping;
+      shipping = data.shippingOverride;
+      logger.info(
+        { storeId, shippingOverride: data.shippingOverride, calculatedShipping },
+        '[Admin-Order] shipping override applied'
       );
     }
 

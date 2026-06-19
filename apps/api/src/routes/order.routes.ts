@@ -1313,6 +1313,13 @@ const adminOrderSchema = z.object({
   notes: z.string().optional(),
   couponCode: z.string().optional(),
   currency: z.string().optional(),
+  /**
+   * Optional shipping fee override in integer fils (KWD × 1000).
+   * When set, it replaces the ShippingService-computed fee for this order.
+   * Intended for phone orders where the merchant negotiates a custom rate.
+   * The admin UI collects KWD and converts to fils before sending.
+   */
+  shippingOverride: z.number().int().min(0).optional(),
 });
 
 router.post(
@@ -1418,8 +1425,9 @@ router.post(
 
       const shipping = (order.shippingAddress ?? {}) as Record<string, string | undefined>;
       const customerName =
-        `${order.customer?.firstName ?? shipping.firstName ?? ''} ${order.customer?.lastName ?? shipping.lastName ?? ''}`.trim() ||
-        'Customer';
+        `${order.customer?.firstName ?? shipping.firstName ?? ''} ${
+          order.customer?.lastName ?? shipping.lastName ?? ''
+        }`.trim() || 'Customer';
       const customerEmail = order.customer?.email || shipping.email || '';
       const customerPhone = order.customer?.phone || shipping.phone || undefined;
 
