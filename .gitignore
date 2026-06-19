@@ -141,3 +141,11 @@ dump.rdb
 /reports/
 /blob-report/
 .playwright/
+
+# OpenNext / Cloudflare build artifacts (preview workers — built locally)
+.open-next/
+.wrangler/
+
+# Cloudflare worker build config — local-only (imports opennext devDep not committed)
+apps/*/open-next.config.ts
+apps/*/wrangler.jsonc

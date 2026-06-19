@@ -1,5 +1,10 @@
 const path = require('path');
 
+// Cloudflare/OpenNext build target detection (mirrors apps/web). Set
+// OPEN_NEXT_CLOUDFLARE=1 in the Cloudflare build; CF_PAGES is auto-set by CF.
+// Default (Vercel/local) is false, so the Vercel deploy is unaffected.
+const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAGES;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -17,6 +22,9 @@ const nextConfig = {
   // CDN hosts the admin + storefront use. Mirror the admin's allowlist so
   // next/image can optimize them (CSP already permits https: img-src).
   images: {
+    // Cloudflare build only: disable Next's sharp-based optimizer (native,
+    // Workers-incompatible). On Vercel this stays false (zero regression).
+    unoptimized: IS_CLOUDFLARE,
     remotePatterns: [
       ...(process.env.NODE_ENV !== 'production'
         ? [
