@@ -1,8 +1,20 @@
 const path = require('path');
 
+// Cloudflare/OpenNext build target detection. Set OPEN_NEXT_CLOUDFLARE=1 in the
+// Cloudflare build; CF_PAGES is auto-set by Cloudflare Pages. Default (Vercel/
+// local) is false, so the Vercel deploy is unaffected by the dual-target tweaks
+// below.
+const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAGES;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  // `sharp` is a native module — kept external (not bundled) so the OpenNext/
+  // Cloudflare Worker build doesn't try to bundle the native binary. Harmless on
+  // Vercel/Node, which provides sharp at runtime from node_modules anyway. The
+  // OG route's sharp usage is additionally runtime-gated off Workers.
+  serverExternalPackages: ['sharp'],
 
   // Next 16 + Turbopack default: monorepo-root file-tracing so the bundler
   // walks up to root node_modules for workspace-hoisted deps. Sister to
@@ -12,6 +24,11 @@ const nextConfig = {
   transpilePackages: ['@force/ui', '@force/shared'],
 
   images: {
+    // Cloudflare build only: disable Next's sharp-based image optimizer (native,
+    // Workers-incompatible). Storefront images come from R2 already backend-
+    // resized, so there's no quality loss. On Vercel this stays false → Vercel's
+    // image optimization is unchanged (zero regression).
+    unoptimized: IS_CLOUDFLARE,
     remotePatterns: [
       // Only allow localhost image sources in non-production environments
       ...(process.env.NODE_ENV !== 'production'

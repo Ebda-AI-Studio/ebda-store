@@ -29,14 +29,45 @@
  */
 
 import { ImageResponse } from 'next/og';
-import sharp from 'sharp';
 import { getStore } from '../lib/store-resolver';
 
-// node runtime (NOT edge): sharp is a native module. We use it to rasterize SVG
-// store logos to PNG on the fly so the OG card can <img> them — Satori (the
-// ImageResponse renderer) cannot render an SVG <img> source, which is why the
-// WhatsApp/social preview previously showed the store name instead of the logo.
+// node runtime (NOT edge): on Vercel/Node we rasterize SVG store logos to PNG
+// (via a runtime-gated dynamic `sharp` import — see rasterizeSvgToPng) so the OG
+// card can <img> them; Satori (the ImageResponse renderer) cannot render an SVG
+// <img> source, which is why the WhatsApp/social preview previously showed the
+// store name instead of the logo.
+//
+// Cloudflare/Workers note: `sharp` is a native module that cannot run on
+// Workers. To keep ONE codebase that deploys to BOTH Vercel and Cloudflare, the
+// sharp import is dynamic + gated on isCloudflareRuntime() — the OpenNext build
+// marks `sharp` external (never bundled or called on Workers), and SVG logos
+// gracefully fall back to the branded name card there. Raster logos and the
+// name-card path render identically on both. No Vercel regression.
 export const runtime = 'nodejs';
+
+/** True under Cloudflare (OpenNext) rather than Vercel/Node. Set
+ *  OPEN_NEXT_CLOUDFLARE=1 in the Cloudflare build; CF_PAGES is auto-set by CF. */
+function isCloudflareRuntime(): boolean {
+  return !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAGES;
+}
+
+/** Rasterize an SVG buffer to a PNG data URI via sharp on Node. Returns null on
+ *  Cloudflare (sharp is native → Workers-incompatible) or any failure, so the
+ *  caller falls back to the branded name card. The dynamic import keeps sharp
+ *  out of the Workers bundle. */
+async function rasterizeSvgToPng(svgBuf: Buffer): Promise<string | null> {
+  if (isCloudflareRuntime()) return null;
+  try {
+    const sharp = (await import('sharp')).default;
+    const png = await sharp(svgBuf, { density: 240 })
+      .resize(600, 600, { fit: 'inside', withoutEnlargement: false })
+      .png()
+      .toBuffer();
+    return `data:image/png;base64,${png.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
 export const contentType = 'image/png';
 export const size = { width: 1200, height: 630 };
 
@@ -119,11 +150,8 @@ export default async function Image() {
         const res = await fetch(candidate, { next: { revalidate: 3600 }, redirect: 'error' });
         if (res.ok) {
           const svgBuf = Buffer.from(await res.arrayBuffer());
-          const png = await sharp(svgBuf, { density: 240 })
-            .resize(600, 600, { fit: 'inside', withoutEnlargement: false })
-            .png()
-            .toBuffer();
-          logoUrl = `data:image/png;base64,${png.toString('base64')}`;
+          // Node/Vercel: rasterize via sharp. Cloudflare: returns null → name card.
+          logoUrl = await rasterizeSvgToPng(svgBuf);
         }
       } catch {
         logoUrl = null; // fall back to the name card
