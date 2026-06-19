@@ -111,7 +111,12 @@ const nextConfig = {
               // for cross-domain attribution — without this directive Chrome
               // blocks it and the pixel still fires the event API but loses
               // the cookie-bridge piece.
-              'frame-src https://vercel.live https://www.facebook.com https://td.doubleclick.net',
+              // google.com + maps.google.com: the store Locations page embeds a
+              // key-free Google Maps preview per branch via an <iframe> (see
+              // mapsEmbedSrc()). Without these hosts Chrome blocks the frame
+              // with "This content is blocked. Contact the site owner to fix
+              // the issue." and the map renders as an empty/broken box.
+              'frame-src https://vercel.live https://www.facebook.com https://td.doubleclick.net https://www.google.com https://maps.google.com https://google.com',
               // Allow framing from admin origins for the page-builder live
               // preview. Reads `STOREFRONT_FRAME_ANCESTORS` env var as a
               // space-separated allowlist; falls back to: platform admin
