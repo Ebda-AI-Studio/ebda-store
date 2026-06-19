@@ -9,6 +9,38 @@ import { inngest } from '../lib/inngest/client';
 import { stampHumanEdits } from './ai-autofill.service';
 
 /**
+ * Build a Prisma `AND` clause for a free-text product search.
+ *
+ * Splits the query on whitespace and requires EVERY word to appear (case-
+ * insensitive `contains`) in at least one searchable field. This makes the
+ * search order-independent and middle-word friendly: searching "بريتزوس مشكلة"
+ * matches "مخبوزات بريتزوس مشكلة" because both words are present, and even a
+ * reordered "مشكلة بريتزوس" matches. A single-word query behaves exactly as the
+ * previous single `contains`. Returns an array suitable for spreading into
+ * `where.AND` (empty when the query is blank).
+ *
+ * @param search   raw query string
+ * @param withSku  include the (English-only) SKU column — admin paths only
+ */
+function buildProductSearchAnd(
+  search: string | undefined | null,
+  withSku: boolean
+): Prisma.ProductWhereInput[] {
+  const tokens = (search ?? '').trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+  return tokens.map(token => {
+    const or: Prisma.ProductWhereInput[] = [
+      { name: { contains: token, mode: 'insensitive' } },
+      { nameAr: { contains: token, mode: 'insensitive' } },
+      { description: { contains: token, mode: 'insensitive' } },
+      { descriptionAr: { contains: token, mode: 'insensitive' } },
+    ];
+    if (withSku) or.push({ sku: { contains: token, mode: 'insensitive' } });
+    return { OR: or };
+  });
+}
+
+/**
  * Compute availability flags for a product (and its variants) based on
  * inventory counts. Called on the public list + detail paths only — admin
  * routes return raw Prisma rows without these computed fields.
@@ -219,12 +251,11 @@ export class ProductService {
       // Match against both English and Arabic name/description so admins
       // searching in Arabic find their localized products. SKU stays
       // English-only because SKUs are merchant codes, not localized text.
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { nameAr: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { descriptionAr: { contains: search, mode: 'insensitive' } },
-        { sku: { contains: search, mode: 'insensitive' } },
+      // Word-AND so any subset / reordering of words still matches (e.g.
+      // "بريتزوس مشكلة" finds "مخبوزات بريتزوس مشكلة").
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        ...buildProductSearchAnd(search, true),
       ];
     }
 
@@ -766,11 +797,10 @@ export class ProductService {
     if (search) {
       // Mirror admin list(): match both English + Arabic so storefront
       // shoppers searching in either language find the right products.
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { nameAr: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { descriptionAr: { contains: search, mode: 'insensitive' } },
+      // Word-AND so any subset / reordering of words still matches.
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        ...buildProductSearchAnd(search, false),
       ];
     }
 
@@ -1247,14 +1277,11 @@ export class ProductService {
       deletedAt: null,
     };
 
-    // Text search
+    // Text search — word-AND so any subset / reordering of words still matches.
     if (query && query.trim()) {
-      where.OR = [
-        { name: { contains: query, mode: 'insensitive' } },
-        { nameAr: { contains: query, mode: 'insensitive' } },
-        { description: { contains: query, mode: 'insensitive' } },
-        { descriptionAr: { contains: query, mode: 'insensitive' } },
-        { sku: { contains: query, mode: 'insensitive' } },
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        ...buildProductSearchAnd(query, true),
       ];
     }
 
@@ -1413,15 +1440,22 @@ export class ProductService {
     // service limit param so an attacker can't request more.
     const take = Math.min(25, Math.max(1, limit));
 
+    // Word-AND across name + nameAr only (typeahead shows product names, so
+    // matching on description would surface confusing results). Each query word
+    // must appear in name or nameAr, so a multi-word / reordered query still
+    // matches (e.g. "بريتزوس مشكلة" → "مخبوزات بريتزوس مشكلة").
+    const suggestTokens = trimmed.split(/\s+/).filter(Boolean);
     const products = await prisma.product.findMany({
       where: {
         storeId,
         status: 'active',
         deletedAt: null,
-        OR: [
-          { name: { contains: trimmed, mode: 'insensitive' } },
-          { nameAr: { contains: trimmed, mode: 'insensitive' } },
-        ],
+        AND: suggestTokens.map(token => ({
+          OR: [
+            { name: { contains: token, mode: 'insensitive' as const } },
+            { nameAr: { contains: token, mode: 'insensitive' as const } },
+          ],
+        })),
       },
       select: {
         id: true,

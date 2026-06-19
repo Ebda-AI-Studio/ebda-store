@@ -385,7 +385,10 @@ export default function EditProductPage() {
         return;
       }
 
-      router.push(`/stores/${storeId}/products/${productId}`);
+      // Return to the products list after a successful edit (matches the
+      // create flow), so the merchant lands back where they can keep working
+      // through their catalog instead of on the single-product detail page.
+      router.push(`/stores/${storeId}/products`);
     } catch {
       setError(t('updateFailed'));
     } finally {
