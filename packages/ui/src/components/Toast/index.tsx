@@ -99,7 +99,7 @@ function ToastContainer({
 }) {
   return (
     <div
-      className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] md:bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"
+      className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] md:bottom-4 right-4 z-50 flex flex-col gap-2 w-auto max-w-[280px] sm:max-w-sm pointer-events-none"
       aria-live="polite"
       aria-relevant="additions removals"
     >
@@ -208,7 +208,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         pointer-events-auto relative overflow-hidden
         ${s.container}
         border rounded-xl shadow-lg
-        flex items-start gap-3 p-4
+        flex items-start gap-2.5 p-3 sm:gap-3 sm:p-4
         animate-toast-in
       `}
       role="alert"
