@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, API_URL } from '../lib/api';
+import { setCompareStoreId } from '../lib/compare';
 import {
   type StoreTheme,
   type StoreSocialLinks,
@@ -297,6 +298,9 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
   if (store.id && store.id !== 'demo') {
     api.setStoreId(store.id);
   }
+  // Namespace per-store localStorage (compare list) synchronously during render
+  // so child components read the right store's key on their first render.
+  setCompareStoreId(store.id && store.id !== 'demo' ? store.id : null);
 
   // Apply theme on mount and when theme changes
   useEffect(() => {

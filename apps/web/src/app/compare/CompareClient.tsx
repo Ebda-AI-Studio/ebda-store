@@ -7,6 +7,7 @@ import { ShopChrome } from '../../components';
 import { useCart } from '../../contexts/CartContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { compareStorageKey } from '../../lib/compare';
 
 interface CompareProduct {
   id: string;
@@ -23,7 +24,7 @@ interface CompareProduct {
 function loadInitialProducts(): CompareProduct[] {
   if (typeof window === 'undefined') return [];
   try {
-    const stored = localStorage.getItem('compareProducts');
+    const stored = localStorage.getItem(compareStorageKey());
     if (stored) {
       return JSON.parse(stored);
     }
@@ -55,12 +56,12 @@ export default function CompareClient() {
   function removeProduct(productId: string) {
     const updated = products.filter(p => p.id !== productId);
     setProducts(updated);
-    localStorage.setItem('compareProducts', JSON.stringify(updated));
+    localStorage.setItem(compareStorageKey(), JSON.stringify(updated));
   }
 
   function clearAll() {
     setProducts([]);
-    localStorage.removeItem('compareProducts');
+    localStorage.removeItem(compareStorageKey());
   }
 
   if (isLoading) {

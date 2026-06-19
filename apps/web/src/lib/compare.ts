@@ -1,5 +1,26 @@
-/** localStorage key used for the compare list */
-const COMPARE_KEY = 'compareProducts';
+/**
+ * localStorage key for the compare list, namespaced per store.
+ *
+ * Path-based stores (store.forcemediakw.com/<slug>) share a single localStorage
+ * origin, so a flat 'compareProducts' key bled one store's compare list into a
+ * sibling store. The active store id is set once by StoreContext (mirrors
+ * `api.setStoreId`) and the key becomes `compareProducts:<storeId>`. Falls back
+ * to the legacy flat key before a store has resolved.
+ */
+const LEGACY_COMPARE_KEY = 'compareProducts';
+let currentStoreId: string | null = null;
+
+/** Called by StoreContext when the active storefront store resolves. */
+export function setCompareStoreId(storeId: string | null): void {
+  currentStoreId = storeId && storeId !== 'demo' ? storeId : null;
+}
+
+/** The per-store compare list localStorage key. Exported for components that
+ *  read/write the list directly (e.g. the Compare page). */
+export function compareStorageKey(): string {
+  return currentStoreId ? `${LEGACY_COMPARE_KEY}:${currentStoreId}` : LEGACY_COMPARE_KEY;
+}
+
 const MAX_COMPARE_ITEMS = 4;
 
 export interface CompareProduct {
@@ -17,7 +38,7 @@ export interface CompareProduct {
 export function getCompareList(): CompareProduct[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(COMPARE_KEY);
+    const raw = localStorage.getItem(compareStorageKey());
     return raw ? (JSON.parse(raw) as CompareProduct[]) : [];
   } catch {
     return [];
@@ -27,7 +48,7 @@ export function getCompareList(): CompareProduct[] {
 /** Persist the list back to localStorage. */
 function saveCompareList(list: CompareProduct[]): void {
   try {
-    localStorage.setItem(COMPARE_KEY, JSON.stringify(list));
+    localStorage.setItem(compareStorageKey(), JSON.stringify(list));
   } catch {
     // Storage quota exceeded – silently ignore
   }

@@ -55,7 +55,16 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const CART_STORAGE_KEY = 'force-store-cart';
+// Per-store localStorage key. Path-based stores (store.forcemediakw.com/<slug>)
+// share one origin, so a flat 'force-store-cart' key bled one store's guest
+// cart into another on the same browser (visual-only — the server cart is
+// already storeId-scoped, but the optimistic first paint showed the wrong
+// store's items). Namespacing by store.id isolates each store's cached cart.
+// `legacy` is the old flat key, kept only so we can purge it post-migration.
+const LEGACY_CART_STORAGE_KEY = 'force-store-cart';
+function cartStorageKeyFor(storeId: string | undefined): string {
+  return storeId && storeId !== 'demo' ? `force-store-cart:${storeId}` : LEGACY_CART_STORAGE_KEY;
+}
 
 function mapServerItem(item: ServerCartItem): CartItem {
   return {
@@ -86,12 +95,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // resolves (deps re-run hydrate when it does).
   const { store } = useStore();
   const hasStore = !!store?.id && store.id !== 'demo';
+  // Storage key is per-store; recomputed when the store resolves so each store
+  // reads/writes only its own cached cart.
+  const cartStorageKey = cartStorageKeyFor(store?.id);
 
   // Fast first paint: load cached items from localStorage before the server
   // round-trip. These are overwritten once the authoritative cart arrives.
+  // Re-runs when the store (and thus the key) resolves so we paint the right
+  // store's cache, not a stale sibling's. One-time: purge the old flat key.
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      if (cartStorageKey !== LEGACY_CART_STORAGE_KEY) {
+        localStorage.removeItem(LEGACY_CART_STORAGE_KEY);
+      }
+      const saved = localStorage.getItem(cartStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
@@ -101,7 +118,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Corrupt JSON -- ignore.
     }
-  }, []);
+  }, [cartStorageKey]);
 
   const refetchCart = useCallback(async () => {
     if (!hasStore) return;
@@ -138,7 +155,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         // don't need it in the effect deps (which would re-run the migration).
         let localItems: CartItem[] = [];
         try {
-          const saved = localStorage.getItem(CART_STORAGE_KEY);
+          const saved = localStorage.getItem(cartStorageKey);
           if (saved) {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed)) localItems = parsed as CartItem[];
@@ -175,18 +192,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [refetchCart, hasStore]);
+  }, [refetchCart, hasStore, cartStorageKey]);
 
   // Persist to localStorage so the next page load can paint the cart
   // instantly while the server round-trip is in flight.
   useEffect(() => {
     if (!isReady) return;
     try {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(cartStorageKey, JSON.stringify(items));
     } catch {
       // Quota exceeded or storage disabled -- non-fatal.
     }
-  }, [items, isReady]);
+  }, [items, isReady, cartStorageKey]);
 
   const addItem = useCallback(
     async (item: Omit<CartItem, 'quantity' | 'productId'>, quantity: number = 1) => {
