@@ -554,6 +554,32 @@ export default function StoreLayoutPage() {
                     ? t('sections.hero.modeSingleHint')
                     : t('sections.hero.modeSliderHint')}
                 </p>
+                {/* Image fit: full-bleed (crop to fill) vs framed (show the
+                    whole image). A smaller-than-recommended image gets cropped
+                    in full-bleed; framed (object-contain) shows it complete.
+                    Default full-bleed preserves existing stores' look. */}
+                <div className="mb-2 text-xs font-medium text-muted-foreground">
+                  {t('sections.hero.fitLabel')}
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <ModeButton
+                    active={(layout.hero.presentation ?? 'full-bleed') === 'full-bleed'}
+                    onClick={() =>
+                      updateSection('hero', s => ({ ...s, presentation: 'full-bleed' }))
+                    }
+                    label={t('sections.hero.fitFill')}
+                  />
+                  <ModeButton
+                    active={layout.hero.presentation === 'framed'}
+                    onClick={() => updateSection('hero', s => ({ ...s, presentation: 'framed' }))}
+                    label={t('sections.hero.fitFit')}
+                  />
+                </div>
+                <p className="mb-4 text-xs text-muted-foreground">
+                  {(layout.hero.presentation ?? 'full-bleed') === 'full-bleed'
+                    ? t('sections.hero.fitFillHint')
+                    : t('sections.hero.fitFitHint')}
+                </p>
                 {/* Autoplay only matters in slider mode — hide it entirely
                     when the merchant has picked the static single banner so
                     the form doesn't expose an irrelevant control. */}
@@ -2207,7 +2233,9 @@ export default function StoreLayoutPage() {
                     ? `&_layoutDraft=${encodeURIComponent(previewDraftToken)}`
                     : '';
                   const src = `${previewUrl}${sep}_preview=${previewRefreshTick}${draft}`;
-                  const iframeKey = `${previewUrl}#${previewRefreshTick}#${previewDraftToken ?? ''}#${previewDevice}`;
+                  const iframeKey = `${previewUrl}#${previewRefreshTick}#${
+                    previewDraftToken ?? ''
+                  }#${previewDevice}`;
                   if (previewDevice === 'mobile') {
                     // True phone width — 390px (iPhone logical width), centered.
                     return (
