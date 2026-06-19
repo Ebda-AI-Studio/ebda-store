@@ -14,14 +14,14 @@
 
 `@opennextjs/cloudflare@1.19.11` peer range: `next: ">=15.5.18 <16 || >=16.2.6"`.
 
-| Project | Next | OpenNext |
-|---|---|---|
-| FWB web / admin / orders | 16.2.9 | ✅ |
-| om-hassan-menu | 16.2.6 | ✅ |
-| digital-card | 16.2.6 | ✅ |
-| WBS frontend | `^16.0.10` | ✅ (pin lockfile ≥ 16.2.6 — `npm update next`) |
-| Force Media CRM | `^16.0.10` | ✅ (same lockfile nudge) |
-| force-media-landing / al_assriya | static/simple | ✅ trivial on Pages |
+| Project                          | Next          | OpenNext                                       |
+| -------------------------------- | ------------- | ---------------------------------------------- |
+| FWB web / admin / orders         | 16.2.9        | ✅                                             |
+| om-hassan-menu                   | 16.2.6        | ✅                                             |
+| digital-card                     | 16.2.6        | ✅                                             |
+| WBS frontend                     | `^16.0.10`    | ✅ (pin lockfile ≥ 16.2.6 — `npm update next`) |
+| Force Media CRM                  | `^16.0.10`    | ✅ (same lockfile nudge)                       |
+| force-media-landing / al_assriya | static/simple | ✅ trivial on Pages                            |
 
 No adapter blocker anywhere.
 
@@ -29,46 +29,53 @@ No adapter blocker anywhere.
 
 Cloudflare Workers is **not Node** — native binaries (`sharp`) and Node-runtime SDKs (Sentry Node + OpenTelemetry, loaded via `instrumentation.ts`) can't execute. The `next build` succeeds; OpenNext's bundler then can't resolve/trace these. Fleet scan (`instrumentation` / `sharp` / `@sentry/node` / OTel / other native):
 
-| Project | `instrumentation` (Sentry-node) | `sharp` (OG/image) | Verdict |
-|---|---|---|---|
-| **FWB web** | ✔ | ✔ (`opengraph-image.tsx`) | 2 fixes |
-| **FWB admin** | ✔ | — | 1 fix (shared) |
-| **FWB orders** | — | — | **clean** |
-| **WBS frontend** | ✔ | — | 1 fix (shared) |
-| **Force Media CRM** | — | — | **clean** |
-| **om-hassan-menu** | — | — (OG via `next/og`) | **clean** |
-| **digital-card** | — | — (OG via `next/og`) | **clean** |
+| Project             | `instrumentation` (Sentry-node) | `sharp` (OG/image)        | Verdict        |
+| ------------------- | ------------------------------- | ------------------------- | -------------- |
+| **FWB web**         | ✔                               | ✔ (`opengraph-image.tsx`) | 2 fixes        |
+| **FWB admin**       | ✔                               | —                         | 1 fix (shared) |
+| **FWB orders**      | —                               | —                         | **clean**      |
+| **WBS frontend**    | ✔                               | —                         | 1 fix (shared) |
+| **Force Media CRM** | —                               | —                         | **clean**      |
+| **om-hassan-menu**  | —                               | — (OG via `next/og`)      | **clean**      |
+| **digital-card**    | —                               | — (OG via `next/og`)      | **clean**      |
 
 **The entire fleet = two distinct fixes.** Four projects already clean.
 
 ## The migration recipe (per blocker)
 
 ### 1. `instrumentation.ts` — server Sentry (Node SDK) → Workers
+
 Affects: FWB web, FWB admin, WBS frontend. The hook loads `@sentry/nextjs` + `sentry.server.config.ts` for the Node runtime; that won't run on Workers, and OpenNext can't trace the compiled `server/instrumentation.js` in the monorepo standalone.
+
 - **Fix:** use **`@sentry/cloudflare`** (Workers SDK) for the server side, or gate the Node instrumentation to only load when `NEXT_RUNTIME === 'nodejs'` AND not on Workers. One shared change.
 
 ### 2. `opengraph-image.tsx` — `sharp` → `next/og`
+
 Affects: FWB web only. The dynamic OG-image route composes images with native `sharp`.
+
 - **Fix:** rewrite with **`next/og`'s `ImageResponse`** (Satori — edge/Workers-native, no sharp), or move OG generation to the Railway backend. One file.
 
 ### 3. Image optimization
+
 - Set **`images.unoptimized: true`** — R2 images are already backend-`sharp`-resized on upload, so no quality loss. Or wire a Cloudflare Image Resizing loader.
 
 ### 4. Per-tenant custom domains (the scale driver)
+
 - Replace the Vercel domain-provisioning code with the **Cloudflare for SaaS Custom Hostnames API** (auto-SSL per hostname). Purpose-built for hundreds of tenant domains; ~$0.10/hostname/mo, 100 free.
 
 ## Cost forecast @ 100 stores (≈8.4M pageviews/mo, mixed traffic)
 
-| Scenario | Vercel | Cloudflare |
-|---|---|---|
-| Good ISR/edge caching (current pattern) | ~$300/mo | ~$35/mo |
-| High traffic / weak caching | $500–1,500/mo | $50–150/mo |
+| Scenario                                | Vercel        | Cloudflare |
+| --------------------------------------- | ------------- | ---------- |
+| Good ISR/edge caching (current pattern) | ~$300/mo      | ~$35/mo    |
+| High traffic / weak caching             | $500–1,500/mo | $50–150/mo |
 
-Driver: Cloudflare **free egress + cheap requests + $0.10 hostnames**. Product images already on R2 (egress-free) compounds the saving. *Caching is the #1 cost lever on either platform — do it regardless.*
+Driver: Cloudflare **free egress + cheap requests + $0.10 hostnames**. Product images already on R2 (egress-free) compounds the saving. _Caching is the #1 cost lever on either platform — do it regardless._
 
 ## Dual-run plan (run both until validated, then cut over per-tenant)
 
 Low-risk because the backend (Railway) + images (R2) are shared, and DNS is per-domain:
+
 1. Vercel stays prod (untouched).
 2. Cloudflare Pages builds the same `web` repo in parallel → `*.pages.dev`. Validate render. Zero prod impact.
 3. Point one demo/test domain at Cloudflare via Cloudflare for SaaS → prove the custom-hostname + SSL flow.
@@ -76,13 +83,16 @@ Low-risk because the backend (Railway) + images (R2) are shared, and DNS is per-
 5. Migrate domains in batches; decommission Vercel when the last store moves. Overlap cost during eval ≈ $25/mo.
 
 ## Effort estimate
+
 - FWB pattern (web/admin/orders): the 2 shared fixes (Sentry-cloudflare + OG/next/og + `unoptimized`) ≈ **0.5–1 day**.
 - Cloudflare-for-SaaS hostname flow (swap provisioning code) ≈ **1–2 days**.
 - Per-project: WBS frontend (instrumentation fix only), CRM/om-hassan/digital-card (clean — config + deploy).
 - **Realistic total to a validated, dual-running cutover-ready state: ~1–2 weeks** focused, then incremental per-tenant migration.
 
 ## Trigger to actually move
+
 When monthly Vercel **usage** (above the $20 base) consistently crosses ~$300–500/mo, **or** when onboarding custom-domain stores at volume (~15–25+). Until then: stay on Vercel, keep storefronts ISR/edge-cached, keep images on R2, and avoid Vercel-only lock-in (Edge Config, Vercel KV/Postgres/Cron) so the move stays a config swap.
 
 ---
-*Spike artifacts: `@opennextjs/cloudflare@1.19.11` + `wrangler@^4.86.0` on a throwaway `spike/opennext-cloudflare` worktree; `next build` validated; blockers isolated to `instrumentation.ts` + `opengraph-image.tsx` (sharp). Re-run with `npx opennextjs-cloudflare build` after the 2 fixes for a fully-clean Worker bundle.*
+
+_Spike artifacts: `@opennextjs/cloudflare@1.19.11` + `wrangler@^4.86.0` on a throwaway `spike/opennext-cloudflare` worktree; `next build` validated; blockers isolated to `instrumentation.ts` + `opengraph-image.tsx` (sharp). Re-run with `npx opennextjs-cloudflare build` after the 2 fixes for a fully-clean Worker bundle._

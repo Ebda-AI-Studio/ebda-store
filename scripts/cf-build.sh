@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+#
+# Build a Next app for Cloudflare (OpenNext) in one command.
+#
+# WHY THIS SCRIPT EXISTS — OpenNext cannot trace Next's `instrumentation.ts` in
+# our monorepo standalone output. Next emits `.next/server/instrumentation.js`
+# but does NOT copy it into `.next/standalone/`, and OpenNext's copyTracedFiles
+# then dies with:
+#     Error: File server/instrumentation.js does not exist
+# This is an upstream @opennextjs/aws limitation (still present in the latest
+# @opennextjs/cloudflare@1.19.11) — it is triggered by the mere PRESENCE of the
+# file, independent of its contents, so there is no in-file code fix. The only
+# reliable workaround is to build with instrumentation.ts absent.
+#
+# This script does exactly that, automatically and safely: it moves
+# instrumentation.ts aside for the build only, then ALWAYS restores it (EXIT
+# trap — even on failure / Ctrl-C), so the committed Vercel path is never
+# altered. Apps without an instrumentation.ts (e.g. orders) just build straight.
+#
+# Usage:   bash scripts/cf-build.sh <web|admin|orders>
+# Then:    cd apps/<app> && npx wrangler deploy   (needs a prior `wrangler login`)
+#
+# Requires the local-only CF build tooling per app (NOT committed — see
+# docs/migration/cloudflare-preview-workers.md): the @opennextjs/cloudflare +
+# wrangler devDeps, apps/<app>/wrangler.jsonc, and apps/<app>/open-next.config.ts.
+#
+set -euo pipefail
+
+APP="${1:?usage: cf-build.sh <web|admin|orders>}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+APP_DIR="$ROOT/apps/$APP"
+BIN="$ROOT/node_modules/.bin/opennextjs-cloudflare"
+
+[ -d "$APP_DIR" ] || { echo "cf-build: no such app: apps/$APP" >&2; exit 1; }
+[ -x "$BIN" ] || { echo "cf-build: @opennextjs/cloudflare not installed — run: npm i -D @opennextjs/cloudflare@1.19.11 wrangler@^4.86.0 -w @force/$APP" >&2; exit 1; }
+[ -f "$APP_DIR/wrangler.jsonc" ] || { echo "cf-build: missing apps/$APP/wrangler.jsonc (see docs/migration/cloudflare-preview-workers.md)" >&2; exit 1; }
+
+cd "$APP_DIR"
+
+INSTR="instrumentation.ts"
+BAK="$INSTR.cfbak"
+restore() { if [ -f "$BAK" ]; then mv -f "$BAK" "$INSTR"; echo "cf-build: restored $INSTR"; fi; }
+trap restore EXIT
+
+if [ -f "$INSTR" ]; then
+  mv "$INSTR" "$BAK"
+  echo "cf-build: moved $INSTR aside for the Cloudflare build (OpenNext trace workaround)"
+fi
+
+echo "cf-build: building apps/$APP for Cloudflare..."
+OPEN_NEXT_CLOUDFLARE=1 "$BIN" build
+
+echo "cf-build: ✓ apps/$APP built -> apps/$APP/.open-next/worker.js"
+echo "cf-build: deploy with -> (cd apps/$APP && npx wrangler deploy)"

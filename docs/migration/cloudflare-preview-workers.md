@@ -43,32 +43,35 @@ export default defineCloudflareConfig({});
 
 ## Build + deploy recipe (per app)
 
-From the repo root, after the devDeps above are installed:
+From the repo root, after the devDeps + `wrangler.jsonc` + `open-next.config.ts` above exist, build with the committed helper (it handles the `instrumentation.ts` workaround automatically — see below) then deploy:
 
 ```bash
-# orders (clean)
-cd apps/orders
-OPEN_NEXT_CLOUDFLARE=1 ../../node_modules/.bin/opennextjs-cloudflare build
-../../node_modules/.bin/wrangler deploy        # -> force-orders-cf-preview.workers.dev
+bash scripts/cf-build.sh orders                # -> apps/orders/.open-next/worker.js
+(cd apps/orders && npx wrangler deploy)         # -> force-orders-cf-preview.workers.dev
 
-# admin (Sentry node instrumentation can't run on Workers; OpenNext can't trace it)
-cd ../admin
-mv instrumentation.ts instrumentation.ts.cfbak           # move aside for the CF build only
-OPEN_NEXT_CLOUDFLARE=1 ../../node_modules/.bin/opennextjs-cloudflare build
-mv instrumentation.ts.cfbak instrumentation.ts           # restore — Vercel path untouched
-../../node_modules/.bin/wrangler deploy        # -> force-admin-cf-preview.workers.dev
+bash scripts/cf-build.sh admin
+(cd apps/admin && npx wrangler deploy)          # -> force-admin-cf-preview.workers.dev
+
+bash scripts/cf-build.sh web
+(cd apps/web && npx wrangler deploy)            # -> force-web-cf-preview.workers.dev
 ```
 
-`OPEN_NEXT_CLOUDFLARE=1` flips the `IS_CLOUDFLARE` gates (image optimizer off). `wrangler deploy` reads `wrangler.jsonc`. Requires a prior `wrangler login`.
+`scripts/cf-build.sh` sets `OPEN_NEXT_CLOUDFLARE=1` (flips the `IS_CLOUDFLARE` image gate) and, for apps that have an `instrumentation.ts`, moves it aside for the build only and **always restores it** (EXIT trap — even on failure), so the committed Vercel path is never touched. `wrangler deploy` reads `wrangler.jsonc`; requires a prior `wrangler login`.
 
-## Known blocker — admin `instrumentation.ts` (Sentry Node SDK)
+## Why the `instrumentation.ts` workaround is required (OpenNext upstream limitation)
 
-`apps/admin/instrumentation.ts` statically re-exports `@sentry/nextjs` (`export { captureRequestError as onRequestError }`) + dynamically loads `sentry.server.config`. The Sentry **Node** SDK + OpenTelemetry can't run on Workers, and OpenNext can't trace the compiled `instrumentation.js` in the monorepo standalone output. The build-time move-aside above is the same workaround the web Phase-1 spike used. `apps/web` has the identical file and the same caveat.
+OpenNext **cannot trace Next's `instrumentation.ts`** in our monorepo standalone output. Next emits `.next/server/instrumentation.js` but does **not** copy it into `.next/standalone/`, so OpenNext's `copyTracedFiles` dies with:
 
-**Permanent fix (deferred to prod-cutover):** swap the server side to **`@sentry/cloudflare`** (Workers SDK) gated on `IS_CLOUDFLARE`, applied to web + admin together. Not done here because (a) it risks the live Vercel Sentry wiring and (b) these are preview-only. Tracked in `cloudflare-readiness.md` §1.
+```
+Error: File server/instrumentation.js does not exist
+```
+
+This is triggered by the **mere presence** of `instrumentation.ts`, independent of its contents — so there is **no in-file code fix** (verified 2026-06-19: gating/lazy-importing the Sentry calls inside the file does not help; the trace step fails before any of that runs). It is an upstream `@opennextjs/aws` limitation, still present in the **latest** `@opennextjs/cloudflare@1.19.11`. The only reliable workaround is to build with the file absent, which `scripts/cf-build.sh` automates safely. `apps/web` + `apps/admin` both have an `instrumentation.ts`; `apps/orders` has none (builds straight).
+
+**Possible future eliminations (not needed for preview):** (a) an OpenNext release that fixes `copyTracedFiles` for instrumentation → then the file can stay; (b) move server-side Sentry to `@sentry/cloudflare` (Workers SDK) AND drop `instrumentation.ts` on the CF build — heavier, risks the live Vercel Sentry wiring, deferred to prod cutover. Tracked in `cloudflare-readiness.md` §1.
 
 ## Next steps (when promoting beyond preview)
 
-1. Permanent `instrumentation.ts` fix (`@sentry/cloudflare`) across web + admin.
-2. Commit the build tooling (devDeps + scripts) + wire a CI build job, lockfile regenerated with npm 10.8.2.
+1. Re-check newer `@opennextjs/cloudflare` for the `copyTracedFiles` instrumentation fix; if shipped, drop the move-aside. Otherwise `@sentry/cloudflare` across web + admin.
+2. Commit the build tooling (devDeps + worker config) + wire a CI build job, lockfile regenerated with npm 10.8.2.
 3. Cloudflare for SaaS custom-hostname onboarding per client domain (production DNS — canary 1–2 stores first, per `cloudflare-readiness.md`).
