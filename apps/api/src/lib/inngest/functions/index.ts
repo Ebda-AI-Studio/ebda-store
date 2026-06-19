@@ -43,6 +43,7 @@ import { aiAutofillSweep } from './ai-autofill-sweep';
 import { orderCapiConversion } from './order-capi-conversion';
 import { orderStuckPaymentSweep } from './order-stuck-payment-sweep';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
+import { r2OrphanSweep } from './r2-orphan-sweep';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -110,4 +111,7 @@ export const inngestFunctions: InngestFunction.Any[] = [
   orderStuckPaymentSweep,
   // Auto-cancel stale unpaid orders past AUTO_CANCEL_UNPAID_DAYS (daily cron).
   orderAutoCancelUnpaid,
+  // Weekly R2 orphan sweep: lists bucket vs DB references and reports
+  // orphans via logger + Telegram. Deletion gated on R2_ORPHAN_SWEEP_APPLY=true.
+  r2OrphanSweep,
 ];

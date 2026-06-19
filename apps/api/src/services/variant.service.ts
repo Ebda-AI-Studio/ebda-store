@@ -210,6 +210,16 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Option not found');
     }
 
+    // Capture imageUrls BEFORE the transaction deletes the rows so we
+    // can clean up R2 after the commit. Variants are hard-deleted (no
+    // soft-delete), so the image is genuinely orphaned once deleteMany
+    // runs. We collect outside the tx so the select is a plain read
+    // and doesn't enlarge the transaction window.
+    const variantsToDelete = await prisma.productVariant.findMany({
+      where: { productId },
+      select: { imageUrl: true },
+    });
+
     await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // Delete all variants since they depend on options
       await tx.productVariant.deleteMany({ where: { productId } });
@@ -225,6 +235,16 @@ export class VariantService {
         });
       }
     });
+
+    // Fire-and-forget R2 cleanup after the commit — same pattern as
+    // updateVariant / deleteVariant above.
+    for (const v of variantsToDelete) {
+      if (v.imageUrl) {
+        void deleteR2ObjectIfOrphan(v.imageUrl).catch(err =>
+          logger.warn({ err, productId, optionId }, '[variant.deleteOption] r2 cleanup failed')
+        );
+      }
+    }
   }
 
   /**
@@ -322,11 +342,13 @@ export class VariantService {
       );
     }
 
-    // Delete any variants using this value
+    // Delete any variants using this value.  Select imageUrl so we can
+    // clean up R2 objects after the deletes commit.
     const variantsWithValue = await prisma.productVariant.findMany({
       where: {
         options: { some: { valueId } },
       },
+      select: { id: true, imageUrl: true },
     });
 
     if (variantsWithValue.length > 0) {
@@ -336,6 +358,16 @@ export class VariantService {
     }
 
     await prisma.productOptionValue.delete({ where: { id: valueId } });
+
+    // Fire-and-forget R2 cleanup for any variant images that were just
+    // hard-deleted — same pattern as deleteVariant / deleteOption.
+    for (const v of variantsWithValue) {
+      if (v.imageUrl) {
+        void deleteR2ObjectIfOrphan(v.imageUrl).catch(err =>
+          logger.warn({ err, valueId }, '[variant.deleteOptionValue] r2 cleanup failed')
+        );
+      }
+    }
   }
 
   /**

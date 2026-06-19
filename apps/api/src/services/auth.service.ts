@@ -8,6 +8,7 @@ import { EmailService } from './email.service';
 import { accountLockout } from './account-lockout.service';
 import logger from '../lib/logger';
 import { redis } from './redis.service';
+import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 
 interface TokenPayload {
   userId: string;
@@ -891,7 +892,7 @@ export class AuthService {
   static async eraseAccount(userId: string): Promise<void> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, storeId: true, role: true },
+      select: { id: true, storeId: true, role: true, avatar: true },
     });
     if (!user) {
       throw new AppError(404, 'NOT_FOUND', 'User not found');
@@ -965,6 +966,15 @@ export class AuthService {
         },
       });
     });
+
+    // The avatar URL was just nulled out of the DB — clean up R2 after
+    // the transaction commits. Best-effort, same pattern as other cleanup
+    // sites: never let storage hiccups propagate to the caller.
+    if (user.avatar) {
+      void deleteR2ObjectIfOrphan(user.avatar).catch(err =>
+        logger.warn({ err, userId }, '[auth.eraseAccount] r2 avatar cleanup failed')
+      );
+    }
   }
 
   /**

@@ -1,0 +1,290 @@
+import type { InngestFunction } from 'inngest';
+import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import { withRlsBypass } from '@force/database';
+import logger from '../../logger';
+import { inngest } from '../client';
+import { sendAlert } from '../../../services/alerts.service';
+import { config } from '../../../config';
+import { urlToR2Key, collectUrlsFromJson } from '../../../services/r2-cleanup.service';
+
+/**
+ * Weekly R2 orphan sweep — cron 0 4 * * 0 (Sunday 04:00 UTC).
+ *
+ * Lists every object in the R2 bucket, collects every URL still
+ * referenced anywhere in the database, computes the diff, and
+ * REPORTS the result via structured logger + Telegram alert.
+ *
+ * DOES NOT DELETE by default. Set env var R2_ORPHAN_SWEEP_APPLY=true
+ * to enable batch deletion of confirmed orphans (DeleteObjects ≤1000
+ * objects/request). Default is report-only — review the logs/alerts
+ * before enabling apply mode.
+ *
+ * Safety guards:
+ *  - Objects younger than 24 h are skipped (in-flight upload protection:
+ *    a file may have landed in R2 before its DB row was committed).
+ *  - R2_ORPHAN_SWEEP_APPLY must be the literal string "true" to enable
+ *    deletion — any other value (including "1", "yes") stays in report mode.
+ *  - Only runs if storage is configured (STORAGE_ENDPOINT etc.). Exits
+ *    cleanly if not.
+ *  - Cross-tenant DB queries run via withRlsBypass so FORCE RLS policies
+ *    (set per HTTP request, absent on cron) don't filter rows to 0.
+ */
+
+/** Objects younger than this are skipped regardless of DB reference state. */
+const MIN_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/** Maximum orphans included in the Telegram alert sample (keeps message short). */
+const ALERT_SAMPLE = 10;
+
+/** DeleteObjects batch cap (R2 S3-compatible API limit). */
+const DELETE_BATCH = 1000;
+
+interface R2Obj {
+  key: string;
+  size: number;
+  lastModified?: Date;
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toFixed(2)} ${units[i]}`;
+}
+
+/**
+ * Page through every object in the configured R2 bucket.
+ * Reuses the same S3 client setup as the orphan-audit script and
+ * StorageService (endpoint + access key + secret key from config).
+ */
+async function listAllObjects(client: S3Client, bucket: string): Promise<R2Obj[]> {
+  const objects: R2Obj[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const res = await client.send(
+      new ListObjectsV2Command({ Bucket: bucket, ContinuationToken: continuationToken })
+    );
+    for (const obj of res.Contents ?? []) {
+      if (obj.Key)
+        objects.push({ key: obj.Key, size: obj.Size ?? 0, lastModified: obj.LastModified });
+    }
+    continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return objects;
+}
+
+/**
+ * Walk every image-bearing column in the schema and return the complete
+ * set of R2 keys that are currently referenced by at least one live row.
+ *
+ * MUST mirror the reference set in:
+ *   - scripts/r2-orphan-audit.ts  collectReferencedKeys()
+ *   - apps/api/src/services/r2-cleanup.service.ts  isStillReferenced()
+ *
+ * Keep these three in sync when a new image column is added.
+ *
+ * Tables covered: productImage.url, productVariant.imageUrl,
+ * category.image, storePage.coverImage, blogPost.coverImage,
+ * store.(logo|logoAr|heroImage|ogImage|favicon|layoutSettings JSON),
+ * user.avatar.
+ *
+ * Each table is queried in its own withRlsBypass call so a slow table
+ * doesn't hold a single massive transaction open across the whole sweep.
+ * withRlsBypass is required on a cron path (no HTTP tenant context) so
+ * FORCE RLS policies don't filter cross-tenant rows to zero.
+ */
+async function collectReferencedKeys(): Promise<Set<string>> {
+  const keys = new Set<string>();
+
+  const add = (url: string | null | undefined): void => {
+    const key = urlToR2Key(url);
+    if (key) keys.add(key);
+  };
+
+  // Store brand images + layoutSettings JSON
+  const stores = await withRlsBypass(tx =>
+    tx.store.findMany({
+      select: {
+        logo: true,
+        logoAr: true,
+        favicon: true,
+        heroImage: true,
+        ogImage: true,
+        layoutSettings: true,
+      },
+    })
+  );
+  for (const s of stores) {
+    add(s.logo);
+    add(s.logoAr);
+    add(s.favicon);
+    add(s.heroImage);
+    add(s.ogImage);
+    // layoutSettings JSON may embed slide/banner image URLs
+    for (const url of collectUrlsFromJson(s.layoutSettings)) add(url);
+  }
+
+  // Store CMS pages: cover image
+  const pages = await withRlsBypass(tx => tx.storePage.findMany({ select: { coverImage: true } }));
+  for (const p of pages) add(p.coverImage);
+
+  // Blog posts: cover image
+  const blogPosts = await withRlsBypass(tx =>
+    tx.blogPost.findMany({ select: { coverImage: true } })
+  );
+  for (const b of blogPosts) add(b.coverImage);
+
+  // Categories: cover image
+  const categories = await withRlsBypass(tx => tx.category.findMany({ select: { image: true } }));
+  for (const c of categories) add(c.image);
+
+  // Product gallery images
+  const productImages = await withRlsBypass(tx =>
+    tx.productImage.findMany({ select: { url: true } })
+  );
+  for (const pi of productImages) add(pi.url);
+
+  // Product variant images
+  const variants = await withRlsBypass(tx =>
+    tx.productVariant.findMany({ select: { imageUrl: true } })
+  );
+  for (const v of variants) add(v.imageUrl);
+
+  // User avatars
+  const users = await withRlsBypass(tx => tx.user.findMany({ select: { avatar: true } }));
+  for (const u of users) add(u.avatar);
+
+  return keys;
+}
+
+export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'r2-orphan-sweep',
+    name: 'R2 orphan sweep (weekly cron, report-only by default)',
+    retries: 1,
+    concurrency: { limit: 1 },
+    triggers: [{ cron: '0 4 * * 0' }], // Sunday 04:00 UTC
+  },
+  async ({ step }) => {
+    // ── Guard: storage must be configured ────────────────────────────────
+    if (!config.storageEndpoint || !config.storageAccessKey || !config.storageSecretKey) {
+      logger.info('r2-orphan-sweep: storage not configured — skipping');
+      return { skipped: true, reason: 'storage not configured' };
+    }
+
+    const bucket = config.storageBucket || 'uploads';
+
+    // R2_ORPHAN_SWEEP_APPLY=true enables deletion — any other value stays
+    // in report-only mode. Default OFF for safety.
+    const applyDeletes = process.env.R2_ORPHAN_SWEEP_APPLY === 'true';
+
+    const client = new S3Client({
+      endpoint: config.storageEndpoint,
+      region: 'auto',
+      credentials: {
+        accessKeyId: config.storageAccessKey,
+        secretAccessKey: config.storageSecretKey,
+      },
+      forcePathStyle: true,
+    });
+
+    // ── Step 1: list R2 bucket ────────────────────────────────────────────
+    const objects = await step.run('list-r2-objects', () => listAllObjects(client, bucket));
+    logger.info({ count: objects.length, bucket }, 'r2-orphan-sweep: listed R2 objects');
+
+    // ── Step 2: collect DB-referenced keys ───────────────────────────────
+    const referenced = await step.run('collect-referenced-keys', () => collectReferencedKeys());
+    logger.info({ count: referenced.size }, 'r2-orphan-sweep: collected referenced keys from DB');
+
+    // ── Step 3: compute orphans ───────────────────────────────────────────
+    const now = Date.now();
+    const orphans: string[] = [];
+    let totalBytes = 0;
+    let orphanBytes = 0;
+    let skippedYoung = 0;
+
+    for (const obj of objects) {
+      totalBytes += obj.size;
+      if (referenced.has(obj.key)) continue;
+      // Skip objects younger than 24 h — the DB row may not have landed yet
+      // (upload-to-DB write is not atomic; protecting against that race).
+      const ageMs = obj.lastModified ? now - obj.lastModified.getTime() : Infinity;
+      if (ageMs < MIN_AGE_MS) {
+        skippedYoung++;
+        continue;
+      }
+      orphans.push(obj.key);
+      orphanBytes += obj.size;
+    }
+
+    const summary = {
+      totalKeys: objects.length,
+      totalBytes,
+      orphanCount: orphans.length,
+      orphanBytes,
+      skippedYoung,
+      applyDeletes,
+    };
+
+    logger.info(summary, 'r2-orphan-sweep: computed orphans');
+
+    // ── Step 4: optional batch delete ────────────────────────────────────
+    let deleted = 0;
+    if (applyDeletes && orphans.length > 0) {
+      deleted = await step.run('delete-orphans', async () => {
+        let count = 0;
+        for (let i = 0; i < orphans.length; i += DELETE_BATCH) {
+          const slice = orphans.slice(i, i + DELETE_BATCH);
+          await client.send(
+            new DeleteObjectsCommand({
+              Bucket: bucket,
+              Delete: { Objects: slice.map(Key => ({ Key })), Quiet: true },
+            })
+          );
+          count += slice.length;
+          logger.info(
+            { deleted: count, total: orphans.length },
+            'r2-orphan-sweep: batch delete progress'
+          );
+        }
+        return count;
+      });
+      logger.info({ deleted }, 'r2-orphan-sweep: apply-delete complete');
+    }
+
+    // ── Step 5: send alert summary ────────────────────────────────────────
+    if (orphans.length > 0 || applyDeletes) {
+      const sample = orphans.slice(0, ALERT_SAMPLE);
+      const moreCount = orphans.length - sample.length;
+      const lines = [
+        `Orphans found: ${orphans.length} (${formatBytes(orphanBytes)})`,
+        `Total bucket: ${objects.length} objects (${formatBytes(totalBytes)})`,
+        `Skipped (< 24 h): ${skippedYoung}`,
+        applyDeletes ? `Deleted: ${deleted}` : 'Mode: REPORT ONLY (R2_ORPHAN_SWEEP_APPLY not set)',
+        '',
+        'Sample orphan keys:',
+        ...sample.map(k => `  ${k}`),
+        ...(moreCount > 0 ? [`  …and ${moreCount} more`] : []),
+      ];
+
+      void sendAlert({
+        level: orphans.length > 100 ? 'p1' : 'info',
+        scope: 'platform',
+        source: 'r2-orphan-sweep',
+        title: `R2 orphan sweep: ${orphans.length} orphan object${
+          orphans.length === 1 ? '' : 's'
+        } found`,
+        body: lines.join('\n'),
+      });
+    } else {
+      logger.info('r2-orphan-sweep: no orphans found — bucket is clean');
+    }
+
+    return { ...summary, deleted };
+  }
+);

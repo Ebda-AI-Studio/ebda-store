@@ -51,25 +51,52 @@ export function urlToR2Key(url: string | null | undefined): string | null {
  * True when at least one live row anywhere in the schema still
  * references this URL. Checks every table that the orphan-audit script
  * tracks — keep in sync when a new image-bearing column is added.
+ *
+ * Tables covered: productImage.url, productVariant.imageUrl,
+ * category.image, storePage.coverImage, blogPost.coverImage,
+ * store.(logo|logoAr|heroImage|ogImage|favicon), user.avatar.
  */
 async function isStillReferenced(url: string): Promise<boolean> {
   // Run all the existence checks in parallel; any single match is
   // enough to abort the delete. Using `findFirst` + `select: { id }`
   // keeps each query as a one-row index probe.
-  const [pi, pv, cat, page, storeLogo, storeLogoAr, storeHero, storeOg, storeFavicon] =
-    await Promise.all([
-      prisma.productImage.findFirst({ where: { url }, select: { id: true } }),
-      prisma.productVariant.findFirst({ where: { imageUrl: url }, select: { id: true } }),
-      prisma.category.findFirst({ where: { image: url }, select: { id: true } }),
-      prisma.storePage.findFirst({ where: { coverImage: url }, select: { id: true } }),
-      prisma.store.findFirst({ where: { logo: url }, select: { id: true } }),
-      prisma.store.findFirst({ where: { logoAr: url }, select: { id: true } }),
-      prisma.store.findFirst({ where: { heroImage: url }, select: { id: true } }),
-      prisma.store.findFirst({ where: { ogImage: url }, select: { id: true } }),
-      prisma.store.findFirst({ where: { favicon: url }, select: { id: true } }),
-    ]);
+  const [
+    pi,
+    pv,
+    cat,
+    page,
+    blog,
+    storeLogo,
+    storeLogoAr,
+    storeHero,
+    storeOg,
+    storeFavicon,
+    userAvatar,
+  ] = await Promise.all([
+    prisma.productImage.findFirst({ where: { url }, select: { id: true } }),
+    prisma.productVariant.findFirst({ where: { imageUrl: url }, select: { id: true } }),
+    prisma.category.findFirst({ where: { image: url }, select: { id: true } }),
+    prisma.storePage.findFirst({ where: { coverImage: url }, select: { id: true } }),
+    prisma.blogPost.findFirst({ where: { coverImage: url }, select: { id: true } }),
+    prisma.store.findFirst({ where: { logo: url }, select: { id: true } }),
+    prisma.store.findFirst({ where: { logoAr: url }, select: { id: true } }),
+    prisma.store.findFirst({ where: { heroImage: url }, select: { id: true } }),
+    prisma.store.findFirst({ where: { ogImage: url }, select: { id: true } }),
+    prisma.store.findFirst({ where: { favicon: url }, select: { id: true } }),
+    prisma.user.findFirst({ where: { avatar: url }, select: { id: true } }),
+  ]);
   return Boolean(
-    pi || pv || cat || page || storeLogo || storeLogoAr || storeHero || storeOg || storeFavicon
+    pi ||
+    pv ||
+    cat ||
+    page ||
+    blog ||
+    storeLogo ||
+    storeLogoAr ||
+    storeHero ||
+    storeOg ||
+    storeFavicon ||
+    userAvatar
   );
 }
 

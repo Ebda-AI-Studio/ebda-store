@@ -170,6 +170,11 @@ async function collectReferencedKeys(
     // imageUrl column not present yet — nothing to do.
   }
 
+  // Blog posts: cover image. Without this, an --apply run would falsely
+  // delete blog covers that are genuinely referenced. MUST be included.
+  const blogPosts = await prisma.blogPost.findMany({ select: { coverImage: true } });
+  for (const b of blogPosts) add(b.coverImage);
+
   // Users: avatar (used by both customers and admins)
   const users = await prisma.user.findMany({ select: { avatar: true } });
   for (const u of users) add(u.avatar);

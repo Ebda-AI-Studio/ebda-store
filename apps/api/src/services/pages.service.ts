@@ -129,7 +129,9 @@ export function renderBlocksToHtml(blocks: unknown): string {
         if (!url.trim()) break;
         const alt = escapeHtml(typeof b.alt === 'string' ? b.alt : '');
         out.push(
-          `<figure class="cms-image"><img src="${safeUrl(url)}" alt="${alt}" loading="lazy" /></figure>`
+          `<figure class="cms-image"><img src="${safeUrl(
+            url
+          )}" alt="${alt}" loading="lazy" /></figure>`
         );
         break;
       }
@@ -141,7 +143,9 @@ export function renderBlocksToHtml(blocks: unknown): string {
         const isExternal = /^https?:/i.test(url.trim());
         const target = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
         out.push(
-          `<p class="cms-button-row"><a class="cms-button" href="${safeUrl(url)}"${target}>${label}</a></p>`
+          `<p class="cms-button-row"><a class="cms-button" href="${safeUrl(
+            url
+          )}"${target}>${label}</a></p>`
         );
         break;
       }
@@ -309,12 +313,24 @@ export class PagesService {
    */
   static async remove(storeId: string, slugRaw: string) {
     const slug = normalizeSlug(slugRaw);
+    // Fetch coverImage BEFORE delete so we can clean up R2 after
+    // commit — mirrors BlogService.remove.
+    const existing = await prisma.storePage.findUnique({
+      where: { storeId_slug: { storeId, slug } },
+      select: { coverImage: true },
+    });
     try {
       await prisma.storePage.delete({
         where: { storeId_slug: { storeId, slug } },
       });
     } catch {
       // P2025 = record not found. Treat as idempotent delete.
+      return;
+    }
+    if (existing?.coverImage) {
+      void deleteR2ObjectIfOrphan(existing.coverImage).catch(err =>
+        logger.warn({ err, storeId, slug }, '[pages.remove] r2 cleanup failed')
+      );
     }
   }
 }
