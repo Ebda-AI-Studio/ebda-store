@@ -225,7 +225,7 @@ export default function MinimalHeader({
         {/* Mobile persistent search bar — always visible under the logo
             row on mobile (pecannbee target layout). Hidden on lg+ where
             the expandable search-toggle in the actions row handles it. */}
-        <div className="lg:hidden pb-3" data-zone="mobile-search">
+        <div className="hidden pb-3" data-zone="mobile-search">
           <form onSubmit={handleSearch} className="relative">
             <svg
               className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-4 h-4 text-muted-foreground pointer-events-none`}

@@ -292,7 +292,7 @@ export default function ClassicHeader({
       {/* Mobile persistent search bar — pecannbee target layout. Always
           visible under the main header row on mobile so customers don't
           have to open the menu to search. Hidden on md+. */}
-      <div className="md:hidden border-t border-border/40 py-3" data-zone="mobile-search">
+      <div className="hidden border-t border-border/40 py-3" data-zone="mobile-search">
         <form onSubmit={handleSearch} className="relative container mx-auto px-4">
           <svg
             className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-7' : 'left-7'} w-5 h-5 text-muted-foreground pointer-events-none`}
