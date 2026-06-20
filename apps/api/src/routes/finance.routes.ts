@@ -42,6 +42,35 @@ import {
 
 const router = Router({ mergeParams: true });
 
+/**
+ * Parse a finance date-range query param into a VALID Date.
+ *
+ * Accepts both shapes callers actually send: date-only `YYYY-MM-DD` and full
+ * ISO timestamps (the admin client sends `Date.toISOString()`, e.g.
+ * `2026-06-01T00:00:00.000Z`). For date-only values it pins the requested day
+ * boundary; full ISO values are used as-is.
+ *
+ * Crucially it never returns an Invalid Date: an absent / unparseable value
+ * falls back to `fallback`. This guards the whole finance surface — an invalid
+ * Date used to reach `trialBalance` and 500 the dashboard, first as Prisma's
+ * "Could not convert from JSON date object to PrismaValue", then (after the
+ * raw-SQL fix) as `RangeError: Invalid time value` on `.toISOString()`. The
+ * original break: the dashboard appended `T23:59:59` to an already-full ISO
+ * string, producing `...000ZT23:59:59` → Invalid Date.
+ */
+export function parseFinanceDate(
+  value: unknown,
+  fallback: Date,
+  boundary: 'start' | 'end' = 'start'
+): Date {
+  if (value === undefined || value === null || value === '') return fallback;
+  const s = String(value);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s)
+    ? new Date(`${s}T${boundary === 'end' ? '23:59:59.999' : '00:00:00.000'}`)
+    : new Date(s);
+  return Number.isNaN(d.getTime()) ? fallback : d;
+}
+
 // ─── GET /:storeId/finance/accounts ──────────────────────────────────────────
 
 /**
@@ -392,7 +421,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : undefined;
+      const asOf = req.query.asOf ? parseFinanceDate(req.query.asOf, new Date(), 'end') : undefined;
       const data = await runInTenantContext(req.params.storeId, () =>
         trialBalance(req.params.storeId, asOf)
       );
@@ -418,10 +447,12 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const from = new Date(
-        String(req.query.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      const from = parseFinanceDate(
+        req.query.from,
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        'start'
       );
-      const to = new Date(String(req.query.to ?? new Date().toISOString()));
+      const to = parseFinanceDate(req.query.to, new Date(), 'end');
       const raw = await runInTenantContext(req.params.storeId, () =>
         profitAndLoss(req.params.storeId, from, to)
       );
@@ -473,7 +504,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : new Date();
+      const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end');
       const raw = await runInTenantContext(req.params.storeId, () =>
         balanceSheet(req.params.storeId, asOf)
       );
@@ -531,8 +562,8 @@ router.get(
       // Allow caller to override the P&L window via from/to query params.
       // Both are expected as YYYY-MM-DD strings (date-only, local midnight).
       // When omitted, the endpoint falls back to current-month behaviour.
-      const from = req.query.from ? new Date(String(req.query.from) + 'T00:00:00') : monthStart;
-      const to = req.query.to ? new Date(String(req.query.to) + 'T23:59:59') : now;
+      const from = parseFinanceDate(req.query.from, monthStart, 'start');
+      const to = parseFinanceDate(req.query.to, now, 'end');
 
       const data = await runInTenantContext(req.params.storeId, async () => {
         const [pnl, bs, stockValueRows] = await Promise.all([
@@ -585,7 +616,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : undefined;
+      const asOf = req.query.asOf ? parseFinanceDate(req.query.asOf, new Date(), 'end') : undefined;
       const rows = await runInTenantContext(req.params.storeId, () =>
         trialBalance(req.params.storeId, asOf)
       );
@@ -626,10 +657,12 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const from = new Date(
-        String(req.query.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      const from = parseFinanceDate(
+        req.query.from,
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        'start'
       );
-      const to = new Date(String(req.query.to ?? new Date().toISOString()));
+      const to = parseFinanceDate(req.query.to, new Date(), 'end');
       const raw = await runInTenantContext(req.params.storeId, () =>
         profitAndLoss(req.params.storeId, from, to)
       );
@@ -688,7 +721,7 @@ router.get(
   requireFeature('accounting.basic'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : new Date();
+      const asOf = parseFinanceDate(req.query.asOf, new Date(), 'end');
       const raw = await runInTenantContext(req.params.storeId, () =>
         balanceSheet(req.params.storeId, asOf)
       );
