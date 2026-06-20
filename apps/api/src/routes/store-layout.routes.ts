@@ -377,7 +377,14 @@ const layoutSchemaInternal = z
       .object({
         enabled: z.boolean().optional(),
         layout: z.enum(['horizontal', 'vertical']).optional(),
+        // `size`, `iconColor`, `iconBgColor` were missing here. This schema has
+        // no .passthrough(), so the parse step silently stripped them on every
+        // PUT — the icon-color controls never persisted (saved layout had the
+        // fields gone, so storefront + post-save preview showed nothing).
+        size: z.enum(['sm', 'md', 'lg']).optional(),
         bgColor: colorValue,
+        iconColor: colorValue,
+        iconBgColor: colorValue,
         typography: sectionTypographyOverride,
         dividers: sectionDividers,
         ...sectionPaddingMaxWidthVisibility,

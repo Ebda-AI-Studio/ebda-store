@@ -1465,7 +1465,7 @@
       },
       "logoSize": {
         "title": "Logo size",
-        "hint": "How big your logo appears in the header. Auto fits each logo to its own shape; pick S / M / L to nudge it. Affects only this store.",
+        "hint": "How big your logo appears in the header. Auto fits each logo to its shape. M is the default size (same as Auto) — pick S to make it smaller or L for bigger. Affects only this store.",
         "auto": "Auto",
         "sm": "S",
         "md": "M",

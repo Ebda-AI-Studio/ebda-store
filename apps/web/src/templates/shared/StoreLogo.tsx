@@ -12,7 +12,11 @@ type LogoSize = 'auto' | 'sm' | 'md' | 'lg';
  * own logo without touching any other store (the old shared Tailwind class made
  * shrinking one store's logo shrink every store's).
  */
-const SIZE_MULT: Record<Exclude<LogoSize, 'auto'>, number> = { sm: 0.82, md: 1, lg: 1.22 };
+// `md` is the neutral default (1.0× = same as `auto` for most logos), so picking
+// "Medium" intentionally looks like the baseline. `sm`/`lg` carry a wide enough
+// delta (±30%) that the change is unmistakable — the earlier ±18% range read as
+// "the control does nothing". Merchants who want a smaller mark pick `sm`.
+const SIZE_MULT: Record<Exclude<LogoSize, 'auto'>, number> = { sm: 0.7, md: 1, lg: 1.3 };
 
 /**
  * Base bounding box (the platform default before this component): mobile h-14
