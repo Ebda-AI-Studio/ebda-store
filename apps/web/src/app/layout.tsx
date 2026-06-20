@@ -153,16 +153,11 @@ export async function generateMetadata(): Promise<Metadata> {
       ? `${localizedStoreName} - تسوق أونلاين في الكويت`
       : `${localizedStoreName} - Online Shopping in Kuwait`);
 
-  // Resolve the og:image entry: prefer admin-configured ogImage or store logo
-  // (both are absolute R2 https URLs). Falls back to the generated /opengraph-image
-  // route (branded 1200×630 card via next/og) when neither is available.
-  // resolveStoreOgImage rejects any non-https URL so WhatsApp never gets a
-  // broken or relative URL — see apps/web/src/lib/seo/og-image.ts for details.
-  const ogImageEntry = resolveStoreOgImage(
-    store.ogImage || store.logo,
-    siteUrl,
-    localizedStoreName
-  );
+  // Resolve the og:image entry: use the merchant's explicit raster ogImage when
+  // set, else the store-aware `/og?slug=<slug>` card (renders the store's logo
+  // or name). The slug is REQUIRED for path-based storefronts — without it the
+  // card resolves to the platform-default "Force" store. See og-image.ts.
+  const ogImageEntry = resolveStoreOgImage(store.ogImage, siteUrl, localizedStoreName, store.slug);
 
   // Normalize Twitter handle to leading-@ form expected by Twitter card meta.
   const twitterHandle = store.twitterHandle

@@ -23,29 +23,41 @@ export interface OgImageEntry {
   alt: string;
 }
 
+/** Raster image extensions WhatsApp/social scrapers can render directly. */
+const RASTER_EXT = /\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i;
+
 /**
  * Resolve the best og:image URL for a store-level page.
  *
  * Priority order:
- * 1. `rawUrl` (store.ogImage or store.logo) — if it is an absolute https URL
- * 2. Fallback: the `/opengraph-image` route on `siteUrl`, which generates a
- *    branded 1200×630 card via `next/og` `ImageResponse`
+ * 1. `ogImage` — the merchant's EXPLICITLY-uploaded social card, but only when
+ *    it is an absolute https RASTER (png/jpg/webp/gif/avif). A designed 1200×630
+ *    card should be used verbatim. (SVG / non-https values are ignored here —
+ *    Satori can't <img> an SVG, and the generated card rasterizes it instead.)
+ * 2. Fallback: the store-aware `/og?slug=<slug>` card route, which renders the
+ *    store's logo (raster or SVG-rasterized) or name on the brand color.
  *
- * The fallback guarantees a non-blank social preview even for stores with no
- * logo uploaded. The generated card uses the store's brand color and name.
+ * Passing the slug is what fixes path-based storefronts: the old fixed
+ * `/opengraph-image` URL carried no store identity, so WhatsApp's fetch resolved
+ * to the platform-default "Force" card. `/og?slug=<slug>` always renders the
+ * right store. When `slug` is absent the card route falls back to the
+ * host-resolved store (custom domains).
  *
- * @param rawUrl   - Store logo or OG image URL (may be undefined or non-https)
+ * @param ogImage  - Merchant's explicit og image URL (store.ogImage)
  * @param siteUrl  - Canonical store base URL (e.g. "https://wadyaljuz.com")
  * @param alt      - Alt text / store name for accessibility and screen readers
+ * @param slug     - Store slug, threaded into the generated-card fallback URL
  */
 export function resolveStoreOgImage(
-  rawUrl: string | null | undefined,
+  ogImage: string | null | undefined,
   siteUrl: string,
-  alt: string
+  alt: string,
+  slug?: string | null
 ): OgImageEntry {
-  // Only accept absolute https URLs — relative paths and http URLs are rejected
-  // because WhatsApp's scraper silently drops non-https og:image values.
-  const url = rawUrl && rawUrl.startsWith('https://') ? rawUrl : `${siteUrl}/opengraph-image`;
+  const useExplicit = !!ogImage && ogImage.startsWith('https://') && RASTER_EXT.test(ogImage);
+  const url = useExplicit
+    ? (ogImage as string)
+    : `${siteUrl}/og${slug ? `?slug=${encodeURIComponent(slug)}` : ''}`;
 
   return { url, width: OG_IMAGE_WIDTH, height: OG_IMAGE_HEIGHT, alt };
 }

@@ -466,9 +466,16 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
 }
 
 /**
- * Resolve store by slug from cache or API
+ * Resolve store by slug from cache or API.
+ *
+ * Exported so the OG-card route (`/og?slug=…`) can resolve a SPECIFIC store
+ * independent of request headers. The old file-convention `/opengraph-image`
+ * route could only ever see the platform-default store for path-based
+ * storefronts (`store.forcemediakw.com/<slug>`) — WhatsApp fetches the image URL
+ * with no `/<slug>` path context, so every path-based store's social preview
+ * fell back to the Force default card. A slug-parameterised route fixes that.
  */
-async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | null> {
+export async function resolveStoreBySlug(slug: string): Promise<ResolvedStore | null> {
   const cacheKey = `slug:${slug}`;
   const cached = storeCache.get(cacheKey);
   if (cached && cached.expires > Date.now()) {

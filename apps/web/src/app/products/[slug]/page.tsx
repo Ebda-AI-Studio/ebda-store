@@ -79,7 +79,7 @@ export async function generateMetadata({
       return { title: 'Product Not Found' };
     }
 
-    return buildProductMetadata(product, store.name);
+    return buildProductMetadata(product, store.name, store.slug);
   } catch {
     // On any fetch error, return minimal metadata
     return { title: 'Product' };
@@ -99,7 +99,11 @@ interface ProductData {
   categories?: Array<{ category?: { name?: string } }>;
 }
 
-function buildProductMetadata(product: ProductData, storeName: string): Metadata {
+function buildProductMetadata(
+  product: ProductData,
+  storeName: string,
+  storeSlug?: string
+): Metadata {
   const title = product.name;
   // AEO > SEO > plain description (truncated to 160 chars for meta tag).
   const rawDescription = pickMetaDescription(product) || product.description;
@@ -109,6 +113,22 @@ function buildProductMetadata(product: ProductData, storeName: string): Metadata
   const ogImage = product.images?.[0]?.url;
   const category = product.categories?.[0]?.category?.name;
 
+  // og:image — the product photo when present, else the store-aware OG card
+  // (`/og?slug=`, resolved against the layout's metadataBase) so an imageless
+  // product still gets the store's branded preview instead of a blank card.
+  const ogImages = ogImage
+    ? [{ url: ogImage, alt: product.name }]
+    : storeSlug
+      ? [
+          {
+            url: `/og?slug=${encodeURIComponent(storeSlug)}`,
+            width: 1200,
+            height: 630,
+            alt: storeName,
+          },
+        ]
+      : [];
+
   return {
     title,
     description,
@@ -116,7 +136,7 @@ function buildProductMetadata(product: ProductData, storeName: string): Metadata
       title: `${title} | ${storeName}`,
       description,
       type: 'website',
-      ...(ogImage ? { images: [{ url: ogImage, alt: product.name }] } : {}),
+      ...(ogImages.length ? { images: ogImages } : {}),
     },
     other: {
       ...(category ? { 'product:category': category } : {}),

@@ -33,18 +33,14 @@ export function PoweredByForce() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Powered by Force AI"
-        className="inline-flex items-center gap-1.5 align-middle hover:opacity-80 transition-opacity"
+        className="inline-flex items-center gap-1 align-middle hover:opacity-80 transition-opacity"
       >
+        {/* "Powered by Force AI" as a text wordmark — the raw /logo.svg mark read
+            as a stray orange box in the footer. "Force AI" is set in the brand
+            orange + semibold so it reads as an intentional wordmark, while
+            "Powered by" stays muted (inherited) so it reads as attribution. */}
         <span>{t('Powered by', 'مدعوم من')}</span>
-        {/* Force AI brand mark (the orange Force logo) instead of the "Force AI"
-            wordmark text — same asset PlatformLanding uses, sized to the line. */}
-        <img
-          src="/logo.svg"
-          alt="Force AI"
-          className="inline-block h-4 w-auto sm:h-5"
-          loading="lazy"
-          decoding="async"
-        />
+        <span className="font-semibold text-[#ff6e01]">Force AI</span>
       </a>
     </div>
   );

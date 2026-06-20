@@ -33,13 +33,27 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const post = await fetchPost(store.id, slug);
   if (!post) return { title: 'Not found' };
   const description = post.excerpt ?? post.title;
+  // og:image — the post cover when present, else the store-aware OG card so an
+  // imageless post still gets the store's branded preview (not a blank card).
+  const ogImages = post.coverImage
+    ? [post.coverImage]
+    : store.slug
+      ? [
+          {
+            url: `/og?slug=${encodeURIComponent(store.slug)}`,
+            width: 1200,
+            height: 630,
+            alt: store.name,
+          },
+        ]
+      : [];
   return {
     title: post.title,
     description,
     openGraph: {
       title: post.title,
       description: post.excerpt ?? '',
-      images: post.coverImage ? [post.coverImage] : [],
+      images: ogImages,
       type: 'article',
     },
     alternates: { canonical: `/blog/${slug}` },
