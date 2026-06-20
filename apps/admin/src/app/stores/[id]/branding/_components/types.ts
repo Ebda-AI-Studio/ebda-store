@@ -53,6 +53,9 @@ export interface StoreTheme {
    *  aspect ratio; sm/md/lg nudge the box. Default 'auto'. Mirrors the
    *  @force/shared StoreTheme field consumed by the storefront StoreLogo. */
   logoSize?: 'auto' | 'sm' | 'md' | 'lg';
+  /** Show the virtual Best Sellers tile in the homepage category strip
+   *  (default true). Toggled on the Categories page beside the cover. */
+  showBestSellersTile?: boolean;
   /** Footer-specific logo URL — overrides branding.logo on the storefront
    *  footer when set. Ahmad 2026-05-20: for dark footers needing a white logo. */
   footerLogo?: string;

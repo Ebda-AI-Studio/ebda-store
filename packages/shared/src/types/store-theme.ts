@@ -198,6 +198,18 @@ export interface StoreTheme {
   logoSize?: 'auto' | 'sm' | 'md' | 'lg';
 
   /**
+   * Show the virtual "Best Sellers" tile in the homepage category strip.
+   * Default `true`. The tile is synthesized by the API (`slug: 'best-sellers'`)
+   * whenever ≥1 product is flagged as a best seller — it has no Category row,
+   * so the per-category `showOnHomeStrip` flag can't hide it. This flag is the
+   * equivalent control for that virtual tile. When `false`, the homepage strip
+   * omits it; the Best Sellers product carousel ("scroll") and the
+   * `/products?category=best-sellers` listing are unaffected. Edited on the
+   * Categories admin page, beside the Best Sellers cover.
+   */
+  showBestSellersTile?: boolean;
+
+  /**
    * Footer logo override (R2 URL). When set, the storefront footer uses this
    * image instead of `branding.logo`. Useful when the footer has a dark bg
    * and the main logo doesn't read well — merchant uploads a white/inverted

@@ -226,8 +226,14 @@ export function HomePageContent({
   // Homepage category strip: only categories the merchant left visible
   // (showOnHomeStrip !== false). Hiding a category here never affects its
   // collection page, nav, or product filters — those use the full list.
+  // The virtual "Best Sellers" tile (slug 'best-sellers', synthesized by the
+  // API) has no Category row, so it can't carry showOnHomeStrip — gate it on
+  // the store-level `showBestSellersTile` theme flag instead (default true).
+  // Hiding it here leaves the Best Sellers carousel + listing page untouched.
+  const hideBestSellersTile = store.theme?.showBestSellersTile === false;
   const templateCategories = categories
     .filter(c => c.showOnHomeStrip !== false)
+    .filter(c => !(hideBestSellersTile && c.slug === 'best-sellers'))
     .map(toTemplateCategory);
 
   // Hero customization. Read from the StoreContext store — single source of

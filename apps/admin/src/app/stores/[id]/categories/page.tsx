@@ -76,6 +76,38 @@ export default function StoreCategoriesPage() {
   const [bestSellersImage, setBestSellersImage] = useState<string | null>(null);
   const [savingBestSellersImage, setSavingBestSellersImage] = useState(false);
 
+  // Show the virtual Best Sellers tile in the homepage category strip. Lives on
+  // the StoreTheme JSON (`showBestSellersTile`, default true) — the tile has no
+  // Category row, so the per-category showOnHomeStrip flag can't reach it. The
+  // storefront omits the tile when this is false; the Best Sellers carousel +
+  // listing page are unaffected.
+  const [showBestSellersTile, setShowBestSellersTile] = useState(true);
+  const [savingShowBestSellersTile, setSavingShowBestSellersTile] = useState(false);
+
+  const saveShowBestSellersTile = useCallback(
+    async (next: boolean) => {
+      if (!storeId) return;
+      const previous = showBestSellersTile;
+      setShowBestSellersTile(next); // optimistic
+      setSavingShowBestSellersTile(true);
+      try {
+        // Server shallow-merges theme — send only the key this surface owns.
+        const { error: apiError } = await apiPut(`/api/v1/stores/${storeId}/theme`, {
+          showBestSellersTile: next,
+        });
+        if (apiError) {
+          setShowBestSellersTile(previous); // revert on failure
+          showError(t('errorTitle'), apiError.message ?? '');
+          return;
+        }
+        toastSuccess(next ? 'Best Sellers tile shown' : 'Best Sellers tile hidden');
+      } finally {
+        setSavingShowBestSellersTile(false);
+      }
+    },
+    [storeId, showBestSellersTile, showError, toastSuccess, t]
+  );
+
   const fetchBestSellersImage = useCallback(async () => {
     if (!storeId) return;
     const { data } = await apiGet<{ image: string | null }>(
@@ -138,14 +170,19 @@ export default function StoreCategoriesPage() {
   useEffect(() => {
     fetchCategories();
     fetchBestSellersImage();
-    // Fetch store template for per-theme upload-size hint (non-critical).
+    // Fetch store template (upload-size hint) + the Best Sellers tile flag
+    // (non-critical). Both ride the same store GET.
     if (storeId) {
-      apiGet<{ store: { template?: TemplateId } }>(`/api/v1/admin/stores/${storeId}`)
+      apiGet<{ store: { template?: TemplateId; theme?: { showBestSellersTile?: boolean } } }>(
+        `/api/v1/admin/stores/${storeId}`
+      )
         .then(({ data }) => {
           if (data?.store?.template) setStoreTemplate(data.store.template);
+          // Default true — only an explicit false hides the tile.
+          setShowBestSellersTile(data?.store?.theme?.showBestSellersTile !== false);
         })
         .catch(() => {
-          // non-critical — falls back to base recommended size
+          // non-critical — falls back to base recommended size + tile shown
         });
     }
   }, [fetchCategories, fetchBestSellersImage, storeId]);
@@ -369,6 +406,36 @@ export default function StoreCategoriesPage() {
               recommendedSizeHint={recommendedSizeTextForTemplate('categorySquare', storeTemplate)}
             />
           </div>
+        </div>
+
+        {/* Show/hide the Best Sellers tile in the homepage category strip.
+            Lives on StoreTheme (showBestSellersTile) — the tile is virtual, so
+            it can't use the per-category "Show on homepage strip" toggle. The
+            Best Sellers product carousel and its listing page stay regardless. */}
+        <div className="mt-4 flex items-center justify-between gap-3 border-t pt-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Show on homepage strip</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Turn off to remove the Best Sellers card from the homepage category strip. The Best
+              Sellers carousel and its page stay.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showBestSellersTile}
+            disabled={savingShowBestSellersTile}
+            onClick={() => saveShowBestSellersTile(!showBestSellersTile)}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+              showBestSellersTile ? 'bg-primary' : 'bg-muted-foreground/30'
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                showBestSellersTile ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
         </div>
       </div>
 
