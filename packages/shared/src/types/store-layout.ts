@@ -628,6 +628,10 @@ export interface TrustStripSettings extends SectionBgOverride, SectionPaddingMax
    *  literal hsl/hex. When unset, falls back to `--primary` at 10% opacity
    *  (or the auto-contrast tint when a custom `bgColor` is set). */
   iconBgColor?: string;
+  /** Title + subtitle text color. Accepts a `token:<name>` brand token or a
+   *  literal hsl/hex. When unset, the labels use the auto-contrast foreground
+   *  (when a custom `bgColor` is set) or the default `--foreground` token. */
+  textColor?: string;
   typography?: SectionTypographyOverride;
   dividers?: SectionDividers;
 }

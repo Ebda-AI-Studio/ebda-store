@@ -385,6 +385,7 @@ const layoutSchemaInternal = z
         bgColor: colorValue,
         iconColor: colorValue,
         iconBgColor: colorValue,
+        textColor: colorValue,
         typography: sectionTypographyOverride,
         dividers: sectionDividers,
         ...sectionPaddingMaxWidthVisibility,

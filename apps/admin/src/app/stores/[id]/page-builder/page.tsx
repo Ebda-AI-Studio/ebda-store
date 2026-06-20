@@ -4122,6 +4122,14 @@ function ExtraSectionCard({
               onChange={v => onPatch({ iconBgColor: v })}
               theme={theme}
             />
+            <ColorField
+              label="Text color"
+              value={
+                (settings as import('@force/shared').TrustStripSettings | undefined)?.textColor
+              }
+              onChange={v => onPatch({ textColor: v })}
+              theme={theme}
+            />
           </>
         )}
         {kind === 'blogCarousel' && (

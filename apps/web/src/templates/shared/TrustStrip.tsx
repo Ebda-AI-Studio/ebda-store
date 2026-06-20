@@ -138,6 +138,10 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
   const iconBgColor = settings?.iconBgColor
     ? resolveColor(settings.iconBgColor, store.theme)
     : undefined;
+  // Merchant-editable title/subtitle text color. Explicit pick wins over the
+  // auto-contrast foreground; falls back to the existing token classes when unset.
+  const textColor = settings?.textColor ? resolveColor(settings.textColor, store.theme) : undefined;
+  const textFgStyle = textColor ? ({ color: textColor } as React.CSSProperties) : autoFgStyle;
   const effectiveIconFg = iconColor ?? autoFg;
   // When no explicit circle color is given, derive a translucent tint of the
   // glyph color. `color-mix` works for ANY valid CSS color (hex, hsl, and
@@ -184,10 +188,10 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
                   />
                 </svg>
               </span>
-              <h3 className={titleClass} style={autoFgStyle}>
+              <h3 className={titleClass} style={textFgStyle}>
                 {isRtl ? item.titleAr : item.titleEn}
               </h3>
-              <p className={subClass} style={autoFgStyle}>
+              <p className={subClass} style={textFgStyle}>
                 {isRtl ? item.subAr : item.subEn}
               </p>
             </li>
