@@ -113,8 +113,8 @@ export async function generateTaxReport(
       ON e.id = l.entry_id
       AND e.status = 'posted'
       AND e.source = 'order'
-      AND e.posted_at >= $2
-      AND e.posted_at <= $3
+      AND e.posted_at >= $2::timestamp
+      AND e.posted_at <= $3::timestamp
       AND e.store_id = $1
     JOIN public.orders o
       ON o.id = e.source_id
@@ -125,8 +125,11 @@ export async function generateTaxReport(
     ORDER BY e.posted_at ASC, o.order_number ASC
     `,
     storeId,
-    from,
-    to
+    // Prisma 6.19 $queryRawUnsafe rejects JS Date objects — pass ISO strings.
+    // `posted_at` is `timestamp without time zone`, so the SQL casts the
+    // string params with `$n::timestamp` (no `timestamp >= text` operator).
+    from.toISOString(),
+    to.toISOString()
   );
 
   // ─── Build per-transaction rows ──────────────────────────────────────────────

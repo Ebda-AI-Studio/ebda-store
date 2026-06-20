@@ -109,9 +109,12 @@ export const auditLogArchive: InngestFunction.Any = inngest.createFunction(
         const result = await withRlsBypass(tx =>
           tx.$executeRawUnsafe<number>(
             `DELETE FROM public.audit_logs WHERE id IN (
-               SELECT id FROM public.audit_logs WHERE created_at < $1 LIMIT ${DELETE_BATCH}
+               SELECT id FROM public.audit_logs WHERE created_at < $1::timestamp LIMIT ${DELETE_BATCH}
              )`,
-            cutoff
+            // Prisma 6.19 $executeRawUnsafe rejects JS Date objects — pass ISO
+            // string. `created_at` is `timestamp without time zone`, so cast
+            // the string param with `$1::timestamp` (no `timestamp < text`).
+            cutoff.toISOString()
           )
         );
         if (!result || result === 0) break;

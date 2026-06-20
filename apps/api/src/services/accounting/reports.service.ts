@@ -33,12 +33,19 @@ export async function trialBalance(storeId: string, asOf?: Date): Promise<TrialB
     LEFT JOIN public.journal_lines l ON l.account_id = a.id
     LEFT JOIN public.journal_entries e
       ON e.id = l.entry_id
-      AND e.status = 'posted'${asOf ? ' AND e.posted_at <= $2' : ''}
+      AND e.status = 'posted'${asOf ? ' AND e.posted_at <= $2::timestamp' : ''}
     WHERE a.store_id = $1
     GROUP BY a.id, a.code, a.name_en, a.name_ar, a.type
     ORDER BY a.code ASC
   `;
-  const params: unknown[] = asOf ? [storeId, asOf] : [storeId];
+  // Prisma 6.19 $queryRawUnsafe rejects JS Date objects ("Could not convert
+  // from JSON date object to PrismaValue"), so pass an ISO string. A bound
+  // string binds as `text`, and `posted_at` is `timestamp without time zone`
+  // (Prisma's default DateTime mapping) — there is no `timestamp >= text`
+  // operator, so the SQL casts the param explicitly with `$2::timestamp`.
+  // `.toISOString()` is UTC wall-clock; `'...Z'::timestamp` drops the Z to the
+  // same naive UTC value Prisma stores, so the comparison is unchanged.
+  const params: unknown[] = asOf ? [storeId, asOf.toISOString()] : [storeId];
 
   const rows = await prisma.$queryRawUnsafe<
     Array<{

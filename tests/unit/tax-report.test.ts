@@ -182,7 +182,7 @@ describe('generateTaxReport — basic aggregation', () => {
     expect(result.rows[1].date).toBe('2026-01-31');
   });
 
-  it('passes storeId, from, to as positional params to queryRawUnsafe', async () => {
+  it('passes storeId + ISO-string from/to as positional params to queryRawUnsafe', async () => {
     mockQueryRawUnsafe.mockResolvedValueOnce([]);
 
     await generateTaxReport(STORE_ID, { from: FROM, to: TO });
@@ -192,7 +192,9 @@ describe('generateTaxReport — basic aggregation', () => {
     expect(typeof sql).toBe('string');
     expect(sql).toContain("code = '2100'");
     expect(sid).toBe(STORE_ID);
-    expect(f).toBe(FROM);
-    expect(t).toBe(TO);
+    // Dates are serialized to ISO strings — Prisma 6.19 $queryRawUnsafe
+    // rejects raw JS Date objects.
+    expect(f).toBe(FROM.toISOString());
+    expect(t).toBe(TO.toISOString());
   });
 });
