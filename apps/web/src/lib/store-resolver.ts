@@ -170,17 +170,16 @@ const DEFAULT_STORE: ResolvedStore = {
   heroImage: null,
 };
 
-// Simple in-memory cache for store resolution.
-//
-// 2 minutes (down from 5) — short enough that admin-driven changes
-// (typography, Best Sellers cover, hero copy, theme, announcement
-// bar) feel responsive to the merchant, long enough that we're not
-// re-hitting the public store endpoint constantly and racking up
-// Vercel function invocations. The API itself caches the store
-// payload in Redis upstream, so the per-call cost is small either
-// way, but 2 min is the sweet spot for cost vs. perceived freshness.
+// Simple per-instance in-memory cache for store resolution — a hot-path
+// optimizer on top of Next's tagged data cache (the API purges that on save).
 const storeCache = new Map<string, { store: ResolvedStore; expires: number }>();
-const CACHE_TTL = 2 * 60 * 1000;
+// Short TTL (was 2 min). This per-instance in-memory layer is just a hot-path
+// optimizer on top of Next's tagged data cache. The API purges the data cache
+// on save via /api/revalidate (revalidateTag), so this small window is the only
+// residual staleness — keeping it low (8s) makes a merchant's theme/layout edit
+// appear on the storefront within a few seconds instead of up to 2 minutes.
+// In-memory (not Redis), so the <120s Redis-TTL-floor rule does not apply.
+const CACHE_TTL = 8 * 1000;
 
 /**
  * Get the store domain from request headers
@@ -212,7 +211,10 @@ export async function isPlatformDomain(): Promise<boolean> {
 async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null> {
   try {
     const response = await fetch(`${API_URL}/public/store/resolve`, {
-      next: { revalidate: 120 }, // 2-minute revalidate — paired with the in-memory storeCache TTL
+      // Tagged so the API can purge THIS store's cached resolve on save
+      // (POST /api/revalidate → revalidateTag). `revalidate` stays as a slow
+      // fallback for stores that never get an explicit purge.
+      next: { revalidate: 15, tags: [`store-domain:${domain}`] },
       headers: {
         'Content-Type': 'application/json',
         'x-store-domain': domain,
@@ -355,7 +357,7 @@ async function resolveStoreByDomain(domain: string): Promise<ResolvedStore | nul
 async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
   try {
     const response = await fetch(`${API_URL}/public/stores/${slug}`, {
-      next: { revalidate: 120 },
+      next: { revalidate: 15, tags: [`store-slug:${slug}`] },
       headers: { 'Content-Type': 'application/json' },
     });
 

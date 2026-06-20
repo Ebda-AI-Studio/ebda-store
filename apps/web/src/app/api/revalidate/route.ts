@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
+
+/**
+ * On-demand storefront cache purge. The API (Railway) calls this after a
+ * merchant saves theme / layout / branding so the change appears on the
+ * storefront within ~a second instead of waiting out the data-cache TTL.
+ *
+ * The store-resolver fetches are tagged `store-domain:<domain>` and
+ * `store-slug:<slug>`; this route purges those tags via `revalidateTag`, which
+ * invalidates Next's shared data cache across all instances. The per-instance
+ * in-memory `storeCache` (resolver) has a short TTL so it can't hold a change
+ * for more than a few seconds even on the instance that didn't serve this call.
+ *
+ * Auth: a shared `REVALIDATE_SECRET` (also set on the API). If the secret is
+ * unset on this deployment, the route refuses (503) rather than purging
+ * unauthenticated — it never silently accepts.
+ */
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: NextRequest) {
+  const secret = process.env.REVALIDATE_SECRET;
+  if (!secret) {
+    return NextResponse.json(
+      { ok: false, error: 'REVALIDATE_SECRET not configured' },
+      { status: 503 }
+    );
+  }
+
+  let body: { secret?: string; tags?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: 'invalid json' }, { status: 400 });
+  }
+
+  if (body.secret !== secret) {
+    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  }
+
+  const tags = Array.isArray(body.tags)
+    ? body.tags.filter((t): t is string => typeof t === 'string' && t.length > 0 && t.length < 200)
+    : [];
+  if (tags.length === 0 || tags.length > 10) {
+    return NextResponse.json({ ok: false, error: 'tags must be 1..10 strings' }, { status: 400 });
+  }
+
+  // Next 16 signature: revalidateTag(tag, profile). 'max' = purge across the
+  // longest cache-life. Wrapped defensively so an evolving cache-API quirk can
+  // never 500 this endpoint — the short fetch `revalidate` window is the floor
+  // either way.
+  for (const tag of tags) {
+    try {
+      revalidateTag(tag, 'max');
+    } catch (e) {
+      console.warn('[revalidate] revalidateTag failed for', tag, e);
+    }
+  }
+  return NextResponse.json({ ok: true, revalidated: tags });
+}

@@ -7,6 +7,7 @@ import logger from '../lib/logger';
 import { cleanupRemovedImages, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
+import { revalidateStorefront } from '../lib/revalidate-storefront';
 
 /**
  * Bust every public-cache entry that depends on a store record. The
@@ -18,11 +19,19 @@ import { seedCoaForStore } from './accounting/account.service';
  * caches for the same store. Cheap relative to the cost of serving
  * stale settings to a customer mid-purchase.
  */
-async function bustStoreCaches(storeId: string, slug: string | null): Promise<void> {
+async function bustStoreCaches(
+  storeId: string,
+  slug: string | null,
+  domain?: string | null
+): Promise<void> {
   await invalidateCached(`public:store:${storeId}`);
   if (slug) await invalidateCached(`public:store:${slug}`);
   await invalidateCached(`public:categories:${storeId}`);
   invalidateCachedPrefix(`public:products:${storeId}:`);
+  // Purge the storefront's Next data cache too (fire-and-forget, no-op if the
+  // STOREFRONT_REVALIDATE_URL / REVALIDATE_SECRET env pair isn't configured) so
+  // a merchant's edit shows on the live storefront within ~a second.
+  revalidateStorefront({ slug, domain });
 }
 
 interface CreateStoreData {
@@ -286,7 +295,7 @@ export class StoreService {
       );
     }
 
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
 
     if (data.heroImage !== undefined && previousHeroImage && previousHeroImage !== data.heroImage) {
       void deleteR2ObjectIfOrphan(previousHeroImage).catch(err =>
@@ -441,7 +450,7 @@ export class StoreService {
     }
 
     // Public-facing storefront caches too — same logic as updates.
-    await bustStoreCaches(storeId, store.slug);
+    await bustStoreCaches(storeId, store.slug, store.domain);
 
     // Reclaim R2 storage: every upload for this store is namespaced under
     // `stores/<storeId>/...`, so purge that whole prefix. Best-effort + AFTER
@@ -561,7 +570,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
   }
 
@@ -585,7 +594,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
   }
 
@@ -617,7 +626,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
 
     // Diff the three image fields and queue cleanup for any URL that
     // was replaced. `undefined` in the patch means "leave existing", so
@@ -659,7 +668,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
   }
 
@@ -694,7 +703,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
   }
 
@@ -719,7 +728,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
   }
 
@@ -744,7 +753,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
   }
 
@@ -787,7 +796,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
 
     if (seo.ogImage !== undefined && previousOgImage && previousOgImage !== seo.ogImage) {
       void deleteR2ObjectIfOrphan(previousOgImage).catch(err =>
@@ -834,7 +843,7 @@ export class StoreService {
     });
 
     await StoreService.invalidateCache(store);
-    await bustStoreCaches(updatedStore.id, updatedStore.slug);
+    await bustStoreCaches(updatedStore.id, updatedStore.slug, updatedStore.domain);
     return updatedStore;
   }
 }
