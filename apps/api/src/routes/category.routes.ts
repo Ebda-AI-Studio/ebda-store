@@ -29,6 +29,7 @@ const createCategorySchema = z.object({
   metaDescriptionAr: z.string().max(400).optional().nullable(),
   metaDescriptionAeo: z.string().max(400).optional().nullable(),
   metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
+  showOnHomeStrip: z.boolean().optional(),
 });
 
 const updateCategorySchema = z.object({
@@ -49,6 +50,7 @@ const updateCategorySchema = z.object({
   metaDescriptionAr: z.string().max(400).optional().nullable(),
   metaDescriptionAeo: z.string().max(400).optional().nullable(),
   metaDescriptionAeoAr: z.string().max(400).optional().nullable(),
+  showOnHomeStrip: z.boolean().optional(),
 });
 
 // GET /stores/:storeId/categories/best-sellers-image — read the
@@ -225,6 +227,8 @@ router.post(
           metaDescriptionAr: data.metaDescriptionAr,
           metaDescriptionAeo: data.metaDescriptionAeo,
           metaDescriptionAeoAr: data.metaDescriptionAeoAr,
+          // Homepage-strip visibility (omitted → DB default true).
+          showOnHomeStrip: data.showOnHomeStrip,
         },
         include: {
           _count: { select: { products: true } },
@@ -322,6 +326,9 @@ router.put(
           ...(data.metaDescriptionAeoAr !== undefined
             ? { metaDescriptionAeoAr: data.metaDescriptionAeoAr }
             : {}),
+          // Homepage-strip visibility — only when present (omitting it never
+          // flips an existing value).
+          ...(data.showOnHomeStrip !== undefined ? { showOnHomeStrip: data.showOnHomeStrip } : {}),
         },
         include: {
           _count: { select: { products: true } },

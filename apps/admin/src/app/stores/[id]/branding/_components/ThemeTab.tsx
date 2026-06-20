@@ -185,6 +185,31 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         <BrandPreview theme={branding.theme} />
       </div>
 
+      {/* ── Logo size ────────────────────────────────────────────────────── */}
+      <div className="rounded-lg border border-border bg-card p-4">
+        <p className="text-sm font-semibold text-foreground">{t('logoSize.title')}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t('logoSize.hint')}</p>
+        <div className="mt-3 inline-flex rounded-lg border border-border p-0.5">
+          {(['auto', 'sm', 'md', 'lg'] as const).map(opt => {
+            const active = (theme.logoSize ?? 'auto') === opt;
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setSeed('logoSize', opt)}
+                className={`min-w-[44px] rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted/60'
+                }`}
+              >
+                {t(`logoSize.${opt}`)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Blog ─────────────────────────────────────────────────────────── */}
       <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
         <span className="min-w-0 flex-1">

@@ -49,6 +49,10 @@ export interface StoreTheme {
   trustStripLayout?: 'horizontal' | 'vertical';
   /** Trust-strip size — scales icons + labels together. Default 'md'. */
   trustStripSize?: 'sm' | 'md' | 'lg';
+  /** Header logo sizing (per-store). 'auto' fits each logo by its measured
+   *  aspect ratio; sm/md/lg nudge the box. Default 'auto'. Mirrors the
+   *  @force/shared StoreTheme field consumed by the storefront StoreLogo. */
+  logoSize?: 'auto' | 'sm' | 'md' | 'lg';
   /** Footer-specific logo URL — overrides branding.logo on the storefront
    *  footer when set. Ahmad 2026-05-20: for dark footers needing a white logo. */
   footerLogo?: string;

@@ -646,6 +646,10 @@ model Category {
   parentId             String?   @map("parent_id")
   position             Int       @default(0)
   isActive             Boolean   @default(true) @map("is_active")
+  // Whether this category appears as a CARD in the homepage category strip.
+  // Default true (visible). When false it's hidden from the homepage strip
+  // ONLY — its collection page, nav, and product filters are unaffected.
+  showOnHomeStrip      Boolean   @default(true) @map("show_on_home_strip")
   // SEO meta — set per-category in admin or via the AI bulk sweep.
   metaTitle            String?   @map("meta_title")
   metaTitleAr          String?   @map("meta_title_ar")

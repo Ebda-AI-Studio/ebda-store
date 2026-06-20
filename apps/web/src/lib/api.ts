@@ -128,6 +128,9 @@ interface Category {
   description?: string;
   image?: string;
   productCount?: number;
+  /** When false, hidden from the homepage category strip only (the collection
+   *  page / nav / filters still show it). Defaults true. */
+  showOnHomeStrip?: boolean;
 }
 
 /**

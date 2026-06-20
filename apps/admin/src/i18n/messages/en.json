@@ -1463,6 +1463,14 @@
         "title": "Show quick-add (+) on product carousels",
         "hint": "Customers can add a product to cart with one tap directly from the homepage carousels — no need to open the product page first. When on, the bottom \"Add to cart\" button on each carousel card is hidden (the + replaces it)."
       },
+      "logoSize": {
+        "title": "Logo size",
+        "hint": "How big your logo appears in the header. Auto fits each logo to its own shape; pick S / M / L to nudge it. Affects only this store.",
+        "auto": "Auto",
+        "sm": "S",
+        "md": "M",
+        "lg": "L"
+      },
       "blog": {
         "title": "Enable blog",
         "hint": "Turns on the /blog section on your storefront and the From-the-Blog carousel on your homepage. Manage posts under Blog in the sidebar."
@@ -3567,6 +3575,8 @@
       "categoryImage": "Category Image",
       "uploadCategoryImage": "Upload Category Image",
       "categoryImageHint": "Recommended: 800×800px (1:1 square), JPG or PNG. Storefront crops to square — center your subject for best result.",
+      "showOnHomeStrip": "Show on homepage strip",
+      "showOnHomeStripHint": "When on, this category appears as a card in the homepage category strip. Turn off to hide the card there — the category's own page, the nav, and product filters still show it.",
       "required": "*",
       "cancel": "Cancel",
       "saving": "Saving...",

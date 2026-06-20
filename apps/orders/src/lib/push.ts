@@ -100,7 +100,7 @@ export async function isSubscribed(): Promise<boolean> {
  */
 export async function subscribeToOrderPush(
   storeId: string
-): Promise<'subscribed' | 'denied' | 'unsupported' | 'error'> {
+): Promise<'subscribed' | 'denied' | 'unsupported' | 'sw-not-ready' | 'server-rejected' | 'error'> {
   const support = pushSupport();
   if (support !== 'supported') return 'unsupported';
 
@@ -117,7 +117,7 @@ export async function subscribeToOrderPush(
         '[push] service worker not ready — push subscribe aborted. ' +
           'Fully close and reopen the app to pick up the latest build.'
       );
-      return 'error';
+      return 'sw-not-ready';
     }
 
     // Reuse an existing subscription if present, else create one.
@@ -148,7 +148,7 @@ export async function subscribeToOrderPush(
       // we don't end up with a device the API doesn't know about (it would
       // never receive pushes and would block re-subscribe attempts).
       await subscription.unsubscribe().catch(() => undefined);
-      return 'error';
+      return 'server-rejected';
     }
 
     return 'subscribed';

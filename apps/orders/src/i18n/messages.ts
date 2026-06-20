@@ -188,6 +188,8 @@ export interface Messages {
     enabled: string;
     denied: string;
     failed: string;
+    swNotReady: string;
+    serverError: string;
     iosHint: string;
   };
 }
@@ -391,6 +393,9 @@ export const MESSAGES: Record<Locale, Messages> = {
       enabled: 'Notifications enabled',
       denied: 'Notifications are blocked. Enable them in your browser settings.',
       failed: 'Could not enable notifications. Try again.',
+      swNotReady:
+        "Couldn't start the app's background worker. Fully close the app and reopen it, then try again.",
+      serverError: 'The server rejected the subscription. Please try again, or contact support.',
       iosHint: 'Install the app first (Share → Add to Home Screen), then open it to enable alerts.',
     },
   },
@@ -591,6 +596,9 @@ export const MESSAGES: Record<Locale, Messages> = {
       enabled: 'تم تفعيل الإشعارات',
       denied: 'الإشعارات محظورة. فعّلها من إعدادات المتصفح.',
       failed: 'تعذّر تفعيل الإشعارات. حاول مرة أخرى.',
+      swNotReady:
+        'تعذّر تشغيل خدمة التطبيق في الخلفية. أغلق التطبيق تمامًا ثم أعد فتحه وحاول مجددًا.',
+      serverError: 'رفض الخادم الاشتراك. حاول مرة أخرى أو تواصل مع الدعم.',
       iosHint: 'ثبّت التطبيق أولًا (مشاركة ← إضافة إلى الشاشة الرئيسية) ثم افتحه لتفعيل التنبيهات.',
     },
   },

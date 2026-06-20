@@ -107,6 +107,12 @@ export function EnableNotifications() {
       } else if (result === 'denied') {
         notify(t.notifications.denied, 'error');
         setVisible(false); // permission is now non-default; don't keep showing
+      } else if (result === 'sw-not-ready') {
+        // Service worker never activated — actionable: reopen the app.
+        notify(t.notifications.swNotReady, 'error');
+      } else if (result === 'server-rejected') {
+        // The API refused the subscription (see the console warn for the body).
+        notify(t.notifications.serverError, 'error');
       } else {
         notify(t.notifications.failed, 'error');
       }

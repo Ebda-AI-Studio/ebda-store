@@ -19,6 +19,7 @@ interface CategoryFormData {
   metaDescriptionAr?: string;
   metaDescriptionAeo?: string;
   metaDescriptionAeoAr?: string;
+  showOnHomeStrip?: boolean;
 }
 
 interface CategoryFormProps {
@@ -242,6 +243,24 @@ export function CategoryForm({
             recommendedSizeHint={t('categoryImageHint')}
           />
         </div>
+
+        {/* Homepage category-strip visibility (default on). */}
+        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-border p-4">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-foreground">
+              {t('showOnHomeStrip')}
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              {t('showOnHomeStripHint')}
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={form.showOnHomeStrip ?? true}
+            onChange={e => onFormChange(prev => ({ ...prev, showOnHomeStrip: e.target.checked }))}
+            className="h-5 w-5 cursor-pointer accent-primary"
+          />
+        </label>
 
         {/* SEO meta — what shows up on Google + social shares for this category. */}
         <div className="rounded-lg border border-border p-4">

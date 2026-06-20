@@ -223,7 +223,12 @@ export function HomePageContent({
   const templateProducts = featuredProducts.map(toTemplateProduct);
   const templateNewArrivals = newArrivals.map(toTemplateProduct);
   const templateBestSellers = bestSellers.map(toTemplateProduct);
-  const templateCategories = categories.map(toTemplateCategory);
+  // Homepage category strip: only categories the merchant left visible
+  // (showOnHomeStrip !== false). Hiding a category here never affects its
+  // collection page, nav, or product filters — those use the full list.
+  const templateCategories = categories
+    .filter(c => c.showOnHomeStrip !== false)
+    .map(toTemplateCategory);
 
   // Hero customization. Read from the StoreContext store — single source of
   // truth on the client. The fallback for an empty headline is the store's

@@ -26,6 +26,7 @@ const emptyForm: CategoryFormData = {
   metaDescriptionAr: '',
   metaDescriptionAeo: '',
   metaDescriptionAeoAr: '',
+  showOnHomeStrip: true,
 };
 
 function slugify(text: string) {
@@ -181,6 +182,7 @@ export default function StoreCategoriesPage() {
         (cat as Category & { metaDescriptionAeo?: string }).metaDescriptionAeo || '',
       metaDescriptionAeoAr:
         (cat as Category & { metaDescriptionAeoAr?: string }).metaDescriptionAeoAr || '',
+      showOnHomeStrip: (cat as Category & { showOnHomeStrip?: boolean }).showOnHomeStrip ?? true,
     });
     setFormErrors({});
     setSaveMessage(null);
@@ -232,6 +234,7 @@ export default function StoreCategoriesPage() {
         metaDescriptionAr: form.metaDescriptionAr?.trim() || null,
         metaDescriptionAeo: form.metaDescriptionAeo?.trim() || null,
         metaDescriptionAeoAr: form.metaDescriptionAeoAr?.trim() || null,
+        showOnHomeStrip: form.showOnHomeStrip ?? true,
       };
 
       const { error: apiError } = isEditing
