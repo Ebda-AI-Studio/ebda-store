@@ -32,9 +32,19 @@ export function PoweredByForce() {
         href="https://store.forcemediakw.com"
         target="_blank"
         rel="noopener noreferrer"
-        className="hover:text-foreground/80 transition-colors"
+        aria-label="Powered by Force AI"
+        className="inline-flex items-center gap-1.5 align-middle hover:opacity-80 transition-opacity"
       >
-        {t('Powered by Force AI', 'مدعوم من Force AI')}
+        <span>{t('Powered by', 'مدعوم من')}</span>
+        {/* Force AI brand mark (the orange Force logo) instead of the "Force AI"
+            wordmark text — same asset PlatformLanding uses, sized to the line. */}
+        <img
+          src="/logo.svg"
+          alt="Force AI"
+          className="inline-block h-4 w-auto sm:h-5"
+          loading="lazy"
+          decoding="async"
+        />
       </a>
     </div>
   );
