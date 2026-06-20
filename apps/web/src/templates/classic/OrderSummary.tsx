@@ -36,14 +36,14 @@ export default function ClassicOrderSummary({
       aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}
     >
       <h2
-        className="text-sm font-semibold uppercase tracking-widest text-muted-foreground"
+        className="text-sm font-bold uppercase tracking-widest text-muted-foreground"
         style={typography?.heading}
       >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="mt-6 space-y-4 text-sm" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground" style={typography?.label}>
+          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
           <dd className="tracking-tight text-foreground tabular-nums" style={typography?.price}>
@@ -59,7 +59,7 @@ export default function ClassicOrderSummary({
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground" style={typography?.label}>
+          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="tracking-tight text-foreground tabular-nums" style={typography?.price}>
@@ -86,7 +86,7 @@ export default function ClassicOrderSummary({
         )}
         <div className="mt-6 flex items-baseline justify-between border-t border-border pt-6">
           <dt
-            className="text-sm font-semibold uppercase tracking-widest text-foreground"
+            className="text-sm font-bold uppercase tracking-widest text-foreground"
             style={typography?.heading}
           >
             {isRtl ? 'الإجمالي' : 'Total'}

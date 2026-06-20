@@ -63,7 +63,10 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
     <nav
       // pb env-safe-area-inset so the bar clears the iPhone home indicator.
       // Only ever rendered at < md — desktop shell remains the sidebar.
-      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_-4px_rgba(0,0,0,0.08)] md:hidden"
+      // `translateZ(0)` promotes the bar to its own GPU layer so it stays pinned
+      // to the bottom during iOS standalone-PWA momentum scrolling (it was
+      // visibly jumping up on scroll without a dedicated compositor layer).
+      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_-4px_rgba(0,0,0,0.08)] [transform:translateZ(0)] [-webkit-transform:translateZ(0)] md:hidden"
       role="navigation"
       aria-label={t('mobileBottomNav')}
     >

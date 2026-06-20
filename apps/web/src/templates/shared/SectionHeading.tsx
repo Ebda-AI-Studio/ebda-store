@@ -128,12 +128,16 @@ export function SectionHeading({
   const resolvedBg: string = resolveColor(sectionBgColor, store.theme) ?? '#ffffff';
   const ensureReadable = (zoneColor: string | undefined): string | undefined => {
     const auto = pickReadableForeground(resolvedBg) ?? '#000000';
-    if (!zoneColor) return sectionBgColor ? auto : undefined; // no bg context → inherit (page CSS), but...
+    if (!zoneColor) return sectionBgColor ? auto : undefined; // no explicit pick → auto-contrast
+    // The merchant EXPLICITLY picked this color (the page-builder shows a live
+    // preview of the result), so honour it — a manual edit must override. The
+    // old 2:1 readability floor forced a deliberate light-on-light heading to
+    // black, ignoring the merchant (Ahmad 2026-06-20: "I need the manual edit to
+    // override"). We only self-correct a pick that is LITERALLY invisible — i.e.
+    // essentially the same color as the background (contrast < 1.06 ≈
+    // white-on-white) — to keep the stale-color safety without blocking a real tint.
     const concrete = resolveColor(zoneColor, store.theme) ?? zoneColor;
-    // 2:1 floor: decisively kills invisible text (white-on-white = 1:1, light
-    // grey ~1.5:1) while preserving a deliberate brand pick (e.g. Force orange
-    // on white ≈ 2.9:1 stays). Above the floor we trust the merchant's choice.
-    return contrastRatio(resolvedBg, concrete) >= 2 ? zoneColor : auto;
+    return contrastRatio(resolvedBg, concrete) >= 1.06 ? zoneColor : auto;
   };
   // When there is no explicit color AND no section bg, fall back to a guaranteed
   // dark default rather than inheriting (which on a white page can resolve to an

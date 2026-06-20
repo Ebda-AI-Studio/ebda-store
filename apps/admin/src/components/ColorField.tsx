@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { ColorContrastPreview } from './ColorContrastPreview';
 import { COLOR_TOKENS, resolveColor } from '@force/shared';
 import type { StoreTheme, ColorToken } from '@force/shared';
@@ -89,6 +89,13 @@ export function ColorField({
   // externally (e.g. the native color picker or a token selection).
   const [rawHex, setRawHex] = useState<string>(hexValue);
 
+  // Remember the last custom hex the merchant entered so switching Custom →
+  // brand token → Custom restores it instead of resetting to #ffffff (Ahmad
+  // 2026-06-20). Updated at render whenever a custom hex is active; survives a
+  // token selection because the ref persists while `hexValue` goes empty.
+  const lastCustomHexRef = useRef<string>(hexValue || '');
+  if (!isToken && hexValue) lastCustomHexRef.current = hexValue;
+
   // Keep rawHex in sync when the committed value changes externally (native
   // picker, token switch, clear, or parent-set value).
   // We intentionally don't use useEffect here to avoid stale-closure issues;
@@ -120,7 +127,9 @@ export function ColorField({
       onChange('');
       setRawHex('');
     } else if (next === CUSTOM) {
-      const currentHex = hexValue || '#ffffff';
+      // Restore the merchant's last custom hex (preserved across a token
+      // selection) rather than resetting to white.
+      const currentHex = hexValue || lastCustomHexRef.current || '#ffffff';
       onChange(currentHex);
       setRawHex(currentHex);
     } else {

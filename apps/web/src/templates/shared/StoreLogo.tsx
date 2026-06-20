@@ -21,7 +21,7 @@ type LogoSize = 'auto' | 'sm' | 'md' | 'lg';
 // baseline — matching the standing "lean smaller" preference. `lg` (1.0×) is the
 // old default; `auto` keeps the smart aspect-fit. Picking ANY of S/M/L now
 // changes the rendered logo.
-const SIZE_MULT: Record<Exclude<LogoSize, 'auto'>, number> = { sm: 0.6, md: 0.8, lg: 1.0 };
+const SIZE_MULT: Record<Exclude<LogoSize, 'auto'>, number> = { sm: 0.65, md: 0.9, lg: 1.5 };
 
 /**
  * Base bounding box (the platform default before this component): mobile h-14

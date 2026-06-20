@@ -33,7 +33,7 @@ export default function MinimalOrderSummary({
     <aside dir={isRtl ? 'rtl' : 'ltr'} aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}>
       <dl className="space-y-4 text-sm" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground" style={typography?.label}>
+          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
           <dd className="text-foreground tabular-nums" style={typography?.price}>
@@ -49,7 +49,7 @@ export default function MinimalOrderSummary({
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground" style={typography?.label}>
+          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="text-foreground tabular-nums" style={typography?.price}>
@@ -75,7 +75,7 @@ export default function MinimalOrderSummary({
           </div>
         )}
         <div className="flex items-baseline justify-between border-t border-border pt-5">
-          <dt className="text-foreground" style={typography?.heading}>
+          <dt className="font-bold text-foreground" style={typography?.heading}>
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
           <dd className="text-lg text-foreground tabular-nums" style={typography?.price}>

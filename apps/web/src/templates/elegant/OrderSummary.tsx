@@ -36,14 +36,17 @@ export default function ElegantOrderSummary({
       aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}
     >
       <h2
-        className="text-sm font-light uppercase tracking-[0.3em] text-muted-foreground"
+        className="text-sm font-bold uppercase tracking-[0.3em] text-muted-foreground"
         style={typography?.heading}
       >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="mt-8 space-y-5 text-sm font-light" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="tracking-wide text-muted-foreground" style={typography?.label}>
+          <dt
+            className="font-semibold tracking-wide text-muted-foreground"
+            style={typography?.label}
+          >
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
           <dd className="tracking-wide text-foreground tabular-nums" style={typography?.price}>
@@ -61,7 +64,10 @@ export default function ElegantOrderSummary({
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="tracking-wide text-muted-foreground" style={typography?.label}>
+          <dt
+            className="font-semibold tracking-wide text-muted-foreground"
+            style={typography?.label}
+          >
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="tracking-wide text-foreground tabular-nums" style={typography?.price}>
@@ -90,7 +96,7 @@ export default function ElegantOrderSummary({
         )}
         <div className="mt-8 flex items-baseline justify-between border-t border-foreground/20 pt-8">
           <dt
-            className="text-sm font-light uppercase tracking-[0.3em] text-foreground"
+            className="text-sm font-bold uppercase tracking-[0.3em] text-foreground"
             style={typography?.heading}
           >
             {isRtl ? 'الإجمالي' : 'Total'}

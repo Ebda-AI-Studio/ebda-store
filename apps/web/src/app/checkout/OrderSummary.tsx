@@ -75,7 +75,7 @@ export function OrderSummary({
   return (
     <div className="mt-8 lg:col-span-4 lg:mt-0">
       <div className="sticky top-24 rounded-xl border bg-card p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-foreground" style={typography?.heading}>
+        <h2 className="text-lg font-bold text-foreground" style={typography?.heading}>
           {t('Order Summary', translations['Order Summary'])}
         </h2>
 
@@ -244,7 +244,7 @@ export function OrderSummary({
         {/* Totals */}
         <div className="mt-6 space-y-3 border-t pt-6">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground" style={typography?.label}>
+            <span className="font-semibold text-muted-foreground" style={typography?.label}>
               {t('Subtotal', translations['Subtotal'])}
             </span>
             <span className="font-medium tabular-nums" style={typography?.price}>
@@ -292,7 +292,7 @@ export function OrderSummary({
             );
           })()}
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground" style={typography?.label}>
+            <span className="font-semibold text-muted-foreground" style={typography?.label}>
               {t('Shipping', translations['Shipping'])}
             </span>
             <span
@@ -310,7 +310,7 @@ export function OrderSummary({
             </span>
           </div>
           <div className="flex justify-between border-t pt-3">
-            <span className="text-lg font-semibold text-foreground" style={typography?.heading}>
+            <span className="text-lg font-bold text-foreground" style={typography?.heading}>
               {t('Total', translations['Total'])}
             </span>
             <span className="text-lg font-bold text-primary tabular-nums" style={typography?.price}>

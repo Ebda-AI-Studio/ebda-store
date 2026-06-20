@@ -35,15 +35,12 @@ export default function ModernOrderSummary({
       className="rounded-2xl border border-border/60 bg-card p-7 shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.10)]"
       aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}
     >
-      <h2
-        className="text-lg font-semibold text-foreground tracking-tight"
-        style={typography?.heading}
-      >
+      <h2 className="text-lg font-bold text-foreground tracking-tight" style={typography?.heading}>
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="mt-5 space-y-3 text-sm" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground" style={typography?.label}>
+          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
           <dd className="font-medium text-foreground tabular-nums" style={typography?.price}>
@@ -59,7 +56,7 @@ export default function ModernOrderSummary({
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="text-muted-foreground" style={typography?.label}>
+          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="font-medium text-foreground tabular-nums" style={typography?.price}>
@@ -85,7 +82,7 @@ export default function ModernOrderSummary({
           </div>
         )}
         <div className="mt-4 flex items-baseline justify-between border-t border-border/60 pt-4">
-          <dt className="text-base font-semibold text-foreground" style={typography?.heading}>
+          <dt className="text-base font-bold text-foreground" style={typography?.heading}>
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
           <dd className="text-xl font-bold text-primary tabular-nums" style={typography?.price}>
