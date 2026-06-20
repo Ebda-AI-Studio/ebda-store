@@ -1,10 +1,10 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { ReactNode } from 'react';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { StoreLogo } from '../templates/shared/StoreLogo';
 
 interface MinimalChromeProps {
   children: ReactNode;
@@ -46,18 +46,11 @@ export function MinimalChrome({
           <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 md:h-24 md:px-6 lg:px-8">
             <Link href={storeUrl('/')} className="flex items-center gap-2">
               {store.logo ? (
-                <Image
-                  src={store.logo}
-                  alt={store.name}
-                  width={210}
-                  height={80}
-                  priority
-                  // Same firm bounding-box cap as the storefront theme headers
-                  // (h-14/max-w-[150px] mobile → h-20/max-w-[210px] desktop) so
-                  // the logo is identically sized on checkout / auth / share
-                  // pages and never renders oversized for wide or square logos.
-                  className="h-14 max-h-14 w-auto max-w-[150px] object-contain md:h-20 md:max-h-20 md:max-w-[210px]"
-                />
+                // Adaptive StoreLogo (same component as the 5 theme headers) so
+                // checkout / auth / share pages honor the store's `theme.logoSize`
+                // and aspect-fit exactly like the storefront header — not a
+                // separate hardcoded bounding box.
+                <StoreLogo src={store.logo} alt={store.name} priority />
               ) : (
                 <span className="text-2xl font-bold text-primary sm:text-3xl">{store.name}</span>
               )}

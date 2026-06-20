@@ -127,9 +127,34 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
     ? (pickReadableForeground(resolvedBg) ?? undefined)
     : undefined;
   const autoFgStyle = autoFg ? ({ color: autoFg } as React.CSSProperties) : undefined;
-  const autoIconBg = autoFg
-    ? ({ backgroundColor: `${autoFg}1a`, color: autoFg } as React.CSSProperties)
+
+  // Merchant-editable icon colors (page-builder Trust strip card). An explicit
+  // pick always wins over the auto-contrast fallback; an explicit icon glyph
+  // color also drives the title/subtitle so the badge reads as one unit. When
+  // only the glyph color is set, the circle defaults to a 10%-opacity tint of
+  // it; when only the circle color is set, the glyph keeps the readable
+  // default. Precedence: explicit > auto-contrast > brand-token classes.
+  const iconColor = settings?.iconColor ? resolveColor(settings.iconColor, store.theme) : undefined;
+  const iconBgColor = settings?.iconBgColor
+    ? resolveColor(settings.iconBgColor, store.theme)
     : undefined;
+  const effectiveIconFg = iconColor ?? autoFg;
+  // When no explicit circle color is given, derive a translucent tint of the
+  // glyph color. `color-mix` works for ANY valid CSS color (hex, hsl, and
+  // `hsl(var(--token))`) — unlike the old `${color}1a` hex-suffix hack, which
+  // produced invalid CSS for token/hsl values. On browsers without color-mix
+  // (pre-2023 Safari) the declaration is dropped and the `bg-[…]/10` class wins.
+  const iconWrapStyle: React.CSSProperties | undefined =
+    iconColor || iconBgColor || autoFg
+      ? {
+          ...(iconBgColor
+            ? { backgroundColor: iconBgColor }
+            : effectiveIconFg
+              ? { backgroundColor: `color-mix(in srgb, ${effectiveIconFg} 10%, transparent)` }
+              : {}),
+          ...(effectiveIconFg ? { color: effectiveIconFg } : {}),
+        }
+      : undefined;
 
   return (
     <section
@@ -147,7 +172,7 @@ export function TrustStrip({ settings }: { settings?: TrustStripSettings } = {})
             >
               <span
                 className={`inline-flex items-center justify-center rounded-full bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] ${iconWrapClass}`}
-                style={autoIconBg}
+                style={iconWrapStyle}
                 aria-hidden
               >
                 <svg className={iconSvgClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">

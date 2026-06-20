@@ -4106,6 +4106,22 @@ function ExtraSectionCard({
                 <option value="lg">Large</option>
               </select>
             </label>
+            <ColorField
+              label="Icon color"
+              value={
+                (settings as import('@force/shared').TrustStripSettings | undefined)?.iconColor
+              }
+              onChange={v => onPatch({ iconColor: v })}
+              theme={theme}
+            />
+            <ColorField
+              label="Icon background color"
+              value={
+                (settings as import('@force/shared').TrustStripSettings | undefined)?.iconBgColor
+              }
+              onChange={v => onPatch({ iconBgColor: v })}
+              theme={theme}
+            />
           </>
         )}
         {kind === 'blogCarousel' && (

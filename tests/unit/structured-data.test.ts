@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  breadcrumbList,
+  breadcrumbJsonLd,
   itemList,
   storeJsonLd,
   faqPageJsonLd,
@@ -9,9 +9,9 @@ import {
   reviewJsonLd,
 } from '@web/lib/structured-data';
 
-describe('breadcrumbList', () => {
+describe('breadcrumbJsonLd', () => {
   it('builds positioned ListItem array', () => {
-    const r = breadcrumbList([
+    const r = breadcrumbJsonLd([
       { name: 'Home', url: 'https://example.com' },
       { name: 'Products', url: 'https://example.com/products' },
     ]) as any;
@@ -25,12 +25,12 @@ describe('breadcrumbList', () => {
   });
 
   it('handles single-item breadcrumb', () => {
-    const r = breadcrumbList([{ name: 'Home', url: 'https://example.com' }]) as any;
+    const r = breadcrumbJsonLd([{ name: 'Home', url: 'https://example.com' }]) as any;
     expect(r.itemListElement).toHaveLength(1);
   });
 
   it('handles empty array', () => {
-    const r = breadcrumbList([]) as any;
+    const r = breadcrumbJsonLd([]) as any;
     expect(r.itemListElement).toHaveLength(0);
   });
 });

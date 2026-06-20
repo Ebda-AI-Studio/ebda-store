@@ -11,10 +11,11 @@
  *    is the in-foreground complement to these background notifications.
  */
 
-// Bumped to v3 — purges the pre-fix `force-orders-v2` shell so an already-
-// installed PWA stops serving a stale app build (the old build had broken push
-// env baked in). The activate step deletes every cache key != CACHE.
-const CACHE = 'force-orders-v3';
+// Bumped to v4 — purges the `force-orders-v3` shell so an already-installed PWA
+// stops serving the stale app build (the pre-#320 shell had the toast pinned
+// top-center + the old notification-failure copy). The activate step deletes
+// every cache key != CACHE, so a new sw.js byte-change forces a fresh precache.
+const CACHE = 'force-orders-v4';
 const APP_SHELL = ['/orders', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {

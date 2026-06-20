@@ -620,6 +620,14 @@ export interface TrustStripSettings extends SectionBgOverride, SectionPaddingMax
   /** Scales icons + labels together. Default 'md'.
    *  Legacy fallback: `theme.trustStripSize`. */
   size?: 'sm' | 'md' | 'lg';
+  /** Icon glyph color (the line-art SVG). Accepts a `token:<name>` brand token
+   *  or a literal hsl/hex. When unset, falls back to the brand `--primary`
+   *  token (or the auto-contrast color when a custom `bgColor` is set). */
+  iconColor?: string;
+  /** Icon circle background color. Accepts a `token:<name>` brand token or a
+   *  literal hsl/hex. When unset, falls back to `--primary` at 10% opacity
+   *  (or the auto-contrast tint when a custom `bgColor` is set). */
+  iconBgColor?: string;
   typography?: SectionTypographyOverride;
   dividers?: SectionDividers;
 }

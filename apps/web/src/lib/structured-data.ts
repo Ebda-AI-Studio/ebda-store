@@ -148,23 +148,6 @@ export function breadcrumbJsonLd(items: BreadcrumbItem[]) {
 }
 
 // ---------------------------------------------------------------------------
-// BreadcrumbList — used on every interior page so AI agents understand the
-// site hierarchy. Pass an array of { name, url } in order from root to leaf.
-// ---------------------------------------------------------------------------
-export function breadcrumbList(items: Array<{ name: string; url: string }>): object {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: items.map((item, idx) => ({
-      '@type': 'ListItem',
-      position: idx + 1,
-      name: item.name,
-      item: item.url,
-    })),
-  };
-}
-
-// ---------------------------------------------------------------------------
 // ItemList — used on listing pages (all products, category detail). Lists
 // the products with inline minimal Product objects.
 // ---------------------------------------------------------------------------

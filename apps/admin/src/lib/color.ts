@@ -57,18 +57,3 @@ export function hslToHex(hsl: string): string {
 
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
-
-/** Convert hex color string to RGB object. */
-export function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const h = hex.replace('#', '');
-  return {
-    r: parseInt(h.substring(0, 2), 16),
-    g: parseInt(h.substring(2, 4), 16),
-    b: parseInt(h.substring(4, 6), 16),
-  };
-}
-
-/** Convert RGB values to hex color string. */
-export function rgbToHex(r: number, g: number, b: number): string {
-  return `#${[r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('')}`;
-}
