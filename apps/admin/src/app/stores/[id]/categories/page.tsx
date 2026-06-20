@@ -167,6 +167,44 @@ export default function StoreCategoriesPage() {
     );
   }, [categories, search]);
 
+  // Drag-free reorder via up/down controls. Persist the full order; revert +
+  // refetch on failure. Reorder is only offered when no search filter is active
+  // (so the visible index == the real index).
+  const [reordering, setReordering] = useState(false);
+  const persistOrder = useCallback(
+    async (ordered: Category[]) => {
+      if (!storeId) return;
+      setReordering(true);
+      try {
+        const { error: apiError } = await apiPut(`/api/v1/stores/${storeId}/categories/reorder`, {
+          orderedIds: ordered.map(c => c.id),
+        });
+        if (apiError) {
+          showError(t('errorTitle'), apiError.message ?? '');
+          fetchCategories(); // revert optimistic order to the server's truth
+        }
+      } finally {
+        setReordering(false);
+      }
+    },
+    [storeId, showError, fetchCategories, t]
+  );
+  const handleMove = useCallback(
+    (id: string, direction: 'up' | 'down') => {
+      setCategories(prev => {
+        const idx = prev.findIndex(c => c.id === id);
+        if (idx < 0) return prev;
+        const swap = direction === 'up' ? idx - 1 : idx + 1;
+        if (swap < 0 || swap >= prev.length) return prev;
+        const next = prev.slice();
+        [next[idx], next[swap]] = [next[swap], next[idx]];
+        void persistOrder(next);
+        return next;
+      });
+    },
+    [persistOrder]
+  );
+
   useEffect(() => {
     fetchCategories();
     fetchBestSellersImage();
@@ -448,6 +486,8 @@ export default function StoreCategoriesPage() {
           onEdit={openEditForm}
           onDelete={setDeleteTarget}
           onAddFirst={openAddForm}
+          onMove={search.trim() ? undefined : handleMove}
+          reordering={reordering}
         />
       </div>
 

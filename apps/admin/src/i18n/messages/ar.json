@@ -3606,7 +3606,9 @@
       "inactive": "غير نشط",
       "edit": "تعديل",
       "delete": "حذف",
-      "deleting": "جارٍ الحذف..."
+      "deleting": "جارٍ الحذف...",
+      "moveUp": "نقل لأعلى",
+      "moveDown": "نقل لأسفل"
     }
   },
   "reviews": {

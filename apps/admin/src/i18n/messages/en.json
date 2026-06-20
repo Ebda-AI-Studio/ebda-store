@@ -3606,7 +3606,9 @@
       "inactive": "Inactive",
       "edit": "Edit",
       "delete": "Delete",
-      "deleting": "Deleting..."
+      "deleting": "Deleting...",
+      "moveUp": "Move up",
+      "moveDown": "Move down"
     }
   },
   "reviews": {

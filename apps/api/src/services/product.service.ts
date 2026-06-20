@@ -1173,7 +1173,10 @@ export class ProductService {
           // resolves to the virtual page now.
           slug: { not: 'best-sellers' },
         },
-        orderBy: { name: 'asc' },
+        // Merchant-defined order (Category.position) wins; name is the stable
+        // tiebreaker so un-reordered stores keep their A→Z look. The virtual
+        // Best Sellers tile is prepended after this with position -1.
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
         take: 100, // Guard against stores with unbounded category growth
         include: {
           _count: { select: { products: true } },

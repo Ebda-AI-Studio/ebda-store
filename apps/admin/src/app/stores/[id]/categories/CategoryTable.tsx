@@ -23,6 +23,10 @@ interface CategoryTableProps {
   onEdit: (category: Category) => void;
   onDelete: (category: { id: string; name: string }) => void;
   onAddFirst: () => void;
+  /** Move a category one step up/down. The page persists the new order. When
+   *  omitted (or while a save is in flight), the move controls are hidden. */
+  onMove?: (id: string, direction: 'up' | 'down') => void;
+  reordering?: boolean;
 }
 
 export type { Category };
@@ -34,6 +38,8 @@ export function CategoryTable({
   onEdit,
   onDelete,
   onAddFirst,
+  onMove,
+  reordering = false,
 }: CategoryTableProps) {
   const t = useT('categories.table');
   if (isLoading) {
@@ -122,7 +128,7 @@ export function CategoryTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {categories.map(cat => (
+          {categories.map((cat, idx) => (
             <tr key={cat.id} className="hover:bg-muted transition-colors">
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -176,6 +182,54 @@ export function CategoryTable({
               </td>
               <td className="px-6 py-4 text-end">
                 <div className="flex items-center justify-end gap-2">
+                  {onMove && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onMove(cat.id, 'up')}
+                        disabled={idx === 0 || reordering}
+                        aria-label={t('moveUp')}
+                        title={t('moveUp')}
+                        className="grid h-7 w-7 place-items-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 15l7-7 7 7"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMove(cat.id, 'down')}
+                        disabled={idx === categories.length - 1 || reordering}
+                        aria-label={t('moveDown')}
+                        title={t('moveDown')}
+                        className="grid h-7 w-7 place-items-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => onEdit(cat)}

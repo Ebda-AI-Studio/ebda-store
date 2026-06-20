@@ -157,7 +157,9 @@ router.get(
 
       const categories = await prisma.category.findMany({
         where: { storeId, deletedAt: null },
-        orderBy: { name: 'asc' },
+        // Merchant-defined order first (Category.position), name as the stable
+        // tiebreaker so stores that never reordered keep their A→Z look.
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
         include: {
           _count: { select: { products: true } },
         },
@@ -167,6 +169,40 @@ router.get(
         success: true,
         data: { categories },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:storeId/categories/reorder — persist the merchant's drag/move
+// order. Body: { orderedIds: [...] } in the desired display order; we write
+// position = index for each. `updateMany` scoped to (id, storeId) so a token
+// can never reorder another tenant's categories. Literal path declared BEFORE
+// the `/:categoryId` routes so it isn't shadowed by the param route.
+const reorderCategoriesSchema = z.object({
+  orderedIds: z.array(z.string().uuid()).min(1).max(500),
+});
+router.put(
+  '/reorder',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { orderedIds } = reorderCategoriesSchema.parse(req.body);
+      await prisma.$transaction(
+        orderedIds.map((id, index) =>
+          prisma.category.updateMany({
+            where: { id, storeId, deletedAt: null },
+            data: { position: index },
+          })
+        )
+      );
+      await invalidateCached(`public:categories:${storeId}`);
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }
