@@ -164,9 +164,20 @@ export default function ElegantFooter({
                 : 'md:grid-cols-4'
           } md:gap-12`}
         >
-          {/* Brand — desktop only. Logo moves into Follow col on mobile
-              (Ahmad 2026-05-21). Description stays here on both. */}
+          {/* Brand — desktop only. Logo centered at top on mobile (Ahmad 2026-06-20). */}
           <div className="col-span-2 md:col-span-1">
+            {displayLogo && !hideFooterLogoMobile && (
+              <img
+                src={displayLogo}
+                alt={displayName}
+                className="md:hidden mx-auto h-16 w-auto object-contain mb-5"
+                style={
+                  !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
+                    ? { filter: footerLogoAutoFilter }
+                    : undefined
+                }
+              />
+            )}
             {displayLogo ? (
               <img
                 src={displayLogo}
@@ -283,28 +294,13 @@ export default function ElegantFooter({
             </div>
           )}
 
-          {/* Social — heading row carries the mobile logo so it aligns with
-              the Contact column's heading in the neighboring grid cell
-              (Ahmad 2026-05-21: "logo same row as تواصل"). Logo sits on
-              the inline-end via ms-auto: right in LTR, left in RTL. */}
+          {/* Social */}
           {socialLinks.length > 0 && (
             <div>
               <div className="flex items-center mb-6">
                 <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground font-serif">
                   {isRtl ? 'تابعنا' : 'Follow'}
                 </h4>
-                {displayLogo && !hideFooterLogoMobile && (
-                  <img
-                    src={displayLogo}
-                    alt={displayName}
-                    className="md:hidden ms-auto h-16 w-auto object-contain"
-                    style={
-                      !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
-                        ? { filter: footerLogoAutoFilter }
-                        : undefined
-                    }
-                  />
-                )}
               </div>
               <div className="flex flex-wrap items-center gap-4">
                 {socialLinks.map(s => (

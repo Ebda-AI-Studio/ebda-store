@@ -66,9 +66,20 @@ export default function ClassicFooter({
       <div className="container mx-auto px-4 pt-16 pb-8">
         {/* Main grid — brand + up to 4 nav columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-12 mb-12">
-          {/* Brand column — logo desktop-only at top; on mobile it
-              moves beside the social icons below (Ahmad 2026-05-21). */}
+          {/* Brand column — logo centered at top on mobile (Ahmad 2026-06-20). */}
           <div className="lg:col-span-2 space-y-5">
+            {displayLogo && !hideFooterLogoMobile && (
+              <img
+                src={footerLogo || displayLogo}
+                alt={displayName}
+                className="md:hidden mx-auto h-16 w-auto object-contain mb-5"
+                style={
+                  !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
+                    ? { filter: footerLogoAutoFilter }
+                    : undefined
+                }
+              />
+            )}
             {displayLogo ? (
               <img
                 src={footerLogo || displayLogo}
@@ -137,8 +148,7 @@ export default function ClassicFooter({
               </ul>
             )}
 
-            {/* Social icons — on mobile, the logo lands at the OPPOSITE end
-                of this row via ms-auto. Ahmad 2026-05-21. */}
+            {/* Social icons */}
             {socialLinks.length > 0 && (
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 {socialLinks.map(s => (
@@ -153,18 +163,6 @@ export default function ClassicFooter({
                     <SocialGlyph entry={s} className="w-8 h-8" />
                   </a>
                 ))}
-                {displayLogo && !hideFooterLogoMobile && (
-                  <img
-                    src={footerLogo || displayLogo}
-                    alt={displayName}
-                    className="md:hidden ms-auto h-16 w-auto object-contain"
-                    style={
-                      !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
-                        ? { filter: footerLogoAutoFilter }
-                        : undefined
-                    }
-                  />
-                )}
               </div>
             )}
           </div>

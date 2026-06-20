@@ -56,8 +56,19 @@ export default function MinimalFooter({
       <div className="container mx-auto px-6">
         {/* Single-row layout: logo · links · copyright */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-          {/* Brand — desktop only; on mobile the logo moves beside the
-              social icons further down (Ahmad 2026-05-21). */}
+          {displayLogo && !hideFooterLogoMobile && (
+            <img
+              src={displayLogo}
+              alt={displayName}
+              className="md:hidden mx-auto h-16 w-auto object-contain mb-5"
+              style={
+                !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
+                  ? { filter: footerLogoAutoFilter }
+                  : undefined
+              }
+            />
+          )}
+          {/* Brand — desktop only (Ahmad 2026-06-20: mobile logo is now centered at the top). */}
           <div className="hidden md:block flex-shrink-0">
             {displayLogo ? (
               <img
@@ -96,9 +107,7 @@ export default function MinimalFooter({
           )}
 
           {/* Social — only render the row when at least one social link is
-              configured, so empty stores don't show a hollow column. Uses the
-              shared brand-correct SVG icons rather than text labels so the
-              footer doesn't read as half-finished placeholder copy. */}
+              configured, so empty stores don't show a hollow column. */}
           {socialLinks.length > 0 && (
             <div className={`flex items-center gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
               {socialLinks.map(s => (
@@ -113,18 +122,6 @@ export default function MinimalFooter({
                   <SocialGlyph entry={s} className="w-8 h-8" />
                 </a>
               ))}
-              {displayLogo && !hideFooterLogoMobile && (
-                <img
-                  src={displayLogo}
-                  alt={displayName}
-                  className="md:hidden ms-auto h-16 w-auto object-contain"
-                  style={
-                    !footerLogo && footerLogoAutoFilter && footerLogoAutoFilter !== 'none'
-                      ? { filter: footerLogoAutoFilter }
-                      : undefined
-                  }
-                />
-              )}
             </div>
           )}
         </div>
