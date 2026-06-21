@@ -1,6 +1,7 @@
 'use client';
 
 import { SectionHeader } from '@/components/landing/SectionHeader';
+import { Aurora } from '@/components/landing/Reveal';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -40,8 +41,9 @@ export function MerchantsSection() {
   const { t } = useLanguage();
 
   return (
-    <section id="merchants" className="bg-black py-20 md:py-28">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+    <section id="merchants" className="relative overflow-hidden bg-black py-20 md:py-28">
+      <Aurora />
+      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <SectionHeader
           kicker={t('REAL KUWAITI STORES', 'متاجر كويتية حقيقية')}
           title={t('Built on Force AI', 'مبنية على Force AI')}

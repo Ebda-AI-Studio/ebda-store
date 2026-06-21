@@ -2,14 +2,16 @@
 
 import { Bot, Globe } from 'lucide-react';
 import { SectionHeader } from '@/components/landing/SectionHeader';
+import { Aurora } from '@/components/landing/Reveal';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export function AeoGeoSection() {
   const { t } = useLanguage();
 
   return (
-    <section id="aeo-geo" className="w-full bg-black py-20 md:py-28">
-      <div className="mx-auto max-w-5xl px-4">
+    <section id="aeo-geo" className="relative overflow-hidden w-full bg-black py-20 md:py-28">
+      <Aurora />
+      <div className="relative z-10 mx-auto max-w-5xl px-4">
         {/* Section header */}
         <SectionHeader
           kicker={t('THE AI ADVANTAGE', 'ميزة الذكاء الاصطناعي')}

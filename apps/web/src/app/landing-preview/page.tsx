@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { HeroSection } from '@/components/landing/HeroSection';
+import { StatsStrip } from '@/components/landing/StatsStrip';
 import FeaturesSection from '@/components/landing/FeaturesSection';
 import { BeforeAfterSection } from '@/components/landing/BeforeAfterSection';
 import { AeoGeoSection } from '@/components/landing/AeoGeoSection';
@@ -8,6 +9,7 @@ import { MerchantsSection } from '@/components/landing/MerchantsSection';
 import CtaSection from '@/components/landing/CtaSection';
 import { FooterSection } from '@/components/landing/FooterSection';
 import { FloatingWhatsApp } from '@/components/landing/FloatingWhatsApp';
+import { Reveal } from '@/components/landing/Reveal';
 
 /**
  * Isolated preview of the redesigned Force AI platform landing.
@@ -30,11 +32,22 @@ export default function LandingPreviewPage() {
     <main className="bg-black">
       <LandingHeader />
       <HeroSection />
-      <FeaturesSection />
-      <BeforeAfterSection />
-      <AeoGeoSection />
-      <MerchantsSection />
-      <CtaSection />
+      <StatsStrip />
+      <Reveal>
+        <FeaturesSection />
+      </Reveal>
+      <Reveal>
+        <BeforeAfterSection />
+      </Reveal>
+      <Reveal>
+        <AeoGeoSection />
+      </Reveal>
+      <Reveal>
+        <MerchantsSection />
+      </Reveal>
+      <Reveal>
+        <CtaSection />
+      </Reveal>
       <FooterSection />
       <FloatingWhatsApp />
     </main>

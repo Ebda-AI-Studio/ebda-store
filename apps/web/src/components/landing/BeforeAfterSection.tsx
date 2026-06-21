@@ -3,6 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { SectionHeader } from '@/components/landing/SectionHeader';
+import { Aurora } from '@/components/landing/Reveal';
 
 /**
  * Before → After: a blank starter store (CSS wireframe) transforms into a real,
@@ -56,8 +57,9 @@ function BrowserFrame({ children }: { children: React.ReactNode }) {
 export function BeforeAfterSection() {
   const { t } = useLanguage();
   return (
-    <section id="before-after" className="bg-black px-4 py-20 md:py-28">
-      <div className="mx-auto max-w-6xl">
+    <section id="before-after" className="relative overflow-hidden bg-black px-4 py-20 md:py-28">
+      <Aurora />
+      <div className="relative z-10 mx-auto max-w-6xl">
         <SectionHeader
           kicker={t('FROM ZERO TO LIVE', 'من الصفر إلى الإطلاق')}
           title={t('A blank page becomes your store', 'صفحة فارغة تتحوّل إلى متجرك')}
