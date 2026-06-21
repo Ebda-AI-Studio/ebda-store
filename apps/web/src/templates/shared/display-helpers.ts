@@ -5,6 +5,7 @@
  * logic that was previously duplicated in every template.
  */
 
+import { sanitizeUrl } from '@force/shared';
 import type {
   FooterBottomBarConfig,
   FooterLinkSection,
@@ -233,7 +234,16 @@ export function resolveAddressHref(
 ): string | null {
   if (addressLink === false) return null;
   const trimmedUrl = addressUrl?.trim();
-  if (trimmedUrl) return trimmedUrl;
+  if (trimmedUrl) {
+    // Defence-in-depth: sanitize the merchant-supplied URL so a
+    // `javascript:` / `data:` value stored before the server-side
+    // `safeOptionalUrl` guard was deployed can't execute at render time.
+    // An unsafe value falls back to the synthesised Google Maps URL so
+    // the address text remains linked (rather than silently unwrapped).
+    const safe = sanitizeUrl(trimmedUrl, '');
+    if (safe) return safe;
+    // Unsafe explicit URL → fall through to the auto-generated Maps link.
+  }
   return buildMapsHref(address);
 }
 

@@ -1,4 +1,5 @@
 import type React from 'react';
+import { sanitizeUrl } from '@force/shared';
 import type { StoreContact, StoreSocials } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -435,5 +436,13 @@ export function getSocialLinks(
     { key: 'pinterest', icon: PINTEREST_PATH, url: socials.pinterest },
     { key: 'telegram', icon: TELEGRAM_PATH, url: socials.telegram },
   ];
-  return candidates.filter((s): s is SocialLinkEntry => !!s.url);
+  // Defence-in-depth: even if a `javascript:` URL somehow slipped into the
+  // DB before the server-side `safeOptionalUrl` guard was deployed, sanitize
+  // at render time. `sanitizeUrl` returns '#' for unsafe values; we drop
+  // those so the footer never shows a dead '#' link for a legitimate social URL
+  // that was simply not set.
+  return candidates
+    .filter((s): s is typeof s & { url: string } => !!s.url)
+    .map(s => ({ ...s, url: sanitizeUrl(s.url, '') }))
+    .filter((s): s is SocialLinkEntry => !!s.url);
 }

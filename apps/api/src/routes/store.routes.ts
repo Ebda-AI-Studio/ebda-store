@@ -67,6 +67,29 @@ const updateStoreSchema = createStoreSchema.partial().extend({
   heroImage: heroNullableStr(1000),
   blogEnabled: z.boolean().optional(),
   locationsEnabled: z.boolean().optional(),
+  // Override `settings` with a version that validates the `contact.addressUrl`
+  // sub-field. The field is rendered into `<a href>` on the storefront, so a
+  // `javascript:`/`data:` value stored here is stored-XSS. All other keys in
+  // the JSONB blob pass through unvalidated (existing behaviour).
+  settings: z
+    .record(z.string(), z.any())
+    .superRefine((settings, ctx) => {
+      const contact = settings?.contact;
+      if (contact && typeof contact === 'object') {
+        const addressUrl = (contact as Record<string, unknown>).addressUrl;
+        if (addressUrl !== undefined && addressUrl !== null && addressUrl !== '') {
+          if (!isSafeUrl(addressUrl)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['contact', 'addressUrl'],
+              message:
+                'Link must be a relative path or use http(s)/mailto/tel — javascript: is not allowed',
+            });
+          }
+        }
+      }
+    })
+    .optional(),
 });
 
 const themeSchema = z.record(z.string(), z.unknown()).refine(
@@ -194,15 +217,20 @@ const brandingSchema = z
 
 const socialSchema = z
   .object({
-    facebook: optionalUrl,
-    instagram: optionalUrl,
-    twitter: optionalUrl,
-    tiktok: optionalUrl,
-    youtube: optionalUrl,
-    snapchat: optionalUrl,
-    linkedin: optionalUrl,
-    wikidata: optionalUrl,
-    wikipedia: optionalUrl,
+    // Social-link fields are rendered directly into `<a href>` on the
+    // storefront footer. Use `safeOptionalUrl` (not `optionalUrl`) so a
+    // `javascript:`/`data:` value is rejected at save time (stored-XSS guard).
+    // `optionalUrl` uses `z.string().url()` which only checks URL shape and
+    // silently accepts `javascript:alert(1)`.
+    facebook: safeOptionalUrl,
+    instagram: safeOptionalUrl,
+    twitter: safeOptionalUrl,
+    tiktok: safeOptionalUrl,
+    youtube: safeOptionalUrl,
+    snapchat: safeOptionalUrl,
+    linkedin: safeOptionalUrl,
+    wikidata: safeOptionalUrl,
+    wikipedia: safeOptionalUrl,
     // NOTE: `whatsapp` is intentionally NOT a social-links field. The WhatsApp
     // display number is canonical on the `store.whatsapp` column (edited in
     // /contact). Keeping it here too let `/social` store a divergent value that

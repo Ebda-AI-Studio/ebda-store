@@ -1,8 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma, PaymentProvider, ProviderHealthStatus } from '@force/database';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
+import { requireStoreAccess } from '../middleware/store-access';
 import { encryption } from '../services/encryption.service';
 import { auditLog } from '../middleware/security';
 import { PaymentService } from '../services/payment.service';
@@ -694,6 +695,8 @@ router.get(
 router.get(
   '/store/:storeId',
   authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   requirePermission('store:settings'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -712,7 +715,8 @@ router.get(
         return;
       }
 
-      // Check if user owns the store or is super_admin
+      // Defense-in-depth: inline ownership check (requireStoreAccess already
+      // enforced this, but keep as belt-and-suspenders for explicitness)
       const user = getAuthUser(req);
       if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
@@ -765,6 +769,8 @@ router.get(
 router.post(
   '/store/:storeId',
   authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   requirePermission('store:settings'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -786,6 +792,7 @@ router.post(
         return;
       }
 
+      // Defense-in-depth: inline ownership check (requireStoreAccess already enforced this)
       if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
           success: false,
@@ -878,6 +885,8 @@ router.post(
 router.put(
   '/store/:storeId/:provider',
   authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   requirePermission('store:settings'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -899,6 +908,7 @@ router.put(
         return;
       }
 
+      // Defense-in-depth: inline ownership check (requireStoreAccess already enforced this)
       if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
           success: false,
@@ -1000,6 +1010,8 @@ router.put(
 router.delete(
   '/store/:storeId/:provider',
   authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   requirePermission('store:settings'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1020,6 +1032,7 @@ router.delete(
         return;
       }
 
+      // Defense-in-depth: inline ownership check (requireStoreAccess already enforced this)
       if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
           success: false,
@@ -1077,6 +1090,8 @@ router.delete(
 router.post(
   '/store/:storeId/:provider/toggle',
   authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
   requirePermission('store:settings'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1098,6 +1113,7 @@ router.post(
         return;
       }
 
+      // Defense-in-depth: inline ownership check (requireStoreAccess already enforced this)
       if (user.role !== 'super_admin' && store.ownerId !== user.userId) {
         res.status(403).json({
           success: false,

@@ -12,6 +12,26 @@ import {
 import { useRouter, usePathname } from 'next/navigation';
 import { getApiUrl, refreshAccessToken } from './api';
 
+/**
+ * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where
+ * the cross-origin auth cookie is unreliable for installed PWAs (ITP
+ * purges it). On all other browsers (desktop Chrome/Firefox, Android
+ * Chrome) the HTTP-only cookie carries the session and tokens must NOT
+ * be persisted to localStorage (JS-readable, XSS exposure).
+ *
+ * Detection logic:
+ *  - Classic iOS: /iP(hone|ad|od)/i in the UA
+ *  - iPadOS 13+ desktop-mode: navigator.platform === 'MacIntel' with
+ *    maxTouchPoints > 1 (Apple's own documented fingerprint for this case)
+ */
+function isIosWebkit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (/iP(hone|ad|od)/i.test(navigator.userAgent)) return true;
+  // iPadOS 13+ reports MacIntel + touch points
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
 interface User {
   id: string;
   email: string;
@@ -57,7 +77,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // The module-level refreshInFlight in api.ts IS the single-flight guard —
   // no separate ref is needed here.
   const refreshToken = useCallback(async (): Promise<boolean> => {
-    if (typeof window !== 'undefined' && !localStorage.getItem('refreshToken')) return false;
+    // On iOS/iPadOS the refresh token lives in localStorage (the httpOnly
+    // cookie is unreliable for installed PWAs). Bail out if iOS has no
+    // localStorage token — there is nothing to exchange.
+    // On all other browsers the refresh token rides in the refresh_token
+    // httpOnly cookie (sent automatically via credentials:'include'), so
+    // we DO NOT bail out early when localStorage is empty — let the server
+    // read it from the cookie. The /auth/refresh route accepts either.
+    if (typeof window !== 'undefined' && isIosWebkit() && !localStorage.getItem('refreshToken')) {
+      return false;
+    }
     try {
       const newAccessToken = await refreshAccessToken();
       return newAccessToken !== null;
@@ -162,12 +191,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshToken: string;
     csrfToken?: string;
   }) {
-    if (data.accessToken) {
-      localStorage.setItem('accessToken', data.accessToken);
-    }
-    localStorage.setItem('refreshToken', data.refreshToken);
-    if (data.csrfToken) {
-      localStorage.setItem('csrfToken', data.csrfToken);
+    // Only persist tokens to localStorage on iOS/iPadOS WebKit, where the
+    // cross-origin httpOnly cookie is unreliable for installed PWAs (ITP
+    // purges it). On all other browsers (desktop Chrome/Firefox, Android
+    // Chrome) auth rides the httpOnly cookie and we must NOT write tokens
+    // to localStorage — they are JS-readable and expose them to XSS.
+    if (isIosWebkit()) {
+      if (data.accessToken) {
+        localStorage.setItem('accessToken', data.accessToken);
+      }
+      localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.csrfToken) {
+        localStorage.setItem('csrfToken', data.csrfToken);
+      }
     }
     // Set session indicator cookie so middleware can gate admin pages. 30
     // days is the "looks signed in" hint window — the real session lasts as

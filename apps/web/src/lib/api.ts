@@ -24,6 +24,21 @@
  */
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
+/**
+ * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where the
+ * cross-origin httpOnly auth cookie is unreliable for installed PWAs (ITP
+ * purges it). On all other browsers (desktop Chrome/Firefox, Android Chrome)
+ * the httpOnly cookie carries the session and the refresh token must NOT be
+ * persisted to localStorage (JS-readable, XSS exposure).
+ */
+function isIosWebkit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (/iP(hone|ad|od)/i.test(navigator.userAgent)) return true;
+  // iPadOS 13+ desktop-mode fingerprint (Apple's documented detection)
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
 // Common types
 interface User {
   id: string;
@@ -288,25 +303,37 @@ class ApiClient {
     if (this.refreshPromise) return this.refreshPromise;
 
     this.refreshPromise = (async (): Promise<string | null> => {
-      const refreshToken =
+      // On iOS/iPadOS the refresh token lives in localStorage (the httpOnly
+      // cookie is unreliable for installed PWAs). On every other browser the
+      // refresh token rides in the refresh_token httpOnly cookie, sent
+      // automatically via credentials:'include' — so we send an empty body
+      // and let the server read it from the cookie. The /auth/refresh route
+      // accepts either. Only bail early when iOS has no stored token.
+      const ios = isIosWebkit();
+      const storedRefreshToken =
         typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-      if (!refreshToken) return null;
+      if (ios && !storedRefreshToken) return null;
 
       try {
         const res = await fetch(`${this.baseUrl}/auth/refresh`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
+          body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
         });
         if (!res.ok) return null;
         const json = await res.json();
         if (json.success && json.data) {
-          if (json.data.refreshToken && typeof window !== 'undefined') {
-            localStorage.setItem('refreshToken', json.data.refreshToken);
-          }
-          if (json.data.csrfToken && typeof window !== 'undefined') {
-            localStorage.setItem('csrfToken', json.data.csrfToken);
+          // Only persist rotated tokens to localStorage on iOS. On other
+          // browsers the server already rotated the httpOnly cookies in this
+          // response — no JS-visible token storage needed.
+          if (ios && typeof window !== 'undefined') {
+            if (json.data.refreshToken) {
+              localStorage.setItem('refreshToken', json.data.refreshToken);
+            }
+            if (json.data.csrfToken) {
+              localStorage.setItem('csrfToken', json.data.csrfToken);
+            }
           }
           return json.data.accessToken ?? null;
         }
@@ -465,9 +492,13 @@ class ApiClient {
     }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password, storeId }) });
 
     if (result.success && result.data) {
-      // The access token is set as an HTTP-only cookie by the API response.
-      // Only store the refresh token in localStorage.
-      if (typeof window !== 'undefined') {
+      // The access token is always set as an HTTP-only cookie by the API
+      // response. Persist the refresh token to localStorage ONLY on
+      // iOS/iPadOS WebKit, where the cross-origin httpOnly cookie is
+      // unreliable for installed PWAs (ITP purges it). On every other browser
+      // auth rides the httpOnly cookies and writing the refresh token to
+      // localStorage would needlessly expose it to XSS.
+      if (typeof window !== 'undefined' && isIosWebkit()) {
         localStorage.setItem('refreshToken', result.data.refreshToken);
         if (result.data.csrfToken) {
           localStorage.setItem('csrfToken', result.data.csrfToken);

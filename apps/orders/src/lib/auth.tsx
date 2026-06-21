@@ -4,6 +4,21 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useRouter, usePathname } from 'next/navigation';
 import { getApiUrl, refreshAccessToken } from './api';
 
+/**
+ * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where
+ * the cross-origin auth cookie is unreliable for installed PWAs (ITP
+ * purges it). On all other browsers the httpOnly cookie carries the
+ * session and tokens must NOT be persisted to localStorage (JS-readable,
+ * XSS exposure).
+ */
+function isIosWebkit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (/iP(hone|ad|od)/i.test(navigator.userAgent)) return true;
+  // iPadOS 13+ desktop-mode fingerprint (Apple's documented detection)
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -44,16 +59,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // API request) share ONE /auth/refresh rotation instead of racing and
   // tripping the server-side reuse-detection.
   const refreshToken = useCallback(async (): Promise<boolean> => {
-    if (typeof window !== 'undefined' && !localStorage.getItem('refreshToken')) return false;
+    // On iOS/iPadOS the refresh token lives in localStorage (the httpOnly
+    // cookie is unreliable). Bail out if iOS has no localStorage token.
+    // On all other browsers the refresh token rides in the refresh_token
+    // httpOnly cookie — do NOT bail out early when localStorage is empty;
+    // the server reads it from the cookie via credentials:'include'.
+    if (typeof window !== 'undefined' && isIosWebkit() && !localStorage.getItem('refreshToken')) {
+      return false;
+    }
     try {
       const newAccessToken = await refreshAccessToken();
       if (newAccessToken) {
-        // Token rotation writes accessToken + refreshToken + csrfToken to
-        // localStorage inside refreshAccessToken(). Read back the user from
-        // the updated access token by calling /auth/me (or trust that the
-        // checkAuth caller will do so). For the common path (checkAuth on
-        // mount) the caller re-reads the user after this returns true, so
-        // we don't need a separate /me call here.
+        // On iOS, token rotation writes accessToken + refreshToken +
+        // csrfToken to localStorage inside refreshAccessToken(). On other
+        // browsers the server rotates the httpOnly cookie in the response.
         return true;
       }
     } catch (error) {
@@ -137,9 +156,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshToken: string;
     csrfToken?: string;
   }) {
-    if (data.accessToken) localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
-    if (data.csrfToken) localStorage.setItem('csrfToken', data.csrfToken);
+    // Only persist tokens to localStorage on iOS/iPadOS WebKit, where the
+    // cross-origin httpOnly cookie is unreliable for installed PWAs (ITP
+    // purges it). On all other browsers auth rides the httpOnly cookie and
+    // writing tokens to localStorage would expose them to XSS unnecessarily.
+    if (isIosWebkit()) {
+      if (data.accessToken) localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.csrfToken) localStorage.setItem('csrfToken', data.csrfToken);
+    }
     setUser(data.user);
   }
 

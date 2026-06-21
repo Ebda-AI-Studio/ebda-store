@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { prisma } from '@force/database';
 import { resolveLayoutSettings, isSafeUrl } from '@force/shared';
 import type { TemplateId } from '@force/shared';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { getAuthUser } from '../utils/store-helpers';
@@ -669,6 +669,7 @@ export const layoutSchema: z.ZodObject<Record<string, z.ZodTypeAny>> = layoutSch
 router.get(
   '/',
   authenticate,
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -698,6 +699,7 @@ router.get(
 router.put(
   '/',
   authenticate,
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
@@ -774,6 +776,7 @@ router.put(
 router.post(
   '/preview',
   authenticate,
+  authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {

@@ -30,6 +30,20 @@ export function getApiUrl(): string {
 }
 
 /**
+ * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where the
+ * cross-origin httpOnly auth cookie is unreliable for installed PWAs (ITP
+ * purges it). On all other browsers the httpOnly cookie carries the session
+ * and tokens must NOT be persisted to localStorage (JS-readable, XSS exposure).
+ */
+function isIosWebkit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (/iP(hone|ad|od)/i.test(navigator.userAgent)) return true;
+  // iPadOS 13+ desktop-mode fingerprint (Apple's documented detection)
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
+/**
  * Single-flight transparent refresh-on-401. Concurrent 401s share ONE in-flight
  * /auth/refresh so we don't rotate the refresh-token family N times and trip
  * the API's reuse-detection.
@@ -41,20 +55,30 @@ export function refreshAccessToken(): Promise<string | null> {
 
   refreshInFlight = (async (): Promise<string | null> => {
     if (typeof window === 'undefined') return null;
-    const refreshToken = localStorage.getItem('refreshToken');
+    // On iOS/iPadOS the refresh token lives in localStorage (the httpOnly
+    // cookie is unreliable). On every other browser send an empty body and
+    // let the server read the refresh_token httpOnly cookie via
+    // credentials:'include' — the /auth/refresh route accepts either.
+    const ios = isIosWebkit();
+    const storedRefreshToken = ios ? localStorage.getItem('refreshToken') : null;
     try {
       const res = await fetch(`${getApiUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+        body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
       });
       if (!res.ok) return null;
       const json = await res.json();
       if (json?.success && json.data) {
-        if (json.data.accessToken) localStorage.setItem('accessToken', json.data.accessToken);
-        if (json.data.refreshToken) localStorage.setItem('refreshToken', json.data.refreshToken);
-        if (json.data.csrfToken) localStorage.setItem('csrfToken', json.data.csrfToken);
+        // Only persist rotated tokens to localStorage on iOS. On other
+        // browsers the server already rotated the httpOnly cookies in this
+        // response — no JS-visible token storage needed.
+        if (ios) {
+          if (json.data.accessToken) localStorage.setItem('accessToken', json.data.accessToken);
+          if (json.data.refreshToken) localStorage.setItem('refreshToken', json.data.refreshToken);
+          if (json.data.csrfToken) localStorage.setItem('csrfToken', json.data.csrfToken);
+        }
         return json.data.accessToken ?? null;
       }
       return null;

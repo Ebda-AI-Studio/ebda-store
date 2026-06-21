@@ -427,6 +427,40 @@ const server = httpServer.listen(config.port, () => {
     'WebSocket enabled, API docs available'
   );
 
+  // Finding #5 (MED): BYPASSRLS guard.
+  // If DATABASE_URL ever connects as a BYPASSRLS role (e.g. neondb_owner),
+  // all RLS tenant isolation is silently off — every store can read every
+  // other store's data. Refuse to serve traffic in production; warn in dev.
+  // Wrapped in try/catch so a transient query failure doesn't kill the boot.
+  (async () => {
+    try {
+      const rows = await prisma.$queryRaw<Array<{ rolbypassrls: boolean }>>`
+        SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user
+      `;
+      const bypassRls = rows[0]?.rolbypassrls === true;
+      if (bypassRls) {
+        if (config.nodeEnv === 'production') {
+          logger.fatal(
+            { currentUser: 'see pg_roles', rolbypassrls: true },
+            '[SECURITY FATAL] DATABASE_URL connects as a BYPASSRLS role — ' +
+              'all RLS tenant isolation is disabled. ' +
+              'Switch DATABASE_URL to the non-owner role (force_app) and redeploy.'
+          );
+          process.exit(1);
+        } else {
+          logger.warn(
+            { rolbypassrls: true },
+            '[SECURITY WARN] DB role has BYPASSRLS — RLS is not enforced in this environment. ' +
+              'Use the force_app role in production.'
+          );
+        }
+      }
+    } catch (err) {
+      // Query failure must not crash boot — log and continue.
+      logger.warn({ err }, '[SECURITY] BYPASSRLS guard query failed — skipping check');
+    }
+  })();
+
   // Surface auth-token TTLs at boot. A stale `JWT_EXPIRES_IN="3h"` env
   // var on Railway once silently broke the iOS PWA — the cookie's
   // `maxAge` was 30 days but the JWT inside it expired every 3 hours,

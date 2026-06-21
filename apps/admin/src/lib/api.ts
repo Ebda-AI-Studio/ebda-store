@@ -73,15 +73,31 @@ export function getApiUrl(): string {
 }
 
 /**
+ * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where the
+ * cross-origin auth cookie is unreliable for installed PWAs (ITP purges it).
+ * On all other browsers the httpOnly cookie carries the session and tokens
+ * must NOT be persisted to localStorage (JS-readable, XSS exposure).
+ */
+function isIosWebkit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (/iP(hone|ad|od)/i.test(navigator.userAgent)) return true;
+  // iPadOS 13+ desktop-mode fingerprint (Apple's documented detection)
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
+/**
  * Transparent refresh-on-401 (matches the storefront ApiClient).
  *
  * The access token is now short-lived (30 min). When a protected request
  * 401s mid-session we silently exchange the long-lived refresh token for a
  * fresh access+refresh pair via /auth/refresh and retry the original request
  * once — the merchant never sees a logout. Rotation means the response
- * returns a NEW refresh token; we mirror both into localStorage for the iOS
- * PWA Bearer path. The HTTP-only refresh cookie is rotated server-side in
- * parallel for the browser-cookie path.
+ * returns a NEW refresh token; we mirror both into localStorage ONLY on
+ * iOS/iPadOS WebKit (Bearer path). On all other browsers the httpOnly
+ * refresh cookie is rotated server-side and returned tokens are kept
+ * in-memory only (not persisted to localStorage). The HTTP-only refresh
+ * cookie is always rotated server-side in parallel for both paths.
  *
  * Single-flight: concurrent 401s share ONE in-flight refresh promise so we
  * don't fire N parallel /auth/refresh calls (which would rotate the family
@@ -94,24 +110,30 @@ export function refreshAccessToken(): Promise<string | null> {
 
   refreshInFlight = (async (): Promise<string | null> => {
     if (typeof window === 'undefined') return null;
-    // Body token for the Bearer/localStorage path; the HTTP-only refresh
-    // cookie is sent automatically via credentials:'include' for the
-    // pure-browser path (the API accepts either).
-    const refreshToken = localStorage.getItem('refreshToken');
+    // On iOS/iPadOS the refresh token lives in localStorage (httpOnly cookie
+    // is unreliable). On all other browsers send an empty body and let the
+    // server read from req.cookies.refresh_token instead.
+    const ios = isIosWebkit();
+    const storedRefreshToken = ios ? localStorage.getItem('refreshToken') : null;
 
     try {
       const res = await fetch(`${getApiUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+        body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
       });
       if (!res.ok) return null;
       const json = await res.json();
       if (json?.success && json.data) {
-        if (json.data.accessToken) localStorage.setItem('accessToken', json.data.accessToken);
-        if (json.data.refreshToken) localStorage.setItem('refreshToken', json.data.refreshToken);
-        if (json.data.csrfToken) localStorage.setItem('csrfToken', json.data.csrfToken);
+        // Only persist new tokens to localStorage on iOS/iPadOS. On other
+        // browsers the httpOnly cookie was already rotated by the server
+        // response — no JS-visible token storage needed.
+        if (ios) {
+          if (json.data.accessToken) localStorage.setItem('accessToken', json.data.accessToken);
+          if (json.data.refreshToken) localStorage.setItem('refreshToken', json.data.refreshToken);
+          if (json.data.csrfToken) localStorage.setItem('csrfToken', json.data.csrfToken);
+        }
         return json.data.accessToken ?? null;
       }
       return null;
