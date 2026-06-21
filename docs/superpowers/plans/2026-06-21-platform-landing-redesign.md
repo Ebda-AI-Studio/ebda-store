@@ -15,7 +15,7 @@ Force brand = **orange `#ff6e01` / white / black / grey**. Storefront tokens alr
 Replace the components' shipped palettes:
 
 - WebGL shader fragment: the RGB-split sine field → tint toward orange (warm the `r`, mute `b`) on black.
-- radial-orbital-timeline: `from-purple-500 via-blue-500 to-teal-500` center + `from-blue-500 to-purple-500` energy bars → orange gradient (`from-primary`/`to-primary/60`); keep black/white node states.
+- ~~radial-orbital-timeline~~ — REPLACED 2026-06-21: the orbital read as a gimmicky full-screen, click-to-expand toy that hid the capabilities. Features is now a scannable **bento grid** (`FeaturesSection.tsx`, no external component) with the AI flagship as the 2×2 tile; AEO/GEO dropped here to stay complementary with `AeoGeoSection`. Card idiom matches AeoGeoSection (glass + orange icon chip + hover lift/glow). The orbital component + its purple/blue palette are gone.
 - sparkles: `particleColor="#ffffff"` on black, accent gradients `via-indigo-500`/`via-sky-500` → `via-primary`.
 - testimonial-cards: `border-slate-700 bg-slate-800/20`, `text-indigo-400` author → `border-border bg-card/40`, `text-primary`.
 - logo-cloud: real Force client/tech logos via lucide or `logo_search` MCP, not the svgl defaults.
@@ -27,7 +27,7 @@ Replace the components' shipped palettes:
 | #   | Section          | Primary component(s)                                            | Status                             |
 | --- | ---------------- | --------------------------------------------------------------- | ---------------------------------- |
 | 1   | Hero             | `web-gl-shader` + `liquid-glass-button` + `animated-text-cycle` | ✅ built (PR #333)                 |
-| 2   | Features         | `radial-orbital-timeline`                                       | ✅ built (PR #333)                 |
+| 2   | Features         | bento grid (`FeaturesSection.tsx`)                              | ✅ rebuilt — orbital replaced      |
 | 3   | CTA              | `sparkles`                                                      | ✅ built (PR #333)                 |
 | 4   | Buttons (system) | `liquid-glass-button` (LiquidButton + MetalButton)              | ✅ built (PR #333)                 |
 | 5   | Testimonials     | `testimonial-cards`                                             | ✅ built (PR #333)                 |
