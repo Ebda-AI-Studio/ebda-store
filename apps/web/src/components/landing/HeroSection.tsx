@@ -2,6 +2,7 @@
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { liquidbuttonVariants } from '@/components/ui/liquid-glass-button';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // three.js must never hit the SSR bundle — lazy-load client-side only.
 const WebGLShader = dynamic(
@@ -17,6 +18,8 @@ const GLASS_STYLE: React.CSSProperties = {
 };
 
 export function HeroSection() {
+  const { t } = useLanguage();
+
   return (
     <section
       id="hero"
@@ -30,13 +33,16 @@ export function HeroSection() {
         <div className="max-w-3xl w-full rounded-2xl border border-border/40 bg-background/5 backdrop-blur-md p-10 md:p-16 flex flex-col items-center gap-6 text-center shadow-2xl">
           {/* Headline */}
           <h1 className="text-4xl md:text-7xl font-bold leading-tight tracking-tight text-white">
-            Build your store with <span className="text-primary">Force AI</span>
+            {t('Build your store with', 'ابنِ متجرك مع')}{' '}
+            <span className="text-primary">Force AI</span>
           </h1>
 
           {/* Sub-headline */}
           <p className="text-base md:text-xl text-muted-foreground max-w-xl leading-relaxed">
-            AI-powered e-commerce storefronts built for Kuwait and the Gulf. Launch a fully
-            customized online store in minutes — Arabic-first, locally integrated, always smart.
+            {t(
+              'AI-powered e-commerce storefronts built for Kuwait and the Gulf. Launch a fully customized online store in minutes — Arabic-first, locally integrated, always smart.',
+              'متاجر إلكترونية مدعومة بالذكاء الاصطناعي، صُممت للكويت والخليج. أطلق متجرك الإلكتروني المخصص في دقائق — عربي أولاً، متكامل محلياً، وذكي دائماً.'
+            )}
           </p>
 
           {/* CTAs */}
@@ -52,7 +58,7 @@ export function HeroSection() {
               )}
               style={GLASS_STYLE}
             >
-              Talk on WhatsApp
+              {t('Talk on WhatsApp', 'تواصل عبر واتساب')}
             </a>
 
             {/* Secondary CTA — Email */}
@@ -61,7 +67,7 @@ export function HeroSection() {
               className={cn(liquidbuttonVariants({ size: 'lg' }))}
               style={GLASS_STYLE}
             >
-              Email us
+              {t('Email us', 'راسلنا')}
             </a>
           </div>
         </div>

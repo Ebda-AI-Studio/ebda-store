@@ -2,11 +2,13 @@
 
 import { SectionHeader } from '@/components/landing/SectionHeader';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Merchant {
   name: string;
   logo: string;
-  quote: string;
+  quoteEn: string;
+  quoteAr: string;
   url: string;
 }
 
@@ -14,31 +16,39 @@ const MERCHANTS: Merchant[] = [
   {
     name: 'Wady Aljuz',
     logo: 'https://pub-ff2bd6a1f8dd4567b9dd4c92e7a8b0f7.r2.dev/stores/dfc1c208-1c30-4eba-9821-6f3be15e3506/branding/f50c74cd-fc75-4d40-af6d-7003adef8db1.svg',
-    quote: 'From our shelves to checkout in a day — Force AI runs the whole store.',
+    quoteEn: 'From our shelves to checkout in a day — Force AI runs the whole store.',
+    quoteAr: 'من الرف إلى الدفع في يوم واحد — Force AI يدير المتجر بالكامل.',
     url: 'https://wadyaljuz.com',
   },
   {
     name: 'Pecannbee',
     logo: 'https://pub-ff2bd6a1f8dd4567b9dd4c92e7a8b0f7.r2.dev/stores/359afc1f-ea5b-4f8d-b372-c038c6c057f7/logos/922a161f-6a7b-41b7-b597-81ec7e9e7486-4175480730368983c07345ad2_37965252.png',
-    quote: 'The AI writes our product pages in Arabic and English. We just sell.',
+    quoteEn: 'The AI writes our product pages in Arabic and English. We just sell.',
+    quoteAr: 'الذكاء الاصطناعي يكتب صفحات منتجاتنا بالعربي والإنجليزي. نحن نبيع فقط.',
     url: 'https://store.forcemediakw.com/pecannbee',
   },
   {
     name: 'Palora',
     logo: 'https://pub-ff2bd6a1f8dd4567b9dd4c92e7a8b0f7.r2.dev/branding/98ef3992-fb82-4164-8cf8-8e9f15780e4c.png',
-    quote: 'Payments, delivery and books all in one place. Setup took an afternoon.',
+    quoteEn: 'Payments, delivery and books all in one place. Setup took an afternoon.',
+    quoteAr: 'الدفع والتوصيل والطلبات في مكان واحد. الإعداد استغرق بعد الظهر فقط.',
     url: 'https://store.forcemediakw.com/palora',
   },
 ];
 
 export function MerchantsSection() {
+  const { t } = useLanguage();
+
   return (
     <section id="merchants" className="bg-black py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          kicker="REAL KUWAITI STORES"
-          title="Built on Force AI"
-          subtitle="Live stores already selling with Force AI — from groceries to gifts."
+          kicker={t('REAL KUWAITI STORES', 'متاجر كويتية حقيقية')}
+          title={t('Built on Force AI', 'مبنية على Force AI')}
+          subtitle={t(
+            'Live stores already selling with Force AI — from groceries to gifts.',
+            'متاجر تبيع فعلاً عبر Force AI — من البقالة إلى الهدايا.'
+          )}
           className="mb-16"
         />
 
@@ -69,8 +79,8 @@ export function MerchantsSection() {
               <h3 className="mb-2 text-center text-lg font-semibold text-white">{merchant.name}</h3>
 
               {/* Quote */}
-              <p className="mb-6 text-center text-sm italic leading-relaxed text-muted-foreground">
-                &ldquo;{merchant.quote}&rdquo;
+              <p className="mb-6 text-center text-sm italic leading-relaxed text-white/85">
+                &ldquo;{t(merchant.quoteEn, merchant.quoteAr)}&rdquo;
               </p>
 
               {/* Visit link */}
@@ -81,7 +91,7 @@ export function MerchantsSection() {
                   rel="noopener noreferrer"
                   className="text-sm text-primary hover:underline"
                 >
-                  Visit store &rarr;
+                  {t('Visit store', 'زيارة المتجر')} &rarr;
                 </a>
               </div>
             </div>

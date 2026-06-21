@@ -3,14 +3,17 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { liquidbuttonVariants } from '@/components/ui/liquid-glass-button';
-
-const NAV_LINKS = [
-  { label: 'What we do', href: '#features' },
-  { label: 'Merchants', href: '#merchants' },
-  { label: 'Contact', href: 'https://wa.me/96566740311' },
-] as const;
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export function LandingHeader() {
+  const { language, setLanguage, t } = useLanguage();
+
+  const navLinks = [
+    { label: t('What we do', 'ماذا نقدم'), href: '#features' },
+    { label: t('Merchants', 'المتاجر'), href: '#merchants' },
+    { label: t('Contact', 'تواصل'), href: 'https://wa.me/96566740311' },
+  ];
+
   return (
     <header className="sticky top-0 z-50 bg-black/60 backdrop-blur-md border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-6">
@@ -22,9 +25,9 @@ export function LandingHeader() {
 
         {/* Desktop nav — hidden on mobile */}
         <nav className="hidden md:flex items-center gap-8 flex-1 justify-center">
-          {NAV_LINKS.map(link => (
+          {navLinks.map(link => (
             <a
-              key={link.label}
+              key={link.href}
               href={link.href}
               className="text-sm text-white/60 hover:text-white transition-colors"
             >
@@ -33,8 +36,18 @@ export function LandingHeader() {
           ))}
         </nav>
 
-        {/* CTA — always visible */}
-        <div className="shrink-0">
+        {/* Language toggle + CTA — always visible */}
+        <div className="shrink-0 flex items-center gap-3">
+          {/* Language toggle */}
+          <button
+            type="button"
+            onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+            className="rounded-full border border-white/20 px-3 py-1.5 text-sm text-white/80 hover:text-white transition-colors"
+          >
+            {language === 'ar' ? 'EN' : 'عربي'}
+          </button>
+
+          {/* Get started CTA */}
           <a
             href="https://wa.me/96566740311"
             target="_blank"
@@ -47,7 +60,7 @@ export function LandingHeader() {
               boxShadow: '0 4px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25)',
             }}
           >
-            Get started
+            {t('Get started', 'ابدأ الآن')}
           </a>
         </div>
       </div>

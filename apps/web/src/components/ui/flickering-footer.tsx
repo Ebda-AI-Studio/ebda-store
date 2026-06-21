@@ -4,6 +4,7 @@ import * as React from 'react';
 import { parse, toRGBA } from 'color-bits';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // ---------------------------------------------------------------------------
 // color-bits helpers
@@ -278,9 +279,41 @@ function FooterColumn({ title, links }: FooterColumnProps) {
 export function FlickeringFooter() {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const isTablet = useMediaQuery('(min-width: 640px)');
+  const { t } = useLanguage();
 
   // Big text: "Force AI" on desktop, "Force" on tablet, nothing on mobile
   const bigText = isDesktop ? 'Force AI' : isTablet ? 'Force' : null;
+
+  // Translated footer link columns — column titles + link labels
+  const translatedFooterLinks: Array<{
+    title: string;
+    links: ReadonlyArray<{ label: string; href: string }>;
+  }> = [
+    {
+      title: t('Company', 'الشركة'),
+      links: [
+        { label: t('About', 'عن الشركة'), href: '/about' },
+        { label: t('Contact', 'تواصل معنا'), href: '/contact' },
+        { label: t('Blog', 'المدونة'), href: '/blog' },
+      ],
+    },
+    {
+      title: t('Product', 'المنتج'),
+      links: [
+        { label: t('Features', 'المميزات'), href: '/features' },
+        { label: t('Pricing', 'الأسعار'), href: '/pricing' },
+        { label: t('Stores', 'المتاجر'), href: '/stores' },
+      ],
+    },
+    {
+      title: t('Resources', 'الموارد'),
+      links: [
+        { label: t('Docs', 'التوثيق'), href: '/docs' },
+        { label: t('Support', 'الدعم'), href: '/support' },
+        { label: t('Status', 'الحالة'), href: '/status' },
+      ],
+    },
+  ];
 
   return (
     <footer className="relative w-full bg-black overflow-hidden">
@@ -296,7 +329,10 @@ export function FlickeringFooter() {
               <span className="text-white font-bold text-lg tracking-tight">Force AI</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              {siteConfig.hero.description}
+              {t(
+                siteConfig.hero.description,
+                'منصة التجارة الإلكترونية المدعومة بالذكاء الاصطناعي للأعمال الخليجية.'
+              )}
             </p>
             <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
               <a
@@ -318,11 +354,7 @@ export function FlickeringFooter() {
 
           {/* Link columns */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-10">
-            {(
-              Object.entries(siteConfig.footerLinks) as Array<
-                [string, ReadonlyArray<{ label: string; href: string }>]
-              >
-            ).map(([title, links]) => (
+            {translatedFooterLinks.map(({ title, links }) => (
               <FooterColumn key={title} title={title} links={links} />
             ))}
           </div>
@@ -376,20 +408,21 @@ export function FlickeringFooter() {
       <div className="relative z-10 border-t border-border/20 px-6 py-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-xs text-muted-foreground/60">
-            &copy; {new Date().getFullYear()} Force AI. All rights reserved.
+            &copy; {new Date().getFullYear()} Force AI.{' '}
+            {t('All rights reserved.', 'جميع الحقوق محفوظة.')}
           </p>
           <div className="flex items-center gap-4">
             <Link
               href="/privacy"
               className="text-xs text-muted-foreground/60 hover:text-white transition-colors"
             >
-              Privacy
+              {t('Privacy', 'الخصوصية')}
             </Link>
             <Link
               href="/terms"
               className="text-xs text-muted-foreground/60 hover:text-white transition-colors"
             >
-              Terms
+              {t('Terms', 'الشروط')}
             </Link>
           </div>
         </div>

@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { HeroSection } from '@/components/landing/HeroSection';
 import FeaturesSection from '@/components/landing/FeaturesSection';
+import { BeforeAfterSection } from '@/components/landing/BeforeAfterSection';
+import { AeoGeoSection } from '@/components/landing/AeoGeoSection';
 import { MerchantsSection } from '@/components/landing/MerchantsSection';
 import CtaSection from '@/components/landing/CtaSection';
 import { FooterSection } from '@/components/landing/FooterSection';
@@ -29,6 +31,8 @@ export default function LandingPreviewPage() {
       <LandingHeader />
       <HeroSection />
       <FeaturesSection />
+      <BeforeAfterSection />
+      <AeoGeoSection />
       <MerchantsSection />
       <CtaSection />
       <FooterSection />
