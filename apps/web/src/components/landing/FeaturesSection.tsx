@@ -44,24 +44,24 @@ export default function FeaturesSection() {
       featured: true,
       title: t('AI autofill — Arabic & English', 'ملء تلقائي بالذكاء الاصطناعي — عربي وإنجليزي'),
       body: t(
-        'Upload a photo or type a few words and the platform writes product names, descriptions, and SEO copy in Arabic and English at once — bidirectional, Arabic-first, and ready to publish in seconds. No copywriter, no translator, no blank fields.',
-        'ارفع صورة أو اكتب بضع كلمات وتكتب المنصة أسماء المنتجات والأوصاف ونصوص SEO بالعربية والإنجليزية معاً — ثنائي الاتجاه، عربي أولاً، وجاهز للنشر في ثوانٍ. لا كاتب محتوى ولا مترجم ولا حقول فارغة.'
+        'Type a product name in Arabic or English and the platform fills in the rest — the other language, the description, and the SEO copy — all at once, bidirectional and Arabic-first, ready to publish in seconds. No copywriter, no translator, no blank fields.',
+        'اكتب اسم المنتج بالعربية أو الإنجليزية وتُكمل المنصة الباقي — اللغة الأخرى والوصف ونصوص SEO — دفعةً واحدة، ثنائي الاتجاه وعربي أولاً، وجاهز للنشر في ثوانٍ. لا كاتب محتوى ولا مترجم ولا حقول فارغة.'
       ),
     },
     {
       icon: Search,
       title: t('SEO that writes itself', 'SEO يكتب نفسه'),
       body: t(
-        'Per-product meta titles, alt text, canonical tags, sitemaps, and Arabic/English hreflang are generated and kept fresh automatically — no plugin, no developer.',
-        'عناوين ميتا لكل منتج ونص بديل وعلامات canonical وخرائط موقع وhreflang للعربية والإنجليزية تُولَّد وتُحدَّث تلقائياً — لا إضافات ولا مطوّر.'
+        'Per-product meta titles and descriptions, canonical tags, sitemaps, structured data, and Arabic/English hreflang are generated and kept fresh automatically — no plugin, no developer.',
+        'عناوين ووصف ميتا لكل منتج وعلامات canonical وخرائط موقع وبيانات منظّمة وhreflang للعربية والإنجليزية تُولَّد وتُحدَّث تلقائياً — لا إضافات ولا مطوّر.'
       ),
     },
     {
       icon: CreditCard,
       title: t('Kuwait payments, connected', 'مدفوعات الكويت، موصولة'),
       body: t(
-        'Tap, MyFatoorah, Hesabe, and UPayments are wired in out of the box — KNET and cards work on day one, with KWD as the first-class currency and no external checkout redirects.',
-        'Tap وMyFatoorah وHesabe وUPayments مدمجة من اليوم الأول — KNET والبطاقات تعمل فوراً، والدينار الكويتي هو العملة الرئيسية دون تحويل إلى صفحات دفع خارجية.'
+        'Tap, MyFatoorah, Hesabe, and UPayments are wired in out of the box — KNET and cards work on day one, KWD is the first-class currency, and every payment is verified server-side when the customer returns.',
+        'Tap وMyFatoorah وHesabe وUPayments مدمجة من اليوم الأول — KNET والبطاقات تعمل فوراً، والدينار الكويتي هو العملة الرئيسية، ويُتحقَّق من كل دفعة على الخادم عند عودة العميل.'
       ),
     },
     {
@@ -74,10 +74,10 @@ export default function FeaturesSection() {
     },
     {
       icon: MessageCircle,
-      title: t('WhatsApp catalog & broadcasts', 'كتالوج واتساب والبث'),
+      title: t('WhatsApp orders & catalog', 'طلبات واتساب والكتالوج'),
       body: t(
-        'Your live catalog syncs to a native WhatsApp catalog automatically, and you broadcast targeted offers to customer segments — all from the dashboard you manage orders on.',
-        'يتزامن كتالوجك الحي مع كتالوج WhatsApp الأصلي تلقائياً، وتبث عروضاً مستهدفة لشرائح العملاء — كل ذلك من لوحة التحكم التي تدير منها طلباتك.'
+        'Your live product catalog syncs to a native Meta WhatsApp catalog automatically, customers get order, shipping, and delivery updates on WhatsApp, and you can send one-tap payment links — all from the dashboard you manage orders on.',
+        'يتزامن كتالوج منتجاتك الحي مع كتالوج WhatsApp الأصلي من Meta تلقائياً، ويصل العملاء تحديثات الطلب والشحن والتسليم عبر واتساب، ويمكنك إرسال روابط دفع بضغطة واحدة — كل ذلك من لوحة التحكم التي تدير منها طلباتك.'
       ),
     },
     {
