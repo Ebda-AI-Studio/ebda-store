@@ -38,7 +38,7 @@ export function SectionHeader({
       {/* Signature orange hairline — the repeated visual constant. */}
       <span className={cn('h-[3px] w-20 rounded-full bg-primary', isCenter ? 'mx-auto' : '')} />
       {subtitle ? (
-        <p className="mt-1 max-w-2xl text-base md:text-lg text-muted-foreground leading-relaxed">
+        <p className="mt-1 max-w-2xl text-base md:text-lg text-white/70 leading-relaxed">
           {subtitle}
         </p>
       ) : null}

@@ -107,6 +107,10 @@ const KNOWN_APP_ROUTES = new Set([
   // redesigned-landing preview page.
   'og',
   'landing-preview',
+  // Static asset folder for the landing preview (e.g. /landing/after-store.jpg).
+  // Without this the platform domain treats `landing` as a store slug and 404s
+  // the image.
+  'landing',
 ]);
 
 /**

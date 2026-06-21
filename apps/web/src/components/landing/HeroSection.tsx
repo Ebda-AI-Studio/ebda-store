@@ -38,7 +38,7 @@ export function HeroSection() {
           </h1>
 
           {/* Sub-headline */}
-          <p className="text-base md:text-xl text-muted-foreground max-w-xl leading-relaxed">
+          <p className="text-base md:text-xl text-white/70 max-w-xl leading-relaxed">
             {t(
               'AI-powered e-commerce storefronts built for Kuwait and the Gulf. Launch a fully customized online store in minutes — Arabic-first, locally integrated, always smart.',
               'متاجر إلكترونية مدعومة بالذكاء الاصطناعي، صُممت للكويت والخليج. أطلق متجرك الإلكتروني المخصص في دقائق — عربي أولاً، متكامل محلياً، وذكي دائماً.'

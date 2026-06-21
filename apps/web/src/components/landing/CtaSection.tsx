@@ -56,7 +56,7 @@ export default function CtaSection() {
       <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center gap-10 text-center">
         {/* Badge */}
         <span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-4 py-1 text-sm font-medium text-primary">
-          {t('Powered by Force AI', 'مدعوم من Force AI')}
+          {t('Ready when you are', 'جاهزون متى ما أردت')}
         </span>
 
         {/* Headline */}

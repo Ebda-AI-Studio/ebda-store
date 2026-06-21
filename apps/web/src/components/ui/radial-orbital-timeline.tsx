@@ -148,8 +148,12 @@ export default function RadialOrbitalTimeline({ timelineData }: Props) {
           transform: `translate(${centerOffset.x}px, ${centerOffset.y}px)`,
         }}
       >
+        {/* Soft outer glow so the core reads as a light source on black */}
+        <div className="absolute -inset-6 rounded-full bg-primary/30 blur-2xl" />
         <div className="w-full h-full rounded-full bg-gradient-to-br from-primary via-primary to-orange-400 opacity-90 blur-sm" />
-        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary via-primary to-orange-400" />
+        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary via-primary to-orange-400 shadow-[0_0_50px_rgba(255,110,1,0.55)]" />
+        {/* Inner highlight for a glassy core */}
+        <div className="absolute inset-2 rounded-full bg-gradient-to-br from-white/40 to-transparent" />
         <div
           className={cn(
             'absolute inset-0 rounded-full bg-gradient-to-br from-primary via-primary to-orange-400 animate-ping',
@@ -161,7 +165,7 @@ export default function RadialOrbitalTimeline({ timelineData }: Props) {
       {/* Orbit ring */}
       <div
         ref={orbitRef}
-        className="absolute rounded-full border border-white/10"
+        className="absolute rounded-full border border-white/15"
         style={{ width: ORBIT_RADIUS * 2, height: ORBIT_RADIUS * 2 }}
       />
 
@@ -209,7 +213,7 @@ export default function RadialOrbitalTimeline({ timelineData }: Props) {
                 <Icon size={18} />
               </div>
               {/* Title label */}
-              <span className="text-white/80 text-xs font-medium whitespace-nowrap max-w-[120px] text-center leading-tight">
+              <span className="text-white/90 text-xs font-medium whitespace-nowrap max-w-[120px] text-center leading-tight">
                 {item.title}
               </span>
             </button>

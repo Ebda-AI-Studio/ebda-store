@@ -16,8 +16,8 @@ const MERCHANTS: Merchant[] = [
   {
     name: 'Wady Aljuz',
     logo: 'https://pub-ff2bd6a1f8dd4567b9dd4c92e7a8b0f7.r2.dev/stores/dfc1c208-1c30-4eba-9821-6f3be15e3506/branding/f50c74cd-fc75-4d40-af6d-7003adef8db1.svg',
-    quoteEn: 'From our shelves to checkout in a day — Force AI runs the whole store.',
-    quoteAr: 'من الرف إلى الدفع في يوم واحد — Force AI يدير المتجر بالكامل.',
+    quoteEn: 'From our shelves to checkout in a day — the platform runs the whole store.',
+    quoteAr: 'من الرف إلى الدفع في يوم واحد — المنصة تدير المتجر بالكامل.',
     url: 'https://wadyaljuz.com',
   },
   {
@@ -46,8 +46,8 @@ export function MerchantsSection() {
           kicker={t('REAL KUWAITI STORES', 'متاجر كويتية حقيقية')}
           title={t('Built on Force AI', 'مبنية على Force AI')}
           subtitle={t(
-            'Live stores already selling with Force AI — from groceries to gifts.',
-            'متاجر تبيع فعلاً عبر Force AI — من البقالة إلى الهدايا.'
+            'Live Kuwaiti stores already selling every day — from groceries to gifts.',
+            'متاجر كويتية حقيقية تبيع كل يوم — من البقالة إلى الهدايا.'
           )}
           className="mb-16"
         />
@@ -57,7 +57,7 @@ export function MerchantsSection() {
             <div
               key={merchant.name}
               className={cn(
-                'rounded-2xl border border-border bg-card/40 p-8 backdrop-blur',
+                'rounded-2xl border border-white/10 bg-white/[0.04] p-8 backdrop-blur',
                 'transition-all hover:-translate-y-1 hover:border-primary/40',
                 'hover:shadow-[0_8px_40px_rgba(255,110,1,0.15)]'
               )}

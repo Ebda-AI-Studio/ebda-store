@@ -24,8 +24,8 @@ export default function FeaturesSection() {
       title: t('AI Autofill — AR & EN', 'ملء تلقائي بالذكاء الاصطناعي — عربي وإنجليزي'),
       date: 'AI',
       content: t(
-        'Upload a photo or type a few words and Force AI writes product names, descriptions, and SEO copy in Arabic and English simultaneously — bidirectional, Arabic-first, and ready to publish in seconds.',
-        'ارفع صورة أو اكتب بضع كلمات وسيكتب Force AI أسماء المنتجات والأوصاف ونصوص SEO بالعربية والإنجليزية في آنٍ واحد — ثنائي الاتجاه، عربي أولاً، وجاهز للنشر في ثوانٍ.'
+        'Upload a photo or type a few words and the platform writes product names, descriptions, and SEO copy in Arabic and English simultaneously — bidirectional, Arabic-first, and ready to publish in seconds.',
+        'ارفع صورة أو اكتب بضع كلمات وستكتب المنصة أسماء المنتجات والأوصاف ونصوص SEO بالعربية والإنجليزية في آنٍ واحد — ثنائي الاتجاه، عربي أولاً، وجاهز للنشر في ثوانٍ.'
       ),
       category: 'Artificial Intelligence',
       icon: Sparkles,
@@ -38,8 +38,8 @@ export default function FeaturesSection() {
       title: t('AEO — Answer Engine Optimization', 'AEO — تحسين محركات الإجابة'),
       date: 'AI',
       content: t(
-        'Force AI structures your catalog with question-answer schema so ChatGPT, Gemini, and Perplexity recommend your products when shoppers ask AI what to buy — your store becomes the answer, not a search result.',
-        'يهيّئ Force AI كتالوجك بمخطط أسئلة وأجوبة لتوصي ChatGPT وGemini وPerplexity بمنتجاتك عندما يسأل المتسوقون الذكاء الاصطناعي عمّا يشترون — يصبح متجرك هو الإجابة لا مجرد نتيجة بحث.'
+        'Your catalog is structured with question-answer schema so ChatGPT, Gemini, and Perplexity recommend your products when shoppers ask AI what to buy — your store becomes the answer, not a search result.',
+        'يُهيَّأ كتالوجك بمخطط أسئلة وأجوبة لتوصي ChatGPT وGemini وPerplexity بمنتجاتك عندما يسأل المتسوقون الذكاء الاصطناعي عمّا يشترون — يصبح متجرك هو الإجابة لا مجرد نتيجة بحث.'
       ),
       category: 'Artificial Intelligence',
       icon: Bot,
@@ -141,8 +141,8 @@ export default function FeaturesSection() {
           kicker={t('AI-NATIVE COMMERCE', 'تجارة ذكاء اصطناعي أصيلة')}
           title={t('Your store, run by AI', 'متجرك، يُديره الذكاء الاصطناعي')}
           subtitle={t(
-            'Force AI handles the writing, the search visibility, the books, and the payments — so Kuwaiti merchants can focus on what they sell, not how to manage it.',
-            'Force AI يتولّى الكتابة والظهور في البحث والمحاسبة والمدفوعات — لتتفرّغ أنت لما تبيعه لا لكيفية إدارته.'
+            'Writing, search visibility, accounting, payments, and WhatsApp — everything a Kuwaiti merchant needs, in one place.',
+            'الكتابة والظهور في البحث والمحاسبة والمدفوعات وواتساب — كل ما يحتاجه التاجر الكويتي في مكان واحد.'
           )}
         />
       </div>

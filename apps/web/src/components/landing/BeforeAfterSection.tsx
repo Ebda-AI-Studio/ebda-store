@@ -6,8 +6,8 @@ import { SectionHeader } from '@/components/landing/SectionHeader';
 
 /**
  * Before → After: a blank starter store (CSS wireframe) transforms into a real,
- * fully-branded Force AI storefront (an actual screenshot of a live merchant,
- * Pecannbee). The "after" is genuine — proof, not a mockup.
+ * fully-branded storefront (an actual screenshot of a live merchant, Pecannbee).
+ * The "after" is genuine — proof, not a mockup.
  */
 
 /** A grey wireframe standing in for an empty / unbranded starting store. */
@@ -62,8 +62,8 @@ export function BeforeAfterSection() {
           kicker={t('FROM ZERO TO LIVE', 'من الصفر إلى الإطلاق')}
           title={t('A blank page becomes your store', 'صفحة فارغة تتحوّل إلى متجرك')}
           subtitle={t(
-            'Send us your products. Force AI builds the logo, layout, Arabic + English copy, and payments — a real branded store, live in days.',
-            'أرسل لنا منتجاتك، ويبني Force AI الشعار والتصميم والمحتوى بالعربي والإنجليزي والدفع — متجر بهويتك، جاهز خلال أيام.'
+            'Send us your products. We take it from there — a fully branded, bilingual store with payments wired in, live in days.',
+            'أرسل لنا منتجاتك ونتولّى الباقي — متجر بهويتك بالعربي والإنجليزي ومدفوعات جاهزة، تنطلق خلال أيام.'
           )}
           className="mb-14"
         />
@@ -88,19 +88,16 @@ export function BeforeAfterSection() {
             </span>
           </div>
 
-          {/* After — a real Force AI store */}
+          {/* After — a real live store */}
           <div className="flex-1">
             <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              {t('After · a live Force AI store', 'بعد · متجر حقيقي على Force AI')}
+              {t('After · a live store', 'بعد · متجر حقيقي')}
             </p>
             <BrowserFrame>
               <div className="aspect-[4/3] w-full overflow-hidden">
                 <img
                   src="/landing/after-store.jpg"
-                  alt={t(
-                    'A live branded Force AI storefront',
-                    'متجر حقيقي بهوية كاملة على Force AI'
-                  )}
+                  alt={t('A live branded storefront', 'متجر حقيقي بهوية كاملة')}
                   className="h-full w-full object-cover object-top"
                   loading="lazy"
                   decoding="async"

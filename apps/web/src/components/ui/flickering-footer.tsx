@@ -285,32 +285,27 @@ export function FlickeringFooter() {
   const bigText = isDesktop ? 'Force AI' : isTablet ? 'Force' : null;
 
   // Translated footer link columns — column titles + link labels
+  // Real destinations only — landing section anchors + live contact channels.
+  // (The old /about, /pricing, /docs… paths don't exist on the platform host and
+  // 404'd into the legacy landing.)
   const translatedFooterLinks: Array<{
     title: string;
     links: ReadonlyArray<{ label: string; href: string }>;
   }> = [
     {
-      title: t('Company', 'الشركة'),
+      title: t('Explore', 'استكشف'),
       links: [
-        { label: t('About', 'عن الشركة'), href: '/about' },
-        { label: t('Contact', 'تواصل معنا'), href: '/contact' },
-        { label: t('Blog', 'المدونة'), href: '/blog' },
+        { label: t('What we do', 'ماذا نقدم'), href: '#features' },
+        { label: t('The AI edge', 'ميزة الذكاء الاصطناعي'), href: '#aeo-geo' },
+        { label: t('Our merchants', 'متاجرنا'), href: '#merchants' },
       ],
     },
     {
-      title: t('Product', 'المنتج'),
+      title: t('Get in touch', 'تواصل معنا'),
       links: [
-        { label: t('Features', 'المميزات'), href: '/features' },
-        { label: t('Pricing', 'الأسعار'), href: '/pricing' },
-        { label: t('Stores', 'المتاجر'), href: '/stores' },
-      ],
-    },
-    {
-      title: t('Resources', 'الموارد'),
-      links: [
-        { label: t('Docs', 'التوثيق'), href: '/docs' },
-        { label: t('Support', 'الدعم'), href: '/support' },
-        { label: t('Status', 'الحالة'), href: '/status' },
+        { label: t('WhatsApp', 'واتساب'), href: 'https://wa.me/96566740311' },
+        { label: t('Email', 'البريد'), href: 'mailto:info@forcemediakw.com' },
+        { label: t('Force Media', 'فورس ميديا'), href: 'https://forcemediakw.com' },
       ],
     },
   ];
