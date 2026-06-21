@@ -100,6 +100,13 @@ const KNOWN_APP_ROUTES = new Set([
   'apple-icon',
   'sitemap',
   'robots',
+  // Platform-level routes (not store-scoped) — must never be read as a store
+  // slug on the platform domain, or store.forcemediakw.com/<route> resolves to a
+  // nonexistent store and 404s. `og` is the store-aware OG-card route
+  // (GET /og?slug=…) used by social link previews; `landing-preview` is the
+  // redesigned-landing preview page.
+  'og',
+  'landing-preview',
 ]);
 
 /**
