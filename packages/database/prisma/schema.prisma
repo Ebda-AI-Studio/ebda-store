@@ -2045,6 +2045,8 @@ model ShippingZone {
 model ShippingAreaRate {
   id                    String   @id @default(uuid())
   storeId               String   @map("store_id")
+  country               String   @default("Kuwait")
+  countryAr             String   @default("الكويت") @map("country_ar")
   governorate           String
   governorateAr         String   @map("governorate_ar")
   area                  String
@@ -2057,7 +2059,7 @@ model ShippingAreaRate {
   updatedAt             DateTime @updatedAt @map("updated_at")
   store                 Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  @@unique([storeId, governorate, area])
+  @@unique([storeId, country, governorate, area])
   @@index([storeId, isActive])
   @@map("shipping_area_rates")
 }

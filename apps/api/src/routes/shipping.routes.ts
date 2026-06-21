@@ -466,6 +466,10 @@ async function parseXlsxBufferToRows(buf: Buffer): Promise<Record<string, string
 // ─── ShippingAreaRate schemas ──────────────────────────────────────────────
 
 const areaRateSchema = z.object({
+  // Country defaults to Kuwait so existing Kuwait-only payloads keep working;
+  // a custom country/province/area is just a row with these set freely.
+  country: z.string().min(1).max(60).optional().default('Kuwait'),
+  countryAr: z.string().min(1).max(60).optional().default('الكويت'),
   governorate: z.string().min(1).max(60),
   governorateAr: z.string().min(1).max(60),
   area: z.string().min(1).max(60),
@@ -642,14 +646,17 @@ router.put(
         rates.map(rate =>
           prisma.shippingAreaRate.upsert({
             where: {
-              storeId_governorate_area: {
+              storeId_country_governorate_area: {
                 storeId,
+                country: rate.country,
                 governorate: rate.governorate,
                 area: rate.area,
               },
             },
             create: {
               storeId,
+              country: rate.country,
+              countryAr: rate.countryAr,
               governorate: rate.governorate,
               governorateAr: rate.governorateAr,
               area: rate.area,
@@ -660,6 +667,7 @@ router.put(
               position: rate.position ?? 0,
             },
             update: {
+              countryAr: rate.countryAr,
               governorateAr: rate.governorateAr,
               areaAr: rate.areaAr,
               deliveryFee: rate.deliveryFee,
@@ -803,14 +811,18 @@ router.post(
           toUpsert.map((rate, position) =>
             prisma.shippingAreaRate.upsert({
               where: {
-                storeId_governorate_area: {
+                storeId_country_governorate_area: {
                   storeId,
+                  // Import is Kuwait-only today; the column default keeps the key stable.
+                  country: 'Kuwait',
                   governorate: rate.governorate,
                   area: rate.area,
                 },
               },
               create: {
                 storeId,
+                country: 'Kuwait',
+                countryAr: 'الكويت',
                 governorate: rate.governorate,
                 governorateAr: rate.governorateAr,
                 area: rate.area,

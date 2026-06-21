@@ -1,10 +1,21 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useId } from 'react';
+import { useState, useRef, useEffect, useCallback, useId, useMemo } from 'react';
 import { KUWAIT_GOVERNORATES, areasForGovernorate } from '@force/shared';
 // Pure filter logic lives in a separate .ts file so vitest (node env) can
 // import and unit-test it without a JSX transformer.
 export { filterGovernorates, filterAreas } from './governorate-area-utils';
+
+// Minimal shape of a row from GET /public/:storeId/shipping/area-rates
+// (only the fields this component needs — CheckoutClient owns the full type).
+export interface AreaRateRow {
+  country: string;
+  countryAr: string;
+  governorate: string;
+  governorateAr: string;
+  area: string;
+  areaAr: string;
+}
 
 // --------------------------------------------------------------------------
 // Single combobox primitive
@@ -245,6 +256,8 @@ interface GovernorateAreaSelectProps {
   locale: 'ar' | 'en';
   ratedAreas?: Set<string>; // EN area names that have a shipping rate
   ratedGovernorates?: Set<string>; // EN gov names that have ≥1 rated area
+  /** Full rated-rows array — used to surface custom areas and multi-country selector */
+  areaRates?: AreaRateRow[];
   governorateError?: string;
   areaError?: string;
 }
@@ -256,38 +269,160 @@ export function GovernorateAreaSelect({
   locale,
   ratedAreas,
   ratedGovernorates,
+  areaRates,
   governorateError,
   areaError,
 }: GovernorateAreaSelectProps) {
   const govId = useId();
   const areaId = useId();
+  const countryId = useId();
 
-  // Build governorate options
-  const governorateOptions: ComboboxOption[] = KUWAIT_GOVERNORATES.filter(gov => {
-    if (ratedGovernorates && ratedGovernorates.size > 0 && !ratedGovernorates.has(gov.en)) {
-      return false;
+  // --------------------------------------------------------------------------
+  // Multi-country: derive distinct countries from rated rows.
+  // Only show the country selector when >1 distinct country exists.
+  // --------------------------------------------------------------------------
+  const countries = useMemo<ComboboxOption[]>(() => {
+    if (!areaRates || areaRates.length === 0) return [];
+    const seen = new Map<string, string>(); // en -> ar
+    for (const r of areaRates) {
+      if (!seen.has(r.country)) seen.set(r.country, r.countryAr);
     }
-    return true;
-  }).map(gov => ({
-    value: gov.en,
-    label: locale === 'ar' ? `${gov.ar} / ${gov.en}` : `${gov.en} / ${gov.ar}`,
-  }));
+    if (seen.size <= 1) return []; // single-country: no dropdown needed
+    return Array.from(seen.entries()).map(([en, ar]) => ({
+      value: en,
+      label: locale === 'ar' ? `${ar} / ${en}` : `${en} / ${ar}`,
+    }));
+  }, [areaRates, locale]);
 
-  // Build area options for selected governorate
-  const areaOptions: ComboboxOption[] = governorate
-    ? areasForGovernorate(governorate)
-        .filter(a => {
-          if (ratedAreas && ratedAreas.size > 0 && !ratedAreas.has(a.en)) return false;
-          return true;
-        })
-        .map(a => ({
-          value: a.en,
-          label: locale === 'ar' ? `${a.ar} / ${a.en}` : `${a.en} / ${a.ar}`,
-        }))
-    : [];
+  const isMultiCountry = countries.length > 1;
+
+  // Internal country selection state (only meaningful when multi-country).
+  // Default: first country from the list or 'Kuwait' as fallback.
+  const defaultCountry = useMemo(() => {
+    if (!isMultiCountry) return '';
+    // If the current governorate belongs to a country in the rates, use that.
+    if (governorate && areaRates) {
+      const match = areaRates.find(r => r.governorate === governorate);
+      if (match) return match.country;
+    }
+    return countries[0]?.value ?? '';
+  }, [isMultiCountry, governorate, areaRates, countries]);
+
+  const [selectedCountry, setSelectedCountry] = useState(defaultCountry);
+
+  // Sync selectedCountry when the parent clears governorate (e.g. a reset).
+  useEffect(() => {
+    if (!governorate && isMultiCountry && defaultCountry) {
+      setSelectedCountry(defaultCountry);
+    }
+  }, [governorate, isMultiCountry, defaultCountry]);
+
+  // --------------------------------------------------------------------------
+  // Build the MERGED governorate option list:
+  //   (a) Static Kuwait govs that appear in ratedGovernorates
+  //   (b) Custom govs from areaRates NOT in the static set
+  // When multi-country, further filter to govs belonging to the active country.
+  // --------------------------------------------------------------------------
+  const governorateOptions = useMemo<ComboboxOption[]>(() => {
+    // Compute effective country inline so this memo's deps are explicit state refs.
+    const activeCountry = isMultiCountry ? selectedCountry : '';
+    const staticGovNames = new Set(KUWAIT_GOVERNORATES.map(g => g.en));
+
+    // (a) Static govs that have at least one rated area (and match the active
+    //     country when multi-country).
+    const staticOptions: ComboboxOption[] = KUWAIT_GOVERNORATES.filter(gov => {
+      if (ratedGovernorates && ratedGovernorates.size > 0 && !ratedGovernorates.has(gov.en)) {
+        return false;
+      }
+      if (isMultiCountry && areaRates) {
+        // Confirm at least one rate for this gov belongs to the active country.
+        const hasRateForCountry = areaRates.some(
+          r => r.governorate === gov.en && r.country === activeCountry
+        );
+        if (!hasRateForCountry) return false;
+      }
+      return true;
+    }).map(gov => ({
+      value: gov.en,
+      label: locale === 'ar' ? `${gov.ar} / ${gov.en}` : `${gov.en} / ${gov.ar}`,
+    }));
+
+    // (b) Custom govs: in areaRates but NOT in the static list.
+    //     AR label comes from the first matching rate row.
+    const customOptions: ComboboxOption[] = [];
+    if (areaRates) {
+      const seenCustom = new Set<string>();
+      for (const r of areaRates) {
+        if (staticGovNames.has(r.governorate)) continue;
+        if (seenCustom.has(r.governorate)) continue;
+        if (isMultiCountry && r.country !== activeCountry) continue;
+        seenCustom.add(r.governorate);
+        customOptions.push({
+          value: r.governorate,
+          label:
+            locale === 'ar'
+              ? `${r.governorateAr} / ${r.governorate}`
+              : `${r.governorate} / ${r.governorateAr}`,
+        });
+      }
+    }
+
+    return [...staticOptions, ...customOptions];
+  }, [ratedGovernorates, areaRates, isMultiCountry, selectedCountry, locale]);
+
+  // --------------------------------------------------------------------------
+  // Build the MERGED area option list for the selected governorate:
+  //   (a) Static areas in that gov that are in ratedAreas
+  //   (b) Custom areas from rate rows for this gov NOT in the static list
+  // --------------------------------------------------------------------------
+  const areaOptions = useMemo<ComboboxOption[]>(() => {
+    if (!governorate) return [];
+
+    const staticAreas = areasForGovernorate(governorate); // [] for custom govs
+    const staticAreaNames = new Set(staticAreas.map(a => a.en));
+
+    // (a) Static areas with a rate.
+    const staticAreaOptions: ComboboxOption[] = staticAreas
+      .filter(a => {
+        if (ratedAreas && ratedAreas.size > 0 && !ratedAreas.has(a.en)) return false;
+        return true;
+      })
+      .map(a => ({
+        value: a.en,
+        label: locale === 'ar' ? `${a.ar} / ${a.en}` : `${a.en} / ${a.ar}`,
+      }));
+
+    // (b) Custom areas: rate rows for this gov whose area is NOT in the static list.
+    const customAreaOptions: ComboboxOption[] = [];
+    if (areaRates) {
+      for (const r of areaRates) {
+        if (r.governorate !== governorate) continue;
+        if (staticAreaNames.has(r.area)) continue;
+        customAreaOptions.push({
+          value: r.area,
+          label: locale === 'ar' ? `${r.areaAr} / ${r.area}` : `${r.area} / ${r.areaAr}`,
+        });
+      }
+    }
+
+    return [...staticAreaOptions, ...customAreaOptions];
+  }, [governorate, ratedAreas, areaRates, locale]);
+
+  // --------------------------------------------------------------------------
+  // Handlers
+  // --------------------------------------------------------------------------
+  const handleCountrySelect = (countryEn: string) => {
+    setSelectedCountry(countryEn);
+    // Clear governorate + area when country switches.
+    onChange('', '');
+  };
+
+  const handleCountryCleared = () => {
+    setSelectedCountry(countries[0]?.value ?? '');
+    onChange('', '');
+  };
 
   const handleGovernorateSelect = (govEn: string) => {
-    // When governorate changes, clear area
     onChange(govEn, '');
   };
 
@@ -303,48 +438,67 @@ export function GovernorateAreaSelect({
     onChange(governorate, '');
   };
 
+  const countryLabel = locale === 'ar' ? 'الدولة *' : 'Country *';
+  const countryPlaceholder = locale === 'ar' ? 'الدولة' : 'Country';
   const govLabel = locale === 'ar' ? 'المحافظة *' : 'Governorate *';
   const areaLabel = locale === 'ar' ? 'المنطقة *' : 'Area *';
   const govPlaceholder = locale === 'ar' ? 'المحافظة' : 'Governorate';
   const areaPlaceholder = locale === 'ar' ? 'المنطقة' : 'Area';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div data-error={!!governorateError}>
-        <Combobox
-          id={govId}
-          label={govLabel}
-          placeholder={govPlaceholder}
-          value={governorate}
-          options={governorateOptions}
-          hasError={!!governorateError}
-          onSelect={handleGovernorateSelect}
-          onClear={handleGovernorateCleared}
-        />
-        {governorateError && (
-          <p role="alert" className="mt-1 text-sm text-destructive">
-            {governorateError}
-          </p>
-        )}
-      </div>
+    <div className="space-y-4">
+      {/* Country selector — only rendered for multi-country stores */}
+      {isMultiCountry && (
+        <div>
+          <Combobox
+            id={countryId}
+            label={countryLabel}
+            placeholder={countryPlaceholder}
+            value={selectedCountry}
+            options={countries}
+            onSelect={handleCountrySelect}
+            onClear={handleCountryCleared}
+          />
+        </div>
+      )}
 
-      <div data-error={!!areaError}>
-        <Combobox
-          id={areaId}
-          label={areaLabel}
-          placeholder={areaPlaceholder}
-          value={area}
-          options={areaOptions}
-          disabled={!governorate}
-          hasError={!!areaError}
-          onSelect={handleAreaSelect}
-          onClear={handleAreaCleared}
-        />
-        {areaError && (
-          <p role="alert" className="mt-1 text-sm text-destructive">
-            {areaError}
-          </p>
-        )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div data-error={!!governorateError}>
+          <Combobox
+            id={govId}
+            label={govLabel}
+            placeholder={govPlaceholder}
+            value={governorate}
+            options={governorateOptions}
+            hasError={!!governorateError}
+            onSelect={handleGovernorateSelect}
+            onClear={handleGovernorateCleared}
+          />
+          {governorateError && (
+            <p role="alert" className="mt-1 text-sm text-destructive">
+              {governorateError}
+            </p>
+          )}
+        </div>
+
+        <div data-error={!!areaError}>
+          <Combobox
+            id={areaId}
+            label={areaLabel}
+            placeholder={areaPlaceholder}
+            value={area}
+            options={areaOptions}
+            disabled={!governorate}
+            hasError={!!areaError}
+            onSelect={handleAreaSelect}
+            onClear={handleAreaCleared}
+          />
+          {areaError && (
+            <p role="alert" className="mt-1 text-sm text-destructive">
+              {areaError}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

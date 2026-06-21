@@ -215,8 +215,9 @@ describe('POST /stores/public/:storeId/shipping/calculate', () => {
     await withRlsBypass(async tx => {
       await tx.shippingAreaRate.upsert({
         where: {
-          storeId_governorate_area: {
+          storeId_country_governorate_area: {
             storeId: storeAId,
+            country: 'Kuwait',
             governorate: 'Kuwait City',
             area: 'Sharq',
           },

@@ -58,6 +58,8 @@ interface ShippingZone {
 
 // Area-rate shape returned by the public shipping rates endpoint
 interface AreaRate {
+  country: string;
+  countryAr: string;
   governorate: string;
   governorateAr: string;
   area: string;
@@ -165,6 +167,8 @@ export default function CheckoutClient() {
   const [ratedAreas, setRatedAreas] = useState<Set<string>>(new Set());
   const [ratedGovernorates, setRatedGovernorates] = useState<Set<string>>(new Set());
   const [rateByArea, setRateByArea] = useState<Map<string, AreaRate>>(new Map());
+  // Full rates array — passed to GovernorateAreaSelect for custom-area support
+  const [allAreaRates, setAllAreaRates] = useState<AreaRate[]>([]);
   const [shippingUnavailable, setShippingUnavailable] = useState(false);
   // Whether the store configured per-area shipping rates at all. When false,
   // the store has no shipping config → legacy free-shipping behavior (cost 0),
@@ -338,7 +342,6 @@ export default function CheckoutClient() {
     }));
     if (saved.area) setSelectedArea(saved.area);
     setSaveInfo(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store?.id]);
 
   // Form validation errors
@@ -394,6 +397,7 @@ export default function CheckoutClient() {
               setRatedAreas(areaSet);
               setRatedGovernorates(govSet);
               setRateByArea(byArea);
+              setAllAreaRates(rates);
             }
           } catch {
             // Non-fatal — fall back to showing all areas
@@ -778,6 +782,8 @@ export default function CheckoutClient() {
       const selectedAreaForSave =
         selectedGovForSave?.areas.find(a => a.en === formData.area) ??
         findGovernorateByArea(formData.area)?.areas.find(a => a.en === formData.area);
+      // Fallback to rate-row AR names for custom areas/governorates not in the static list.
+      const rateRowForSave = rateByArea.get(formData.area);
       if (saveInfo) {
         saveCheckoutInfo(store.id, {
           firstName: formData.firstName,
@@ -785,9 +791,9 @@ export default function CheckoutClient() {
           phone: formData.phone,
           email: formData.email,
           governorate: selectedGovForSave?.en ?? formData.governorate,
-          governorateAr: selectedGovForSave?.ar ?? '',
+          governorateAr: selectedGovForSave?.ar ?? rateRowForSave?.governorateAr ?? '',
           area: selectedAreaForSave?.en ?? formData.area,
-          areaAr: selectedAreaForSave?.ar ?? '',
+          areaAr: selectedAreaForSave?.ar ?? rateRowForSave?.areaAr ?? '',
           block: formData.block,
           street: formData.street,
           avenue: formData.avenue,
@@ -806,11 +812,14 @@ export default function CheckoutClient() {
       // the invoice / order confirmation can show the *buyer's* contact email
       // — not the authenticated user's profile email (which can differ when
       // a logged-in admin checks out for someone else).
-      // Resolve both English and Arabic names from the canonical dataset.
+      // Resolve both English and Arabic names.
+      // For Kuwait areas, prefer the static canonical data; for custom areas
+      // (not in the static list), fall back to the rate-row AR names.
       const selectedGov = KUWAIT_GOVERNORATES.find(g => g.en === formData.governorate);
       const selectedKuwaitArea =
         selectedGov?.areas.find(a => a.en === formData.area) ??
         findGovernorateByArea(formData.area)?.areas.find(a => a.en === formData.area);
+      const rateRow = rateByArea.get(formData.area);
 
       // Compose address1 from structured fields for back-compat with
       // existing order display / admin views.
@@ -828,11 +837,11 @@ export default function CheckoutClient() {
           lastName: formData.lastName,
           address1: composedAddress1,
           address2: formData.apartment,
-          // Structured Kuwait address fields
+          // Structured address fields — custom area AR names fall back to the rate row.
           area: selectedKuwaitArea?.en ?? formData.area,
-          areaAr: selectedKuwaitArea?.ar ?? '',
+          areaAr: selectedKuwaitArea?.ar ?? rateRow?.areaAr ?? '',
           governorate: selectedGov?.en ?? formData.governorate,
-          governorateAr: selectedGov?.ar ?? '',
+          governorateAr: selectedGov?.ar ?? rateRow?.governorateAr ?? '',
           // Additional structured fields for delivery logistics
           block: formData.block,
           street: formData.street,
@@ -840,7 +849,10 @@ export default function CheckoutClient() {
           house: formData.house,
           floor: formData.floor,
           city: '',
-          country: 'KW',
+          // Use the country from the rate row when available (multi-country stores),
+          // falling back to "Kuwait" — matches the Address.country default + the
+          // "Kuwait" value every Kuwait rate row carries (don't mix "KW" / "Kuwait").
+          country: rateRow?.country ?? 'Kuwait',
           phone: formData.phone,
           email: formData.email,
         },
@@ -1088,6 +1100,16 @@ export default function CheckoutClient() {
     );
   }
 
+  // Derive single-country display values for the static Country row.
+  // When the store has rates for >1 distinct country, the country selector
+  // renders inside GovernorateAreaSelect instead and this row is hidden.
+  const distinctRatedCountries =
+    allAreaRates.length > 0 ? [...new Set(allAreaRates.map(r => r.country))] : ['Kuwait'];
+  const isSingleCountryStore = distinctRatedCountries.length <= 1;
+  const singleCountryEn = distinctRatedCountries[0] ?? 'Kuwait';
+  const singleCountryAr =
+    allAreaRates.find(r => r.country === singleCountryEn)?.countryAr ?? 'الكويت';
+
   return (
     <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
       <div className="flex-1" style={checkoutBgStyle}>
@@ -1265,17 +1287,20 @@ export default function CheckoutClient() {
                         )}
                       </div>
 
-                      {/* Country row \u2014 fixed Kuwait, shown for UX context */}
-                      <div>
-                        <label className="block text-sm font-medium text-foreground mb-1">
-                          {t('Country', '\u0627\u0644\u0628\u0644\u062f')}
-                        </label>
-                        <div className="flex items-center rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
-                          {t('Kuwait', '\u0627\u0644\u0643\u0648\u064a\u062a')}
+                      {/* Country row \u2014 fixed display for single-country stores.
+                          Multi-country stores get an interactive selector inside GovernorateAreaSelect. */}
+                      {isSingleCountryStore && (
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1">
+                            {t('Country', '\u0627\u0644\u0628\u0644\u062f')}
+                          </label>
+                          <div className="flex items-center rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
+                            {t(singleCountryEn, singleCountryAr)}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      {/* Governorate \u2192 Area typeahead cascade */}
+                      {/* Governorate \u2192 Area typeahead cascade (+ optional country selector for multi-country stores) */}
                       <GovernorateAreaSelect
                         governorate={formData.governorate}
                         area={formData.area}
@@ -1285,6 +1310,7 @@ export default function CheckoutClient() {
                         ratedGovernorates={
                           ratedGovernorates.size > 0 ? ratedGovernorates : undefined
                         }
+                        areaRates={allAreaRates.length > 0 ? allAreaRates : undefined}
                         governorateError={formErrors.governorate}
                         areaError={formErrors.area}
                       />

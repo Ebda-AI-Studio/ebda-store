@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@force/ui';
 import { KUWAIT_GOVERNORATES } from '@force/shared';
 import { useT } from '@/i18n/useT';
-import { apiGet, apiPut, apiFetch } from '../../../../../lib/api';
+import { apiGet, apiPut, apiDelete, apiFetch } from '../../../../../lib/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface AreaRate {
   id?: string;
+  country: string;
+  countryAr: string;
   governorate: string;
   governorateAr: string;
   area: string;
@@ -28,6 +30,21 @@ interface AreaRowState {
 }
 
 type AreaStateMap = Record<string, AreaRowState>; // key = `${governorate}||${area}`
+
+// A custom row: a rate that is not part of the static Kuwait list
+interface CustomRow {
+  /** DB id — present if the row was fetched from the server; absent if unsaved */
+  id?: string;
+  country: string;
+  countryAr: string;
+  governorate: string;
+  governorateAr: string;
+  area: string;
+  areaAr: string;
+  isActive: boolean;
+  feeKwd: string;
+  thresholdKwd: string;
+}
 
 interface Props {
   storeId: string;
@@ -49,6 +66,14 @@ function rowKey(governorate: string, area: string) {
   return `${governorate}||${area}`;
 }
 
+/** Returns true if the (country, governorate, area) triple belongs to the static Kuwait list */
+function isKuwaitStatic(country: string, governorate: string, area: string): boolean {
+  if (country !== 'Kuwait') return false;
+  const gov = KUWAIT_GOVERNORATES.find(g => g.en === governorate);
+  if (!gov) return false;
+  return gov.areas.some(a => a.en === area);
+}
+
 interface ImportPreview {
   valid: Array<{
     governorate: string;
@@ -61,6 +86,91 @@ interface ImportPreview {
   wouldUpsert: number;
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+interface ToggleProps {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+}
+function Toggle({ checked, onChange, label }: ToggleProps) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+        checked ? 'bg-primary' : 'bg-muted'
+      }`}
+    >
+      <span
+        className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+          checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
+        }`}
+      />
+    </button>
+  );
+}
+
+interface FeeInputsProps {
+  feeKwd: string;
+  thresholdKwd: string;
+  onFeeChange: (v: string) => void;
+  onThresholdChange: (v: string) => void;
+  feeLabel: string;
+  freeOverLabel: string;
+  currencyLabel: string;
+  optionalLabel: string;
+  freeOverHint: string;
+}
+function FeeInputs({
+  feeKwd,
+  thresholdKwd,
+  onFeeChange,
+  onThresholdChange,
+  feeLabel,
+  freeOverLabel,
+  currencyLabel,
+  optionalLabel,
+  freeOverHint,
+}: FeeInputsProps) {
+  return (
+    <>
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          min="0"
+          step="0.001"
+          placeholder="0.000"
+          value={feeKwd}
+          onChange={e => onFeeChange(e.target.value)}
+          aria-label={feeLabel}
+          className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+        />
+        <span className="text-xs text-muted-foreground">{currencyLabel}</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline">
+          {freeOverHint}
+        </span>
+        <input
+          type="number"
+          min="0"
+          step="0.001"
+          placeholder={optionalLabel}
+          value={thresholdKwd}
+          onChange={e => onThresholdChange(e.target.value)}
+          aria-label={freeOverLabel}
+          className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+        />
+        <span className="text-xs text-muted-foreground">{currencyLabel}</span>
+      </div>
+    </>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function AreaRateEditor({ storeId }: Props) {
@@ -69,13 +179,39 @@ export function AreaRateEditor({ storeId }: Props) {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Static Kuwait area state (same structure as before)
   const [areaState, setAreaState] = useState<AreaStateMap>({});
 
-  // Accordion: which governorate is open
-  const [openGov, setOpenGov] = useState<string | null>(null);
+  // Custom (non-static) rows — country/province/area added by the merchant
+  const [customRows, setCustomRows] = useState<CustomRow[]>([]);
 
-  // Bulk-apply per-governorate input value
+  // Accordion: which Kuwait governorate is open
+  const [openGov, setOpenGov] = useState<string | null>(null);
+  // Accordion: which custom-country is open (keyed by country EN)
+  const [openCustomCountry, setOpenCustomCountry] = useState<string | null>(null);
+
+  // Bulk-apply per-governorate input value (Kuwait static)
   const [bulkFeeKwd, setBulkFeeKwd] = useState<Record<string, string>>({});
+
+  // "Add area" inline forms per (country||governorate) key
+  const [addAreaForm, setAddAreaForm] = useState<
+    Record<string, { area: string; areaAr: string; feeKwd: string }>
+  >({});
+  // Which add-area inline forms are open
+  const [addAreaOpen, setAddAreaOpen] = useState<Record<string, boolean>>({});
+
+  // "Add custom location" panel
+  const [addLocOpen, setAddLocOpen] = useState(false);
+  const [addLocForm, setAddLocForm] = useState({
+    country: '',
+    countryAr: '',
+    governorate: '',
+    governorateAr: '',
+    area: '',
+    areaAr: '',
+    feeKwd: '',
+  });
 
   // Import/export
   const [exporting, setExporting] = useState(false);
@@ -101,19 +237,41 @@ export function AreaRateEditor({ storeId }: Props) {
           map[k] = { isActive: false, feeKwd: '', thresholdKwd: '' };
         }
       }
-      // Overlay saved rates
+
+      const custom: CustomRow[] = [];
+
       if (data?.rates) {
         for (const rate of data.rates) {
-          const k = rowKey(rate.governorate, rate.area);
-          map[k] = {
-            isActive: rate.isActive,
-            feeKwd: rate.deliveryFee > 0 ? filsToKwd(rate.deliveryFee) : '',
-            thresholdKwd:
-              rate.freeShippingThreshold != null ? filsToKwd(rate.freeShippingThreshold) : '',
-          };
+          if (isKuwaitStatic(rate.country, rate.governorate, rate.area)) {
+            // Overlay onto the static Kuwait map
+            const k = rowKey(rate.governorate, rate.area);
+            map[k] = {
+              isActive: rate.isActive,
+              feeKwd: rate.deliveryFee > 0 ? filsToKwd(rate.deliveryFee) : '',
+              thresholdKwd:
+                rate.freeShippingThreshold != null ? filsToKwd(rate.freeShippingThreshold) : '',
+            };
+          } else {
+            // Non-static: add to custom rows
+            custom.push({
+              id: rate.id,
+              country: rate.country,
+              countryAr: rate.countryAr,
+              governorate: rate.governorate,
+              governorateAr: rate.governorateAr,
+              area: rate.area,
+              areaAr: rate.areaAr,
+              isActive: rate.isActive,
+              feeKwd: rate.deliveryFee > 0 ? filsToKwd(rate.deliveryFee) : '',
+              thresholdKwd:
+                rate.freeShippingThreshold != null ? filsToKwd(rate.freeShippingThreshold) : '',
+            });
+          }
         }
       }
+
       setAreaState(map);
+      setCustomRows(custom);
     } catch {
       toastError(t('errorTitle'), t('fetchFailed'));
     } finally {
@@ -125,13 +283,32 @@ export function AreaRateEditor({ storeId }: Props) {
     fetchRates();
   }, [fetchRates]);
 
-  // ── Row updates ────────────────────────────────────────────────────────────
+  // ── Static Kuwait row updates ─────────────────────────────────────────────
 
   function updateRow(key: string, patch: Partial<AreaRowState>) {
     setAreaState(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }));
   }
 
-  // ── Bulk apply ─────────────────────────────────────────────────────────────
+  // ── Custom row updates ────────────────────────────────────────────────────
+
+  function updateCustomRow(idx: number, patch: Partial<CustomRow>) {
+    setCustomRows(prev => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }
+
+  async function removeCustomRow(idx: number) {
+    const row = customRows[idx];
+    if (row.id) {
+      // Has a DB record — delete it
+      const { error } = await apiDelete(`/api/v1/stores/${storeId}/shipping/area-rates/${row.id}`);
+      if (error) {
+        toastError(t('errorTitle'), t('deleteFailed'));
+        return;
+      }
+    }
+    setCustomRows(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  // ── Bulk apply (Kuwait static) ────────────────────────────────────────────
 
   function applyBulkFee(govEn: string) {
     const gov = KUWAIT_GOVERNORATES.find(g => g.en === govEn);
@@ -147,12 +324,85 @@ export function AreaRateEditor({ storeId }: Props) {
     });
   }
 
+  // ── Add area inline form ──────────────────────────────────────────────────
+
+  const addAreaFormKey = (country: string, governorate: string) => `${country}||${governorate}`;
+
+  function toggleAddAreaForm(country: string, governorate: string) {
+    const k = addAreaFormKey(country, governorate);
+    setAddAreaOpen(prev => ({ ...prev, [k]: !prev[k] }));
+    if (!addAreaForm[k]) {
+      setAddAreaForm(prev => ({ ...prev, [k]: { area: '', areaAr: '', feeKwd: '' } }));
+    }
+  }
+
+  function submitAddArea(
+    country: string,
+    countryAr: string,
+    governorate: string,
+    governorateAr: string
+  ) {
+    const k = addAreaFormKey(country, governorate);
+    const form = addAreaForm[k];
+    if (!form || !form.area.trim()) return;
+
+    const newRow: CustomRow = {
+      country,
+      countryAr,
+      governorate,
+      governorateAr,
+      area: form.area.trim(),
+      areaAr: form.areaAr.trim(),
+      isActive: form.feeKwd !== '',
+      feeKwd: form.feeKwd,
+      thresholdKwd: '',
+    };
+
+    setCustomRows(prev => [...prev, newRow]);
+    // Reset and close the form
+    setAddAreaForm(prev => ({ ...prev, [k]: { area: '', areaAr: '', feeKwd: '' } }));
+    setAddAreaOpen(prev => ({ ...prev, [k]: false }));
+  }
+
+  // ── Add custom location panel ─────────────────────────────────────────────
+
+  function submitAddLoc() {
+    if (!addLocForm.country.trim() || !addLocForm.governorate.trim() || !addLocForm.area.trim())
+      return;
+
+    const newRow: CustomRow = {
+      country: addLocForm.country.trim(),
+      countryAr: addLocForm.countryAr.trim(),
+      governorate: addLocForm.governorate.trim(),
+      governorateAr: addLocForm.governorateAr.trim(),
+      area: addLocForm.area.trim(),
+      areaAr: addLocForm.areaAr.trim(),
+      isActive: addLocForm.feeKwd !== '',
+      feeKwd: addLocForm.feeKwd,
+      thresholdKwd: '',
+    };
+
+    setCustomRows(prev => [...prev, newRow]);
+    setAddLocForm({
+      country: '',
+      countryAr: '',
+      governorate: '',
+      governorateAr: '',
+      area: '',
+      areaAr: '',
+      feeKwd: '',
+    });
+    setAddLocOpen(false);
+  }
+
   // ── Save ──────────────────────────────────────────────────────────────────
 
   async function handleSave() {
     setSaving(true);
     try {
       const rates: Array<{
+        country: string;
+        countryAr: string;
         governorate: string;
         governorateAr: string;
         area: string;
@@ -164,15 +414,18 @@ export function AreaRateEditor({ storeId }: Props) {
       }> = [];
 
       let position = 0;
+
+      // 1. Static Kuwait rows
       for (const gov of KUWAIT_GOVERNORATES) {
         for (const area of gov.areas) {
           const k = rowKey(gov.en, area.en);
           const row = areaState[k];
           if (!row) continue;
           const fee = kwdToFils(row.feeKwd);
-          // Include if active OR has a non-zero fee
           if (!row.isActive && fee === 0) continue;
           const entry: (typeof rates)[number] = {
+            country: 'Kuwait',
+            countryAr: 'الكويت',
             governorate: gov.en,
             governorateAr: gov.ar,
             area: area.en,
@@ -186,6 +439,27 @@ export function AreaRateEditor({ storeId }: Props) {
           }
           rates.push(entry);
         }
+      }
+
+      // 2. Custom rows (includes custom Kuwait areas AND other countries)
+      for (const row of customRows) {
+        const fee = kwdToFils(row.feeKwd);
+        if (!row.isActive && fee === 0) continue;
+        const entry: (typeof rates)[number] = {
+          country: row.country,
+          countryAr: row.countryAr,
+          governorate: row.governorate,
+          governorateAr: row.governorateAr,
+          area: row.area,
+          areaAr: row.areaAr,
+          deliveryFee: fee,
+          isActive: row.isActive,
+          position: position++,
+        };
+        if (row.thresholdKwd.trim() !== '') {
+          entry.freeShippingThreshold = kwdToFils(row.thresholdKwd);
+        }
+        rates.push(entry);
       }
 
       const { error } = await apiPut(`/api/v1/stores/${storeId}/shipping/area-rates/bulk`, {
@@ -205,9 +479,7 @@ export function AreaRateEditor({ storeId }: Props) {
     }
   }
 
-  // ── Export ──────────────────────────────────────────────────────────────
-  // Binary stream → Blob → object URL → anchor click. Uses apiFetch (not
-  // apiGet) for the Bearer-aware download path (iOS admin PWA).
+  // ── Export ────────────────────────────────────────────────────────────────
 
   async function handleExport() {
     if (exporting) return;
@@ -237,16 +509,12 @@ export function AreaRateEditor({ storeId }: Props) {
     }
   }
 
-  // ── Import ──────────────────────────────────────────────────────────────
-  // Send the raw file (xlsx or csv) to the API via multipart FormData.
-  // dryRun=true → show preview modal → confirm → dryRun=false → reload.
+  // ── Import ────────────────────────────────────────────────────────────────
 
   async function postImportFile(file: File, dryRun: boolean) {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('dryRun', String(dryRun));
-    // apiFetch handles Bearer auth + CSRF; do NOT set Content-Type manually
-    // (browser sets multipart/form-data with the correct boundary).
     const res = await apiFetch(`/api/v1/stores/${storeId}/shipping/area-rates/import`, {
       method: 'POST',
       body: fd,
@@ -260,10 +528,8 @@ export function AreaRateEditor({ storeId }: Props) {
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    // Reset so re-selecting the same file fires onChange again.
     e.target.value = '';
     if (!file) return;
-
     setImporting(true);
     try {
       const data = await postImportFile(file, true);
@@ -304,7 +570,7 @@ export function AreaRateEditor({ storeId }: Props) {
     setPendingFile(null);
   }
 
-  // ── Counts for accordion header ────────────────────────────────────────────
+  // ── Counts for accordion header ───────────────────────────────────────────
 
   function feeCount(govEn: string): number {
     const gov = KUWAIT_GOVERNORATES.find(g => g.en === govEn);
@@ -313,6 +579,48 @@ export function AreaRateEditor({ storeId }: Props) {
       const row = areaState[rowKey(govEn, area.en)];
       return row && (row.isActive || kwdToFils(row.feeKwd) > 0);
     }).length;
+  }
+
+  // ── Custom geography grouping helpers ─────────────────────────────────────
+
+  /**
+   * Returns unique custom countries. Kuwait is NOT included here even if
+   * there are custom areas added under Kuwait governorates — those render
+   * inside the static Kuwait accordion.
+   */
+  function customCountries(): string[] {
+    const seen = new Set<string>();
+    for (const row of customRows) {
+      if (row.country !== 'Kuwait') seen.add(row.country);
+    }
+    return Array.from(seen);
+  }
+
+  function customRowsForCountry(country: string): CustomRow[] {
+    return customRows.filter(r => r.country === country);
+  }
+
+  /**
+   * Custom areas that were added to a static Kuwait governorate
+   * (country === 'Kuwait' but area is NOT in the static list for that gov).
+   */
+  function customAreasForKuwaitGov(govEn: string): Array<{ row: CustomRow; idx: number }> {
+    return customRows
+      .map((row, idx) => ({ row, idx }))
+      .filter(
+        ({ row }) =>
+          row.country === 'Kuwait' &&
+          row.governorate === govEn &&
+          !KUWAIT_GOVERNORATES.find(g => g.en === govEn)?.areas.some(a => a.en === row.area)
+      );
+  }
+
+  function customRowsByGovernorate(country: string): string[] {
+    const seen = new Set<string>();
+    for (const row of customRows) {
+      if (row.country === country) seen.add(row.governorate);
+    }
+    return Array.from(seen);
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -324,6 +632,34 @@ export function AreaRateEditor({ storeId }: Props) {
       </div>
     );
   }
+
+  const ChevronIcon = ({ open }: { open: boolean }) => (
+    <svg
+      className={`w-5 h-5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+
+  const TrashIcon = () => (
+    <svg
+      className="w-4 h-4"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+      />
+    </svg>
+  );
 
   return (
     <div className="space-y-4">
@@ -418,11 +754,15 @@ export function AreaRateEditor({ storeId }: Props) {
         </div>
       )}
 
-      {/* Governorate accordion */}
+      {/* ── Static Kuwait governorate accordion ─────────────────────────── */}
       <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
         {KUWAIT_GOVERNORATES.map(gov => {
           const isOpen = openGov === gov.en;
           const count = feeCount(gov.en);
+          const customAreas = customAreasForKuwaitGov(gov.en);
+          const addKey = addAreaFormKey('Kuwait', gov.en);
+          const addAreaIsOpen = addAreaOpen[addKey] ?? false;
+          const addForm = addAreaForm[addKey] ?? { area: '', areaAr: '', feeKwd: '' };
 
           return (
             <div key={gov.en}>
@@ -440,20 +780,13 @@ export function AreaRateEditor({ storeId }: Props) {
                       {count} / {gov.areas.length}
                     </span>
                   )}
+                  {customAreas.length > 0 && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                      +{customAreas.length}
+                    </span>
+                  )}
                 </div>
-                <svg
-                  className={`w-5 h-5 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
+                <ChevronIcon open={isOpen} />
               </button>
 
               {/* Accordion body */}
@@ -483,95 +816,599 @@ export function AreaRateEditor({ storeId }: Props) {
                     </button>
                   </div>
 
-                  {/* Area rows */}
+                  {/* Static area rows */}
                   <div className="divide-y divide-border/60">
                     {gov.areas.map(area => {
                       const k = rowKey(gov.en, area.en);
-                      const row = areaState[k] ?? {
-                        isActive: false,
-                        feeKwd: '',
-                        thresholdKwd: '',
-                      };
+                      const row = areaState[k] ?? { isActive: false, feeKwd: '', thresholdKwd: '' };
 
                       return (
                         <div
                           key={area.en}
                           className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 py-2.5"
                         >
-                          {/* Active toggle */}
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={row.isActive}
-                            onClick={() => updateRow(k, { isActive: !row.isActive })}
-                            className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                              row.isActive ? 'bg-primary' : 'bg-muted'
-                            }`}
-                          >
-                            <span
-                              className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
-                                row.isActive
-                                  ? 'translate-x-5 rtl:-translate-x-5'
-                                  : 'translate-x-1 rtl:-translate-x-1'
-                              }`}
-                            />
-                          </button>
-
-                          {/* Area name */}
+                          <Toggle
+                            checked={row.isActive}
+                            onChange={v => updateRow(k, { isActive: v })}
+                          />
                           <div className="flex-1 min-w-0">
                             <span className="text-sm text-foreground">{area.en}</span>
                             <span className="text-xs text-muted-foreground font-arabic ms-2">
                               {area.ar}
                             </span>
                           </div>
+                          <FeeInputs
+                            feeKwd={row.feeKwd}
+                            thresholdKwd={row.thresholdKwd}
+                            onFeeChange={val =>
+                              updateRow(k, {
+                                feeKwd: val,
+                                isActive: val !== '' ? true : row.isActive,
+                              })
+                            }
+                            onThresholdChange={val => updateRow(k, { thresholdKwd: val })}
+                            feeLabel={`${t('feeLabel')} – ${area.en}`}
+                            freeOverLabel={`${t('freeOverLabel')} – ${area.en}`}
+                            currencyLabel={t('currency')}
+                            optionalLabel={t('optional')}
+                            freeOverHint={t('freeOver')}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                          {/* Fee input */}
+                  {/* Custom areas added to this Kuwait governorate */}
+                  {customAreas.length > 0 && (
+                    <div className="border-t border-border/60">
+                      <p className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/10">
+                        {t('addedAreas') ?? 'Added areas'} / المناطق المضافة
+                      </p>
+                      <div className="divide-y divide-border/40">
+                        {customAreas.map(({ row, idx }) => (
+                          <div
+                            key={`custom-kw-${idx}`}
+                            className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 py-2.5"
+                          >
+                            <Toggle
+                              checked={row.isActive}
+                              onChange={v => updateCustomRow(idx, { isActive: v })}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm text-foreground">{row.area}</span>
+                              {row.areaAr && (
+                                <span className="text-xs text-muted-foreground font-arabic ms-2">
+                                  {row.areaAr}
+                                </span>
+                              )}
+                            </div>
+                            <FeeInputs
+                              feeKwd={row.feeKwd}
+                              thresholdKwd={row.thresholdKwd}
+                              onFeeChange={val =>
+                                updateCustomRow(idx, {
+                                  feeKwd: val,
+                                  isActive: val !== '' ? true : row.isActive,
+                                })
+                              }
+                              onThresholdChange={val => updateCustomRow(idx, { thresholdKwd: val })}
+                              feeLabel={`${t('feeLabel')} – ${row.area}`}
+                              freeOverLabel={`${t('freeOverLabel')} – ${row.area}`}
+                              currencyLabel={t('currency')}
+                              optionalLabel={t('optional')}
+                              freeOverHint={t('freeOver')}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeCustomRow(idx)}
+                              aria-label={`${t('remove') ?? 'Remove'} ${row.area}`}
+                              className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                            >
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add area inline form for this Kuwait governorate */}
+                  <div className="border-t border-border/60 px-4 py-2">
+                    {!addAreaIsOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleAddAreaForm('Kuwait', gov.en)}
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v16m8-8H4"
+                          />
+                        </svg>
+                        {t('addArea') ?? 'Add area'} / إضافة منطقة
+                      </button>
+                    ) : (
+                      <div className="flex flex-wrap items-end gap-2 py-1">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs text-muted-foreground">
+                            {t('areaEn') ?? 'Area (EN)'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Area name"
+                            value={addForm.area}
+                            onChange={e =>
+                              setAddAreaForm(prev => ({
+                                ...prev,
+                                [addKey]: { ...addForm, area: e.target.value },
+                              }))
+                            }
+                            className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs text-muted-foreground">
+                            {t('areaAr') ?? 'المنطقة (ع)'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="اسم المنطقة"
+                            dir="rtl"
+                            value={addForm.areaAr}
+                            onChange={e =>
+                              setAddAreaForm(prev => ({
+                                ...prev,
+                                [addKey]: { ...addForm, areaAr: e.target.value },
+                              }))
+                            }
+                            className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs text-muted-foreground">{t('feeLabel')}</label>
                           <div className="flex items-center gap-1">
                             <input
                               type="number"
                               min="0"
                               step="0.001"
                               placeholder="0.000"
-                              value={row.feeKwd}
-                              onChange={e => {
-                                const val = e.target.value;
-                                updateRow(k, {
-                                  feeKwd: val,
-                                  isActive: val !== '' ? true : row.isActive,
-                                });
-                              }}
-                              aria-label={`${t('feeLabel')} – ${area.en}`}
-                              className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
-                            />
-                            <span className="text-xs text-muted-foreground">{t('currency')}</span>
-                          </div>
-
-                          {/* Free-over threshold */}
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline">
-                              {t('freeOver')}
-                            </span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.001"
-                              placeholder={t('optional')}
-                              value={row.thresholdKwd}
-                              onChange={e => updateRow(k, { thresholdKwd: e.target.value })}
-                              aria-label={`${t('freeOverLabel')} – ${area.en}`}
+                              value={addForm.feeKwd}
+                              onChange={e =>
+                                setAddAreaForm(prev => ({
+                                  ...prev,
+                                  [addKey]: { ...addForm, feeKwd: e.target.value },
+                                }))
+                              }
                               className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
                             />
                             <span className="text-xs text-muted-foreground">{t('currency')}</span>
                           </div>
                         </div>
-                      );
-                    })}
+                        <button
+                          type="button"
+                          onClick={() => submitAddArea('Kuwait', 'الكويت', gov.en, gov.ar)}
+                          disabled={!addForm.area.trim()}
+                          className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {t('addBtn') ?? 'Add'} / إضافة
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleAddAreaForm('Kuwait', gov.en)}
+                          className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted/60 transition-colors"
+                        >
+                          {t('cancel')}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           );
         })}
+      </div>
+
+      {/* ── Custom countries ──────────────────────────────────────────────── */}
+      {customCountries().map(country => {
+        const countryRows = customRowsForCountry(country);
+        const firstRow = countryRows[0];
+        const countryAr = firstRow?.countryAr ?? '';
+        const isOpen = openCustomCountry === country;
+        const govs = customRowsByGovernorate(country);
+
+        return (
+          <div
+            key={country}
+            className="divide-y divide-border rounded-xl border border-border overflow-hidden"
+          >
+            {/* Country header */}
+            <button
+              type="button"
+              onClick={() => setOpenCustomCountry(isOpen ? null : country)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/70 transition-colors text-start"
+            >
+              <div className="flex items-center gap-3">
+                <span className="font-medium text-foreground">{country}</span>
+                {countryAr && (
+                  <span className="text-muted-foreground font-arabic text-sm">{countryAr}</span>
+                )}
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                  {countryRows.length}
+                </span>
+              </div>
+              <ChevronIcon open={isOpen} />
+            </button>
+
+            {isOpen && (
+              <div className="bg-background">
+                {govs.map(gov => {
+                  const govRows = countryRows.filter(r => r.governorate === gov);
+                  const govAr = govRows[0]?.governorateAr ?? '';
+                  const govAddKey = addAreaFormKey(country, gov);
+                  const govAddOpen = addAreaOpen[govAddKey] ?? false;
+                  const govAddForm = addAreaForm[govAddKey] ?? {
+                    area: '',
+                    areaAr: '',
+                    feeKwd: '',
+                  };
+
+                  return (
+                    <div key={gov} className="border-b border-border last:border-b-0">
+                      {/* Governorate label */}
+                      <div className="flex items-center gap-2 px-4 py-2 bg-muted/20">
+                        <span className="text-sm font-medium text-foreground">{gov}</span>
+                        {govAr && (
+                          <span className="text-xs text-muted-foreground font-arabic">{govAr}</span>
+                        )}
+                      </div>
+
+                      {/* Areas */}
+                      <div className="divide-y divide-border/40">
+                        {govRows.map(row => {
+                          const idx = customRows.indexOf(row);
+                          return (
+                            <div
+                              key={`${gov}||${row.area}`}
+                              className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 py-2.5"
+                            >
+                              <Toggle
+                                checked={row.isActive}
+                                onChange={v => updateCustomRow(idx, { isActive: v })}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm text-foreground">{row.area}</span>
+                                {row.areaAr && (
+                                  <span className="text-xs text-muted-foreground font-arabic ms-2">
+                                    {row.areaAr}
+                                  </span>
+                                )}
+                              </div>
+                              <FeeInputs
+                                feeKwd={row.feeKwd}
+                                thresholdKwd={row.thresholdKwd}
+                                onFeeChange={val =>
+                                  updateCustomRow(idx, {
+                                    feeKwd: val,
+                                    isActive: val !== '' ? true : row.isActive,
+                                  })
+                                }
+                                onThresholdChange={val =>
+                                  updateCustomRow(idx, { thresholdKwd: val })
+                                }
+                                feeLabel={`${t('feeLabel')} – ${row.area}`}
+                                freeOverLabel={`${t('freeOverLabel')} – ${row.area}`}
+                                currencyLabel={t('currency')}
+                                optionalLabel={t('optional')}
+                                freeOverHint={t('freeOver')}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeCustomRow(idx)}
+                                aria-label={`${t('remove') ?? 'Remove'} ${row.area}`}
+                                className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                              >
+                                <TrashIcon />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Add area to this custom governorate */}
+                      <div className="px-4 py-2">
+                        {!govAddOpen ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleAddAreaForm(country, gov)}
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                          >
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 4v16m8-8H4"
+                              />
+                            </svg>
+                            {t('addArea') ?? 'Add area'} / إضافة منطقة
+                          </button>
+                        ) : (
+                          <div className="flex flex-wrap items-end gap-2 py-1">
+                            <div className="flex flex-col gap-1">
+                              <label className="text-xs text-muted-foreground">
+                                {t('areaEn') ?? 'Area (EN)'}
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Area name"
+                                value={govAddForm.area}
+                                onChange={e =>
+                                  setAddAreaForm(prev => ({
+                                    ...prev,
+                                    [govAddKey]: { ...govAddForm, area: e.target.value },
+                                  }))
+                                }
+                                className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="text-xs text-muted-foreground">
+                                {t('areaAr') ?? 'المنطقة (ع)'}
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="اسم المنطقة"
+                                dir="rtl"
+                                value={govAddForm.areaAr}
+                                onChange={e =>
+                                  setAddAreaForm(prev => ({
+                                    ...prev,
+                                    [govAddKey]: { ...govAddForm, areaAr: e.target.value },
+                                  }))
+                                }
+                                className="w-32 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <label className="text-xs text-muted-foreground">
+                                {t('feeLabel')}
+                              </label>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.001"
+                                  placeholder="0.000"
+                                  value={govAddForm.feeKwd}
+                                  onChange={e =>
+                                    setAddAreaForm(prev => ({
+                                      ...prev,
+                                      [govAddKey]: { ...govAddForm, feeKwd: e.target.value },
+                                    }))
+                                  }
+                                  className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  {t('currency')}
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => submitAddArea(country, countryAr, gov, govAr)}
+                              disabled={!govAddForm.area.trim()}
+                              className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {t('addBtn') ?? 'Add'} / إضافة
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleAddAreaForm(country, gov)}
+                              className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted/60 transition-colors"
+                            >
+                              {t('cancel')}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* ── Add custom location panel ─────────────────────────────────────── */}
+      <div className="rounded-xl border border-dashed border-border overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setAddLocOpen(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-muted/20 hover:bg-muted/40 transition-colors text-start"
+        >
+          <div className="flex items-center gap-2">
+            {!addLocOpen && (
+              <svg
+                className="w-4 h-4 text-primary"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+            )}
+            <span className="text-sm font-medium text-foreground">
+              {t('addCustomLocation') ?? 'Add custom location'} / إضافة موقع مخصص
+            </span>
+          </div>
+          <ChevronIcon open={addLocOpen} />
+        </button>
+
+        {addLocOpen && (
+          <div className="bg-background p-4 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              {t('addCustomLocationHint') ??
+                'Add a new country, province/governorate and area. A country+province combination is created once it has at least one area.'}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Country EN */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-foreground">
+                  {t('countryEn') ?? 'Country (EN)'} *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Saudi Arabia"
+                  value={addLocForm.country}
+                  onChange={e => setAddLocForm(prev => ({ ...prev, country: e.target.value }))}
+                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              {/* Country AR */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-foreground">
+                  {t('countryAr') ?? 'الدولة (ع)'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: المملكة العربية السعودية"
+                  dir="rtl"
+                  value={addLocForm.countryAr}
+                  onChange={e => setAddLocForm(prev => ({ ...prev, countryAr: e.target.value }))}
+                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                />
+              </div>
+              {/* Governorate EN */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-foreground">
+                  {t('governorateEn') ?? 'Province / Governorate (EN)'} *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Riyadh"
+                  value={addLocForm.governorate}
+                  onChange={e => setAddLocForm(prev => ({ ...prev, governorate: e.target.value }))}
+                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              {/* Governorate AR */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-foreground">
+                  {t('governorateAr') ?? 'المحافظة (ع)'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: الرياض"
+                  dir="rtl"
+                  value={addLocForm.governorateAr}
+                  onChange={e =>
+                    setAddLocForm(prev => ({ ...prev, governorateAr: e.target.value }))
+                  }
+                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                />
+              </div>
+              {/* Area EN */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-foreground">
+                  {t('areaEn') ?? 'Area (EN)'} *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Al Olaya"
+                  value={addLocForm.area}
+                  onChange={e => setAddLocForm(prev => ({ ...prev, area: e.target.value }))}
+                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              {/* Area AR */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-foreground">
+                  {t('areaAr') ?? 'المنطقة (ع)'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: العليا"
+                  dir="rtl"
+                  value={addLocForm.areaAr}
+                  onChange={e => setAddLocForm(prev => ({ ...prev, areaAr: e.target.value }))}
+                  className="px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-arabic"
+                />
+              </div>
+              {/* Fee */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-foreground">{t('feeLabel')}</label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    placeholder="0.000"
+                    value={addLocForm.feeKwd}
+                    onChange={e => setAddLocForm(prev => ({ ...prev, feeKwd: e.target.value }))}
+                    className="w-28 px-2 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+                  />
+                  <span className="text-xs text-muted-foreground">{t('currency')}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setAddLocOpen(false);
+                  setAddLocForm({
+                    country: '',
+                    countryAr: '',
+                    governorate: '',
+                    governorateAr: '',
+                    area: '',
+                    areaAr: '',
+                    feeKwd: '',
+                  });
+                }}
+                className="px-3 py-1.5 text-sm font-medium border border-border rounded-lg hover:bg-muted/60 transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={submitAddLoc}
+                disabled={
+                  !addLocForm.country.trim() ||
+                  !addLocForm.governorate.trim() ||
+                  !addLocForm.area.trim()
+                }
+                className="px-4 py-1.5 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {t('addBtn') ?? 'Add'} / إضافة
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Save button */}
