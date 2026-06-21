@@ -3,7 +3,7 @@
 import * as React from 'react';
 import dynamic from 'next/dynamic';
 import AnimatedTextCycle from '@/components/ui/animated-text-cycle';
-import { MetalButton } from '@/components/ui/liquid-glass-button';
+import { LiquidLink } from '@/components/ui/liquid-glass-button';
 
 // Dynamically imported so tsparticles never runs on the server.
 const SparklesCore = dynamic(() => import('@/components/ui/sparkles').then(m => m.SparklesCore), {
@@ -19,7 +19,7 @@ const CYCLE_WORDS = ['storefront', 'catalog', 'checkout', 'brand', 'growth'];
  *  - SparklesCore as an absolute background layer (Force orange particles).
  *  - Radial gradient masks so the sparkles fade at the edges.
  *  - A headline with AnimatedTextCycle cycling through CYCLE_WORDS.
- *  - A primary MetalButton CTA.
+ *  - Liquid-glass CTA links to the real contact channels (WhatsApp / email).
  */
 export default function CtaSection() {
   return (
@@ -64,22 +64,28 @@ export default function CtaSection() {
 
         {/* Sub-copy */}
         <p className="max-w-xl text-lg text-white/60">
-          Everything you need to build, sell, and grow — in one beautifully designed platform.
+          We build and run your store — you focus on selling. One team, fully managed, Arabic-first.
         </p>
 
-        {/* CTA */}
+        {/* CTA — liquid-glass links to the real contact channels (managed model, no self-serve) */}
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <MetalButton colorVariant="primary" size="xl">
-            Get started free
-          </MetalButton>
-          <MetalButton colorVariant="default" size="xl">
-            See a live demo
-          </MetalButton>
+          <LiquidLink
+            href="https://wa.me/96566740311"
+            target="_blank"
+            rel="noopener noreferrer"
+            size="xl"
+            className="text-white"
+          >
+            Talk on WhatsApp
+          </LiquidLink>
+          <LiquidLink href="mailto:info@forcemediakw.com" size="xl" className="text-white">
+            Email us
+          </LiquidLink>
         </div>
 
-        {/* Social proof line */}
+        {/* Trust line — accurate to the managed-agency model */}
         <p className="text-sm text-white/40">
-          No credit card required · Cancel anytime · Live in minutes
+          Managed setup · Kuwait payments built in · Live in days
         </p>
       </div>
     </section>

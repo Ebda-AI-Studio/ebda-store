@@ -16,7 +16,7 @@ export const buttonVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary/90',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-        cool: 'bg-blue-600 text-white hover:bg-blue-700',
+        cool: 'bg-primary text-primary-foreground hover:bg-primary/90',
         outline: 'border border-border bg-background hover:bg-accent hover:text-accent-foreground',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
@@ -116,6 +116,14 @@ function ShineEffect() {
   );
 }
 
+/** Shared glass styling for the liquid button + its anchor-link twin below. */
+export const LIQUID_GLASS_STYLE: React.CSSProperties = {
+  backdropFilter: 'blur(12px) url("#container-glass")',
+  WebkitBackdropFilter: 'blur(12px) url("#container-glass")',
+  background: 'rgba(255,255,255,0.10)',
+  boxShadow: '0 4px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25)',
+};
+
 export const LiquidButton = React.forwardRef<HTMLButtonElement, LiquidButtonProps>(
   ({ className, size, children, style, ...props }, ref) => {
     return (
@@ -124,13 +132,7 @@ export const LiquidButton = React.forwardRef<HTMLButtonElement, LiquidButtonProp
         <button
           ref={ref}
           className={cn(liquidbuttonVariants({ size, className }))}
-          style={{
-            backdropFilter: 'blur(12px) url("#container-glass")',
-            WebkitBackdropFilter: 'blur(12px) url("#container-glass")',
-            background: 'rgba(255,255,255,0.10)',
-            boxShadow: '0 4px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25)',
-            ...style,
-          }}
+          style={{ ...LIQUID_GLASS_STYLE, ...style }}
           {...props}
         >
           <ShineEffect />
@@ -142,160 +144,32 @@ export const LiquidButton = React.forwardRef<HTMLButtonElement, LiquidButtonProp
 );
 LiquidButton.displayName = 'LiquidButton';
 
-// ---------------------------------------------------------------------------
-// MetalButton — gradient metallic feel with press/hover state
-// ---------------------------------------------------------------------------
+/**
+ * Anchor twin of LiquidButton — identical liquid-glass look, but a real `<a>`
+ * so it can be a navigation/CTA link (WhatsApp, email, scroll anchors). Using a
+ * styled anchor avoids the `asChild`/Slot decoration-merge complexity.
+ */
+export interface LiquidLinkProps
+  extends
+    React.AnchorHTMLAttributes<HTMLAnchorElement>,
+    VariantProps<typeof liquidbuttonVariants> {}
 
-type ColorVariant = 'default' | 'primary' | 'success' | 'error' | 'gold' | 'bronze';
-
-interface ColorConfig {
-  outer: string;
-  inner: string;
-  button: string;
-}
-
-const colorVariants: Record<ColorVariant, ColorConfig> = {
-  default: {
-    outer: 'from-zinc-400 via-zinc-300 to-zinc-500',
-    inner: 'from-zinc-600 to-zinc-800',
-    button: 'from-zinc-200 via-zinc-100 to-zinc-300 text-zinc-900',
-  },
-  primary: {
-    // Force brand orange
-    outer: 'from-primary via-secondary to-muted',
-    inner: 'from-primary to-primary/40',
-    button: 'from-primary/90 via-primary to-primary/70 text-white',
-  },
-  success: {
-    outer: 'from-green-400 via-green-300 to-green-600',
-    inner: 'from-green-600 to-green-800',
-    button: 'from-green-300 via-green-200 to-green-400 text-green-900',
-  },
-  error: {
-    outer: 'from-red-400 via-red-300 to-red-600',
-    inner: 'from-red-600 to-red-800',
-    button: 'from-red-300 via-red-200 to-red-400 text-red-900',
-  },
-  gold: {
-    outer: 'from-yellow-400 via-yellow-200 to-yellow-500',
-    inner: 'from-yellow-600 to-yellow-800',
-    button: 'from-yellow-200 via-yellow-100 to-yellow-300 text-yellow-900',
-  },
-  bronze: {
-    outer: 'from-amber-600 via-amber-400 to-amber-700',
-    inner: 'from-amber-800 to-amber-950',
-    button: 'from-amber-400 via-amber-300 to-amber-500 text-amber-950',
-  },
-};
-
-export interface MetalButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  colorVariant?: ColorVariant;
-  size?: 'sm' | 'default' | 'lg' | 'xl';
-}
-
-export const MetalButton = React.forwardRef<HTMLButtonElement, MetalButtonProps>(
-  (
-    {
-      className,
-      colorVariant = 'default',
-      size = 'default',
-      children,
-      onMouseEnter,
-      onMouseLeave,
-      onMouseDown,
-      onMouseUp,
-      onTouchStart,
-      onTouchEnd,
-      ...props
-    },
-    ref
-  ) => {
-    const [pressed, setPressed] = React.useState(false);
-    const [hovered, setHovered] = React.useState(false);
-    const [isTouch, setIsTouch] = React.useState(false);
-
-    // Detect touch device on mount
-    React.useEffect(() => {
-      setIsTouch(
-        typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
-      );
-    }, []);
-
-    const colors = colorVariants[colorVariant];
-
-    const sizePadding: Record<string, string> = {
-      sm: 'px-4 py-1.5 text-sm',
-      default: 'px-6 py-2.5 text-base',
-      lg: 'px-8 py-3 text-lg',
-      xl: 'px-10 py-4 text-xl',
-    };
-
+export const LiquidLink = React.forwardRef<HTMLAnchorElement, LiquidLinkProps>(
+  ({ className, size, children, style, ...props }, ref) => {
     return (
-      <button
-        ref={ref}
-        className={cn(
-          // Outer metallic ring
-          'relative inline-flex rounded-xl bg-gradient-to-b p-[2px] transition-transform duration-100',
-          colors.outer,
-          pressed ? 'scale-95' : hovered ? 'scale-105' : 'scale-100',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          'disabled:pointer-events-none disabled:opacity-50',
-          className
-        )}
-        onMouseEnter={e => {
-          if (!isTouch) setHovered(true);
-          onMouseEnter?.(e);
-        }}
-        onMouseLeave={e => {
-          if (!isTouch) setHovered(false);
-          onMouseLeave?.(e);
-        }}
-        onMouseDown={e => {
-          setPressed(true);
-          onMouseDown?.(e);
-        }}
-        onMouseUp={e => {
-          setPressed(false);
-          onMouseUp?.(e);
-        }}
-        onTouchStart={e => {
-          setPressed(true);
-          onTouchStart?.(e);
-        }}
-        onTouchEnd={e => {
-          setPressed(false);
-          onTouchEnd?.(e);
-        }}
-        {...props}
-      >
-        {/* Inner recess ring */}
-        <span
-          className={cn(
-            'relative flex w-full items-center justify-center rounded-[10px] bg-gradient-to-b p-[2px]',
-            colors.inner
-          )}
+      <>
+        <GlassFilter />
+        <a
+          ref={ref}
+          className={cn(liquidbuttonVariants({ size, className }))}
+          style={{ ...LIQUID_GLASS_STYLE, ...style }}
+          {...props}
         >
-          {/* Button face */}
-          <span
-            className={cn(
-              'relative flex w-full items-center justify-center rounded-lg bg-gradient-to-b font-semibold shadow-inner',
-              colors.button,
-              sizePadding[size] ?? sizePadding['default']
-            )}
-          >
-            {/* Shine */}
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-lg"
-              style={{
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.40) 0%, transparent 60%)',
-              }}
-            />
-            <span className="relative z-10">{children}</span>
-          </span>
-        </span>
-      </button>
+          <ShineEffect />
+          <span className="relative z-10">{children}</span>
+        </a>
+      </>
     );
   }
 );
-MetalButton.displayName = 'MetalButton';
+LiquidLink.displayName = 'LiquidLink';

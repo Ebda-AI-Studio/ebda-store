@@ -1,5 +1,7 @@
 'use client';
 import dynamic from 'next/dynamic';
+import { cn } from '@/lib/utils';
+import { liquidbuttonVariants } from '@/components/ui/liquid-glass-button';
 
 // three.js must never hit the SSR bundle — lazy-load client-side only.
 const WebGLShader = dynamic(
@@ -7,31 +9,25 @@ const WebGLShader = dynamic(
   { ssr: false }
 );
 
+const GLASS_STYLE: React.CSSProperties = {
+  backdropFilter: 'blur(12px) url("#container-glass")',
+  WebkitBackdropFilter: 'blur(12px) url("#container-glass")',
+  background: 'rgba(255,255,255,0.10)',
+  boxShadow: '0 4px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25)',
+};
+
 export function HeroSection() {
   return (
-    <section className="relative min-h-screen bg-black overflow-hidden flex items-center justify-center">
+    <section
+      id="hero"
+      className="relative min-h-screen bg-black overflow-hidden flex items-center justify-center"
+    >
       {/* Full-bleed WebGL background — stays inside this section via absolute inset-0 */}
       <WebGLShader />
 
       {/* Foreground content — above the canvas */}
       <div className="relative z-10 flex items-center justify-center w-full px-4 py-24">
         <div className="max-w-3xl w-full rounded-2xl border border-border/40 bg-background/5 backdrop-blur-md p-10 md:p-16 flex flex-col items-center gap-6 text-center shadow-2xl">
-          {/* Available-now indicator. Green is a semantic "available/online"
-              status signal on Force's OWN platform landing — this page is not a
-              tenant-themed storefront, so the design-token rule (which exists to
-              make tenant pages honor the tenant theme) doesn't apply here. */}
-          {/* eslint-disable no-restricted-syntax */}
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
-            </span>
-            <span className="text-xs font-medium text-green-400 tracking-wide uppercase">
-              Available now
-            </span>
-          </div>
-          {/* eslint-enable no-restricted-syntax */}
-
           {/* Headline */}
           <h1 className="text-4xl md:text-7xl font-bold leading-tight tracking-tight text-white">
             Build your store with <span className="text-primary">Force AI</span>
@@ -43,13 +39,31 @@ export function HeroSection() {
             customized online store in minutes — Arabic-first, locally integrated, always smart.
           </p>
 
-          {/* CTA */}
-          <button
-            type="button"
-            className="mt-2 inline-flex items-center justify-center rounded-full bg-primary px-8 h-12 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-          >
-            Get started
-          </button>
+          {/* CTAs */}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-4">
+            {/* Primary CTA — WhatsApp */}
+            <a
+              href="https://wa.me/96566740311"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                liquidbuttonVariants({ size: 'lg' }),
+                'bg-primary/80 border-primary/40 hover:bg-primary/90'
+              )}
+              style={GLASS_STYLE}
+            >
+              Talk on WhatsApp
+            </a>
+
+            {/* Secondary CTA — Email */}
+            <a
+              href="mailto:info@forcemediakw.com"
+              className={cn(liquidbuttonVariants({ size: 'lg' }))}
+              style={GLASS_STYLE}
+            >
+              Email us
+            </a>
+          </div>
         </div>
       </div>
     </section>

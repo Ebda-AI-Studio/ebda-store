@@ -242,32 +242,6 @@ export function FlickeringGrid({
 // Icons
 // ---------------------------------------------------------------------------
 
-const Icons = {
-  /** Generic Force AI mark — orange square with "F" */
-  logo: ({ className }: { className?: string }) => (
-    <svg
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={cn('w-8 h-8', className)}
-      aria-label="Force AI"
-    >
-      <rect width="32" height="32" rx="6" fill="#ff6e01" />
-      <text
-        x="16"
-        y="22"
-        textAnchor="middle"
-        fontFamily="sans-serif"
-        fontWeight="800"
-        fontSize="18"
-        fill="white"
-      >
-        F
-      </text>
-    </svg>
-  ),
-};
-
 // ---------------------------------------------------------------------------
 // FooterLink column
 // ---------------------------------------------------------------------------
@@ -315,15 +289,31 @@ export function FlickeringFooter() {
       {/* ------------------------------------------------------------------ */}
       <div className="relative z-10 border-t border-border/30 px-6 py-16">
         <div className="max-w-6xl mx-auto flex flex-col gap-12 md:gap-0 md:flex-row md:justify-between">
-          {/* Brand lockup */}
+          {/* Brand lockup — real Force AI logo (public/logo.svg, orange mark). */}
           <div className="flex flex-col gap-4 max-w-xs">
-            <div className="flex items-center gap-2">
-              <Icons.logo />
+            <div className="flex items-center gap-2.5">
+              <img src="/logo.svg" alt="Force AI" className="h-9 w-auto" />
               <span className="text-white font-bold text-lg tracking-tight">Force AI</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {siteConfig.hero.description}
             </p>
+            <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+              <a
+                href="https://wa.me/96566740311"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors"
+              >
+                WhatsApp · +965 6674 0311
+              </a>
+              <a
+                href="mailto:info@forcemediakw.com"
+                className="hover:text-primary transition-colors"
+              >
+                info@forcemediakw.com
+              </a>
+            </div>
           </div>
 
           {/* Link columns */}
