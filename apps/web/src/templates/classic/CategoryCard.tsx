@@ -4,8 +4,10 @@ import type React from 'react';
 import Link from 'next/link';
 import type { CategoryCardProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStore } from '../../contexts/StoreContext';
 import { categorySizeClass, cardShapeClasses } from '../shared/card-size';
 import { responsiveFontSize } from '../shared/section-typography';
+import { getCategoryCountUnit } from '../../lib/category-count-unit';
 
 export default function ClassicCategoryCard({
   category,
@@ -18,7 +20,9 @@ export default function ClassicCategoryCard({
 }: CategoryCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
+  const { store } = useStore();
   const displayName = isRtl && category.nameAr ? category.nameAr : category.name;
+  const countUnit = getCategoryCountUnit(store.theme, isRtl);
   const isOverlay = captionPosition === 'overlay';
   // Named shape overrides classic's default aspect-square sm:aspect-[3/4]
   // + rounded-sm (added 2026-05-16). Falls back to classic defaults.
@@ -103,7 +107,7 @@ export default function ClassicCategoryCard({
           {/* Product count */}
           {category.productCount !== undefined && (
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              {isRtl ? `${category.productCount} قطعة` : `${category.productCount} pieces`}
+              {category.productCount} {countUnit}
             </p>
           )}
 

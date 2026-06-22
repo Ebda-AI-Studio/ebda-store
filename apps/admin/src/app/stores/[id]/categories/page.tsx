@@ -84,6 +84,33 @@ export default function StoreCategoriesPage() {
   const [showBestSellersTile, setShowBestSellersTile] = useState(true);
   const [savingShowBestSellersTile, setSavingShowBestSellersTile] = useState(false);
 
+  // Merchant-configurable product count unit label shown on category cards
+  // (e.g. "4 pieces" / "4 قطعة"). Stored on StoreTheme JSON (`categoryCountUnit`).
+  // Defaults are "pieces" (EN) and "قطعة" (AR) — same as the storefront fallback.
+  const [countUnitEn, setCountUnitEn] = useState('pieces');
+  const [countUnitAr, setCountUnitAr] = useState('قطعة');
+  const [savingCountUnit, setSavingCountUnit] = useState(false);
+
+  const saveCountUnit = useCallback(
+    async (en: string, ar: string) => {
+      if (!storeId) return;
+      setSavingCountUnit(true);
+      try {
+        const { error: apiError } = await apiPut(`/api/v1/stores/${storeId}/theme`, {
+          categoryCountUnit: { en: en.trim() || 'pieces', ar: ar.trim() || 'قطعة' },
+        });
+        if (apiError) {
+          showError(t('errorTitle'), apiError.message ?? '');
+          return;
+        }
+        toastSuccess('Category count label saved');
+      } finally {
+        setSavingCountUnit(false);
+      }
+    },
+    [storeId, showError, toastSuccess, t]
+  );
+
   const saveShowBestSellersTile = useCallback(
     async (next: boolean) => {
       if (!storeId) return;
@@ -209,15 +236,25 @@ export default function StoreCategoriesPage() {
     fetchCategories();
     fetchBestSellersImage();
     // Fetch store template (upload-size hint) + the Best Sellers tile flag
-    // (non-critical). Both ride the same store GET.
+    // + the category count unit label (non-critical). All ride the same store GET.
     if (storeId) {
-      apiGet<{ store: { template?: TemplateId; theme?: { showBestSellersTile?: boolean } } }>(
-        `/api/v1/admin/stores/${storeId}`
-      )
+      apiGet<{
+        store: {
+          template?: TemplateId;
+          theme?: {
+            showBestSellersTile?: boolean;
+            categoryCountUnit?: { en: string; ar: string };
+          };
+        };
+      }>(`/api/v1/admin/stores/${storeId}`)
         .then(({ data }) => {
           if (data?.store?.template) setStoreTemplate(data.store.template);
           // Default true — only an explicit false hides the tile.
           setShowBestSellersTile(data?.store?.theme?.showBestSellersTile !== false);
+          // Populate count unit fields from saved theme (fall back to defaults).
+          const saved = data?.store?.theme?.categoryCountUnit;
+          if (saved?.en) setCountUnitEn(saved.en);
+          if (saved?.ar) setCountUnitAr(saved.ar);
         })
         .catch(() => {
           // non-critical — falls back to base recommended size + tile shown
@@ -474,6 +511,78 @@ export default function StoreCategoriesPage() {
               }`}
             />
           </button>
+        </div>
+      </div>
+
+      {/* Category count unit label — merchant-configurable word shown after the count
+          on category cards (e.g. "4 pieces" / "4 قطعة"). Saved on StoreTheme JSON. */}
+      <div className="mb-4 rounded-xl border bg-card p-4 shadow-sm">
+        <div className="mb-3">
+          <h3 className="text-base font-semibold text-foreground">
+            Product count label
+            <span className="ms-2 text-sm font-normal text-muted-foreground">/ تسمية العدد</span>
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            The word shown after the product count on category cards, e.g. &ldquo;4{' '}
+            <strong>pieces</strong>&rdquo; / &ldquo;4 <strong>قطعة</strong>&rdquo;. Leave blank to
+            use the default (&ldquo;pieces&rdquo; / &ldquo;قطعة&rdquo;).
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground" dir="rtl">
+            الكلمة التي تظهر بعد عدد المنتجات في بطاقات الأقسام، مثلاً &quot;4 <strong>قطعة</strong>
+            &quot; / &quot;4 <strong>pieces</strong>&quot;.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label
+              className="mb-1 block text-xs font-medium text-foreground"
+              htmlFor="count-unit-en"
+            >
+              English label
+            </label>
+            <input
+              id="count-unit-en"
+              type="text"
+              value={countUnitEn}
+              onChange={e => setCountUnitEn(e.target.value)}
+              placeholder="pieces"
+              maxLength={30}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+          <div>
+            <label
+              className="mb-1 block text-xs font-medium text-foreground"
+              htmlFor="count-unit-ar"
+              dir="rtl"
+            >
+              التسمية بالعربي
+            </label>
+            <input
+              id="count-unit-ar"
+              type="text"
+              dir="rtl"
+              value={countUnitAr}
+              onChange={e => setCountUnitAr(e.target.value)}
+              placeholder="قطعة"
+              maxLength={30}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            type="button"
+            disabled={savingCountUnit}
+            onClick={() => saveCountUnit(countUnitEn, countUnitAr)}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {savingCountUnit ? 'Saving…' : 'Save label'}
+          </button>
+          <span className="text-xs text-muted-foreground">
+            Preview: <strong>{countUnitEn || 'pieces'}</strong> /{' '}
+            <strong dir="rtl">{countUnitAr || 'قطعة'}</strong>
+          </span>
         </div>
       </div>
 

@@ -281,6 +281,17 @@ export interface StoreTheme {
    */
   bgSectionAlt?: string;
 
+  /**
+   * Per-store category product-count unit label (EN + AR).
+   * Displayed after the count on category cards, e.g. "4 pieces" / "4 قطعة".
+   * When unset, the storefront defaults to EN "pieces" / AR "قطعة".
+   * Merchant edits via Admin → Categories.
+   */
+  categoryCountUnit?: {
+    en: string;
+    ar: string;
+  };
+
   // Custom CSS (for advanced users)
   customCss?: string;
 }
