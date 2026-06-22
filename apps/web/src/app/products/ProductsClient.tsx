@@ -389,7 +389,7 @@ export default function ProductsClient({
             className="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
             style={zoneStyle(plpSubtitleZone, plpScale)}
           >
-            <Link href="/" className="transition-colors hover:text-primary">
+            <Link href={storeUrl('/')} className="transition-colors hover:text-primary">
               {t('Home', translations['Home'])}
             </Link>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
