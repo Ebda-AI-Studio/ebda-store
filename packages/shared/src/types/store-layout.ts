@@ -406,6 +406,20 @@ export interface FilterSidebarSettings {
   enabled: boolean;
   /** When false on desktop, opens collapsed; users click to expand */
   defaultOpen: boolean;
+  /**
+   * Merchant-controlled background color for the desktop sidebar panel.
+   * Accepts a brand token ('token:primary' | 'token:card' | …) or a hex
+   * value. When unset, the sidebar falls back to the CSS-variable driven
+   * default (hsl(var(--primary))) — keeping the existing look for all
+   * stores that haven't opted in.
+   */
+  bgColor?: string;
+  /**
+   * Merchant-controlled text/icon color for the desktop sidebar panel.
+   * Accepts a brand token or hex. When unset, inherits
+   * hsl(var(--primary-foreground)) — the existing default.
+   */
+  textColor?: string;
 }
 
 /** Aspect-ratio choices for the PDP main image. */

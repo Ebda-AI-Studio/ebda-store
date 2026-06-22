@@ -1050,7 +1050,9 @@
         "filterSidebar": {
           "title": "PLP filter sidebar",
           "description": "Sort + price + attribute filters on category list pages",
-          "defaultOpen": "Open by default on desktop"
+          "defaultOpen": "Open by default on desktop",
+          "bgColor": "Sidebar background color",
+          "textColor": "Sidebar text color"
         },
         "testimonials": {
           "title": "Customer testimonials",

@@ -51,6 +51,19 @@ interface ProductsFilterSidebarProps {
    * whether it starts in the expanded state. Defaults to true when undefined.
    */
   defaultOpen?: boolean;
+  /**
+   * Merchant-controlled background color for the sidebar panel (desktop) and
+   * mobile trigger button. Already resolved to a CSS color string via
+   * `resolveColor(value, store.theme)`. When undefined, the sidebar uses its
+   * existing CSS-variable-driven default (hsl(var(--primary))).
+   */
+  sidebarBgColor?: string;
+  /**
+   * Merchant-controlled text/icon color for the sidebar panel. Already
+   * resolved to a CSS color string. When undefined, inherits
+   * hsl(var(--primary-foreground)).
+   */
+  sidebarTextColor?: string;
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -80,8 +93,22 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     priceCeil,
     onPriceChange,
     defaultOpen,
+    sidebarBgColor,
+    sidebarTextColor,
   } = props;
   const { t } = useLanguage();
+
+  // Build optional inline-style overrides. When the merchant has set a custom
+  // bg/text color, we apply it via style= so it wins over the Tailwind classes
+  // (which encode the default hsl(var(--primary)) / hsl(var(--primary-foreground))).
+  // When unset we pass nothing — the Tailwind defaults remain in full effect.
+  const sidebarStyle: React.CSSProperties | undefined =
+    sidebarBgColor || sidebarTextColor
+      ? {
+          ...(sidebarBgColor ? { backgroundColor: sidebarBgColor } : {}),
+          ...(sidebarTextColor ? { color: sidebarTextColor } : {}),
+        }
+      : undefined;
 
   // Local controlled value for the input. Submitting via Enter still works,
   // but we also fire `onSearchChange` after 300ms of keystroke stillness
@@ -401,6 +428,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // trigger, the lot.
     <aside
       className="w-full shrink-0 lg:w-64 lg:rounded-2xl lg:overflow-hidden lg:p-4 lg:bg-[hsl(var(--primary))] lg:text-[hsl(var(--primary-foreground))]"
+      style={sidebarStyle}
       data-zone="filters"
     >
       {/* Mobile trigger — opens the bottom-sheet. */}
@@ -410,6 +438,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-xl bg-[hsl(var(--primary))] px-4 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/0.9)]"
+        style={sidebarStyle}
       >
         <span className="inline-flex items-center gap-2">
           <svg

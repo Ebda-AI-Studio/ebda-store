@@ -9,6 +9,7 @@ import type {
   FilterSidebarSettings,
   ProductsPageSettings,
 } from '@force/shared';
+import { resolveColor } from '@force/shared';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { useToast } from '@force/ui';
 import { useCart } from '../../contexts/CartContext';
@@ -470,6 +471,16 @@ export default function ProductsClient({
                     setPriceMax(max);
                   }}
                   defaultOpen={filterSidebar?.defaultOpen}
+                  sidebarBgColor={
+                    filterSidebar?.bgColor
+                      ? (resolveColor(filterSidebar.bgColor, store.theme) ?? undefined)
+                      : undefined
+                  }
+                  sidebarTextColor={
+                    filterSidebar?.textColor
+                      ? (resolveColor(filterSidebar.textColor, store.theme) ?? undefined)
+                      : undefined
+                  }
                 />
                 {/* View Mode */}
                 <div className="hidden items-center gap-1 rounded-lg border border-border bg-background p-1 sm:flex">

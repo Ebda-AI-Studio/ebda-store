@@ -1293,6 +1293,22 @@ export default function StoreLayoutPage() {
                   checked={layout.filterSidebar.defaultOpen}
                   onChange={v => updateSection('filterSidebar', s => ({ ...s, defaultOpen: v }))}
                 />
+                <ColorField
+                  label={t('sections.filterSidebar.bgColor')}
+                  value={layout.filterSidebar.bgColor}
+                  onChange={v =>
+                    updateSection('filterSidebar', s => ({ ...s, bgColor: v ?? undefined }))
+                  }
+                  theme={storeInfo?.theme}
+                />
+                <ColorField
+                  label={t('sections.filterSidebar.textColor')}
+                  value={layout.filterSidebar.textColor}
+                  onChange={v =>
+                    updateSection('filterSidebar', s => ({ ...s, textColor: v ?? undefined }))
+                  }
+                  theme={storeInfo?.theme}
+                />
               </SectionCard>
 
               {/* ── Page design: one card per storefront page (background +
