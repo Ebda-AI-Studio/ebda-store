@@ -1,8 +1,10 @@
 name: Neon snapshot
 
 on:
-  push:
-    branches: [main]
+  # Push trigger RETIRED 2026-06-08 (per-commit prod-<sha> snapshots drove
+  # extra-branch + compute cost; DR is now a daily local pg_dump). Kept as
+  # workflow_dispatch-only so it can still be run manually if ever needed —
+  # it no longer fires on every push to main.
   workflow_dispatch:
     inputs:
       force_cloud:
