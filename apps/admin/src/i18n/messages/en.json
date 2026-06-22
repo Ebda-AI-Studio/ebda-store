@@ -1870,7 +1870,20 @@
       "importing": "Importing…",
       "cancel": "Cancel",
       "importedTitle": "Imported",
-      "importedDescription": "{count} area rate(s) updated."
+      "importedDescription": "{count} area rate(s) updated.",
+      "countryEn": "Country",
+      "countryAr": "Country (Arabic)",
+      "governorateEn": "Province",
+      "governorateAr": "Province (Arabic)",
+      "areaEn": "Area name",
+      "areaAr": "Area name (Arabic)",
+      "addArea": "Add area",
+      "addBtn": "Add",
+      "addedAreas": "Added areas",
+      "addCustomLocation": "Add custom location",
+      "addCustomLocationHint": "Add a country, province and area that aren't in the list above.",
+      "remove": "Remove",
+      "deleteFailed": "Couldn't delete the area"
     }
   },
   "tax": {

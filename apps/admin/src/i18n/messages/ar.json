@@ -1870,7 +1870,20 @@
       "importing": "جارٍ الاستيراد…",
       "cancel": "إلغاء",
       "importedTitle": "تم الاستيراد",
-      "importedDescription": "تم تحديث {count} رسم منطقة."
+      "importedDescription": "تم تحديث {count} رسم منطقة.",
+      "countryEn": "الدولة",
+      "countryAr": "الدولة (بالعربية)",
+      "governorateEn": "المحافظة",
+      "governorateAr": "المحافظة (بالعربية)",
+      "areaEn": "اسم المنطقة",
+      "areaAr": "اسم المنطقة (بالعربية)",
+      "addArea": "إضافة منطقة",
+      "addBtn": "إضافة",
+      "addedAreas": "المناطق المضافة",
+      "addCustomLocation": "إضافة موقع مخصص",
+      "addCustomLocationHint": "أضف دولة ومحافظة ومنطقة غير موجودة في القائمة أعلاه.",
+      "remove": "حذف",
+      "deleteFailed": "تعذّر حذف المنطقة"
     }
   },
   "tax": {

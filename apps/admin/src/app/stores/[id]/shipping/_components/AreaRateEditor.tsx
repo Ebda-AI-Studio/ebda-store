@@ -862,7 +862,7 @@ export function AreaRateEditor({ storeId }: Props) {
                   {customAreas.length > 0 && (
                     <div className="border-t border-border/60">
                       <p className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/10">
-                        {t('addedAreas') ?? 'Added areas'} / المناطق المضافة
+                        {t('addedAreas')}
                       </p>
                       <div className="divide-y divide-border/40">
                         {customAreas.map(({ row, idx }) => (
@@ -901,7 +901,7 @@ export function AreaRateEditor({ storeId }: Props) {
                             <button
                               type="button"
                               onClick={() => removeCustomRow(idx)}
-                              aria-label={`${t('remove') ?? 'Remove'} ${row.area}`}
+                              aria-label={`${t('remove')} ${row.area}`}
                               className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
                             >
                               <TrashIcon />
@@ -934,14 +934,12 @@ export function AreaRateEditor({ storeId }: Props) {
                             d="M12 4v16m8-8H4"
                           />
                         </svg>
-                        {t('addArea') ?? 'Add area'} / إضافة منطقة
+                        {t('addArea')}
                       </button>
                     ) : (
                       <div className="flex flex-wrap items-end gap-2 py-1">
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-muted-foreground">
-                            {t('areaEn') ?? 'Area (EN)'}
-                          </label>
+                          <label className="text-xs text-muted-foreground">{t('areaEn')}</label>
                           <input
                             type="text"
                             placeholder="Area name"
@@ -956,9 +954,7 @@ export function AreaRateEditor({ storeId }: Props) {
                           />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <label className="text-xs text-muted-foreground">
-                            {t('areaAr') ?? 'المنطقة (ع)'}
-                          </label>
+                          <label className="text-xs text-muted-foreground">{t('areaAr')}</label>
                           <input
                             type="text"
                             placeholder="اسم المنطقة"
@@ -999,7 +995,7 @@ export function AreaRateEditor({ storeId }: Props) {
                           disabled={!addForm.area.trim()}
                           className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {t('addBtn') ?? 'Add'} / إضافة
+                          {t('addBtn')}
                         </button>
                         <button
                           type="button"
@@ -1114,7 +1110,7 @@ export function AreaRateEditor({ storeId }: Props) {
                               <button
                                 type="button"
                                 onClick={() => removeCustomRow(idx)}
-                                aria-label={`${t('remove') ?? 'Remove'} ${row.area}`}
+                                aria-label={`${t('remove')} ${row.area}`}
                                 className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
                               >
                                 <TrashIcon />
@@ -1146,14 +1142,12 @@ export function AreaRateEditor({ storeId }: Props) {
                                 d="M12 4v16m8-8H4"
                               />
                             </svg>
-                            {t('addArea') ?? 'Add area'} / إضافة منطقة
+                            {t('addArea')}
                           </button>
                         ) : (
                           <div className="flex flex-wrap items-end gap-2 py-1">
                             <div className="flex flex-col gap-1">
-                              <label className="text-xs text-muted-foreground">
-                                {t('areaEn') ?? 'Area (EN)'}
-                              </label>
+                              <label className="text-xs text-muted-foreground">{t('areaEn')}</label>
                               <input
                                 type="text"
                                 placeholder="Area name"
@@ -1168,9 +1162,7 @@ export function AreaRateEditor({ storeId }: Props) {
                               />
                             </div>
                             <div className="flex flex-col gap-1">
-                              <label className="text-xs text-muted-foreground">
-                                {t('areaAr') ?? 'المنطقة (ع)'}
-                              </label>
+                              <label className="text-xs text-muted-foreground">{t('areaAr')}</label>
                               <input
                                 type="text"
                                 placeholder="اسم المنطقة"
@@ -1215,7 +1207,7 @@ export function AreaRateEditor({ storeId }: Props) {
                               disabled={!govAddForm.area.trim()}
                               className="px-3 py-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {t('addBtn') ?? 'Add'} / إضافة
+                              {t('addBtn')}
                             </button>
                             <button
                               type="button"
@@ -1260,25 +1252,18 @@ export function AreaRateEditor({ storeId }: Props) {
                 />
               </svg>
             )}
-            <span className="text-sm font-medium text-foreground">
-              {t('addCustomLocation') ?? 'Add custom location'} / إضافة موقع مخصص
-            </span>
+            <span className="text-sm font-medium text-foreground">{t('addCustomLocation')}</span>
           </div>
           <ChevronIcon open={addLocOpen} />
         </button>
 
         {addLocOpen && (
           <div className="bg-background p-4 space-y-4">
-            <p className="text-xs text-muted-foreground">
-              {t('addCustomLocationHint') ??
-                'Add a new country, province/governorate and area. A country+province combination is created once it has at least one area.'}
-            </p>
+            <p className="text-xs text-muted-foreground">{t('addCustomLocationHint')}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Country EN */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">
-                  {t('countryEn') ?? 'Country (EN)'} *
-                </label>
+                <label className="text-xs font-medium text-foreground">{t('countryEn')} *</label>
                 <input
                   type="text"
                   placeholder="e.g. Saudi Arabia"
@@ -1289,9 +1274,7 @@ export function AreaRateEditor({ storeId }: Props) {
               </div>
               {/* Country AR */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">
-                  {t('countryAr') ?? 'الدولة (ع)'}
-                </label>
+                <label className="text-xs font-medium text-foreground">{t('countryAr')}</label>
                 <input
                   type="text"
                   placeholder="مثال: المملكة العربية السعودية"
@@ -1304,7 +1287,7 @@ export function AreaRateEditor({ storeId }: Props) {
               {/* Governorate EN */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-foreground">
-                  {t('governorateEn') ?? 'Province / Governorate (EN)'} *
+                  {t('governorateEn')} *
                 </label>
                 <input
                   type="text"
@@ -1316,9 +1299,7 @@ export function AreaRateEditor({ storeId }: Props) {
               </div>
               {/* Governorate AR */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">
-                  {t('governorateAr') ?? 'المحافظة (ع)'}
-                </label>
+                <label className="text-xs font-medium text-foreground">{t('governorateAr')}</label>
                 <input
                   type="text"
                   placeholder="مثال: الرياض"
@@ -1332,9 +1313,7 @@ export function AreaRateEditor({ storeId }: Props) {
               </div>
               {/* Area EN */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">
-                  {t('areaEn') ?? 'Area (EN)'} *
-                </label>
+                <label className="text-xs font-medium text-foreground">{t('areaEn')} *</label>
                 <input
                   type="text"
                   placeholder="e.g. Al Olaya"
@@ -1345,9 +1324,7 @@ export function AreaRateEditor({ storeId }: Props) {
               </div>
               {/* Area AR */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-foreground">
-                  {t('areaAr') ?? 'المنطقة (ع)'}
-                </label>
+                <label className="text-xs font-medium text-foreground">{t('areaAr')}</label>
                 <input
                   type="text"
                   placeholder="مثال: العليا"
@@ -1404,7 +1381,7 @@ export function AreaRateEditor({ storeId }: Props) {
                 }
                 className="px-4 py-1.5 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('addBtn') ?? 'Add'} / إضافة
+                {t('addBtn')}
               </button>
             </div>
           </div>
