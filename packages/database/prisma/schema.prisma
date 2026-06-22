@@ -855,11 +855,13 @@ model ProductImage {
 model ProductCategory {
   productId  String @map("product_id")
   categoryId String @map("category_id")
+  position   Int    @default(0) @map("position")
 
   product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@id([productId, categoryId])
+  @@index([categoryId, position])
   @@map("product_categories")
 }
 

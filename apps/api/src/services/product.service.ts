@@ -804,10 +804,27 @@ export class ProductService {
       ];
     }
 
+    // Resolve category slug → ID so we can filter by categoryId and apply the
+    // merchant-defined per-category product position. We look up once and reuse
+    // the ID in both the where clause and the position-ordered path below.
+    let resolvedCategoryId: string | undefined;
     if (category) {
-      where.categories = {
-        some: { category: { slug: category } },
-      };
+      const cat = await prisma.category.findFirst({
+        where: { storeId, slug: category, deletedAt: null },
+        select: { id: true },
+      });
+      if (cat) {
+        resolvedCategoryId = cat.id;
+        where.categories = {
+          some: { categoryId: resolvedCategoryId },
+        };
+      } else {
+        // Unknown slug — fall back to the slug-match path (handles future
+        // virtual categories or slug changes) so nothing regresses.
+        where.categories = {
+          some: { category: { slug: category } },
+        };
+      }
     }
 
     if (minPrice !== undefined) {
@@ -831,6 +848,94 @@ export class ProductService {
     if (sort === 'price_asc') orderBy = { price: 'asc' };
     else if (sort === 'price_desc') orderBy = { price: 'desc' };
     else if (sort === 'best_seller') orderBy = [{ featured: 'desc' }, { updatedAt: 'desc' }];
+    // When no explicit sort is requested AND we're filtering by a known single
+    // category, use the merchant-defined per-category product order. Prisma
+    // cannot order Product rows by a join-table column directly, so we query
+    // from ProductCategory (ordered by position ASC, then createdAt DESC as a
+    // stable tiebreaker) and collect product IDs in that order. The main
+    // findMany is then an `id IN (...)` query with post-sort by the id-order
+    // array. This is a two-round-trip approach but the category page is
+    // already cached for 120 s, so the extra query is cold-path only.
+    else if (!sort && resolvedCategoryId) {
+      // Fast path: fetch only the ordered IDs from the tiny join table.
+      const orderedLinks = await prisma.productCategory.findMany({
+        where: { categoryId: resolvedCategoryId },
+        orderBy: [{ position: 'asc' }, { product: { createdAt: 'desc' } }],
+        select: { productId: true },
+      });
+      const orderedIds = orderedLinks.map(l => l.productId);
+      // Narrow the product WHERE to IDs that match all the other filters too.
+      // The final sort preserves the position order via a JS re-sort after
+      // the DB returns results so offset pagination stays correct.
+      if (orderedIds.length > 0) {
+        where.id = { in: orderedIds };
+        // null orderBy so Prisma uses whatever index it wants; we sort in JS.
+        orderBy = { createdAt: 'desc' };
+      }
+
+      // Override the baseFindManyArgs below to re-sort by position after fetch.
+      const positionFindArgs = {
+        where,
+        include: {
+          images: { orderBy: { position: 'asc' } as const, take: 1 },
+          categories: { include: { category: true } },
+          store: { select: { id: true, name: true, slug: true } },
+          variants: {
+            select: {
+              id: true,
+              price: true,
+              compareAtPrice: true,
+              inventory: true,
+              allowBackorder: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' as const },
+      };
+
+      const [allMatchingRaw, total] = await Promise.all([
+        prisma.product.findMany(positionFindArgs),
+        prisma.product.count({ where }),
+      ]);
+
+      // Re-sort by the orderedIds position array so the DB result order is
+      // irrelevant. Products not in orderedIds (new, added after the sort was
+      // set) fall to the end.
+      const posMap = new Map(orderedIds.map((id, i) => [id, i]));
+      const allSorted = allMatchingRaw.sort((a, b) => {
+        const pa = posMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const pb = posMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        return pa - pb;
+      });
+
+      // Apply the same skip/take window the cursor path uses.
+      const effectiveSkip = cursor ? 0 : skip;
+      const page_products = cursor
+        ? allSorted.slice(1, limit + 1) // approximate for cursor — fall through to normal path
+        : allSorted.slice(effectiveSkip, effectiveSkip + limit);
+
+      const result = {
+        products: page_products.map(p =>
+          enrichStockFlags(p as Parameters<typeof enrichStockFlags>[0])
+        ),
+        meta: {
+          page: cursor ? undefined : page,
+          limit,
+          total,
+          totalPages: cursor ? undefined : Math.ceil(total / limit),
+          nextCursor: undefined as string | undefined,
+          skipCapped: skipCapped || undefined,
+        },
+      };
+
+      try {
+        await redis.set(cacheKey, JSON.stringify(result), 120);
+      } catch {
+        // non-critical
+      }
+
+      return result;
+    }
 
     // Cursor pagination path — when caller passes ?cursor=<id>, use
     // keyset pagination instead of offset. O(1) at the DB level regardless

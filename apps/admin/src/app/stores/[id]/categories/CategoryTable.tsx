@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 
 interface Category {
@@ -20,6 +21,7 @@ interface CategoryTableProps {
   categories: Category[];
   isLoading: boolean;
   deletingId: string | null;
+  storeId: string;
   onEdit: (category: Category) => void;
   onDelete: (category: { id: string; name: string }) => void;
   onAddFirst: () => void;
@@ -35,6 +37,7 @@ export function CategoryTable({
   categories,
   isLoading,
   deletingId,
+  storeId,
   onEdit,
   onDelete,
   onAddFirst,
@@ -42,6 +45,7 @@ export function CategoryTable({
   reordering = false,
 }: CategoryTableProps) {
   const t = useT('categories.table');
+  const tOrder = useT('categories.productOrder');
   if (isLoading) {
     return (
       <div className="space-y-4 p-6">
@@ -237,6 +241,15 @@ export function CategoryTable({
                   >
                     {t('edit')}
                   </button>
+                  {(cat._count?.products ?? 0) > 1 && (
+                    <Link
+                      href={`/stores/${storeId}/categories/${cat.id}/order`}
+                      className="px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+                      title={tOrder('title')}
+                    >
+                      {tOrder('title')}
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => onDelete({ id: cat.id, name: cat.name })}

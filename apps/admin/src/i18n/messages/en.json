@@ -3622,6 +3622,26 @@
       "deleting": "Deleting...",
       "moveUp": "Move up",
       "moveDown": "Move down"
+    },
+    "productOrder": {
+      "title": "Product Order",
+      "subtitle": "Drag to set the display order of products in this category",
+      "backToCategories": "Back to Categories",
+      "save": "Save Order",
+      "saving": "Saving…",
+      "saveSuccess": "Product order saved",
+      "saveFailed": "Failed to save product order",
+      "connectionError": "Unable to connect to the server",
+      "fetchFailed": "Failed to load products",
+      "empty": "No products in this category",
+      "emptyDescription": "Add products to this category first, then you can set their display order here.",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "noSearch": "Reordering is disabled while a search filter is active",
+      "unsavedChanges": "You have unsaved changes. Save before leaving.",
+      "productCount": "{count} products",
+      "sku": "SKU: {sku}",
+      "inactive": "Inactive"
     }
   },
   "reviews": {

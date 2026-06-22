@@ -483,6 +483,7 @@ export default function StoreCategoriesPage() {
           categories={filteredCategories}
           isLoading={isLoading}
           deletingId={deletingId}
+          storeId={storeId}
           onEdit={openEditForm}
           onDelete={setDeleteTarget}
           onAddFirst={openAddForm}

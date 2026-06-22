@@ -209,6 +209,132 @@ router.put(
   }
 );
 
+// GET /stores/:storeId/categories/:categoryId/products
+// List all products in a category in their current display order (position ASC,
+// then createdAt DESC as stable tiebreaker). Used by the admin reorder UI.
+router.get(
+  '/:categoryId/products',
+  authenticate,
+  authorize('store_admin', 'super_admin', 'staff'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, categoryId } = req.params;
+
+      const category = await prisma.category.findFirst({
+        where: { id: categoryId, storeId, deletedAt: null },
+        select: { id: true, name: true, nameAr: true },
+      });
+      if (!category) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Category not found' },
+        });
+        return;
+      }
+
+      const links = await prisma.productCategory.findMany({
+        where: { categoryId },
+        orderBy: [{ position: 'asc' }, { product: { createdAt: 'desc' } }],
+        select: {
+          position: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              nameAr: true,
+              sku: true,
+              status: true,
+              images: { orderBy: { position: 'asc' }, take: 1, select: { url: true } },
+            },
+          },
+        },
+      });
+
+      const products = links.map(l => ({ ...l.product, position: l.position }));
+
+      res.json({ success: true, data: { category, products } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:storeId/categories/:categoryId/products/reorder
+// Persist the merchant's drag/move order for products within a category.
+// Body: { orderedProductIds: [...] } in the desired display order; we write
+// ProductCategory.position = index for each pair. The route validates that every
+// product ID in the body actually belongs to the category so a token cannot
+// forge positions for another tenant's products.
+const reorderCategoryProductsSchema = z.object({
+  orderedProductIds: z.array(z.string().uuid()).min(1).max(500),
+});
+router.put(
+  '/:categoryId/products/reorder',
+  authenticate,
+  requirePermission('products:write'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, categoryId } = req.params;
+      const { orderedProductIds } = reorderCategoryProductsSchema.parse(req.body);
+
+      // Verify the category belongs to the store.
+      const category = await prisma.category.findFirst({
+        where: { id: categoryId, storeId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!category) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Category not found' },
+        });
+        return;
+      }
+
+      // Validate that every supplied product ID is actually in this category.
+      // `updateMany` scoped to (productId, categoryId) is already safe (it
+      // silently ignores IDs not in the category), but we surface an explicit
+      // error so callers know when their list is stale.
+      const existing = await prisma.productCategory.findMany({
+        where: { categoryId, productId: { in: orderedProductIds } },
+        select: { productId: true },
+      });
+      const existingIds = new Set(existing.map(r => r.productId));
+      const unknown = orderedProductIds.filter(id => !existingIds.has(id));
+      if (unknown.length > 0) {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'PRODUCT_NOT_IN_CATEGORY',
+            message: `${unknown.length} product(s) not found in this category`,
+          },
+        });
+        return;
+      }
+
+      // Persist positions in a single transaction — set position = index.
+      await prisma.$transaction(
+        orderedProductIds.map((productId, index) =>
+          prisma.productCategory.updateMany({
+            where: { productId, categoryId },
+            data: { position: index },
+          })
+        )
+      );
+
+      // Bust the public product cache for this store so the storefront
+      // immediately reflects the new order on the next request.
+      await invalidateCached(`public:categories:${storeId}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /stores/:storeId/categories
 router.post(
   '/',
