@@ -4264,6 +4264,19 @@
         "entryId": "Journal Entry ID",
         "confirm": "Link",
         "cancel": "Cancel"
+      },
+      "difference": {
+        "title": "Reconciliation Difference",
+        "reconciled": "Reconciled",
+        "mismatch": "Mismatch",
+        "bankBalance": "Bank balance (period net)",
+        "ledgerBalance": "Ledger balance (GL account)",
+        "delta": "Difference",
+        "unmatchedBankSide": "Unmatched bank lines",
+        "unmatchedLedgerSide": "Unmatched ledger entries",
+        "bankLines": "bank line(s)",
+        "ledgerEntries": "ledger entry/entries",
+        "suggestedAction": "Suggested action"
       }
     }
   },

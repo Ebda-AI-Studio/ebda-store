@@ -308,6 +308,7 @@ const mockBankStatementUpdate = vi.fn();
 const mockBankTxUpdate = vi.fn();
 const mockJournalEntryFindFirst = vi.fn();
 const mockBankTxFindFirst = vi.fn();
+const mockQueryRawUnsafe = vi.fn();
 
 vi.mock('@force/database', () => ({
   prisma: {
@@ -336,6 +337,7 @@ vi.mock('@force/database', () => ({
 import {
   runAutoMatch,
   applyManualMatch,
+  getReconciliationDifference,
 } from '../../apps/api/src/services/accounting/bank-reconcile.service';
 
 const STORE_ID = 'store-test-001';
@@ -374,8 +376,12 @@ beforeEach(() => {
       update: mockBankTxUpdate,
     },
     journalLine: { findMany: mockJournalLineFindMany },
-    bankStatement: { update: mockBankStatementUpdate },
+    bankStatement: {
+      update: mockBankStatementUpdate,
+      findFirst: mockBankTxFindFirst,
+    },
     journalEntry: { findFirst: mockJournalEntryFindFirst },
+    $queryRawUnsafe: (...a: unknown[]) => mockQueryRawUnsafe(...a),
   };
 
   mockWithRlsBypass.mockImplementation((fn: (tx: unknown) => unknown) => fn(mockTx));
@@ -601,5 +607,155 @@ describe('applyManualMatch — overrides', () => {
         // journalEntryId omitted
       })
     ).rejects.toThrow('journalEntryId required');
+  });
+});
+
+// ─── getReconciliationDifference ─────────────────────────────────────────────
+
+describe('getReconciliationDifference — balance computation', () => {
+  const GL_ACCOUNT_ID = 'gl-account-1030';
+  const PERIOD_END = new Date('2026-01-31T23:59:59.000Z');
+
+  /**
+   * Helper: set up the mock tx so bankStatement.findFirst returns the stmt meta,
+   * bankTransaction.findMany returns the bank txs list, and $queryRawUnsafe
+   * returns ledger totals on the first call and unmatched ledger rows on the second.
+   */
+  function setupMocks({
+    glAccountId = GL_ACCOUNT_ID,
+    periodEnd = PERIOD_END,
+    periodStart = new Date('2026-01-01'),
+    bankTxs = [] as Array<{
+      amountFils: number;
+      direction: 'debit' | 'credit';
+      matchStatus: string;
+    }>,
+    ledgerDebit = 0n,
+    ledgerCredit = 0n,
+    unmatchedLedgerRows = [] as Array<{ entry_id: string; debit: bigint; credit: bigint }>,
+  } = {}) {
+    // bankStatement.findFirst — first call = stmt meta (glAccountId, periodEnd)
+    // second call = periodStart
+    mockBankTxFindFirst
+      .mockResolvedValueOnce({ glAccountId, periodEnd })
+      .mockResolvedValueOnce({ periodStart });
+
+    // bankTransaction.findMany — full list for bank balance
+    mockBankTxFindMany.mockResolvedValueOnce(bankTxs);
+
+    // $queryRawUnsafe — first call = ledger balance; second call = unmatched entries
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([{ debit_total: ledgerDebit, credit_total: ledgerCredit }])
+      .mockResolvedValueOnce(unmatchedLedgerRows);
+  }
+
+  it('reports isReconciled=true when bank and ledger agree', async () => {
+    setupMocks({
+      bankTxs: [
+        { amountFils: 50000, direction: 'credit', matchStatus: 'auto_matched' },
+        { amountFils: 10000, direction: 'debit', matchStatus: 'auto_matched' },
+      ],
+      // bankBalance = +50000 − 10000 = +40000
+      ledgerDebit: 50000n,
+      ledgerCredit: 10000n,
+      // ledgerBalance = 50000 − 10000 = +40000
+      // difference = 40000 − 40000 = 0
+    });
+
+    const result = await getReconciliationDifference(STMT_ID, STORE_ID);
+
+    expect(result.isReconciled).toBe(true);
+    expect(result.differenceFils).toBe(0);
+    expect(result.bankBalanceFils).toBe(40000);
+    expect(result.ledgerBalanceFils).toBe(40000);
+  });
+
+  it('reports positive difference when bank exceeds ledger', async () => {
+    setupMocks({
+      bankTxs: [
+        { amountFils: 100000, direction: 'credit', matchStatus: 'auto_matched' },
+        { amountFils: 15000, direction: 'debit', matchStatus: 'unmatched' },
+      ],
+      // bankBalance = +100000 − 15000 = +85000
+      ledgerDebit: 100000n,
+      ledgerCredit: 0n,
+      // ledgerBalance = 100000 − 0 = +100000
+      // difference = 85000 − 100000 = −15000
+      unmatchedLedgerRows: [],
+    });
+
+    const result = await getReconciliationDifference(STMT_ID, STORE_ID);
+
+    expect(result.isReconciled).toBe(false);
+    expect(result.bankBalanceFils).toBe(85000);
+    expect(result.ledgerBalanceFils).toBe(100000);
+    expect(result.differenceFils).toBe(-15000);
+    expect(result.unmatchedBankFils).toBe(15000);
+  });
+
+  it('reports negative difference when ledger exceeds bank', async () => {
+    setupMocks({
+      bankTxs: [{ amountFils: 50000, direction: 'credit', matchStatus: 'auto_matched' }],
+      // bankBalance = +50000
+      ledgerDebit: 70000n,
+      ledgerCredit: 0n,
+      // ledgerBalance = 70000
+      // difference = 50000 − 70000 = −20000
+      unmatchedLedgerRows: [{ entry_id: 'e-1', debit: 20000n, credit: 0n }],
+    });
+
+    const result = await getReconciliationDifference(STMT_ID, STORE_ID);
+
+    expect(result.isReconciled).toBe(false);
+    expect(result.differenceFils).toBe(-20000);
+    expect(result.unmatchedLedgerFils).toBe(20000);
+    expect(result.unmatchedLedgerCount).toBe(1);
+  });
+
+  it('generates suggested action text in EN and AR when reconciled', async () => {
+    setupMocks({ bankTxs: [], ledgerDebit: 0n, ledgerCredit: 0n });
+
+    const result = await getReconciliationDifference(STMT_ID, STORE_ID);
+
+    expect(result.suggestedActionEn).toContain('fully reconciled');
+    expect(result.suggestedActionAr).toContain('بالكامل');
+  });
+
+  it('generates suggested action text when bank exceeds ledger', async () => {
+    setupMocks({
+      bankTxs: [{ amountFils: 5000, direction: 'credit', matchStatus: 'unmatched' }],
+      ledgerDebit: 0n,
+      ledgerCredit: 0n,
+    });
+
+    const result = await getReconciliationDifference(STMT_ID, STORE_ID);
+
+    expect(result.suggestedActionEn).toContain('Bank balance');
+    expect(result.suggestedActionEn).toContain('exceeds ledger');
+    expect(result.suggestedActionAr).toContain('رصيد البنك');
+  });
+
+  it('generates suggested action text when ledger exceeds bank', async () => {
+    setupMocks({
+      bankTxs: [],
+      ledgerDebit: 10000n,
+      ledgerCredit: 0n,
+      unmatchedLedgerRows: [{ entry_id: 'e-2', debit: 10000n, credit: 0n }],
+    });
+
+    const result = await getReconciliationDifference(STMT_ID, STORE_ID);
+
+    expect(result.suggestedActionEn).toContain('Ledger balance');
+    expect(result.suggestedActionEn).toContain('exceeds bank');
+    expect(result.suggestedActionAr).toContain('رصيد الدفتر');
+  });
+
+  it('throws 404 when statement not found', async () => {
+    // bankStatement.findFirst returns null
+    mockBankTxFindFirst.mockResolvedValueOnce(null);
+
+    await expect(getReconciliationDifference('nonexistent-stmt', STORE_ID)).rejects.toThrow(
+      'statement_not_found'
+    );
   });
 });

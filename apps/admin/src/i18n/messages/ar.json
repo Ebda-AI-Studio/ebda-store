@@ -4264,6 +4264,19 @@
         "entryId": "معرّف القيد",
         "confirm": "ربط",
         "cancel": "إلغاء"
+      },
+      "difference": {
+        "title": "فارق المطابقة",
+        "reconciled": "مُغلق",
+        "mismatch": "يوجد فارق",
+        "bankBalance": "رصيد البنك (صافي الفترة)",
+        "ledgerBalance": "رصيد الدفتر (الحساب)",
+        "delta": "الفارق",
+        "unmatchedBankSide": "حركات بنكية غير مطابقة",
+        "unmatchedLedgerSide": "قيود دفتر غير مطابقة",
+        "bankLines": "حركة/حركات",
+        "ledgerEntries": "قيد/قيود",
+        "suggestedAction": "الإجراء المقترح"
       }
     }
   },

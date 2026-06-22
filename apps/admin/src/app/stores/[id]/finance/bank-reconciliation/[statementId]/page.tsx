@@ -39,6 +39,18 @@ interface Summary {
   unmatchedAmountFils: number;
 }
 
+interface ReconciliationDifference {
+  bankBalanceFils: number;
+  ledgerBalanceFils: number;
+  differenceFils: number;
+  unmatchedBankFils: number;
+  unmatchedLedgerFils: number;
+  unmatchedLedgerCount: number;
+  suggestedActionEn: string;
+  suggestedActionAr: string;
+  isReconciled: boolean;
+}
+
 interface StatementDetail {
   id: string;
   fileName: string;
@@ -48,6 +60,7 @@ interface StatementDetail {
   status: string;
   glAccount: { id: string; code: string; nameEn: string; nameAr: string | null };
   summary: Summary;
+  difference: ReconciliationDifference;
 }
 
 interface TxsResponse {
@@ -240,6 +253,7 @@ export default function StatementDetailPage() {
   }
 
   const summary = stmt?.summary;
+  const difference = stmt?.difference;
 
   const FILTER_OPTIONS: { value: FilterOption; label: string }[] = [
     { value: 'all', label: 'All' },
@@ -313,6 +327,109 @@ export default function StatementDetailPage() {
                 <p className="mt-1 text-lg font-semibold text-gray-800">{card.value}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Reconciliation difference panel */}
+        {difference && (
+          <div
+            className={`rounded-xl border p-4 shadow-sm ${
+              difference.isReconciled ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-800">{t('difference.title')}</h2>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  difference.isReconciled
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+              >
+                {difference.isReconciled ? t('difference.reconciled') : t('difference.mismatch')}
+              </span>
+            </div>
+
+            {/* Balance row */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
+                <p className="text-xs text-gray-400 leading-tight">{t('difference.bankBalance')}</p>
+                <p className="mt-1 text-lg font-semibold text-gray-800 font-mono">
+                  {difference.bankBalanceFils < 0 ? '−' : ''}KWD{' '}
+                  {kwd(Math.abs(difference.bankBalanceFils))}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
+                <p className="text-xs text-gray-400 leading-tight">
+                  {t('difference.ledgerBalance')}
+                </p>
+                <p className="mt-1 text-lg font-semibold text-gray-800 font-mono">
+                  {difference.ledgerBalanceFils < 0 ? '−' : ''}KWD{' '}
+                  {kwd(Math.abs(difference.ledgerBalanceFils))}
+                </p>
+              </div>
+              <div
+                className={`rounded-lg border p-3 shadow-sm ${
+                  difference.isReconciled
+                    ? 'border-green-200 bg-green-100'
+                    : 'border-red-200 bg-red-100'
+                }`}
+              >
+                <p className="text-xs text-gray-600 leading-tight">{t('difference.delta')}</p>
+                <p
+                  className={`mt-1 text-lg font-bold font-mono ${
+                    difference.isReconciled ? 'text-green-700' : 'text-red-700'
+                  }`}
+                >
+                  {difference.differenceFils < 0 ? '−' : difference.differenceFils > 0 ? '+' : ''}
+                  KWD {kwd(Math.abs(difference.differenceFils))}
+                </p>
+              </div>
+            </div>
+
+            {/* Where breakdown */}
+            {!difference.isReconciled && (
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+                  <p className="text-xs font-medium text-amber-700">
+                    {t('difference.unmatchedBankSide')}
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold text-amber-900 font-mono">
+                    KWD {kwd(difference.unmatchedBankFils)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-amber-600">
+                    {summary?.unmatched ?? 0} {t('difference.bankLines')}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-purple-100 bg-purple-50 p-3">
+                  <p className="text-xs font-medium text-purple-700">
+                    {t('difference.unmatchedLedgerSide')}
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold text-purple-900 font-mono">
+                    {difference.unmatchedLedgerFils < 0 ? '−' : ''}KWD{' '}
+                    {kwd(Math.abs(difference.unmatchedLedgerFils))}
+                  </p>
+                  <p className="mt-0.5 text-xs text-purple-600">
+                    {difference.unmatchedLedgerCount} {t('difference.ledgerEntries')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Suggested action */}
+            <div
+              className={`rounded-lg border p-3 text-sm ${
+                difference.isReconciled
+                  ? 'border-green-200 bg-white text-green-800'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'
+              }`}
+            >
+              <p className="font-medium mb-0.5">{t('difference.suggestedAction')}</p>
+              <p>{difference.suggestedActionEn}</p>
+              <p className="mt-1 text-xs opacity-70 text-right" dir="rtl">
+                {difference.suggestedActionAr}
+              </p>
+            </div>
           </div>
         )}
 

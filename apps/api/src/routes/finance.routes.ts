@@ -38,6 +38,7 @@ import {
   runAutoMatch,
   applyManualMatch,
   getReconciliationSummary,
+  getReconciliationDifference,
 } from '../services/accounting/bank-reconcile.service';
 
 const router = Router({ mergeParams: true });
@@ -1182,8 +1183,42 @@ router.get(
         return;
       }
 
-      const summary = await getReconciliationSummary(req.params.sid, req.params.storeId);
-      res.json({ data: { ...stmt, summary } });
+      const [summary, difference] = await Promise.all([
+        getReconciliationSummary(req.params.sid, req.params.storeId),
+        getReconciliationDifference(req.params.sid, req.params.storeId),
+      ]);
+      res.json({ data: { ...stmt, summary, difference } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /:storeId/finance/bank-statements/:sid/reconciliation-difference ────
+// Returns the mismatch panel data: bankBalance, ledgerBalance, delta, where-breakdown,
+// and suggested action (EN + AR). Intentionally separate from the statement detail
+// so the UI can refresh it live after match/unmatch actions without re-fetching the
+// full transaction list.
+
+router.get(
+  '/:storeId/finance/bank-statements/:sid/reconciliation-difference',
+  ...bankRecMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Verify statement ownership before running the difference query
+      const stmt = await runInTenantContext(req.params.storeId, () =>
+        prisma.bankStatement.findFirst({
+          where: { id: req.params.sid, storeId: req.params.storeId },
+          select: { id: true },
+        })
+      );
+      if (!stmt) {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+
+      const difference = await getReconciliationDifference(req.params.sid, req.params.storeId);
+      res.json({ data: difference });
     } catch (err) {
       next(err);
     }

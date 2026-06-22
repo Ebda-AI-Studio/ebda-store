@@ -61,6 +61,53 @@ export interface ReconciliationSummary {
   unmatchedAmountFils: number;
 }
 
+/**
+ * Reconciliation difference panel — the "where is the gap and what to do" block.
+ *
+ * bankBalanceFils
+ *   = sum of all bank statement lines (debits and credits net, from the
+ *     merchant's perspective: credits add to the bank account, debits reduce it).
+ *     This is what the bank statement says the closing balance contribution is.
+ *
+ * ledgerBalanceFils
+ *   = debit_total - credit_total of all posted journal lines against the GL
+ *     account linked to this statement, up to the statement's periodEnd.
+ *     Asset accounts (bank/cash) are debit-natural, so a positive balance
+ *     means the ledger agrees funds exist.
+ *
+ * differenceFils = bankBalanceFils - ledgerBalanceFils
+ *   > 0 → bank shows more than ledger (unrecorded receipts or missing ledger entries)
+ *   < 0 → ledger shows more than bank (unrecorded payments or duplicate ledger entries)
+ *   = 0 → fully reconciled
+ *
+ * unmatchedBankFils   — net of bank lines not yet matched to a ledger entry
+ * unmatchedLedgerFils — net of ledger entries against this GL account with no
+ *                       matching bank transaction in this statement
+ *
+ * suggestedAction — human-readable string (English + Arabic stored separately)
+ *   explaining what the merchant should do to close the gap.
+ */
+export interface ReconciliationDifference {
+  /** Sum of all bank statement lines net in fils (credits positive, debits negative from bank POV). */
+  bankBalanceFils: number;
+  /** Ledger balance for the linked GL account up to statement period end (debit−credit, fils). */
+  ledgerBalanceFils: number;
+  /** bankBalanceFils − ledgerBalanceFils. Zero = reconciled. */
+  differenceFils: number;
+  /** Total fils of unmatched bank lines (explains bank side of the gap). */
+  unmatchedBankFils: number;
+  /** Total fils of unmatched ledger entries for this GL account in the period (explains ledger side). */
+  unmatchedLedgerFils: number;
+  /** How many ledger entries against this GL account in the period have no matching bank tx. */
+  unmatchedLedgerCount: number;
+  /** Suggested action string (English). */
+  suggestedActionEn: string;
+  /** Suggested action string (Arabic). */
+  suggestedActionAr: string;
+  /** True when differenceFils === 0 (fully reconciled). */
+  isReconciled: boolean;
+}
+
 // ─── Import ───────────────────────────────────────────────────────────────────
 
 /**
@@ -455,5 +502,204 @@ export async function getReconciliationSummary(
     }
 
     return summary;
+  });
+}
+
+// ─── Reconciliation Difference ────────────────────────────────────────────────
+
+/**
+ * Compute the reconciliation difference between the bank statement and the
+ * linked GL account in the ledger.
+ *
+ * BANK BALANCE (bankBalanceFils):
+ *   Sum of all BankTransaction rows for this statement. For the merchant's bank
+ *   account, credits (money coming in) are positive and debits (money going out)
+ *   are negative. This gives the net cash flow the bank statement records for the
+ *   period, not a closing balance.
+ *
+ * LEDGER BALANCE (ledgerBalanceFils):
+ *   Sum of all posted JournalLine rows for the GL account linked to this
+ *   statement, up to the statement's periodEnd (or "now" when periodEnd is null).
+ *   Bank/cash accounts are ASSET accounts (debit-natural), so:
+ *     ledgerBalance = debit_total − credit_total
+ *   A positive ledger balance means the account has a debit balance (value held).
+ *
+ * DIFFERENCE (differenceFils = bankBalanceFils − ledgerBalanceFils):
+ *   > 0 → bank shows more inflow than ledger recorded (missing receipts in ledger)
+ *   < 0 → ledger shows more than bank (over-posted or duplicate ledger entries)
+ *   = 0 → bank and ledger agree for this period
+ *
+ * UNMATCHED BANK FILS:
+ *   Sum of unmatched BankTransaction amounts. These are the bank lines that have
+ *   no corresponding ledger entry — they represent the "missing" ledger side.
+ *
+ * UNMATCHED LEDGER FILS:
+ *   Net of posted JournalLine entries against the GL account in the period that
+ *   are NOT matched to any BankTransaction. These are ledger entries that have
+ *   no bank confirmation.
+ *
+ * NOTE on GL account link:
+ *   BankStatement.glAccountId is the explicit link set at import time (the
+ *   merchant selects a GL account from the COA, e.g. "1030 Bank Main"). This is
+ *   the definitive link — no heuristic needed. If a store has multiple bank
+ *   accounts they import separate statements each linked to their own GL account.
+ */
+export async function getReconciliationDifference(
+  statementId: string,
+  storeId: string
+): Promise<ReconciliationDifference> {
+  return withRlsBypass(async tx => {
+    // Fetch statement meta (linked GL account + period)
+    const stmt = await tx.bankStatement.findFirst({
+      where: { id: statementId, storeId },
+      select: { glAccountId: true, periodEnd: true },
+    });
+
+    if (!stmt) {
+      throw Object.assign(new Error('statement_not_found'), { statusCode: 404 });
+    }
+
+    const { glAccountId, periodEnd } = stmt;
+    // Use periodEnd as the ledger snapshot date; fall back to "now" when absent
+    const ledgerAsOf = periodEnd ?? new Date();
+
+    // ── Bank side ──
+    // Fetch all transactions; compute net bank balance (credits positive, debits negative).
+    const bankTxs = await tx.bankTransaction.findMany({
+      where: { statementId, storeId },
+      select: { amountFils: true, direction: true, matchStatus: true },
+    });
+
+    let bankBalanceFils = 0;
+    let unmatchedBankFils = 0;
+
+    for (const btx of bankTxs) {
+      // From the bank account's perspective: a credit from the bank (money in) = debit to
+      // the asset account; a debit from the bank (money out) = credit to the asset account.
+      // We express bankBalance in asset-account terms: credits to account = positive.
+      const signedAmount = btx.direction === 'credit' ? btx.amountFils : -btx.amountFils;
+      bankBalanceFils += signedAmount;
+
+      const status = btx.matchStatus as BankMatchStatus;
+      if (status === 'unmatched') {
+        unmatchedBankFils += btx.amountFils; // absolute fils (sign context is per bank tx)
+      }
+    }
+
+    // ── Ledger side ──
+    // Sum all posted journal lines against the linked GL account up to periodEnd.
+    // Using raw SQL for the same pattern as trialBalance (pgbouncer-safe schema prefix).
+    const ledgerRows = await tx.$queryRawUnsafe<
+      Array<{ debit_total: bigint; credit_total: bigint }>
+    >(
+      `SELECT
+        COALESCE(SUM(l.debit), 0)  AS debit_total,
+        COALESCE(SUM(l.credit), 0) AS credit_total
+       FROM public.journal_lines l
+       JOIN public.journal_entries e ON e.id = l.entry_id
+       WHERE l.account_id = $1
+         AND e.store_id = $2
+         AND e.status = 'posted'
+         AND e.posted_at <= $3::timestamp`,
+      glAccountId,
+      storeId,
+      ledgerAsOf.toISOString()
+    );
+
+    const ledgerDebit = Number(ledgerRows[0]?.debit_total ?? 0);
+    const ledgerCredit = Number(ledgerRows[0]?.credit_total ?? 0);
+    // Asset account (debit-natural): balance = DR - CR
+    const ledgerBalanceFils = ledgerDebit - ledgerCredit;
+
+    // ── Unmatched ledger entries ──
+    // Journal entries that touched this GL account in the period but are NOT
+    // linked to any BankTransaction in this statement.
+    // "In the period" = posted_at between statement's periodStart..periodEnd.
+    const periodStart = await tx.bankStatement
+      .findFirst({ where: { id: statementId, storeId }, select: { periodStart: true } })
+      .then(s => s?.periodStart ?? null);
+
+    const unmatched = await tx.$queryRawUnsafe<
+      Array<{ entry_id: string; debit: bigint; credit: bigint }>
+    >(
+      `SELECT l.entry_id, l.debit, l.credit
+       FROM public.journal_lines l
+       JOIN public.journal_entries e ON e.id = l.entry_id
+       WHERE l.account_id = $1
+         AND e.store_id = $2
+         AND e.status = 'posted'
+         ${periodStart ? 'AND e.posted_at >= $4::timestamp' : ''}
+         AND e.posted_at <= $3::timestamp
+         AND NOT EXISTS (
+           SELECT 1 FROM public.bank_transactions bt
+           WHERE bt.matched_journal_entry_id = e.id
+             AND bt.statement_id = $5
+         )`,
+      glAccountId,
+      storeId,
+      ledgerAsOf.toISOString(),
+      ...(periodStart ? [periodStart.toISOString()] : []),
+      statementId
+    );
+
+    let unmatchedLedgerFils = 0;
+    for (const row of unmatched) {
+      // Net contribution of the unmatched ledger line (DR positive for asset account)
+      unmatchedLedgerFils += Number(row.debit) - Number(row.credit);
+    }
+
+    // ── Difference ──
+    const differenceFils = bankBalanceFils - ledgerBalanceFils;
+    const isReconciled = differenceFils === 0;
+
+    // ── Suggested action ──
+    const kwdBank = (Math.abs(bankBalanceFils) / 1000).toFixed(3);
+    const kwdLedger = (Math.abs(ledgerBalanceFils) / 1000).toFixed(3);
+    const kwdDiff = (Math.abs(differenceFils) / 1000).toFixed(3);
+    const unmatchedCount = bankTxs.filter(b => b.matchStatus === 'unmatched').length;
+    const unmatchedLedgerCount = unmatched.length;
+
+    let suggestedActionEn: string;
+    let suggestedActionAr: string;
+
+    if (isReconciled) {
+      suggestedActionEn =
+        'Bank and ledger agree — this statement is fully reconciled. No action required.';
+      suggestedActionAr = 'البنك والدفتر متطابقان — تم إغلاق كشف الحساب بالكامل. لا يلزم أي إجراء.';
+    } else if (differenceFils > 0) {
+      suggestedActionEn =
+        `Bank balance (KWD ${kwdBank}) exceeds ledger balance (KWD ${kwdLedger}) by KWD ${kwdDiff}. ` +
+        `${unmatchedCount} unmatched bank line(s) totalling KWD ${(unmatchedBankFils / 1000).toFixed(3)} have no ledger entry. ` +
+        `Suggested action: record journal entries for the missing bank transactions, ` +
+        `or post an adjusting entry of KWD ${kwdDiff} (debit bank account, credit appropriate account).`;
+      suggestedActionAr =
+        `رصيد البنك (${kwdBank} د.ك) يتجاوز رصيد الدفتر (${kwdLedger} د.ك) بفارق ${kwdDiff} د.ك. ` +
+        `${unmatchedCount} حركة/حركات بنكية غير مطابقة بمجموع ${(unmatchedBankFils / 1000).toFixed(3)} د.ك لا يقابلها قيود في الدفتر. ` +
+        `الإجراء المقترح: سجّل قيوداً محاسبية للحركات البنكية الغائبة، ` +
+        `أو أضف قيد تسوية بقيمة ${kwdDiff} د.ك (مدين: حساب البنك، دائن: الحساب المناسب).`;
+    } else {
+      suggestedActionEn =
+        `Ledger balance (KWD ${kwdLedger}) exceeds bank balance (KWD ${kwdBank}) by KWD ${kwdDiff}. ` +
+        `${unmatchedLedgerCount} unmatched ledger entry/entries totalling KWD ${(Math.abs(unmatchedLedgerFils) / 1000).toFixed(3)} have no bank confirmation. ` +
+        `Suggested action: verify the ${unmatchedLedgerCount} unmatched ledger entries — reverse any duplicates, ` +
+        `or post an adjusting entry of KWD ${kwdDiff} (credit bank account, debit appropriate account).`;
+      suggestedActionAr =
+        `رصيد الدفتر (${kwdLedger} د.ك) يتجاوز رصيد البنك (${kwdBank} د.ك) بفارق ${kwdDiff} د.ك. ` +
+        `${unmatchedLedgerCount} قيد/قيود في الدفتر بمجموع ${(Math.abs(unmatchedLedgerFils) / 1000).toFixed(3)} د.ك لا يقابلها حركات بنكية. ` +
+        `الإجراء المقترح: راجع القيود ${unmatchedLedgerCount} غير المطابقة — اعكس أي قيود مكررة، ` +
+        `أو أضف قيد تسوية بقيمة ${kwdDiff} د.ك (دائن: حساب البنك، مدين: الحساب المناسب).`;
+    }
+
+    return {
+      bankBalanceFils,
+      ledgerBalanceFils,
+      differenceFils,
+      unmatchedBankFils,
+      unmatchedLedgerFils,
+      unmatchedLedgerCount,
+      suggestedActionEn,
+      suggestedActionAr,
+      isReconciled,
+    };
   });
 }
