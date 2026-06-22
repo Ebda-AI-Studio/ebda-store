@@ -1177,10 +1177,10 @@ export default function CheckoutClient() {
             </div>
           </div>
 
-          <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+          <div className="flex flex-col lg:grid lg:grid-cols-12 lg:gap-8">
             {/* Form */}
-            <div className="lg:col-span-8">
-              <form onSubmit={handleSubmit}>
+            <div className="order-1 lg:order-none lg:col-span-8">
+              <form id="checkout-shipping-form" onSubmit={handleSubmit}>
                 {step === 1 && (
                   <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <h2
@@ -1545,7 +1545,11 @@ export default function CheckoutClient() {
                       )}
                     </div>
 
-                    <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    {/* Desktop-only button row \u2014 on mobile the button renders
+                        AFTER <OrderSummary> so the order is:
+                        address \u2192 discount/summary \u2192 Continue to Payment.
+                        Hidden below lg; shown as a normal row on lg+. */}
+                    <div className="hidden lg:flex mt-6 flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <Link
                         href={storeUrl('/cart')}
                         className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
@@ -1616,6 +1620,33 @@ export default function CheckoutClient() {
               }
               typography={checkoutTypography}
             />
+
+            {/* Mobile-only button row — visible only below lg breakpoint, after
+                the OrderSummary (coupon + totals), so the mobile reading order
+                is: address fields → discount/summary → Continue to Payment.
+                Uses form="checkout-shipping-form" to submit the shipping form
+                even though this button lives outside the <form> element.
+                Hidden on lg+ because the desktop button row inside the form
+                is visible there. Only rendered on shipping step (step === 1). */}
+            {step === 1 && (
+              <div className="lg:hidden mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <Link
+                  href={storeUrl('/cart')}
+                  className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
+                >
+                  {language === 'ar' ? 'العودة إلى السلة →' : '← Return to cart'}
+                </Link>
+                <Button
+                  type="submit"
+                  form="checkout-shipping-form"
+                  className="w-full sm:w-auto"
+                  size="lg"
+                  disabled={shippingUnavailable}
+                >
+                  {t('Continue to Payment', 'المتابعة للدفع')}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
