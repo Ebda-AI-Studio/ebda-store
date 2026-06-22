@@ -193,6 +193,13 @@ export function AreaRateEditor({ storeId }: Props) {
 
   // Bulk-apply per-governorate input value (Kuwait static)
   const [bulkFeeKwd, setBulkFeeKwd] = useState<Record<string, string>>({});
+  // Per-governorate free-shipping-over threshold (decoupled from the fee apply).
+  const [bulkThresholdKwd, setBulkThresholdKwd] = useState<Record<string, string>>({});
+
+  // Global bulk-apply: applies one flat fee + free-over threshold to ALL
+  // areas across ALL Kuwait governorates at once.
+  const [globalBulkFeeKwd, setGlobalBulkFeeKwd] = useState('');
+  const [globalBulkThresholdKwd, setGlobalBulkThresholdKwd] = useState('');
 
   // "Add area" inline forms per (country||governorate) key
   const [addAreaForm, setAddAreaForm] = useState<
@@ -319,6 +326,60 @@ export function AreaRateEditor({ storeId }: Props) {
       for (const area of gov.areas) {
         const k = rowKey(gov.en, area.en);
         next[k] = { ...next[k], feeKwd, isActive: feeKwd !== '' };
+      }
+      return next;
+    });
+  }
+
+  // ── Global bulk-apply (ALL Kuwait areas across ALL governorates) ──────────
+
+  // Apply ONE flat fee to every area in every governorate. Leaves each area's
+  // free-over threshold untouched (decoupled from the free-over apply below).
+  function applyGlobalFee() {
+    const feeKwd = globalBulkFeeKwd.trim();
+    if (feeKwd === '') return;
+    setAreaState(prev => {
+      const next = { ...prev };
+      for (const gov of KUWAIT_GOVERNORATES) {
+        for (const area of gov.areas) {
+          const k = rowKey(gov.en, area.en);
+          next[k] = { ...next[k], feeKwd, isActive: true };
+        }
+      }
+      return next;
+    });
+  }
+
+  // Apply ONE free-shipping-over threshold to every area in every governorate.
+  // Decoupled — leaves each area's fee untouched (so the merchant can set a
+  // uniform "free over X" across the country without overwriting the fees).
+  function applyGlobalThreshold() {
+    const thresholdKwd = globalBulkThresholdKwd.trim();
+    if (thresholdKwd === '') return;
+    setAreaState(prev => {
+      const next = { ...prev };
+      for (const gov of KUWAIT_GOVERNORATES) {
+        for (const area of gov.areas) {
+          const k = rowKey(gov.en, area.en);
+          next[k] = { ...next[k], thresholdKwd };
+        }
+      }
+      return next;
+    });
+  }
+
+  // Apply ONE free-shipping-over threshold to every area in ONE governorate.
+  // Decoupled from the per-governorate fee apply (leaves fees untouched).
+  function applyBulkThreshold(govEn: string) {
+    const gov = KUWAIT_GOVERNORATES.find(g => g.en === govEn);
+    if (!gov) return;
+    const thresholdKwd = bulkThresholdKwd[govEn] ?? '';
+    if (thresholdKwd === '') return;
+    setAreaState(prev => {
+      const next = { ...prev };
+      for (const area of gov.areas) {
+        const k = rowKey(gov.en, area.en);
+        next[k] = { ...next[k], thresholdKwd };
       }
       return next;
     });
@@ -754,6 +815,64 @@ export function AreaRateEditor({ storeId }: Props) {
         </div>
       )}
 
+      {/* ── Global apply-to-all-areas control ───────────────────────────── */}
+      <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
+        <p className="text-sm font-medium text-foreground mb-3">{t('applyAllGlobal')}</p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">{t('applyAllGlobalFee')}</label>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                placeholder="0.000"
+                value={globalBulkFeeKwd}
+                onChange={e => setGlobalBulkFeeKwd(e.target.value)}
+                aria-label={t('applyAllGlobalFee')}
+                className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+              />
+              <span className="text-xs text-muted-foreground">{t('currency')}</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">{t('applyAllGlobalThreshold')}</label>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline">
+                {t('freeOver')}
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                placeholder={t('optional')}
+                value={globalBulkThresholdKwd}
+                onChange={e => setGlobalBulkThresholdKwd(e.target.value)}
+                aria-label={t('applyAllGlobalThreshold')}
+                className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary text-end"
+              />
+              <span className="text-xs text-muted-foreground">{t('currency')}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={applyGlobalFee}
+            disabled={globalBulkFeeKwd.trim() === ''}
+            className="px-3 py-1 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t('applyAllGlobalFeeBtn')}
+          </button>
+          <button
+            type="button"
+            onClick={applyGlobalThreshold}
+            disabled={globalBulkThresholdKwd.trim() === ''}
+            className="px-3 py-1 text-xs font-medium border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t('applyAllGlobalThresholdBtn')}
+          </button>
+        </div>
+      </div>
+
       {/* ── Static Kuwait governorate accordion ─────────────────────────── */}
       <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
         {KUWAIT_GOVERNORATES.map(gov => {
@@ -792,8 +911,8 @@ export function AreaRateEditor({ storeId }: Props) {
               {/* Accordion body */}
               {isOpen && (
                 <div className="bg-background">
-                  {/* Bulk-apply row */}
-                  <div className="flex items-center gap-2 px-4 py-3 bg-muted/20 border-b border-border">
+                  {/* Bulk-apply row (fee + free-over, decoupled) */}
+                  <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-muted/20 border-b border-border">
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {t('applyAll')}
                     </span>
@@ -804,6 +923,7 @@ export function AreaRateEditor({ storeId }: Props) {
                       placeholder="0.000"
                       value={bulkFeeKwd[gov.en] ?? ''}
                       onChange={e => setBulkFeeKwd(prev => ({ ...prev, [gov.en]: e.target.value }))}
+                      aria-label={t('applyAll')}
                       className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <span className="text-xs text-muted-foreground">{t('currency')}</span>
@@ -811,6 +931,31 @@ export function AreaRateEditor({ storeId }: Props) {
                       type="button"
                       onClick={() => applyBulkFee(gov.en)}
                       className="px-3 py-1 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                    >
+                      {t('applyBtn')}
+                    </button>
+                    {/* Free-over apply for this governorate (decoupled from fee) */}
+                    <span className="text-xs text-muted-foreground whitespace-nowrap ms-2">
+                      {t('freeOver')}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      placeholder={t('optional')}
+                      value={bulkThresholdKwd[gov.en] ?? ''}
+                      onChange={e =>
+                        setBulkThresholdKwd(prev => ({ ...prev, [gov.en]: e.target.value }))
+                      }
+                      aria-label={t('freeOver')}
+                      className="w-24 px-2 py-1 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    <span className="text-xs text-muted-foreground">{t('currency')}</span>
+                    <button
+                      type="button"
+                      onClick={() => applyBulkThreshold(gov.en)}
+                      disabled={(bulkThresholdKwd[gov.en] ?? '').trim() === ''}
+                      className="px-3 py-1 text-xs font-medium border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {t('applyBtn')}
                     </button>

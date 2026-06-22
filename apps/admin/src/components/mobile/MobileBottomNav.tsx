@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useT } from '@/i18n/useT';
@@ -35,6 +37,19 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
   const pathname = usePathname();
   const t = useT('nav');
 
+  // Portal target — resolved after first client paint so SSR is safe.
+  // Rendering via createPortal(…, document.body) detaches the nav from
+  // any ancestor stacking context (the mobile sidebar <aside> uses
+  // `transform: translateX(…)` which creates a new containing block in
+  // iOS Safari / standalone-PWA, causing `position:fixed` children to
+  // anchor to that transformed ancestor instead of the viewport — the
+  // visual "jump on scroll" the merchant reported). A portal lifts the
+  // nav out of that subtree so it is always viewport-anchored.
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
+
   const tabs: Tab[] = [
     {
       key: 'dashboard',
@@ -59,13 +74,17 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
-  return (
+  const nav = (
     <nav
       // pb env-safe-area-inset so the bar clears the iPhone home indicator.
       // Only ever rendered at < md — desktop shell remains the sidebar.
-      // `translateZ(0)` promotes the bar to its own GPU layer so it stays pinned
-      // to the bottom during iOS standalone-PWA momentum scrolling (it was
-      // visibly jumping up on scroll without a dedicated compositor layer).
+      // Rendered via createPortal to document.body so it is NEVER inside a
+      // transformed ancestor (the mobile sidebar aside uses translateX which
+      // creates a new CSS containing block on iOS Safari / standalone-PWA,
+      // making position:fixed anchor to that element instead of the viewport
+      // — the "jumps on scroll" the merchant reported). Portalling out
+      // guarantees viewport anchoring regardless of what the admin layout
+      // does with transforms. translateZ(0) is kept for GPU layer promotion.
       className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_-4px_rgba(0,0,0,0.08)] [transform:translateZ(0)] [-webkit-transform:translateZ(0)] md:hidden"
       role="navigation"
       aria-label={t('mobileBottomNav')}
@@ -111,4 +130,9 @@ export function MobileBottomNav({ storeId, onOpenMore }: MobileBottomNavProps) {
       </button>
     </nav>
   );
+
+  // During SSR / before hydration portalRoot is null — render nothing
+  // (the bar is md:hidden anyway so desktop sees no flash).
+  if (!portalRoot) return null;
+  return createPortal(nav, portalRoot);
 }

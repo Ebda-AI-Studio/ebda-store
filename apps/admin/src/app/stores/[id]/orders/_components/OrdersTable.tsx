@@ -93,15 +93,23 @@ export function OrdersTable({
     {
       header: t('table.order'),
       primaryOnMobile: true,
-      cell: order => (
-        <Link
-          href={`/stores/${storeId}/orders/${order.id}`}
-          className="font-semibold text-primary hover:underline"
-          onClick={e => e.stopPropagation()}
-        >
-          {order.orderNumber || `#${order.id.slice(0, 8).toUpperCase()}`}
-        </Link>
-      ),
+      cell: order => {
+        // Show a compact order number on the list row: last 6 chars of the
+        // full number prefixed with "#…" so it's de-emphasised. The full
+        // number lives on the order detail page and is unchanged there.
+        const full = order.orderNumber || `#${order.id.slice(0, 8).toUpperCase()}`;
+        const compact = full.length > 7 ? `#…${full.slice(-6)}` : full;
+        return (
+          <Link
+            href={`/stores/${storeId}/orders/${order.id}`}
+            className="font-mono text-xs font-medium text-primary hover:underline"
+            onClick={e => e.stopPropagation()}
+            title={full}
+          >
+            {compact}
+          </Link>
+        );
+      },
     },
     {
       header: t('table.customer'),
