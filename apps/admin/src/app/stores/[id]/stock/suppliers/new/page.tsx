@@ -110,6 +110,10 @@ export default function NewSupplierPage() {
         setError(apiError.message);
         return;
       }
+      // Invalidate the App Router cache so the suppliers list re-fetches and
+      // shows the just-created/edited supplier (without this, navigating back
+      // serves the cached list and the new row appears missing until a hard reload).
+      router.refresh();
       router.push(`/stores/${storeId}/stock/suppliers`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
