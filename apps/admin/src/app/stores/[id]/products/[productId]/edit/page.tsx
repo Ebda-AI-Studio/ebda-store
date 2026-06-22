@@ -388,6 +388,8 @@ export default function EditProductPage() {
       // Return to the products list after a successful edit (matches the
       // create flow), so the merchant lands back where they can keep working
       // through their catalog instead of on the single-product detail page.
+      // invalidate App Router cache so the destination list re-fetches the saved row
+      router.refresh();
       router.push(`/stores/${storeId}/products`);
     } catch {
       setError(t('updateFailed'));

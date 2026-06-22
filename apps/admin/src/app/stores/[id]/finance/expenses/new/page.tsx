@@ -222,6 +222,8 @@ export default function NewExpensePage() {
             setOcrStatus('success');
             setOcrMessage(t('ocr.success'));
             setOcrUploading(false);
+            // invalidate App Router cache so the destination list re-fetches the saved row
+            router.refresh();
             router.push(`/stores/${storeId}/finance/expenses`);
             return;
           }
@@ -305,6 +307,8 @@ export default function NewExpensePage() {
         return;
       }
 
+      // invalidate App Router cache so the destination list re-fetches the saved row
+      router.refresh();
       router.push(`/stores/${storeId}/finance/expenses`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));

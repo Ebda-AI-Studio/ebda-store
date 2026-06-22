@@ -176,6 +176,8 @@ export default function NewProductPage() {
       }
 
       if (data) {
+        // invalidate App Router cache so the destination list re-fetches the saved row
+        router.refresh();
         router.push(`/stores/${storeId}/products`);
       }
     } catch {

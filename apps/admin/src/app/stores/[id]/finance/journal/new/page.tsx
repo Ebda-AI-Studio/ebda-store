@@ -115,6 +115,8 @@ export default function NewJournalEntryPage() {
         setError(apiError.message);
         return;
       }
+      // invalidate App Router cache so the destination list re-fetches the saved row
+      router.refresh();
       router.push(`/stores/${storeId}/finance/journal/${data?.id}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));

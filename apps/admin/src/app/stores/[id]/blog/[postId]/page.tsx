@@ -142,6 +142,8 @@ export default function BlogPostEditorPage({
       setError(error.message);
       return;
     }
+    // invalidate App Router cache so the destination list re-fetches the saved row
+    router.refresh();
     router.push(`/stores/${storeId}/blog`);
   }
 

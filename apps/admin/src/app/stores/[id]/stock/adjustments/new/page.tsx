@@ -503,6 +503,8 @@ export default function NewStockAdjustmentPage() {
         setError(apiError.message);
         return;
       }
+      // invalidate App Router cache so the destination list re-fetches the saved row
+      router.refresh();
       router.push(`/stores/${storeId}/stock/adjustments`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -550,6 +552,8 @@ export default function NewStockAdjustmentPage() {
         setError(`Created draft ${data.id} but posting failed: ${postError.message}`);
         return;
       }
+      // invalidate App Router cache so the destination list re-fetches the saved row
+      router.refresh();
       router.push(`/stores/${storeId}/stock/adjustments`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -591,7 +595,11 @@ export default function NewStockAdjustmentPage() {
         {activeTab === 'csv' && (
           <CsvUploadTab
             storeId={storeId}
-            onSuccess={() => router.push(`/stores/${storeId}/stock/adjustments`)}
+            onSuccess={() => {
+              // invalidate App Router cache so the destination list re-fetches the saved row
+              router.refresh();
+              router.push(`/stores/${storeId}/stock/adjustments`);
+            }}
           />
         )}
 
