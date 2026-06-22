@@ -4735,6 +4735,153 @@
     "contactCta": "Talk to us",
     "alsoIncluded": "Also included in this plan"
   },
+  "aiTools": {
+    "title": "AI Tools",
+    "subtitle": "Catalogue-wide translation, SEO, AEO, and GEO sweeps",
+    "backToStore": "Back to store",
+    "replaceExisting": "Replace existing",
+    "starting": "Starting…",
+    "viewResults": "View results",
+    "confirmReplace": "This will REPLACE existing content for this sweep. Continue?",
+    "confirmCancel": "Cancel this sweep? Already-processed items keep their changes.",
+    "errorFailedToStart": "Failed to start sweep",
+    "errorNetwork": "Network error",
+    "errorFailed": "Failed",
+    "sections": {
+      "translation": "Translation",
+      "seo": "SEO",
+      "aeo": "AEO — Answer Engine Optimization",
+      "geo": "GEO — Generative Engine Optimization",
+      "geoDescription": "Optimises your store for LLM-powered search — ChatGPT, Perplexity, Google AI Overview, Bing Copilot."
+    },
+    "cards": {
+      "fillMissingArabic": {
+        "title": "Fill missing Arabic",
+        "body": "Walks every product, category, and the store row. Translates the English value into Arabic only when the Arabic field is empty.",
+        "button": "Run sweep"
+      },
+      "fillMissingEnglish": {
+        "title": "Fill missing English",
+        "body": "Reverse direction. For every Arabic-only field, fills the English side. Skips already-bilingual entities.",
+        "button": "Run sweep"
+      },
+      "seoMeta": {
+        "title": "Generate missing SEO meta",
+        "body": "For the store row and every product, generates meta title + description in EN and AR when those fields are empty. Skips entities that already have SEO.",
+        "button": "Run sweep",
+        "forceTooltip": "Overwrites existing SEO meta on all entities."
+      },
+      "recommendations": {
+        "title": "AI product recommendations",
+        "body": "Generate AI-driven cross-sell recommendations across your catalogue. Fills the storefront \"You might also like\" section on each product page. Re-running updates existing suggestions.",
+        "button": "Run sweep",
+        "forceTooltip": "Re-generates recommendations for every product, replacing existing AI picks."
+      },
+      "draftFaqs": {
+        "title": "Draft FAQs with AI",
+        "body": "Generates up to 8 store-level FAQ items covering delivery, payments, returns, product care, and more — bilingual (EN + AR). Skips questions a merchant has already edited.",
+        "button": "Draft FAQs",
+        "forceTooltip": "Deletes all existing AI-drafted FAQs and regenerates from scratch. Manually-edited FAQs are preserved.",
+        "resultsLabel": "View FAQs on SEO page"
+      },
+      "draftHowtos": {
+        "title": "Draft How-To Guides with AI",
+        "body": "Drafts up to 3 step-by-step HowTo guides relevant to the store's product mix (e.g. how to place an order, how to return an item). Bilingual EN + AR.",
+        "button": "Draft HowTos",
+        "forceTooltip": "Deletes all existing AI-drafted HowTos and regenerates from scratch. Manually-edited guides are preserved.",
+        "resultsLabel": "View HowTos on SEO page"
+      },
+      "metaAeo": {
+        "title": "Rewrite Meta Descriptions (AEO)",
+        "body": "Rewrites empty store, product, and category meta descriptions in a conversational, direct-answer style suited for AI answer engines. Only fills blank AEO fields — never overwrites existing content.",
+        "button": "Rewrite meta",
+        "forceTooltip": "Overwrites existing AEO meta descriptions on all entities.",
+        "resultsLabel": "View meta on SEO page"
+      },
+      "productFaqs": {
+        "title": "Draft Product FAQs with AI",
+        "body": "Generates up to 5 bilingual (EN + AR) FAQ pairs for every product — the same drafting used by the per-product button, run across your whole catalogue. Skips products that already have FAQs.",
+        "button": "Draft product FAQs",
+        "forceTooltip": "Re-drafts FAQs for every product, replacing AI-drafted FAQs. Manually-edited FAQs are preserved."
+      },
+      "llmsTxt": {
+        "title": "Generate LLMs.txt",
+        "body": "Creates a /llms.txt file listing your store's categories, example product URLs, and key info. AI crawlers use this to understand your catalogue without scraping every page.",
+        "button": "Generate",
+        "forceTooltip": "Overwrites existing LLMs.txt with a freshly generated version."
+      },
+      "citationCopy": {
+        "title": "Product citation copy",
+        "body": "Rewrites product descriptions in \"definitive first sentence + key specs\" format — the exact style AI assistants quote when answering product questions. Fills empty products only.",
+        "button": "Run sweep",
+        "forceTooltip": "Overwrites existing citation copy on all products."
+      },
+      "brandFacts": {
+        "title": "Brand facts JSON",
+        "body": "Generates structured brand facts (location, categories, languages, contact methods) as a JSON-LD Organization block. Emitted on every storefront page to improve AI knowledge-graph entries.",
+        "button": "Generate",
+        "forceTooltip": "Overwrites existing brand facts JSON with freshly generated data."
+      },
+      "defaultForceTooltip": "Replaces existing content with a fresh AI generation."
+    },
+    "masterSweep": {
+      "runAllAeo": "Run all AEO sweeps",
+      "runAllGeo": "Run all GEO sweeps",
+      "aeoForceTooltip": "Overwrites existing AEO content. Without this, sweeps skip entities that already have content.",
+      "geoForceTooltip": "Overwrites existing GEO content. Without this, sweeps skip entities that already have content."
+    },
+    "jobKind": {
+      "translateToAr": "Translate (→ AR)",
+      "translateToEn": "Translate (→ EN)",
+      "seo": "SEO meta",
+      "faqAeo": "Draft FAQs",
+      "howtoAeo": "Draft HowTos",
+      "metaAeo": "Meta AEO rewrite",
+      "productFaqs": "Product FAQs",
+      "recommendations": "AI recommendations",
+      "llmsTxt": "LLMs.txt",
+      "citationCopy": "Citation copy",
+      "brandFacts": "Brand facts"
+    },
+    "activeJob": {
+      "sweepSuffix": "sweep",
+      "statusCancelled": "Cancelled",
+      "statusCompleted": "Completed",
+      "statusCompletedAt": "Completed {date}",
+      "statusStartedAt": "Started {date}",
+      "statusQueued": "Queued",
+      "cancel": "Cancel",
+      "cancelling": "Cancelling…",
+      "cancelAll": "Cancel all",
+      "dismiss": "Dismiss",
+      "hide": "Hide",
+      "viewFailures": "View {count} failure",
+      "viewFailuresPlural": "View {count} failures"
+    },
+    "stats": {
+      "filled": "Filled",
+      "skipped": "Skipped",
+      "failed": "Failed"
+    },
+    "recentRuns": {
+      "title": "Recent runs",
+      "empty": "No sweeps yet.",
+      "colStarted": "Started",
+      "colKind": "Kind",
+      "colStatus": "Status",
+      "colFilled": "Filled",
+      "colSkipped": "Skipped",
+      "colFailed": "Failed",
+      "details": "Details"
+    },
+    "status": {
+      "queued": "queued",
+      "running": "running",
+      "completed": "completed",
+      "failed": "failed",
+      "cancelled": "cancelled"
+    }
+  },
   "account": {
     "security": {
       "title": "Security",

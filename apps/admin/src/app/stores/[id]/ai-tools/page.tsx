@@ -10,6 +10,7 @@ import { GeoResultsPanel } from './_components/GeoResultsPanel';
 import { AiSweepResultsPanels } from './_components/AiSweepResultsPanels';
 import { AiUsageSummaryCard } from '../../../../components/ai/AiUsageSummaryCard';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+import { useT } from '../../../../i18n/useT';
 
 /**
  * Bulk AI sweeps — kick off a catalogue-wide translation or SEO
@@ -77,33 +78,6 @@ interface MasterSweep {
 //   rate limiter
 const POLL_MS = 4000;
 
-function jobKindLabel(kind: BulkAiJob['kind'], direction?: 'to_ar' | 'to_en' | null): string {
-  switch (kind) {
-    case 'translate':
-      return `Translate (${direction === 'to_en' ? '→ EN' : '→ AR'})`;
-    case 'seo':
-      return 'SEO meta';
-    case 'faq_aeo':
-      return 'Draft FAQs';
-    case 'howto_aeo':
-      return 'Draft HowTos';
-    case 'meta_aeo':
-      return 'Meta AEO rewrite';
-    case 'product_faqs':
-      return 'Product FAQs';
-    case 'recommendations':
-      return 'AI recommendations';
-    case 'llms_txt':
-      return 'LLMs.txt';
-    case 'citation_copy':
-      return 'Citation copy';
-    case 'brand_facts':
-      return 'Brand facts';
-    default:
-      return kind;
-  }
-}
-
 export default function AiToolsPage() {
   // Feature gate: bulk_operations covers AI catalogue sweeps; absent from
   // PLAN_BASELINE by default and enabled via super-admin override per store.
@@ -111,6 +85,7 @@ export default function AiToolsPage() {
 
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('aiTools');
 
   const [jobs, setJobs] = useState<BulkAiJob[]>([]);
   const [activeJob, setActiveJob] = useState<BulkAiJobDetail | null>(null);
@@ -207,13 +182,13 @@ export default function AiToolsPage() {
         { direction }
       );
       if (apiError || !data) {
-        setError(apiError?.message || 'Failed to start sweep');
+        setError(apiError?.message || t('errorFailedToStart'));
         return;
       }
       setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
       await fetchJobs();
     } catch {
-      setError('Network error');
+      setError(t('errorNetwork'));
     } finally {
       setStarting(null);
     }
@@ -224,7 +199,7 @@ export default function AiToolsPage() {
   /** Shared single-job starter. Handles smart-skip (default) and force paths. */
   async function start(endpoint: string, key: StartingKey, body: object = {}, force = false) {
     if (force) {
-      if (!confirm('This will REPLACE existing content for this sweep. Continue?')) return;
+      if (!confirm(t('confirmReplace'))) return;
     }
     setError(null);
     setStarting(key);
@@ -237,13 +212,13 @@ export default function AiToolsPage() {
           payload
         );
         if (apiError || !data) {
-          setError(apiError?.message || 'Failed');
+          setError(apiError?.message || t('errorFailed'));
           return;
         }
         setActiveMaster({
           masterRunId: data.masterRunId,
           jobIds: data.jobs.map(j => j.id),
-          label: endpoint.includes('aeo') ? 'Run all AEO sweeps' : 'Run all GEO sweeps',
+          label: endpoint.includes('aeo') ? t('masterSweep.runAllAeo') : t('masterSweep.runAllGeo'),
           jobs: data.jobs.map(j => ({ ...j, errors: null })) as BulkAiJobDetail[],
         });
       } else {
@@ -252,14 +227,14 @@ export default function AiToolsPage() {
           payload
         );
         if (apiError || !data) {
-          setError(apiError?.message || 'Failed');
+          setError(apiError?.message || t('errorFailed'));
           return;
         }
         setActiveJob({ ...data.job, errors: null } as BulkAiJobDetail);
       }
       await fetchJobs();
     } catch {
-      setError('Network error');
+      setError(t('errorNetwork'));
     } finally {
       setStarting(null);
     }
@@ -271,7 +246,7 @@ export default function AiToolsPage() {
     (!!activeMaster && activeMaster.jobs.some(j => !isTerminal(j.status)));
 
   async function cancelJob(jobId: string) {
-    if (!confirm('Cancel this sweep? Already-processed items keep their changes.')) return;
+    if (!confirm(t('confirmCancel'))) return;
     setCancelling(jobId);
     try {
       await apiPost(`/api/v1/stores/${storeId}/ai/jobs/${jobId}/cancel`, {});
@@ -286,7 +261,7 @@ export default function AiToolsPage() {
   }
 
   async function cancelMasterSweep(sweep: MasterSweep) {
-    if (!confirm('Cancel this sweep? Already-processed items keep their changes.')) return;
+    if (!confirm(t('confirmCancel'))) return;
     // Cancel all child jobs in parallel.
     await Promise.allSettled(
       sweep.jobIds.map(id => apiPost(`/api/v1/stores/${storeId}/ai/jobs/${id}/cancel`, {}))
@@ -301,12 +276,12 @@ export default function AiToolsPage() {
 
   return (
     <AdminLayout
-      title="AI Tools"
-      subtitle="Catalogue-wide translation, SEO, AEO, and GEO sweeps"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <Link href={`/stores/${storeId}`}>
           <Button type="button" variant="outline">
-            Back to store
+            {t('backToStore')}
           </Button>
         </Link>
       }
@@ -323,60 +298,72 @@ export default function AiToolsPage() {
       )}
 
       {/* ── Translation ───────────────────────────────────────────── */}
-      <SectionHeading title="Translation" />
+      <SectionHeading title={t('sections.translation')} />
       <div className="grid gap-4 md:grid-cols-3">
         <BulkActionCard
-          title="Fill missing Arabic"
-          body="Walks every product, category, and the store row. Translates the English value into Arabic only when the Arabic field is empty."
-          buttonLabel="Run sweep"
+          title={t('cards.fillMissingArabic.title')}
+          body={t('cards.fillMissingArabic.body')}
+          buttonLabel={t('cards.fillMissingArabic.button')}
+          startingLabel={t('starting')}
           loading={starting === 'translate-ar'}
           disabled={anyRunning}
           onAction={() => startTranslate('to_ar')}
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.defaultForceTooltip')}
         />
         <BulkActionCard
-          title="Fill missing English"
-          body="Reverse direction. For every Arabic-only field, fills the English side. Skips already-bilingual entities."
-          buttonLabel="Run sweep"
+          title={t('cards.fillMissingEnglish.title')}
+          body={t('cards.fillMissingEnglish.body')}
+          buttonLabel={t('cards.fillMissingEnglish.button')}
+          startingLabel={t('starting')}
           loading={starting === 'translate-en'}
           disabled={anyRunning}
           onAction={() => startTranslate('to_en')}
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.defaultForceTooltip')}
         />
       </div>
 
       {/* ── SEO ───────────────────────────────────────────────────── */}
-      <SectionHeading title="SEO" className="mt-6" />
+      <SectionHeading title={t('sections.seo')} className="mt-6" />
       <div className="grid gap-4 md:grid-cols-3">
         <BulkActionCard
-          title="Generate missing SEO meta"
-          body="For the store row and every product, generates meta title + description in EN and AR when those fields are empty. Skips entities that already have SEO."
-          buttonLabel="Run sweep"
+          title={t('cards.seoMeta.title')}
+          body={t('cards.seoMeta.body')}
+          buttonLabel={t('cards.seoMeta.button')}
+          startingLabel={t('starting')}
           loading={starting === 'seo'}
           disabled={anyRunning}
           onAction={force => start('/bulk/seo', 'seo', {}, force)}
-          forceTooltip="Overwrites existing SEO meta on all entities."
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.seoMeta.forceTooltip')}
         />
         <BulkActionCard
-          title="AI product recommendations"
-          body='Generate AI-driven cross-sell recommendations across your catalogue. Fills the storefront "You might also like" section on each product page. Re-running updates existing suggestions.'
-          buttonLabel="Run sweep"
+          title={t('cards.recommendations.title')}
+          body={t('cards.recommendations.body')}
+          buttonLabel={t('cards.recommendations.button')}
+          startingLabel={t('starting')}
           loading={starting === 'recommendations'}
           disabled={anyRunning}
           onAction={force => start('/bulk/recommendations', 'recommendations', {}, force)}
-          forceTooltip="Re-generates recommendations for every product, replacing existing AI picks."
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.recommendations.forceTooltip')}
         />
       </div>
 
       {/* ── AEO ───────────────────────────────────────────────────── */}
-      <SectionHeading title="AEO — Answer Engine Optimization" className="mt-6">
+      <SectionHeading title={t('sections.aeo')} className="mt-6">
         <div className="flex items-center gap-3">
           <ReplaceCheckbox
             id="aeo-force"
             checked={aeoForce}
             onChange={setAeoForce}
-            tooltip="Overwrites existing AEO content. Without this, sweeps skip entities that already have content."
+            label={t('replaceExisting')}
+            tooltip={t('masterSweep.aeoForceTooltip')}
           />
           <MasterSweepButton
-            label="Run all AEO sweeps"
+            label={t('masterSweep.runAllAeo')}
+            startingLabel={t('starting')}
             loading={starting === 'aeo-all'}
             disabled={anyRunning}
             onClick={() => start('/bulk/aeo-sweep-all', 'aeo-all', { count: 8 }, aeoForce)}
@@ -385,97 +372,110 @@ export default function AiToolsPage() {
       </SectionHeading>
       <div className="mt-3 grid gap-4 md:grid-cols-3">
         <BulkActionCard
-          title="Draft FAQs with AI"
-          body="Generates up to 8 store-level FAQ items covering delivery, payments, returns, product care, and more — bilingual (EN + AR). Skips questions a merchant has already edited."
-          buttonLabel="Draft FAQs"
+          title={t('cards.draftFaqs.title')}
+          body={t('cards.draftFaqs.body')}
+          buttonLabel={t('cards.draftFaqs.button')}
+          startingLabel={t('starting')}
           loading={starting === 'faq-aeo'}
           disabled={anyRunning}
           onAction={force => start('/bulk/faq-aeo', 'faq-aeo', { count: 8 }, force)}
-          forceTooltip="Deletes all existing AI-drafted FAQs and regenerates from scratch. Manually-edited FAQs are preserved."
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.draftFaqs.forceTooltip')}
           resultsHref={`/stores/${storeId}/seo#faqs`}
-          resultsLabel="View FAQs on SEO page"
+          resultsLabel={t('cards.draftFaqs.resultsLabel')}
         />
         <BulkActionCard
-          title="Draft How-To Guides with AI"
-          body="Drafts up to 3 step-by-step HowTo guides relevant to the store's product mix (e.g. how to place an order, how to return an item). Bilingual EN + AR."
-          buttonLabel="Draft HowTos"
+          title={t('cards.draftHowtos.title')}
+          body={t('cards.draftHowtos.body')}
+          buttonLabel={t('cards.draftHowtos.button')}
+          startingLabel={t('starting')}
           loading={starting === 'howto-aeo'}
           disabled={anyRunning}
           onAction={force => start('/bulk/howto-aeo', 'howto-aeo', { count: 3 }, force)}
-          forceTooltip="Deletes all existing AI-drafted HowTos and regenerates from scratch. Manually-edited guides are preserved."
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.draftHowtos.forceTooltip')}
           resultsHref={`/stores/${storeId}/seo#howtos`}
-          resultsLabel="View HowTos on SEO page"
+          resultsLabel={t('cards.draftHowtos.resultsLabel')}
         />
         <BulkActionCard
-          title="Rewrite Meta Descriptions (AEO)"
-          body="Rewrites empty store, product, and category meta descriptions in a conversational, direct-answer style suited for AI answer engines. Only fills blank AEO fields — never overwrites existing content."
-          buttonLabel="Rewrite meta"
+          title={t('cards.metaAeo.title')}
+          body={t('cards.metaAeo.body')}
+          buttonLabel={t('cards.metaAeo.button')}
+          startingLabel={t('starting')}
           loading={starting === 'meta-aeo'}
           disabled={anyRunning}
           onAction={force => start('/bulk/meta-aeo', 'meta-aeo', {}, force)}
-          forceTooltip="Overwrites existing AEO meta descriptions on all entities."
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.metaAeo.forceTooltip')}
           resultsHref={`/stores/${storeId}/seo`}
-          resultsLabel="View meta on SEO page"
+          resultsLabel={t('cards.metaAeo.resultsLabel')}
         />
         <BulkActionCard
-          title="Draft Product FAQs with AI"
-          body="Generates up to 5 bilingual (EN + AR) FAQ pairs for every product — the same drafting used by the per-product button, run across your whole catalogue. Skips products that already have FAQs."
-          buttonLabel="Draft product FAQs"
+          title={t('cards.productFaqs.title')}
+          body={t('cards.productFaqs.body')}
+          buttonLabel={t('cards.productFaqs.button')}
+          startingLabel={t('starting')}
           loading={starting === 'product-faqs'}
           disabled={anyRunning}
           onAction={force => start('/bulk/product-faqs', 'product-faqs', {}, force)}
-          forceTooltip="Re-drafts FAQs for every product, replacing AI-drafted FAQs. Manually-edited FAQs are preserved."
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.productFaqs.forceTooltip')}
         />
       </div>
 
       {/* ── GEO ───────────────────────────────────────────────────── */}
-      <SectionHeading title="GEO — Generative Engine Optimization" className="mt-6">
+      <SectionHeading title={t('sections.geo')} className="mt-6">
         <div className="flex items-center gap-3">
           <ReplaceCheckbox
             id="geo-force"
             checked={geoForce}
             onChange={setGeoForce}
-            tooltip="Overwrites existing GEO content. Without this, sweeps skip entities that already have content."
+            label={t('replaceExisting')}
+            tooltip={t('masterSweep.geoForceTooltip')}
           />
           <MasterSweepButton
-            label="Run all GEO sweeps"
+            label={t('masterSweep.runAllGeo')}
+            startingLabel={t('starting')}
             loading={starting === 'geo-all'}
             disabled={anyRunning}
             onClick={() => start('/bulk/geo-sweep-all', 'geo-all', {}, geoForce)}
           />
         </div>
       </SectionHeading>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Optimises your store for LLM-powered search — ChatGPT, Perplexity, Google AI Overview, Bing
-        Copilot.
-      </p>
+      <p className="mt-1 text-xs text-muted-foreground">{t('sections.geoDescription')}</p>
       <div className="mt-3 grid gap-4 md:grid-cols-3">
         <BulkActionCard
-          title="Generate LLMs.txt"
-          body="Creates a /llms.txt file listing your store's categories, example product URLs, and key info. AI crawlers use this to understand your catalogue without scraping every page."
-          buttonLabel="Generate"
+          title={t('cards.llmsTxt.title')}
+          body={t('cards.llmsTxt.body')}
+          buttonLabel={t('cards.llmsTxt.button')}
+          startingLabel={t('starting')}
           loading={starting === 'llms-txt'}
           disabled={anyRunning}
           onAction={force => start('/bulk/llms-txt', 'llms-txt', {}, force)}
-          forceTooltip="Overwrites existing LLMs.txt with a freshly generated version."
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.llmsTxt.forceTooltip')}
         />
         <BulkActionCard
-          title="Product citation copy"
-          body='Rewrites product descriptions in "definitive first sentence + key specs" format — the exact style AI assistants quote when answering product questions. Fills empty products only.'
-          buttonLabel="Run sweep"
+          title={t('cards.citationCopy.title')}
+          body={t('cards.citationCopy.body')}
+          buttonLabel={t('cards.citationCopy.button')}
+          startingLabel={t('starting')}
           loading={starting === 'citation-copy'}
           disabled={anyRunning}
           onAction={force => start('/bulk/citation-copy', 'citation-copy', {}, force)}
-          forceTooltip="Overwrites existing citation copy on all products."
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.citationCopy.forceTooltip')}
         />
         <BulkActionCard
-          title="Brand facts JSON"
-          body="Generates structured brand facts (location, categories, languages, contact methods) as a JSON-LD Organization block. Emitted on every storefront page to improve AI knowledge-graph entries."
-          buttonLabel="Generate"
+          title={t('cards.brandFacts.title')}
+          body={t('cards.brandFacts.body')}
+          buttonLabel={t('cards.brandFacts.button')}
+          startingLabel={t('starting')}
           loading={starting === 'brand-facts'}
           disabled={anyRunning}
           onAction={force => start('/bulk/brand-facts', 'brand-facts', {}, force)}
-          forceTooltip="Overwrites existing brand facts JSON with freshly generated data."
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.brandFacts.forceTooltip')}
         />
       </div>
 
@@ -492,6 +492,7 @@ export default function AiToolsPage() {
             setActiveJob(null);
             fetchJobs();
           }}
+          t={t}
         />
       )}
 
@@ -504,6 +505,7 @@ export default function AiToolsPage() {
             setActiveMaster(null);
             fetchJobs();
           }}
+          t={t}
         />
       )}
 
@@ -512,20 +514,20 @@ export default function AiToolsPage() {
 
       {/* Recent runs table */}
       <div className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold">Recent runs</h2>
+        <h2 className="mb-3 text-lg font-semibold">{t('recentRuns.title')}</h2>
         {jobs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No sweeps yet.</p>
+          <p className="text-sm text-muted-foreground">{t('recentRuns.empty')}</p>
         ) : (
           <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
             <table className="w-full text-sm">
               <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3 text-start">Started</th>
-                  <th className="px-4 py-3 text-start">Kind</th>
-                  <th className="px-4 py-3 text-start">Status</th>
-                  <th className="px-4 py-3 text-end">Filled</th>
-                  <th className="px-4 py-3 text-end">Skipped</th>
-                  <th className="px-4 py-3 text-end">Failed</th>
+                  <th className="px-4 py-3 text-start">{t('recentRuns.colStarted')}</th>
+                  <th className="px-4 py-3 text-start">{t('recentRuns.colKind')}</th>
+                  <th className="px-4 py-3 text-start">{t('recentRuns.colStatus')}</th>
+                  <th className="px-4 py-3 text-end">{t('recentRuns.colFilled')}</th>
+                  <th className="px-4 py-3 text-end">{t('recentRuns.colSkipped')}</th>
+                  <th className="px-4 py-3 text-end">{t('recentRuns.colFailed')}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -535,9 +537,11 @@ export default function AiToolsPage() {
                     <td className="px-4 py-3 text-muted-foreground">
                       {new Date(j.createdAt).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 font-medium">{jobKindLabel(j.kind, j.direction)}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {jobKindLabel(j.kind, j.direction, t)}
+                    </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={j.status} />
+                      <StatusBadge status={j.status} t={t} />
                     </td>
                     <td className="px-4 py-3 text-end font-medium text-emerald-600">{j.filled}</td>
                     <td className="px-4 py-3 text-end text-muted-foreground">{j.skipped}</td>
@@ -548,7 +552,7 @@ export default function AiToolsPage() {
                         onClick={() => fetchActiveJob(j.id).then(() => undefined)}
                         className="text-xs text-primary hover:underline"
                       >
-                        Details
+                        {t('recentRuns.details')}
                       </button>
                     </td>
                   </tr>
@@ -560,6 +564,43 @@ export default function AiToolsPage() {
       </div>
     </AdminLayout>
   );
+}
+
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+
+type TFn = ReturnType<typeof useT>;
+
+function jobKindLabel(
+  kind: BulkAiJob['kind'],
+  direction: 'to_ar' | 'to_en' | null | undefined,
+  t: TFn
+): string {
+  switch (kind) {
+    case 'translate':
+      return direction === 'to_en' ? t('jobKind.translateToEn') : t('jobKind.translateToAr');
+    case 'seo':
+      return t('jobKind.seo');
+    case 'faq_aeo':
+      return t('jobKind.faqAeo');
+    case 'howto_aeo':
+      return t('jobKind.howtoAeo');
+    case 'meta_aeo':
+      return t('jobKind.metaAeo');
+    case 'product_faqs':
+      return t('jobKind.productFaqs');
+    case 'recommendations':
+      return t('jobKind.recommendations');
+    case 'llms_txt':
+      return t('jobKind.llmsTxt');
+    case 'citation_copy':
+      return t('jobKind.citationCopy');
+    case 'brand_facts':
+      return t('jobKind.brandFacts');
+    default:
+      return kind;
+  }
 }
 
 // -----------------------------------------------------------------------
@@ -588,11 +629,13 @@ function ReplaceCheckbox({
   id,
   checked,
   onChange,
+  label,
   tooltip,
 }: {
   id: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  label: string;
   tooltip: string;
 }) {
   return (
@@ -604,7 +647,7 @@ function ReplaceCheckbox({
         onChange={e => onChange(e.target.checked)}
         className="h-3.5 w-3.5 cursor-pointer accent-[#fc6b02]"
       />
-      <span className="text-xs text-muted-foreground">Replace existing</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
       <span
         title={tooltip}
         className="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground"
@@ -620,21 +663,25 @@ function BulkActionCard({
   title,
   body,
   buttonLabel,
+  startingLabel,
   loading,
   disabled,
   onAction,
-  forceTooltip = 'Replaces existing content with a fresh AI generation.',
+  replaceExistingLabel,
+  forceTooltip,
   resultsHref,
   resultsLabel,
 }: {
   title: string;
   body: string;
   buttonLabel: string;
+  startingLabel: string;
   loading: boolean;
   disabled: boolean;
   /** Called with force=true when checkbox is checked (after confirm), false otherwise. */
   onAction: (force: boolean) => void;
-  forceTooltip?: string;
+  replaceExistingLabel: string;
+  forceTooltip: string;
   resultsHref?: string;
   resultsLabel?: string;
 }) {
@@ -667,6 +714,7 @@ function BulkActionCard({
           id={checkboxId}
           checked={replaceExisting}
           onChange={setReplaceExisting}
+          label={replaceExistingLabel}
           tooltip={forceTooltip}
         />
       </div>
@@ -678,7 +726,7 @@ function BulkActionCard({
         className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
-        <span>{loading ? 'Starting…' : buttonLabel}</span>
+        <span>{loading ? startingLabel : buttonLabel}</span>
       </button>
 
       {resultsHref && (
@@ -686,7 +734,7 @@ function BulkActionCard({
           href={resultsHref}
           className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
-          {resultsLabel ?? 'View results'}
+          {resultsLabel}
           <span aria-hidden>→</span>
         </Link>
       )}
@@ -696,11 +744,13 @@ function BulkActionCard({
 
 function MasterSweepButton({
   label,
+  startingLabel,
   loading,
   disabled,
   onClick,
 }: {
   label: string;
+  startingLabel: string;
   loading: boolean;
   disabled: boolean;
   onClick: () => void;
@@ -723,12 +773,12 @@ function MasterSweepButton({
       className="inline-flex items-center gap-2 rounded-lg bg-[#fc6b02] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {loading ? <SpinIcon /> : <span aria-hidden>✨</span>}
-      {loading ? 'Starting…' : label}
+      {loading ? startingLabel : label}
     </button>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, t }: { status: string; t: TFn }) {
   const styles =
     status === 'completed'
       ? 'bg-emerald-100 text-emerald-700'
@@ -739,9 +789,27 @@ function StatusBadge({ status }: { status: string }) {
           : status === 'running'
             ? 'bg-amber-100 text-amber-700'
             : 'bg-muted text-foreground';
+
+  const label = (() => {
+    switch (status) {
+      case 'queued':
+        return t('status.queued');
+      case 'running':
+        return t('status.running');
+      case 'completed':
+        return t('status.completed');
+      case 'failed':
+        return t('status.failed');
+      case 'cancelled':
+        return t('status.cancelled');
+      default:
+        return status;
+    }
+  })();
+
   return (
     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${styles}`}>
-      {status}
+      {label}
     </span>
   );
 }
@@ -751,33 +819,39 @@ function ActiveJobCard({
   cancelling,
   onCancel,
   onClose,
+  t,
 }: {
   job: BulkAiJobDetail;
   cancelling?: boolean;
   onCancel?: () => void;
   onClose: () => void;
+  t: TFn;
 }) {
   const pct = job.total > 0 ? Math.min(100, Math.round((job.processed / job.total) * 100)) : 0;
   const isDone =
     job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled';
   const isActive = job.status === 'running' || job.status === 'queued';
 
+  const statusText = (() => {
+    if (job.status === 'cancelled') return t('activeJob.statusCancelled');
+    if (isDone) {
+      return job.completedAt
+        ? t('activeJob.statusCompletedAt', { date: new Date(job.completedAt).toLocaleString() })
+        : t('activeJob.statusCompleted');
+    }
+    return job.startedAt
+      ? t('activeJob.statusStartedAt', { date: new Date(job.startedAt).toLocaleString() })
+      : t('activeJob.statusQueued');
+  })();
+
   return (
     <div className="mt-6 rounded-xl border-2 border-[#fc6b02]/30 bg-[#fc6b02]/5 p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold">{jobKindLabel(job.kind, job.direction)} sweep</h3>
-          <p className="text-xs text-muted-foreground">
-            {job.status === 'cancelled'
-              ? 'Cancelled'
-              : isDone
-                ? job.completedAt
-                  ? `Completed ${new Date(job.completedAt).toLocaleString()}`
-                  : 'Completed'
-                : job.startedAt
-                  ? `Started ${new Date(job.startedAt).toLocaleString()}`
-                  : 'Queued'}
-          </p>
+          <h3 className="text-base font-semibold">
+            {jobKindLabel(job.kind, job.direction, t)} {t('activeJob.sweepSuffix')}
+          </h3>
+          <p className="text-xs text-muted-foreground">{statusText}</p>
         </div>
         <div className="flex items-center gap-2">
           {isActive && onCancel && (
@@ -787,7 +861,7 @@ function ActiveJobCard({
               disabled={cancelling}
               className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20 disabled:opacity-50"
             >
-              {cancelling ? 'Cancelling…' : 'Cancel'}
+              {cancelling ? t('activeJob.cancelling') : t('activeJob.cancel')}
             </button>
           )}
           <button
@@ -795,7 +869,7 @@ function ActiveJobCard({
             onClick={onClose}
             className="text-sm text-muted-foreground hover:text-foreground"
           >
-            {isDone ? 'Dismiss' : 'Hide'}
+            {isDone ? t('activeJob.dismiss') : t('activeJob.hide')}
           </button>
         </div>
       </div>
@@ -813,9 +887,13 @@ function ActiveJobCard({
       </div>
 
       <div className="grid grid-cols-3 gap-3 text-sm">
-        <Stat label="Filled" value={job.filled} tone="ok" />
-        <Stat label="Skipped" value={job.skipped} tone="muted" />
-        <Stat label="Failed" value={job.failed} tone={job.failed > 0 ? 'bad' : 'muted'} />
+        <Stat label={t('stats.filled')} value={job.filled} tone="ok" />
+        <Stat label={t('stats.skipped')} value={job.skipped} tone="muted" />
+        <Stat
+          label={t('stats.failed')}
+          value={job.failed}
+          tone={job.failed > 0 ? 'bad' : 'muted'}
+        />
       </div>
 
       {job.errorMessage && <p className="mt-3 text-sm text-destructive">{job.errorMessage}</p>}
@@ -823,7 +901,9 @@ function ActiveJobCard({
       {job.errors && job.errors.length > 0 && (
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-            View {job.errors.length} failure{job.errors.length === 1 ? '' : 's'}
+            {job.errors.length === 1
+              ? t('activeJob.viewFailures', { count: job.errors.length })
+              : t('activeJob.viewFailuresPlural', { count: job.errors.length })}
           </summary>
           <ul className="mt-2 space-y-1 text-xs">
             {job.errors.slice(0, 50).map((e, i) => (
@@ -846,10 +926,12 @@ function MasterSweepCard({
   sweep,
   onCancel,
   onClose,
+  t,
 }: {
   sweep: MasterSweep;
   onCancel?: () => void;
   onClose: () => void;
+  t: TFn;
 }) {
   const { jobs, label } = sweep;
 
@@ -889,9 +971,9 @@ function MasterSweepCard({
         <div>
           <h3 className="text-base font-semibold">{label}</h3>
           <div className="mt-0.5 flex items-center gap-2">
-            <StatusBadge status={overallStatus} />
+            <StatusBadge status={overallStatus} t={t} />
             <span className="text-xs text-muted-foreground">
-              {jobs.map(j => jobKindLabel(j.kind)).join(' + ')}
+              {jobs.map(j => jobKindLabel(j.kind, j.direction, t)).join(' + ')}
             </span>
           </div>
         </div>
@@ -902,7 +984,7 @@ function MasterSweepCard({
               onClick={onCancel}
               className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20"
             >
-              Cancel all
+              {t('activeJob.cancelAll')}
             </button>
           )}
           <button
@@ -910,7 +992,7 @@ function MasterSweepCard({
             onClick={onClose}
             className="text-sm text-muted-foreground hover:text-foreground"
           >
-            {allDone ? 'Dismiss' : 'Hide'}
+            {allDone ? t('activeJob.dismiss') : t('activeJob.hide')}
           </button>
         </div>
       </div>
@@ -928,9 +1010,13 @@ function MasterSweepCard({
       </div>
 
       <div className="grid grid-cols-3 gap-3 text-sm">
-        <Stat label="Filled" value={totals.filled} tone="ok" />
-        <Stat label="Skipped" value={totals.skipped} tone="muted" />
-        <Stat label="Failed" value={totals.failed} tone={totals.failed > 0 ? 'bad' : 'muted'} />
+        <Stat label={t('stats.filled')} value={totals.filled} tone="ok" />
+        <Stat label={t('stats.skipped')} value={totals.skipped} tone="muted" />
+        <Stat
+          label={t('stats.failed')}
+          value={totals.failed}
+          tone={totals.failed > 0 ? 'bad' : 'muted'}
+        />
       </div>
 
       {/* Per-sub-job status chips */}
@@ -940,8 +1026,8 @@ function MasterSweepCard({
             key={j.id}
             className="flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1 text-xs"
           >
-            <StatusBadge status={j.status} />
-            <span className="font-medium">{jobKindLabel(j.kind)}</span>
+            <StatusBadge status={j.status} t={t} />
+            <span className="font-medium">{jobKindLabel(j.kind, j.direction, t)}</span>
           </div>
         ))}
       </div>
