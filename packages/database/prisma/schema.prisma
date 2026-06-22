@@ -2646,6 +2646,7 @@ model Supplier {
   paymentTerms    SupplierPaymentTerms @default(net0) @map("payment_terms")
   customTermsDays Int?                 @map("custom_terms_days")
   defaultCurrency String               @default("KWD") @map("default_currency")
+  leadTimeDays    Int                  @default(7) @map("lead_time_days")
   apBalanceCached Int                  @default(0) @map("ap_balance_cached")
   isActive        Boolean              @default(true) @map("is_active")
   notes           String?

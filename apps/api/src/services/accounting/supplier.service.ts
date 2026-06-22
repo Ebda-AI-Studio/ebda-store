@@ -12,6 +12,7 @@ export interface CreateSupplierInput {
   paymentTerms?: SupplierPaymentTerms;
   customTermsDays?: number;
   defaultCurrency?: string;
+  leadTimeDays?: number;
   notes?: string;
   notesAr?: string;
 }
@@ -29,6 +30,7 @@ export async function createSupplier(input: CreateSupplierInput): Promise<Suppli
       paymentTerms: input.paymentTerms ?? 'net0',
       customTermsDays: input.customTermsDays,
       defaultCurrency: input.defaultCurrency ?? 'KWD',
+      leadTimeDays: input.leadTimeDays ?? 7,
       notes: input.notes,
       notesAr: input.notesAr,
     },

@@ -24,6 +24,7 @@ const createSchema = z.object({
   address: z.record(z.string(), z.unknown()).optional(),
   paymentTerms: z.enum(['net0', 'net15', 'net30', 'net60', 'custom']).optional(),
   customTermsDays: z.number().int().min(1).max(365).optional(),
+  leadTimeDays: z.number().int().min(1).max(365).optional(),
   notes: z.string().optional(),
   notesAr: z.string().optional(),
 });

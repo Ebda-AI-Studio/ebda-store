@@ -95,6 +95,19 @@ export async function pickLastSupplierForProduct(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: fetch leadTimeDays from a supplier row (returns null if not found)
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getSupplierLeadTime(supplierId: string, tx: any): Promise<number | null> {
+  const row = await tx.supplier.findUnique({
+    where: { id: supplierId },
+    select: { leadTimeDays: true },
+  });
+  return row?.leadTimeDays ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: sum OrderItem quantity for a product over the last N days (paid orders)
 // ---------------------------------------------------------------------------
 
@@ -233,10 +246,34 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       const rule = product.reorderRules[0] ?? null;
 
       const minQty = rule?.minQty ?? product.lowStockThreshold;
-      const leadTimeDays = rule?.leadTimeDays ?? 7;
       const safetyStockDays = rule?.safetyStockDays ?? 7;
       const defaultReorderQty = Math.max(Math.round(velocity * 14), minQty * 2);
       const reorderQty = rule?.reorderQty ?? defaultReorderQty;
+
+      // Lead-time resolution order (per spec):
+      //   1. ReorderRule.leadTimeDays  — explicit per-product rule (wins when a rule exists)
+      //   2. supplier.leadTimeDays     — last-PO supplier when no rule is configured
+      //   3. 7                         — system-wide default
+      //
+      // Also resolve supplierId here so we can reuse the last-PO lookup for both
+      // lead-time fallback and the suggestion row (avoiding a duplicate DB call).
+      let leadTimeDays: number;
+      let resolvedSupplierId: string | null;
+
+      if (rule !== null) {
+        // A per-product rule always takes priority over the supplier's lead time.
+        leadTimeDays = rule.leadTimeDays;
+        // Supplier for the suggestion: prefer rule's explicit preferred supplier.
+        resolvedSupplierId =
+          rule.preferredSupplierId ?? (await pickLastSupplierForProduct(product.id, tx));
+      } else {
+        // No rule: resolve the supplier first (last PO), then use its leadTimeDays.
+        resolvedSupplierId = await pickLastSupplierForProduct(product.id, tx);
+        const supplierLt = resolvedSupplierId
+          ? await getSupplierLeadTime(resolvedSupplierId, tx)
+          : null;
+        leadTimeDays = supplierLt ?? 7;
+      }
 
       const onHand = product.inventory;
 
@@ -277,9 +314,8 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       const urgencyDays = Math.round(onHand / safeVelocity);
       const suggestedQty = Math.max(reorderQty, openBacklog + reorderQty - onHand - onOrder);
 
-      // Supplier: prefer rule's preferredSupplierId, else look up last PO
-      const supplierId =
-        rule?.preferredSupplierId ?? (await pickLastSupplierForProduct(product.id, tx));
+      // Use the already-resolved supplierId (avoids a second pickLastSupplierForProduct call).
+      const supplierId = resolvedSupplierId;
 
       collected.push({
         productId: product.id,

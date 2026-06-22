@@ -18,6 +18,7 @@ interface Supplier {
   email: string | null;
   paymentTerms: string;
   customTermsDays: number | null;
+  leadTimeDays: number;
   notes: string | null;
   notesAr: string | null;
 }
@@ -50,6 +51,7 @@ export default function NewSupplierPage() {
   const [email, setEmail] = useState('');
   const [paymentTerms, setPaymentTerms] = useState<string>('net30');
   const [customTermsDays, setCustomTermsDays] = useState('');
+  const [leadTimeDays, setLeadTimeDays] = useState('7');
   const [notes, setNotes] = useState('');
   const [notesAr, setNotesAr] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -71,6 +73,7 @@ export default function NewSupplierPage() {
           setEmail(s.email ?? '');
           setPaymentTerms(s.paymentTerms);
           setCustomTermsDays(s.customTermsDays?.toString() ?? '');
+          setLeadTimeDays(s.leadTimeDays?.toString() ?? '7');
           setNotes(s.notes ?? '');
           setNotesAr(s.notesAr ?? '');
         }
@@ -97,6 +100,7 @@ export default function NewSupplierPage() {
       paymentTerms,
       customTermsDays:
         paymentTerms === 'custom' && customTermsDays ? parseInt(customTermsDays) : undefined,
+      leadTimeDays: leadTimeDays ? parseInt(leadTimeDays) : 7,
       notes: notes.trim() || undefined,
       notesAr: notesAr.trim() || undefined,
     };
@@ -229,6 +233,26 @@ export default function NewSupplierPage() {
               />
             </label>
           )}
+        </div>
+
+        {/* Net lead time */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium">Net lead time (days) / مدة التوريد (أيام)</span>
+              <HelpTip text="Number of days from placing an order with this supplier until stock arrives. Used by the reorder engine when no per-product rule overrides it." />
+            </div>
+            <input
+              type="number"
+              min="1"
+              max="365"
+              step="1"
+              value={leadTimeDays}
+              onChange={e => setLeadTimeDays(e.target.value)}
+              className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm"
+              placeholder="7"
+            />
+          </label>
         </div>
 
         {/* Notes + NotesAr */}
