@@ -3929,6 +3929,7 @@
         "newsletter": "Newsletter",
         "affiliates": "Affiliates",
         "abandonedCarts": "Abandoned Carts",
+        "paymentAbandonments": "Payment Abandonments",
         "locations": "Locations"
       },
       "superAdmin": "Super Admin",
@@ -4752,6 +4753,34 @@
       "errorDisable": "Invalid code. Please try again.",
       "successEnabled": "2FA has been enabled for your account.",
       "successDisabled": "2FA has been disabled."
+    }
+  },
+  "paymentAbandonments": {
+    "page": {
+      "title": "Payment Abandonments",
+      "subtitle": "Shoppers who reached the payment gateway but did not complete payment.",
+      "enterprise": "Payment abandonment capture is an Enterprise feature.",
+      "empty": "No gateway abandoners found in this period.",
+      "emptyHint": "The sweep runs every 30 minutes and marks orders whose gateway link was generated but never paid.",
+      "statsTotal": "Total abandoners",
+      "statsLast7": "Last 7 days",
+      "statsLast30": "Last 30 days",
+      "statsValue": "Total abandoned value",
+      "colOrderNumber": "Order #",
+      "colCustomer": "Customer",
+      "colPhone": "Phone",
+      "colEmail": "Email",
+      "colGateway": "Gateway",
+      "colValue": "Value",
+      "colItems": "Items",
+      "colAbandonedAt": "Abandoned at",
+      "colStatus": "Status",
+      "viewOrder": "View order",
+      "retargetHint": "Contact the customer via WhatsApp or phone to recover the sale.",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "dateApply": "Apply",
+      "guest": "Guest"
     }
   }
 }

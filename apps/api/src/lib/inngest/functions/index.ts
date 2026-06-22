@@ -44,6 +44,7 @@ import { orderCapiConversion } from './order-capi-conversion';
 import { orderStuckPaymentSweep } from './order-stuck-payment-sweep';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
 import { r2OrphanSweep } from './r2-orphan-sweep';
+import { paymentAbandonmentSweep } from './payment-abandonment-sweep';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -114,4 +115,8 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // Weekly R2 orphan sweep: lists bucket vs DB references and reports
   // orphans via logger + Telegram. Deletion gated on R2_ORPHAN_SWEEP_APPLY=true.
   r2OrphanSweep,
+  // Enterprise: every-30-min sweep that stamps paymentGatewayAbandonedAt on
+  // orders that reached a payment gateway (paymentUrl non-null) but never paid.
+  // Only runs for stores with the 'payment_abandonment' feature enabled.
+  paymentAbandonmentSweep,
 ];

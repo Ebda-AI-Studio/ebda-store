@@ -78,9 +78,21 @@ export class OrderService {
       customerId?: string;
       from?: Date;
       to?: Date;
+      /**
+       * When true, exclude orders that are status=pending AND paymentStatus=unpaid
+       * (i.e. an online-payment order that has not been paid yet and is not COD).
+       * COD orders are always included regardless of status because the fulfillment
+       * operator needs to see them — they are "confirmed" from day one (no payment
+       * gateway involved). This flag powers the Orders PWA's confirmed-only view.
+       *
+       * The filter is: NOT (status=pending AND paymentStatus=unpaid AND has an
+       * online-payment Payment row). In practice: keeps COD pending + keeps all
+       * confirmed/processing/shipped/delivered/cancelled/refunded.
+       */
+      confirmedOnly?: boolean;
     } = {}
   ) {
-    const { status, customerId, from, to } = options;
+    const { status, customerId, from, to, confirmedOnly } = options;
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
@@ -92,6 +104,20 @@ export class OrderService {
     // also pollute analytics aggregates that count off this query).
     const where: Prisma.OrderWhereInput = { storeId, deletedAt: null };
     if (status) where.status = status as OrderStatus;
+
+    // Orders-PWA confirmed-only filter: exclude unconfirmed online-payment
+    // orders (pending + unpaid with an online Payment row). COD orders that
+    // are pending are real orders — always included.
+    if (confirmedOnly && !status) {
+      where.NOT = {
+        AND: [
+          { status: 'pending' },
+          { paymentStatus: 'unpaid' },
+          // Has at least one online-payment Payment (not COD/cash).
+          { payments: { some: { provider: { notIn: ['cod', 'cash', 'cash_on_delivery'] } } } },
+        ],
+      };
+    }
     if (customerId) where.customerId = customerId;
     if (from || to) {
       where.createdAt = {};

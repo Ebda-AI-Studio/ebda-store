@@ -86,6 +86,8 @@ const ENTERPRISE_ADDITIONS: FeatureKey[] = [
   'affiliate',
   'sms',
   'floating_widget',
+  // High-intent retargeting (2026-06-22)
+  'payment_abandonment',
 ];
 
 /**

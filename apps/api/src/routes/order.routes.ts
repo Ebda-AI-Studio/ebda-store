@@ -378,7 +378,7 @@ const getSessionId = (req: Request): string => {
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const { page, limit, status, from, to } = req.query;
+    const { page, limit, status, from, to, confirmedOnly } = req.query;
     const role = req.user?.role;
     const isStoreViewer = role === 'store_admin' || role === 'super_admin' || role === 'staff';
 
@@ -399,6 +399,10 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
       customerId: isStoreViewer ? undefined : req.user?.userId,
       from: from ? new Date(String(from) + 'T00:00:00') : undefined,
       to: to ? new Date(String(to) + 'T23:59:59') : undefined,
+      // Orders PWA passes confirmedOnly=1 to show only confirmed/COD orders.
+      // Only honoured for store viewers (staff / admins); customer queries
+      // are already scoped to their own orders and never need this filter.
+      confirmedOnly: isStoreViewer && confirmedOnly === '1',
     });
 
     res.json({

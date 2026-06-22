@@ -54,6 +54,7 @@ import expensesRoutes from './expenses.routes';
 import backordersRoutes from './backorders.routes';
 import botAnalyticsRoutes from './bot-analytics.routes';
 import staffRoutes from './staff.routes';
+import paymentAbandonmentsRoutes from './payment-abandonments.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -197,6 +198,9 @@ router.use('/stores', tenantContext, botAnalyticsRoutes);
 
 // Staff management — store owners add / remove staff members
 router.use('/stores/:storeId/staff', tenantContext, staffRoutes);
+
+// Payment-gateway abandonment retargeting (Enterprise — payment_abandonment)
+router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);
 
 // Wishlist routes (user-scoped, no store context)
 router.use('/wishlist', wishlistRoutes);

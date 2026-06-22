@@ -38,6 +38,10 @@ export const FEATURE_KEYS_ARRAY = [
   'inventory.barcode',
   'inventory.purchase_orders',
   'inventory.bulk_adjustments',
+  // Payment-gateway abandonment capture (2026-06-22) — Enterprise only.
+  // Gates the Inngest sweep that stamps paymentGatewayAbandonedAt and the
+  // admin retargeting UI at /stores/:id/payment-abandonments.
+  'payment_abandonment',
   // Accounting sub-features (2026-05-27)
   'accounting.basic',
   'accounting.expenses',
@@ -469,6 +473,20 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'استيراد كشف البنك (CSV/OFX) مع مطابقة آلية بدفتر اليومية وإمكانية التصحيح اليدوي.',
     category: 'operations',
+    tier: 'addon',
+  },
+  payment_abandonment: {
+    key: 'payment_abandonment',
+    name: 'Payment-Gateway Abandonment Capture',
+    nameAr: 'التقاط تخلي عملاء البوابة',
+    description:
+      'Identify shoppers who reached the payment gateway but did not complete payment. ' +
+      'Records are stamped by an automated sweep and surfaced in the retargeting dashboard ' +
+      'with customer contact, cart value, and gateway used.',
+    descriptionAr:
+      'تحديد المتسوّقين الذين وصلوا إلى بوابة الدفع لكنهم لم يُكملوا الدفع. ' +
+      'تُسجَّل البيانات بشكل تلقائي وتظهر في لوحة إعادة الاستهداف مع بيانات التواصل وقيمة العربة والبوابة المستخدمة.',
+    category: 'marketing',
     tier: 'addon',
   },
 };

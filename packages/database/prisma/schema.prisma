@@ -1098,6 +1098,15 @@ model Order {
   // paymentStatus=unpaid past STUCK_PAYMENT_MINUTES.
   stuckPaymentAlertedAt DateTime? @map("stuck_payment_alerted_at")
 
+  // Enterprise: payment-gateway abandonment capture. Set by the Inngest
+  // payment-abandonment-sweep cron when the order has a Payment row with a
+  // paymentUrl (customer reached the gateway) but paymentStatus is still
+  // unpaid past the configured threshold. NULL = not a gateway abandoner
+  // (or not yet evaluated). Used to power the retargeting UI under
+  // /stores/:id/payment-abandonments (Enterprise-only, feature key:
+  // payment_abandonment). See migration 20260622130000.
+  paymentGatewayAbandonedAt DateTime? @map("payment_gateway_abandoned_at")
+
   // Relations
   store               Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
   customer            User?                @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -1119,6 +1128,9 @@ model Order {
   // Admin orders list — newest first within a store. Created in
   // 20260501030000_perf_indexes.
   @@index([storeId, createdAt(sort: Desc)])
+  // Payment-gateway abandoners list (Enterprise).
+  // Added 20260622130000.
+  @@index([storeId, paymentGatewayAbandonedAt])
   @@map("orders")
 }
 

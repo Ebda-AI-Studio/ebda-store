@@ -5,40 +5,47 @@ import { useToast } from '@/contexts/ToastContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 /**
- * New-order alert for v1: a lightweight in-app watcher. The parent (orders
- * list) polls and passes the newest pending-order id + a monotonically
- * increasing snapshot. When a NEW pending order id appears that we haven't seen
- * before, we beep (Web Audio) + toast.
+ * In-app new-order alert (foreground complement to background VAPID push).
  *
- * v2 ships real background push delivery (VAPID web-push, `orders_app`
- * audience — see lib/push.ts + the order-created Inngest fanout). This in-app
- * watcher remains the IN-FOREGROUND complement: it beeps + toasts while the
- * app is open/focused, where a background OS push may be suppressed or
- * deduplicated. The two are intentionally layered, not redundant.
+ * The parent passes the id of the NEWEST order in the confirmed-only list.
+ * When a new order id appears that wasn't there on the previous poll tick, we
+ * beep (Web Audio API) and show a toast. The first observation after mount
+ * establishes a silent baseline so we don't alert on orders that already
+ * existed when the app opened.
+ *
+ * Why latestOrderId (not latestPendingId): with the confirmed-only filter
+ * active on the orders PWA, unconfirmed pending+unpaid online orders are
+ * excluded from the list. Tracking the newest order in the response (which
+ * is sorted newest-first) catches both:
+ *   - COD orders landing as status=pending (no online Payment row — included)
+ *   - Online orders arriving as status=confirmed after payment succeeds
+ *
+ * Background push (VAPID, `orders_app` audience) is the primary out-of-band
+ * delivery path when the app is closed/backgrounded — see lib/push.ts and
+ * the order-created Inngest fanout. This component is the in-foreground layer.
  */
-export function NewOrderWatcher({ latestPendingId }: { latestPendingId: string | null }) {
+export function NewOrderWatcher({ latestOrderId }: { latestOrderId: string | null }) {
   const { notify } = useToast();
   const { t } = useLanguage();
   const seenRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (!latestPendingId) return;
+    if (!latestOrderId) return;
 
-    // First observation establishes the baseline silently — we don't beep for
-    // orders that already existed when the app opened.
+    // First observation after mount — establish baseline silently.
     if (!initializedRef.current) {
-      seenRef.current = latestPendingId;
+      seenRef.current = latestOrderId;
       initializedRef.current = true;
       return;
     }
 
-    if (latestPendingId !== seenRef.current) {
-      seenRef.current = latestPendingId;
+    if (latestOrderId !== seenRef.current) {
+      seenRef.current = latestOrderId;
       notify(t.orders.newOrderToast, 'success');
       beep();
     }
-  }, [latestPendingId, notify, t.orders.newOrderToast]);
+  }, [latestOrderId, notify, t.orders.newOrderToast]);
 
   return null;
 }

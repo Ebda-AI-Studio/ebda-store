@@ -132,6 +132,12 @@ export default function OrdersListPage() {
           limit: String(pagination.limit),
           from: resolved.from,
           to: resolved.to,
+          // Orders PWA is a fulfillment tool — staff should only see orders
+          // that are actionable: COD orders (any status) and confirmed/paid
+          // online orders. Unconfirmed online orders (pending + unpaid, customer
+          // hasn't paid yet) are not fulfillable and clutter the list. The API
+          // filters these out server-side when confirmedOnly=1 is present.
+          confirmedOnly: '1',
         });
         const apiStatus = filterToApiStatus(filter);
         if (apiStatus) qs.set('status', apiStatus);
@@ -195,10 +201,19 @@ export default function OrdersListPage() {
     return list;
   }, [orders, filter, search]);
 
-  // Newest pending order drives the new-order alert.
-  const latestPendingId = useMemo(() => {
-    const pending = orders.filter(o => o.status === 'pending');
-    return pending.length > 0 ? pending[0].id : null;
+  // Newest order id drives the in-app new-order alert (NewOrderWatcher).
+  //
+  // With the confirmed-only filter active, pending unconfirmed online orders
+  // are excluded from the list — so watching for `status === 'pending'` would
+  // never fire. Instead we watch the newest order in the response (orders are
+  // already sorted newest-first by the API). When a new order appears at the
+  // top, NewOrderWatcher beeps + toasts.
+  //
+  // COD orders arrive as status=pending and ARE included (no online Payment row).
+  // Confirmed/paid online orders arrive as status=confirmed. Both are "new" to
+  // a fulfillment operator and should trigger the alert.
+  const latestOrderId = useMemo(() => {
+    return orders.length > 0 ? orders[0].id : null;
   }, [orders]);
 
   // ── Pagination helpers ────────────────────────────────────────────────────
@@ -296,7 +311,7 @@ export default function OrdersListPage() {
   return (
     <div className="min-h-dvh pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
       <AppHeader />
-      <NewOrderWatcher latestPendingId={latestPendingId} />
+      <NewOrderWatcher latestOrderId={latestOrderId} />
 
       <main className="mx-auto max-w-2xl px-4 pt-4">
         <InstallPrompt />

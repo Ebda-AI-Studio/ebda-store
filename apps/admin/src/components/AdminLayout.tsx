@@ -151,6 +151,7 @@ export function AdminLayout({
     newsletter: t('hubTabs.newsletter'),
     affiliates: t('hubTabs.affiliates'),
     abandonedCarts: t('hubTabs.abandonedCarts'),
+    paymentAbandonments: t('hubTabs.paymentAbandonments'),
     // Settings tabs
   };
 

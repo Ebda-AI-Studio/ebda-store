@@ -42,8 +42,9 @@ describe('Feature Registry', () => {
     // 2026-05-21: 22 keys (added floating_widget).
     // 2026-05-27: 36 keys (added 7 inventory.* + 7 accounting.* sub-features
     //   for the 3-tier plan system — see packages/shared/src/plan-baselines.ts).
-    it('has exactly 36 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(36);
+    // 2026-06-22: 37 keys (added payment_abandonment Enterprise feature).
+    it('has exactly 37 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(37);
     });
   });
 
