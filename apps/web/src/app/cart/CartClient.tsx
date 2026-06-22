@@ -20,6 +20,7 @@ import {
   pageTextScale,
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
+import { useLastListing } from '../../hooks/useLastListing';
 
 export default function CartClient() {
   const {
@@ -85,6 +86,7 @@ export default function CartClient() {
     cta: cartZoneStyle(cartCtaZone),
   };
   const { language, t } = useLanguage();
+  const continuShoppingHref = useLastListing();
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
@@ -584,7 +586,7 @@ export default function CartClient() {
                   {/* Continue Shopping */}
                   <div className="mt-8">
                     <Link
-                      href={storeUrl('/products')}
+                      href={continuShoppingHref}
                       className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                     >
                       <svg

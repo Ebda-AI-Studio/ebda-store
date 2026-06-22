@@ -23,6 +23,7 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { OrderSummary } from './OrderSummary';
+import { useLastListing } from '../../hooks/useLastListing';
 
 // Lazy-load the payment step component (includes PaymentIcons SVGs)
 // so it is only fetched when the user advances past the shipping form.
@@ -108,6 +109,7 @@ export default function CheckoutClient() {
     (store?.settings?.checkoutLabel as string | undefined) ?? 'Secure Checkout';
   const checkoutLabelAr = (store?.settings?.checkoutLabelAr as string | undefined) ?? 'دفع آمن';
   const storeUrl = useStoreUrl();
+  const continueShoppingHref = useLastListing();
   const { items: cartContextItems, total: cartContextTotal, isReady: cartIsReady } = useCart();
   const { language, t } = useLanguage();
   const [step, setStep] = useState(1);
@@ -1090,7 +1092,7 @@ export default function CheckoutClient() {
               '\u0623\u0636\u0641 \u0628\u0639\u0636 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0642\u0628\u0644 \u0625\u062a\u0645\u0627\u0645 \u0627\u0644\u062f\u0641\u0639.'
             )}
           </p>
-          <Link href={storeUrl('/products')}>
+          <Link href={continueShoppingHref}>
             <Button className="mt-6">
               {t('Continue Shopping', translations['Continue Shopping'])}
             </Button>

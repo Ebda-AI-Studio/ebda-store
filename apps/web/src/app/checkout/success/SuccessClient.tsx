@@ -12,6 +12,7 @@ import { trackPurchase } from '../../../components/MarketingPixels';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
 import { formatDate } from '@/lib/format-date';
+import { useLastListing } from '../../../hooks/useLastListing';
 
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway
@@ -31,6 +32,7 @@ function SuccessContent() {
   // audit trail — authorization rides on the order UUID, not this value.
   const returnPaymentId = searchParams?.get('paymentId') || searchParams?.get('Id') || undefined;
   const storeUrl = useStoreUrl();
+  const continueShoppingHref = useLastListing();
   const { store } = useStore();
   const { clearCart } = useCart();
   const { t, language } = useLanguage();
@@ -358,7 +360,7 @@ function SuccessContent() {
                 </Button>
               </Link>
             ) : (
-              <Link href={storeUrl('/products')}>
+              <Link href={continueShoppingHref}>
                 <Button size="lg">
                   {t(
                     'Continue Shopping',

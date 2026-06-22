@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { type Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '@/contexts/StoreContext';
@@ -16,6 +17,7 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import type { CategoriesPageSettings } from '@force/shared';
+import { recordLastListing } from '@/lib/last-listing';
 
 interface CategoriesClientProps {
   categories: Category[];
@@ -56,6 +58,16 @@ export default function CategoriesClient({
   const catDensity = pageDensityStyle(catPage?.density);
 
   const templateCategories = categories.map(toTemplateCategory);
+
+  // Record this page as the last-browsed listing so "Continue Shopping" in
+  // the cart returns the shopper here instead of /products.
+  useEffect(() => {
+    const path = window.location.pathname + window.location.search;
+    const storePrefix = store?.slug && store.id !== 'demo' ? `/${store.slug}` : '';
+    const relative =
+      storePrefix && path.startsWith(storePrefix) ? path.slice(storePrefix.length) : path;
+    recordLastListing(store?.id, relative || '/categories');
+  }, [store?.id, store?.slug]);
 
   return (
     <ShopChrome>

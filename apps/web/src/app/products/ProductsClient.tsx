@@ -29,6 +29,7 @@ import {
 import { ProductListItem } from './ProductListItem';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
+import { recordLastListing } from '@/lib/last-listing';
 
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
@@ -205,6 +206,20 @@ export default function ProductsClient({
     );
     setCompareIds(ids);
   }, []);
+
+  // Record this listing page as the shopper's last-browsed category/PLP so
+  // the "Continue Shopping" button in the cart can return them here.
+  // We capture pathname+search (store-relative) on mount; the storeUrl() call
+  // in useLastListing re-applies the correct prefix at read time.
+  useEffect(() => {
+    const path = window.location.pathname + window.location.search;
+    // Strip the platform slug prefix (/<slug>/...) to store a store-relative path.
+    // useStoreUrl() will re-apply it when the href is built in useLastListing.
+    const storePrefix = store?.slug && store.id !== 'demo' ? `/${store.slug}` : '';
+    const relative =
+      storePrefix && path.startsWith(storePrefix) ? path.slice(storePrefix.length) : path;
+    recordLastListing(store?.id, relative || '/products');
+  }, [store?.id, store?.slug]);
 
   // Track previous filter values to detect filter changes vs. page changes.
   // perPage is treated as a filter so increasing it snaps the user back to
