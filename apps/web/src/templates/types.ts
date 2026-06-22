@@ -752,6 +752,9 @@ export interface CartTableItem {
   price: number;
   quantity: number;
   image?: string;
+  /** Resolved variant label (e.g. "Red / Large") for display on the cart row. */
+  variantTitle?: string;
+  variantTitleAr?: string;
 }
 
 /**

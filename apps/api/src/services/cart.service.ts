@@ -12,6 +12,7 @@ export class CartService {
           product: {
             include: { images: { take: 1, orderBy: { position: 'asc' } } },
           },
+          variant: { select: { id: true, title: true, titleAr: true } },
         },
       },
     } as const;
@@ -421,9 +422,13 @@ export class CartService {
         data: { storeId, sessionId: guestSessionId, customerId },
       }));
 
-    // Merge items
+    // Merge items — match on BOTH productId and variantId so a red-large variant
+    // and a red-small variant (same product, different variants) stay as separate
+    // lines instead of incorrectly merging into one.
     for (const guestItem of guestCart.items) {
-      const existingItem = userCart?.items.find(item => item.productId === guestItem.productId);
+      const existingItem = userCart?.items.find(
+        item => item.productId === guestItem.productId && item.variantId === guestItem.variantId
+      );
 
       if (existingItem) {
         await prisma.cartItem.update({
@@ -435,6 +440,7 @@ export class CartService {
           data: {
             cartId: targetCart.id,
             productId: guestItem.productId,
+            variantId: guestItem.variantId ?? null,
             quantity: guestItem.quantity,
           },
         });

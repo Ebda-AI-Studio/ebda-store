@@ -378,8 +378,8 @@ describe('CartService', () => {
       sessionId: 'guest-session',
       customerId: null,
       items: [
-        { id: 'guest-item-1', productId: 'prod-1', quantity: 2 },
-        { id: 'guest-item-2', productId: 'prod-2', quantity: 1 },
+        { id: 'guest-item-1', productId: 'prod-1', variantId: null, quantity: 2 },
+        { id: 'guest-item-2', productId: 'prod-2', variantId: null, quantity: 1 },
       ],
     };
 
@@ -388,7 +388,7 @@ describe('CartService', () => {
       storeId: mockStoreId,
       sessionId: 'user-session',
       customerId: mockCustomerId,
-      items: [{ id: 'user-item-1', productId: 'prod-1', quantity: 3 }],
+      items: [{ id: 'user-item-1', productId: 'prod-1', variantId: null, quantity: 3 }],
     };
 
     beforeEach(() => {
@@ -411,11 +411,13 @@ describe('CartService', () => {
         data: { quantity: 5 }, // 3 + 2
       });
 
-      // prod-2 only in guest - should create
+      // prod-2 only in guest - should create (with variantId so uniqueness is
+      // correctly enforced at the DB level by the partial unique indexes)
       expect(prisma.cartItem.create).toHaveBeenCalledWith({
         data: {
           cartId: mockUserCart.id,
           productId: 'prod-2',
+          variantId: null,
           quantity: 1,
         },
       });

@@ -70,6 +70,11 @@ export default function ModernCartTable({
                 >
                   {displayName}
                 </Link>
+                {(item.variantTitle || item.variantTitleAr) && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
+                  </p>
+                )}
                 <p
                   className="mt-1 text-sm font-medium text-primary tabular-nums"
                   style={typography?.price}

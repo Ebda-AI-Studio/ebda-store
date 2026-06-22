@@ -54,6 +54,11 @@ export default function BoldCartTable({
                   >
                     {displayName}
                   </Link>
+                  {(item.variantTitle || item.variantTitleAr) && (
+                    <p className="mt-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
+                    </p>
+                  )}
                   <p
                     className="mt-1 text-sm font-bold uppercase tracking-wider text-primary tabular-nums"
                     style={typography?.price}

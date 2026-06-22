@@ -407,6 +407,8 @@ export default function CartClient() {
                         price: item.price,
                         quantity: item.quantity,
                         image: item.image,
+                        variantTitle: item.variantTitle,
+                        variantTitleAr: item.variantTitleAr,
                       }))}
                       isRtl={language === 'ar'}
                       currency={store.currency}
@@ -471,6 +473,13 @@ export default function CartClient() {
                                 >
                                   {language === 'ar' && item.nameAr ? item.nameAr : item.name}
                                 </h3>
+                                {(item.variantTitle || item.variantTitleAr) && (
+                                  <p className="mt-0.5 text-sm text-muted-foreground">
+                                    {language === 'ar' && item.variantTitleAr
+                                      ? item.variantTitleAr
+                                      : item.variantTitle}
+                                  </p>
+                                )}
                                 <p
                                   className="mt-1 text-base font-bold text-muted-foreground sm:text-lg"
                                   data-zone="productPrice"

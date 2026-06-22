@@ -54,6 +54,11 @@ export default function ElegantCartTable({
                   >
                     {displayName}
                   </Link>
+                  {(item.variantTitle || item.variantTitleAr) && (
+                    <p className="mt-0.5 text-xs tracking-wide text-muted-foreground">
+                      {isRtl && item.variantTitleAr ? item.variantTitleAr : item.variantTitle}
+                    </p>
+                  )}
                   <p
                     className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums"
                     style={typography?.price}

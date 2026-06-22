@@ -20,6 +20,9 @@ export interface CartItem {
   slug: string;
   category?: string;
   variantId?: string;
+  /** Resolved variant label (e.g. "Red / Large") for display on the cart page. */
+  variantTitle?: string;
+  variantTitleAr?: string;
 }
 
 // Shape returned by GET /public/cart
@@ -37,6 +40,7 @@ interface ServerCartItem {
     images?: Array<{ id: string; url: string; alt?: string | null }>;
     categories?: Array<{ category: { name?: string; nameAr?: string } }>;
   };
+  variant?: { id: string; title: string; titleAr?: string | null } | null;
 }
 
 interface CartContextType {
@@ -78,6 +82,8 @@ function mapServerItem(item: ServerCartItem): CartItem {
     slug: item.product.slug,
     category: item.product.categories?.[0]?.category?.name,
     variantId: item.variantId ?? undefined,
+    variantTitle: item.variant?.title ?? undefined,
+    variantTitleAr: item.variant?.titleAr ?? undefined,
   };
 }
 
