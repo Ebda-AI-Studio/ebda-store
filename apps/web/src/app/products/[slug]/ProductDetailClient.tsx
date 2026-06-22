@@ -751,6 +751,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 cardFrameColor={productCardDefaults?.cardFrameColor}
                 showLabel={productCardDefaults?.showLabel}
                 showHover={productCardDefaults?.showHover}
+                cardImageAspect={productCardDefaults?.cardImageAspect}
+                cardImageRadius={productCardDefaults?.cardImageRadius}
+                showCardName={productCardDefaults?.showCardName}
+                showCardPrice={productCardDefaults?.showCardPrice}
                 urlPrefix={storeUrl('')}
                 onAddToCart={async productId => {
                   const found = relatedProducts.find(x => x.id === productId);

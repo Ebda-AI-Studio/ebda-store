@@ -747,6 +747,29 @@ export interface AnnouncementSectionSettings
  * the homepage edge; merchants couldn't change PLP card density or
  * frame color without a code change.
  */
+/**
+ * Image aspect-ratio choices for product/category card image wrappers.
+ * Separate from CardAspect which drives the carousel layout; these apply
+ * specifically to the image container inside the card.
+ *   '1:1'  → square (default compact-ecommerce baseline)
+ *   '4:5'  → fashion portrait
+ *   '3:4'  → tall portrait (lookbook / clothing)
+ *   '16:9' → wide landscape (lifestyle / banner)
+ *   'auto' → natural — no forced ratio, image fills its natural height
+ */
+export type CardImageAspect = '1:1' | '4:5' | '3:4' | '16:9' | 'auto';
+
+/**
+ * Corner-radius scale for card image wrappers. Controls the `border-radius`
+ * of the image container (not the card frame — that's cardFrameStyle).
+ *   'none' → no rounding (sharp corners)
+ *   'sm'   → slight rounding (4px)
+ *   'md'   → moderate rounding (8px, compact-ecommerce default)
+ *   'lg'   → prominent rounding (16px)
+ *   'full' → pill / circle (max border-radius, for circle-style cards)
+ */
+export type CardImageRadius = 'none' | 'sm' | 'md' | 'lg' | 'full';
+
 export interface ProductCardDefaults {
   cardSize?: CardSize;
   cardAspect?: CardAspect;
@@ -768,6 +791,32 @@ export interface ProductCardDefaults {
    * appear on per-section product-grid cards. Added 2026-05-19 (Wave 3A).
    */
   typography?: SectionTypographyOverride;
+  /**
+   * Item 8 — per-card image aspect ratio for card image wrappers.
+   * When set, overrides the template's default aspect on the card image container.
+   * Applies to product cards on PLP / carousels / category listings.
+   * Default undefined → template decides (existing behavior preserved).
+   */
+  cardImageAspect?: CardImageAspect;
+  /**
+   * Item 8 — per-card image corner radius for card image wrappers.
+   * When set, overrides the card's default border-radius on the image container.
+   * Default undefined → theme/template decides (existing behavior preserved).
+   */
+  cardImageRadius?: CardImageRadius;
+  /**
+   * Item 9 — show / hide the product name below the card image.
+   * Default undefined / true → name always visible (current behavior).
+   * When false, the name is hidden on all card surfaces.
+   */
+  showCardName?: boolean;
+  /**
+   * Item 9 — show / hide the product price below the card image.
+   * Composes with the store-level `showPriceOnCards` flag (StoreTheme):
+   * either flag being false suppresses the price.
+   * Default undefined / true → price visible (current behavior).
+   */
+  showCardPrice?: boolean;
 }
 
 export interface StoreLayoutSettings {

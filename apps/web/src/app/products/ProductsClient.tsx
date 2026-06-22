@@ -607,6 +607,10 @@ export default function ProductsClient({
                       cardFrameColor={productCardDefaults?.cardFrameColor}
                       showLabel={productCardDefaults?.showLabel}
                       showHover={productCardDefaults?.showHover}
+                      cardImageAspect={productCardDefaults?.cardImageAspect}
+                      cardImageRadius={productCardDefaults?.cardImageRadius}
+                      showCardName={productCardDefaults?.showCardName}
+                      showCardPrice={productCardDefaults?.showCardPrice}
                       productNameZone={plpProductNameZone}
                       productPriceZone={plpProductPriceZone}
                       productCtaZone={plpProductCtaZone}

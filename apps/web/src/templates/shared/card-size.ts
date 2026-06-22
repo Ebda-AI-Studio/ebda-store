@@ -13,6 +13,8 @@ import type {
   CardFrameSize,
   CardFrameWidth,
   CardGap,
+  CardImageAspect,
+  CardImageRadius,
   CardShape,
   CardSize,
 } from '@force/shared';
@@ -267,4 +269,54 @@ export function gridColsClass(
     desktop === 2 ? 'lg:grid-cols-2' : desktop === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4';
 
   return `${mobileCls} ${smCls} ${mdCls} ${lgCls}`;
+}
+
+/**
+ * Item 8 — card image aspect override.
+ * Maps the merchant's chosen CardImageAspect → a Tailwind aspect-ratio class
+ * for the image wrapper div inside a product card.
+ * Returns '' when undefined so the template's own default applies.
+ *
+ * Static-string enumeration so Tailwind JIT keeps every class.
+ */
+export function cardImageAspectClass(aspect: CardImageAspect | undefined): string {
+  switch (aspect) {
+    case '1:1':
+      return 'aspect-square';
+    case '4:5':
+      return 'aspect-[4/5]';
+    case '3:4':
+      return 'aspect-[3/4]';
+    case '16:9':
+      return 'aspect-video';
+    case 'auto':
+      return '';
+    default:
+      return '';
+  }
+}
+
+/**
+ * Item 8 — card image corner-radius override.
+ * Maps the merchant's chosen CardImageRadius → a Tailwind border-radius class
+ * applied on the image wrapper div.
+ * Returns '' when undefined so the template's own rounding applies.
+ *
+ * Static-string enumeration so Tailwind JIT keeps every class.
+ */
+export function cardImageRadiusClass(radius: CardImageRadius | undefined): string {
+  switch (radius) {
+    case 'none':
+      return 'rounded-none';
+    case 'sm':
+      return 'rounded';
+    case 'md':
+      return 'rounded-lg';
+    case 'lg':
+      return 'rounded-2xl';
+    case 'full':
+      return 'rounded-full';
+    default:
+      return '';
+  }
 }

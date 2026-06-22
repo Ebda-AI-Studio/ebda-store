@@ -2137,6 +2137,173 @@ export default function StoreLayoutPage() {
                       className="h-5 w-5 cursor-pointer accent-primary"
                     />
                   </label>
+                  {/* Item 6 — price visibility store-wide */}
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-foreground">
+                        Show price on cards
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Display the price below every product card. Turn off to hide prices
+                        store-wide (e.g. wholesale or inquiry-only stores).
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={
+                        pendingThemeUpdates.showPriceOnCards ??
+                        storeInfo?.theme?.showPriceOnCards !== false
+                      }
+                      onChange={e =>
+                        setPendingThemeUpdates(prev => ({
+                          ...prev,
+                          showPriceOnCards: e.target.checked,
+                        }))
+                      }
+                      className="h-5 w-5 cursor-pointer accent-primary"
+                    />
+                  </label>
+                  {/* Item 10 — image normalization */}
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-foreground">
+                        Normalize product images
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Force all card images to fill their container uniformly (object-fit: cover).
+                        Creates a consistent grid look when product photos have mixed dimensions.
+                        Images are never modified — toggle off to revert.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={
+                        pendingThemeUpdates.normalizeProductImages ??
+                        storeInfo?.theme?.normalizeProductImages === true
+                      }
+                      onChange={e =>
+                        setPendingThemeUpdates(prev => ({
+                          ...prev,
+                          normalizeProductImages: e.target.checked,
+                        }))
+                      }
+                      className="h-5 w-5 cursor-pointer accent-primary"
+                    />
+                  </label>
+                  {/* Items 8 + 9 — image aspect, radius, label visibility */}
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+                    <p className="text-sm font-semibold text-foreground">Card image shape</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">
+                          Image aspect ratio
+                        </label>
+                        <select
+                          value={layout.productCardDefaults?.cardImageAspect ?? ''}
+                          onChange={e =>
+                            setLayout(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    productCardDefaults: {
+                                      ...(prev.productCardDefaults ?? {}),
+                                      cardImageAspect:
+                                        (e.target
+                                          .value as import('@force/shared').CardImageAspect) ||
+                                        undefined,
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="">Theme default</option>
+                          <option value="1:1">Square (1:1)</option>
+                          <option value="4:5">Portrait (4:5)</option>
+                          <option value="3:4">Tall portrait (3:4)</option>
+                          <option value="16:9">Landscape (16:9)</option>
+                          <option value="auto">Auto (no constraint)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">
+                          Corner radius
+                        </label>
+                        <select
+                          value={layout.productCardDefaults?.cardImageRadius ?? ''}
+                          onChange={e =>
+                            setLayout(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    productCardDefaults: {
+                                      ...(prev.productCardDefaults ?? {}),
+                                      cardImageRadius:
+                                        (e.target
+                                          .value as import('@force/shared').CardImageRadius) ||
+                                        undefined,
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="">Theme default</option>
+                          <option value="none">None (sharp)</option>
+                          <option value="sm">Small</option>
+                          <option value="md">Medium</option>
+                          <option value="lg">Large</option>
+                          <option value="full">Full (circle)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-2 pt-1">
+                      <label className="flex items-center justify-between gap-4 cursor-pointer">
+                        <span className="text-sm text-foreground">Show product name</span>
+                        <input
+                          type="checkbox"
+                          checked={layout.productCardDefaults?.showCardName !== false}
+                          onChange={e =>
+                            setLayout(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    productCardDefaults: {
+                                      ...(prev.productCardDefaults ?? {}),
+                                      showCardName: e.target.checked,
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className="h-4 w-4 cursor-pointer accent-primary"
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-4 cursor-pointer">
+                        <span className="text-sm text-foreground">Show product price</span>
+                        <input
+                          type="checkbox"
+                          checked={layout.productCardDefaults?.showCardPrice !== false}
+                          onChange={e =>
+                            setLayout(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    productCardDefaults: {
+                                      ...(prev.productCardDefaults ?? {}),
+                                      showCardPrice: e.target.checked,
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className="h-4 w-4 cursor-pointer accent-primary"
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -2326,7 +2493,13 @@ export default function StoreLayoutPage() {
           //    behavior — Ahmad 2026-05-20: "smart palette does apply
           //    automatically i don't want this".
           const hasThemeUpdates = Object.keys(themeUpdates).some(
-            k => !['showBrandBadge', 'showQuickAdd'].includes(k)
+            k =>
+              ![
+                'showBrandBadge',
+                'showQuickAdd',
+                'showPriceOnCards',
+                'normalizeProductImages',
+              ].includes(k)
           );
           if (hasThemeUpdates) {
             setPendingThemeUpdates(prev => ({ ...prev, ...themeUpdates }));

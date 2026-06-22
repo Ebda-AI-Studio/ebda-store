@@ -17,7 +17,10 @@ import {
   productSizeClass,
   cardAspectClass,
   cardShapeClasses,
+  cardImageAspectClass,
+  cardImageRadiusClass,
 } from './card-size';
+import { getProductPricing } from '../../lib/product-pricing';
 import { productCardPropsEqual } from './product-card-memo';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
@@ -77,6 +80,11 @@ function PecannbeeProductCardImpl({
   productPriceZone,
   productCtaZone,
   priority,
+  // Items 8/9 — image controls + label visibility
+  cardImageAspect,
+  cardImageRadius,
+  showCardName,
+  showCardPrice,
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -92,6 +100,25 @@ function PecannbeeProductCardImpl({
     `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+
+  // Item 8 — per-card image aspect + radius overrides.
+  const imgAspectCls = cardImageAspectClass(cardImageAspect);
+  const imgRadiusCls = cardImageRadiusClass(cardImageRadius);
+
+  // Items 6 / 9 — price visibility: store-level master toggle + per-card flag.
+  const showPriceOnCards = store.theme?.showPriceOnCards !== false;
+  const priceVisible = showPriceOnCards && showCardPrice !== false;
+
+  // Item 9 — name visibility.
+  const nameVisible = showCardName !== false;
+
+  // Item 10 — image normalization flag. When on, object-fit: cover + neutral bg
+  // ensure a uniform grid look regardless of source image proportions.
+  const normalizeImages = store.theme?.normalizeProductImages === true;
+
+  // Variant-aware pricing: use getProductPricing so hasVariants shows "From X"
+  // and we don't show the parent's stale standalone price when variants exist.
+  const pricing = getProductPricing(product, undefined, 'card');
 
   const inStock = product.inStock !== false;
   const onSale = !!(product.compareAtPrice && product.compareAtPrice > product.price);
@@ -154,13 +181,11 @@ function PecannbeeProductCardImpl({
         prefetch={false}
         className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        {/* Image: mobile 1:1 (square reads cleaner in tight 2-up grids),
-            desktop 3:4 portrait per design.md canonical product image
-            size 600×800. PecannbeeProductCard is the PLP / search /
-            category-listing card; per-store cardAspect on the homepage
-            carousels lives on theme-specific ProductCards instead. */}
+        {/* Image: item 8 — aspect+radius driven by per-store cardImageAspect/cardImageRadius;
+            falls back to the mobile-square / desktop-portrait theme default. Item 10 —
+            when normalizeImages is on, object-fill bg ensures transparent PNGs read cleanly. */}
         <div
-          className={`relative overflow-hidden bg-muted ${aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {img ? (
             <>
@@ -170,9 +195,10 @@ function PecannbeeProductCardImpl({
                 fill
                 priority={priority}
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
-                className={`object-cover transition-opacity duration-500 ${
+                className={`${normalizeImages ? 'object-cover' : 'object-cover'} transition-opacity duration-500 ${
                   showHover !== false && product.images?.[1]?.url ? 'group-hover/img:opacity-0' : ''
                 }`}
+                style={normalizeImages ? { objectFit: 'cover' } : undefined}
               />
               {showHover !== false && product.images?.[1]?.url && (
                 <Image
@@ -265,71 +291,77 @@ function PecannbeeProductCardImpl({
         className={`flex flex-1 flex-col ${textSizes.gap} ${textSizes.pad} ${styles.productCardBody ?? ''}`}
       >
         {/* showLabel gates the entire name + price + tax block. When false the
-            card shows image + CTA only — useful for icon-style catalog grids
-            where the merchant wants a minimal card. Defaults to visible (undefined
-            treated as true) to preserve existing behavior. */}
-        {showLabel !== false && (
+            card shows image + CTA only — useful for icon-style catalog grids.
+            Items 6/9: within the block, nameVisible (showCardName) and
+            priceVisible (showPriceOnCards + showCardPrice) gate each sub-element
+            independently so a merchant can show name-only or price-only. */}
+        {showLabel !== false && (nameVisible || priceVisible) && (
           <>
-            <Link
-              href={href}
-              prefetch={false}
-              className="focus:outline-none focus-visible:underline"
-            >
-              <p
-                id={`prod-${product.id}-name`}
-                data-zone="productName"
-                className={`line-clamp-2 font-semibold ${textSizes.name} ${styles.productCardName}`}
-                style={{
-                  textWrap: 'balance',
-                  fontFamily: productNameZone?.fontFamily,
-                  fontSize: responsiveFontSize(productNameZone?.fontSize),
-                  fontWeight: productNameZone?.fontWeight,
-                  color: productNameZone?.color,
-                  letterSpacing: productNameZone?.letterSpacing,
-                  lineHeight: productNameZone?.lineHeight,
-                  textTransform:
-                    productNameZone?.textTransform as React.CSSProperties['textTransform'],
-                }}
-                itemProp="name"
+            {nameVisible && (
+              <Link
+                href={href}
+                prefetch={false}
+                className="focus:outline-none focus-visible:underline"
               >
-                {name}
-              </p>
-            </Link>
-            <div
-              className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
-            >
-              <span
-                itemProp="offers"
-                itemScope
-                itemType="https://schema.org/Offer"
-                className="contents"
-              >
-                <meta itemProp="priceCurrency" content={currency} />
-                <meta itemProp="price" content={String(product.price / 1000)} />
-                <span
-                  data-zone="productPrice"
-                  className={`font-bold tabular-nums ${textSizes.price} ${styles.productCardPrice}`}
+                <p
+                  id={`prod-${product.id}-name`}
+                  data-zone="productName"
+                  className={`line-clamp-2 font-semibold ${textSizes.name} ${styles.productCardName}`}
                   style={{
-                    fontFamily: productPriceZone?.fontFamily,
-                    fontSize: responsiveFontSize(productPriceZone?.fontSize),
-                    fontWeight: productPriceZone?.fontWeight,
-                    color: productPriceZone?.color,
-                    letterSpacing: productPriceZone?.letterSpacing,
-                    lineHeight: productPriceZone?.lineHeight,
+                    textWrap: 'balance',
+                    fontFamily: productNameZone?.fontFamily,
+                    fontSize: responsiveFontSize(productNameZone?.fontSize),
+                    fontWeight: productNameZone?.fontWeight,
+                    color: productNameZone?.color,
+                    letterSpacing: productNameZone?.letterSpacing,
+                    lineHeight: productNameZone?.lineHeight,
                     textTransform:
-                      productPriceZone?.textTransform as React.CSSProperties['textTransform'],
+                      productNameZone?.textTransform as React.CSSProperties['textTransform'],
                   }}
+                  itemProp="name"
                 >
-                  {(product.price / 1000).toFixed(3)} {currency}
+                  {name}
+                </p>
+              </Link>
+            )}
+            {priceVisible && (
+              <div
+                className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+              >
+                <span
+                  itemProp="offers"
+                  itemScope
+                  itemType="https://schema.org/Offer"
+                  className="contents"
+                >
+                  <meta itemProp="priceCurrency" content={currency} />
+                  <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
+                  <span
+                    data-zone="productPrice"
+                    className={`font-bold tabular-nums ${textSizes.price} ${styles.productCardPrice}`}
+                    style={{
+                      fontFamily: productPriceZone?.fontFamily,
+                      fontSize: responsiveFontSize(productPriceZone?.fontSize),
+                      fontWeight: productPriceZone?.fontWeight,
+                      color: productPriceZone?.color,
+                      letterSpacing: productPriceZone?.letterSpacing,
+                      lineHeight: productPriceZone?.lineHeight,
+                      textTransform:
+                        productPriceZone?.textTransform as React.CSSProperties['textTransform'],
+                    }}
+                  >
+                    {pricing.mode === 'fromMin' ? `${isRtl ? 'من ' : 'From '}` : ''}
+                    {(pricing.displayPrice / 1000).toFixed(3)} {currency}
+                  </span>
                 </span>
-              </span>
-              {onSale && product.compareAtPrice && (
-                <span className="text-sm text-muted-foreground line-through">
-                  {(product.compareAtPrice / 1000).toFixed(3)}
-                </span>
-              )}
-            </div>
-            <TaxInclusiveLabel className="block text-xs text-muted-foreground" />
+                {pricing.displayCompare && (
+                  <span className="text-sm text-muted-foreground line-through">
+                    {(pricing.displayCompare / 1000).toFixed(3)}
+                  </span>
+                )}
+              </div>
+            )}
+            {priceVisible && <TaxInclusiveLabel className="block text-xs text-muted-foreground" />}
           </>
         )}
 

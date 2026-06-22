@@ -11,6 +11,8 @@ import {
   cardFrameSizeClass,
   cardAspectClass,
   cardShapeClasses,
+  cardImageAspectClass,
+  cardImageRadiusClass,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
@@ -53,6 +55,11 @@ function MinimalProductCard({
   cardFrameSize,
   cardFrameColor,
   priority,
+  // Items 8/9
+  cardImageAspect,
+  cardImageRadius,
+  showCardName,
+  showCardPrice,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -66,6 +73,16 @@ function MinimalProductCard({
   // then theme default (mobile square / desktop portrait).
   const shape = cardShapeClasses(cardShape);
   const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
+
+  // Item 8 — per-card image aspect + radius.
+  const imgAspectCls = cardImageAspectClass(cardImageAspect);
+  const imgRadiusCls = cardImageRadiusClass(cardImageRadius);
+  // Items 6 / 9 — price + name visibility.
+  const showPriceOnCards = store.theme?.showPriceOnCards !== false;
+  const priceVisible = showPriceOnCards && showCardPrice !== false;
+  const nameVisible = showCardName !== false;
+  // Item 10 — normalize images.
+  const normalizeImages = store.theme?.normalizeProductImages === true;
 
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
@@ -96,7 +113,7 @@ function MinimalProductCard({
         {/* Image — PC-3: aspect driven by cardShape/cardAspect; falls back to
             mobile-square / desktop-portrait theme default. */}
         <div
-          className={`relative overflow-hidden bg-muted/30 mb-3 ${aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted/30 mb-3 ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {/* Platform-level OOS ribbon — minimal pack stays chrome-free
               elsewhere, but the OOS state needs unambiguous communication
@@ -135,6 +152,7 @@ function MinimalProductCard({
               src={product.images[0].url}
               alt={isRtl && product.nameAr ? product.nameAr : product.name}
               className="w-full h-full object-cover group-hover:opacity-85 transition-opacity duration-700 ease-out"
+              style={normalizeImages ? { objectFit: 'cover' } : undefined}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               priority={priority}
@@ -204,40 +222,47 @@ function MinimalProductCard({
         </div>
 
         {/* Text — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
-        {showLabel !== false && (
+        {showLabel !== false && (nameVisible || priceVisible) && (
           <div
             className={`flex flex-col gap-2 ${textSizes.pad} ${isRtl ? 'text-right' : 'text-left'}`}
           >
-            <h3
-              id={`prod-${product.id}-name`}
-              data-zone="productName"
-              className={`${textSizes.name} tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug`}
-              itemProp="name"
-            >
-              {isRtl && product.nameAr ? product.nameAr : product.name}
-            </h3>
+            {nameVisible && (
+              <h3
+                id={`prod-${product.id}-name`}
+                data-zone="productName"
+                className={`${textSizes.name} tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug`}
+                itemProp="name"
+              >
+                {isRtl && product.nameAr ? product.nameAr : product.name}
+              </h3>
+            )}
+            {/* schema meta always rendered for SEO */}
             <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
               <meta itemProp="priceCurrency" content={currency} />
               <meta itemProp="price" content={String(pricing.displayPrice / 1000)} />
             </span>
-            <Price
-              price={pricing.displayPrice}
-              compareAtPrice={pricing.displayCompare ?? undefined}
-              fromPrefix={pricing.mode === 'fromMin'}
-              currency={currency}
-              isRtl={isRtl}
-              size="sm"
-              showDiscount={false}
-              className={`${textSizes.price} tracking-wide font-light text-muted-foreground tabular-nums`}
-            />
+            {priceVisible && (
+              <Price
+                price={pricing.displayPrice}
+                compareAtPrice={pricing.displayCompare ?? undefined}
+                fromPrefix={pricing.mode === 'fromMin'}
+                currency={currency}
+                isRtl={isRtl}
+                size="sm"
+                showDiscount={false}
+                className={`${textSizes.price} tracking-wide font-light text-muted-foreground tabular-nums`}
+              />
+            )}
             {/* Discount indicator — minimal pack stays chrome-free, so use a
               short uppercase 'sale' label inline rather than a badge box. */}
-            {hasSale && (
+            {priceVisible && hasSale && (
               <p className="text-[10px] tracking-[0.25em] uppercase text-foreground/80">
                 {isRtl ? 'تخفيض' : 'Sale'}
               </p>
             )}
-            <TaxInclusiveLabel className="block text-[10px] tracking-wide font-light text-muted-foreground/70" />
+            {priceVisible && (
+              <TaxInclusiveLabel className="block text-[10px] tracking-wide font-light text-muted-foreground/70" />
+            )}
           </div>
         )}
       </Link>

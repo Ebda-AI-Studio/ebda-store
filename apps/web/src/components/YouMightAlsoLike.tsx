@@ -137,6 +137,10 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
         cardFrameColor={productCardDefaults?.cardFrameColor}
         showLabel={productCardDefaults?.showLabel}
         showHover={productCardDefaults?.showHover}
+        cardImageAspect={productCardDefaults?.cardImageAspect}
+        cardImageRadius={productCardDefaults?.cardImageRadius}
+        showCardName={productCardDefaults?.showCardName}
+        showCardPrice={productCardDefaults?.showCardPrice}
         urlPrefix={storeUrl('')}
         onAddToCart={handleAddToCart}
       />

@@ -550,6 +550,10 @@ export function HomePageContent({
                       layout.newArrivals.cardFrameColor ||
                       layout.productCardDefaults?.cardFrameColor
                     }
+                    cardImageAspect={layout.productCardDefaults?.cardImageAspect}
+                    cardImageRadius={layout.productCardDefaults?.cardImageRadius}
+                    showCardName={layout.productCardDefaults?.showCardName}
+                    showCardPrice={layout.productCardDefaults?.showCardPrice}
                     headingZone={newArrivalsHeadingZone}
                     kickerZone={newArrivalsKickerZone}
                     subtitleZone={newArrivalsSubtitleZone}
@@ -634,6 +638,10 @@ export function HomePageContent({
                       layout.bestSellers.cardFrameColor ||
                       layout.productCardDefaults?.cardFrameColor
                     }
+                    cardImageAspect={layout.productCardDefaults?.cardImageAspect}
+                    cardImageRadius={layout.productCardDefaults?.cardImageRadius}
+                    showCardName={layout.productCardDefaults?.showCardName}
+                    showCardPrice={layout.productCardDefaults?.showCardPrice}
                     headingZone={bestSellersHeadingZone}
                     kickerZone={bestSellersKickerZone}
                     subtitleZone={bestSellersSubtitleZone}
@@ -893,6 +901,10 @@ export function HomePageContent({
                   cardFrameWidth={extra.cardFrameWidth}
                   cardFrameSize={extra.cardFrameSize}
                   cardFrameColor={extra.cardFrameColor}
+                  cardImageAspect={layout.productCardDefaults?.cardImageAspect}
+                  cardImageRadius={layout.productCardDefaults?.cardImageRadius}
+                  showCardName={layout.productCardDefaults?.showCardName}
+                  showCardPrice={layout.productCardDefaults?.showCardPrice}
                   sectionBgColor={extra.bgColor}
                 />
               </section>

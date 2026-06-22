@@ -234,6 +234,27 @@ export interface StoreTheme {
   hideFooterLogoMobile?: boolean;
 
   /**
+   * Item 6 — master price-on-cards visibility toggle. When false, no product card
+   * anywhere on the storefront shows a price (name + CTA still render). Default
+   * true — hiding all prices is a bigger surprise than showing them, so new stores
+   * default to showing prices. Merchants who run "inquiry-only" or B2B flows can
+   * opt out here. Wired in Page Builder → Product cards. 2026-06-22.
+   */
+  showPriceOnCards?: boolean;
+
+  /**
+   * Item 10 — image normalization template. When true, every product image on the
+   * storefront renders with object-fit: cover inside the per-surface fixed aspect
+   * ratio (from productCardDefaults.cardImageAspect / productDetailPage.imageAspect).
+   * A neutral bg-muted fill shows behind transparent PNGs so a grid looks like
+   * "one photographer shot it all". PURE CSS render-layer only — the original
+   * image is NEVER mutated or re-uploaded. Revert = set this flag false to restore
+   * native rendering. Default false — opt-in because it changes existing grid
+   * appearance for stores whose images have mixed natural ratios. 2026-06-22.
+   */
+  normalizeProductImages?: boolean;
+
+  /**
    * AI-first autopilot. When ON (the default), the platform auto-fills a
    * product's empty AI-writable fields (Arabic name/description, SEO meta)
    * on create/update and on the 3-day sweep, and generates recommendations

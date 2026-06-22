@@ -11,6 +11,8 @@ import {
   cardFrameSizeClass,
   cardAspectClass,
   cardShapeClasses,
+  cardImageAspectClass,
+  cardImageRadiusClass,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
@@ -52,6 +54,11 @@ function BoldProductCard({
   cardFrameSize,
   cardFrameColor,
   priority,
+  // Items 8/9
+  cardImageAspect,
+  cardImageRadius,
+  showCardName,
+  showCardPrice,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -66,6 +73,16 @@ function BoldProductCard({
   // then bold theme default (aspect-square per brand identity).
   const shape = cardShapeClasses(cardShape);
   const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
+
+  // Item 8 — per-card image aspect + radius.
+  const imgAspectCls = cardImageAspectClass(cardImageAspect);
+  const imgRadiusCls = cardImageRadiusClass(cardImageRadius);
+  // Items 6 / 9 — price + name visibility.
+  const showPriceOnCards = store.theme?.showPriceOnCards !== false;
+  const priceVisible = showPriceOnCards && showCardPrice !== false;
+  const nameVisible = showCardName !== false;
+  // Item 10 — normalize images.
+  const normalizeImages = store.theme?.normalizeProductImages === true;
 
   const discount = calculateDiscount(product.price, product.compareAtPrice);
 
@@ -97,7 +114,9 @@ function BoldProductCard({
       >
         {/* Image — PC-3: aspect driven by cardShape/cardAspect; bold theme
             default stays aspect-square to preserve the streetwear brand identity. */}
-        <div className={`relative overflow-hidden bg-muted ${aspectOverride || 'aspect-square'}`}>
+        <div
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square'}`}
+        >
           {/* Platform-level OOS ribbon (red, prominent) — same visual
               across every theme (2026-05-16). */}
           <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
@@ -124,6 +143,7 @@ function BoldProductCard({
                 'object-cover transition-transform duration-300 ease-out',
                 isHovered && 'scale-[1.05]'
               )}
+              style={normalizeImages ? { objectFit: 'cover' } : undefined}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               priority={priority}
@@ -191,30 +211,37 @@ function BoldProductCard({
         </div>
 
         {/* Content — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
-        {showLabel !== false && (
+        {showLabel !== false && (nameVisible || priceVisible) && (
           <div className={`flex flex-col gap-2 ${textSizes.pad}`}>
-            <h3
-              id={`prod-${product.id}-name`}
-              data-zone="productName"
-              className={`font-black ${textSizes.name} uppercase tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200`}
-              itemProp="name"
-            >
-              {isRtl && product.nameAr ? product.nameAr : product.name}
-            </h3>
+            {nameVisible && (
+              <h3
+                id={`prod-${product.id}-name`}
+                data-zone="productName"
+                className={`font-black ${textSizes.name} uppercase tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200`}
+                itemProp="name"
+              >
+                {isRtl && product.nameAr ? product.nameAr : product.name}
+              </h3>
+            )}
+            {/* schema meta always rendered for SEO */}
             <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
               <meta itemProp="priceCurrency" content={currency} />
               <meta itemProp="price" content={String(product.price / 1000)} />
             </span>
-            <Price
-              price={product.price}
-              compareAtPrice={product.compareAtPrice}
-              currency={currency}
-              isRtl={isRtl}
-              size="lg"
-              showDiscount={false}
-              className={`font-black tabular-nums ${textSizes.price}`}
-            />
-            <TaxInclusiveLabel className="block text-xs uppercase tracking-wide text-muted-foreground" />
+            {priceVisible && (
+              <Price
+                price={product.price}
+                compareAtPrice={product.compareAtPrice}
+                currency={currency}
+                isRtl={isRtl}
+                size="lg"
+                showDiscount={false}
+                className={`font-black tabular-nums ${textSizes.price}`}
+              />
+            )}
+            {priceVisible && (
+              <TaxInclusiveLabel className="block text-xs uppercase tracking-wide text-muted-foreground" />
+            )}
           </div>
         )}
       </Link>

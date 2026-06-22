@@ -11,6 +11,8 @@ import {
   cardFrameSizeClass,
   cardAspectClass,
   cardShapeClasses,
+  cardImageAspectClass,
+  cardImageRadiusClass,
 } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
@@ -54,6 +56,11 @@ function ModernProductCard({
   cardFrameSize,
   cardFrameColor,
   priority = false,
+  // Items 8/9
+  cardImageAspect,
+  cardImageRadius,
+  showCardName,
+  showCardPrice,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
@@ -69,6 +76,17 @@ function ModernProductCard({
   // then theme default (mobile square / desktop portrait).
   const shape = cardShapeClasses(cardShape);
   const aspectOverride = shape.aspect || cardAspectClass(cardAspect);
+
+  // Item 8 — per-card image aspect + radius overrides.
+  const imgAspectCls = cardImageAspectClass(cardImageAspect);
+  const imgRadiusCls = cardImageRadiusClass(cardImageRadius);
+
+  // Items 6 / 9 — price + name visibility.
+  const showPriceOnCards = store.theme?.showPriceOnCards !== false;
+  const priceVisible = showPriceOnCards && showCardPrice !== false;
+  const nameVisible = showCardName !== false;
+  // Item 10 — image normalization.
+  const normalizeImages = store.theme?.normalizeProductImages === true;
 
   const discount = calculateDiscount(product.price, product.compareAtPrice);
   // Localized name for alt text + display. Falls through to English when
@@ -115,9 +133,9 @@ function ModernProductCard({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Image Container */}
+        {/* Image Container — item 8: aspect+radius from admin overrides. */}
         <div
-          className={`relative overflow-hidden bg-muted ${aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {product.images?.[0]?.url ? (
             <>
@@ -128,6 +146,7 @@ function ModernProductCard({
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 priority={priority}
+                style={normalizeImages ? { objectFit: 'cover' } : undefined}
               />
               {/* Second image on hover */}
               {showHover !== false && product.images[1]?.url && (
@@ -264,33 +283,36 @@ function ModernProductCard({
             />
           )}
 
-          {showLabel !== false && (
+          {showLabel !== false && (nameVisible || priceVisible) && (
             <>
-              <h3
-                id={`prod-${product.id}-name`}
-                data-zone="productName"
-                className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 leading-snug tracking-tight ${isRtl ? 'text-right' : ''}`}
-                itemProp="name"
-              >
-                {isRtl && product.nameAr ? product.nameAr : product.name}
-              </h3>
-
-              <div className="mt-auto pt-1 tabular-nums">
-                <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
-                  <meta itemProp="priceCurrency" content={currency} />
-                  <meta itemProp="price" content={String(product.price / 1000)} />
-                </span>
-                <Price
-                  price={product.price}
-                  compareAtPrice={product.compareAtPrice}
-                  currency={currency}
-                  isRtl={isRtl}
-                  size="md"
-                  showDiscount={false}
-                  className={textSizes.price}
-                />
-                <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
-              </div>
+              {nameVisible && (
+                <h3
+                  id={`prod-${product.id}-name`}
+                  data-zone="productName"
+                  className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 leading-snug tracking-tight ${isRtl ? 'text-right' : ''}`}
+                  itemProp="name"
+                >
+                  {isRtl && product.nameAr ? product.nameAr : product.name}
+                </h3>
+              )}
+              {priceVisible && (
+                <div className="mt-auto pt-1 tabular-nums">
+                  <span itemProp="offers" itemScope itemType="https://schema.org/Offer">
+                    <meta itemProp="priceCurrency" content={currency} />
+                    <meta itemProp="price" content={String(product.price / 1000)} />
+                  </span>
+                  <Price
+                    price={product.price}
+                    compareAtPrice={product.compareAtPrice}
+                    currency={currency}
+                    isRtl={isRtl}
+                    size="md"
+                    showDiscount={false}
+                    className={textSizes.price}
+                  />
+                  <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
+                </div>
+              )}
             </>
           )}
         </div>

@@ -14,6 +14,8 @@ import {
   cardShapeClasses,
   gridGapClass,
   productSizeClass,
+  cardImageAspectClass,
+  cardImageRadiusClass,
 } from './card-size';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
@@ -73,6 +75,11 @@ export function ProductCarousel({
   productCtaZone,
   dividers,
   sectionBgColor,
+  // Items 8/9 — image controls + label visibility
+  cardImageAspect,
+  cardImageRadius,
+  showCardName,
+  showCardPrice,
 }: ProductCarouselProps) {
   const styles = getPackStyles(pack);
   const sizeCap = productSizeClass(cardSize);
@@ -90,6 +97,20 @@ export function ProductCarousel({
   // Match PecannbeeProductCard + 4/5 theme cards so the same product isn't square
   // in a carousel but portrait in a category grid (audit: ratio consistency).
   const aspectCls = shape.aspect || cardAspectClass(cardAspect) || 'aspect-square sm:aspect-[3/4]';
+
+  // Item 8 — per-card image aspect + radius overrides.
+  const imgAspectCls = cardImageAspectClass(cardImageAspect);
+  const imgRadiusCls = cardImageRadiusClass(cardImageRadius);
+  // Effective image aspect: explicit override wins, else shape/carousel default.
+  const effectiveAspectCls = imgAspectCls || aspectCls;
+
+  // Items 6 / 9 — price visibility: store-level toggle + per-card flag.
+  const showPriceOnCards = store.theme?.showPriceOnCards !== false;
+  const priceVisible = showPriceOnCards && showCardPrice !== false;
+  // Item 9 — name visibility.
+  const nameVisible = showCardName !== false;
+  // Item 10 — normalize images flag.
+  const normalizeImages = store.theme?.normalizeProductImages === true;
   const scrollRef = useRef<HTMLUListElement>(null);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
@@ -299,7 +320,7 @@ export function ProductCarousel({
                       className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       <div
-                        className={`group/img relative ${aspectCls} ${shape.radius} overflow-hidden bg-muted`}
+                        className={`group/img relative ${effectiveAspectCls} ${imgRadiusCls || shape.radius} overflow-hidden bg-muted`}
                       >
                         <OutOfStockRibbon inStock={inStock} isRtl={isRtl} />
                         {/* Sprint 2: NEW orange pill top-START when new OR
@@ -333,6 +354,7 @@ export function ProductCarousel({
                                   ? 'group-hover/img:opacity-0'
                                   : ''
                               }`}
+                              style={normalizeImages ? { objectFit: 'cover' } : undefined}
                             />
                             {showHover && product.images?.[1]?.url && (
                               <Image
@@ -413,53 +435,89 @@ export function ProductCarousel({
                           chrome offender. Whole block hides when the
                           merchant turns 'Show label' off in admin
                           (cardless / image-only product strips). */}
-                      {showLabel && (
-                        <div
-                          className={`${textSizes.pad} space-y-2 ${styles.productCardBody ?? ''}`}
-                        >
-                          <p
-                            className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}
-                            data-zone="productName"
-                            style={{
-                              fontFamily: productNameZone?.fontFamily,
-                              fontSize: responsiveFontSize(productNameZone?.fontSize),
-                              fontWeight: productNameZone?.fontWeight,
-                              color: productNameZone?.color,
-                              letterSpacing: productNameZone?.letterSpacing,
-                              lineHeight: productNameZone?.lineHeight,
-                              textTransform:
-                                productNameZone?.textTransform as React.CSSProperties['textTransform'],
-                            }}
-                          >
-                            {name}
-                          </p>
-                          <div
-                            className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
-                          >
-                            <span
-                              className={`${textSizes.price} ${styles.productCardPrice}`}
-                              data-zone="productPrice"
-                              style={{
-                                fontFamily: productPriceZone?.fontFamily,
-                                fontSize: responsiveFontSize(productPriceZone?.fontSize),
-                                fontWeight: productPriceZone?.fontWeight,
-                                color: productPriceZone?.color,
-                                letterSpacing: productPriceZone?.letterSpacing,
-                                lineHeight: productPriceZone?.lineHeight,
-                                textTransform:
-                                  productPriceZone?.textTransform as React.CSSProperties['textTransform'],
-                              }}
+                      {showLabel &&
+                        (nameVisible || priceVisible) &&
+                        (() => {
+                          // Variant-aware pricing for carousel cards.
+                          const carouselPricing = (() => {
+                            const variants = product.variants ?? [];
+                            const prices = variants
+                              .map(v => v.price)
+                              .filter((p): p is number => typeof p === 'number');
+                            const minVariantPrice = prices.length > 0 ? Math.min(...prices) : null;
+                            const hasVariants = variants.length > 0;
+                            if (hasVariants && minVariantPrice !== null) {
+                              const maxP = Math.max(...prices);
+                              return {
+                                mode: minVariantPrice === maxP ? 'single' : 'fromMin',
+                                displayPrice: minVariantPrice,
+                                displayCompare: null as number | null,
+                              };
+                            }
+                            return {
+                              mode: 'single',
+                              displayPrice: product.price,
+                              displayCompare:
+                                product.compareAtPrice && product.compareAtPrice > product.price
+                                  ? product.compareAtPrice
+                                  : (null as number | null),
+                            };
+                          })();
+                          return (
+                            <div
+                              className={`${textSizes.pad} space-y-2 ${styles.productCardBody ?? ''}`}
                             >
-                              {(product.price / 1000).toFixed(3)} {currency}
-                            </span>
-                            {onSale && product.compareAtPrice && (
-                              <span className="text-sm text-muted-foreground line-through">
-                                {(product.compareAtPrice / 1000).toFixed(3)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                              {nameVisible && (
+                                <p
+                                  className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}
+                                  data-zone="productName"
+                                  style={{
+                                    fontFamily: productNameZone?.fontFamily,
+                                    fontSize: responsiveFontSize(productNameZone?.fontSize),
+                                    fontWeight: productNameZone?.fontWeight,
+                                    color: productNameZone?.color,
+                                    letterSpacing: productNameZone?.letterSpacing,
+                                    lineHeight: productNameZone?.lineHeight,
+                                    textTransform:
+                                      productNameZone?.textTransform as React.CSSProperties['textTransform'],
+                                  }}
+                                >
+                                  {name}
+                                </p>
+                              )}
+                              {priceVisible && (
+                                <div
+                                  className={`flex items-baseline gap-2 ${styles.productCardBody ? 'justify-center' : ''}`}
+                                >
+                                  <span
+                                    className={`${textSizes.price} ${styles.productCardPrice}`}
+                                    data-zone="productPrice"
+                                    style={{
+                                      fontFamily: productPriceZone?.fontFamily,
+                                      fontSize: responsiveFontSize(productPriceZone?.fontSize),
+                                      fontWeight: productPriceZone?.fontWeight,
+                                      color: productPriceZone?.color,
+                                      letterSpacing: productPriceZone?.letterSpacing,
+                                      lineHeight: productPriceZone?.lineHeight,
+                                      textTransform:
+                                        productPriceZone?.textTransform as React.CSSProperties['textTransform'],
+                                    }}
+                                  >
+                                    {carouselPricing.mode === 'fromMin'
+                                      ? `${isRtl ? 'من ' : 'From '}`
+                                      : ''}
+                                    {(carouselPricing.displayPrice / 1000).toFixed(3)} {currency}
+                                  </span>
+                                  {carouselPricing.displayCompare && (
+                                    <span className="text-sm text-muted-foreground line-through">
+                                      {(carouselPricing.displayCompare / 1000).toFixed(3)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                     </Link>
                     {/* Platform-level dual CTA: variant products → View link
                         to PDP, single-variant products → Add to cart. OOS

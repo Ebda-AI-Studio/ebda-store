@@ -468,6 +468,14 @@ export interface ProductCarouselProps {
    * Pass the raw value (hex OR 'token:<name>').
    */
   sectionBgColor?: string;
+  /** Item 8 — per-card image aspect ratio for the card image wrapper. */
+  cardImageAspect?: import('@force/shared').CardImageAspect;
+  /** Item 8 — per-card image corner radius for the card image wrapper. */
+  cardImageRadius?: import('@force/shared').CardImageRadius;
+  /** Item 9 — show/hide the product name on carousel cards. Default true. */
+  showCardName?: boolean;
+  /** Item 9 — show/hide the product price on carousel cards. Default true. */
+  showCardPrice?: boolean;
 }
 
 /**
@@ -616,6 +624,28 @@ export interface ProductCardProps {
   productNameZone?: ResolvedZone;
   productPriceZone?: ResolvedZone;
   productCtaZone?: ResolvedZone;
+  /**
+   * Item 8 — per-card image aspect ratio override. When set, overrides the
+   * template's default aspect on the card image wrapper (1:1 / 4:5 / 3:4 /
+   * 16:9 / auto). Sourced from productCardDefaults.cardImageAspect.
+   */
+  cardImageAspect?: import('@force/shared').CardImageAspect;
+  /**
+   * Item 8 — per-card image corner radius override. Applied on the image
+   * wrapper div. Sourced from productCardDefaults.cardImageRadius.
+   */
+  cardImageRadius?: import('@force/shared').CardImageRadius;
+  /**
+   * Item 9 — show / hide the product name below the card image.
+   * Default undefined / true → name always visible.
+   */
+  showCardName?: boolean;
+  /**
+   * Item 9 — show / hide the product price below the card image.
+   * Composes with store.theme.showPriceOnCards; either being false hides price.
+   * Default undefined / true → price visible.
+   */
+  showCardPrice?: boolean;
 }
 
 /**
