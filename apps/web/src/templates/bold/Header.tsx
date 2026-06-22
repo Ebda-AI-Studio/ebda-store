@@ -198,7 +198,10 @@ export default function BoldHeader({
 
           {/* Mobile persistent search bar — pecannbee target. Always visible
               under the logo row on mobile, hidden on md+. */}
-          <div className="hidden pb-3 border-t border-white/10 pt-3" data-zone="mobile-search">
+          <div
+            className="block md:hidden pb-3 border-t border-white/10 pt-3"
+            data-zone="mobile-search"
+          >
             <form onSubmit={handleSearch} className="relative">
               <svg
                 className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-white/50 pointer-events-none`}
