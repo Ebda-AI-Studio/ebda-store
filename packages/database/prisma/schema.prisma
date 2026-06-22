@@ -697,10 +697,16 @@ model Product {
   status               ProductStatus @default(draft)
   featured             Boolean       @default(false)
   isNew                Boolean       @default(false) @map("is_new")
+  // Merchant-set display position within the New Arrivals carousel.
+  // 0 = unordered (falls back to createdAt desc). Set via the reorder admin page.
+  newArrivalPosition   Int           @default(0) @map("new_arrival_position")
   // Manually curated by the store admin — drives the storefront's
   // "Best Sellers" carousel. Independent of actual order data so a merchant
   // can stage products at launch before any sales data exists.
   isBestSeller         Boolean       @default(false) @map("is_best_seller")
+  // Merchant-set display position within the Best Sellers carousel.
+  // 0 = unordered (falls back to createdAt desc). Set via the reorder admin page.
+  bestSellerPosition   Int           @default(0) @map("best_seller_position")
   viewCount            Int           @default(0) @map("view_count")
   metaTitle            String?       @map("meta_title")
   metaTitleAr          String?       @map("meta_title_ar")
@@ -777,6 +783,10 @@ model Product {
   // schema doesn't know about the index and `prisma migrate dev` will
   // try to drop it on every diff.
   @@index([storeId, isBestSeller])
+  // Carousel position indexes — filtered on the flag so only flagged rows
+  // participate (matches the partial indexes in migration 20260622150000).
+  @@index([storeId, isNew, newArrivalPosition])
+  @@index([storeId, isBestSeller, bestSellerPosition])
   // Storefront list query: store-scoped, soft-delete-aware, newest-first.
   // Created in 20260501030000_perf_indexes.
   @@index([storeId, deletedAt, createdAt(sort: Desc)])

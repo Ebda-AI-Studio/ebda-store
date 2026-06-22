@@ -110,6 +110,7 @@ The Page Builder is the single destination for all storefront design and layout 
 - **Hero banner** — manage slides (image + headline + CTA). The legacy `/hero` page has been retired and redirects here; all previous hero content is available as slides.
 - **Featured categories** — which 4-6 show on the home page
 - **Featured products** — which appear in the "Bestsellers" carousel
+- **Carousel order** — control the exact display order of your New Arrivals and Best Sellers carousels from **Admin → Products → Order New Arrivals / Order Best Sellers**. Mark products as New Arrival or Best Seller on the product edit page first, then drag/move them into your preferred sequence. (ترتيب عرض منتجات قسمَي "الوصول الجديد" و"الأكثر مبيعاً" — المنتجات → ترتيب الوصول الجديد / ترتيب الأكثر مبيعاً)
 - **Testimonials** — customer reviews shown on the home page
 - **Storefront Navigation** — add, remove, or reorder header navigation links
 - **Footer links** — configure footer link groups and social media handles

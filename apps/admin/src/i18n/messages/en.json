@@ -409,7 +409,9 @@
       "toolbar": {
         "addProduct": "Add Product",
         "bulkImport": "Bulk Import",
-        "backToStore": "Back to Store"
+        "backToStore": "Back to Store",
+        "orderNewArrivals": "Order New Arrivals",
+        "orderBestSellers": "Order Best Sellers"
       },
       "filters": {
         "ariaLabel": "Filter products by status",
@@ -771,6 +773,48 @@
       "errors": {
         "createFailed": "Failed to create product. Please try again."
       }
+    },
+    "newArrivalsOrder": {
+      "title": "New Arrivals Order",
+      "subtitle": "Set the display order of products in the New Arrivals carousel",
+      "backToProducts": "Back to Products",
+      "save": "Save Order",
+      "saving": "Saving…",
+      "saveSuccess": "New Arrivals order saved",
+      "saveFailed": "Failed to save order",
+      "connectionError": "Unable to connect to the server",
+      "fetchFailed": "Failed to load products",
+      "empty": "No New Arrivals products",
+      "emptyDescription": "Mark products as “New Arrival” on the product edit page, then return here to set their display order.",
+      "goToProducts": "Go to Products",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "unsavedChanges": "You have unsaved changes. Save before leaving.",
+      "productCount": "{count} products",
+      "sku": "SKU: {sku}",
+      "inactive": "Inactive",
+      "retry": "Retry"
+    },
+    "bestSellersOrder": {
+      "title": "Best Sellers Order",
+      "subtitle": "Set the display order of products in the Best Sellers carousel",
+      "backToProducts": "Back to Products",
+      "save": "Save Order",
+      "saving": "Saving…",
+      "saveSuccess": "Best Sellers order saved",
+      "saveFailed": "Failed to save order",
+      "connectionError": "Unable to connect to the server",
+      "fetchFailed": "Failed to load products",
+      "empty": "No Best Sellers products",
+      "emptyDescription": "Mark products as “Best Seller” on the product edit page, then return here to set their display order.",
+      "goToProducts": "Go to Products",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "unsavedChanges": "You have unsaved changes. Save before leaving.",
+      "productCount": "{count} products",
+      "sku": "SKU: {sku}",
+      "inactive": "Inactive",
+      "retry": "Retry"
     }
   },
   "orders": {

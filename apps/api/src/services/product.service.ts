@@ -841,13 +841,27 @@ export class ProductService {
       where.isBestSeller = true;
     }
 
+    // `sort=newest` is used by the New Arrivals homepage carousel — filter to
+    // isNew=true so the carousel only shows products the merchant has explicitly
+    // flagged as new arrivals.
+    if (sort === 'newest') {
+      where.isNew = true;
+    }
+
     let orderBy: Prisma.ProductOrderByWithRelationInput | Prisma.ProductOrderByWithRelationInput[] =
       {
         createdAt: 'desc',
       };
     if (sort === 'price_asc') orderBy = { price: 'asc' };
     else if (sort === 'price_desc') orderBy = { price: 'desc' };
-    else if (sort === 'best_seller') orderBy = [{ featured: 'desc' }, { updatedAt: 'desc' }];
+    // Best Sellers: order by merchant-set bestSellerPosition ASC, then createdAt
+    // DESC as a stable tiebreaker for products that share the default position (0).
+    // `featured` was the old tiebreaker but position is more predictable.
+    else if (sort === 'best_seller')
+      orderBy = [{ bestSellerPosition: 'asc' }, { createdAt: 'desc' }];
+    // New Arrivals: order by merchant-set newArrivalPosition ASC, then createdAt
+    // DESC so newly-flagged products appear naturally until the merchant reorders.
+    else if (sort === 'newest') orderBy = [{ newArrivalPosition: 'asc' }, { createdAt: 'desc' }];
     // When no explicit sort is requested AND we're filtering by a known single
     // category, use the merchant-defined per-category product order. Prisma
     // cannot order Product rows by a join-table column directly, so we query
