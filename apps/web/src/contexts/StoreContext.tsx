@@ -427,6 +427,12 @@ export function useStoreUrl() {
   return useCallback(
     (path: string) => {
       if (!prefix) return path;
+      // Bare base (`''` or `'/'`) → the prefix itself, WITHOUT a trailing slash.
+      // Callers use storeUrl('') as a `urlPrefix` and then build `${urlPrefix}/cart`,
+      // so a trailing slash here produced `/<slug>//cart` on the platform host
+      // (custom domains were unaffected because prefix is ''). `/<slug>` is also
+      // the canonical store-root route, so storeUrl('/') maps there cleanly.
+      if (path === '' || path === '/') return prefix;
       // Don't double-prefix
       if (path.startsWith(prefix)) return path;
       return `${prefix}${path.startsWith('/') ? path : `/${path}`}`;
