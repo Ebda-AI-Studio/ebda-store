@@ -10,6 +10,15 @@ export function OrderCard({ order, storeId }: { order: Order; storeId: string })
   const { t, locale } = useLanguage();
   const itemCount = order.items?.reduce((sum, i) => sum + (i.quantity ?? 0), 0) ?? 0;
 
+  // Item 16: the customer NAME is the prominent OUTSIDE line; the order number is
+  // shrunk to a secondary line here and shown in full on the detail page. Guest
+  // orders (no name) fall back to the order ref as the primary line so the card
+  // never shows an empty heading.
+  const orderRef = order.orderNumber ?? order.id.slice(0, 8);
+  const name = customerName(order.customer, '');
+  const primaryLine = name || orderRef;
+  const secondaryRef = name ? orderRef : null;
+
   return (
     <Link
       href={`/orders/${order.id}?store=${storeId}`}
@@ -17,12 +26,12 @@ export function OrderCard({ order, storeId }: { order: Order; storeId: string })
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold leading-snug text-foreground">
-            {order.orderNumber ?? order.id.slice(0, 8)}
-          </p>
-          <p className="mt-0.5 truncate text-sm leading-snug text-muted-foreground">
-            {customerName(order.customer)}
-          </p>
+          <p className="truncate text-sm font-bold leading-snug text-foreground">{primaryLine}</p>
+          {secondaryRef && (
+            <p className="mt-0.5 truncate text-xs leading-snug text-muted-foreground">
+              {secondaryRef}
+            </p>
+          )}
         </div>
         <StatusBadge status={order.status} />
       </div>
