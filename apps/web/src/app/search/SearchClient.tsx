@@ -12,6 +12,7 @@ import { useCart } from '../../contexts/CartContext';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../templates/adapters';
 import { trackSearch } from '../../components/MarketingPixels';
+import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
 const sortValues = ['newest', 'price-asc', 'price-desc', 'name-asc'] as const;
 
@@ -214,23 +215,31 @@ function SearchContent() {
 
         {/* Search form */}
         <form onSubmit={handleSearch} role="search" className="mb-6">
-          <div className="flex gap-3 max-w-2xl mx-auto">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder={t(
-                'Search for products...',
-                '\u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a...'
-              )}
-              className="flex-1 px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
-            />
-            <button
-              type="submit"
-              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
-            >
-              {t('Search', translations['Search'])}
-            </button>
+          <div className="relative max-w-2xl mx-auto">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder={t(
+                  'Search for products...',
+                  '\u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a...'
+                )}
+                className="flex-1 px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background text-foreground"
+              />
+              <button
+                type="submit"
+                className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
+              >
+                {t('Search', translations['Search'])}
+              </button>
+            </div>
+            {/* Live autocomplete suggestions \u2014 same component as theme headers.
+                Absolutely positioned relative to this wrapper so it overlays
+                the page content below the input. Selecting a suggestion
+                navigates to the product page (handled inside the component);
+                the on-page results list continues to be driven by searchTerm. */}
+            <SearchAutocomplete query={searchTerm} onSelect={() => {}} />
           </div>
         </form>
 

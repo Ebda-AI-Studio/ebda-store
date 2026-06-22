@@ -240,7 +240,7 @@ export default function ElegantHeader({
         {/* Mobile persistent search bar — always visible under the logo
             row on mobile (pecannbee target). Hidden on md+ where the
             expandable search toggle in the actions row handles it. */}
-        <div className="block md:hidden pb-4 -mt-2" data-zone="mobile-search">
+        <div className="hidden pb-4 -mt-2" data-zone="mobile-search">
           <form onSubmit={handleSearch} className="relative">
             <svg
               className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-foreground/40 pointer-events-none`}

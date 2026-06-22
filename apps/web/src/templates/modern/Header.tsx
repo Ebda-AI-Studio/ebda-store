@@ -240,10 +240,7 @@ export default function ModernHeader({
               Inline magnifying-glass icon on the start side mirrors the
               pecannbee pill shape — single icon-in-input, no separate
               submit button on mobile (form still submits on Enter). */}
-          <div
-            className="block md:hidden pb-3 border-t border-border/40 pt-3"
-            data-zone="mobile-search"
-          >
+          <div className="hidden pb-3 border-t border-border/40 pt-3" data-zone="mobile-search">
             <form onSubmit={handleSearch} className="relative">
               <svg
                 className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} w-5 h-5 text-muted-foreground pointer-events-none`}
