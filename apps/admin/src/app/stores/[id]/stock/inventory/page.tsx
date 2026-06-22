@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { useT } from '@/i18n/useT';
@@ -52,12 +52,28 @@ const INVENTORY_PAGE_LIMIT = 100;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// Valid stock-status filter values that can arrive via ?filter= from KPI cards.
+type StockFilterParam = 'low_stock' | 'out_of_stock';
+
+function isStockFilterParam(v: string | null): v is StockFilterParam {
+  return v === 'low_stock' || v === 'out_of_stock';
+}
+
 export default function StockInventoryPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useT('stock.inventory');
   const tc = useT('common');
+
+  // ?filter= is set when navigating from a KPI card in InventoryStatsCards.
+  // Accepted values: 'low_stock' | 'out_of_stock'. Applied client-side so we
+  // avoid adding a new API param for a simple display filter.
+  const filterParam = searchParams.get('filter');
+  const activeStockFilter: StockFilterParam | null = isStockFilterParam(filterParam)
+    ? filterParam
+    : null;
 
   const [products, setProducts] = useState<ProductRow[] | null>(null);
   // Total SKUs matching the current filter (from API meta). Used to surface a
@@ -94,6 +110,20 @@ export default function StockInventoryPage() {
     if (term) qs.set('search', term);
     return `/api/v1/stores/${storeId}/products?${qs.toString()}`;
   };
+
+  // Client-side stock-status filter driven by the ?filter= query param set by
+  // KPI card navigation. The API fetches all products; we narrow the display
+  // here so the filter reacts instantly without a new network request.
+  const visibleProducts = useMemo(() => {
+    if (!products) return null;
+    if (!activeStockFilter) return products;
+    return products.filter(p => {
+      const onHand = p.hasVariants ? (p.totalInventory ?? 0) : p.inventory;
+      if (activeStockFilter === 'out_of_stock') return onHand === 0;
+      if (activeStockFilter === 'low_stock') return onHand > 0 && onHand <= p.lowStockThreshold;
+      return true;
+    });
+  }, [products, activeStockFilter]);
 
   // Whether every loaded product already allows backorder. Drives the
   // toggle button's label between "Enable all" and "Disable all".
@@ -198,9 +228,16 @@ export default function StockInventoryPage() {
   };
 
   // ─── Bulk low-stock-threshold ────────────────────────────────────────────
+  // allSelected / toggleSelectAll operate on visibleProducts so when the stock
+  // filter is active, "select all" only selects the visible (filtered) rows.
   const allSelected = useMemo(
-    () => Boolean(products && products.length > 0 && selectedIds.length === products.length),
-    [products, selectedIds]
+    () =>
+      Boolean(
+        visibleProducts &&
+        visibleProducts.length > 0 &&
+        selectedIds.length === visibleProducts.length
+      ),
+    [visibleProducts, selectedIds]
   );
 
   const toggleSelection = (id: string) => {
@@ -208,7 +245,7 @@ export default function StockInventoryPage() {
   };
 
   const toggleSelectAll = () => {
-    setSelectedIds(allSelected ? [] : (products ?? []).map(p => p.id));
+    setSelectedIds(allSelected ? [] : (visibleProducts ?? []).map(p => p.id));
   };
 
   const handleBulkSetThreshold = async () => {
@@ -307,24 +344,47 @@ export default function StockInventoryPage() {
           </div>
         )}
 
+        {/* Active stock-filter chip — shown when navigated here via a KPI card */}
+        {activeStockFilter && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <span>
+              Filtered:{' '}
+              <span className="font-medium text-foreground">
+                {activeStockFilter === 'low_stock' ? 'Low stock' : 'Out of stock'}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => router.replace(`/stores/${storeId}/stock/inventory`)}
+              className="ms-auto rounded border border-border px-2 py-0.5 hover:bg-muted transition-colors"
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
+
         {/* Loading skeleton while first fetch is in-flight */}
         {!products && !productsErr && (
           <div className="p-6 text-muted-foreground text-sm">{tc('loading')}</div>
         )}
 
-        {products && products.length === 0 && (
+        {visibleProducts && visibleProducts.length === 0 && (
           <p className="text-muted-foreground text-sm">{tc('noResults')}</p>
         )}
-        {products && products.length > 0 && (
+        {visibleProducts && visibleProducts.length > 0 && (
           <>
             {/* "Showing N of M" indicator — so a catalogue larger than the
                 page cap is never silently truncated. */}
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{t('showingCount', { shown: products.length, total: totalSkus })}</span>
+              <span>
+                {activeStockFilter
+                  ? `Showing ${visibleProducts.length} of ${products?.length ?? 0} products`
+                  : t('showingCount', { shown: visibleProducts.length, total: totalSkus })}
+              </span>
             </div>
-            {totalPages > 1 && (
+            {!activeStockFilter && totalPages > 1 && (
               <div className="mb-3 rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-                {t('truncatedNotice', { shown: products.length, total: totalSkus })}
+                {t('truncatedNotice', { shown: visibleProducts.length, total: totalSkus })}
               </div>
             )}
             <div className="rounded-xl border border-border overflow-hidden">
@@ -368,7 +428,7 @@ export default function StockInventoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(p => {
+                  {visibleProducts.map(p => {
                     // Variant products carry their stock on the variants, so the
                     // API returns a variant-aware `totalInventory`. Resolve On-Hand
                     // + low-stock colouring against that value.
@@ -395,12 +455,12 @@ export default function StockInventoryPage() {
                             <span className="truncate max-w-[10rem]">{p.name}</span>
                             {hasReorder && (
                               <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 shrink-0">
-                                🔴 {t('badgeReorder')}
+                                {t('badgeReorder')}
                               </span>
                             )}
                             {hasDead && (
                               <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 shrink-0">
-                                🟡 {t('badgeDeadstock')}
+                                {t('badgeDeadstock')}
                               </span>
                             )}
                           </div>
