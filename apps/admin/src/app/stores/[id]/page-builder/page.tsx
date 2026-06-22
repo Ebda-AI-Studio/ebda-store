@@ -117,7 +117,11 @@ export default function StoreLayoutPage() {
   // crops/shifts it (a real phone at 390px is fine). 'mobile' pins the iframe
   // to a true phone width (390px, centered); 'desktop' renders a wide canvas
   // (1280px) scaled to fit the pane so the desktop layout is shown un-cropped.
-  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
+  // Preview is mobile-only — Ahmad 2026-06-22 "remove the desktop preview, only
+  // mobile is great". The storefront is mobile-first and the desktop canvas added
+  // no value for the merchant's day-to-day editing. Pinned to a true phone width
+  // (390px, centered) so the mobile hero asset renders un-cropped.
+  const previewDevice = 'mobile' as const;
   // Smart Palette + future brand-token edits stage their theme updates here
   // instead of writing immediately to /theme. The main Save button flushes
   // these alongside layout + typography so the merchant has one source of
@@ -2351,35 +2355,6 @@ export default function StoreLayoutPage() {
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-foreground">Live preview</h3>
               <div className="flex items-center gap-2">
-                {/* Device toggle — mobile (true 390px phone width) / desktop
-                    (1280px canvas scaled to fit). Defaults to mobile so the
-                    hero isn't shown at the pane's broken in-between width. */}
-                <div className="inline-flex rounded-lg border border-border bg-card p-0.5 text-[11px] font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewDevice('mobile')}
-                    aria-pressed={previewDevice === 'mobile'}
-                    className={`rounded-md px-2.5 py-1 transition-colors ${
-                      previewDevice === 'mobile'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    📱 {t('preview.mobile') /* Mobile / جوال */}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewDevice('desktop')}
-                    aria-pressed={previewDevice === 'desktop'}
-                    className={`rounded-md px-2.5 py-1 transition-colors ${
-                      previewDevice === 'desktop'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    🖥 {t('preview.desktop') /* Desktop / سطح المكتب */}
-                  </button>
-                </div>
                 {previewUrl && (
                   <a
                     href={previewUrl}
@@ -2403,34 +2378,17 @@ export default function StoreLayoutPage() {
                   const iframeKey = `${previewUrl}#${previewRefreshTick}#${
                     previewDraftToken ?? ''
                   }#${previewDevice}`;
-                  if (previewDevice === 'mobile') {
-                    // True phone width — 390px (iPhone logical width), centered.
-                    return (
-                      <iframe
-                        key={iframeKey}
-                        src={src}
-                        title="Storefront preview (mobile)"
-                        className="block h-[calc(100vh-200px)] w-[390px] max-w-full bg-background"
-                        loading="lazy"
-                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                      />
-                    );
-                  }
-                  // Desktop — render a wide 1280px canvas and let the pane scroll
-                  // it horizontally. This shows the real desktop layout (≥ the
-                  // `lg` breakpoint) instead of the storefront wrapping down to
-                  // the narrow ~480px pane width. The merchant scrolls to pan.
+                  // Mobile-only preview — true phone width (390px, iPhone logical
+                  // width), centered. The desktop canvas was removed per Ahmad.
                   return (
-                    <div className="w-full overflow-x-auto">
-                      <iframe
-                        key={iframeKey}
-                        src={src}
-                        title="Storefront preview (desktop)"
-                        className="block h-[calc(100vh-200px)] w-[1280px] max-w-none bg-background"
-                        loading="lazy"
-                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                      />
-                    </div>
+                    <iframe
+                      key={iframeKey}
+                      src={src}
+                      title="Storefront preview (mobile)"
+                      className="block h-[calc(100vh-200px)] w-[390px] max-w-full bg-background"
+                      loading="lazy"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                    />
                   );
                 })()}
               </div>
