@@ -44,7 +44,24 @@
  * No ADMIN_PASSWORD needed — reuses the first super_admin already in the DB.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
+import type {
+  AccountType,
+  JournalEntrySource,
+  JournalEntryStatus,
+  ExpenseStatus,
+  SupplierPaymentTerms,
+  PurchaseOrderStatus,
+  StockAdjustmentType,
+  StockAdjustmentStatus,
+  BankTransactionDirection,
+  BankMatchStatus,
+  InventoryChangeType,
+  PaymentStatus,
+  ReturnStatus,
+  ReturnType,
+  RfmSegment,
+} from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -1248,7 +1265,12 @@ async function main() {
   console.log('\n[5/7] Seeding customers…');
 
   // Clear existing orders/reviews/loyalty for this store first
-  // (Order cascade removes order items and loyalty transactions)
+  // (Order cascade removes order items, payments, payment events, shipments,
+  //  backorder lines and loyalty transactions). Returns FK to orders WITHOUT
+  //  a cascade, so they (+ their items, which DO cascade) must be deleted
+  //  explicitly first — otherwise the order delete trips returns_order_id_fkey
+  //  on the second idempotent run (the enrichment block below creates returns).
+  await prisma.return.deleteMany({ where: { storeId: store.id } });
   await prisma.review.deleteMany({ where: { storeId: store.id } });
   await prisma.loyaltyTransaction.deleteMany({ where: { storeId: store.id } });
   await prisma.loyaltyPoints.deleteMany({ where: { storeId: store.id } });
@@ -2591,6 +2613,1541 @@ async function main() {
     },
   });
   console.log('  ✓ 1 HowTo entry ("How to Place an Order")');
+
+  // ════════════════════════════════════════════════════════════════════════
+  // EVERY-SUBSYSTEM ENRICHMENT  (added by feat/demo-store-full-seed)
+  //
+  // The blocks below populate the accounting, inventory, full order-scenario,
+  // payment-event, return, abandoned-cart, shipment, wishlist and analytics
+  // subsystems so that EVERY admin page + storefront surface renders real,
+  // believable data ("every data has a UI"). Each block is wrapped in
+  // try/catch so one schema mismatch can never abort the rest, and each is
+  // idempotent (delete-then-recreate scoped to THIS store only).
+  // ════════════════════════════════════════════════════════════════════════
+
+  // Running tally of what this enrichment pass created (printed in summary).
+  const enrich: Record<string, number> = {};
+
+  // Helper: pull a per-store sequence number (mirrors the Sequence model the
+  // accounting/inventory services use). We just need stable, unique, readable
+  // numbers for the demo — not the production FOR-UPDATE atomic path.
+  function pad(n: number, w = 4): string {
+    return String(n).padStart(w, '0');
+  }
+
+  // ── A. Registered customer Users (for returns / wishlists / RFM) ──────────
+  //   Returns.customerId + Wishlist.userId both FK to User (role=customer),
+  //   NOT the Customer model. Build one User per demo Customer, store-scoped
+  //   and idempotent via the (storeId,email) unique key.
+  const demoUsers: Array<{ id: string; firstName: string; lastName: string; email: string }> = [];
+  try {
+    const pwHash = await bcrypt.hash('DemoPass123!', 10);
+    for (let i = 0; i < createdCustomers.length; i++) {
+      const c = createdCustomers[i];
+      const email = `customer${i + 1}@demo.forcemediakw.com`;
+      const u = await prisma.user.upsert({
+        where: { storeId_email: { storeId: store.id, email } },
+        update: { firstName: c.firstName, lastName: c.lastName },
+        create: {
+          storeId: store.id,
+          email,
+          passwordHash: pwHash,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          role: 'customer',
+        },
+      });
+      demoUsers.push({ id: u.id, firstName: c.firstName, lastName: c.lastName, email });
+    }
+    enrich['customer user accounts'] = demoUsers.length;
+    console.log(`\n[enrich] ✓ ${demoUsers.length} registered customer accounts`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ customer user accounts skipped:', (e as Error).message);
+  }
+
+  // ── B. Product cost prices (drives COGS / P&L / dead-stock value) ─────────
+  //   Set a cost = ~55% of price on every product so margin/anomaly/dead-stock
+  //   reports have real numbers to compute from.
+  try {
+    let costed = 0;
+    for (const p of createdProducts) {
+      await prisma.product.update({
+        where: { id: p.id },
+        data: { costPrice: Math.round(p.price * 0.55) },
+      });
+      costed++;
+    }
+    enrich['product cost prices set'] = costed;
+    console.log(`[enrich] ✓ cost prices set on ${costed} products`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ cost prices skipped:', (e as Error).message);
+  }
+
+  // ── C. ACCOUNTING — chart of accounts, journal entries, expenses, P&L ─────
+  let accountIds: Record<string, string> = {};
+  try {
+    // Clean prior accounting rows for THIS store (order matters: lines→entries,
+    // expenses → accounts). Restrict FKs mean we delete children first.
+    await prisma.bankTransaction.deleteMany({ where: { storeId: store.id } });
+    await prisma.bankStatement.deleteMany({ where: { storeId: store.id } });
+    await prisma.expense.deleteMany({ where: { storeId: store.id } });
+    await prisma.journalLine.deleteMany({ where: { entry: { storeId: store.id } } });
+    await prisma.journalEntry.deleteMany({ where: { storeId: store.id } });
+    await prisma.account.deleteMany({ where: { storeId: store.id } });
+
+    // Chart of accounts — one per type, with a couple of children.
+    const COA: Array<{ code: string; nameEn: string; nameAr: string; type: AccountType }> = [
+      { code: '1000', nameEn: 'Cash & Bank', nameAr: 'النقدية والبنك', type: 'asset' },
+      { code: '1100', nameEn: 'KNET Settlement', nameAr: 'تسوية كي نت', type: 'asset' },
+      { code: '1200', nameEn: 'Accounts Receivable', nameAr: 'الذمم المدينة', type: 'asset' },
+      { code: '1300', nameEn: 'Inventory', nameAr: 'المخزون', type: 'asset' },
+      { code: '2000', nameEn: 'Accounts Payable', nameAr: 'الذمم الدائنة', type: 'liability' },
+      { code: '2100', nameEn: 'Tax Payable', nameAr: 'الضرائب المستحقة', type: 'liability' },
+      { code: '3000', nameEn: 'Owner Equity', nameAr: 'حقوق الملكية', type: 'equity' },
+      { code: '4000', nameEn: 'Sales Revenue', nameAr: 'إيرادات المبيعات', type: 'revenue' },
+      { code: '4100', nameEn: 'Shipping Revenue', nameAr: 'إيرادات الشحن', type: 'revenue' },
+      {
+        code: '5000',
+        nameEn: 'Cost of Goods Sold',
+        nameAr: 'تكلفة البضاعة المباعة',
+        type: 'expense',
+      },
+      { code: '6000', nameEn: 'Rent Expense', nameAr: 'مصروف الإيجار', type: 'expense' },
+      { code: '6100', nameEn: 'Marketing Expense', nameAr: 'مصروف التسويق', type: 'expense' },
+      { code: '6200', nameEn: 'Utilities Expense', nameAr: 'مصروف المرافق', type: 'expense' },
+      { code: '6300', nameEn: 'Salaries Expense', nameAr: 'مصروف الرواتب', type: 'expense' },
+    ];
+    for (const a of COA) {
+      const acc = await prisma.account.create({
+        data: {
+          storeId: store.id,
+          code: a.code,
+          nameEn: a.nameEn,
+          nameAr: a.nameAr,
+          type: a.type,
+          isSystem: ['1000', '1200', '1300', '2000', '4000', '5000'].includes(a.code),
+        },
+      });
+      accountIds[a.code] = acc.id;
+    }
+    enrich['chart of accounts'] = COA.length;
+
+    // Balanced journal entries (debits === credits, in fils).
+    let entryNo = 0;
+    async function postEntry(
+      source: JournalEntrySource,
+      memo: string,
+      memoAr: string,
+      lines: Array<{ code: string; debit?: number; credit?: number; lineMemo?: string }>,
+      daysAgo: number,
+      status: JournalEntryStatus = 'posted'
+    ) {
+      entryNo++;
+      const totalDebit = lines.reduce((s, l) => s + (l.debit ?? 0), 0);
+      const totalCredit = lines.reduce((s, l) => s + (l.credit ?? 0), 0);
+      if (totalDebit !== totalCredit) {
+        throw new Error(`Unbalanced journal entry "${memo}": ${totalDebit} != ${totalCredit}`);
+      }
+      return prisma.journalEntry.create({
+        data: {
+          storeId: store.id,
+          entryNumber: `JE-${pad(entryNo)}`,
+          postedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * daysAgo),
+          source,
+          memo,
+          memoAr,
+          status,
+          postedBy: owner.id,
+          lines: {
+            create: lines.map(l => ({
+              accountId: accountIds[l.code],
+              debit: l.debit ?? 0,
+              credit: l.credit ?? 0,
+              currency: 'KWD',
+              originalAmount: (l.debit ?? 0) || (l.credit ?? 0),
+              lineMemo: l.lineMemo ?? null,
+            })),
+          },
+        },
+      });
+    }
+
+    // 1. Opening balance: owner injects capital + opening inventory.
+    await postEntry(
+      'opening_balance',
+      'Opening balance — owner capital injection',
+      'الرصيد الافتتاحي — ضخ رأس مال المالك',
+      [
+        { code: '1000', debit: fils(5000), lineMemo: 'Cash on hand' },
+        { code: '1300', debit: fils(3000), lineMemo: 'Opening inventory' },
+        { code: '3000', credit: fils(8000), lineMemo: 'Owner equity' },
+      ],
+      75
+    );
+    // 2-4. Sales entries (revenue recognition for a few paid orders).
+    const saleEntries = [
+      { net: fils(42), ship: fils(1.5), cogs: fils(23), days: 40 },
+      { net: fils(35), ship: fils(1.5), cogs: fils(19), days: 28 },
+      { net: fils(64), ship: fils(1.5), cogs: fils(35), days: 14 },
+    ];
+    for (const s of saleEntries) {
+      const gross = s.net + s.ship;
+      await postEntry(
+        'order',
+        'Sales — paid order revenue recognition',
+        'المبيعات — إثبات إيرادات طلب مدفوع',
+        [
+          { code: '1100', debit: gross, lineMemo: 'KNET settlement receivable' },
+          { code: '4000', credit: s.net, lineMemo: 'Product sales' },
+          { code: '4100', credit: s.ship, lineMemo: 'Shipping income' },
+        ],
+        s.days
+      );
+      // Matching COGS entry.
+      await postEntry(
+        'order',
+        'COGS — inventory relief for sold goods',
+        'تكلفة البضاعة — تخفيض المخزون للبضاعة المباعة',
+        [
+          { code: '5000', debit: s.cogs, lineMemo: 'Cost of goods sold' },
+          { code: '1300', credit: s.cogs, lineMemo: 'Inventory reduction' },
+        ],
+        s.days
+      );
+    }
+    // 5. A refund entry (reverses part of a sale).
+    await postEntry(
+      'refund',
+      'Refund — partial refund on returned item',
+      'استرداد — استرداد جزئي على عنصر مُرجَع',
+      [
+        { code: '4000', debit: fils(14), lineMemo: 'Sales reversal' },
+        { code: '1100', credit: fils(14), lineMemo: 'Refund paid back via KNET' },
+      ],
+      9
+    );
+    // 6. A manual reversed entry (so the "reversed" status filter has content).
+    await postEntry(
+      'manual',
+      'Manual correction (later reversed)',
+      'تصحيح يدوي (تم عكسه لاحقاً)',
+      [
+        { code: '6200', debit: fils(8), lineMemo: 'Mis-posted utility' },
+        { code: '1000', credit: fils(8), lineMemo: 'Cash' },
+      ],
+      20,
+      'reversed'
+    );
+    // 7. A draft entry (so the "draft" status filter has content).
+    await postEntry(
+      'manual',
+      'Draft — pending owner review',
+      'مسودة — بانتظار مراجعة المالك',
+      [
+        { code: '6100', debit: fils(25), lineMemo: 'Instagram ad spend (unconfirmed)' },
+        { code: '2000', credit: fils(25), lineMemo: 'Payable to agency' },
+      ],
+      3,
+      'draft'
+    );
+    enrich['journal entries'] = entryNo;
+
+    // Expenses across categories (each posts to an expense + paid-from account).
+    const EXPENSES: Array<{
+      acct: string;
+      amount: number;
+      desc: string;
+      descAr: string;
+      status: ExpenseStatus;
+      days: number;
+    }> = [
+      {
+        acct: '6000',
+        amount: fils(350),
+        desc: 'Monthly shop rent',
+        descAr: 'إيجار المحل الشهري',
+        status: 'posted',
+        days: 30,
+      },
+      {
+        acct: '6100',
+        amount: fils(120),
+        desc: 'Instagram & TikTok ads',
+        descAr: 'إعلانات إنستغرام وتيك توك',
+        status: 'posted',
+        days: 22,
+      },
+      {
+        acct: '6200',
+        amount: fils(45),
+        desc: 'Electricity & water',
+        descAr: 'الكهرباء والماء',
+        status: 'approved',
+        days: 15,
+      },
+      {
+        acct: '6300',
+        amount: fils(600),
+        desc: 'Staff salaries',
+        descAr: 'رواتب الموظفين',
+        status: 'posted',
+        days: 28,
+      },
+      {
+        acct: '6100',
+        amount: fils(80),
+        desc: 'Influencer collaboration',
+        descAr: 'تعاون مع مؤثر',
+        status: 'pending',
+        days: 5,
+      },
+      {
+        acct: '6200',
+        amount: fils(30),
+        desc: 'Internet & phone',
+        descAr: 'الإنترنت والهاتف',
+        status: 'draft',
+        days: 2,
+      },
+    ];
+    let expNo = 0;
+    for (const ex of EXPENSES) {
+      expNo++;
+      await prisma.expense.create({
+        data: {
+          storeId: store.id,
+          expenseNumber: `EXP-${pad(expNo)}`,
+          expenseAccountId: accountIds[ex.acct],
+          paidFromAccountId: accountIds['1000'],
+          amount: ex.amount,
+          total: ex.amount,
+          originalAmount: ex.amount,
+          currency: 'KWD',
+          expenseDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * ex.days),
+          status: ex.status,
+          notes: ex.desc,
+          notesAr: ex.descAr,
+          createdBy: owner.id,
+          postedAt:
+            ex.status === 'posted' ? new Date(Date.now() - 1000 * 60 * 60 * 24 * ex.days) : null,
+        },
+      });
+    }
+    enrich['expenses'] = expNo;
+
+    // FX rate registry (accounting.multi_currency) — a couple of USD/EUR rows.
+    try {
+      await prisma.fxRateEntry.deleteMany({ where: { storeId: store.id } });
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      await prisma.fxRateEntry.createMany({
+        data: [
+          {
+            storeId: store.id,
+            currency: 'USD',
+            rate: '0.30700000',
+            rateDate: today,
+            recordedBy: owner.id,
+          },
+          {
+            storeId: store.id,
+            currency: 'EUR',
+            rate: '0.33200000',
+            rateDate: today,
+            recordedBy: owner.id,
+          },
+        ],
+      });
+      enrich['fx rates'] = 2;
+    } catch (e) {
+      console.warn('[enrich] ⚠ fx rates skipped:', (e as Error).message);
+    }
+
+    console.log(
+      `[enrich] ✓ accounting: ${COA.length} accounts, ${entryNo} journal entries, ${expNo} expenses`
+    );
+  } catch (e) {
+    console.warn('[enrich] ⚠ accounting block skipped:', (e as Error).message);
+  }
+
+  // ── D. BANK RECONCILIATION — statement with matched + unmatched txns ──────
+  try {
+    if (accountIds['1000']) {
+      const stmt = await prisma.bankStatement.create({
+        data: {
+          storeId: store.id,
+          glAccountId: accountIds['1000'],
+          fileName: 'NBK-statement-june.csv',
+          periodStart: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30),
+          periodEnd: new Date(),
+          status: 'reconciling',
+        },
+      });
+      // Pull a couple of posted journal entries to "match" against.
+      const matchableEntries = await prisma.journalEntry.findMany({
+        where: { storeId: store.id, status: 'posted' },
+        take: 2,
+      });
+      const txns = [
+        {
+          desc: 'KNET POS settlement',
+          amountFils: fils(43.5),
+          direction: 'credit' as BankTransactionDirection,
+          matchStatus: 'auto_matched' as BankMatchStatus,
+          matchedJournalEntryId: matchableEntries[0]?.id ?? null,
+          confidence: 95,
+          rowHash: `demo-bank-${store.id.slice(0, 6)}-1`,
+          days: 5,
+        },
+        {
+          desc: 'KNET POS settlement',
+          amountFils: fils(36.5),
+          direction: 'credit' as BankTransactionDirection,
+          matchStatus: 'manual_matched' as BankMatchStatus,
+          matchedJournalEntryId: matchableEntries[1]?.id ?? null,
+          confidence: 100,
+          rowHash: `demo-bank-${store.id.slice(0, 6)}-2`,
+          days: 8,
+        },
+        {
+          desc: 'Bank service charge',
+          amountFils: fils(2),
+          direction: 'debit' as BankTransactionDirection,
+          matchStatus: 'unmatched' as BankMatchStatus,
+          matchedJournalEntryId: null,
+          confidence: 0,
+          rowHash: `demo-bank-${store.id.slice(0, 6)}-3`,
+          days: 10,
+        },
+        {
+          desc: 'Unidentified deposit',
+          amountFils: fils(15),
+          direction: 'credit' as BankTransactionDirection,
+          matchStatus: 'unmatched' as BankMatchStatus,
+          matchedJournalEntryId: null,
+          confidence: 0,
+          rowHash: `demo-bank-${store.id.slice(0, 6)}-4`,
+          days: 12,
+        },
+      ];
+      for (const t of txns) {
+        await prisma.bankTransaction.create({
+          data: {
+            statementId: stmt.id,
+            storeId: store.id,
+            date: new Date(Date.now() - 1000 * 60 * 60 * 24 * t.days),
+            description: t.desc,
+            amountFils: t.amountFils,
+            direction: t.direction,
+            rowHash: t.rowHash,
+            matchedJournalEntryId: t.matchedJournalEntryId,
+            matchStatus: t.matchStatus,
+            confidence: t.confidence,
+          },
+        });
+      }
+      enrich['bank statements'] = 1;
+      enrich['bank transactions'] = txns.length;
+      console.log(
+        `[enrich] ✓ bank reconciliation: 1 statement, ${txns.length} txns (2 matched, 2 unmatched)`
+      );
+    }
+  } catch (e) {
+    console.warn('[enrich] ⚠ bank reconciliation skipped:', (e as Error).message);
+  }
+
+  // ── E. INVENTORY — suppliers, POs, adjustments, count session, reorder ────
+  let supplierIds: string[] = [];
+  try {
+    await prisma.countLine.deleteMany({ where: { session: { storeId: store.id } } });
+    await prisma.countSession.deleteMany({ where: { storeId: store.id } });
+    await prisma.stockAdjustmentItem.deleteMany({
+      where: { adjustment: { storeId: store.id } },
+    });
+    await prisma.stockAdjustment.deleteMany({ where: { storeId: store.id } });
+    await prisma.reorderRule.deleteMany({ where: { storeId: store.id } });
+    await prisma.reorderSuggestion.deleteMany({ where: { storeId: store.id } });
+    await prisma.deadStockFlag.deleteMany({ where: { storeId: store.id } });
+    await prisma.backorderLine.deleteMany({ where: { storeId: store.id } });
+    await prisma.purchaseOrderItem.deleteMany({ where: { po: { storeId: store.id } } });
+    await prisma.purchaseOrder.deleteMany({ where: { storeId: store.id } });
+    await prisma.profitAnomaly.deleteMany({ where: { storeId: store.id } });
+    await prisma.supplier.deleteMany({ where: { storeId: store.id } });
+
+    // Suppliers
+    const SUPPLIERS: Array<{
+      name: string;
+      nameAr: string;
+      terms: SupplierPaymentTerms;
+      lead: number;
+      contact: string;
+    }> = [
+      {
+        name: 'Gulf Electronics Trading',
+        nameAr: 'الخليج لتجارة الإلكترونيات',
+        terms: 'net30',
+        lead: 14,
+        contact: 'Abdullah',
+      },
+      {
+        name: 'Levant Textiles Co.',
+        nameAr: 'شركة نسيج المشرق',
+        terms: 'net15',
+        lead: 21,
+        contact: 'Mona',
+      },
+      {
+        name: 'Arabian Gourmet Imports',
+        nameAr: 'واردات الذواقة العربية',
+        terms: 'net60',
+        lead: 30,
+        contact: 'Yousef',
+      },
+    ];
+    for (const s of SUPPLIERS) {
+      const sup = await prisma.supplier.create({
+        data: {
+          storeId: store.id,
+          name: s.name,
+          nameAr: s.nameAr,
+          contactName: s.contact,
+          phone: '+96522200000',
+          email: `${slug(s.name)}@suppliers.demo.test`,
+          paymentTerms: s.terms,
+          leadTimeDays: s.lead,
+          defaultCurrency: 'KWD',
+          isActive: true,
+        },
+      });
+      supplierIds.push(sup.id);
+    }
+    enrich['suppliers'] = supplierIds.length;
+
+    // Purchase orders in different states (draft / sent / partial / received).
+    const poProductA = createdProducts[0]; // Headphones
+    const poProductB = createdProducts[1]; // Speaker
+    const POs: Array<{ status: PurchaseOrderStatus; supplierIdx: number; days: number }> = [
+      { status: 'draft', supplierIdx: 0, days: 2 },
+      { status: 'sent', supplierIdx: 0, days: 6 },
+      { status: 'partial', supplierIdx: 1, days: 12 },
+      { status: 'received', supplierIdx: 2, days: 25 },
+    ];
+    let poNo = 0;
+    for (const po of POs) {
+      poNo++;
+      const unitCostA = Math.round(poProductA.price * 0.55);
+      const unitCostB = Math.round(poProductB.price * 0.55);
+      const qtyA = 20;
+      const qtyB = 15;
+      const subtotal = unitCostA * qtyA + unitCostB * qtyB;
+      const receivedQtyA = po.status === 'received' ? qtyA : po.status === 'partial' ? 10 : 0;
+      const receivedQtyB = po.status === 'received' ? qtyB : po.status === 'partial' ? 5 : 0;
+      await prisma.purchaseOrder.create({
+        data: {
+          storeId: store.id,
+          supplierId: supplierIds[po.supplierIdx],
+          poNumber: `PO-${pad(poNo)}`,
+          status: po.status,
+          expectedDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
+          receivedAt:
+            po.status === 'received' ? new Date(Date.now() - 1000 * 60 * 60 * 24 * po.days) : null,
+          subtotal,
+          total: subtotal,
+          currency: 'KWD',
+          apAccountId: accountIds['2000'] ?? null,
+          createdBy: owner.id,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * po.days),
+          items: {
+            create: [
+              {
+                productId: poProductA.id,
+                qty: qtyA,
+                qtyReceived: receivedQtyA,
+                unitCost: unitCostA,
+                total: unitCostA * qtyA,
+              },
+              {
+                productId: poProductB.id,
+                qty: qtyB,
+                qtyReceived: receivedQtyB,
+                unitCost: unitCostB,
+                total: unitCostB * qtyB,
+              },
+            ],
+          },
+        },
+      });
+    }
+    enrich['purchase orders'] = poNo;
+
+    // Stock adjustments (a posted damage write-off + a posted found).
+    const ADJ: Array<{
+      type: StockAdjustmentType;
+      status: StockAdjustmentStatus;
+      reason: string;
+      reasonAr: string;
+      productIdx: number;
+      prev: number;
+      next: number;
+      days: number;
+    }> = [
+      {
+        type: 'damage',
+        status: 'posted',
+        reason: 'Water-damaged units',
+        reasonAr: 'وحدات تالفة بالماء',
+        productIdx: 2,
+        prev: 80,
+        next: 76,
+        days: 10,
+      },
+      {
+        type: 'found',
+        status: 'posted',
+        reason: 'Found extra units in back room',
+        reasonAr: 'وحدات إضافية في المخزن',
+        productIdx: 5,
+        prev: 42,
+        next: 45,
+        days: 18,
+      },
+      {
+        type: 'cycle_count',
+        status: 'draft',
+        reason: 'Cycle count variance (pending review)',
+        reasonAr: 'فرق جرد دوري (قيد المراجعة)',
+        productIdx: 6,
+        prev: 22,
+        next: 21,
+        days: 1,
+      },
+    ];
+    let adjNo = 0;
+    for (const a of ADJ) {
+      adjNo++;
+      const prod = createdProducts[a.productIdx];
+      const delta = a.next - a.prev;
+      const unitCost = Math.round(prod.price * 0.55);
+      await prisma.stockAdjustment.create({
+        data: {
+          storeId: store.id,
+          adjustmentNumber: `ADJ-${pad(adjNo)}`,
+          type: a.type,
+          status: a.status,
+          reason: a.reason,
+          reasonAr: a.reasonAr,
+          totalValueImpact: delta * unitCost,
+          postedAt:
+            a.status === 'posted' ? new Date(Date.now() - 1000 * 60 * 60 * 24 * a.days) : null,
+          postedBy: a.status === 'posted' ? owner.id : null,
+          createdBy: owner.id,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * a.days),
+          items: {
+            create: [
+              {
+                productId: prod.id,
+                previousQty: a.prev,
+                newQty: a.next,
+                deltaQty: delta,
+                unitCost,
+              },
+            ],
+          },
+        },
+      });
+    }
+    enrich['stock adjustments'] = adjNo;
+
+    // Reorder rules (produce live reorder suggestions for low-stock items).
+    const reorderProducts = createdProducts.slice(0, 3);
+    let ruleNo = 0;
+    for (const rp of reorderProducts) {
+      ruleNo++;
+      await prisma.reorderRule.create({
+        data: {
+          storeId: store.id,
+          productId: rp.id,
+          minQty: 10,
+          reorderQty: 30,
+          leadTimeDays: 14,
+          safetyStockDays: 7,
+          preferredSupplierId: supplierIds[0],
+          isActive: true,
+        },
+      });
+    }
+    enrich['reorder rules'] = ruleNo;
+
+    // Live reorder suggestions (advisory smart-layer rows).
+    let sugNo = 0;
+    for (const rp of reorderProducts) {
+      sugNo++;
+      await prisma.reorderSuggestion.create({
+        data: {
+          storeId: store.id,
+          productId: rp.id,
+          suggestedQty: 30,
+          velocity7d: 2.5,
+          velocity28d: 1.8,
+          onHand: 6,
+          onOrder: 0,
+          openBacklog: 2,
+          urgencyDays: 3,
+          supplierId: supplierIds[0],
+          reasoningEn:
+            'Stock below reorder point with 2.5 units/day velocity — order now to avoid stockout in ~3 days.',
+          reasoningAr:
+            'المخزون أقل من نقطة إعادة الطلب بسرعة بيع 2.5 وحدة/يوم — اطلب الآن لتجنب نفاد المخزون خلال 3 أيام.',
+          status: 'open',
+        },
+      });
+    }
+    enrich['reorder suggestions'] = sugNo;
+
+    // Dead-stock flag (one slow-moving item).
+    const deadProd = createdProducts[createdProducts.length - 1];
+    await prisma.deadStockFlag.create({
+      data: {
+        storeId: store.id,
+        productId: deadProd.id,
+        daysSinceSale: 92,
+        stockOnHand: 25,
+        stockValueFils: Math.round(deadProd.price * 0.55) * 25,
+        suggestedDiscountBps: 2500,
+        clearanceCopyEn:
+          'No sales in 92 days. Suggest 25% clearance discount to free up shelf space and recover cash.',
+        clearanceCopyAr:
+          'لا مبيعات منذ 92 يوماً. نقترح خصم تصفية 25٪ لتحرير المساحة واسترداد النقد.',
+        status: 'open',
+      },
+    });
+    enrich['dead-stock flags'] = 1;
+
+    // Backorder line (one product oversold, awaiting a PO).
+    try {
+      const backProd = createdProducts[1]; // the out-of-stock speaker
+      const anyOrderItem = await prisma.orderItem.findFirst({
+        where: { order: { storeId: store.id }, productId: backProd.id },
+      });
+      if (anyOrderItem) {
+        await prisma.backorderLine.create({
+          data: {
+            storeId: store.id,
+            orderItemId: anyOrderItem.id,
+            productId: backProd.id,
+            qty: 3,
+            qtyFulfilled: 0,
+          },
+        });
+        enrich['backorder lines'] = 1;
+      }
+    } catch (e) {
+      console.warn('[enrich] ⚠ backorder line skipped:', (e as Error).message);
+    }
+
+    // Profit anomaly (margin drop alert — so the anomaly report has content).
+    await prisma.profitAnomaly.create({
+      data: {
+        storeId: store.id,
+        scope: 'store',
+        metric: 'margin_drop',
+        current7d: 38.2,
+        baseline28d: 47.5,
+        deltaPercent: -19.6,
+        severity: 'warning',
+        explanationEn:
+          'Gross margin dropped from 47.5% to 38.2% this week — driven by higher COGS on the cargo trousers line and increased discounting.',
+        explanationAr:
+          'انخفض هامش الربح الإجمالي من 47.5٪ إلى 38.2٪ هذا الأسبوع — بسبب ارتفاع تكلفة البضاعة على خط بناطيل الكارغو وزيادة الخصومات.',
+        acknowledged: false,
+      },
+    });
+    enrich['profit anomalies'] = 1;
+
+    // Cycle-count session with lines + variance.
+    const countProducts = createdProducts.slice(7, 10);
+    const session = await prisma.countSession.create({
+      data: {
+        storeId: store.id,
+        status: 'closed',
+        note: 'Monthly cycle count — electronics aisle',
+        createdBy: owner.id,
+        closedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4),
+      },
+    });
+    let lineNo = 0;
+    for (const cp of countProducts) {
+      lineNo++;
+      const systemQty = 20 + lineNo * 5;
+      const countedQty = systemQty + (lineNo === 2 ? -2 : lineNo === 3 ? 1 : 0);
+      await prisma.countLine.create({
+        data: {
+          sessionId: session.id,
+          productId: cp.id,
+          countedQty,
+          systemQty,
+          variance: countedQty - systemQty,
+        },
+      });
+    }
+    enrich['count sessions'] = 1;
+    enrich['count lines'] = lineNo;
+
+    console.log(
+      `[enrich] ✓ inventory: ${supplierIds.length} suppliers, ${poNo} POs, ${adjNo} adjustments, ${ruleNo} reorder rules, ${sugNo} suggestions, 1 dead-stock, 1 count session`
+    );
+  } catch (e) {
+    console.warn('[enrich] ⚠ inventory block skipped:', (e as Error).message);
+  }
+
+  // ── F. WAREHOUSES + per-warehouse stock (inventory.multi_warehouse) ───────
+  try {
+    await prisma.warehouseStock.deleteMany({ where: { storeId: store.id } });
+    await prisma.warehouse.deleteMany({ where: { storeId: store.id } });
+    const wMain = await prisma.warehouse.create({
+      data: {
+        storeId: store.id,
+        name: 'Main Warehouse — Shuwaikh',
+        nameAr: 'المستودع الرئيسي — الشويخ',
+        code: 'MAIN',
+        isDefault: true,
+        priority: 10,
+        address: 'Shuwaikh Industrial Area, Kuwait',
+        isActive: true,
+      },
+    });
+    const wEast = await prisma.warehouse.create({
+      data: {
+        storeId: store.id,
+        name: 'East Depot — Salmiya',
+        nameAr: 'مستودع شرق — السالمية',
+        code: 'KWT-2',
+        isDefault: false,
+        priority: 5,
+        address: 'Salmiya, Kuwait',
+        isActive: true,
+      },
+    });
+    let wsNo = 0;
+    for (const p of createdProducts.slice(0, 8)) {
+      wsNo++;
+      await prisma.warehouseStock.create({
+        data: {
+          warehouseId: wMain.id,
+          storeId: store.id,
+          productId: p.id,
+          quantity: 20 + (wsNo % 5) * 4,
+        },
+      });
+      await prisma.warehouseStock.create({
+        data: {
+          warehouseId: wEast.id,
+          storeId: store.id,
+          productId: p.id,
+          quantity: 5 + (wsNo % 3) * 2,
+        },
+      });
+    }
+    enrich['warehouses'] = 2;
+    enrich['warehouse stock rows'] = wsNo * 2;
+    console.log(`[enrich] ✓ 2 warehouses, ${wsNo * 2} warehouse-stock rows`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ warehouses skipped:', (e as Error).message);
+  }
+
+  // ── G. INVENTORY HISTORY (movement ledger) ────────────────────────────────
+  try {
+    await prisma.inventoryHistory.deleteMany({ where: { storeId: store.id } });
+    let ihNo = 0;
+    const histTypes: InventoryChangeType[] = [
+      'initial',
+      'sale',
+      'return_stock',
+      'manual_add',
+      'damage',
+      'adjustment',
+    ];
+    for (let i = 0; i < createdProducts.length; i++) {
+      const p = createdProducts[i];
+      const type = histTypes[i % histTypes.length];
+      const qty = type === 'sale' || type === 'damage' ? -(1 + (i % 3)) : 1 + (i % 4);
+      const prevStock = 30 + i;
+      ihNo++;
+      await prisma.inventoryHistory.create({
+        data: {
+          productId: p.id,
+          storeId: store.id,
+          type,
+          quantity: qty,
+          previousStock: prevStock,
+          newStock: prevStock + qty,
+          reason: `Demo ${type} movement`,
+          createdBy: owner.id,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * (i + 1)),
+        },
+      });
+    }
+    enrich['inventory history rows'] = ihNo;
+    console.log(`[enrich] ✓ ${ihNo} inventory-history rows`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ inventory history skipped:', (e as Error).message);
+  }
+
+  // ── H. EXTRA ORDER SCENARIOS — failed/stuck payments, payment events,
+  //        partial refund, COD, link orders to registered customers ─────────
+  try {
+    // Link the existing orders to registered customer Users so the customer
+    // 360 / RFM / cohort surfaces resolve a real account per order.
+    if (demoUsers.length) {
+      const existingOrders = await prisma.order.findMany({
+        where: { storeId: store.id },
+        select: { id: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      for (let i = 0; i < existingOrders.length; i++) {
+        await prisma.order.update({
+          where: { id: existingOrders[i].id },
+          data: { customerId: demoUsers[i % demoUsers.length].id },
+        });
+      }
+    }
+
+    // Spread the existing orders' createdAt over the last ~90 days so
+    // analytics / cohorts / funnel / RFM have a real time distribution.
+    const spreadOrders = await prisma.order.findMany({
+      where: { storeId: store.id },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    for (let i = 0; i < spreadOrders.length; i++) {
+      const daysAgo = Math.round((i / Math.max(1, spreadOrders.length - 1)) * 88) + 1;
+      await prisma.order.update({
+        where: { id: spreadOrders[i].id },
+        data: { createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * daysAgo) },
+      });
+    }
+    enrich['orders re-dated over 90d'] = spreadOrders.length;
+
+    // A FAILED-payment order (status=pending, paymentStatus=failed).
+    const failedCust = demoUsers[0];
+    const failProd = createdProducts[3];
+    const failTotal = failProd.price + fils(1.5);
+    const failedOrder = await prisma.order.create({
+      data: {
+        storeId: store.id,
+        customerId: failedCust?.id ?? null,
+        orderNumber: `DEMO-FAIL-0001`,
+        status: 'pending',
+        paymentStatus: 'failed',
+        subtotal: failProd.price,
+        shipping: fils(1.5),
+        total: failTotal,
+        currency: 'KWD',
+        shippingAddress: address('Ahmad', 'Al-Sabah'),
+        billingAddress: address('Ahmad', 'Al-Sabah'),
+        notes: 'Card declined at gateway',
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+        items: {
+          create: [
+            {
+              productId: failProd.id,
+              productName: failProd.name,
+              quantity: 1,
+              price: failProd.price,
+              total: failProd.price,
+            },
+          ],
+        },
+      },
+    });
+    const failedPayment = await prisma.payment.create({
+      data: {
+        orderId: failedOrder.id,
+        provider: 'myfatoorah',
+        method: 'knet',
+        status: 'failed',
+        amount: failTotal,
+        currency: 'KWD',
+        transactionId: `DEMO-TXN-FAIL`,
+        paymentUrl: 'https://demo.myfatoorah.test/pay/FAIL',
+        failureReason: 'INSUFFICIENT_FUNDS',
+      },
+    });
+
+    // A STUCK/UNPAID online order (reached gateway, never paid) =
+    // payment-gateway abandoner → Enterprise retargeting list.
+    const stuckCust = demoUsers[1];
+    const stuckProd = createdProducts[4];
+    const stuckTotal = stuckProd.price + fils(1.5);
+    const stuckOrder = await prisma.order.create({
+      data: {
+        storeId: store.id,
+        customerId: stuckCust?.id ?? null,
+        orderNumber: `DEMO-STUCK-0001`,
+        status: 'pending',
+        paymentStatus: 'unpaid',
+        subtotal: stuckProd.price,
+        shipping: fils(1.5),
+        total: stuckTotal,
+        currency: 'KWD',
+        shippingAddress: address('Fatima', 'Al-Rashid'),
+        billingAddress: address('Fatima', 'Al-Rashid'),
+        paymentGatewayAbandonedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+        stuckPaymentAlertedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+        items: {
+          create: [
+            {
+              productId: stuckProd.id,
+              productName: stuckProd.name,
+              quantity: 1,
+              price: stuckProd.price,
+              total: stuckProd.price,
+            },
+          ],
+        },
+      },
+    });
+    const stuckPayment = await prisma.payment.create({
+      data: {
+        orderId: stuckOrder.id,
+        provider: 'tap',
+        method: 'visa',
+        status: 'pending',
+        amount: stuckTotal,
+        currency: 'KWD',
+        transactionId: `DEMO-TXN-STUCK`,
+        paymentUrl: 'https://demo.tap.test/pay/STUCK',
+      },
+    });
+    enrich['extra order scenarios (failed+stuck)'] = 2;
+
+    // Payment events — append-only lifecycle log for several payments.
+    await prisma.paymentEvent.deleteMany({ where: { storeId: store.id } });
+    let peNo = 0;
+    async function event(
+      payment: { id: string; orderId: string },
+      eventType: string,
+      fromStatus: PaymentStatus | null,
+      toStatus: PaymentStatus | null,
+      provider: string | null,
+      daysAgo: number,
+      details: Prisma.InputJsonValue = {}
+    ) {
+      peNo++;
+      await prisma.paymentEvent.create({
+        data: {
+          paymentId: payment.id,
+          storeId: store.id,
+          orderId: payment.orderId,
+          eventType,
+          fromStatus,
+          toStatus,
+          provider,
+          details,
+          occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * daysAgo),
+        },
+      });
+    }
+    // Failed payment lifecycle.
+    await event(failedPayment, 'created', null, 'pending', null, 3);
+    await event(failedPayment, 'webhook', 'pending', 'failed', 'myfatoorah', 3, {
+      failureReason: 'INSUFFICIENT_FUNDS',
+    });
+    // Stuck payment lifecycle (created, gateway redirect, then nothing).
+    await event(stuckPayment, 'created', null, 'pending', null, 2);
+    await event(stuckPayment, 'webhook', 'pending', 'pending', 'tap', 2, {
+      note: 'gateway opened, no completion received',
+    });
+    // A completed payment lifecycle for one paid order.
+    const paidPayment = await prisma.payment.findFirst({
+      where: { order: { storeId: store.id }, status: 'completed' },
+    });
+    if (paidPayment) {
+      await event(
+        { id: paidPayment.id, orderId: paidPayment.orderId },
+        'created',
+        null,
+        'pending',
+        null,
+        14
+      );
+      await event(
+        { id: paidPayment.id, orderId: paidPayment.orderId },
+        'webhook',
+        'pending',
+        'completed',
+        paidPayment.provider,
+        14,
+        { settlementId: 'DEMO-SETTLE-001' }
+      );
+    }
+    enrich['payment events'] = peNo;
+
+    // Partial refund on a delivered+paid order.
+    const refundablePayment = await prisma.payment.findFirst({
+      where: { order: { storeId: store.id, status: 'delivered' }, status: 'completed' },
+    });
+    if (refundablePayment) {
+      const partial = Math.round(refundablePayment.amount * 0.4);
+      await prisma.payment.update({
+        where: { id: refundablePayment.id },
+        data: {
+          status: 'partially_refunded',
+          refundedAmount: partial,
+          refundId: 'DEMO-REFUND-001',
+        },
+      });
+      await event(
+        { id: refundablePayment.id, orderId: refundablePayment.orderId },
+        'refund',
+        'completed',
+        'partially_refunded',
+        refundablePayment.provider,
+        6,
+        { refundAmount: partial, reason: 'Customer reported one damaged item' }
+      );
+      enrich['partial refunds'] = 1;
+    }
+
+    console.log(
+      `[enrich] ✓ order scenarios: failed + stuck/abandoned orders, ${peNo} payment events, partial refund, customers linked, orders re-dated`
+    );
+  } catch (e) {
+    console.warn('[enrich] ⚠ order scenarios block skipped:', (e as Error).message);
+  }
+
+  // ── I. RETURNS — one in each meaningful return status ─────────────────────
+  try {
+    await prisma.returnItem.deleteMany({ where: { return: { storeId: store.id } } });
+    await prisma.return.deleteMany({ where: { storeId: store.id } });
+
+    // Returns require a customerId that FKs to User. Use orders that already
+    // have a registered customer + at least one item.
+    const returnableOrders = await prisma.order.findMany({
+      where: { storeId: store.id, customerId: { not: null }, status: 'delivered' },
+      include: { items: true },
+      take: 6,
+    });
+
+    const RETURN_STATES: Array<{
+      status: ReturnStatus;
+      type: ReturnType;
+      reason: string;
+      refundDays: number | null;
+    }> = [
+      { status: 'pending', type: 'return', reason: 'Wrong size', refundDays: null },
+      { status: 'approved', type: 'refund', reason: 'Changed mind', refundDays: null },
+      { status: 'received', type: 'return', reason: 'Damaged on arrival', refundDays: null },
+      { status: 'completed', type: 'refund', reason: 'Defective item', refundDays: 4 },
+      { status: 'rejected', type: 'return', reason: 'Outside return window', refundDays: null },
+    ];
+    let retNo = 0;
+    for (let i = 0; i < RETURN_STATES.length && i < returnableOrders.length; i++) {
+      const o = returnableOrders[i];
+      if (!o.customerId || o.items.length === 0) continue;
+      const rs = RETURN_STATES[i];
+      const item = o.items[0];
+      retNo++;
+      await prisma.return.create({
+        data: {
+          storeId: store.id,
+          orderId: o.id,
+          customerId: o.customerId,
+          returnNumber: `RET-${pad(retNo)}`,
+          type: rs.type,
+          status: rs.status,
+          reason: rs.reason,
+          refundAmount: rs.status === 'completed' ? item.price : 0,
+          refundMethod: rs.status === 'completed' ? 'original' : null,
+          refundedAt: rs.refundDays
+            ? new Date(Date.now() - 1000 * 60 * 60 * 24 * rs.refundDays)
+            : null,
+          approvedBy: ['approved', 'received', 'completed'].includes(rs.status) ? owner.id : null,
+          approvedAt: ['approved', 'received', 'completed'].includes(rs.status)
+            ? new Date(Date.now() - 1000 * 60 * 60 * 24 * (i + 3))
+            : null,
+          rejectedBy: rs.status === 'rejected' ? owner.id : null,
+          rejectedAt:
+            rs.status === 'rejected' ? new Date(Date.now() - 1000 * 60 * 60 * 24 * 2) : null,
+          rejectionReason:
+            rs.status === 'rejected' ? 'Return requested after the 14-day window' : null,
+          items: {
+            create: [
+              {
+                orderItemId: item.id,
+                productId: item.productId,
+                productName: item.productName,
+                quantity: 1,
+                reason: rs.reason,
+                condition: rs.status === 'received' ? 'damaged' : 'opened',
+              },
+            ],
+          },
+        },
+      });
+    }
+    enrich['returns (each status)'] = retNo;
+    console.log(`[enrich] ✓ ${retNo} returns across pending/approved/received/completed/rejected`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ returns block skipped:', (e as Error).message);
+  }
+
+  // ── J. SHIPMENTS — tracking for shipped/delivered orders ──────────────────
+  try {
+    await prisma.shipment.deleteMany({ where: { storeId: store.id } });
+    await prisma.shippingCarrierConfig.deleteMany({ where: { storeId: store.id } });
+    // Carrier config (so the shipping-carriers admin page has a row).
+    await prisma.shippingCarrierConfig.create({
+      data: {
+        storeId: store.id,
+        carrier: 'aramex',
+        enabled: true,
+        isDefault: true,
+        settings: { pickupCity: 'Kuwait City', defaultWeightKg: 1 },
+      },
+    });
+    enrich['shipping carrier configs'] = 1;
+
+    const shippableOrders = await prisma.order.findMany({
+      where: { storeId: store.id, status: { in: ['shipped', 'delivered'] }, shipment: null },
+      take: 5,
+    });
+    let shipNo = 0;
+    for (const o of shippableOrders) {
+      shipNo++;
+      const delivered = o.status === 'delivered';
+      await prisma.shipment.create({
+        data: {
+          storeId: store.id,
+          orderId: o.id,
+          carrier: 'aramex',
+          trackingNumber: `ARMX${pad(1000000 + shipNo, 7)}`,
+          trackingUrl: `https://www.aramex.com/track/results?ShipmentNumber=ARMX${pad(1000000 + shipNo, 7)}`,
+          status: delivered ? 'delivered' : 'in_transit',
+          pickupAddress: { city: 'Kuwait City', country: 'Kuwait' },
+          deliveryAddress: o.shippingAddress as object,
+          weight: '1.5',
+          estimatedDeliveryAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2),
+          statusHistory: [
+            { status: 'created', at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString() },
+            {
+              status: 'in_transit',
+              at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+            },
+            ...(delivered
+              ? [
+                  {
+                    status: 'delivered',
+                    at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
+                  },
+                ]
+              : []),
+          ],
+        },
+      });
+    }
+    enrich['shipments'] = shipNo;
+    console.log(`[enrich] ✓ ${shipNo} shipments + 1 carrier config`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ shipments block skipped:', (e as Error).message);
+  }
+
+  // ── K. ABANDONED CARTS — including a recovered one + a payment abandoner ──
+  try {
+    await prisma.abandonedCart.deleteMany({ where: { storeId: store.id } });
+    // Remove demo carts from a prior run, then build fresh ones.
+    await prisma.cart.deleteMany({
+      where: { storeId: store.id, sessionId: { startsWith: 'demo-abandon-' } },
+    });
+
+    // Abandoned-cart config (so the admin config page renders).
+    await prisma.abandonedCartConfig.upsert({
+      where: { storeId: store.id },
+      update: {
+        step1Enabled: true,
+        step2Enabled: true,
+        step3Enabled: true,
+        autoCouponEnabled: true,
+      },
+      create: {
+        storeId: store.id,
+        step1Enabled: true,
+        step2Enabled: true,
+        step3Enabled: true,
+        autoCouponEnabled: true,
+        couponDiscountPercent: 10,
+      },
+    });
+    enrich['abandoned cart config'] = 1;
+
+    const ABANDON: Array<{
+      status: string;
+      step1: number | null;
+      step2: number | null;
+      step3: number | null;
+      recovered: boolean;
+      custIdx: number;
+    }> = [
+      { status: 'pending', step1: null, step2: null, step3: null, recovered: false, custIdx: 2 },
+      { status: 'contacted', step1: 1, step2: null, step3: null, recovered: false, custIdx: 3 },
+      { status: 'contacted', step1: 2, step2: 1, step3: null, recovered: false, custIdx: 4 },
+      { status: 'recovered', step1: 3, step2: 2, step3: 1, recovered: true, custIdx: 5 },
+    ];
+    let acNo = 0;
+    for (const ab of ABANDON) {
+      acNo++;
+      const cust = demoUsers[ab.custIdx] ?? null;
+      const prod = createdProducts[(acNo * 2) % createdProducts.length];
+      const cart = await prisma.cart.create({
+        data: {
+          storeId: store.id,
+          sessionId: `demo-abandon-${acNo}`,
+          customerId: cust?.id ?? null,
+          items: {
+            create: [{ productId: prod.id, quantity: 1 + (acNo % 2) }],
+          },
+        },
+      });
+      await prisma.abandonedCart.create({
+        data: {
+          storeId: store.id,
+          cartId: cart.id,
+          customerId: cust?.id ?? null,
+          sessionId: cart.sessionId,
+          customerEmail: cust?.email ?? `guest${acNo}@demo.test`,
+          customerPhone: '+96599001000',
+          cartTotal: (prod.price / 1000).toFixed(3),
+          cartItemCount: 1 + (acNo % 2),
+          cartItems: [
+            { productId: prod.id, name: prod.name, quantity: 1 + (acNo % 2), price: prod.price },
+          ],
+          status: ab.status,
+          step1SentAt: ab.step1 ? new Date(Date.now() - 1000 * 60 * 60 * 24 * ab.step1) : null,
+          step2SentAt: ab.step2 ? new Date(Date.now() - 1000 * 60 * 60 * 24 * ab.step2) : null,
+          step3SentAt: ab.step3 ? new Date(Date.now() - 1000 * 60 * 60 * 24 * ab.step3) : null,
+          recoveredAt: ab.recovered ? new Date(Date.now() - 1000 * 60 * 60 * 12) : null,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * (acNo + 1)),
+        },
+      });
+    }
+    enrich['abandoned carts'] = acNo;
+    console.log(`[enrich] ✓ ${acNo} abandoned carts (1 recovered) + config`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ abandoned carts block skipped:', (e as Error).message);
+  }
+
+  // ── L. WISHLISTS — registered customers with saved products ───────────────
+  try {
+    await prisma.wishlistItem.deleteMany({ where: { wishlist: { storeId: store.id } } });
+    await prisma.wishlist.deleteMany({ where: { storeId: store.id } });
+    let wlNo = 0;
+    let wliNo = 0;
+    for (let i = 0; i < Math.min(5, demoUsers.length); i++) {
+      const u = demoUsers[i];
+      const wl = await prisma.wishlist.create({
+        data: { userId: u.id, storeId: store.id, name: 'My Wishlist' },
+      });
+      wlNo++;
+      const picks = createdProducts.slice(i, i + 3);
+      for (const p of picks) {
+        await prisma.wishlistItem.create({
+          data: { wishlistId: wl.id, productId: p.id },
+        });
+        wliNo++;
+      }
+    }
+    enrich['wishlists'] = wlNo;
+    enrich['wishlist items'] = wliNo;
+    console.log(`[enrich] ✓ ${wlNo} wishlists, ${wliNo} wishlist items`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ wishlists block skipped:', (e as Error).message);
+  }
+
+  // ── M. LOYALTY — earned + redeemed transactions on real orders ────────────
+  try {
+    // Layer redeem + review-bonus transactions on top of the earn rows the
+    // base seed created, so the loyalty ledger shows both directions + tiers.
+    const loyaltyUsers = await prisma.loyaltyPoints.findMany({
+      where: { storeId: store.id },
+      take: 5,
+    });
+    let ltNo = 0;
+    for (let i = 0; i < loyaltyUsers.length; i++) {
+      const lp = loyaltyUsers[i];
+      // A redeem transaction (negative points).
+      await prisma.loyaltyTransaction.create({
+        data: {
+          storeId: store.id,
+          customerId: lp.customerId,
+          type: 'redeem_discount',
+          points: -100,
+          description: 'Redeemed 100 points for 0.1 KWD discount',
+        },
+      });
+      ltNo++;
+      // A review-bonus transaction (positive).
+      await prisma.loyaltyTransaction.create({
+        data: {
+          storeId: store.id,
+          customerId: lp.customerId,
+          type: 'earn_review',
+          points: 50,
+          description: 'Bonus points for writing a product review',
+        },
+      });
+      ltNo++;
+      // A welcome-signup bonus.
+      if (i === 0) {
+        await prisma.loyaltyTransaction.create({
+          data: {
+            storeId: store.id,
+            customerId: lp.customerId,
+            type: 'earn_signup',
+            points: 100,
+            description: 'Welcome bonus on account creation',
+          },
+        });
+        ltNo++;
+      }
+    }
+    enrich['extra loyalty transactions'] = ltNo;
+    console.log(`[enrich] ✓ ${ltNo} extra loyalty transactions (redeem + review + signup)`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ loyalty transactions block skipped:', (e as Error).message);
+  }
+
+  // ── N. ANALYTICS SNAPSHOTS — cohort / funnel / RFM / daily views ──────────
+  try {
+    await prisma.customerCohortSnapshot.deleteMany({ where: { storeId: store.id } });
+    await prisma.funnelSnapshot.deleteMany({ where: { storeId: store.id } });
+    await prisma.customerRfmSnapshot.deleteMany({ where: { storeId: store.id } });
+    await prisma.productDailyView.deleteMany({ where: { storeId: store.id } });
+
+    // Cohort snapshots — 3 cohort months × a few period offsets.
+    const now = new Date();
+    let cohortNo = 0;
+    for (let m = 0; m < 3; m++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+      const cohortMonth = `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}`;
+      const total = 12 - m * 2;
+      for (let offset = 0; offset <= m; offset++) {
+        cohortNo++;
+        await prisma.customerCohortSnapshot.create({
+          data: {
+            storeId: store.id,
+            cohortMonth,
+            periodOffset: offset,
+            customersTotal: total,
+            customersActive: Math.max(1, Math.round(total * (1 - offset * 0.25))),
+            ordersInPeriod: Math.max(1, total - offset * 2),
+            revenueInPeriod: fils((total - offset) * 18),
+          },
+        });
+      }
+    }
+    enrich['cohort snapshots'] = cohortNo;
+
+    // Funnel snapshots — last 14 days.
+    let funnelNo = 0;
+    for (let i = 0; i < 14; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const views = 120 - i * 3;
+      funnelNo++;
+      await prisma.funnelSnapshot.create({
+        data: {
+          storeId: store.id,
+          periodDate: date,
+          productViews: views,
+          cartsCreated: Math.round(views * 0.35),
+          cartItemsAdded: Math.round(views * 0.5),
+          checkoutsStarted: Math.round(views * 0.18),
+          ordersCompleted: Math.round(views * 0.1),
+          ordersAbandoned: Math.round(views * 0.08),
+          revenueFils: fils(Math.round(views * 0.1) * 16),
+        },
+      });
+    }
+    enrich['funnel snapshots'] = funnelNo;
+
+    // RFM snapshots — one per registered customer across several segments.
+    const rfmSegments: RfmSegment[] = [
+      'vip',
+      'loyal',
+      'potential',
+      'new_customer',
+      'at_risk',
+      'hibernating',
+      'lost',
+    ];
+    let rfmNo = 0;
+    for (let i = 0; i < demoUsers.length; i++) {
+      const seg = rfmSegments[i % rfmSegments.length];
+      rfmNo++;
+      await prisma.customerRfmSnapshot.create({
+        data: {
+          storeId: store.id,
+          customerId: demoUsers[i].id,
+          recencyDays: 5 + i * 9,
+          frequencyOrders: Math.max(1, 6 - i),
+          monetaryFils: fils(150 - i * 12),
+          rfmScore: Math.max(1, 555 - i * 40),
+          segment: seg,
+        },
+      });
+    }
+    enrich['rfm snapshots'] = rfmNo;
+
+    // Product daily views — last 7 days for the first 8 products.
+    let pdvNo = 0;
+    for (const p of createdProducts.slice(0, 8)) {
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        pdvNo++;
+        await prisma.productDailyView.create({
+          data: {
+            storeId: store.id,
+            productId: p.id,
+            date,
+            count: 10 + ((pdvNo * 3) % 25),
+          },
+        });
+      }
+    }
+    enrich['product daily views'] = pdvNo;
+
+    console.log(
+      `[enrich] ✓ analytics: ${cohortNo} cohort, ${funnelNo} funnel, ${rfmNo} RFM, ${pdvNo} daily-view rows`
+    );
+  } catch (e) {
+    console.warn('[enrich] ⚠ analytics snapshots block skipped:', (e as Error).message);
+  }
+
+  // ── O. NEWSLETTER SUBSCRIBERS (so the newsletter admin page has rows) ─────
+  try {
+    await prisma.newsletterSubscriber.deleteMany({ where: { storeId: store.id } });
+    let nlNo = 0;
+    for (let i = 0; i < demoUsers.length; i++) {
+      nlNo++;
+      await prisma.newsletterSubscriber.create({
+        data: {
+          storeId: store.id,
+          email: demoUsers[i].email,
+          firstName: demoUsers[i].firstName,
+        },
+      });
+    }
+    enrich['newsletter subscribers'] = nlNo;
+    console.log(`[enrich] ✓ ${nlNo} newsletter subscribers`);
+  } catch (e) {
+    console.warn('[enrich] ⚠ newsletter subscribers skipped:', (e as Error).message);
+  }
+
+  // ── Enrichment summary ────────────────────────────────────────────────────
+  console.log('\n  ── Every-subsystem enrichment row counts ──');
+  for (const [k, v] of Object.entries(enrich)) {
+    console.log(`    ${k.padEnd(36)} ${v}`);
+  }
 
   // ── Summary ───────────────────────────────────────────────────────────────
   console.log('\n╔══════════════════════════════════════════════════╗');

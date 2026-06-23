@@ -28,6 +28,47 @@ other store.
 | HowTo           | 1 entry — "How to Place an Order" (6 bilingual steps)                                                                                                                                                                                     |
 | layoutSettings  | Fully populated: kicker/subtitle on every carousel section, 2 extra carousels (Editor's Picks + Staff Spotlight manual), per-page bgColor/density for products/PDP/categories/locations/checkout/cart, sectionOrder, blogCarousel enabled |
 
+### Every-subsystem enrichment (added 2026-06-23, `feat/demo-store-full-seed`)
+
+On top of the base data above, the seed now populates EVERY remaining subsystem so
+that any admin page or storefront surface shows real, believable rows ("every data
+has a UI"). Each block is wrapped in `try/catch` + `console.log` so one schema
+mismatch can never abort the rest, and each is delete-then-recreate idempotent
+scoped to the `demo` store only.
+
+| Subsystem                 | What it seeds                                                                                                                                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Registered customers      | 10 `User` (role=customer) accounts (`customerN@demo.forcemediakw.com`, password `DemoPass123!`) — back wishlists, returns, RFM. Existing orders are linked to these.                                               |
+| Product cost prices       | `costPrice` set to ~55% of price on all products → drives COGS / P&L / margin / dead-stock value.                                                                                                                  |
+| **Accounting — chart**    | 14-account chart of accounts (asset / liability / equity / revenue / expense) with a couple of children + `isSystem` flags.                                                                                        |
+| **Accounting — journal**  | 10 balanced journal entries (debits == credits, in fils): opening balance, sales revenue + matching COGS, a refund, a `reversed` entry, a `draft` entry. Posted by the store owner.                                |
+| **Accounting — expenses** | 6 expenses across rent / marketing / utilities / salaries in `posted` / `approved` / `pending` / `draft` states.                                                                                                   |
+| **Accounting — FX**       | 2 FX rate registry rows (USD / EUR → KWD) for `accounting.multi_currency`.                                                                                                                                         |
+| **Bank reconciliation**   | 1 bank statement (`reconciling`) + 4 transactions: 2 matched (auto + manual) to journal entries, 2 unmatched → the reconciliation mismatch report has content.                                                     |
+| **Inventory — suppliers** | 3 suppliers with lead-time + payment terms (net15 / net30 / net60).                                                                                                                                                |
+| **Inventory — POs**       | 4 purchase orders in `draft` / `sent` / `partial` / `received` states with line items + partial receipts.                                                                                                          |
+| **Inventory — adjust.**   | 3 stock adjustments (damage write-off + found, both posted; a draft cycle-count) with before/after qty + value impact.                                                                                             |
+| **Inventory — reorder**   | 3 reorder rules + 3 live reorder suggestions (advisory smart-layer) + 1 dead-stock flag + 1 backorder line + 1 profit anomaly (margin-drop warning).                                                               |
+| **Inventory — counts**    | 1 closed cycle-count session with 3 count lines (incl. a variance).                                                                                                                                                |
+| **Warehouses**            | 2 warehouses (Shuwaikh main + Salmiya depot) + 16 per-warehouse stock rows (`inventory.multi_warehouse`).                                                                                                          |
+| **Inventory history**     | 19 movement-ledger rows spanning initial / sale / return_stock / manual_add / damage / adjustment.                                                                                                                 |
+| **Order scenarios**       | Existing 19 orders re-dated across ~90 days (analytics/cohorts/funnel/RFM) + linked to registered customers; plus a FAILED-payment order and a STUCK/UNPAID gateway-abandoner order (Enterprise retargeting list). |
+| **Payment events**        | 6 append-only payment-lifecycle events (created → webhook → completed/failed) including a settlement id and a failure reason.                                                                                      |
+| **Partial refund**        | One delivered+paid order's payment moved to `partially_refunded` (40%) with a `refund` payment event.                                                                                                              |
+| **Returns**               | 5 returns, one in each meaningful status (pending / approved / received / completed / rejected) with return items + reasons + refund/rejection metadata.                                                           |
+| **Shipments**             | 1 Aramex carrier config + up to 5 shipments (tracking #, URL, status history) for shipped/delivered orders.                                                                                                        |
+| **Abandoned carts**       | Config row + 4 abandoned carts (pending / contacted ×2 / recovered) each with a real `Cart` + items and stepped reminder timestamps.                                                                               |
+| **Wishlists**             | 5 customer wishlists with 15 saved-product items.                                                                                                                                                                  |
+| **Loyalty txns**          | 11 extra loyalty transactions on top of the base earn rows: redeem-discount (negative), review bonus, signup bonus — both directions + tiers.                                                                      |
+| **Analytics snapshots**   | 6 cohort snapshots, 14 funnel snapshots (last 14 days), 10 RFM snapshots (across every `RfmSegment`), 56 product-daily-view rows.                                                                                  |
+| **Newsletter**            | 10 newsletter subscribers (one per registered customer).                                                                                                                                                           |
+
+Money is integer **fils** (1 KWD = 1000 fils) everywhere. `LoyaltyPoints` /
+`Return` / `Wishlist` all FK to `User` (role customer), NOT the `Customer` model —
+the seed creates the registered `User` rows for that. Run the seed and read the
+final `── Every-subsystem enrichment row counts ──` block for the exact per-run
+counts.
+
 ### Variant shapes demonstrated
 
 | #   | Description                                    | Products | Options | Variants |
