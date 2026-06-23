@@ -5,6 +5,7 @@ import type { PaymentProvider } from '../../../services/payment-providers/types'
 import logger from '../../logger';
 import { inngest } from '../client';
 import { shouldProcessInboxRow, shouldApplyWebhookEffects } from '../webhook-offload.guard';
+import { AppError } from '../../../middleware/error-handler';
 
 /**
  * Consumes `payment/webhook.received` and runs the heavy
@@ -172,13 +173,40 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
         return withRlsBypass(_tx => apply());
       });
     } catch (err) {
-      // Persist the error then rethrow so Inngest retries. The row stays
-      // 'processing'/'failed' and is a durable backstop for a replay sweep.
-      // When retries are exhausted Inngest emits inngest/function.failed →
-      // alertsFailureWatch fires a P0 (money-path escalation) so a stuck
-      // captured payment is never silent. The 'failed' WebhookEvent row is what
-      // an operator replays from.
       const message = err instanceof Error ? err.message : String(err);
+
+      // TERMINAL client errors (4xx AppError: forged/invalid signature, store
+      // mismatch, malformed payload) are NOT retryable — the bytes are bad, so
+      // replaying them just burns retries and, worse, pages a P0 on every forged
+      // POST (an unauthenticated attacker could spam P0s). Mark the row
+      // 'rejected' and RETURN without throwing: no retry, no inngest/function.failed,
+      // no P0. The durable row + lastError remain for audit. Only 5xx / unknown
+      // (DB, network — genuinely transient) rethrow to retry + escalate.
+      const isTerminalClientError =
+        err instanceof AppError && err.statusCode >= 400 && err.statusCode < 500;
+      if (isTerminalClientError) {
+        await step
+          .run('mark-rejected', async () =>
+            withRlsBypass(tx =>
+              tx.webhookEvent.update({
+                where: { id: webhookEventId },
+                data: { status: 'rejected', lastError: message.slice(0, 1000) },
+              })
+            )
+          )
+          .catch(() => undefined);
+        logger.warn(
+          { err, webhookEventId, provider, storeId },
+          '[payment-webhook-process] webhook rejected (terminal client error) — not retrying'
+        );
+        return;
+      }
+
+      // Transient failure: persist + rethrow so Inngest retries. The row stays
+      // 'failed' and is a durable backstop for a replay sweep. When retries are
+      // exhausted Inngest emits inngest/function.failed → alertsFailureWatch
+      // fires a P0 (money-path escalation) so a stuck captured payment is never
+      // silent. The 'failed' WebhookEvent row is what an operator replays from.
       await step
         .run('mark-failed', async () =>
           withRlsBypass(tx =>

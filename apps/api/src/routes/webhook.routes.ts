@@ -138,49 +138,68 @@ async function recordInboundWebhook(input: {
   rawBody: string;
   signature: string;
 }): Promise<string> {
-  return withRlsBypass(async tx => {
-    // First delivery: create the row. On the unique-key conflict (a
-    // re-delivery), refresh the volatile fields — but ONLY for a row that has
-    // NOT already been processed. This preserves the stored audit bytes
-    // (rawBody/signature/payload) of a 'processed' row so a late re-delivery
-    // can't corrupt the record of what we actually acted on. `status` is never
-    // touched here: a non-terminal row stays reprocessable, a 'processed' row
-    // stays a consumer no-op (shouldProcessInboxRow). The fresh inngest.send
-    // below re-enqueues regardless.
-    const existing = await tx.webhookEvent.findUnique({
-      where: { idempotencyKey: input.idempotencyKey },
-      select: { id: true, status: true },
+  try {
+    return await withRlsBypass(async tx => {
+      // First delivery: create the row. On the unique-key conflict (a
+      // re-delivery), refresh the volatile fields — but ONLY for a row that has
+      // NOT already been processed. This preserves the stored audit bytes
+      // (rawBody/signature/payload) of a 'processed' row so a late re-delivery
+      // can't corrupt the record of what we actually acted on. `status` is never
+      // touched here: a non-terminal row stays reprocessable, a 'processed' row
+      // stays a consumer no-op (shouldProcessInboxRow). The fresh inngest.send
+      // below re-enqueues regardless.
+      const existing = await tx.webhookEvent.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+        select: { id: true, status: true },
+      });
+
+      if (!existing) {
+        const created = await tx.webhookEvent.create({
+          data: {
+            provider: input.provider,
+            idempotencyKey: input.idempotencyKey,
+            storeId: input.storeId ?? null,
+            payload: input.payload as object,
+            rawBody: input.rawBody,
+            signature: input.signature,
+            status: 'received',
+          },
+          select: { id: true },
+        });
+        return created.id;
+      }
+
+      if (existing.status !== 'processed') {
+        await tx.webhookEvent.update({
+          where: { id: existing.id },
+          data: {
+            payload: input.payload as object,
+            rawBody: input.rawBody,
+            signature: input.signature,
+            storeId: input.storeId ?? null,
+          },
+        });
+      }
+      return existing.id;
     });
-
-    if (!existing) {
-      const created = await tx.webhookEvent.create({
-        data: {
-          provider: input.provider,
-          idempotencyKey: input.idempotencyKey,
-          storeId: input.storeId ?? null,
-          payload: input.payload as object,
-          rawBody: input.rawBody,
-          signature: input.signature,
-          status: 'received',
-        },
-        select: { id: true },
-      });
-      return created.id;
+  } catch (err) {
+    // Two near-simultaneous deliveries of the same txn both passed the
+    // findUnique (saw no row) and both tried to create → the second hits a
+    // P2002 on the unique idempotency_key. The aborted tx can't recover
+    // in-place, so re-read the row the winner just created in a FRESH tx and
+    // return its id. Without this the route 500s and the provider retries — the
+    // exact "5xx → provider retry loop" the inbox exists to avoid.
+    if ((err as { code?: string } | null)?.code === 'P2002') {
+      const row = (await withRlsBypass(tx =>
+        tx.webhookEvent.findUnique({
+          where: { idempotencyKey: input.idempotencyKey },
+          select: { id: true },
+        })
+      )) as { id: string } | null;
+      if (row) return row.id;
     }
-
-    if (existing.status !== 'processed') {
-      await tx.webhookEvent.update({
-        where: { id: existing.id },
-        data: {
-          payload: input.payload as object,
-          rawBody: input.rawBody,
-          signature: input.signature,
-          storeId: input.storeId ?? null,
-        },
-      });
-    }
-    return existing.id;
-  });
+    throw err;
+  }
 }
 
 /**

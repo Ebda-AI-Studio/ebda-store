@@ -45,6 +45,34 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
     // unless the tenant GUC is set. Inngest jobs run OUTSIDE the HTTP request, so
     // there is no tenant-context middleware here — set it explicitly from the
     // event's storeId, or this findUnique returns null and the fanout dies.
+    // Fire-once-per-order guard. order/created can be enqueued for the SAME
+    // paid order by both the customer-return confirm path AND the payment
+    // webhook consumer (and Inngest delivers at-least-once). Atomically CLAIM
+    // the order_created_notified_at stamp — only the first claimant proceeds;
+    // any later enqueue (or a duplicate delivery) matches 0 rows and skips the
+    // whole fanout, so the new-order email + admin OneSignal push fire exactly
+    // once. Memoized as its own step, so a retry of a LATER step re-uses the
+    // claim (count=1) and still re-runs only the failed sends.
+    const claim = await step.run('claim-order-created', () =>
+      runInTenantContext(storeId, () =>
+        prisma.order.updateMany({
+          where: { id: orderId, orderCreatedNotifiedAt: null },
+          data: { orderCreatedNotifiedAt: new Date() },
+        })
+      )
+    );
+    if (claim.count === 0) {
+      logger.info(
+        { orderId, storeId },
+        '[order-created] already notified — skipping duplicate fanout'
+      );
+      return;
+    }
+
+    // FORCE RLS (migration complete_force_rls_coverage) filters orders to 0 rows
+    // unless the tenant GUC is set. Inngest jobs run OUTSIDE the HTTP request, so
+    // there is no tenant-context middleware here — set it explicitly from the
+    // event's storeId, or this findUnique returns null and the fanout dies.
     const order = await step.run('load-order', async () =>
       runInTenantContext(storeId, async () => {
         const row = await prisma.order.findUnique({

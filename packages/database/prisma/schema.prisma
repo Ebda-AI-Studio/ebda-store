@@ -1113,6 +1113,15 @@ model Order {
   // paymentStatus=unpaid past STUCK_PAYMENT_MINUTES.
   stuckPaymentAlertedAt DateTime? @map("stuck_payment_alerted_at")
 
+  // order/created fanout dedupe. The order/created event can be enqueued by
+  // BOTH the customer-return "confirm" path AND the payment webhook consumer
+  // for the same paid order (and Inngest delivers at-least-once). The
+  // order-created fn atomically claims this stamp (UPDATE ... WHERE NULL) and
+  // skips the whole fanout if already claimed, so the "new order" email + admin
+  // OneSignal push fire EXACTLY once per order regardless of how many times the
+  // event is enqueued. NULL = not yet notified.
+  orderCreatedNotifiedAt DateTime? @map("order_created_notified_at")
+
   // Enterprise: payment-gateway abandonment capture. Set by the Inngest
   // payment-abandonment-sweep cron when the order has a Payment row with a
   // paymentUrl (customer reached the gateway) but paymentStatus is still
