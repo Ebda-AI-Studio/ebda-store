@@ -114,7 +114,7 @@ function ClassicProductCard({
         {/* Image container — PC-3: aspect driven by cardShape/cardAspect;
             falls back to mobile-square / desktop-portrait theme default. */}
         <div
-          className={`relative overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-3 ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-3 ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {onToggleCompare && (
             <CompareButton

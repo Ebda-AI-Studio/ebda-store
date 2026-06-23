@@ -185,7 +185,7 @@ function PecannbeeProductCardImpl({
             falls back to the mobile-square / desktop-portrait theme default. Item 10 —
             when normalizeImages is on, object-fill bg ensures transparent PNGs read cleanly. */}
         <div
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {img ? (
             <>
