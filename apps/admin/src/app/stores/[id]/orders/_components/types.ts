@@ -5,6 +5,14 @@ export interface OrderCustomer {
   email: string;
 }
 
+/** Shipping address JSON — for guest orders the shopper's name/email live here
+ *  (there is no `customer` row), so the list falls back to it for the name. */
+export interface OrderAddress {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
+
 export interface OrderPayment {
   provider: string;
   status: string;
@@ -21,7 +29,9 @@ export interface OrderLineItem {
 export interface Order {
   id: string;
   orderNumber?: string;
-  customer: OrderCustomer;
+  customer?: OrderCustomer | null;
+  // Guest orders have no `customer` row — name/email fall back to this.
+  shippingAddress?: OrderAddress | null;
   total: number;
   status: string;
   paymentStatus: string;

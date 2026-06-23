@@ -49,6 +49,9 @@ export interface Order {
   id: string;
   orderNumber?: string;
   customer?: OrderCustomer | null;
+  // Guest orders have no `customer` row — the name the shopper entered lives
+  // here, so the card falls back to it (otherwise guest orders show no name).
+  shippingAddress?: AddressJson | null;
   total: number;
   currency?: string;
   status: string;

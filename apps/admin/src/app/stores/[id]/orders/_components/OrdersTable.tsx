@@ -115,12 +115,18 @@ export function OrdersTable({
       header: t('table.customer'),
       cell: order => {
         const itemSummary = summarizeItems(order.items, count => t('table.moreItems', { count }));
+        // Guest orders have no `customer` row — fall back to the name/email the
+        // shopper entered in the shipping address so the cell is never blank.
+        const addr = order.shippingAddress;
+        const custName =
+          `${order.customer?.firstName ?? ''} ${order.customer?.lastName ?? ''}`.trim();
+        const guestName = `${addr?.firstName ?? ''} ${addr?.lastName ?? ''}`.trim();
+        const displayName = custName || guestName || '—';
+        const displayEmail = order.customer?.email || addr?.email || '';
         return (
           <div>
-            <p className="font-medium text-foreground">
-              {order.customer?.firstName} {order.customer?.lastName}
-            </p>
-            <p className="text-sm text-muted-foreground">{order.customer?.email}</p>
+            <p className="font-medium text-foreground">{displayName}</p>
+            <p className="text-sm text-muted-foreground">{displayEmail}</p>
             {itemSummary && (
               <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1" title={itemSummary}>
                 {itemSummary}

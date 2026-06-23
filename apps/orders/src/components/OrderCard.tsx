@@ -15,7 +15,12 @@ export function OrderCard({ order, storeId }: { order: Order; storeId: string })
   // orders (no name) fall back to the order ref as the primary line so the card
   // never shows an empty heading.
   const orderRef = order.orderNumber ?? order.id.slice(0, 8);
-  const name = customerName(order.customer, '');
+  // Guest orders carry no `customer` row — fall back to the name the shopper
+  // entered in the shipping address (then their email) so the card always shows
+  // a real name, not just the order ref.
+  const addr = order.shippingAddress;
+  const guestName = addr ? `${addr.firstName ?? ''} ${addr.lastName ?? ''}`.trim() : '';
+  const name = customerName(order.customer, '') || guestName || addr?.email || '';
   const primaryLine = name || orderRef;
   const secondaryRef = name ? orderRef : null;
 
