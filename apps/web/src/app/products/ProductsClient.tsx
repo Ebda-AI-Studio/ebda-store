@@ -699,6 +699,11 @@ export default function ProductsClient({
                       isInCompare={compareIds.has(product.id)}
                       onToggleCompare={handleToggleCompare}
                       onAddToCart={handleAddToCart}
+                      showCardPrice={
+                        store.theme?.showPriceOnCards === false
+                          ? false
+                          : productCardDefaults?.showCardPrice
+                      }
                     />
                   ))}
                 </div>

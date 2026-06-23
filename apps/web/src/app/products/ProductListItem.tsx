@@ -12,6 +12,10 @@ interface ProductListItemProps {
   isInCompare: boolean;
   onToggleCompare: (product: Product, e: React.MouseEvent) => void;
   onAddToCart: (product: Product, e: React.MouseEvent) => void;
+  /** Effective price visibility (already composed from productCardDefaults.showCardPrice
+   *  + theme.showPriceOnCards by the parent). When false, the price is hidden — the
+   *  list view is a product-card render path and must honor the toggle like the grid. */
+  showCardPrice?: boolean;
 }
 
 export function ProductListItem({
@@ -19,8 +23,10 @@ export function ProductListItem({
   isInCompare,
   onToggleCompare,
   onAddToCart,
+  showCardPrice,
 }: ProductListItemProps) {
   const { t, isRtl } = useLanguage();
+  const priceVisible = showCardPrice !== false;
   // Localized name for alt text + heading. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
   const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
@@ -92,19 +98,26 @@ export function ProductListItem({
           </h3>
         </div>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {pricing.mode === 'fromMin' && (
-              <span className="text-xs text-muted-foreground">{t('From', 'ابتداءً من')}</span>
-            )}
-            <span className="text-xl font-bold text-primary tabular-nums" data-zone="productPrice">
-              {formatPrice(pricing.displayPrice)}
-            </span>
-            {pricing.displayCompare && pricing.displayCompare > pricing.displayPrice && (
-              <span className="text-sm text-muted-foreground line-through">
-                {formatPrice(pricing.displayCompare)}
+          {priceVisible ? (
+            <div className="flex items-center gap-2">
+              {pricing.mode === 'fromMin' && (
+                <span className="text-xs text-muted-foreground">{t('From', 'ابتداءً من')}</span>
+              )}
+              <span
+                className="text-xl font-bold text-primary tabular-nums"
+                data-zone="productPrice"
+              >
+                {formatPrice(pricing.displayPrice)}
               </span>
-            )}
-          </div>
+              {pricing.displayCompare && pricing.displayCompare > pricing.displayPrice && (
+                <span className="text-sm text-muted-foreground line-through">
+                  {formatPrice(pricing.displayCompare)}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span />
+          )}
           <div className="flex items-center gap-2">
             {/* Compare button for list view */}
             <button
