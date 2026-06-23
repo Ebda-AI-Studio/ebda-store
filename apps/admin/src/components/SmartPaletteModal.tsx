@@ -53,6 +53,14 @@ export interface ThemeUpdates {
   showPriceOnCards?: boolean;
   /** Item 10 — force object-fit:cover on card images to create a uniform grid. Default false. */
   normalizeProductImages?: boolean;
+  /** Order-summary label colors (cart / checkout / address pages). */
+  summaryLabelColor?: string;
+  summaryTotalColor?: string;
+  summaryLabelBold?: boolean;
+  /** Products listing page (PLP) text colors. */
+  plpBreadcrumbColor?: string;
+  plpHeadingColor?: string;
+  plpSubheadingColor?: string;
 }
 
 interface SmartPaletteModalProps {

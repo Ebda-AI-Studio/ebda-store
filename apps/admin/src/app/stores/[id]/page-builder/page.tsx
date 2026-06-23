@@ -1344,6 +1344,52 @@ export default function StoreLayoutPage() {
                       onResetRole={pg.onResetRole}
                       theme={storeInfo?.theme}
                     />
+                    {/* PLP text color knobs — breadcrumb, h1, subtitle.
+                        Stored on StoreTheme JSON (no migration). */}
+                    <div className="mt-4 space-y-1 border-t border-border/40 pt-4">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Text colors
+                      </p>
+                      <ColorField
+                        label="Breadcrumb color (Home / Products)"
+                        value={
+                          (pendingThemeUpdates.plpBreadcrumbColor as string | undefined) ??
+                          storeInfo?.theme?.plpBreadcrumbColor
+                        }
+                        onChange={v =>
+                          setPendingThemeUpdates(prev => ({ ...prev, plpBreadcrumbColor: v }))
+                        }
+                        hint="Color of the Home → Products breadcrumb trail. Default: theme muted."
+                        theme={storeInfo?.theme ?? FALLBACK_THEME}
+                        inheritFromToken="muted"
+                      />
+                      <ColorField
+                        label="Page heading color (All Products)"
+                        value={
+                          (pendingThemeUpdates.plpHeadingColor as string | undefined) ??
+                          storeInfo?.theme?.plpHeadingColor
+                        }
+                        onChange={v =>
+                          setPendingThemeUpdates(prev => ({ ...prev, plpHeadingColor: v }))
+                        }
+                        hint="Color of the 'All Products' h1. Default: theme foreground."
+                        theme={storeInfo?.theme ?? FALLBACK_THEME}
+                        inheritFromToken="foreground"
+                      />
+                      <ColorField
+                        label="Subtitle color (Browse our collection)"
+                        value={
+                          (pendingThemeUpdates.plpSubheadingColor as string | undefined) ??
+                          storeInfo?.theme?.plpSubheadingColor
+                        }
+                        onChange={v =>
+                          setPendingThemeUpdates(prev => ({ ...prev, plpSubheadingColor: v }))
+                        }
+                        hint="Color of the subtitle under the h1. Default: theme muted."
+                        theme={storeInfo?.theme ?? FALLBACK_THEME}
+                        inheritFromToken="muted"
+                      />
+                    </div>
                   </SectionCard>
                 );
               })()}
@@ -1606,6 +1652,65 @@ export default function StoreLayoutPage() {
                   }
                   theme={storeInfo?.theme}
                 />
+                {/* Order-summary label colors — cart, checkout, and address pages.
+                    Stored on StoreTheme JSON (no migration). Defaults match the
+                    current look so existing stores see no visual change. */}
+                <div className="mt-4 space-y-1 border-t border-border/40 pt-4">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Order summary labels
+                  </p>
+                  <ColorField
+                    label="Label color (Subtotal, Shipping…)"
+                    value={
+                      (pendingThemeUpdates.summaryLabelColor as string | undefined) ??
+                      storeInfo?.theme?.summaryLabelColor
+                    }
+                    onChange={v =>
+                      setPendingThemeUpdates(prev => ({ ...prev, summaryLabelColor: v }))
+                    }
+                    hint="Color of the Subtotal, Shipping, Tax row labels. Default: theme foreground."
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                    inheritFromToken="foreground"
+                  />
+                  <ColorField
+                    label="Total color"
+                    value={
+                      (pendingThemeUpdates.summaryTotalColor as string | undefined) ??
+                      storeInfo?.theme?.summaryTotalColor
+                    }
+                    onChange={v =>
+                      setPendingThemeUpdates(prev => ({ ...prev, summaryTotalColor: v }))
+                    }
+                    hint="Color of the Total label and amount. Default: theme foreground."
+                    theme={storeInfo?.theme ?? FALLBACK_THEME}
+                    inheritFromToken="foreground"
+                  />
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-foreground">
+                        Bold summary labels
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Makes Subtotal / Shipping / Total labels bold. On by default.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={
+                        pendingThemeUpdates.summaryLabelBold !== undefined
+                          ? (pendingThemeUpdates.summaryLabelBold as boolean)
+                          : storeInfo?.theme?.summaryLabelBold !== false
+                      }
+                      onChange={e =>
+                        setPendingThemeUpdates(prev => ({
+                          ...prev,
+                          summaryLabelBold: e.target.checked,
+                        }))
+                      }
+                      className="h-5 w-5 cursor-pointer accent-primary"
+                    />
+                  </label>
+                </div>
               </SectionCard>
 
               {/* Testimonials */}

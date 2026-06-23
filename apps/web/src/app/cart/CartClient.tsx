@@ -21,6 +21,7 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { useLastListing } from '../../hooks/useLastListing';
+import { resolveColor } from '@force/shared';
 
 export default function CartClient() {
   const {
@@ -87,6 +88,26 @@ export default function CartClient() {
   };
   const { language, t } = useLanguage();
   const continuShoppingHref = useLastListing();
+
+  // ── Summary-label color + bold (StoreTheme → per-store) ─────────────────
+  // Defaults: label color → token:foreground (unchanged look), bold → true
+  // (matches the existing `font-bold` classes on summary rows).
+  const summaryLabelColorResolved = store.theme?.summaryLabelColor
+    ? (resolveColor(store.theme.summaryLabelColor, store.theme) ?? undefined)
+    : undefined;
+  const summaryTotalColorResolved = store.theme?.summaryTotalColor
+    ? (resolveColor(store.theme.summaryTotalColor, store.theme) ?? undefined)
+    : undefined;
+  // summaryLabelBold defaults to true (current look is bold); merchant sets
+  // false to switch to regular weight.
+  const summaryLabelBold = store.theme?.summaryLabelBold !== false;
+  const summaryLabelStyle = summaryLabelColorResolved
+    ? { color: summaryLabelColorResolved }
+    : undefined;
+  const summaryTotalStyle = summaryTotalColorResolved
+    ? { color: summaryTotalColorResolved }
+    : undefined;
+  const summaryFontWeight = summaryLabelBold ? 'font-bold' : 'font-normal';
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
@@ -637,6 +658,11 @@ export default function CartClient() {
                         ctaLabelAr="المتابعة للدفع"
                         ctaHref={storeUrl('/checkout')}
                         typography={cartTypography}
+                        summaryColors={{
+                          labelColor: summaryLabelColorResolved,
+                          totalColor: summaryTotalColorResolved,
+                          bold: summaryLabelBold,
+                        }}
                       >
                         {isEnabled('coupons') && (
                           <div>
@@ -701,7 +727,10 @@ export default function CartClient() {
                         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
                           <h2
                             className="text-lg font-bold text-foreground"
-                            style={cartZoneStyle(cartHeadingZone)}
+                            style={{
+                              ...cartZoneStyle(cartHeadingZone),
+                              ...summaryLabelStyle,
+                            }}
                           >
                             {t(
                               'Order Summary',
@@ -783,8 +812,11 @@ export default function CartClient() {
                           <div className="mt-6 space-y-3">
                             <div className="flex justify-between text-sm">
                               <span
-                                className="text-muted-foreground"
-                                style={cartZoneStyle(cartLabelZone)}
+                                className={`${summaryFontWeight} text-muted-foreground`}
+                                style={{
+                                  ...cartZoneStyle(cartLabelZone),
+                                  ...summaryLabelStyle,
+                                }}
                               >
                                 {t(
                                   'Subtotal',
@@ -812,8 +844,11 @@ export default function CartClient() {
                             )}
                             <div className="flex justify-between text-sm">
                               <span
-                                className="text-muted-foreground"
-                                style={cartZoneStyle(cartLabelZone)}
+                                className={`${summaryFontWeight} text-muted-foreground`}
+                                style={{
+                                  ...cartZoneStyle(cartLabelZone),
+                                  ...summaryLabelStyle,
+                                }}
                               >
                                 {t('Shipping', '\u0627\u0644\u0634\u062d\u0646')}
                               </span>
@@ -822,8 +857,11 @@ export default function CartClient() {
                                   "Calculated at checkout" label rather than a
                                   premature "Free". */}
                               <span
-                                className="font-medium text-muted-foreground"
-                                style={cartZoneStyle(cartLabelZone)}
+                                className={`${summaryFontWeight} text-muted-foreground`}
+                                style={{
+                                  ...cartZoneStyle(cartLabelZone),
+                                  ...summaryLabelStyle,
+                                }}
                               >
                                 {t(
                                   'Calculated at checkout',
@@ -834,14 +872,20 @@ export default function CartClient() {
                             <div className="border-t border-border pt-3">
                               <div className="flex justify-between">
                                 <span
-                                  className="text-lg font-bold text-foreground"
-                                  style={cartZoneStyle(cartHeadingZone)}
+                                  className={`text-lg ${summaryFontWeight} text-foreground`}
+                                  style={{
+                                    ...cartZoneStyle(cartHeadingZone),
+                                    ...summaryTotalStyle,
+                                  }}
                                 >
                                   {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}
                                 </span>
                                 <span
-                                  className="text-xl font-bold text-primary"
-                                  style={cartZoneStyle(cartPriceZone)}
+                                  className={`text-xl ${summaryFontWeight} text-primary`}
+                                  style={{
+                                    ...cartZoneStyle(cartPriceZone),
+                                    ...summaryTotalStyle,
+                                  }}
                                 >
                                   {formatPrice(total)}
                                 </span>

@@ -23,11 +23,19 @@ export default function ElegantOrderSummary({
   ctaDisabled,
   ctaLoading,
   typography,
+  summaryColors,
 }: OrderSummaryProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const fmt = (p: number) => `${(p / 1000).toFixed(3)} ${currency}`;
   const ctaText = isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr);
+  const summaryLabelBold = summaryColors?.bold !== false;
+  const labelColorStyle = summaryColors?.labelColor
+    ? { color: summaryColors.labelColor }
+    : undefined;
+  const totalColorStyle = summaryColors?.totalColor
+    ? { color: summaryColors.totalColor }
+    : undefined;
 
   return (
     <aside
@@ -37,15 +45,15 @@ export default function ElegantOrderSummary({
     >
       <h2
         className="text-sm font-bold uppercase tracking-[0.3em] text-muted-foreground"
-        style={typography?.heading}
+        style={{ ...typography?.heading, ...labelColorStyle }}
       >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="mt-8 space-y-5 text-sm font-light" aria-live="polite">
         <div className="flex items-center justify-between">
           <dt
-            className="font-semibold tracking-wide text-muted-foreground"
-            style={typography?.label}
+            className={`${summaryLabelBold ? 'font-semibold' : 'font-normal'} tracking-wide text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
           >
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
@@ -65,8 +73,8 @@ export default function ElegantOrderSummary({
         )}
         <div className="flex items-center justify-between">
           <dt
-            className="font-semibold tracking-wide text-muted-foreground"
-            style={typography?.label}
+            className={`${summaryLabelBold ? 'font-semibold' : 'font-normal'} tracking-wide text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
           >
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
@@ -96,14 +104,14 @@ export default function ElegantOrderSummary({
         )}
         <div className="mt-8 flex items-baseline justify-between border-t border-foreground/20 pt-8">
           <dt
-            className="text-sm font-bold uppercase tracking-[0.3em] text-foreground"
-            style={typography?.heading}
+            className={`text-sm ${summaryLabelBold ? 'font-bold' : 'font-normal'} uppercase tracking-[0.3em] text-foreground`}
+            style={{ ...typography?.heading, ...totalColorStyle }}
           >
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
           <dd
             className="text-xl font-light tracking-wide text-foreground tabular-nums"
-            style={typography?.price}
+            style={{ ...typography?.price, ...totalColorStyle }}
           >
             {fmt(total)}
           </dd>

@@ -27,6 +27,16 @@ export interface LoyaltyRedeemControl {
   loyaltyDiscount: number;
 }
 
+/** Resolved summary-label color overrides from StoreTheme flags. */
+export interface SummaryColors {
+  /** CSS color for row labels (Order Summary heading, Subtotal, Shipping). */
+  labelColor?: string;
+  /** CSS color for the grand-total label + amount. */
+  totalColor?: string;
+  /** Whether labels render bold (default true). */
+  bold?: boolean;
+}
+
 interface OrderSummaryProps {
   items: CheckoutCartItem[];
   subtotal: number;
@@ -44,6 +54,8 @@ interface OrderSummaryProps {
   loyalty?: LoyaltyRedeemControl;
   /** Per-store checkout typography (page-builder → Checkout page). */
   typography?: { heading?: CSSProperties; label?: CSSProperties; price?: CSSProperties };
+  /** Per-store summary-label color + bold overrides from StoreTheme. */
+  summaryColors?: SummaryColors;
 }
 
 export function OrderSummary({
@@ -61,8 +73,17 @@ export function OrderSummary({
   couponError,
   loyalty,
   typography,
+  summaryColors,
 }: OrderSummaryProps) {
   const { t, isRtl } = useLanguage();
+  const summaryLabelBold = summaryColors?.bold !== false;
+  const summaryFontWeight = summaryLabelBold ? 'font-bold' : 'font-normal';
+  const labelColorStyle = summaryColors?.labelColor
+    ? { color: summaryColors.labelColor }
+    : undefined;
+  const totalColorStyle = summaryColors?.totalColor
+    ? { color: summaryColors.totalColor }
+    : undefined;
   // KWD formatting for the points-value hint (pointsValue is fils/point).
   const pointsValueLabel = (points: number) =>
     loyalty ? formatPrice(points * loyalty.pointsValue) : '';
@@ -244,7 +265,10 @@ export function OrderSummary({
         {/* Totals */}
         <div className="mt-6 space-y-3 border-t pt-6">
           <div className="flex justify-between text-sm">
-            <span className="font-semibold text-muted-foreground" style={typography?.label}>
+            <span
+              className={`${summaryFontWeight} text-muted-foreground`}
+              style={{ ...typography?.label, ...labelColorStyle }}
+            >
               {t('Subtotal', translations['Subtotal'])}
             </span>
             <span className="font-medium tabular-nums" style={typography?.price}>
@@ -292,7 +316,10 @@ export function OrderSummary({
             );
           })()}
           <div className="flex justify-between text-sm">
-            <span className="font-semibold text-muted-foreground" style={typography?.label}>
+            <span
+              className={`${summaryFontWeight} text-muted-foreground`}
+              style={{ ...typography?.label, ...labelColorStyle }}
+            >
               {t('Shipping', translations['Shipping'])}
             </span>
             <span
@@ -310,10 +337,16 @@ export function OrderSummary({
             </span>
           </div>
           <div className="flex justify-between border-t pt-3">
-            <span className="text-lg font-bold text-foreground" style={typography?.heading}>
+            <span
+              className={`text-lg ${summaryFontWeight} text-foreground`}
+              style={{ ...typography?.heading, ...totalColorStyle }}
+            >
               {t('Total', translations['Total'])}
             </span>
-            <span className="text-lg font-bold text-primary tabular-nums" style={typography?.price}>
+            <span
+              className={`text-lg ${summaryFontWeight} text-primary tabular-nums`}
+              style={{ ...typography?.price, ...totalColorStyle }}
+            >
               {formatPrice(total)}
             </span>
           </div>

@@ -292,6 +292,45 @@ export interface StoreTheme {
     ar: string;
   };
 
+  // ── Order-summary label colors (cart / checkout / address pages) ──────────
+  /**
+   * Color for summary row labels (Order Summary heading, Subtotal, Shipping).
+   * Accepts a `token:<name>` brand-token reference or a hex color.
+   * Default (when undefined): inherits `token:foreground` — no visual change
+   * for existing stores.
+   */
+  summaryLabelColor?: string;
+  /**
+   * Color for the grand-total row (Total label + amount). When undefined,
+   * falls back to `token:foreground` so existing stores look unchanged.
+   * Lets merchants make the total pop with the brand primary or any color.
+   */
+  summaryTotalColor?: string;
+  /**
+   * When true, summary row labels (Subtotal, Shipping, Total) render bold.
+   * Default true to match the current bold rendering — opting out sets
+   * `font-normal` so labels appear in regular weight.
+   */
+  summaryLabelBold?: boolean;
+
+  // ── Products listing page (PLP) text colors ─────────────────────────────
+  /**
+   * Color for the PLP breadcrumb links (Home / Products) and the subtitle
+   * "Browse our collection". Accepts a token ref or hex. Default: inherits
+   * `token:muted` — no visual change for existing stores.
+   */
+  plpBreadcrumbColor?: string;
+  /**
+   * Color for the PLP main heading ("All Products"). Accepts a token ref or
+   * hex. Default (when undefined): inherits `token:foreground`.
+   */
+  plpHeadingColor?: string;
+  /**
+   * Color for the PLP subtitle / sub-heading ("Browse our collection of
+   * premium products"). Accepts a token ref or hex. Default: `token:muted`.
+   */
+  plpSubheadingColor?: string;
+
   // Custom CSS (for advanced users)
   customCss?: string;
 }

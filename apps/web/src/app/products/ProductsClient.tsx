@@ -184,6 +184,18 @@ export default function ProductsClient({
   const plpScale = pageTextScale(productsPage?.textScale);
   const plpDensity = pageDensityStyle(productsPage?.density);
 
+  // PLP text color overrides — breadcrumb, heading, subheading.
+  // Resolved from token:* or hex; undefined when unset → falls back to Tailwind class.
+  const plpBreadcrumbColorStyle = store.theme?.plpBreadcrumbColor
+    ? { color: resolveColor(store.theme.plpBreadcrumbColor, store.theme) ?? undefined }
+    : undefined;
+  const plpHeadingColorStyle = store.theme?.plpHeadingColor
+    ? { color: resolveColor(store.theme.plpHeadingColor, store.theme) ?? undefined }
+    : undefined;
+  const plpSubheadingColorStyle = store.theme?.plpSubheadingColor
+    ? { color: resolveColor(store.theme.plpSubheadingColor, store.theme) ?? undefined }
+    : undefined;
+
   // Cart-id → quantity is consumed by ProductListItem (list view). The grid
   // view's PecannbeeProductCard handles its own optimistic add state.
   const cartQuantities = useMemo<Record<string, number>>(() => {
@@ -403,7 +415,7 @@ export default function ProductsClient({
           {/* Breadcrumb */}
           <nav
             className="mb-6 flex items-center gap-2 text-sm text-muted-foreground"
-            style={zoneStyle(plpSubtitleZone, plpScale)}
+            style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
           >
             <Link href={storeUrl('/')} className="transition-colors hover:text-primary">
               {t('Home', translations['Home'])}
@@ -411,7 +423,10 @@ export default function ProductsClient({
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            <span className="text-foreground" style={zoneStyle(plpSubtitleZone, plpScale)}>
+            <span
+              className="text-foreground"
+              style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
+            >
               {t('Products', translations['Products'])}
             </span>
           </nav>
@@ -420,11 +435,14 @@ export default function ProductsClient({
           <div className="mb-8">
             <h1
               className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
-              style={zoneStyle(plpHeadingZone, plpScale)}
+              style={{ ...zoneStyle(plpHeadingZone, plpScale), ...plpHeadingColorStyle }}
             >
               {t('All Products', translations['All Products'])}
             </h1>
-            <p className="mt-2 text-muted-foreground" style={zoneStyle(plpSubtitleZone, plpScale)}>
+            <p
+              className="mt-2 text-muted-foreground"
+              style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
+            >
               {t(
                 'Browse our collection of premium products',
                 '\u062a\u0635\u0641\u062d \u0645\u062c\u0645\u0648\u0639\u062a\u0646\u0627 \u0645\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0645\u0645\u064a\u0632\u0629'

@@ -23,11 +23,19 @@ export default function ClassicOrderSummary({
   ctaDisabled,
   ctaLoading,
   typography,
+  summaryColors,
 }: OrderSummaryProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const fmt = (p: number) => `${(p / 1000).toFixed(3)} ${currency}`;
   const ctaText = isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr);
+  const summaryLabelBold = summaryColors?.bold !== false;
+  const labelColorStyle = summaryColors?.labelColor
+    ? { color: summaryColors.labelColor }
+    : undefined;
+  const totalColorStyle = summaryColors?.totalColor
+    ? { color: summaryColors.totalColor }
+    : undefined;
 
   return (
     <aside
@@ -37,13 +45,16 @@ export default function ClassicOrderSummary({
     >
       <h2
         className="text-sm font-bold uppercase tracking-widest text-muted-foreground"
-        style={typography?.heading}
+        style={{ ...typography?.heading, ...labelColorStyle }}
       >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="mt-6 space-y-4 text-sm" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
+          <dt
+            className={`${summaryLabelBold ? 'font-semibold' : 'font-normal'} text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
+          >
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
           <dd className="tracking-tight text-foreground tabular-nums" style={typography?.price}>
@@ -59,7 +70,10 @@ export default function ClassicOrderSummary({
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
+          <dt
+            className={`${summaryLabelBold ? 'font-semibold' : 'font-normal'} text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
+          >
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="tracking-tight text-foreground tabular-nums" style={typography?.price}>
@@ -86,14 +100,14 @@ export default function ClassicOrderSummary({
         )}
         <div className="mt-6 flex items-baseline justify-between border-t border-border pt-6">
           <dt
-            className="text-sm font-bold uppercase tracking-widest text-foreground"
-            style={typography?.heading}
+            className={`text-sm ${summaryLabelBold ? 'font-bold' : 'font-normal'} uppercase tracking-widest text-foreground`}
+            style={{ ...typography?.heading, ...totalColorStyle }}
           >
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
           <dd
             className="text-lg font-semibold tracking-tight text-foreground tabular-nums"
-            style={typography?.price}
+            style={{ ...typography?.price, ...totalColorStyle }}
           >
             {fmt(total)}
           </dd>

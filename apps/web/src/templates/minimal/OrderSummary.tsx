@@ -23,17 +23,28 @@ export default function MinimalOrderSummary({
   ctaDisabled,
   ctaLoading,
   typography,
+  summaryColors,
 }: OrderSummaryProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const fmt = (p: number) => `${(p / 1000).toFixed(3)} ${currency}`;
   const ctaText = isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr);
+  const summaryLabelBold = summaryColors?.bold !== false;
+  const labelColorStyle = summaryColors?.labelColor
+    ? { color: summaryColors.labelColor }
+    : undefined;
+  const totalColorStyle = summaryColors?.totalColor
+    ? { color: summaryColors.totalColor }
+    : undefined;
 
   return (
     <aside dir={isRtl ? 'rtl' : 'ltr'} aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}>
       <dl className="space-y-4 text-sm" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
+          <dt
+            className={`${summaryLabelBold ? 'font-semibold' : 'font-normal'} text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
+          >
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
           <dd className="text-foreground tabular-nums" style={typography?.price}>
@@ -49,7 +60,10 @@ export default function MinimalOrderSummary({
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
+          <dt
+            className={`${summaryLabelBold ? 'font-semibold' : 'font-normal'} text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
+          >
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="text-foreground tabular-nums" style={typography?.price}>
@@ -75,10 +89,16 @@ export default function MinimalOrderSummary({
           </div>
         )}
         <div className="flex items-baseline justify-between border-t border-border pt-5">
-          <dt className="font-bold text-foreground" style={typography?.heading}>
+          <dt
+            className={`${summaryLabelBold ? 'font-bold' : 'font-normal'} text-foreground`}
+            style={{ ...typography?.heading, ...totalColorStyle }}
+          >
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
-          <dd className="text-lg text-foreground tabular-nums" style={typography?.price}>
+          <dd
+            className="text-lg text-foreground tabular-nums"
+            style={{ ...typography?.price, ...totalColorStyle }}
+          >
             {fmt(total)}
           </dd>
         </div>

@@ -23,11 +23,19 @@ export default function BoldOrderSummary({
   ctaDisabled,
   ctaLoading,
   typography,
+  summaryColors,
 }: OrderSummaryProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const fmt = (p: number) => `${(p / 1000).toFixed(3)} ${currency}`;
   const ctaText = isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr);
+  const summaryLabelBold = summaryColors?.bold !== false;
+  const labelColorStyle = summaryColors?.labelColor
+    ? { color: summaryColors.labelColor }
+    : undefined;
+  const totalColorStyle = summaryColors?.totalColor
+    ? { color: summaryColors.totalColor }
+    : undefined;
 
   return (
     <aside
@@ -37,15 +45,15 @@ export default function BoldOrderSummary({
     >
       <h2
         className="border-b-2 border-foreground bg-foreground px-5 py-3 text-sm font-black uppercase tracking-widest text-background"
-        style={typography?.heading}
+        style={{ ...typography?.heading, ...labelColorStyle }}
       >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="space-y-3 p-5 text-sm" aria-live="polite">
         <div className="flex items-center justify-between">
           <dt
-            className="font-bold uppercase tracking-wider text-muted-foreground"
-            style={typography?.label}
+            className={`${summaryLabelBold ? 'font-bold' : 'font-normal'} uppercase tracking-wider text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
           >
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
@@ -65,8 +73,8 @@ export default function BoldOrderSummary({
         )}
         <div className="flex items-center justify-between">
           <dt
-            className="font-bold uppercase tracking-wider text-muted-foreground"
-            style={typography?.label}
+            className={`${summaryLabelBold ? 'font-bold' : 'font-normal'} uppercase tracking-wider text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
           >
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
@@ -97,14 +105,14 @@ export default function BoldOrderSummary({
         )}
         <div className="mt-3 flex items-baseline justify-between border-t-2 border-foreground pt-3">
           <dt
-            className="text-base font-black uppercase tracking-tight text-foreground"
-            style={typography?.heading}
+            className={`text-base ${summaryLabelBold ? 'font-black' : 'font-normal'} uppercase tracking-tight text-foreground`}
+            style={{ ...typography?.heading, ...totalColorStyle }}
           >
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
           <dd
             className="text-2xl font-black tracking-tight text-foreground tabular-nums"
-            style={typography?.price}
+            style={{ ...typography?.price, ...totalColorStyle }}
           >
             {fmt(total)}
           </dd>

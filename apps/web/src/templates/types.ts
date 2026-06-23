@@ -812,6 +812,21 @@ export interface CartTableProps {
  * its own aesthetic. The parent owns the math; the template is purely
  * presentational + provides a slot for consumer UI (coupon input on cart).
  */
+/**
+ * Resolved summary-label color overrides from StoreTheme, threaded from
+ * CartClient into template OrderSummary components so the merchant's
+ * summaryLabelColor / summaryTotalColor / summaryLabelBold settings reach
+ * every theme's order summary rendering.
+ */
+export interface SummaryColors {
+  /** CSS color for row labels (Order Summary heading, Subtotal, Shipping). */
+  labelColor?: string;
+  /** CSS color for the grand-total label + amount. */
+  totalColor?: string;
+  /** Whether labels render bold (default true). */
+  bold?: boolean;
+}
+
 export interface OrderSummaryProps {
   /** All amounts are in the smallest currency unit (fils for KWD). */
   subtotal: number;
@@ -842,6 +857,8 @@ export interface OrderSummaryProps {
   ctaLoading?: boolean;
   /** Per-store cart typography (page-builder → Cart page). Optional. */
   typography?: CartTypography;
+  /** Per-store summary-label color + bold overrides from StoreTheme. Optional. */
+  summaryColors?: SummaryColors;
 }
 
 /**

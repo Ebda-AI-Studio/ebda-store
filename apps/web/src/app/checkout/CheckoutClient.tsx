@@ -12,7 +12,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
-import { isValidEmail, KUWAIT_GOVERNORATES, findGovernorateByArea } from '@force/shared';
+import {
+  isValidEmail,
+  KUWAIT_GOVERNORATES,
+  findGovernorateByArea,
+  resolveColor,
+} from '@force/shared';
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
 import { saveCheckoutInfo, loadCheckoutInfo, clearCheckoutInfo } from './_lib/savedCheckout';
 import { pageSurfaceStyle } from '@/lib/page-surface';
@@ -102,6 +107,18 @@ export default function CheckoutClient() {
     label: zoneStyle(checkoutLabelZone, checkoutScale),
     price: zoneStyle(checkoutPriceZone, checkoutScale),
   };
+  // Summary-label color + bold overrides from StoreTheme (new per-store flags).
+  const checkoutSummaryColors = store?.theme
+    ? {
+        labelColor: store.theme.summaryLabelColor
+          ? (resolveColor(store.theme.summaryLabelColor, store.theme) ?? undefined)
+          : undefined,
+        totalColor: store.theme.summaryTotalColor
+          ? (resolveColor(store.theme.summaryTotalColor, store.theme) ?? undefined)
+          : undefined,
+        bold: store.theme.summaryLabelBold !== false,
+      }
+    : undefined;
   // Optional override for the minimal-chrome label on /checkout. Store
   // owners can rename or clear the "Secure Checkout" text via
   // store.settings.checkoutLabel / .checkoutLabelAr without code changes.
@@ -1619,6 +1636,7 @@ export default function CheckoutClient() {
                   : undefined
               }
               typography={checkoutTypography}
+              summaryColors={checkoutSummaryColors}
             />
 
             {/* Mobile-only button row — visible only below lg breakpoint, after

@@ -23,11 +23,19 @@ export default function ModernOrderSummary({
   ctaDisabled,
   ctaLoading,
   typography,
+  summaryColors,
 }: OrderSummaryProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const fmt = (p: number) => `${(p / 1000).toFixed(3)} ${currency}`;
   const ctaText = isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr);
+  const summaryLabelBold = summaryColors?.bold !== false;
+  const labelColorStyle = summaryColors?.labelColor
+    ? { color: summaryColors.labelColor }
+    : undefined;
+  const totalColorStyle = summaryColors?.totalColor
+    ? { color: summaryColors.totalColor }
+    : undefined;
 
   return (
     <aside
@@ -35,12 +43,18 @@ export default function ModernOrderSummary({
       className="rounded-2xl border border-border/60 bg-card p-7 shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.10)]"
       aria-label={isRtl ? 'ملخص الطلب' : 'Order summary'}
     >
-      <h2 className="text-lg font-bold text-foreground tracking-tight" style={typography?.heading}>
+      <h2
+        className="text-lg font-bold text-foreground tracking-tight"
+        style={{ ...typography?.heading, ...labelColorStyle }}
+      >
         {isRtl ? 'ملخص الطلب' : 'Order Summary'}
       </h2>
       <dl className="mt-5 space-y-3 text-sm" aria-live="polite">
         <div className="flex items-center justify-between">
-          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
+          <dt
+            className={`${summaryLabelBold ? 'font-semibold' : 'font-normal'} text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
+          >
             {isRtl ? 'المجموع الفرعي' : 'Subtotal'}
           </dt>
           <dd className="font-medium text-foreground tabular-nums" style={typography?.price}>
@@ -56,7 +70,10 @@ export default function ModernOrderSummary({
           </div>
         )}
         <div className="flex items-center justify-between">
-          <dt className="font-semibold text-muted-foreground" style={typography?.label}>
+          <dt
+            className={`${summaryLabelBold ? 'font-semibold' : 'font-normal'} text-muted-foreground`}
+            style={{ ...typography?.label, ...labelColorStyle }}
+          >
             {isRtl ? 'الشحن' : 'Shipping'}
           </dt>
           <dd className="font-medium text-foreground tabular-nums" style={typography?.price}>
@@ -82,10 +99,16 @@ export default function ModernOrderSummary({
           </div>
         )}
         <div className="mt-4 flex items-baseline justify-between border-t border-border/60 pt-4">
-          <dt className="text-base font-bold text-foreground" style={typography?.heading}>
+          <dt
+            className={`text-base ${summaryLabelBold ? 'font-bold' : 'font-normal'} text-foreground`}
+            style={{ ...typography?.heading, ...totalColorStyle }}
+          >
             {isRtl ? 'الإجمالي' : 'Total'}
           </dt>
-          <dd className="text-xl font-bold text-primary tabular-nums" style={typography?.price}>
+          <dd
+            className={`text-xl ${summaryLabelBold ? 'font-bold' : 'font-normal'} text-primary tabular-nums`}
+            style={{ ...typography?.price, ...totalColorStyle }}
+          >
             {fmt(total)}
           </dd>
         </div>
