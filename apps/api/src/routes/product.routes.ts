@@ -313,6 +313,183 @@ router.get(
   }
 );
 
+// Two endpoints — one per carousel — that let merchants set the display order
+// of products within the "New Arrivals" and "Best Sellers" homepage carousels.
+// They follow the exact same shape as the category product reorder endpoint in
+// category.routes.ts (PR #362).
+
+const reorderCarouselSchema = z.object({
+  orderedProductIds: z.array(z.string().uuid()).min(1).max(500),
+});
+
+// GET /stores/:storeId/products/new-arrivals
+// List all products with isNew=true in their current carousel order
+// (newArrivalPosition ASC, createdAt DESC tiebreaker). Used by the admin UI.
+router.get(
+  '/new-arrivals',
+  authenticate,
+  authorize('store_admin', 'super_admin', 'staff'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const products = await prisma.product.findMany({
+        where: { storeId, isNew: true, deletedAt: null },
+        orderBy: [{ newArrivalPosition: 'asc' }, { createdAt: 'desc' }],
+        select: {
+          id: true,
+          name: true,
+          nameAr: true,
+          sku: true,
+          status: true,
+          newArrivalPosition: true,
+          images: { orderBy: { position: 'asc' }, take: 1, select: { url: true } },
+        },
+      });
+      res.json({ success: true, data: { products } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:storeId/products/new-arrivals/reorder
+// Persist the merchant's display order for the New Arrivals carousel.
+// Body: { orderedProductIds: [...] } — validates every ID is an isNew product.
+router.put(
+  '/new-arrivals/reorder',
+  authenticate,
+  requirePermission('products:write'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { orderedProductIds } = reorderCarouselSchema.parse(req.body);
+
+      // Validate every supplied ID is a product in this store with isNew=true.
+      const existing = await prisma.product.findMany({
+        where: { storeId, isNew: true, id: { in: orderedProductIds }, deletedAt: null },
+        select: { id: true },
+      });
+      const existingIds = new Set(existing.map(r => r.id));
+      const unknown = orderedProductIds.filter(id => !existingIds.has(id));
+      if (unknown.length > 0) {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'PRODUCT_NOT_IN_CAROUSEL',
+            message: `${unknown.length} product(s) not found in the New Arrivals carousel`,
+          },
+        });
+        return;
+      }
+
+      // Persist positions in a single transaction — position = index.
+      await prisma.$transaction(
+        orderedProductIds.map((id, index) =>
+          prisma.product.update({
+            where: { id },
+            data: { newArrivalPosition: index },
+          })
+        )
+      );
+
+      // Bust the public product cache so the storefront immediately reflects
+      // the new order on next request.
+      invalidateCachedPrefix(`public:products:${storeId}:`);
+
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /stores/:storeId/products/best-sellers
+// List all products with isBestSeller=true in their current carousel order
+// (bestSellerPosition ASC, createdAt DESC tiebreaker). Used by the admin UI.
+router.get(
+  '/best-sellers',
+  authenticate,
+  authorize('store_admin', 'super_admin', 'staff'),
+  requireStoreAccess,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const products = await prisma.product.findMany({
+        where: { storeId, isBestSeller: true, deletedAt: null },
+        orderBy: [{ bestSellerPosition: 'asc' }, { createdAt: 'desc' }],
+        select: {
+          id: true,
+          name: true,
+          nameAr: true,
+          sku: true,
+          status: true,
+          bestSellerPosition: true,
+          images: { orderBy: { position: 'asc' }, take: 1, select: { url: true } },
+        },
+      });
+      res.json({ success: true, data: { products } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /stores/:storeId/products/best-sellers/reorder
+// Persist the merchant's display order for the Best Sellers carousel.
+// Body: { orderedProductIds: [...] } — validates every ID is an isBestSeller product.
+router.put(
+  '/best-sellers/reorder',
+  authenticate,
+  requirePermission('products:write'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { orderedProductIds } = reorderCarouselSchema.parse(req.body);
+
+      // Validate every supplied ID is a product in this store with isBestSeller=true.
+      const existing = await prisma.product.findMany({
+        where: { storeId, isBestSeller: true, id: { in: orderedProductIds }, deletedAt: null },
+        select: { id: true },
+      });
+      const existingIds = new Set(existing.map(r => r.id));
+      const unknown = orderedProductIds.filter(id => !existingIds.has(id));
+      if (unknown.length > 0) {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'PRODUCT_NOT_IN_CAROUSEL',
+            message: `${unknown.length} product(s) not found in the Best Sellers carousel`,
+          },
+        });
+        return;
+      }
+
+      // Persist positions in a single transaction — position = index.
+      await prisma.$transaction(
+        orderedProductIds.map((id, index) =>
+          prisma.product.update({
+            where: { id },
+            data: { bestSellerPosition: index },
+          })
+        )
+      );
+
+      // Bust the public product cache so the storefront immediately reflects
+      // the new order on next request.
+      invalidateCachedPrefix(`public:products:${storeId}:`);
+
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /stores/:storeId/products/:id - admin product detail. Returns
 // drafts + archived. Storefront uses /public/products/:slug which
 // filters status='active' + deletedAt:null.
@@ -661,181 +838,5 @@ router.delete(
 
 // ─── Carousel reorder endpoints ──────────────────────────────────────────────
 //
-// Two endpoints — one per carousel — that let merchants set the display order
-// of products within the "New Arrivals" and "Best Sellers" homepage carousels.
-// They follow the exact same shape as the category product reorder endpoint in
-// category.routes.ts (PR #362).
-
-const reorderCarouselSchema = z.object({
-  orderedProductIds: z.array(z.string().uuid()).min(1).max(500),
-});
-
-// GET /stores/:storeId/products/new-arrivals
-// List all products with isNew=true in their current carousel order
-// (newArrivalPosition ASC, createdAt DESC tiebreaker). Used by the admin UI.
-router.get(
-  '/new-arrivals',
-  authenticate,
-  authorize('store_admin', 'super_admin', 'staff'),
-  requireStoreAccess,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId } = req.params;
-      const products = await prisma.product.findMany({
-        where: { storeId, isNew: true, deletedAt: null },
-        orderBy: [{ newArrivalPosition: 'asc' }, { createdAt: 'desc' }],
-        select: {
-          id: true,
-          name: true,
-          nameAr: true,
-          sku: true,
-          status: true,
-          newArrivalPosition: true,
-          images: { orderBy: { position: 'asc' }, take: 1, select: { url: true } },
-        },
-      });
-      res.json({ success: true, data: { products } });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// PUT /stores/:storeId/products/new-arrivals/reorder
-// Persist the merchant's display order for the New Arrivals carousel.
-// Body: { orderedProductIds: [...] } — validates every ID is an isNew product.
-router.put(
-  '/new-arrivals/reorder',
-  authenticate,
-  requirePermission('products:write'),
-  requireStoreAccess,
-  writeLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId } = req.params;
-      const { orderedProductIds } = reorderCarouselSchema.parse(req.body);
-
-      // Validate every supplied ID is a product in this store with isNew=true.
-      const existing = await prisma.product.findMany({
-        where: { storeId, isNew: true, id: { in: orderedProductIds }, deletedAt: null },
-        select: { id: true },
-      });
-      const existingIds = new Set(existing.map(r => r.id));
-      const unknown = orderedProductIds.filter(id => !existingIds.has(id));
-      if (unknown.length > 0) {
-        res.status(422).json({
-          success: false,
-          error: {
-            code: 'PRODUCT_NOT_IN_CAROUSEL',
-            message: `${unknown.length} product(s) not found in the New Arrivals carousel`,
-          },
-        });
-        return;
-      }
-
-      // Persist positions in a single transaction — position = index.
-      await prisma.$transaction(
-        orderedProductIds.map((id, index) =>
-          prisma.product.update({
-            where: { id },
-            data: { newArrivalPosition: index },
-          })
-        )
-      );
-
-      // Bust the public product cache so the storefront immediately reflects
-      // the new order on next request.
-      invalidateCachedPrefix(`public:products:${storeId}:`);
-
-      res.json({ success: true });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// GET /stores/:storeId/products/best-sellers
-// List all products with isBestSeller=true in their current carousel order
-// (bestSellerPosition ASC, createdAt DESC tiebreaker). Used by the admin UI.
-router.get(
-  '/best-sellers',
-  authenticate,
-  authorize('store_admin', 'super_admin', 'staff'),
-  requireStoreAccess,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId } = req.params;
-      const products = await prisma.product.findMany({
-        where: { storeId, isBestSeller: true, deletedAt: null },
-        orderBy: [{ bestSellerPosition: 'asc' }, { createdAt: 'desc' }],
-        select: {
-          id: true,
-          name: true,
-          nameAr: true,
-          sku: true,
-          status: true,
-          bestSellerPosition: true,
-          images: { orderBy: { position: 'asc' }, take: 1, select: { url: true } },
-        },
-      });
-      res.json({ success: true, data: { products } });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// PUT /stores/:storeId/products/best-sellers/reorder
-// Persist the merchant's display order for the Best Sellers carousel.
-// Body: { orderedProductIds: [...] } — validates every ID is an isBestSeller product.
-router.put(
-  '/best-sellers/reorder',
-  authenticate,
-  requirePermission('products:write'),
-  requireStoreAccess,
-  writeLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { storeId } = req.params;
-      const { orderedProductIds } = reorderCarouselSchema.parse(req.body);
-
-      // Validate every supplied ID is a product in this store with isBestSeller=true.
-      const existing = await prisma.product.findMany({
-        where: { storeId, isBestSeller: true, id: { in: orderedProductIds }, deletedAt: null },
-        select: { id: true },
-      });
-      const existingIds = new Set(existing.map(r => r.id));
-      const unknown = orderedProductIds.filter(id => !existingIds.has(id));
-      if (unknown.length > 0) {
-        res.status(422).json({
-          success: false,
-          error: {
-            code: 'PRODUCT_NOT_IN_CAROUSEL',
-            message: `${unknown.length} product(s) not found in the Best Sellers carousel`,
-          },
-        });
-        return;
-      }
-
-      // Persist positions in a single transaction — position = index.
-      await prisma.$transaction(
-        orderedProductIds.map((id, index) =>
-          prisma.product.update({
-            where: { id },
-            data: { bestSellerPosition: index },
-          })
-        )
-      );
-
-      // Bust the public product cache so the storefront immediately reflects
-      // the new order on next request.
-      invalidateCachedPrefix(`public:products:${storeId}:`);
-
-      res.json({ success: true });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
 
 export default router;

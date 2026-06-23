@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -31,6 +32,35 @@ export function NotificationBell() {
     useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // The dropdown is rendered in a body portal (fixed position) so it escapes
+  // the admin header's stacking/clip context — the header has `backdrop-blur`,
+  // which establishes a containing block + new stacking context that clipped
+  // the old `absolute` panel (it rendered behind the sidebar, header cut off).
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const place = () => {
+      const btn = buttonRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const width = Math.min(384, window.innerWidth - 16);
+      // Right-align the panel under the bell, then clamp inside the viewport
+      // so it can never run off either edge (works in LTR + RTL).
+      let left = rect.right - width;
+      if (left < 8) left = 8;
+      if (left + width > window.innerWidth - 8) left = window.innerWidth - 8 - width;
+      setCoords({ top: rect.bottom + 8, left, width });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [isOpen]);
 
   // Initial-connect grace period. The bell mounts with `isConnected=false`
   // because the socket handshake hasn't completed yet. Without this
@@ -51,7 +81,12 @@ export function NotificationBell() {
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      // The panel lives in a body portal, so it's NOT inside dropdownRef —
+      // check both the trigger wrapper and the portal panel before closing.
+      const inTrigger = dropdownRef.current?.contains(target);
+      const inPanel = panelRef.current?.contains(target);
+      if (!inTrigger && !inPanel) {
         setIsOpen(false);
       }
     }
@@ -78,6 +113,7 @@ export function NotificationBell() {
     <div className="relative" ref={dropdownRef}>
       {/* Bell Button */}
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="touch-target relative rounded-lg hover:bg-muted dark:hover:bg-foreground transition-colors"
@@ -112,110 +148,119 @@ export function NotificationBell() {
         />
       </button>
 
-      {/* Dropdown */}
-      {isOpen && (
-        <div className="absolute end-0 mt-2 w-80 sm:w-96 bg-card rounded-xl shadow-2xl border border-border z-50 overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
-            <h3 className="font-semibold text-foreground">{t('title')}</h3>
-            <div className="flex gap-2">
-              {unreadCount > 0 && (
-                <button
-                  type="button"
-                  onClick={markAllAsRead}
-                  className="text-xs text-primary hover:text-primary/80 font-medium"
-                >
-                  {t('markAllRead')}
-                </button>
-              )}
-              {notifications.length > 0 && (
-                <button
-                  type="button"
-                  onClick={clearNotifications}
-                  className="text-xs text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
-                >
-                  {t('clear')}
-                </button>
+      {/* Dropdown — rendered in a body portal with fixed positioning so the
+          header's backdrop-blur stacking/clip context can't trap it. */}
+      {isOpen &&
+        coords &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={panelRef}
+            style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width }}
+            className="bg-card rounded-xl shadow-2xl border border-border z-[100] overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
+              <h3 className="font-semibold text-foreground">{t('title')}</h3>
+              <div className="flex gap-2">
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={markAllAsRead}
+                    className="text-xs text-primary hover:text-primary/80 font-medium"
+                  >
+                    {t('markAllRead')}
+                  </button>
+                )}
+                {notifications.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearNotifications}
+                    className="text-xs text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
+                  >
+                    {t('clear')}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Notification List */}
+            <div className="max-h-[400px] overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="py-12 text-center">
+                  <svg
+                    className="w-12 h-12 mx-auto text-muted-foreground/60 dark:text-muted-foreground"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                    />
+                  </svg>
+                  <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
+                    {t('empty')}
+                  </p>
+                </div>
+              ) : (
+                <ul>
+                  {notifications.map(notification => (
+                    <li
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`px-4 py-3 border-b border-border dark:border-border hover:bg-muted dark:hover:bg-foreground/50 cursor-pointer transition-colors ${
+                        !notification.read ? 'bg-primary/5' : ''
+                      }`}
+                    >
+                      <div className="flex gap-3">
+                        {/* Icon */}
+                        <div
+                          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+                            colorMap[notification.type] || 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {iconMap[notification.type] || '🔔'}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium text-sm text-foreground dark:text-white truncate">
+                              {notification.title}
+                            </p>
+                            {!notification.read && (
+                              <span className="flex-shrink-0 w-2 h-2 bg-primary rounded-full mt-1.5" />
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
+                            {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-          </div>
 
-          {/* Notification List */}
-          <div className="max-h-[400px] overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="py-12 text-center">
-                <svg
-                  className="w-12 h-12 mx-auto text-muted-foreground/60 dark:text-muted-foreground"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                  />
-                </svg>
-                <p className="mt-3 text-sm text-muted-foreground dark:text-muted-foreground">
-                  {t('empty')}
+            {/* Footer — only after the 3s grace window (see showReconnecting) */}
+            {!isConnected && showReconnecting && (
+              <div className="px-4 py-2 bg-warning/5 dark:bg-warning/30 border-t border-warning/30 dark:border-yellow-800">
+                <p className="text-xs text-warning dark:text-warning flex items-center gap-1">
+                  <span className="w-2 h-2 bg-warning rounded-full animate-pulse" />
+                  {t('reconnecting')}
                 </p>
               </div>
-            ) : (
-              <ul>
-                {notifications.map(notification => (
-                  <li
-                    key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`px-4 py-3 border-b border-border dark:border-border hover:bg-muted dark:hover:bg-foreground/50 cursor-pointer transition-colors ${
-                      !notification.read ? 'bg-primary/5' : ''
-                    }`}
-                  >
-                    <div className="flex gap-3">
-                      {/* Icon */}
-                      <div
-                        className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
-                          colorMap[notification.type] || 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {iconMap[notification.type] || '🔔'}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium text-sm text-foreground dark:text-white truncate">
-                            {notification.title}
-                          </p>
-                          {!notification.read && (
-                            <span className="flex-shrink-0 w-2 h-2 bg-primary rounded-full mt-1.5" />
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-                          {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
             )}
-          </div>
-
-          {/* Footer — only after the 3s grace window (see showReconnecting) */}
-          {!isConnected && showReconnecting && (
-            <div className="px-4 py-2 bg-warning/5 dark:bg-warning/30 border-t border-warning/30 dark:border-yellow-800">
-              <p className="text-xs text-warning dark:text-warning flex items-center gap-1">
-                <span className="w-2 h-2 bg-warning rounded-full animate-pulse" />
-                {t('reconnecting')}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
