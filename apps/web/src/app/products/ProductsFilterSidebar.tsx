@@ -476,26 +476,29 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="max-h-[85vh] overflow-hidden rounded-t-3xl bg-background shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
+            className="max-h-[85vh] overflow-hidden rounded-t-3xl bg-[hsl(var(--primary))] shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex flex-col items-center bg-background pt-3 pb-2 shrink-0">
-              <span className="h-1 w-12 rounded-full bg-muted-foreground/30" aria-hidden />
+            <div className="flex flex-col items-center bg-[hsl(var(--primary))] pt-3 pb-2 shrink-0">
+              <span
+                className="h-1 w-12 rounded-full bg-[hsl(var(--primary-foreground)/0.3)]"
+                aria-hidden
+              />
               <div className="mt-2 flex w-full items-center justify-between px-5">
                 <h2
                   id="products-filter-sheet-title"
-                  className="text-base font-semibold text-foreground"
+                  className="text-base font-semibold text-[hsl(var(--primary-foreground))]"
                 >
                   {t('Filters', 'فلاتر')}
                 </h2>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-[hsl(var(--primary-foreground)/0.15)]"
                   aria-label={t('Close', 'إغلاق')}
                 >
                   <svg
-                    className="h-5 w-5"
+                    className="h-5 w-5 text-[hsl(var(--primary-foreground))]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -514,7 +517,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
 
             <div className="flex-1 overflow-y-auto px-5 pb-4 space-y-6">{renderBody(true)}</div>
 
-            <div className="border-t border-primary/20 bg-background px-5 py-3 shrink-0">
+            <div className="border-t border-[hsl(var(--primary-foreground)/0.2)] bg-[hsl(var(--primary))] px-5 py-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
