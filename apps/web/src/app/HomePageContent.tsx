@@ -71,6 +71,15 @@ export function HomePageContent({
   const isRtl = language === 'ar';
   const T = getHomepageTemplate(templateId);
 
+  // Effective card-price visibility: the store-level master toggle
+  // (theme.showPriceOnCards) composes with the per-card default
+  // (productCardDefaults.showCardPrice) — either being false hides the price.
+  // The master toggle's read was dropped in the 2026-06 consolidation; this
+  // restores it so a store that hid prices store-wide stays hidden on EVERY
+  // card surface, not just whichever one happened to read showCardPrice.
+  const showCardPriceEff =
+    store.theme?.showPriceOnCards === false ? false : layout.productCardDefaults?.showCardPrice;
+
   // Per-section typography zones. Global zones are not accessible client-side
   // here (they're applied via CSS injection in layout.tsx), so we pass
   // undefined for the global zone — resolveSectionZone returns just the
@@ -553,7 +562,7 @@ export function HomePageContent({
                     cardImageAspect={layout.productCardDefaults?.cardImageAspect}
                     cardImageRadius={layout.productCardDefaults?.cardImageRadius}
                     showCardName={layout.productCardDefaults?.showCardName}
-                    showCardPrice={layout.productCardDefaults?.showCardPrice}
+                    showCardPrice={showCardPriceEff}
                     headingZone={newArrivalsHeadingZone}
                     kickerZone={newArrivalsKickerZone}
                     subtitleZone={newArrivalsSubtitleZone}
@@ -641,7 +650,7 @@ export function HomePageContent({
                     cardImageAspect={layout.productCardDefaults?.cardImageAspect}
                     cardImageRadius={layout.productCardDefaults?.cardImageRadius}
                     showCardName={layout.productCardDefaults?.showCardName}
-                    showCardPrice={layout.productCardDefaults?.showCardPrice}
+                    showCardPrice={showCardPriceEff}
                     headingZone={bestSellersHeadingZone}
                     kickerZone={bestSellersKickerZone}
                     subtitleZone={bestSellersSubtitleZone}
@@ -904,7 +913,7 @@ export function HomePageContent({
                   cardImageAspect={layout.productCardDefaults?.cardImageAspect}
                   cardImageRadius={layout.productCardDefaults?.cardImageRadius}
                   showCardName={layout.productCardDefaults?.showCardName}
-                  showCardPrice={layout.productCardDefaults?.showCardPrice}
+                  showCardPrice={showCardPriceEff}
                   sectionBgColor={extra.bgColor}
                 />
               </section>

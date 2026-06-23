@@ -63,7 +63,7 @@ function ElegantProductCard({
   showCardPrice,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
-  const { store } = useStore();
+  const { store, layout } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -83,7 +83,9 @@ function ElegantProductCard({
   // Items 6 / 9 — price + name visibility.
   // Single price-visibility control: productCardDefaults.showCardPrice
   // (the legacy theme.showPriceOnCards toggle was redundant and removed).
-  const priceVisible = showCardPrice !== false;
+  const priceVisible =
+    (showCardPrice ?? layout?.productCardDefaults?.showCardPrice) !== false &&
+    store.theme?.showPriceOnCards !== false;
   const nameVisible = showCardName !== false;
   // Item 10 — normalize images.
   const normalizeImages = store.theme?.normalizeProductImages === true;

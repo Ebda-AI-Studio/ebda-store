@@ -59,9 +59,10 @@ function BoldProductCard({
   cardImageRadius,
   showCardName,
   showCardPrice,
+  showHover,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
-  const { store } = useStore();
+  const { store, layout } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isHovered, setIsHovered] = useState(false);
 
@@ -80,7 +81,9 @@ function BoldProductCard({
   // Items 6 / 9 — price + name visibility.
   // Single price-visibility control: productCardDefaults.showCardPrice
   // (the legacy theme.showPriceOnCards toggle was redundant and removed).
-  const priceVisible = showCardPrice !== false;
+  const priceVisible =
+    (showCardPrice ?? layout?.productCardDefaults?.showCardPrice) !== false &&
+    store.theme?.showPriceOnCards !== false;
   const nameVisible = showCardName !== false;
   // Item 10 — normalize images.
   const normalizeImages = store.theme?.normalizeProductImages === true;
@@ -137,18 +140,41 @@ function BoldProductCard({
             />
           )}
           {product.images?.[0]?.url ? (
-            <Image
-              src={product.images[0].url}
-              alt={isRtl && product.nameAr ? product.nameAr : product.name}
-              className={cn(
-                'object-cover transition-transform duration-300 ease-out',
-                isHovered && 'scale-[1.05]'
+            <>
+              <Image
+                src={product.images[0].url}
+                alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                className={cn(
+                  'object-cover transition-all duration-300 ease-out',
+                  isHovered && 'scale-[1.05]'
+                )}
+                style={{
+                  ...(normalizeImages ? { objectFit: 'cover' } : {}),
+                  opacity: isHovered && showHover !== false && product.images[1]?.url ? 0 : 1,
+                }}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                priority={priority}
+              />
+              {/* Second image revealed on hover (≥2 images + showHover on). */}
+              {showHover !== false && product.images[1]?.url && (
+                <Image
+                  src={product.images[1].url}
+                  alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                  className={cn(
+                    'absolute inset-0 object-cover transition-all duration-300 ease-out',
+                    isHovered && 'scale-[1.05]'
+                  )}
+                  style={{
+                    ...(normalizeImages ? { objectFit: 'cover' } : {}),
+                    opacity: isHovered ? 1 : 0,
+                  }}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  loading="lazy"
+                />
               )}
-              style={normalizeImages ? { objectFit: 'cover' } : undefined}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              priority={priority}
-            />
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
               <PlaceholderImageIcon className="w-16 h-16" strokeWidth={1.5} />

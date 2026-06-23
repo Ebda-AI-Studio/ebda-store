@@ -112,7 +112,7 @@ export default function BoldFooter({
                     className="text-foreground hover:text-primary transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-8 h-8" />
+                    <SocialGlyph entry={s} className="w-5 h-5" />
                   </a>
                 ))}
               </div>

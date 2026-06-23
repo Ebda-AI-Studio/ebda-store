@@ -9,7 +9,7 @@ import type {
   FilterSidebarSettings,
   ProductsPageSettings,
 } from '@force/shared';
-import { resolveColor } from '@force/shared';
+import { resolveColor, colorToHslTriplet } from '@force/shared';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import { useToast } from '@force/ui';
 import { useCart } from '../../contexts/CartContext';
@@ -508,14 +508,14 @@ export default function ProductsClient({
                     setPriceMax(max);
                   }}
                   defaultOpen={filterSidebar?.defaultOpen}
-                  sidebarBgColor={
+                  bgTriplet={
                     filterSidebar?.bgColor
-                      ? (resolveColor(filterSidebar.bgColor, store.theme) ?? undefined)
+                      ? colorToHslTriplet(filterSidebar.bgColor, store.theme) || undefined
                       : undefined
                   }
-                  sidebarTextColor={
+                  fgTriplet={
                     filterSidebar?.textColor
-                      ? (resolveColor(filterSidebar.textColor, store.theme) ?? undefined)
+                      ? colorToHslTriplet(filterSidebar.textColor, store.theme) || undefined
                       : undefined
                   }
                 />
@@ -658,7 +658,11 @@ export default function ProductsClient({
                       cardImageAspect={productCardDefaults?.cardImageAspect}
                       cardImageRadius={productCardDefaults?.cardImageRadius}
                       showCardName={productCardDefaults?.showCardName}
-                      showCardPrice={productCardDefaults?.showCardPrice}
+                      showCardPrice={
+                        store.theme?.showPriceOnCards === false
+                          ? false
+                          : productCardDefaults?.showCardPrice
+                      }
                       productNameZone={plpProductNameZone}
                       productPriceZone={plpProductPriceZone}
                       productCtaZone={plpProductCtaZone}

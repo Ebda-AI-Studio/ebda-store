@@ -52,18 +52,22 @@ interface ProductsFilterSidebarProps {
    */
   defaultOpen?: boolean;
   /**
-   * Merchant-controlled background color for the sidebar panel (desktop) and
-   * mobile trigger button. Already resolved to a CSS color string via
-   * `resolveColor(value, store.theme)`. When undefined, the sidebar uses its
-   * existing CSS-variable-driven default (hsl(var(--primary))).
+   * Merchant-controlled background color for the WHOLE filter UI — desktop
+   * panel, mobile trigger, AND the mobile bottom-sheet + every inner accent
+   * (category chips, price slider, sort/search). Passed as an HSL TRIPLET
+   * ("26 100% 50%", via `colorToHslTriplet(value, theme)`) and applied as a
+   * local `--primary` override on the <aside>, so it cascades to every
+   * descendant — including the fixed-position mobile sheet — and works with the
+   * existing `hsl(var(--primary)/alpha)` shades. Undefined → inherits the
+   * store's global `--primary` (existing look, no opt-in cost).
    */
-  sidebarBgColor?: string;
+  bgTriplet?: string;
   /**
-   * Merchant-controlled text/icon color for the sidebar panel. Already
-   * resolved to a CSS color string. When undefined, inherits
-   * hsl(var(--primary-foreground)).
+   * Merchant-controlled text/icon color for the whole filter UI, as an HSL
+   * triplet. Applied as a local `--primary-foreground` override on the
+   * <aside>. Undefined → inherits the global `--primary-foreground`.
    */
-  sidebarTextColor?: string;
+  fgTriplet?: string;
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -93,21 +97,24 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     priceCeil,
     onPriceChange,
     defaultOpen,
-    sidebarBgColor,
-    sidebarTextColor,
+    bgTriplet,
+    fgTriplet,
   } = props;
   const { t } = useLanguage();
 
-  // Build optional inline-style overrides. When the merchant has set a custom
-  // bg/text color, we apply it via style= so it wins over the Tailwind classes
-  // (which encode the default hsl(var(--primary)) / hsl(var(--primary-foreground))).
-  // When unset we pass nothing — the Tailwind defaults remain in full effect.
-  const sidebarStyle: React.CSSProperties | undefined =
-    sidebarBgColor || sidebarTextColor
-      ? {
-          ...(sidebarBgColor ? { backgroundColor: sidebarBgColor } : {}),
-          ...(sidebarTextColor ? { color: sidebarTextColor } : {}),
-        }
+  // Override --primary / --primary-foreground LOCALLY on the sidebar root when
+  // the merchant set custom filter colors. Every inner element already paints
+  // from these vars (panel bg, mobile sheet, category chips, price slider,
+  // sort/search) — including the `/alpha` shades — so one override themes the
+  // entire filter UI. CSS custom properties inherit through the DOM, so the
+  // fixed-position mobile sheet (a descendant of <aside>) follows too. Unset →
+  // no override → the store's global tokens apply (existing look preserved).
+  const sidebarVars =
+    bgTriplet || fgTriplet
+      ? ({
+          ...(bgTriplet ? { '--primary': bgTriplet } : {}),
+          ...(fgTriplet ? { '--primary-foreground': fgTriplet } : {}),
+        } as React.CSSProperties)
       : undefined;
 
   // Local controlled value for the input. Submitting via Enter still works,
@@ -428,7 +435,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     // trigger, the lot.
     <aside
       className="w-full shrink-0 lg:w-64 lg:rounded-2xl lg:overflow-hidden lg:p-4 lg:bg-[hsl(var(--primary))] lg:text-[hsl(var(--primary-foreground))]"
-      style={sidebarStyle}
+      style={sidebarVars}
       data-zone="filters"
     >
       {/* Mobile trigger — opens the bottom-sheet. */}
@@ -438,7 +445,6 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         className="lg:hidden mb-4 flex h-11 w-full items-center justify-between rounded-xl bg-[hsl(var(--primary))] px-4 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/0.9)]"
-        style={sidebarStyle}
       >
         <span className="inline-flex items-center gap-2">
           <svg

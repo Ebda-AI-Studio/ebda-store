@@ -60,9 +60,10 @@ function ClassicProductCard({
   cardImageRadius,
   showCardName,
   showCardPrice,
+  showHover,
 }: ProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
-  const { store } = useStore();
+  const { store, layout } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
@@ -83,7 +84,9 @@ function ClassicProductCard({
   // Items 6 / 9 — price + name visibility.
   // Single price-visibility control: productCardDefaults.showCardPrice
   // (the legacy theme.showPriceOnCards toggle was redundant and removed).
-  const priceVisible = showCardPrice !== false;
+  const priceVisible =
+    (showCardPrice ?? layout?.productCardDefaults?.showCardPrice) !== false &&
+    store.theme?.showPriceOnCards !== false;
   const nameVisible = showCardName !== false;
   // Item 10 — normalize images.
   const normalizeImages = store.theme?.normalizeProductImages === true;
@@ -133,15 +136,32 @@ function ClassicProductCard({
             />
           )}
           {product.images?.[0]?.url ? (
-            <Image
-              src={product.images[0].url}
-              alt={isRtl && product.nameAr ? product.nameAr : product.name}
-              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 ease-out"
-              style={normalizeImages ? { objectFit: 'cover' } : undefined}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              priority={priority}
-            />
+            <>
+              <Image
+                src={product.images[0].url}
+                alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                className={`w-full h-full object-cover group-hover:scale-[1.04] transition-all duration-700 ease-out ${
+                  showHover !== false && product.images[1]?.url ? 'group-hover:opacity-0' : ''
+                }`}
+                style={normalizeImages ? { objectFit: 'cover' } : undefined}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                priority={priority}
+              />
+              {/* Second image revealed on hover when the product has ≥2 images
+                  and the merchant hasn't disabled it (showHover). */}
+              {showHover !== false && product.images[1]?.url && (
+                <Image
+                  src={product.images[1].url}
+                  alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                  className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 group-hover:scale-[1.04] transition-all duration-700 ease-out"
+                  style={normalizeImages ? { objectFit: 'cover' } : undefined}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  loading="lazy"
+                />
+              )}
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
               <PlaceholderImageIcon />

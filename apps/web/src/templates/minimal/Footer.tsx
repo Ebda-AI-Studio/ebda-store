@@ -119,7 +119,7 @@ export default function MinimalFooter({
                   className="text-muted-foreground hover:text-foreground overflow-hidden rounded-md transition-colors duration-200 cursor-pointer"
                   aria-label={s.key}
                 >
-                  <SocialGlyph entry={s} className="w-8 h-8" />
+                  <SocialGlyph entry={s} className="w-5 h-5" />
                 </a>
               ))}
             </div>

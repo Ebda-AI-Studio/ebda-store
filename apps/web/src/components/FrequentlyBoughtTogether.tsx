@@ -216,7 +216,9 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
             cardImageAspect={productCardDefaults?.cardImageAspect}
             cardImageRadius={productCardDefaults?.cardImageRadius}
             showCardName={productCardDefaults?.showCardName}
-            showCardPrice={productCardDefaults?.showCardPrice}
+            showCardPrice={
+              store.theme?.showPriceOnCards === false ? false : productCardDefaults?.showCardPrice
+            }
             urlPrefix={storeUrl('')}
             onAddToCart={handleAddToCart}
           />
