@@ -105,8 +105,9 @@ export function ProductCarousel({
   const effectiveAspectCls = imgAspectCls || aspectCls;
 
   // Items 6 / 9 — price visibility: store-level toggle + per-card flag.
-  const showPriceOnCards = store.theme?.showPriceOnCards !== false;
-  const priceVisible = showPriceOnCards && showCardPrice !== false;
+  // Single price-visibility control: productCardDefaults.showCardPrice
+  // (the legacy theme.showPriceOnCards toggle was redundant and removed).
+  const priceVisible = showCardPrice !== false;
   // Item 9 — name visibility.
   const nameVisible = showCardName !== false;
   // Item 10 — normalize images flag.

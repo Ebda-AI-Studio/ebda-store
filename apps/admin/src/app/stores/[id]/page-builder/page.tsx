@@ -2262,32 +2262,10 @@ export default function StoreLayoutPage() {
                       className="h-5 w-5 cursor-pointer accent-primary"
                     />
                   </label>
-                  {/* Item 6 — price visibility store-wide */}
-                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-semibold text-foreground">
-                        Show price on cards
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        Display the price below every product card. Turn off to hide prices
-                        store-wide (e.g. wholesale or inquiry-only stores).
-                      </span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={
-                        pendingThemeUpdates.showPriceOnCards ??
-                        storeInfo?.theme?.showPriceOnCards !== false
-                      }
-                      onChange={e =>
-                        setPendingThemeUpdates(prev => ({
-                          ...prev,
-                          showPriceOnCards: e.target.checked,
-                        }))
-                      }
-                      className="h-5 w-5 cursor-pointer accent-primary"
-                    />
-                  </label>
+                  {/* Price visibility is the single "Show product price" toggle in the
+                      Card image shape group below (productCardDefaults.showCardPrice).
+                      The legacy store-wide theme.showPriceOnCards toggle was redundant
+                      and has been removed. */}
                   {/* Item 10 — image normalization */}
                   <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 cursor-pointer">
                     <span className="flex-1 min-w-0">

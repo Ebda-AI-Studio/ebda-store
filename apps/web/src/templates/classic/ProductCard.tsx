@@ -81,8 +81,9 @@ function ClassicProductCard({
   const imgAspectCls = cardImageAspectClass(cardImageAspect);
   const imgRadiusCls = cardImageRadiusClass(cardImageRadius);
   // Items 6 / 9 — price + name visibility.
-  const showPriceOnCards = store.theme?.showPriceOnCards !== false;
-  const priceVisible = showPriceOnCards && showCardPrice !== false;
+  // Single price-visibility control: productCardDefaults.showCardPrice
+  // (the legacy theme.showPriceOnCards toggle was redundant and removed).
+  const priceVisible = showCardPrice !== false;
   const nameVisible = showCardName !== false;
   // Item 10 — normalize images.
   const normalizeImages = store.theme?.normalizeProductImages === true;
