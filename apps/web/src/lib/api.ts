@@ -829,6 +829,49 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  /**
+   * Fire-and-forget server-side view beacon.
+   *
+   * Posts to POST /api/v1/public/:storeId/views so the nightly analytics
+   * rollup can count views in FunnelSnapshot.productViews.
+   *
+   * Uses `navigator.sendBeacon` when available (non-blocking, survives page
+   * unload) and falls back to a keepalive fetch. Both approaches are
+   * fire-and-forget — any error is silently ignored. Guard against SSR.
+   *
+   * Call once per PDP mount, after verifying we are in a browser context.
+   */
+  beaconProductView(storeId: string, productId: string, sessionId?: string): void {
+    if (typeof window === 'undefined') return; // SSR guard
+    if (!storeId || !productId) return;
+
+    const url = `${this.baseUrl}/public/${storeId}/views`;
+    const body = JSON.stringify(sessionId ? { productId, sessionId } : { productId });
+    const type = 'application/json';
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        const blob = new Blob([body], { type });
+        const sent = navigator.sendBeacon(url, blob);
+        if (sent) return; // sendBeacon succeeded — we're done
+      }
+    } catch {
+      // sendBeacon threw — fall through to fetch keepalive
+    }
+
+    // Keepalive fetch fallback (Chrome/FF when sendBeacon returns false for
+    // large payloads, or in environments without sendBeacon).
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': type },
+      body,
+      keepalive: true,
+      credentials: 'omit', // public endpoint, no cookies needed
+    }).catch(() => {
+      // Ignore — tracking failure must never surface to the user
+    });
+  }
 }
 
 export const api = new ApiClient(API_URL);

@@ -456,6 +456,26 @@ export const couponValidateLimiter = rateLimit({
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
 
+// View ingest limiter — public PDP beacon, high-traffic, unauthenticated.
+// 60 requests per minute per IP. The in-memory session debounce in
+// view-ingest.service.ts provides a second layer: one DB increment per
+// (sessionId, productId) per 10-minute window regardless of IP rotation.
+// Key by normalized IP so IPv6 /128 bots can't bypass via address churn
+// (ipKeyGenerator collapses to /64 prefix — ERR_ERL_KEY_GEN_IPV6).
+export const viewIngestLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'view-ingest'),
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // 60 view beacons per minute per IP (generous for real browsing)
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipForLoadTest,
+  keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+});
+
 // ==========================================
 // Audit Logging
 // ==========================================

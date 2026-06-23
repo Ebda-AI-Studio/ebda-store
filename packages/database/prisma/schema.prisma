@@ -413,6 +413,7 @@ model Store {
   customerCohortSnapshots  CustomerCohortSnapshot[]
   funnelSnapshots          FunnelSnapshot[]
   customerRfmSnapshots     CustomerRfmSnapshot[]
+  productDailyViews        ProductDailyView[]
   whatsAppTemplates        WhatsAppTemplate[]
   paymentEvents            PaymentEvent[]
   bankStatements           BankStatement[]
@@ -769,6 +770,7 @@ model Product {
   deadstockFlags       DeadStockFlag[]
   warehouseStock       WarehouseStock[]
   countLines           CountLine[]
+  dailyViews           ProductDailyView[]
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -3068,6 +3070,35 @@ model CustomerRfmSnapshot {
   @@index([storeId, segment])
   @@index([storeId, rfmScore(sort: Desc)])
   @@map("customer_rfm_snapshots")
+}
+
+// ==========================================
+// Storefront View Ingest — Product Daily Views
+// ==========================================
+//
+// One aggregate row per (store, product, calendar day in KW time).
+// Populated by the public ingest endpoint POST /api/v1/public/:storeId/views.
+// The nightly analytics rollup reads these to populate FunnelSnapshot.productViews.
+//
+// Design: aggregate not event-source — one counter per day, not a row per hit.
+// Keeps the table bounded (stores × products × days_retained rows max).
+//
+// RLS: SELECT, INSERT, UPDATE policies in migration 20260622100000_product_daily_views.
+
+model ProductDailyView {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  productId String   @map("product_id")
+  date      DateTime @db.Date
+  count     Int      @default(0)
+
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId, date])
+  @@index([storeId, date(sort: Desc)])
+  @@index([productId, date(sort: Desc)])
+  @@map("product_daily_views")
 }
 
 // ==========================================

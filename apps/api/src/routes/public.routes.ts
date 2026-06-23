@@ -13,7 +13,9 @@ import {
   cartLimiter,
   writeLimiter,
   newsletterLimiter,
+  viewIngestLimiter,
 } from '../middleware/security';
+import { recordProductView } from '../services/view-ingest.service';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
@@ -907,6 +909,81 @@ router.get(
         success: true,
         data: { items, isPublic: wishlist.isPublic },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /public/:storeId/views — Storefront product view beacon
+//
+// Records a storefront product page view as a per-day aggregate counter in
+// `product_daily_views`. Used by the PDP to fire a fire-and-forget beacon on
+// mount (alongside existing marketing pixel events). This is the server-side
+// ingest that powers the FunnelSnapshot.productViews field in the nightly rollup.
+//
+// Design decisions:
+//  • Two-layer rate limiting: viewIngestLimiter (60/min per IP via Redis) +
+//    session debounce in view-ingest.service.ts (one increment per
+//    sessionId+productId per 10-minute window). A view flood cannot hammer Neon.
+//  • Upsert-increment (one SQL round-trip). Never blocks the page load.
+//  • Fail-open: any error in recordProductView is swallowed so the 200 response
+//    always returns — the storefront beacon is fire-and-forget.
+//  • Store ownership: product is verified to belong to the storeId in the path
+//    before any write happens.
+const viewSchema = z.object({
+  productId: z.string().uuid(),
+  sessionId: z.string().min(1).max(128).optional(),
+});
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+router.post(
+  '/:storeId/views',
+  viewIngestLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      if (!UUID_RE.test(storeId)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_ID', message: 'Invalid store ID' },
+        });
+        return;
+      }
+
+      const parsed = viewSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'productId is required and must be a UUID' },
+        });
+        return;
+      }
+
+      const { productId, sessionId } = parsed.data;
+
+      // Verify the product belongs to this store (ownership guard).
+      // Explicit select to avoid fetching unnecessary columns.
+      const product = await prisma.product.findFirst({
+        where: { id: productId, storeId, deletedAt: null },
+        select: { id: true },
+      });
+
+      if (!product) {
+        // Return 200 for non-existent products — the storefront shouldn't see
+        // an error for a tracking beacon; we just silently skip.
+        res.json({ success: true, data: { recorded: false } });
+        return;
+      }
+
+      // Fire-and-forget: recordProductView is internally fail-open.
+      // We don't await in a way that blocks the response, but the function
+      // itself is lightweight (single SQL upsert) so awaiting is fine — it
+      // resolves well under 50ms in the common case.
+      const recorded = await recordProductView(storeId, productId, sessionId);
+
+      res.json({ success: true, data: { recorded } });
     } catch (error) {
       next(error);
     }

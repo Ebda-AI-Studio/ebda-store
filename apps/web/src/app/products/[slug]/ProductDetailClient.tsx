@@ -222,6 +222,17 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
         currency: 'KWD',
       });
 
+      // Fire server-side view beacon alongside the marketing pixel event.
+      // Debounced per (sessionId, productId) for 10 min in the service.
+      // store.id is available from StoreContext; guard against 'demo' sentinel.
+      if (store?.id && store.id !== 'demo') {
+        const sessionId =
+          typeof window !== 'undefined'
+            ? (localStorage.getItem('sessionId') ?? undefined)
+            : undefined;
+        api.beaconProductView(store.id, product.id, sessionId);
+      }
+
       // Fetch related products
       const categories = product.categories;
       if (categories && categories.length > 0) {
@@ -256,6 +267,15 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             value: loadedProduct.price / 1000,
             currency: 'KWD',
           });
+
+          // Server-side view beacon: fire alongside pixel for analytics rollup.
+          if (store?.id && store.id !== 'demo') {
+            const sessionId =
+              typeof window !== 'undefined'
+                ? (localStorage.getItem('sessionId') ?? undefined)
+                : undefined;
+            api.beaconProductView(store.id, loadedProduct.id, sessionId);
+          }
 
           // Fetch related products from the same category
           const categories = response.data.product.categories;

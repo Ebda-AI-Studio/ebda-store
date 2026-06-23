@@ -399,8 +399,17 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
       },
     });
 
-    // productViews: not available in v1 (no view-count delta column)
-    const productViews = 0;
+    // productViews: sum of ProductDailyView.count for this store on this calendar day.
+    // `date` in product_daily_views is a DATE stored at UTC midnight (kwDayStart output),
+    // so an exact equality match on dayStart gives the right rows.
+    const productViewsAgg = await prisma.productDailyView.aggregate({
+      where: {
+        storeId,
+        date: dayStart, // exact match — DATE column stored as UTC midnight KW-day-start
+      },
+      _sum: { count: true },
+    });
+    const productViews = productViewsAgg._sum.count ?? 0;
 
     try {
       const periodDate = dayStart; // store as UTC midnight-aligned KW day start
