@@ -891,7 +891,7 @@ export class ProductService {
       const positionFindArgs = {
         where,
         include: {
-          images: { orderBy: { position: 'asc' } as const, take: 1 },
+          images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
           categories: { include: { category: true } },
           store: { select: { id: true, name: true, slug: true } },
           variants: {
@@ -965,7 +965,7 @@ export class ProductService {
       where,
       take: limit + 1, // fetch one extra to know if there's a next page
       include: {
-        images: { orderBy: { position: 'asc' } as const, take: 1 },
+        images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
         categories: { include: { category: true } },
         store: { select: { id: true, name: true, slug: true } },
         // Variants are needed by the storefront card components to (a)

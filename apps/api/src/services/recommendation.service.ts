@@ -23,7 +23,7 @@ const productSelect = {
   price: true,
   compareAtPrice: true,
   images: {
-    take: 1,
+    take: 2, // primary + hover-reveal second image on recommendation cards
     orderBy: { position: 'asc' as const },
     select: { url: true, alt: true },
   },
