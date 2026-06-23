@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 
 interface Category {
@@ -46,6 +47,8 @@ export function CategoryTable({
 }: CategoryTableProps) {
   const t = useT('categories.table');
   const tOrder = useT('categories.productOrder');
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
   if (isLoading) {
     return (
       <div className="space-y-4 p-6">
@@ -139,19 +142,25 @@ export function CategoryTable({
                   {cat.image ? (
                     <Image
                       src={cat.image}
-                      alt={cat.name}
+                      alt={isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || ''}
                       width={40}
                       height={40}
                       className="h-10 w-10 rounded-lg object-cover"
                     />
                   ) : (
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold">
-                      {cat.name.charAt(0)}
+                      {(isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || '').charAt(0)}
                     </div>
                   )}
                   <div>
-                    <p className="font-medium text-foreground">{cat.name}</p>
-                    {cat.nameAr && <p className="text-sm text-muted-foreground">{cat.nameAr}</p>}
+                    <p className="font-medium text-foreground">
+                      {isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr}
+                    </p>
+                    {(isRtl ? cat.name : cat.nameAr) && (
+                      <p className="text-sm text-muted-foreground">
+                        {isRtl ? cat.name : cat.nameAr}
+                      </p>
+                    )}
                     {cat.description && (
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                         {cat.description}
@@ -252,7 +261,12 @@ export function CategoryTable({
                   )}
                   <button
                     type="button"
-                    onClick={() => onDelete({ id: cat.id, name: cat.name })}
+                    onClick={() =>
+                      onDelete({
+                        id: cat.id,
+                        name: isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || cat.name,
+                      })
+                    }
                     disabled={deletingId === cat.id}
                     className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors disabled:opacity-50"
                   >

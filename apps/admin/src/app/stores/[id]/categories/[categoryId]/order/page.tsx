@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button, useToast } from '@force/ui';
+import { useLocale } from 'next-intl';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../../../lib/api';
 import { useT } from '@/i18n/useT';
@@ -30,6 +31,8 @@ export default function CategoryProductOrderPage() {
   const storeId = params?.id as string;
   const categoryId = params?.categoryId as string;
   const t = useT('categories.productOrder');
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
 
   const [category, setCategory] = useState<CategoryMeta | null>(null);
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -101,7 +104,11 @@ export default function CategoryProductOrderPage() {
 
   return (
     <AdminLayout
-      title={category ? `${t('title')} — ${category.name}` : t('title')}
+      title={
+        category
+          ? `${t('title')} — ${isRtl ? category.nameAr || category.name : category.name || category.nameAr || ''}`
+          : t('title')
+      }
       subtitle={t('subtitle')}
       actions={
         <div className="flex gap-2">
@@ -202,22 +209,31 @@ export default function CategoryProductOrderPage() {
                 {product.images[0]?.url ? (
                   <Image
                     src={product.images[0].url}
-                    alt={product.name}
+                    alt={
+                      isRtl ? product.nameAr || product.name : product.name || product.nameAr || ''
+                    }
                     width={48}
                     height={48}
                     className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
                   />
                 ) : (
                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold text-sm">
-                    {product.name.charAt(0)}
+                    {(isRtl
+                      ? product.nameAr || product.name
+                      : product.name || product.nameAr || ''
+                    ).charAt(0)}
                   </div>
                 )}
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="truncate font-medium text-sm text-foreground">{product.name}</p>
-                  {product.nameAr && (
-                    <p className="truncate text-xs text-muted-foreground">{product.nameAr}</p>
+                  <p className="truncate font-medium text-sm text-foreground">
+                    {isRtl ? product.nameAr || product.name : product.name || product.nameAr}
+                  </p>
+                  {(isRtl ? product.name : product.nameAr) && (
+                    <p className="truncate text-xs text-muted-foreground">
+                      {isRtl ? product.name : product.nameAr}
+                    </p>
                   )}
                   <div className="mt-0.5 flex items-center gap-2">
                     {product.sku && (

@@ -1,5 +1,6 @@
 'use client';
 
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { STOCK_STATUS_STYLES, type ProductInventory } from './types';
 
@@ -15,6 +16,8 @@ interface LowStockAlertsProps {
 export function LowStockAlerts({ alerts, onAdjust }: LowStockAlertsProps) {
   const t = useT('inventory.alertsTab');
   const tStatus = useT('inventory.status');
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -85,10 +88,12 @@ export function LowStockAlerts({ alerts, onAdjust }: LowStockAlertsProps) {
               {alerts.map(product => (
                 <tr key={product.id} className="hover:bg-muted">
                   <td className="px-6 py-4">
-                    <div className="font-medium text-foreground">{product.name}</div>
-                    {product.nameAr && (
+                    <div className="font-medium text-foreground">
+                      {isRtl ? product.nameAr || product.name : product.name || product.nameAr}
+                    </div>
+                    {(isRtl ? product.name : product.nameAr) && (
                       <div className="text-sm text-muted-foreground font-arabic">
-                        {product.nameAr}
+                        {isRtl ? product.name : product.nameAr}
                       </div>
                     )}
                   </td>

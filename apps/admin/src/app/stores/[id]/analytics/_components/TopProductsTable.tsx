@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { formatCurrency, type TopProduct } from './types';
 
@@ -14,6 +15,8 @@ interface TopProductsTableProps {
  */
 export function TopProductsTable({ products }: TopProductsTableProps) {
   const t = useT('analytics.topProducts');
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
 
   return (
     <div className="bg-card rounded-xl border p-6 shadow-sm">
@@ -28,7 +31,9 @@ export function TopProductsTable({ products }: TopProductsTableProps) {
               {product.image ? (
                 <Image
                   src={product.image}
-                  alt={product.name}
+                  alt={
+                    isRtl ? product.nameAr || product.name : product.name || product.nameAr || ''
+                  }
                   width={40}
                   height={40}
                   className="w-10 h-10 rounded object-cover"
@@ -51,7 +56,9 @@ export function TopProductsTable({ products }: TopProductsTableProps) {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {isRtl ? product.nameAr || product.name : product.name || product.nameAr}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {t('soldCount', { count: product.quantity })}
                 </p>

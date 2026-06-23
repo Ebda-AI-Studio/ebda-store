@@ -21,6 +21,7 @@ export interface SalesData {
 export interface TopProduct {
   id: string;
   name: string;
+  nameAr?: string | null;
   slug: string;
   revenue: number;
   quantity: number;

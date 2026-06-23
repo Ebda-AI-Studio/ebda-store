@@ -1,5 +1,6 @@
 'use client';
 
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import { STOCK_STATUS_STYLES, type ProductInventory, type StockFilter } from './types';
@@ -30,6 +31,8 @@ export function StockLevelsTable({
 }: StockLevelsTableProps) {
   const t = useT('inventory.levels');
   const tStatus = useT('inventory.status');
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
 
   const columns: DataTableColumn<ProductInventory>[] = [
     {
@@ -37,9 +40,13 @@ export function StockLevelsTable({
       primaryOnMobile: true,
       cell: product => (
         <div>
-          <div className="font-medium text-foreground">{product.name}</div>
-          {product.nameAr && (
-            <div className="text-sm text-muted-foreground font-arabic">{product.nameAr}</div>
+          <div className="font-medium text-foreground">
+            {isRtl ? product.nameAr || product.name : product.name || product.nameAr}
+          </div>
+          {(isRtl ? product.name : product.nameAr) && (
+            <div className="text-sm text-muted-foreground font-arabic">
+              {isRtl ? product.name : product.nameAr}
+            </div>
           )}
         </div>
       ),

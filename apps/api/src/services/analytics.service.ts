@@ -80,6 +80,7 @@ interface SalesData {
 interface TopProduct {
   id: string;
   name: string;
+  nameAr?: string | null;
   slug: string;
   revenue: number;
   quantity: number;
@@ -399,6 +400,7 @@ export class AnalyticsService {
       select: {
         id: true,
         name: true,
+        nameAr: true,
         slug: true,
         images: { take: 1, orderBy: { position: 'asc' } },
       },
@@ -413,6 +415,7 @@ export class AnalyticsService {
       results.push({
         id: product.id,
         name: product.name,
+        nameAr: product.nameAr,
         slug: product.slug,
         revenue: g._sum.total ?? 0,
         quantity: g._sum.quantity ?? 0,

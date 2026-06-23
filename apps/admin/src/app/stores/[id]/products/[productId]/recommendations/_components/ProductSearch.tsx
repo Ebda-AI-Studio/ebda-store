@@ -3,12 +3,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { Input } from '@force/ui';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '../../../../../../../lib/api';
 
 export interface ProductSummary {
   id: string;
   name: string;
+  nameAr?: string | null;
   price: number;
   images: { url: string }[];
   status: string;
@@ -23,6 +25,8 @@ interface ProductSearchProps {
 
 export function ProductSearch({ storeId, onSelect, excludeIds, disabled }: ProductSearchProps) {
   const t = useT('products.recommendations.search');
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ProductSummary[]>([]);
   const [searching, setSearching] = useState(false);
@@ -110,7 +114,9 @@ export function ProductSearch({ storeId, onSelect, excludeIds, disabled }: Produ
                 {product.images?.[0] ? (
                   <Image
                     src={product.images[0].url}
-                    alt={product.name}
+                    alt={
+                      isRtl ? product.nameAr || product.name : product.name || product.nameAr || ''
+                    }
                     width={32}
                     height={32}
                     className="h-full w-full object-cover"
@@ -128,7 +134,9 @@ export function ProductSearch({ storeId, onSelect, excludeIds, disabled }: Produ
                   </div>
                 )}
               </div>
-              <span className="text-sm text-foreground truncate">{product.name}</span>
+              <span className="text-sm text-foreground truncate">
+                {isRtl ? product.nameAr || product.name : product.name || product.nameAr}
+              </span>
             </button>
           ))}
         </div>

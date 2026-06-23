@@ -4,9 +4,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
+import { useLocale } from 'next-intl';
 import { KUWAIT_GOVERNORATES, areasForGovernorate } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
+
+interface ProductVariant {
+  id: string;
+  title: string;
+  titleAr?: string | null;
+  price: number;
+  inventory: number;
+  sku?: string | null;
+  isActive: boolean;
+}
 
 interface ProductSearchResult {
   id: string;
@@ -14,10 +25,13 @@ interface ProductSearchResult {
   nameAr?: string;
   price: number;
   sku?: string;
+  hasVariants?: boolean;
+  variants?: ProductVariant[];
 }
 
 interface LineItem {
   productId: string;
+  variantId?: string;
   productName: string;
   unitPrice: number;
   quantity: number;
@@ -53,6 +67,8 @@ export default function NewOrderPage() {
   const router = useRouter();
   const storeId = params?.id as string;
   const { success: toastSuccess, error: toastError } = useToast();
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
 
   // Customer state — either an existing User.id (selected from search)
   // or guest info typed into the form.
@@ -86,6 +102,12 @@ export default function NewOrderPage() {
   const [productSearch, setProductSearch] = useState('');
   const [productResults, setProductResults] = useState<ProductSearchResult[]>([]);
   const [items, setItems] = useState<LineItem[]>([]);
+  // Variant picker: when a product with variants is selected from the dropdown,
+  // it sits here until the merchant picks a variant (or dismisses).
+  const [pendingVariantProduct, setPendingVariantProduct] = useState<ProductSearchResult | null>(
+    null
+  );
+  const [loadingVariants, setLoadingVariants] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -168,25 +190,105 @@ export default function NewOrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, governorate, debouncedArea, subtotal]);
 
-  const addProduct = (p: ProductSearchResult) => {
-    setItems(prev => {
-      const existing = prev.find(it => it.productId === p.id);
-      if (existing) {
-        return prev.map(it => (it.productId === p.id ? { ...it, quantity: it.quantity + 1 } : it));
-      }
-      return [...prev, { productId: p.id, productName: p.name, unitPrice: p.price, quantity: 1 }];
-    });
+  const displayName = (name: string, nameAr?: string | null) =>
+    isRtl ? nameAr || name : name || nameAr || name;
+
+  const addProduct = async (p: ProductSearchResult) => {
     setProductSearch('');
     setProductResults([]);
+
+    // If the product has variants, fetch them and show the variant picker.
+    const hasVariants = p.hasVariants || (p.variants && p.variants.length > 0);
+    if (hasVariants) {
+      if (p.variants && p.variants.length > 0) {
+        // Already have variants in the search result — go straight to picker.
+        setPendingVariantProduct(p);
+      } else {
+        // Need to fetch variants from the dedicated variant endpoint.
+        setLoadingVariants(true);
+        try {
+          const { data } = await apiGet<{
+            product: { variants: ProductVariant[] };
+          }>(`/api/v1/stores/${storeId}/products/${p.id}/variants`);
+          const variants = data?.product?.variants ?? [];
+          setPendingVariantProduct({ ...p, variants });
+        } catch {
+          // Fallback: add as parent product without variant if fetch fails.
+          const locName = displayName(p.name, p.nameAr);
+          setItems(prev => {
+            const existing = prev.find(it => it.productId === p.id && !it.variantId);
+            if (existing) {
+              return prev.map(it =>
+                it.productId === p.id && !it.variantId ? { ...it, quantity: it.quantity + 1 } : it
+              );
+            }
+            return [
+              ...prev,
+              { productId: p.id, productName: locName, unitPrice: p.price, quantity: 1 },
+            ];
+          });
+        } finally {
+          setLoadingVariants(false);
+        }
+      }
+      return;
+    }
+
+    // No variants — add directly with locale-aware name.
+    const locName = displayName(p.name, p.nameAr);
+    setItems(prev => {
+      const existing = prev.find(it => it.productId === p.id && !it.variantId);
+      if (existing) {
+        return prev.map(it =>
+          it.productId === p.id && !it.variantId ? { ...it, quantity: it.quantity + 1 } : it
+        );
+      }
+      return [...prev, { productId: p.id, productName: locName, unitPrice: p.price, quantity: 1 }];
+    });
   };
 
-  const removeItem = (productId: string) => {
-    setItems(prev => prev.filter(it => it.productId !== productId));
+  const addVariant = (product: ProductSearchResult, variant: ProductVariant) => {
+    const productLocName = displayName(product.name, product.nameAr);
+    const variantLocName = isRtl
+      ? variant.titleAr || variant.title
+      : variant.title || variant.titleAr || variant.title;
+    const lineItemName = `${productLocName} — ${variantLocName}`;
+    setItems(prev => {
+      const existing = prev.find(it => it.productId === product.id && it.variantId === variant.id);
+      if (existing) {
+        return prev.map(it =>
+          it.productId === product.id && it.variantId === variant.id
+            ? { ...it, quantity: it.quantity + 1 }
+            : it
+        );
+      }
+      return [
+        ...prev,
+        {
+          productId: product.id,
+          variantId: variant.id,
+          productName: lineItemName,
+          unitPrice: variant.price,
+          quantity: 1,
+        },
+      ];
+    });
+    setPendingVariantProduct(null);
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity < 1) return removeItem(productId);
-    setItems(prev => prev.map(it => (it.productId === productId ? { ...it, quantity } : it)));
+  const removeItem = (productId: string, variantId?: string) => {
+    setItems(prev =>
+      prev.filter(it => !(it.productId === productId && it.variantId === variantId))
+    );
+  };
+
+  const updateQuantity = (productId: string, quantity: number, variantId?: string) => {
+    if (quantity < 1) return removeItem(productId, variantId);
+    setItems(prev =>
+      prev.map(it =>
+        it.productId === productId && it.variantId === variantId ? { ...it, quantity } : it
+      )
+    );
   };
 
   const selectCustomer = (c: CustomerSearchResult) => {
@@ -247,7 +349,11 @@ export default function NewOrderPage() {
           governorate,
           country,
         },
-        items: items.map(it => ({ productId: it.productId, quantity: it.quantity })),
+        items: items.map(it => ({
+          productId: it.productId,
+          quantity: it.quantity,
+          ...(it.variantId ? { variantId: it.variantId } : {}),
+        })),
         notes: notes || undefined,
         couponCode: couponCode || undefined,
       };
@@ -352,7 +458,7 @@ export default function NewOrderPage() {
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               {customerResults.length > 0 && (
-                <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-popover shadow-lg">
+                <ul className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-card shadow-lg">
                   {customerResults.map(c => (
                     <li key={c.id}>
                       <button
@@ -524,7 +630,7 @@ export default function NewOrderPage() {
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
             {productResults.length > 0 && (
-              <ul className="absolute z-10 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-popover shadow-lg">
+              <ul className="absolute z-50 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-card shadow-lg">
                 {productResults.map(p => (
                   <li key={p.id}>
                     <button
@@ -532,7 +638,7 @@ export default function NewOrderPage() {
                       onClick={() => addProduct(p)}
                       className="w-full px-3 py-2 text-start text-sm hover:bg-muted"
                     >
-                      <span className="font-medium">{p.name}</span>
+                      <span className="font-medium">{displayName(p.name, p.nameAr)}</span>
                       {p.sku && <span className="ms-2 text-xs text-muted-foreground">{p.sku}</span>}
                       <span className="ms-2 text-muted-foreground">
                         {(p.price / 1000).toFixed(3)} KWD
@@ -542,6 +648,47 @@ export default function NewOrderPage() {
                 ))}
               </ul>
             )}
+            {loadingVariants && (
+              <p className="mt-2 text-xs text-muted-foreground">Loading variants…</p>
+            )}
+            {/* Variant picker — shown inline after merchant picks a variant product */}
+            {pendingVariantProduct && (
+              <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                  {displayName(pendingVariantProduct.name, pendingVariantProduct.nameAr)} — choose a
+                  variant:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(pendingVariantProduct.variants ?? [])
+                    .filter(v => v.isActive)
+                    .map(v => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => addVariant(pendingVariantProduct, v)}
+                        className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/5 hover:border-primary/40 transition-colors"
+                      >
+                        {isRtl ? v.titleAr || v.title : v.title || v.titleAr || v.title}
+                        <span className="ms-1.5 text-muted-foreground">
+                          {(v.price / 1000).toFixed(3)} KWD
+                        </span>
+                        {v.inventory <= 0 && (
+                          <span className="ms-1.5 text-destructive/70 text-[10px]">
+                            (out of stock)
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingVariantProduct(null)}
+                  className="mt-2 text-xs text-muted-foreground underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
           {items.length === 0 ? (
             <p className="rounded-lg bg-muted/30 p-4 text-center text-sm text-muted-foreground">
@@ -550,7 +697,10 @@ export default function NewOrderPage() {
           ) : (
             <ul className="divide-y divide-border rounded-lg border border-border">
               {items.map(it => (
-                <li key={it.productId} className="flex items-center gap-3 p-3 text-sm">
+                <li
+                  key={`${it.productId}-${it.variantId ?? 'base'}`}
+                  className="flex items-center gap-3 p-3 text-sm"
+                >
                   <span className="flex-1 font-medium text-foreground">{it.productName}</span>
                   <span className="text-xs text-muted-foreground">
                     {(it.unitPrice / 1000).toFixed(3)} KWD
@@ -559,7 +709,9 @@ export default function NewOrderPage() {
                     type="number"
                     min="1"
                     value={it.quantity}
-                    onChange={e => updateQuantity(it.productId, Number(e.target.value))}
+                    onChange={e =>
+                      updateQuantity(it.productId, Number(e.target.value), it.variantId)
+                    }
                     className="w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
                   />
                   <span className="w-24 text-end font-semibold text-foreground">
@@ -567,7 +719,7 @@ export default function NewOrderPage() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => removeItem(it.productId)}
+                    onClick={() => removeItem(it.productId, it.variantId)}
                     aria-label="Remove"
                     className="rounded p-1 text-destructive hover:bg-destructive/10"
                   >

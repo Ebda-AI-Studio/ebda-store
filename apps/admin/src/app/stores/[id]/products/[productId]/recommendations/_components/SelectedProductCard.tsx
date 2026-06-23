@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import type { ProductSummary } from './ProductSearch';
 
@@ -11,6 +12,11 @@ interface SelectedProductCardProps {
 
 export function SelectedProductCard({ product, onRemove }: SelectedProductCardProps) {
   const t = useT('products.recommendations');
+  const locale = useLocale();
+  const isRtl = locale === 'ar';
+  const displayName = isRtl
+    ? product.nameAr || product.name
+    : product.name || product.nameAr || product.name;
 
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2">
@@ -18,7 +24,7 @@ export function SelectedProductCard({ product, onRemove }: SelectedProductCardPr
         {product.images?.[0] ? (
           <Image
             src={product.images[0].url}
-            alt={product.name}
+            alt={displayName}
             width={40}
             height={40}
             className="h-full w-full object-cover"
@@ -36,12 +42,12 @@ export function SelectedProductCard({ product, onRemove }: SelectedProductCardPr
           </div>
         )}
       </div>
-      <span className="flex-1 text-sm font-medium text-foreground truncate">{product.name}</span>
+      <span className="flex-1 text-sm font-medium text-foreground truncate">{displayName}</span>
       <button
         type="button"
         onClick={onRemove}
         className="touch-target flex-shrink-0 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-        aria-label={t('removeAria', { name: product.name })}
+        aria-label={t('removeAria', { name: displayName })}
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
