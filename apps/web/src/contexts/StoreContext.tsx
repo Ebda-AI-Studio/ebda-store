@@ -1,6 +1,14 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { api, API_URL } from '../lib/api';
 import { setCompareStoreId } from '../lib/compare';
 import {
@@ -245,6 +253,11 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
   // the layout-draft bundle when a preview token is active; null otherwise so
   // the live path (no draft) is completely unchanged.
   const [draftSettings, setDraftSettings] = useState<Record<string, unknown> | null>(null);
+  // Draft-only theme overrides (PLP colors, palette tokens, etc.) from the
+  // preview bundle. Merged over the committed store.theme so consumers that read
+  // `store.theme.*` directly (e.g. ProductsClient's PLP colors) reflect the
+  // unsaved preview — keeping the preview faithful to the storefront.
+  const [draftTheme, setDraftTheme] = useState<Record<string, unknown> | null>(null);
 
   // Lazy-fetch layout settings for non-homepage routes so ShopChrome can apply
   // header / footer / announcement chrome overrides everywhere, not only home.
@@ -270,6 +283,7 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
           data?: {
             layout?: import('@force/shared').StoreLayoutSettings;
             settings?: Record<string, unknown>;
+            theme?: Record<string, unknown>;
             isDraft?: boolean;
           };
         };
@@ -281,6 +295,14 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
           setDraftSettings(data.data.settings);
         } else {
           setDraftSettings(null);
+        }
+        // Same for the draft theme — so direct `store.theme.*` reads (PLP colors)
+        // reflect the preview. Cleared when there's no draft so the live path is
+        // untouched.
+        if (data.data?.isDraft && data.data.theme && typeof data.data.theme === 'object') {
+          setDraftTheme(data.data.theme);
+        } else {
+          setDraftTheme(null);
         }
       } catch {
         // Silent: layout chrome is a nice-to-have, fallback is the default chrome.
@@ -302,10 +324,20 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
   // so child components read the right store's key on their first render.
   setCompareStoreId(store.id && store.id !== 'demo' ? store.id : null);
 
-  // Apply theme on mount and when theme changes
+  // The store exposed to consumers, with any unsaved preview theme merged in so
+  // `store.theme.*` reads (e.g. ProductsClient PLP colors) match the preview.
+  const effectiveStore = useMemo(
+    () =>
+      draftTheme
+        ? { ...store, theme: { ...(store.theme ?? {}), ...draftTheme } as typeof store.theme }
+        : store,
+    [store, draftTheme]
+  );
+
+  // Apply theme on mount and when theme changes (committed OR draft).
   useEffect(() => {
-    applyTheme(store.theme || DEFAULT_THEME);
-  }, [store.theme]);
+    applyTheme(effectiveStore.theme || DEFAULT_THEME);
+  }, [effectiveStore.theme]);
 
   // Apply favicon
   useEffect(() => {
@@ -321,7 +353,9 @@ export function StoreProvider({ children, initialStore, previewDraftToken }: Sto
   }, [store.favicon]);
 
   return (
-    <StoreContext.Provider value={{ store, isLoading, error, layout, draftSettings }}>
+    <StoreContext.Provider
+      value={{ store: effectiveStore, isLoading, error, layout, draftSettings }}
+    >
       {children}
     </StoreContext.Provider>
   );

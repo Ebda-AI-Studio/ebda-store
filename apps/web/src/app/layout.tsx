@@ -399,8 +399,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const orgJsonLd = organizationJsonLd(store);
 
   // Build a <style> tag that overrides the default orange theme in globals.css
-  // Inline styles on <html> don't beat `:root {}` in @layer base, so we inject a :root rule instead
-  const themeCssVars = store.theme ? themeToCssVars(store.theme) : null;
+  // Inline styles on <html> don't beat `:root {}` in @layer base, so we inject a :root rule instead.
+  // When an unsaved page-builder PREVIEW draft is active, merge its pending theme
+  // over the committed theme so the preview iframe paints EXACTLY what the
+  // storefront will (PLP breadcrumb/heading/subtitle colors + palette tokens) —
+  // otherwise those theme-driven colors showed live but not in the preview.
+  const effectiveTheme = draftBundle?.theme
+    ? { ...(store.theme ?? {}), ...(draftBundle.theme as Record<string, unknown>) }
+    : store.theme;
+  const themeCssVars = effectiveTheme ? themeToCssVars(effectiveTheme as typeof store.theme) : null;
   // Non-color CSS custom properties that use sanitizeCssValue instead of sanitizeThemeColor
   const nonColorVars = new Set(['--radius', '--font-family']);
 
