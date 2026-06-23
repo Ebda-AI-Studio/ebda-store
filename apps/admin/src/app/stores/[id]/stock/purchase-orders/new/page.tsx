@@ -31,7 +31,7 @@ interface ProductsResponse {
 interface POLineItem {
   productId: string;
   qty: string;
-  unitCost: string; // fils
+  unitCost: string; // KWD (user types dinar; converted to fils on save)
 }
 
 interface POCreated {
@@ -43,10 +43,11 @@ interface POCreated {
 
 const EMPTY_LINE: POLineItem = { productId: '', qty: '', unitCost: '' };
 
+// Returns line total in FILS (qty × unitCost-in-dinar × 1000)
 function lineTotal(line: POLineItem): number {
   const qty = parseInt(line.qty) || 0;
-  const cost = parseInt(line.unitCost) || 0;
-  return qty * cost;
+  const costFils = Math.round((parseFloat(line.unitCost) || 0) * 1000);
+  return qty * costFils;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -118,7 +119,7 @@ export default function NewPurchaseOrderPage() {
       items: validLines.map(l => ({
         productId: l.productId,
         qty: parseInt(l.qty),
-        unitCost: parseInt(l.unitCost), // fils
+        unitCost: Math.round((parseFloat(l.unitCost) || 0) * 1000), // convert KWD → fils
       })),
     };
 
@@ -256,11 +257,11 @@ export default function NewPurchaseOrderPage() {
                       <input
                         type="number"
                         min="0"
-                        step="1"
+                        step="0.001"
                         value={line.unitCost}
                         onChange={e => updateLine(i, { unitCost: e.target.value })}
                         className="w-full border border-border rounded px-2 py-1 text-end font-mono text-base sm:text-sm"
-                        placeholder="0"
+                        placeholder="0.000"
                       />
                     </td>
                     <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">

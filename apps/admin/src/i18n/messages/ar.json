@@ -2352,7 +2352,7 @@
       "fields": {
         "defaultCommissionRate": "معدل العمولة الافتراضي (%)",
         "cookieDurationDays": "مدة ملف تعريف الارتباط (أيام)",
-        "minPayoutAmount": "الحد الأدنى لمبلغ الدفع (فلس)",
+        "minPayoutAmount": "الحد الأدنى لمبلغ الدفع (د.ك)",
         "minPayoutEquivalent": "ما يعادل {amount} د.ك"
       },
       "toggles": {
@@ -3180,8 +3180,8 @@
     },
     "redemption": {
       "title": "الاستبدال",
-      "pointValue": "قيمة النقطة (فلس)",
-      "pointValueHint": "1 نقطة = {value} فلس",
+      "pointValue": "قيمة النقطة (د.ك)",
+      "pointValueHint": "1 نقطة = {value} د.ك",
       "minRedeem": "الحد الأدنى من النقاط للاستبدال",
       "maxPercent": "الحد الأقصى % من الطلب",
       "expirationMonths": "الانتهاء (أشهر)",
@@ -3270,12 +3270,12 @@
       "displayNamePlaceholder": "Cash on Delivery",
       "displayNameArLabel": "الاسم المعروض (العربية)",
       "displayNameArPlaceholder": "الدفع عند الاستلام",
-      "fixedFeeLabel": "رسوم إضافية (فلس)",
-      "fixedFeePlaceholder": "0",
+      "fixedFeeLabel": "رسوم إضافية (د.ك)",
+      "fixedFeePlaceholder": "0.000",
       "fixedFeeEquals": "= {amount} د.ك",
       "fixedFeeHelpPrefix": "رسوم إضافية تُضاف إلى الطلب عند دفع العميل نقدًا عند الاستلام. أدخل",
       "fixedFeeHelpZero": "0",
-      "fixedFeeHelpSuffix": "لإلغاء الرسوم. 1000 فلس = 1 د.ك.",
+      "fixedFeeHelpSuffix": "لإلغاء الرسوم.",
       "infoBanner": "تتجاوز طلبات الدفع عند الاستلام بوابة الدفع. يؤكد العميل الطلب، وتقوم أنت بتعليمه كمدفوع من صفحة الطلبات عند استلام المبلغ."
     },
     "gateway": {
@@ -4188,8 +4188,8 @@
         "selectSupplier": "(بدون مورد)",
         "selectExpenseAccount": "اختر فئة المصروف",
         "selectPaidFromAccount": "اختر حساب الدفع",
-        "amount": "المبلغ (فلس)",
-        "taxAmount": "الضريبة (فلس)",
+        "amount": "المبلغ (د.ك)",
+        "taxAmount": "الضريبة (د.ك)",
         "totalInKwd": "الإجمالي (د.ك)",
         "notes": "ملاحظات (إنجليزي)",
         "notesAr": "ملاحظات (عربي)",
@@ -4540,7 +4540,7 @@
         "expectedDateLabel": "تاريخ الاستلام المتوقع",
         "addItem": "+ إضافة بند",
         "qty": "الكمية",
-        "unitCost": "تكلفة الوحدة (فلس)",
+        "unitCost": "تكلفة الوحدة (د.ك)",
         "lineTotal": "إجمالي البند (د.ك)",
         "subtotal": "المجموع الفرعي",
         "submit": "إنشاء مسودة أمر الشراء"

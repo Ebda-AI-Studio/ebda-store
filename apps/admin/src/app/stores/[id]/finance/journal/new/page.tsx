@@ -80,10 +80,11 @@ export default function NewJournalEntryPage() {
     setLines(cur => (cur.length <= 2 ? cur : cur.filter((_, idx) => idx !== i)));
   }
 
+  // Totals computed in fils for balance check; user types KWD (3 dp)
   const totals = lines.reduce(
     (acc, l) => ({
-      debit: acc.debit + (Number(l.debit) || 0),
-      credit: acc.credit + (Number(l.credit) || 0),
+      debit: acc.debit + Math.round((parseFloat(l.debit) || 0) * 1000),
+      credit: acc.credit + Math.round((parseFloat(l.credit) || 0) * 1000),
     }),
     { debit: 0, credit: 0 }
   );
@@ -102,8 +103,8 @@ export default function NewJournalEntryPage() {
         memoAr: memoAr || undefined,
         lines: lines.map(l => ({
           accountId: l.accountId,
-          debit: Math.round(Number(l.debit) || 0),
-          credit: Math.round(Number(l.credit) || 0),
+          debit: Math.round((parseFloat(l.debit) || 0) * 1000),
+          credit: Math.round((parseFloat(l.credit) || 0) * 1000),
           lineMemo: l.lineMemo || undefined,
         })),
       };
@@ -175,10 +176,10 @@ export default function NewJournalEntryPage() {
                   {tNew('account')}
                 </th>
                 <th className="text-end px-3 py-2 w-32 font-medium text-muted-foreground">
-                  {t('debit')} (fils)
+                  {t('debit')} (KWD)
                 </th>
                 <th className="text-end px-3 py-2 w-32 font-medium text-muted-foreground">
-                  {t('credit')} (fils)
+                  {t('credit')} (KWD)
                 </th>
                 <th className="text-start px-3 py-2 font-medium text-muted-foreground">
                   {t('memo')}
@@ -207,7 +208,7 @@ export default function NewJournalEntryPage() {
                     <input
                       type="number"
                       min="0"
-                      step="1"
+                      step="0.001"
                       value={l.debit}
                       onChange={e =>
                         updateLine(i, {
@@ -222,7 +223,7 @@ export default function NewJournalEntryPage() {
                     <input
                       type="number"
                       min="0"
-                      step="1"
+                      step="0.001"
                       value={l.credit}
                       onChange={e =>
                         updateLine(i, {
@@ -258,10 +259,10 @@ export default function NewJournalEntryPage() {
               <tr className="border-t border-border">
                 <td className="px-3 py-2 font-medium">{tNew('totals')}</td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {totals.debit.toLocaleString()}
+                  {(totals.debit / 1000).toFixed(3)}
                 </td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {totals.credit.toLocaleString()}
+                  {(totals.credit / 1000).toFixed(3)}
                 </td>
                 <td className="px-3 py-2" colSpan={2}>
                   {!balanced && totals.debit + totals.credit > 0 && (

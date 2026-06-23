@@ -1,7 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
-import { formatFils, type AffiliateConfig } from './types';
+import type { AffiliateConfig } from './types';
 
 interface AffiliateCommissionFormProps {
   config: AffiliateConfig;
@@ -71,18 +71,16 @@ export function AffiliateCommissionForm({
             <input
               type="number"
               min="0"
-              value={config.minPayoutAmount}
+              step="0.001"
+              value={(config.minPayoutAmount / 1000).toFixed(3)}
               onChange={e =>
                 onConfigChange({
                   ...config,
-                  minPayoutAmount: parseInt(e.target.value) || 0,
+                  minPayoutAmount: Math.round((parseFloat(e.target.value) || 0) * 1000),
                 })
               }
               className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('fields.minPayoutEquivalent', { amount: formatFils(config.minPayoutAmount) })}
-            </p>
           </div>
         </div>
       </div>

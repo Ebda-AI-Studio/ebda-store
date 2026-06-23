@@ -27,14 +27,17 @@ export function RedemptionForm({ settings, disabled, onChange }: RedemptionFormP
           </label>
           <input
             type="number"
-            min="1"
-            value={settings.pointsValue}
-            onChange={e => onChange({ pointsValue: parseInt(e.target.value) || 1 })}
+            min="0.001"
+            step="0.001"
+            value={(settings.pointsValue / 1000).toFixed(3)}
+            onChange={e =>
+              onChange({ pointsValue: Math.round((parseFloat(e.target.value) || 0) * 1000) })
+            }
             className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             disabled={disabled}
           />
           <p className="text-xs text-muted-foreground mt-1">
-            {t('pointValueHint', { value: settings.pointsValue })}
+            {t('pointValueHint', { value: (settings.pointsValue / 1000).toFixed(3) })}
           </p>
         </div>
         <div>

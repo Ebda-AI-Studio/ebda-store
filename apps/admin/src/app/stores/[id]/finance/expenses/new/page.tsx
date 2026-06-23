@@ -245,14 +245,20 @@ export default function NewExpensePage() {
 
   // ── Manual form submit ───────────────────────────────────────────────────
 
-  const rawAmount = Number(amount) || 0;
-  const rawTax = Number(taxAmount) || 0;
+  const rawAmount = parseFloat(amount) || 0;
+  const rawTax = parseFloat(taxAmount) || 0;
   const isNonKwd = multiCurrencyEnabled && requiresFxRate(currency);
   const fxRateNum = Number(fxRate) || 0;
 
-  // Live KWD preview — for non-KWD, use convertToKwd; for KWD, pass through
-  const kwdAmountFils = isNonKwd && fxRateNum > 0 ? convertToKwd(rawAmount, fxRateNum) : rawAmount;
-  const kwdTaxFils = isNonKwd && fxRateNum > 0 ? convertToKwd(rawTax, fxRateNum) : rawTax;
+  // For KWD, user types dinar → convert to fils for the live preview and payload.
+  // For non-KWD, user types minor units directly (convertToKwd already works in minor units).
+  const rawAmountFils = isNonKwd ? rawAmount : Math.round(rawAmount * 1000);
+  const rawTaxFils = isNonKwd ? rawTax : Math.round(rawTax * 1000);
+
+  // Live KWD preview — for non-KWD, use convertToKwd; for KWD, already in fils
+  const kwdAmountFils =
+    isNonKwd && fxRateNum > 0 ? convertToKwd(rawAmountFils, fxRateNum) : rawAmountFils;
+  const kwdTaxFils = isNonKwd && fxRateNum > 0 ? convertToKwd(rawTaxFils, fxRateNum) : rawTaxFils;
   const totalFilsKwd = kwdAmountFils + kwdTaxFils;
   const totalKwd = (totalFilsKwd / 1000).toFixed(3);
 
@@ -270,7 +276,7 @@ export default function NewExpensePage() {
       setError('Paid-from account is required');
       return;
     }
-    if (!amount || rawAmount <= 0) {
+    if (!amount || rawAmountFils <= 0) {
       setError('Amount must be greater than 0');
       return;
     }
@@ -286,8 +292,10 @@ export default function NewExpensePage() {
         supplierId: supplierId || undefined,
         expenseAccountId,
         paidFromAccountId,
-        amount: Math.round(rawAmount),
-        taxAmount: Math.round(rawTax),
+        // KWD: user typed dinar → already converted to fils in rawAmountFils/rawTaxFils
+        // non-KWD: user typed minor units → rawAmountFils === rawAmount (integer)
+        amount: rawAmountFils,
+        taxAmount: rawTaxFils,
         currency,
         notes: notes || undefined,
         notesAr: notesAr || undefined,
@@ -297,7 +305,7 @@ export default function NewExpensePage() {
       // Include FX fields only for non-KWD currencies
       if (isNonKwd && fxRateNum > 0) {
         payload.fxRate = fxRateNum;
-        payload.originalAmount = Math.round(rawAmount);
+        payload.originalAmount = rawAmountFils;
       }
 
       const { error: apiError } = await apiPost(`/api/v1/stores/${storeId}/expenses`, payload);
@@ -512,13 +520,13 @@ export default function NewExpensePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="block space-y-1">
             <span className="text-sm font-medium">
-              {t('amount')} {isNonKwd ? `(${currency} minor units)` : '(fils)'}{' '}
+              {t('amount')} {isNonKwd ? `(${currency} minor units)` : '(KWD)'}{' '}
               <span className="text-red-500">*</span>
             </span>
             <input
               type="number"
-              min="1"
-              step="1"
+              min={isNonKwd ? '1' : '0.001'}
+              step={isNonKwd ? '1' : '0.001'}
               value={amount}
               onChange={e => setAmount(e.target.value)}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
@@ -533,12 +541,12 @@ export default function NewExpensePage() {
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-medium">
-              {t('taxAmount')} {isNonKwd ? `(${currency} minor units)` : '(fils)'}
+              {t('taxAmount')} {isNonKwd ? `(${currency} minor units)` : '(KWD)'}
             </span>
             <input
               type="number"
               min="0"
-              step="1"
+              step={isNonKwd ? '1' : '0.001'}
               value={taxAmount}
               onChange={e => setTaxAmount(e.target.value)}
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"

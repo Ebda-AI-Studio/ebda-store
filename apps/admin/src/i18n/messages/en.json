@@ -2352,7 +2352,7 @@
       "fields": {
         "defaultCommissionRate": "Default Commission Rate (%)",
         "cookieDurationDays": "Cookie Duration (days)",
-        "minPayoutAmount": "Min Payout Amount (fils)",
+        "minPayoutAmount": "Min Payout Amount (KWD)",
         "minPayoutEquivalent": "{amount} KWD equivalent"
       },
       "toggles": {
@@ -3180,8 +3180,8 @@
     },
     "redemption": {
       "title": "Redemption",
-      "pointValue": "Point Value (fils)",
-      "pointValueHint": "1 point = {value} fils",
+      "pointValue": "Point Value (KWD)",
+      "pointValueHint": "1 point = {value} KWD",
       "minRedeem": "Min Points to Redeem",
       "maxPercent": "Max % of Order",
       "expirationMonths": "Expiration (months)",
@@ -3270,12 +3270,12 @@
       "displayNamePlaceholder": "Cash on Delivery",
       "displayNameArLabel": "Display Name (Arabic)",
       "displayNameArPlaceholder": "الدفع عند الاستلام",
-      "fixedFeeLabel": "Surcharge Fee (fils)",
-      "fixedFeePlaceholder": "0",
+      "fixedFeeLabel": "Surcharge Fee (KWD)",
+      "fixedFeePlaceholder": "0.000",
       "fixedFeeEquals": "= {amount} KWD",
       "fixedFeeHelpPrefix": "Extra charge added to the order when the customer pays cash on delivery. Enter",
       "fixedFeeHelpZero": "0",
-      "fixedFeeHelpSuffix": "for free COD. 1000 fils = 1 KWD.",
+      "fixedFeeHelpSuffix": "for free COD.",
       "infoBanner": "COD orders bypass the payment gateway. The customer confirms the order, and you mark it as paid from the Orders page once cash is collected."
     },
     "gateway": {
@@ -4188,8 +4188,8 @@
         "selectSupplier": "(no vendor)",
         "selectExpenseAccount": "Select expense category",
         "selectPaidFromAccount": "Select paid-from account",
-        "amount": "Amount (fils)",
-        "taxAmount": "Tax (fils)",
+        "amount": "Amount (KWD)",
+        "taxAmount": "Tax (KWD)",
         "totalInKwd": "Total (KWD)",
         "notes": "Notes (English)",
         "notesAr": "Notes (Arabic)",
@@ -4540,7 +4540,7 @@
         "expectedDateLabel": "Expected receipt date",
         "addItem": "+ Add line item",
         "qty": "Qty",
-        "unitCost": "Unit cost (fils)",
+        "unitCost": "Unit cost (KWD)",
         "lineTotal": "Line total (KWD)",
         "subtotal": "Subtotal",
         "submit": "Create draft PO"

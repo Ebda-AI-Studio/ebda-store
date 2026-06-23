@@ -203,17 +203,17 @@ function CodFields({
             <input
               type="number"
               min={0}
-              step={1}
-              value={form.fixedFee ?? 0}
+              step={0.001}
+              value={((Number(form.fixedFee) || 0) / 1000).toFixed(3)}
               onChange={e =>
-                onUpdateField('fixedFee', Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                onUpdateField(
+                  'fixedFee',
+                  Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 1000))
+                )
               }
               placeholder={t('fixedFeePlaceholder')}
               className="w-40 rounded-lg border border-border px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            <span className="text-sm text-muted-foreground">
-              {t('fixedFeeEquals', { amount: ((Number(form.fixedFee) || 0) / 1000).toFixed(3) })}
-            </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {t('fixedFeeHelpPrefix')} <strong>{t('fixedFeeHelpZero')}</strong>{' '}
