@@ -161,7 +161,13 @@ router.get(
         // tiebreaker so stores that never reordered keep their A→Z look.
         orderBy: [{ position: 'asc' }, { name: 'asc' }],
         include: {
-          _count: { select: { products: true } },
+          // Exclude archived/deleted from the category product count so it
+          // reflects live catalog size, not historical/hidden products.
+          _count: {
+            select: {
+              products: { where: { product: { deletedAt: null, status: { not: 'archived' } } } },
+            },
+          },
         },
       });
 
@@ -393,7 +399,13 @@ router.post(
           showOnHomeStrip: data.showOnHomeStrip,
         },
         include: {
-          _count: { select: { products: true } },
+          // Exclude archived/deleted from the category product count so it
+          // reflects live catalog size, not historical/hidden products.
+          _count: {
+            select: {
+              products: { where: { product: { deletedAt: null, status: { not: 'archived' } } } },
+            },
+          },
         },
       });
 
@@ -493,7 +505,13 @@ router.put(
           ...(data.showOnHomeStrip !== undefined ? { showOnHomeStrip: data.showOnHomeStrip } : {}),
         },
         include: {
-          _count: { select: { products: true } },
+          // Exclude archived/deleted from the category product count so it
+          // reflects live catalog size, not historical/hidden products.
+          _count: {
+            select: {
+              products: { where: { product: { deletedAt: null, status: { not: 'archived' } } } },
+            },
+          },
         },
       });
 

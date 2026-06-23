@@ -1298,7 +1298,11 @@ export class ProductService {
         orderBy: [{ position: 'asc' }, { name: 'asc' }],
         take: 100, // Guard against stores with unbounded category growth
         include: {
-          _count: { select: { products: true } },
+          // Storefront "X items" badge = only products a customer can actually
+          // see, so archived / draft / deleted products don't inflate the count.
+          _count: {
+            select: { products: { where: { product: { status: 'active', deletedAt: null } } } },
+          },
         },
       }),
       prisma.product.count({
