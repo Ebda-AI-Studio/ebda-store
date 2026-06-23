@@ -41,6 +41,14 @@ const PER_PAGE_OPTIONS: readonly number[] = [12, 24, 48, 96];
 /** Sort option labels are translated at render time via the t() helper */
 function getSortOptions(t: (en: string, ar: string) => string) {
   return [
+    // Default = the merchant's curated per-category order. Sends NO sort/featured
+    // param so the API uses the ProductCategory.position path (all products in the
+    // store's chosen order). MUST stay first + be the default \u2014 a category browse
+    // should show the whole category, not a filtered collection.
+    {
+      value: 'default',
+      label: t('Recommended', '\u0627\u0644\u0645\u064f\u0648\u0635\u0649 \u0628\u0647'),
+    },
     { value: 'featured', label: t('Featured', '\u0645\u0645\u064a\u0632') },
     { value: 'newest', label: t('Newest', '\u0627\u0644\u0623\u062d\u062f\u062b') },
     {
@@ -112,8 +120,19 @@ export default function ProductsClient({
   // a junk param can't corrupt state.
   const [sortBy, setSortBy] = useState<string>(() => {
     const fromUrl = searchParams.get('sort');
-    const allowed = new Set(['newest', 'price-asc', 'price-desc', 'featured', 'best_seller']);
-    return fromUrl && allowed.has(fromUrl) ? fromUrl : 'newest';
+    const allowed = new Set([
+      'default',
+      'newest',
+      'price-asc',
+      'price-desc',
+      'featured',
+      'best_seller',
+    ]);
+    // Default to the merchant's curated order ('default') so a plain category /
+    // all-products browse shows EVERY product, not the new-arrivals filter that
+    // 'newest' applies. Homepage carousel deep-links (?sort=newest / ?sort=best_seller)
+    // still pass through the allow-list and filter as before.
+    return fromUrl && allowed.has(fromUrl) ? fromUrl : 'default';
   });
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [page, setPage] = useState(1);
@@ -391,7 +410,7 @@ export default function ProductsClient({
   const handleClearAll = () => {
     setSearch('');
     setCategoryFilter('');
-    setSortBy('newest');
+    setSortBy('default');
     setPriceMin(0);
     setPriceMax(100);
   };

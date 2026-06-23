@@ -71,10 +71,13 @@ async function fetchInitialData(
   // them out — which the merchant reads as "the filter is broken". Slugs
   // can be Arabic strings (e.g. "أدوات") so encode each value individually
   // via URLSearchParams.
+  // No `sort` param → the API uses the merchant's curated per-category order
+  // (ProductCategory.position) and returns the WHOLE category. Sending
+  // `sort=newest` here filtered the SSR paint to the new-arrivals collection
+  // (isNew=true), so a category landed showing only a handful of products.
   const productsQuery = new URLSearchParams({
     page: '1',
     limit: '12',
-    sort: 'newest',
   });
   if (filters.category) productsQuery.set('category', filters.category);
 
