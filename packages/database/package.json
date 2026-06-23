@@ -15,6 +15,7 @@
     "push": "prisma db push",
     "studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
+    "seed:demo": "tsx prisma/seed-demo-store.ts",
     "seed:loadtest": "tsx prisma/seed-loadtest-stores.ts",
     "seed:loadtest:cleanup": "tsx prisma/seed-loadtest-stores.ts --cleanup",
     "clean": "rm -rf node_modules"
