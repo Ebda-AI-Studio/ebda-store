@@ -58,7 +58,9 @@ export default function CouponsPage() {
       description: coupon.description || '',
       descriptionAr: coupon.descriptionAr || '',
       type: coupon.type,
-      value: coupon.value,
+      // `fixed` coupons are stored in fils → show as KWD (÷1000) in the form.
+      // `percentage` coupons store the raw percent, shown as-is.
+      value: coupon.type === 'fixed' ? coupon.value / 1000 : coupon.value,
       minOrderAmount: coupon.minOrderAmount ? String(coupon.minOrderAmount / 1000) : '',
       maxDiscount: coupon.maxDiscount ? String(coupon.maxDiscount / 1000) : '',
       usageLimit: coupon.usageLimit ? String(coupon.usageLimit) : '',

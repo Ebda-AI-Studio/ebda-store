@@ -264,7 +264,7 @@ export default function NewPurchaseOrderPage() {
                       />
                     </td>
                     <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
-                      {lt > 0 ? (lt / 1000).toFixed(3) : '—'}
+                      {lt > 0 ? `${(lt / 1000).toFixed(3)} KWD` : '—'}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <button

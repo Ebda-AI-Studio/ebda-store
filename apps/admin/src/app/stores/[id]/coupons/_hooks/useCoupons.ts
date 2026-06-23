@@ -64,7 +64,9 @@ export function useCoupons(storeId: string): UseCouponsResult {
           description: formData.description || undefined,
           descriptionAr: formData.descriptionAr || undefined,
           type: formData.type,
-          value: formData.value,
+          // `fixed` coupons: the input is in KWD (dinar) → store as fils (×1000).
+          // `percentage` coupons: the value is a percent (e.g. 5 = 5%), stored as-is.
+          value: formData.type === 'fixed' ? Math.round(formData.value * 1000) : formData.value,
           minOrderAmount: formData.minOrderAmount
             ? parseInt(formData.minOrderAmount) * 1000
             : undefined,

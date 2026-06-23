@@ -113,11 +113,19 @@ function AnomalyRow({
       <div className="grid grid-cols-3 gap-3 text-xs">
         <div>
           <p className="text-muted-foreground">{t('current7d')}</p>
-          <p className="font-mono font-medium">{item.current7d.toFixed(2)}</p>
+          <p className="font-mono font-medium">
+            {item.metric === 'revenue_drop'
+              ? `${(item.current7d / 1000).toFixed(3)} KWD`
+              : item.current7d.toFixed(2)}
+          </p>
         </div>
         <div>
           <p className="text-muted-foreground">{t('baseline28d')}</p>
-          <p className="font-mono font-medium">{item.baseline28d.toFixed(2)}</p>
+          <p className="font-mono font-medium">
+            {item.metric === 'revenue_drop'
+              ? `${(item.baseline28d / 1000).toFixed(3)} KWD`
+              : item.baseline28d.toFixed(2)}
+          </p>
         </div>
         <div>
           <p className="text-muted-foreground">{t('delta')}</p>
