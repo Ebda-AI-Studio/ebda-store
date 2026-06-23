@@ -45,6 +45,8 @@ import { orderStuckPaymentSweep } from './order-stuck-payment-sweep';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
 import { r2OrphanSweep } from './r2-orphan-sweep';
 import { paymentAbandonmentSweep } from './payment-abandonment-sweep';
+import { paymentWebhookProcess } from './payment-webhook-process';
+import { paymentWebhookStuckSweep } from './payment-webhook-stuck-sweep';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -119,4 +121,12 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // orders that reached a payment gateway (paymentUrl non-null) but never paid.
   // Only runs for stores with the 'payment_abandonment' feature enabled.
   paymentAbandonmentSweep,
+  // Payment webhook offload: consumes payment/webhook.received and runs the
+  // heavy PaymentService.handleWebhook mutation OFF the inbound webhook
+  // request path so a provider webhook storm can't starve the shared
+  // Prisma pool / auth (P2024). See payment-webhook-process.ts.
+  paymentWebhookProcess,
+  // Safety net: re-sends undelivered payment webhook inbox rows + P0-alerts
+  // wedged ones (the inngest.send-ok-but-never-delivered gap). 5-min cron.
+  paymentWebhookStuckSweep,
 ];

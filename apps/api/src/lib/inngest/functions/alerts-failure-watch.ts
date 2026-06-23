@@ -35,11 +35,22 @@ export const alertsFailureWatch: InngestFunction.Any = inngest.createFunction(
     const errorBlob =
       (data.error as { message?: string; name?: string; stack?: string } | undefined) ?? {};
 
+    // Money-path escalation: a payment webhook that exhausts its retries can
+    // leave an order permanently unpaid despite a captured provider payment
+    // (the offload removed the old provider-retry self-heal — see
+    // payment-webhook-process + feedback-db-pool-starvation-webhook-storm-starves-auth.md).
+    // Promote those to P0 so a stuck payment is never a silent P1 until the
+    // WebhookEvent replay sweep ships. The inbox row (status='failed') is the
+    // durable record an operator replays from.
+    const isPaymentPath = functionId === 'payment-webhook-process';
+
     await sendAlert({
-      level: 'p1',
+      level: isPaymentPath ? 'p0' : 'p1',
       scope: 'platform',
       source: `inngest.${functionId}`,
-      title: `inngest function failed: ${functionId}`,
+      title: isPaymentPath
+        ? `PAYMENT webhook processing failed past final retry: ${functionId}`
+        : `inngest function failed: ${functionId}`,
       body: errorBlob.message ?? 'unknown error',
       context: {
         functionId,

@@ -416,6 +416,7 @@ model Store {
   productDailyViews        ProductDailyView[]
   whatsAppTemplates        WhatsAppTemplate[]
   paymentEvents            PaymentEvent[]
+  webhookEvents            WebhookEvent[]
   bankStatements           BankStatement[]
   bankTransactions         BankTransaction[]
   warehouses               Warehouse[]
@@ -1288,6 +1289,79 @@ model PaymentEvent {
   @@index([eventType])
   @@index([provider, occurredAt])
   @@map("payment_events")
+}
+
+/// Transactional inbox for inbound payment-provider webhooks.
+///
+/// Why this exists: PaymentService.handleWebhook does a long chain of DB
+/// mutations (payment.update + recordPaymentEvent + applyRefundEffects +
+/// order.update) inside a tenant-scoped interactive $transaction. Running that
+/// INLINE in the webhook request held connections on the shared basePrisma pool
+/// that also serves auth/login — a provider webhook storm could starve auth
+/// (P2024). See feedback-db-pool-starvation-webhook-storm-starves-auth.md.
+///
+/// The webhook route now: verify signature presence -> idempotency check ->
+/// persist a row here (durable) -> inngest.send -> 200. The
+/// payment-webhook-process Inngest function consumes it and runs the heavy
+/// mutation OFF the request path. This row is the durable record so nothing is
+/// lost if Inngest is briefly unavailable (the route also falls back to inline
+/// processing on a send failure).
+///
+/// NOT an RLS-scoped table: it is written/read cross-tenant (the route resolves
+/// storeId BY querying payments, and the consumer must read this row BEFORE it
+/// can enter tenant context). Writes/reads use withRlsBypass, exactly like the
+/// existing checkIdempotency / resolveStoreIdFromWebhookPayload helpers.
+model WebhookEvent {
+  id String @id @default(uuid())
+
+  /// 'tap' | 'myfatoorah' | 'hesabe' | 'upayments'
+  provider String
+
+  /// Same idempotency key the route derives from the provider transaction id
+  /// (generateIdempotencyKey). UNIQUE so a duplicate provider delivery upserts
+  /// onto the same inbox row instead of creating a second one.
+  idempotencyKey String @unique @map("idempotency_key")
+
+  /// Resolved upfront from the matching Payment row. Null for the platform-only
+  /// path (no per-store payment matched) — the consumer then uses withRlsBypass.
+  storeId String? @map("store_id")
+
+  /// Parsed JSON payload (for business logic / debugging).
+  payload Json
+
+  /// Exact raw bytes of the request body. handleWebhook re-verifies the HMAC
+  /// signature against THIS in the consumer, so the cryptographic check is
+  /// preserved off the request path.
+  rawBody String @map("raw_body")
+
+  /// The signature header the provider sent. Re-checked by handleWebhook.
+  signature String
+
+  /// received | processing | processed | failed
+  status String @default("received")
+
+  /// Increments each time the consumer attempts processing (Inngest retries).
+  attempts Int @default(0)
+
+  /// Last error string when status='failed' / a retry threw. Null otherwise.
+  lastError String? @map("last_error")
+
+  /// Result of a successful process, for audit / replay diagnostics.
+  resultOrderId String? @map("result_order_id")
+  resultStatus  String? @map("result_status")
+
+  receivedAt  DateTime  @default(now()) @map("received_at")
+  processedAt DateTime? @map("processed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  /// Optional back-relation; storeId is nullable (platform path).
+  store Store? @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  @@index([status, receivedAt])
+  @@index([provider, receivedAt])
+  @@index([storeId, receivedAt(sort: Desc)])
+  @@map("webhook_events")
 }
 
 enum PaymentStatus {

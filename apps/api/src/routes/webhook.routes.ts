@@ -9,6 +9,7 @@ import { auditLog } from '../middleware/security';
 import logger from '../lib/logger';
 import { shippingCarrierService } from '../services/shipping-carrier.service';
 import { sendAlert } from '../services/alerts.service';
+import { inngest } from '../lib/inngest/client';
 
 const router = Router();
 
@@ -108,6 +109,189 @@ async function markWebhookProcessed(
       })
     );
   }
+}
+
+/**
+ * Persist an inbound payment webhook to the durable WebhookEvent inbox.
+ *
+ * This is the "persist the raw event durably" step of the offload flow: the
+ * route records the raw bytes + signature + parsed payload BEFORE handing the
+ * heavy processing to Inngest. If Inngest is briefly unavailable the row is
+ * still here (and the route falls back to inline processing), so no webhook is
+ * lost.
+ *
+ * Upsert on the unique idempotencyKey — a duplicate provider delivery that
+ * races past checkIdempotency lands on the SAME inbox row rather than creating
+ * a second one (idempotency layer 2). We never overwrite a row that has already
+ * been processed.
+ *
+ * Runs in withRlsBypass: webhook_events is a cross-tenant inbox (storeId may be
+ * null on the platform path, and the Inngest consumer must read the row before
+ * it can enter tenant context). Mirrors checkIdempotency /
+ * resolveStoreIdFromWebhookPayload, which also run cross-tenant.
+ */
+async function recordInboundWebhook(input: {
+  provider: PaymentProvider;
+  idempotencyKey: string;
+  storeId?: string;
+  payload: Record<string, unknown>;
+  rawBody: string;
+  signature: string;
+}): Promise<string> {
+  return withRlsBypass(async tx => {
+    // First delivery: create the row. On the unique-key conflict (a
+    // re-delivery), refresh the volatile fields — but ONLY for a row that has
+    // NOT already been processed. This preserves the stored audit bytes
+    // (rawBody/signature/payload) of a 'processed' row so a late re-delivery
+    // can't corrupt the record of what we actually acted on. `status` is never
+    // touched here: a non-terminal row stays reprocessable, a 'processed' row
+    // stays a consumer no-op (shouldProcessInboxRow). The fresh inngest.send
+    // below re-enqueues regardless.
+    const existing = await tx.webhookEvent.findUnique({
+      where: { idempotencyKey: input.idempotencyKey },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) {
+      const created = await tx.webhookEvent.create({
+        data: {
+          provider: input.provider,
+          idempotencyKey: input.idempotencyKey,
+          storeId: input.storeId ?? null,
+          payload: input.payload as object,
+          rawBody: input.rawBody,
+          signature: input.signature,
+          status: 'received',
+        },
+        select: { id: true },
+      });
+      return created.id;
+    }
+
+    if (existing.status !== 'processed') {
+      await tx.webhookEvent.update({
+        where: { id: existing.id },
+        data: {
+          payload: input.payload as object,
+          rawBody: input.rawBody,
+          signature: input.signature,
+          storeId: input.storeId ?? null,
+        },
+      });
+    }
+    return existing.id;
+  });
+}
+
+/**
+ * The offload decision point shared by BOTH the explicit `/payment/:provider`
+ * handler and the auto-detect `/payment` handler so they behave identically.
+ *
+ *   1. Persist the raw event to the WebhookEvent inbox (durable).
+ *   2. Try to enqueue `payment/webhook.received` — on success the heavy
+ *      PaymentService.handleWebhook mutation runs in the payment-webhook-process
+ *      Inngest function, OFF this request / the shared API pool. We return
+ *      `enqueued: true` and the caller ACKs 200 immediately.
+ *   3. If inngest.send() throws (Inngest unreachable), DO NOT lose the webhook —
+ *      fall back to processing INLINE here (the previous behaviour), and return
+ *      the real result so the caller's audit log + 200 response stay accurate.
+ *
+ * Tradeoff (documented): we ACK 200 once the row is durably persisted AND the
+ * event is enqueued (or processed inline). If Inngest were to silently drop an
+ * already-accepted event, the WebhookEvent row is the durable backstop for a
+ * replay sweep (follow-up). The inline fallback covers the common
+ * Inngest-unavailable case so the provider is never told "retry" unnecessarily.
+ */
+async function enqueueOrProcessWebhook(args: {
+  provider: PaymentProvider;
+  idempotencyKey: string;
+  storeId?: string;
+  payload: Record<string, unknown>;
+  rawBody: string;
+  signature: string;
+}): Promise<{
+  enqueued: boolean;
+  result?: { success: boolean; status?: string; orderId?: string };
+}> {
+  const { provider, idempotencyKey, storeId, payload, rawBody, signature } = args;
+
+  // 1. Durable persist FIRST — before we attempt anything that can fail.
+  const webhookEventId = await recordInboundWebhook({
+    provider,
+    idempotencyKey,
+    storeId,
+    payload,
+    rawBody,
+    signature,
+  });
+
+  // 2. Try to offload to Inngest.
+  try {
+    await inngest.send({
+      name: 'payment/webhook.received',
+      data: { webhookEventId, provider, idempotencyKey, storeId },
+    });
+    return { enqueued: true };
+  } catch (sendErr) {
+    // 3. Inngest send failed — process inline so the webhook is never lost.
+    logger.error(
+      { err: sendErr, provider, webhookEventId },
+      '[WEBHOOK] inngest.send failed — falling back to inline processing'
+    );
+    const result = await processWebhookInline({
+      provider,
+      idempotencyKey,
+      storeId,
+      payload,
+      rawBody,
+      signature,
+    });
+    // Mark the inbox row processed so a later replay sweep doesn't re-run it.
+    await withRlsBypass(tx =>
+      tx.webhookEvent.update({
+        where: { id: webhookEventId },
+        data: {
+          status: 'processed',
+          processedAt: new Date(),
+          resultOrderId: result.orderId ?? null,
+          resultStatus: result.status ?? null,
+        },
+      })
+    ).catch(() => undefined);
+    return { enqueued: false, result };
+  }
+}
+
+/**
+ * The inline processing path — IDENTICAL to the pre-offload behaviour. Used only
+ * as the fallback when inngest.send() fails (so a webhook storm during an
+ * Inngest outage still completes, just on the request path as before). The
+ * normal path never calls this; the Inngest consumer runs the same
+ * handleWebhook + markWebhookProcessed off the request path.
+ */
+async function processWebhookInline(args: {
+  provider: PaymentProvider;
+  idempotencyKey: string;
+  storeId?: string;
+  payload: Record<string, unknown>;
+  rawBody: string;
+  signature: string;
+}): Promise<{ success: boolean; status?: string; orderId?: string }> {
+  const { provider, idempotencyKey, storeId, payload, rawBody, signature } = args;
+  let result: { success: boolean; status?: string; orderId?: string };
+  if (storeId) {
+    result = await runInTenantContext(storeId, () =>
+      PaymentService.handleWebhook(provider, payload, signature, storeId, rawBody)
+    );
+  } else {
+    result = await withRlsBypass(_tx =>
+      PaymentService.handleWebhook(provider, payload, signature, storeId, rawBody)
+    );
+  }
+  if (result.orderId) {
+    await markWebhookProcessed(result.orderId, idempotencyKey, storeId);
+  }
+  return result;
 }
 
 /**
@@ -316,53 +500,49 @@ router.post(
       // correctly scoped. When storeId is undefined (platform-level path) we
       // fall back to withRlsBypass for the handleWebhook call.
       const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
-      let result: { success: boolean; status?: string; orderId?: string };
-      if (storeIdForWebhook) {
-        result = await runInTenantContext(storeIdForWebhook, () =>
-          PaymentService.handleWebhook(
-            provider,
-            payload,
-            signature,
-            storeIdForWebhook,
-            rawBody.toString()
-          )
-        );
-      } else {
-        result = await withRlsBypass(_tx =>
-          PaymentService.handleWebhook(
-            provider,
-            payload,
-            signature,
-            storeIdForWebhook,
-            rawBody.toString()
-          )
-        );
-      }
 
-      // Mark as processed if we have an order
-      if (result.orderId) {
-        await markWebhookProcessed(result.orderId, idempotencyKey, storeIdForWebhook);
-      }
+      // Offload the heavy PaymentService.handleWebhook mutation off this request:
+      // persist the raw event to the durable WebhookEvent inbox, enqueue an
+      // Inngest event, and ACK 200 immediately. The payment-webhook-process
+      // function runs handleWebhook + markWebhookProcessed in
+      // runInTenantContext(storeId) off the shared API pool, so a webhook storm
+      // can't starve auth (P2024). If inngest.send fails we process inline as
+      // before so the webhook is never lost.
+      const { enqueued, result } = await enqueueOrProcessWebhook({
+        provider,
+        idempotencyKey,
+        storeId: storeIdForWebhook,
+        payload,
+        rawBody: rawBody.toString(),
+        signature,
+      });
 
-      logger.info({ provider, storeId: storeIdForWebhook, result }, '[WEBHOOK] Processed');
+      logger.info(
+        { provider, storeId: storeIdForWebhook, enqueued, result },
+        enqueued ? '[WEBHOOK] Accepted + enqueued' : '[WEBHOOK] Processed inline (Inngest fallback)'
+      );
 
       await auditLog({
-        action: 'WEBHOOK_PROCESSED',
+        action: enqueued ? 'WEBHOOK_ENQUEUED' : 'WEBHOOK_PROCESSED',
         resourceType: 'payment',
-        resourceId: result.orderId,
+        resourceId: result?.orderId,
         details: {
           provider,
           idempotencyKey,
-          status: result.status || 'unknown',
+          status: result?.status || (enqueued ? 'enqueued' : 'unknown'),
         },
         ip: req.ip,
         userAgent: req.headers['user-agent'],
       });
 
-      // Return minimal acknowledgment — no internal IDs or order details
+      // Return minimal acknowledgment — no internal IDs or order details.
+      // 200 after the event is durably persisted + enqueued (or processed inline).
       res.json({
         success: true,
-        data: { message: 'Webhook processed', status: result.status || 'unknown' },
+        data: {
+          message: enqueued ? 'Webhook accepted' : 'Webhook processed',
+          status: result?.status || (enqueued ? 'accepted' : 'unknown'),
+        },
       });
     } catch (error) {
       logger.error({ err: error }, '[WEBHOOK ERROR] Failed to process webhook');
@@ -474,56 +654,46 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
     // run in runInTenantContext(storeId) so all their payment/order writes are
     // correctly scoped. When storeId is undefined we fall back to withRlsBypass.
     const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
-    let result: { success: boolean; status?: string; orderId?: string };
-    if (storeIdForWebhook) {
-      result = await runInTenantContext(storeIdForWebhook, () =>
-        PaymentService.handleWebhook(
-          provider,
-          payload,
-          signature,
-          storeIdForWebhook,
-          rawBody.toString()
-        )
-      );
-    } else {
-      result = await withRlsBypass(_tx =>
-        PaymentService.handleWebhook(
-          provider,
-          payload,
-          signature,
-          storeIdForWebhook,
-          rawBody.toString()
-        )
-      );
-    }
 
-    // Mark as processed if we have an order
-    if (result.orderId) {
-      await markWebhookProcessed(result.orderId, idempotencyKey, storeIdForWebhook);
-    }
+    // Same offload path as the explicit /payment/:provider handler: persist to
+    // the durable inbox, enqueue to Inngest, ACK 200. Inline fallback on send
+    // failure so no webhook is lost. See enqueueOrProcessWebhook.
+    const { enqueued, result } = await enqueueOrProcessWebhook({
+      provider,
+      idempotencyKey,
+      storeId: storeIdForWebhook,
+      payload,
+      rawBody: rawBody.toString(),
+      signature,
+    });
 
     logger.info(
-      { provider, storeId: storeIdForWebhook, result },
-      '[WEBHOOK] Auto-detected provider processed'
+      { provider, storeId: storeIdForWebhook, enqueued, result },
+      enqueued
+        ? '[WEBHOOK] Auto-detected provider accepted + enqueued'
+        : '[WEBHOOK] Auto-detected provider processed inline (Inngest fallback)'
     );
 
     await auditLog({
-      action: 'WEBHOOK_PROCESSED',
+      action: enqueued ? 'WEBHOOK_ENQUEUED' : 'WEBHOOK_PROCESSED',
       resourceType: 'payment',
-      resourceId: result.orderId,
+      resourceId: result?.orderId,
       details: {
         provider,
         idempotencyKey,
-        status: result.status || 'unknown',
+        status: result?.status || (enqueued ? 'enqueued' : 'unknown'),
       },
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
 
-    // Return minimal acknowledgment — no internal IDs or order details
+    // Return minimal acknowledgment — no internal IDs or order details.
     res.json({
       success: true,
-      data: { message: 'Webhook processed', status: result.status || 'unknown' },
+      data: {
+        message: enqueued ? 'Webhook accepted' : 'Webhook processed',
+        status: result?.status || (enqueued ? 'accepted' : 'unknown'),
+      },
     });
   } catch (error) {
     logger.error({ err: error }, '[WEBHOOK ERROR] Failed to process auto-detected webhook');

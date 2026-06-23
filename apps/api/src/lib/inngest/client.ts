@@ -161,6 +161,20 @@ type InsightsRollupRequestedEvent = EventPayload & {
   };
 };
 
+type PaymentWebhookReceivedEvent = EventPayload & {
+  name: 'payment/webhook.received';
+  data: {
+    /// PK of the WebhookEvent inbox row persisted by the route before send.
+    webhookEventId: string;
+    /// 'tap' | 'myfatoorah' | 'hesabe' | 'upayments'
+    provider: string;
+    /// Idempotency key (also the inbox row's unique key) for log correlation.
+    idempotencyKey: string;
+    /// Resolved upfront; undefined for the platform-only path.
+    storeId?: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -178,7 +192,8 @@ export type AppEvent =
   | StockDeadstockScanRequestedEvent
   | StockLowStockScanRequestedEvent
   | AccountingExpenseOcrProcessEvent
-  | InsightsRollupRequestedEvent;
+  | InsightsRollupRequestedEvent
+  | PaymentWebhookReceivedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots
