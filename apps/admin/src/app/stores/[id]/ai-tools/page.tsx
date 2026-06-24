@@ -39,7 +39,9 @@ interface BulkAiJob {
     | 'recommendations'
     | 'llms_txt'
     | 'citation_copy'
-    | 'brand_facts';
+    | 'brand_facts'
+    | 'description_balance'
+    | 'description_revert';
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   direction: 'to_ar' | 'to_en' | null;
   total: number;
@@ -94,6 +96,8 @@ export default function AiToolsPage() {
   const [starting, setStarting] = useState<
     | 'translate-ar'
     | 'translate-en'
+    | 'balance-descriptions'
+    | 'revert-balance'
     | 'seo'
     | 'faq-aeo'
     | 'howto-aeo'
@@ -321,6 +325,33 @@ export default function AiToolsPage() {
           onAction={() => startTranslate('to_en')}
           replaceExistingLabel={t('replaceExisting')}
           forceTooltip={t('cards.defaultForceTooltip')}
+        />
+      </div>
+
+      {/* ── Description language balance ──────────────────────────── */}
+      <SectionHeading title={t('sections.descriptionBalance')} className="mt-6" />
+      <div className="grid gap-4 md:grid-cols-3">
+        <BulkActionCard
+          title={t('cards.balanceDescriptions.title')}
+          body={t('cards.balanceDescriptions.body')}
+          buttonLabel={t('cards.balanceDescriptions.button')}
+          startingLabel={t('starting')}
+          loading={starting === 'balance-descriptions'}
+          disabled={anyRunning}
+          onAction={force => start('/bulk/balance-descriptions', 'balance-descriptions', {}, force)}
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.balanceDescriptions.forceTooltip')}
+        />
+        <BulkActionCard
+          title={t('cards.revertBalance.title')}
+          body={t('cards.revertBalance.body')}
+          buttonLabel={t('cards.revertBalance.button')}
+          startingLabel={t('starting')}
+          loading={starting === 'revert-balance'}
+          disabled={anyRunning}
+          onAction={force => start('/bulk/revert-balance', 'revert-balance', {}, force)}
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.revertBalance.forceTooltip')}
         />
       </div>
 
@@ -598,6 +629,10 @@ function jobKindLabel(
       return t('jobKind.citationCopy');
     case 'brand_facts':
       return t('jobKind.brandFacts');
+    case 'description_balance':
+      return t('jobKind.descriptionBalance');
+    case 'description_revert':
+      return t('jobKind.descriptionRevert');
     default:
       return kind;
   }

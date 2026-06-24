@@ -4805,12 +4805,26 @@
     "errorFailed": "Failed",
     "sections": {
       "translation": "Translation",
+      "descriptionBalance": "Description language balance",
       "seo": "SEO",
       "aeo": "AEO — Answer Engine Optimization",
       "geo": "GEO — Generative Engine Optimization",
-      "geoDescription": "Optimises your store for LLM-powered search — ChatGPT, Perplexity, Google AI Overview, Bing Copilot."
+      "geoDescription": "Optimises your store for LLM-powered search — ChatGPT, Perplexity, Google AI Overview, Bing Copilot.",
+      "descriptionRevert": "Revert description balance"
     },
     "cards": {
+      "balanceDescriptions": {
+        "title": "Balance descriptions",
+        "body": "For every product that has only one language's description, fills the thinner side from the richer one — EN→AR or AR→EN.",
+        "button": "Run balance",
+        "forceTooltip": "Overwrites existing description on the thinner side even when it has some content."
+      },
+      "revertBalance": {
+        "title": "Revert balance",
+        "body": "Undo the last balance run — restores the original descriptions before balancing was applied.",
+        "button": "Revert",
+        "forceTooltip": "Restores the pre-balance originals even if descriptions were edited since."
+      },
       "fillMissingArabic": {
         "title": "Fill missing Arabic",
         "body": "Walks every product, category, and the store row. Translates the English value into Arabic only when the Arabic field is empty.",
@@ -4897,7 +4911,8 @@
       "recommendations": "AI recommendations",
       "llmsTxt": "LLMs.txt",
       "citationCopy": "Citation copy",
-      "brandFacts": "Brand facts"
+      "brandFacts": "Brand facts",
+      "descriptionBalance": "Description balance"
     },
     "activeJob": {
       "sweepSuffix": "sweep",

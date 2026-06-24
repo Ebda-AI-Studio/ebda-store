@@ -175,6 +175,22 @@ type PaymentWebhookReceivedEvent = EventPayload & {
   };
 };
 
+type BulkAiBalanceDescriptionsEvent = EventPayload & {
+  name: 'bulk-ai/balance-descriptions.requested';
+  data: {
+    jobId: string;
+    storeId: string;
+  };
+};
+
+type BulkAiRevertBalanceEvent = EventPayload & {
+  name: 'bulk-ai/revert-balance.requested';
+  data: {
+    jobId: string;
+    storeId: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -193,7 +209,9 @@ export type AppEvent =
   | StockLowStockScanRequestedEvent
   | AccountingExpenseOcrProcessEvent
   | InsightsRollupRequestedEvent
-  | PaymentWebhookReceivedEvent;
+  | PaymentWebhookReceivedEvent
+  | BulkAiBalanceDescriptionsEvent
+  | BulkAiRevertBalanceEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

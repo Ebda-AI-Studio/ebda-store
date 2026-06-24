@@ -23,6 +23,7 @@ import { apiGet, apiPost, apiPut } from '../../../../../../lib/api';
 import { EditSidebar } from './_components/EditSidebar';
 import { ProductFaqSection } from './_components/ProductFaqSection';
 import { AiFieldBadge } from './_components/AiFieldBadge';
+import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
 
 interface Product {
   id: string;
@@ -252,6 +253,14 @@ export default function EditProductPage() {
   const handleAiReset = (field: string, value: string | null) => {
     updateField(field, value ?? '');
     setAiSources(prev => ({ ...prev, [field]: 'ai' }));
+  };
+
+  // Two-field balance/revert callback: the balance or revert endpoint returns
+  // fresh values for BOTH description fields. Update both form inputs and flip
+  // both provenance chips to "ai" so the ✨ AI chips render immediately.
+  const handleBalanced = (descriptionEn: string, descriptionAr: string) => {
+    setFormData(prev => ({ ...prev, description: descriptionEn, descriptionAr }));
+    setAiSources(prev => ({ ...prev, description: 'ai', descriptionAr: 'ai' }));
   };
 
   async function generateSeo(mode: 'fill-empty' | 'overwrite') {
@@ -500,27 +509,34 @@ export default function EditProductPage() {
                 <h2 className="text-lg font-semibold text-foreground">
                   {tSections('basicInformation')}
                 </h2>
-                <AITranslateMissingButton
-                  storeId={storeId}
-                  pairs={[
-                    {
-                      key: 'name',
-                      en: formData.name,
-                      ar: formData.nameAr,
-                      kind: 'product-name',
-                      onEnFilled: v => updateField('name', v),
-                      onArFilled: v => updateField('nameAr', v),
-                    },
-                    {
-                      key: 'description',
-                      en: formData.description ?? '',
-                      ar: formData.descriptionAr ?? '',
-                      kind: 'product-description',
-                      onEnFilled: v => updateField('description', v),
-                      onArFilled: v => updateField('descriptionAr', v),
-                    },
-                  ]}
-                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <AITranslateMissingButton
+                    storeId={storeId}
+                    pairs={[
+                      {
+                        key: 'name',
+                        en: formData.name,
+                        ar: formData.nameAr,
+                        kind: 'product-name',
+                        onEnFilled: v => updateField('name', v),
+                        onArFilled: v => updateField('nameAr', v),
+                      },
+                      {
+                        key: 'description',
+                        en: formData.description ?? '',
+                        ar: formData.descriptionAr ?? '',
+                        kind: 'product-description',
+                        onEnFilled: v => updateField('description', v),
+                        onArFilled: v => updateField('descriptionAr', v),
+                      },
+                    ]}
+                  />
+                  <BalanceDescriptionButton
+                    storeId={storeId}
+                    productId={product?.id}
+                    onBalanced={handleBalanced}
+                  />
+                </div>
               </div>
               <div className="space-y-4">
                 <Input

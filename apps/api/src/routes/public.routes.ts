@@ -168,12 +168,36 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
             .slice(0, 50)
         : undefined;
 
-    // Cache key includes cursor + ids — different cursor positions / id sets get distinct entries.
+    // Variant-option facet filters: ?opt_Size=Large,XL&opt_Color=Red
+    // Each `opt_<OptionName>` param carries comma-separated selected values.
+    // Capped at 10 option names and 20 values each to prevent abuse.
+    const optionFilters: Record<string, string[]> = {};
+    const MAX_OPTION_NAMES = 10;
+    const MAX_OPTION_VALUES = 20;
+    let optionFilterKey = '';
+    for (const [key, raw] of Object.entries(req.query)) {
+      if (!key.startsWith('opt_')) continue;
+      if (Object.keys(optionFilters).length >= MAX_OPTION_NAMES) break;
+      const optionName = key.slice(4); // strip "opt_"
+      if (!optionName || typeof raw !== 'string') continue;
+      const vals = raw
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean)
+        .slice(0, MAX_OPTION_VALUES);
+      if (vals.length > 0) {
+        optionFilters[optionName] = vals;
+        optionFilterKey += `${optionName}=${vals.join(',')};`;
+      }
+    }
+    const hasOptionFilters = Object.keys(optionFilters).length > 0;
+
+    // Cache key includes cursor + ids + option filters — different selections get distinct entries.
     const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${
       search || ''
     }:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${
       validCursor || ''
-    }:${idsParam?.sort().join(',') ?? ''}`;
+    }:${idsParam?.sort().join(',') ?? ''}:${optionFilterKey}`;
 
     const result = await getCached(cacheKey, 120, () =>
       ProductService.listPublic(storeId, {
@@ -187,6 +211,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
         cursor: validCursor,
         ids: idsParam,
+        optionFilters: hasOptionFilters ? optionFilters : undefined,
       })
     );
 

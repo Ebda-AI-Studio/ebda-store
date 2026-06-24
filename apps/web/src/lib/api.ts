@@ -211,6 +211,20 @@ interface PaginationMeta {
   totalPages: number;
 }
 
+/**
+ * One variant-option facet group returned by the public products list.
+ * Only present on products with `ProductOption` rows (variant products).
+ * Stores without options will receive an empty array.
+ */
+interface ProductFacet {
+  /** Option name in English, e.g. "Size". */
+  name: string;
+  /** Arabic option name, e.g. "الحجم". */
+  nameAr?: string | null;
+  /** All distinct values available within the current category/filter context. */
+  values: Array<{ value: string; valueAr?: string | null }>;
+}
+
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -577,9 +591,28 @@ class ApiClient {
   }
 
   // Products (public endpoints)
-  async getProducts(params?: Record<string, string>) {
-    const query = params ? `?${new URLSearchParams(params)}` : '';
-    return this.request<{ products: Product[]; meta: PaginationMeta }>(`/public/products${query}`);
+  /**
+   * Fetch the public product list. Accepts standard filter params plus an
+   * optional `optionFilters` map (option name → selected values) which is
+   * serialized to `?opt_<name>=val1,val2` query params.
+   *
+   * The response now includes a `facets` array alongside `products` and
+   * `meta`. `facets` is empty (`[]`) for stores/categories without options.
+   */
+  async getProducts(params?: Record<string, string>, optionFilters?: Record<string, string[]>) {
+    const searchParams = new URLSearchParams(params);
+    // Serialize option filters as ?opt_<name>=val1,val2
+    if (optionFilters) {
+      for (const [name, vals] of Object.entries(optionFilters)) {
+        if (vals.length > 0) {
+          searchParams.set(`opt_${name}`, vals.join(','));
+        }
+      }
+    }
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request<{ products: Product[]; facets: ProductFacet[]; meta: PaginationMeta }>(
+      `/public/products${query}`
+    );
   }
 
   async getProduct(slugOrId: string) {
@@ -881,6 +914,7 @@ export type {
   Product,
   ProductVariant,
   ProductOption,
+  ProductFacet,
   Category,
   Order,
   PaginationMeta,

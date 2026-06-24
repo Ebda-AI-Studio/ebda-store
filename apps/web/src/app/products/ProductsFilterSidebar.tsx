@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Category, PaginationMeta } from '@/lib/api';
+import type { Category, PaginationMeta, ProductFacet } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
@@ -68,6 +68,23 @@ interface ProductsFilterSidebarProps {
    * <aside>. Undefined → inherits the global `--primary-foreground`.
    */
   fgTriplet?: string;
+  /**
+   * Variant-option facets returned by the API. Each entry is one option axis
+   * (e.g. "Size") with its available values. Renders as a collapsible group
+   * below the price filter. Empty array → no facet groups rendered (stores
+   * without options are visually identical to today).
+   */
+  facets?: ProductFacet[];
+  /**
+   * Currently selected option values per option name.
+   * Keyed by option name (English), values are the selected strings.
+   */
+  optionFilters?: Record<string, string[]>;
+  /**
+   * Called when the shopper checks/unchecks a facet value.
+   * Parent toggles the value in/out of optionFilters and triggers a refetch.
+   */
+  onOptionToggle?: (optionName: string, value: string) => void;
 }
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -96,6 +113,9 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     priceFloor,
     priceCeil,
     onPriceChange,
+    facets = [],
+    optionFilters = {},
+    onOptionToggle,
     defaultOpen,
     bgTriplet,
     fgTriplet,
@@ -161,7 +181,9 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     };
   }, [isOpen]);
 
-  const activeFilterCount = (search.trim() ? 1 : 0) + (categoryFilter ? 1 : 0);
+  // Count active facets: each option name with at least one selected value = 1.
+  const activeOptionCount = Object.values(optionFilters).filter(v => v.length > 0).length;
+  const activeFilterCount = (search.trim() ? 1 : 0) + (categoryFilter ? 1 : 0) + activeOptionCount;
 
   // Close-and-act helpers — when the user picks an option inside the mobile
   // sheet, we close it so they see the filtered results immediately.
@@ -318,6 +340,55 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             </div>
           </div>
         )}
+
+      {/* Variant-option facet groups — rendered only when the API returns facets.
+          Zero facets = stores without options: no visual change. One collapsible
+          group per option axis (e.g. "Size"), checkboxes for each value. */}
+      {facets.length > 0 &&
+        facets.map(facet => {
+          const selectedValues = optionFilters[facet.name] ?? [];
+          const facetLabel = language === 'ar' && facet.nameAr ? facet.nameAr : facet.name;
+          return (
+            <div key={facet.name}>
+              <h3 className="mb-3 text-lg font-medium text-[hsl(var(--primary-foreground))]">
+                {facetLabel}
+              </h3>
+              <div className="space-y-2">
+                {facet.values.map(v => {
+                  const isChecked = selectedValues.includes(v.value);
+                  const valueLabel = language === 'ar' && v.valueAr ? v.valueAr : v.value;
+                  const checkboxId = `facet-${facet.name}-${v.value}-${mobile ? 'm' : 'd'}`;
+                  return (
+                    <label
+                      key={v.value}
+                      htmlFor={checkboxId}
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-base transition-all ${
+                        isChecked
+                          ? 'bg-[hsl(var(--primary-foreground)/0.2)] text-[hsl(var(--primary-foreground))] font-semibold'
+                          : 'bg-[hsl(var(--primary-foreground)/0.08)] text-[hsl(var(--primary-foreground)/0.75)] hover:bg-[hsl(var(--primary-foreground)/0.15)] hover:text-[hsl(var(--primary-foreground))]'
+                      }`}
+                    >
+                      <input
+                        id={checkboxId}
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          // Multi-value facet — do NOT close the mobile sheet on
+                          // each tick (shopper may pick several sizes). The
+                          // "View results" button is the explicit done action.
+                          onOptionToggle?.(facet.name, v.value);
+                        }}
+                        className="h-4 w-4 shrink-0 accent-[hsl(var(--primary-foreground))] rounded"
+                        aria-label={valueLabel}
+                      />
+                      <span>{valueLabel}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
 
       <form onSubmit={mobile ? closeAfter(onSearchSubmit) : onSearchSubmit}>
         <label

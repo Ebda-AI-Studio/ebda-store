@@ -18,7 +18,11 @@ import { inngest } from '../lib/inngest/client';
 import { generateProductFaqs } from '../lib/ai/product-faq-generator';
 import { prisma } from '@force/database';
 import { AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
-import { fillProductFields } from '../services/ai-autofill.service';
+import {
+  fillProductFields,
+  balanceProductDescription,
+  revertProductBalance,
+} from '../services/ai-autofill.service';
 
 const router = Router({ mergeParams: true });
 
@@ -1715,6 +1719,149 @@ router.post(
           field,
           value: (updated as Record<string, unknown> | null)?.[field] ?? null,
           source: 'ai',
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// =====================================================================
+// Description-language balancer — bulk + per-product routes.
+//
+// Bulk: POST /bulk/balance-descriptions  → creates BulkAiJob + enqueues
+// Bulk: POST /bulk/revert-balance        → creates BulkAiJob + enqueues revert
+// Per-product: POST /products/:productId/ai/balance-description
+// Per-product: POST /products/:productId/ai/revert-balance
+// =====================================================================
+
+router.post(
+  '/bulk/balance-descriptions',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'description_balance' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/balance-descriptions.requested',
+          data: { jobId: job.id, storeId },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/bulk/revert-balance',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'description_revert' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/revert-balance.requested',
+          data: { jobId: job.id, storeId },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the revert right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Per-product balance
+router.post(
+  '/products/:productId/ai/balance-description',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId } = req.params;
+      const force = req.body?.force === true;
+
+      const result = await balanceProductDescription(storeId, productId, { force });
+
+      const updated = await prisma.product.findFirst({
+        where: { id: productId, storeId },
+        select: { description: true, descriptionAr: true },
+      });
+
+      res.json({
+        success: true,
+        data: {
+          balanced: result.balanced,
+          side: result.side,
+          description: updated?.description ?? null,
+          descriptionAr: updated?.descriptionAr ?? null,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Per-product revert
+router.post(
+  '/products/:productId/ai/revert-balance',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, productId } = req.params;
+
+      const result = await revertProductBalance(storeId, productId);
+
+      const updated = await prisma.product.findFirst({
+        where: { id: productId, storeId },
+        select: { description: true, descriptionAr: true },
+      });
+
+      res.json({
+        success: true,
+        data: {
+          reverted: result.reverted,
+          description: updated?.description ?? null,
+          descriptionAr: updated?.descriptionAr ?? null,
         },
       });
     } catch (err) {

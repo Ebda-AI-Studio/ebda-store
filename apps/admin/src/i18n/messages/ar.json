@@ -4805,12 +4805,26 @@
     "errorFailed": "فشل",
     "sections": {
       "translation": "الترجمة",
+      "descriptionBalance": "موازنة لغة الوصف",
       "seo": "تحسين محركات البحث",
       "aeo": "تحسين محركات الإجابة (AEO)",
       "geo": "تحسين المحركات التوليدية (GEO)",
-      "geoDescription": "يُحسّن متجرك لمحركات البحث المدعومة بالذكاء الاصطناعي — ChatGPT وPerplexity وGoogle AI Overview وBing Copilot."
+      "geoDescription": "يُحسّن متجرك لمحركات البحث المدعومة بالذكاء الاصطناعي — ChatGPT وPerplexity وGoogle AI Overview وBing Copilot.",
+      "descriptionRevert": "التراجع عن موازنة الوصف"
     },
     "cards": {
+      "balanceDescriptions": {
+        "title": "موازنة الأوصاف",
+        "body": "لكل منتج يحتوي على وصف بلغة واحدة فقط، يملأ الجانب الأضعف من الجانب الأغنى — من الإنجليزية إلى العربية أو العكس.",
+        "button": "تشغيل الموازنة",
+        "forceTooltip": "يستبدل الوصف الموجود في الجانب الأضعف حتى لو كان يحتوي على محتوى."
+      },
+      "revertBalance": {
+        "title": "التراجع عن الموازنة",
+        "body": "التراجع عن آخر عملية موازنة — يستعيد الأوصاف الأصلية قبل تطبيق الموازنة.",
+        "button": "تراجع",
+        "forceTooltip": "يستعيد الأوصاف الأصلية قبل الموازنة حتى لو تم تعديلها منذ ذلك الحين."
+      },
       "fillMissingArabic": {
         "title": "تعبئة الحقول العربية الفارغة",
         "body": "يفحص كل منتج وفئة وصف المتجر، ويترجم النص الإنجليزي إلى العربية فقط عندما يكون الحقل العربي فارغًا.",
@@ -4897,7 +4911,8 @@
       "recommendations": "توصيات الذكاء الاصطناعي",
       "llmsTxt": "LLMs.txt",
       "citationCopy": "نصوص الاستشهاد",
-      "brandFacts": "بيانات العلامة التجارية"
+      "brandFacts": "بيانات العلامة التجارية",
+      "descriptionBalance": "موازنة الأوصاف"
     },
     "activeJob": {
       "sweepSuffix": "مسح",

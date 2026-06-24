@@ -3,7 +3,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { api, type Product, type Category, type PaginationMeta } from '@/lib/api';
+import {
+  api,
+  type Product,
+  type Category,
+  type PaginationMeta,
+  type ProductFacet,
+} from '@/lib/api';
 import type {
   ProductCardDefaults,
   FilterSidebarSettings,
@@ -156,6 +162,29 @@ export default function ProductsClient({
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [meta, setMeta] = useState<PaginationMeta | null>(initialMeta);
   const [isLoading, setIsLoading] = useState(!initialProducts.length);
+  /** Facets returned by the API alongside products — option name → distinct values. */
+  const [facets, setFacets] = useState<ProductFacet[]>([]);
+  /**
+   * Active option filter selections: option name → Set of selected values.
+   * Serialised to URL as ?opt_<name>=val1,val2 and to API as optionFilters.
+   * Read from URL on mount so deep links work.
+   */
+  const [optionFilters, setOptionFilters] = useState<Record<string, string[]>>(() => {
+    const initial: Record<string, string[]> = {};
+    searchParams.forEach((val, key) => {
+      if (key.startsWith('opt_') && val) {
+        const optName = key.slice(4);
+        if (optName) {
+          const vals = val
+            .split(',')
+            .map(v => v.trim())
+            .filter(Boolean);
+          if (vals.length > 0) initial[optName] = vals;
+        }
+      }
+    });
+    return initial;
+  });
   const [error, setError] = useState<string | null>(null);
   // Track which product ids are in the compare list so buttons re-render on change
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
@@ -266,7 +295,15 @@ export default function ProductsClient({
   // perPage is treated as a filter so increasing it snaps the user back to
   // page 1 (otherwise they could land on an out-of-range page when the new
   // page count drops).
-  const prevFiltersRef = useRef({ search, categoryFilter, sortBy, priceMin, priceMax, perPage });
+  const prevFiltersRef = useRef({
+    search,
+    categoryFilter,
+    sortBy,
+    priceMin,
+    priceMax,
+    perPage,
+    optionFilters,
+  });
 
   const fetchProducts = useCallback(
     async (targetPage: number) => {
@@ -299,10 +336,17 @@ export default function ProductsClient({
         if (priceMin > 0) params.minPrice = String(Math.round(priceMin * 1000));
         if (priceMax < 100) params.maxPrice = String(Math.round(priceMax * 1000));
 
-        const response = await api.getProducts(params);
+        // Pass active option filters — API serialises them to ?opt_<name>=val1,val2
+        const activeOptionFilters =
+          Object.keys(optionFilters).length > 0 ? optionFilters : undefined;
+
+        const response = await api.getProducts(params, activeOptionFilters);
         if (response.success && response.data) {
           setProducts(response.data.products || []);
           setMeta(response.data.meta || null);
+          // Update facets from the latest response so they stay in sync with
+          // the current category / price / search context.
+          setFacets(response.data.facets || []);
         } else {
           setError(response.error?.message || 'LOAD_FAILED');
         }
@@ -312,7 +356,7 @@ export default function ProductsClient({
         setIsLoading(false);
       }
     },
-    [search, categoryFilter, sortBy, priceMin, priceMax, perPage]
+    [search, categoryFilter, sortBy, priceMin, priceMax, perPage, optionFilters]
   );
 
   const fetchCategories = useCallback(async () => {
@@ -344,7 +388,9 @@ export default function ProductsClient({
       prev.sortBy !== sortBy ||
       prev.priceMin !== priceMin ||
       prev.priceMax !== priceMax ||
-      prev.perPage !== perPage;
+      prev.perPage !== perPage ||
+      // Deep-compare the option filters object so a toggle triggers a page-1 reset.
+      JSON.stringify(prev.optionFilters) !== JSON.stringify(optionFilters);
 
     if (filtersChanged) {
       prevFiltersRef.current = {
@@ -354,6 +400,7 @@ export default function ProductsClient({
         priceMin,
         priceMax,
         perPage,
+        optionFilters,
       };
       // Reset page to 1 and fetch with page 1 in a single pass
       setPage(1);
@@ -361,7 +408,17 @@ export default function ProductsClient({
     } else {
       fetchProducts(page);
     }
-  }, [page, search, categoryFilter, sortBy, priceMin, priceMax, perPage, fetchProducts]);
+  }, [
+    page,
+    search,
+    categoryFilter,
+    sortBy,
+    priceMin,
+    priceMax,
+    perPage,
+    optionFilters,
+    fetchProducts,
+  ]);
 
   const handleAddToCart = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
@@ -416,12 +473,33 @@ export default function ProductsClient({
     });
   };
 
+  /**
+   * Toggle a single option value in/out of the active filter selection.
+   * Multiple values for the same option = OR; toggling a value that's already
+   * selected removes it. Removes the option name key entirely when no values
+   * remain selected (keeps the object clean and the cache key short).
+   */
+  const handleOptionToggle = useCallback((optionName: string, value: string) => {
+    setOptionFilters(prev => {
+      const existing = prev[optionName] ?? [];
+      const isSelected = existing.includes(value);
+      const next = isSelected ? existing.filter(v => v !== value) : [...existing, value];
+      if (next.length === 0) {
+        const { [optionName]: _removed, ...rest } = prev;
+        void _removed;
+        return rest;
+      }
+      return { ...prev, [optionName]: next };
+    });
+  }, []);
+
   const handleClearAll = () => {
     setSearch('');
     setCategoryFilter('');
     setSortBy('default');
     setPriceMin(0);
     setPriceMax(100);
+    setOptionFilters({});
   };
 
   return (
@@ -533,6 +611,9 @@ export default function ProductsClient({
                     setPriceMin(min);
                     setPriceMax(max);
                   }}
+                  facets={facets}
+                  optionFilters={optionFilters}
+                  onOptionToggle={handleOptionToggle}
                   defaultOpen={filterSidebar?.defaultOpen}
                   bgTriplet={
                     filterSidebar?.bgColor

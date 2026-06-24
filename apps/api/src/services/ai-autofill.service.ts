@@ -2,6 +2,7 @@ import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } fr
 import { prisma } from '@force/database';
 import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
+import { descriptionRichness, richerSide } from '../lib/ai/description-richness';
 import logger from '../lib/logger';
 
 /**
@@ -267,6 +268,154 @@ export async function isAutopilotEnabled(storeId: string): Promise<boolean> {
 }
 
 const STALE_TTL_DAYS = parseInt(process.env.AI_AUTOFILL_STALE_TTL_DAYS ?? '30', 10);
+
+// -----------------------------------------------------------------------
+// Description-language balancer
+//
+// Detects which language (EN/AR) has the richer description for a product
+// and translates it into the thinner (or empty) language. Writes a revert
+// snapshot into `aiBalanceBackup` before the first balance so the merchant
+// can always undo. Designed to be idempotent: repeated calls on an already-
+// balanced pair are no-ops (richness within 10% and both sides present).
+// -----------------------------------------------------------------------
+
+const BALANCE_RICHNESS_THRESHOLD = 0.1; // 10% — skip if already balanced
+
+interface BalanceBackup {
+  description?: string | null;
+  descriptionAr?: string | null;
+  aiFieldSources?: AiFieldSources;
+}
+
+/**
+ * Balance the description fields of a single product.
+ *
+ * Translates the richer language into the thinner one and snapshots the
+ * original values for revert. Returns `{ balanced: false }` when there is
+ * nothing to balance (both empty, or already close enough and `force` is
+ * not set).
+ */
+export async function balanceProductDescription(
+  storeId: string,
+  productId: string,
+  opts: { force?: boolean } = {}
+): Promise<{ balanced: boolean; side: 'en' | 'ar' | null }> {
+  const product = await prisma.product.findFirst({
+    where: { id: productId, storeId, deletedAt: null },
+    select: {
+      description: true,
+      descriptionAr: true,
+      aiFieldSources: true,
+      aiBalanceBackup: true,
+    },
+  });
+  if (!product) return { balanced: false, side: null };
+
+  const side = richerSide(product.description, product.descriptionAr);
+  if (side === null) return { balanced: false, side: null };
+
+  // Already balanced? Skip unless forced.
+  if (!opts.force) {
+    const enScore = descriptionRichness(product.description);
+    const arScore = descriptionRichness(product.descriptionAr);
+    if (enScore > 0 && arScore > 0) {
+      const richer = Math.max(enScore, arScore);
+      const thinner = Math.min(enScore, arScore);
+      const gap = (richer - thinner) / richer;
+      if (gap <= BALANCE_RICHNESS_THRESHOLD) {
+        return { balanced: false, side };
+      }
+    }
+  }
+
+  // Snapshot for revert — only on the FIRST balance so we preserve the TRUE
+  // original and never overwrite with a previously AI-translated value.
+  const sources = (product.aiFieldSources as AiFieldSources) ?? {};
+  const existingBackup = (product.aiBalanceBackup ?? {}) as BalanceBackup;
+  const hasBackup =
+    existingBackup.description !== undefined ||
+    existingBackup.descriptionAr !== undefined ||
+    existingBackup.aiFieldSources !== undefined;
+
+  const backup: BalanceBackup = hasBackup
+    ? existingBackup
+    : {
+        description: product.description,
+        descriptionAr: product.descriptionAr,
+        aiFieldSources: sources,
+      };
+
+  // Translate the rich side into the thin side.
+  const richText = side === 'en' ? product.description! : product.descriptionAr!;
+  const { translation } = await AIService.translate({
+    storeId,
+    text: richText,
+    from: side,
+    to: side === 'en' ? 'ar' : 'en',
+    kind: 'product-description',
+  });
+
+  if (!translation?.trim()) return { balanced: false, side };
+
+  // The THIN side we just wrote is AI (a translation). The RICH side is only
+  // marked AI if it wasn't human-authored — otherwise a human-written source
+  // would become AI-owned and the 30-day stale sweep could silently re-write it
+  // (the value is preserved in aiBalanceBackup for revert regardless).
+  const richField = side === 'en' ? 'description' : 'descriptionAr';
+  const thinField = side === 'en' ? 'descriptionAr' : 'description';
+  const newSources: AiFieldSources = { ...sources, [thinField]: 'ai' };
+  if (sources[richField] !== 'human') newSources[richField] = 'ai';
+
+  await prisma.product.update({
+    where: { id: productId, storeId },
+    data: {
+      ...(side === 'en' ? { descriptionAr: translation } : { description: translation }),
+      aiFieldSources: newSources,
+      aiBalanceBackup: backup as object,
+    },
+  });
+
+  logger.info({ storeId, productId, side }, '[ai-balance] description balanced');
+  return { balanced: true, side };
+}
+
+/**
+ * Revert a product's description fields to the snapshot saved before the
+ * last balance operation. Clears the backup afterwards. Returns
+ * `{ reverted: false }` when no backup exists.
+ */
+export async function revertProductBalance(
+  storeId: string,
+  productId: string
+): Promise<{ reverted: boolean }> {
+  const product = await prisma.product.findFirst({
+    where: { id: productId, storeId, deletedAt: null },
+    select: { aiBalanceBackup: true },
+  });
+  if (!product) return { reverted: false };
+
+  const backup = (product.aiBalanceBackup ?? {}) as BalanceBackup;
+  if (
+    backup.description === undefined &&
+    backup.descriptionAr === undefined &&
+    backup.aiFieldSources === undefined
+  ) {
+    return { reverted: false };
+  }
+
+  await prisma.product.update({
+    where: { id: productId, storeId },
+    data: {
+      description: backup.description ?? null,
+      descriptionAr: backup.descriptionAr ?? null,
+      aiFieldSources: (backup.aiFieldSources ?? {}) as object,
+      aiBalanceBackup: {},
+    },
+  });
+
+  logger.info({ storeId, productId }, '[ai-balance] description reverted');
+  return { reverted: true };
+}
 const SWEEP_THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS ?? '2500', 10);
 const sweepSleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
@@ -290,6 +439,20 @@ export async function sweepStore(storeId: string): Promise<{ products: number; f
     const res = await fillProductFields(storeId, p.id, { op: 'sweep', refreshStale });
     filled += res.filled;
     await sweepSleep(SWEEP_THROTTLE_MS);
+
+    // Autopilot: balance descriptions after filling so the 3-day sweep
+    // keeps both languages in sync. force:false avoids churn on already-
+    // balanced pairs. The revert backup ensures the merchant can undo.
+    try {
+      const balResult = await balanceProductDescription(storeId, p.id, { force: false });
+      if (balResult.balanced) {
+        filled += 1;
+        await sweepSleep(SWEEP_THROTTLE_MS);
+      }
+    } catch (err) {
+      if (isAiQuotaCapError(err)) throw err;
+      logger.warn({ err, storeId, productId: p.id }, '[ai-balance] sweep balance failed, skipping');
+    }
   }
   return { products: products.length, filled };
 }

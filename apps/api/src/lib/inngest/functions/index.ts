@@ -47,6 +47,8 @@ import { r2OrphanSweep } from './r2-orphan-sweep';
 import { paymentAbandonmentSweep } from './payment-abandonment-sweep';
 import { paymentWebhookProcess } from './payment-webhook-process';
 import { paymentWebhookStuckSweep } from './payment-webhook-stuck-sweep';
+import { bulkAiBalanceDescriptions } from './bulk-ai-balance-descriptions';
+import { bulkAiRevertBalance } from './bulk-ai-revert-balance';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -129,4 +131,9 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // Safety net: re-sends undelivered payment webhook inbox rows + P0-alerts
   // wedged ones (the inngest.send-ok-but-never-delivered gap). 5-min cron.
   paymentWebhookStuckSweep,
+  // AI description-language balancer: translates the richer EN/AR description
+  // into the thinner language across the whole catalogue. Revert backup included.
+  bulkAiBalanceDescriptions,
+  // Bulk revert: restores description fields from the balance snapshot.
+  bulkAiRevertBalance,
 ];

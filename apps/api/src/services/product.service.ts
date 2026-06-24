@@ -187,6 +187,93 @@ interface ListProductsOptions {
    *  the Inventory page's "Sales quantity" column. Computed with a single
    *  groupBy over the page window (no N+1). */
   withSalesQuantity?: boolean;
+  /**
+   * Variant-option facet filters. Each entry is an option name (e.g. "Size")
+   * mapped to an array of selected values (e.g. ["Large", "XL"]).
+   * Multiple values for the SAME option = OR (product must have at least one).
+   * Multiple different option names = AND (product must satisfy all).
+   * Absent = no filtering (identical to before for existing callers).
+   */
+  optionFilters?: Record<string, string[]>;
+}
+
+/** One facet group returned by listPublic alongside the products. */
+export interface ProductFacet {
+  name: string;
+  nameAr?: string | null;
+  values: Array<{ value: string; valueAr?: string | null }>;
+}
+
+/**
+ * Build the Prisma `where` sub-clause for a single option facet filter.
+ * A product satisfies the filter when it has a ProductOption with the given
+ * `name` AND at least one of the `values` exists as a ProductOptionValue
+ * linked to that option.
+ *
+ * Multiple calls (one per option name) are ANDed in the parent where clause.
+ */
+function buildOptionFilterClause(optionName: string, values: string[]): Prisma.ProductWhereInput {
+  return {
+    options: {
+      some: {
+        name: optionName,
+        values: {
+          some: {
+            value: { in: values },
+          },
+        },
+      },
+    },
+  };
+}
+
+/**
+ * Compute available facets for the products matching the given `where` clause.
+ * Returns distinct option names (with nameAr) and their distinct values
+ * (with valueAr), scoped to products that pass ALL other filters (category,
+ * price, search, etc.) but ignoring optionFilters themselves so the
+ * unselected values remain visible.
+ *
+ * One query — aggregate via productOption join — no N+1.
+ */
+async function computeFacets(
+  storeId: string,
+  baseWhere: Prisma.ProductWhereInput
+): Promise<ProductFacet[]> {
+  // Fetch all (optionName, nameAr, value, valueAr) tuples for in-scope products.
+  const rows = await prisma.productOption.findMany({
+    where: {
+      product: { ...baseWhere, storeId },
+    },
+    select: {
+      name: true,
+      nameAr: true,
+      position: true,
+      values: {
+        select: { value: true, valueAr: true, position: true },
+        orderBy: { position: 'asc' },
+      },
+    },
+    orderBy: { position: 'asc' },
+  });
+
+  // Merge duplicate option names (same option may appear on many products).
+  const facetMap = new Map<string, ProductFacet>();
+  for (const opt of rows) {
+    if (!facetMap.has(opt.name)) {
+      facetMap.set(opt.name, { name: opt.name, nameAr: opt.nameAr, values: [] });
+    }
+    const facet = facetMap.get(opt.name)!;
+    const existingValues = new Set(facet.values.map(v => v.value));
+    for (const v of opt.values) {
+      if (!existingValues.has(v.value)) {
+        existingValues.add(v.value);
+        facet.values.push({ value: v.value, valueAr: v.valueAr });
+      }
+    }
+  }
+
+  return Array.from(facetMap.values()).filter(f => f.values.length > 0);
 }
 
 // Order statuses that represent a realized sale (units that actually left
@@ -732,6 +819,7 @@ export class ProductService {
       sort,
       cursor,
       ids,
+      optionFilters,
     } = options;
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
@@ -761,6 +849,7 @@ export class ProductService {
       page,
       limit,
       cursor,
+      optionFilters,
     });
     const cacheKey = `products:store:${storeId}:${cacheParams}`;
     try {
@@ -832,6 +921,27 @@ export class ProductService {
     }
     if (maxPrice !== undefined) {
       where.price = { ...((where.price as object) || {}), lte: maxPrice };
+    }
+
+    // Snapshot the where clause BEFORE option filters for facet computation.
+    // Facets are scoped to category/price/search context (so "Size" shows all
+    // sizes available in that category) but ignore active option selections
+    // (standard faceted-search UX: deselected values remain visible).
+    const whereForFacets = { ...where };
+
+    // Variant-option facet filters: each option name → selected values.
+    // Multiple values within one option = OR; multiple option names = AND.
+    if (optionFilters) {
+      const optionEntries = Object.entries(optionFilters).filter(([, vals]) => vals.length > 0);
+      if (optionEntries.length > 0) {
+        const optionClauses = optionEntries.map(([name, vals]) =>
+          buildOptionFilterClause(name, vals)
+        );
+        where.AND = [
+          ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+          ...optionClauses,
+        ];
+      }
     }
 
     // `sort=best_seller` is curator-driven: filter to manually-flagged items
@@ -907,9 +1017,10 @@ export class ProductService {
         orderBy: { createdAt: 'desc' as const },
       };
 
-      const [allMatchingRaw, total] = await Promise.all([
+      const [allMatchingRaw, total, facets] = await Promise.all([
         prisma.product.findMany(positionFindArgs),
         prisma.product.count({ where }),
+        computeFacets(storeId, whereForFacets),
       ]);
 
       // Re-sort by the orderedIds position array so the DB result order is
@@ -932,6 +1043,7 @@ export class ProductService {
         products: page_products.map(p =>
           enrichStockFlags(p as Parameters<typeof enrichStockFlags>[0])
         ),
+        facets,
         meta: {
           page: cursor ? undefined : page,
           limit,
@@ -993,9 +1105,10 @@ export class ProductService {
       ? { ...baseFindManyArgs, cursor: { id: cursor }, skip: 1 }
       : { ...baseFindManyArgs, skip, take: limit };
 
-    const [productsRaw, total] = await Promise.all([
+    const [productsRaw, total, facets] = await Promise.all([
       prisma.product.findMany(findManyArgs),
       prisma.product.count({ where }),
+      computeFacets(storeId, whereForFacets),
     ]);
 
     // When using cursor we fetched limit+1; slice to limit + extract next cursor.
@@ -1006,6 +1119,7 @@ export class ProductService {
 
     const result = {
       products: products.map(p => enrichStockFlags(p as Parameters<typeof enrichStockFlags>[0])),
+      facets,
       meta: {
         page: cursor ? undefined : page,
         limit,
