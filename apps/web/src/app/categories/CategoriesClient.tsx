@@ -57,7 +57,15 @@ export default function CategoriesClient({
   const catScale = pageTextScale(catPage?.textScale);
   const catDensity = pageDensityStyle(catPage?.density);
 
-  const templateCategories = categories.map(toTemplateCategory);
+  // Honor the merchant's "Show Best Sellers tile" toggle on the categories page
+  // too (same StoreTheme flag as the homepage category strip). The virtual
+  // best-sellers tile (synthesized by the API) has slug 'best-sellers'.
+  const visibleCategories =
+    store.theme?.showBestSellersTile === false
+      ? categories.filter(c => c.slug !== 'best-sellers')
+      : categories;
+
+  const templateCategories = visibleCategories.map(toTemplateCategory);
 
   // Record this page as the last-browsed listing so "Continue Shopping" in
   // the cart returns the shopper here instead of /products.
@@ -73,7 +81,7 @@ export default function CategoriesClient({
     <ShopChrome>
       <div className="flex-1" style={catBgStyle}>
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" style={catDensity}>
-          {categories.length === 0 ? (
+          {visibleCategories.length === 0 ? (
             <div className="text-center py-12">
               <h1 className="text-3xl font-bold mb-4" style={zoneStyle(catHeadingZone, catScale)}>
                 {t('Shop by Category', 'تسوق حسب الفئة')}
@@ -103,7 +111,7 @@ export default function CategoriesClient({
           ) : (
             // Skeleton while template loads.
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {categories.map(c => (
+              {visibleCategories.map(c => (
                 <div key={c.id} className="animate-pulse rounded-xl border bg-card">
                   <div className="aspect-square bg-muted rounded-t-xl" />
                   <div className="p-4 space-y-2">

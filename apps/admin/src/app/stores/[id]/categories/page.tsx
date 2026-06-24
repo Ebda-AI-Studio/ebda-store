@@ -483,16 +483,17 @@ export default function StoreCategoriesPage() {
           </div>
         </div>
 
-        {/* Show/hide the Best Sellers tile in the homepage category strip.
+        {/* Show/hide the virtual Best Sellers tile wherever it appears as a
+            category card — the homepage category strip AND the /categories page.
             Lives on StoreTheme (showBestSellersTile) — the tile is virtual, so
             it can't use the per-category "Show on homepage strip" toggle. The
             Best Sellers product carousel and its listing page stay regardless. */}
         <div className="mt-4 flex items-center justify-between gap-3 border-t pt-4">
           <div>
-            <p className="text-sm font-medium text-foreground">Show on homepage strip</p>
+            <p className="text-sm font-medium text-foreground">Show Best Sellers card</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Turn off to remove the Best Sellers card from the homepage category strip. The Best
-              Sellers carousel and its page stay.
+              Turn off to remove the Best Sellers card from the homepage category strip and the
+              Categories page. The Best Sellers carousel and its page stay.
             </p>
           </div>
           <button
