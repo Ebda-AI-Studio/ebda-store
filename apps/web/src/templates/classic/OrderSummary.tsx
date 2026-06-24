@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { OrderSummaryProps } from '../types';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useOrderSummaryBase } from '../shared/useOrderSummaryBase';
 
 export default function ClassicOrderSummary({
   subtotal,
@@ -25,17 +25,8 @@ export default function ClassicOrderSummary({
   typography,
   summaryColors,
 }: OrderSummaryProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
-  const isRtl = isRtlProp ?? ctxIsRtl;
-  const fmt = (p: number) => `${(p / 1000).toFixed(3)} ${currency}`;
-  const ctaText = isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr);
-  const summaryLabelBold = summaryColors?.bold !== false;
-  const labelColorStyle = summaryColors?.labelColor
-    ? { color: summaryColors.labelColor }
-    : undefined;
-  const totalColorStyle = summaryColors?.totalColor
-    ? { color: summaryColors.totalColor }
-    : undefined;
+  const { isRtl, fmt, ctaText, summaryLabelBold, labelColorStyle, totalColorStyle } =
+    useOrderSummaryBase({ currency, ctaLabel, ctaLabelAr, summaryColors, isRtl: isRtlProp });
 
   return (
     <aside

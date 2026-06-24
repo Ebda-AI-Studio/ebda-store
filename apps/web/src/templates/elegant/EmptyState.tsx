@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { EmptyStateProps } from '../types';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useRtlText } from '../shared/useRtlText';
 
 export default function ElegantEmptyState({
   title,
@@ -16,13 +16,15 @@ export default function ElegantEmptyState({
   icon,
   isRtl: isRtlProp,
 }: EmptyStateProps) {
-  const { isRtl: ctxIsRtl } = useLanguage();
-  const isRtl = isRtlProp ?? ctxIsRtl;
-  const displayTitle = isRtl ? (titleAr ?? title) : (title ?? titleAr);
-  const displayDescription = isRtl
-    ? (descriptionAr ?? description)
-    : (description ?? descriptionAr);
-  const displayCta = isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr);
+  const { isRtl, displayTitle, displayDescription, displayCta } = useRtlText({
+    title,
+    titleAr,
+    description,
+    descriptionAr,
+    ctaLabel,
+    ctaLabelAr,
+    isRtl: isRtlProp,
+  });
 
   return (
     <div

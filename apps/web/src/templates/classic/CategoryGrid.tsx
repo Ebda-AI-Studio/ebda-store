@@ -57,6 +57,16 @@ export default function ClassicCategoryGrid({
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
+  if (categories.length === 0) {
+    return null;
+  }
+
+  const cappedDesktop = (
+    desktopColumns ? Math.min(desktopColumns, Math.max(1, categories.length)) : undefined
+  ) as 2 | 3 | 4 | undefined;
+  const cappedMobile = (
+    mobileColumns ? Math.min(mobileColumns, Math.max(1, categories.length)) : undefined
+  ) as 1 | 2 | 3 | undefined;
 
   return (
     <section dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
@@ -82,7 +92,7 @@ export default function ClassicCategoryGrid({
         />
         {/* Grid - 4 columns on desktop for elegant spacing */}
         <div
-          className={`grid ${gridGapClass(cardGap)} ${gridColsClass(mobileColumns, desktopColumns)}`}
+          className={`grid ${gridGapClass(cardGap)} ${gridColsClass(cappedMobile, cappedDesktop)}`}
         >
           {categories.map(category => {
             const frame = cardFrameClass(showCardFrame ?? true, cardFrameStyle);

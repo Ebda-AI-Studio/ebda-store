@@ -59,6 +59,16 @@ export default function BoldCategoryGrid({
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
+  if (categories.length === 0) {
+    return null;
+  }
+
+  const cappedDesktop = (
+    desktopColumns ? Math.min(desktopColumns, Math.max(1, categories.length)) : undefined
+  ) as 2 | 3 | 4 | undefined;
+  const cappedMobile = (
+    mobileColumns ? Math.min(mobileColumns, Math.max(1, categories.length)) : undefined
+  ) as 1 | 2 | 3 | undefined;
 
   return (
     <section
@@ -91,7 +101,7 @@ export default function BoldCategoryGrid({
         />
         {/* Grid - Staggered layout for dynamism */}
         <div
-          className={`grid ${gridGapClass(cardGap)} ${gridColsClass(mobileColumns, desktopColumns)}`}
+          className={`grid ${gridGapClass(cardGap)} ${gridColsClass(cappedMobile, cappedDesktop)}`}
         >
           {categories.map((category, index) => {
             const stagger = index % 2 === 1 ? 'lg:translate-y-8' : '';
