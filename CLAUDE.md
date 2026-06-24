@@ -401,6 +401,7 @@ Optional (feature degrades gracefully if missing):
 - `REDIS_URL` — Railway internal (`redis.railway.internal:6379`); falls back to `localhost:6379` in dev
 - `ONESIGNAL_APP_ID` / `ONESIGNAL_REST_API_KEY` — admin order alerts + storefront broadcasts. When missing, broadcast endpoint returns `503 PUSH_NOT_CONFIGURED`.
 - `ONESIGNAL_ADMIN_APP_ID` / `ONESIGNAL_ADMIN_REST_API_KEY` — optional separate OneSignal app for admin alerts; falls back to the public app id/key if unset.
+- `ONESIGNAL_ORDERS_APP_ID` / `ONESIGNAL_ORDERS_REST_API_KEY` — separate OneSignal app for the **Orders PWA** new-order alerts (origin `orders.forcemediakw.com`). NO fallback (origin mismatch would silently fail) — `notifyOrdersAppOfOrder` skips the send when unset. Targets staff devices by the `store_id` tag the Orders app sets at enable time. `ORDERS_URL` (above) is the deep-link base.
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — standards-based Web Push (RFC 8030) for storefront subscriptions. Without these, `push.service.ts` logs a warning and skips sends.
 - `SENTRY_DSN` — error monitoring; safe to omit in dev.
 - `OTEL_EXPORTER_OTLP_ENDPOINT` — OpenTelemetry distributed tracing. **Opt-in + fail-open**: tracing only activates when this is set to an OTLP/HTTP collector base URL (e.g. Grafana Tempo / Honeycomb / Jaeger — the bootstrap appends `/v1/traces`). With it unset, or if init throws, the API boots normally un-instrumented (tracing can never take the API down). Bootstrap is `apps/api/src/tracing.ts`, imported FIRST in `index.ts` (auto-instruments http/express/pg/ioredis before they load). Companions: `OTEL_EXPORTER_OTLP_HEADERS` (`k=v,k2=v2` auth headers), `OTEL_SERVICE_NAME` (default `force-api`), `OTEL_TRACES_SAMPLER_ARG` (head sample ratio 0–1; default 0.1 prod / 1.0 otherwise).
@@ -437,6 +438,11 @@ Optional (feature degrades gracefully if missing):
 - `NEXT_PUBLIC_API_URL` — Railway API URL
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for storefront broadcasts (script-tag init via `OneSignalStorefrontInit.tsx`). Storefront silently no-ops when missing.
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — VAPID public key for the standards-based Web Push subscription path.
+
+### Orders PWA (Vercel — `force-orders`)
+
+- `NEXT_PUBLIC_API_URL` — Railway API URL.
+- `NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID` — OneSignal app ID for the Orders PWA (`react-onesignal` init via `OneSignalInit.tsx`, origin `orders.forcemediakw.com`). The app silently no-ops (no Enable banner) when missing. Replaced the old `NEXT_PUBLIC_VAPID_PUBLIC_KEY` path (server 403 + iOS-unreliable) on 2026-06-24.
 
 ## Commands
 

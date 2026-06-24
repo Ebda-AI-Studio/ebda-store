@@ -66,14 +66,21 @@ const nextConfig = {
           // Internal tool — never index.
           { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive, nosnippet, noimageindex' },
           {
+            // OneSignal needs:
+            //   script-src + 'unsafe-eval' → SDK runtime checks
+            //   connect-src https://*.onesignal.com → REST + websocket
+            //   worker-src 'self' blob: → /OneSignalSDKWorker.js importScripts the OneSignal CDN
+            //   frame-src https://*.onesignal.com → SDK's permission-prompt iframe
+            //   manifest-src 'self' → PWA install
             key: 'Content-Security-Policy',
             value:
               "default-src 'self'; " +
-              "script-src 'self' 'unsafe-inline'; " +
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com; " +
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://*.onesignal.com; " +
               "font-src 'self' data: https://fonts.gstatic.com; " +
               "img-src 'self' data: https: blob:; " +
-              "connect-src 'self' https://store-api.forcemediakw.com wss://store-api.forcemediakw.com https://*.up.railway.app wss://*.up.railway.app; " +
+              "connect-src 'self' https://store-api.forcemediakw.com wss://store-api.forcemediakw.com https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com; " +
+              'frame-src https://onesignal.com https://*.onesignal.com; ' +
               "worker-src 'self' blob:; " +
               "manifest-src 'self'; " +
               "frame-ancestors 'none'",

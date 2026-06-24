@@ -3,7 +3,6 @@ import { prisma, runInTenantContext } from '@force/database';
 import { EmailService, type OrderEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
-import { pushService } from '../../../services/push.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -204,30 +203,26 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           paymentMethod,
         })
       ),
-      // Orders-PWA (orders.forcemediakw.com) staff push via VAPID web-push.
-      // Targets ONLY the `orders_app` audience — a different device set + a
+      // Orders-PWA (orders.forcemediakw.com) staff push via OneSignal.
+      // Targets ONLY the Orders OneSignal app — a different device set + a
       // different origin from the OneSignal admin app (app.forcemediakw.com),
-      // so the two never double-send. The store's per-event opt-in
-      // (order_confirmed → push) is enforced inside sendToOrdersAppStaff.
+      // so the two never double-send. Tag-based: only devices tagged with
+      // this store's `store_id` (set when staff enable notifications) receive
+      // it. Replaces the old VAPID web-push path (server 403 + iOS-unreliable).
       //
-      // Idempotency: the tag is `order-<orderId>`, so a retried Inngest step
-      // collapses onto the same notification rather than stacking duplicates.
-      step.run('orders-app-push', () => {
-        const money = `${(order.total / 1000).toFixed(3)} ${order.currency}`;
-        const isAr = emailLocale === 'ar';
-        const title = isAr ? 'طلب جديد' : 'New order';
-        const body = isAr
-          ? `طلب جديد ${order.orderNumber} — ${money}`
-          : `New order ${order.orderNumber} — ${money}`;
-        return pushService.sendToOrdersAppStaff(storeId, title, body, {
-          type: 'order.created',
+      // Fire-once: the whole fanout is already deduped per order via the
+      // `order_created_notified_at` claim above, so this fires exactly once.
+      step.run('orders-app-push', () =>
+        OneSignalService.notifyOrdersAppOfOrder({
           orderId: order.id,
           orderNumber: order.orderNumber,
           storeId,
-          tag: `order-${order.id}`,
-          url: `/orders/${order.id}`,
-        });
-      }),
+          total: order.total,
+          currency: order.currency,
+          customerName,
+          locale: emailLocale,
+        })
+      ),
     ]).then(results => {
       results.forEach(r => {
         if (r.status === 'rejected') {

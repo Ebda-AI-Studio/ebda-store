@@ -33,18 +33,34 @@ Mirror the `force-admin` / `force-web` project setup:
 
 Set in Vercel → `force-orders` → Settings → Environment Variables:
 
-| Var                            | Value                                        | Notes                                                                                            |
-| ------------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `NEXT_PUBLIC_API_URL`          | `https://api-production-c058.up.railway.app` | Same Railway API the admin/web use. No `/api/v1` suffix — the app appends it.                    |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | the platform VAPID **public** key            | MUST equal the API's `VAPID_PUBLIC_KEY`. Public key only — the private key NEVER leaves the API. |
+| Var                                   | Value                                        | Notes                                                                                  |
+| ------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`                 | `https://api-production-c058.up.railway.app` | Same Railway API the admin/web use. No `/api/v1` suffix — the app appends it.          |
+| `NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID` | the Orders OneSignal app id                  | Public app id for the SEPARATE OneSignal app whose origin = `orders.forcemediakw.com`. |
 
-The VAPID **private** key (`VAPID_PRIVATE_KEY`) and `VAPID_SUBJECT` live ONLY on
-the Railway API (already configured for the storefront push path). The orders
-PWA never sees them.
+The Orders OneSignal **REST API key** (`ONESIGNAL_ORDERS_REST_API_KEY`) and the
+matching `ONESIGNAL_ORDERS_APP_ID` live ONLY on the Railway API — the orders PWA
+never sees the REST key. OneSignal locks one app per origin, so this is a
+DISTINCT OneSignal app from the admin (`app.forcemediakw.com`) and storefront
+(`store.forcemediakw.com`) ones; create it with `orders.forcemediakw.com` as the
+site URL.
 
-If `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is unset, the app degrades gracefully: the
-"Enable notifications" prompt simply never shows and the in-app new-order
-watcher (beep + toast) still works.
+Also set **`ORDERS_URL=https://orders.forcemediakw.com`** on the Railway API —
+it's the base for the push deep-link (`${ORDERS_URL}/orders/:id?store=:storeId`).
+It defaults to `http://localhost:3002` (the orders dev port), so if it's unset
+in production the push still arrives but its tap-through link points at
+localhost. Set it before launch.
+
+If `NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID` is unset, the app degrades gracefully:
+the "Enable notifications" prompt simply never shows and the in-app new-order
+watcher (beep + toast) still works. The backend also skips the orders-app push
+silently when `ONESIGNAL_ORDERS_APP_ID` / `ONESIGNAL_ORDERS_REST_API_KEY` are
+unset.
+
+> **Migration note (2026-06-24):** the orders PWA was moved OFF the old VAPID
+> web-push path (which hit a server 403 + was unreliable on iOS) onto OneSignal,
+> mirroring the working admin flow. `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is no longer
+> used by this app.
 
 ## 3. Attach the domain `orders.forcemediakw.com`
 
@@ -64,28 +80,36 @@ watcher (beep + toast) still works.
 - Install the PWA (Android/desktop Chrome: install banner; iOS: Share → Add to
   Home Screen).
 - The **Enable notifications** banner appears post-login (only when push is
-  supported, a VAPID key is set, and permission is still default). On iOS it
-  shows an "install first" hint until the app runs standalone.
-- Tap **Enable** → grant permission → a row lands in
-  `push_subscriptions` with `audience = 'orders_app'`.
+  supported, the Orders OneSignal app id is set, and permission is still
+  default). On iOS it shows an "install first" hint until the app runs
+  standalone.
+- Tap **Enable** → grant permission → the device opts in via OneSignal and is
+  tagged `store_id = <selected store>` (verify in the OneSignal dashboard →
+  Audience → the device shows the `store_id` data tag).
 - Place a test order on that store → within a few seconds a
   **"New order …"** push arrives on the device.
 
 ## How push delivery works (reference)
 
-- **Stack:** VAPID Web Push (RFC 8030) via the existing `apps/api`
-  `push.service.ts` — NOT OneSignal. OneSignal locks each app to one origin and
-  the admin OneSignal app is pinned to `app.forcemediakw.com`; the orders PWA is
-  a different origin, so VAPID (platform-wide, origin-agnostic) is the correct
-  reuse.
-- **Subscribe:** `POST /api/v1/stores/:storeId/orders-app/push/subscribe`
-  (authenticated, staff/admin + store-access gated). Tags the row
-  `audience = 'orders_app'`.
+- **Stack:** OneSignal Web SDK (`react-onesignal` v3.5.1), mirroring the admin
+  flow. OneSignal locks each app to one origin, so the orders PWA uses its OWN
+  OneSignal app (origin `orders.forcemediakw.com`) — distinct from the admin
+  (`app.forcemediakw.com`) and storefront (`store.forcemediakw.com`) apps, so
+  the three never double-send.
+- **Init:** `apps/orders/src/components/OneSignalInit.tsx` inits the SDK
+  post-auth with the Orders app id + the static `/OneSignalSDKWorker.js`. It
+  does NOT prompt — the prompt rides the Enable button (a user gesture, which
+  iOS requires).
+- **Subscribe:** the Enable button (`EnableNotifications.tsx` →
+  `lib/push.ts:enableOrderPush`) calls `OneSignal.Notifications.requestPermission()`,
+  opts the device in, sets the `store_id` tag, and `OneSignal.login(userId)`.
+  No server-side subscribe POST (that 403'd on the old VAPID path) and no DB
+  player-id storage — the tag IS the targeting key.
 - **Delivery:** the existing `order/created` Inngest fanout
-  (`order-created.ts`) gains an `orders-app-push` step calling
-  `pushService.sendToOrdersAppStaff(storeId, …)`. It targets ONLY the
-  `orders_app` audience (never shoppers, never the OneSignal admin app — no
-  double-send), respects the store's `order_confirmed → push` opt-in, and runs
-  inside `runInTenantContext` (FORCE-RLS-safe in the Inngest job).
-- **Idempotency:** the notification `tag` is `order-<orderId>`, so a retried
-  Inngest step collapses onto a single notification instead of stacking.
+  (`order-created.ts`) `orders-app-push` step calls
+  `OneSignalService.notifyOrdersAppOfOrder(...)`. It targets ONLY devices tagged
+  `store_id = <orderStoreId>` (tenant-isolated), deep-links to
+  `${ORDERS_URL}/orders/:id?store=:storeId`, and runs inside the per-order
+  fire-once claim (`order_created_notified_at`) so it fires exactly once.
+- **Deep-link:** OneSignal opens the notification's `url` natively on click →
+  the order detail page (`/orders/[orderId]`).

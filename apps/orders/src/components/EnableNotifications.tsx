@@ -6,28 +6,31 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/lib/auth';
 import { can } from '@/lib/permissions';
-import { isSubscribed, pushSupport, subscribeToOrderPush, vapidPublicKey } from '@/lib/push';
+import { enableOrderPush, isSubscribed, onesignalAppId, pushSupport } from '@/lib/push';
 
 const DISMISSED_KEY = 'force-orders-push-dismissed';
 
 /**
  * Post-login prompt that subscribes the staff member's device to new-order
- * push for the selected store (VAPID web-push, `orders_app` audience).
+ * push for the selected store via OneSignal (the Orders OneSignal app).
+ *
+ * Replaces the old VAPID web-push flow (server 403 + iOS-unreliable). On the
+ * Enable button (a user gesture, which iOS requires) we ask OneSignal to prompt
+ * for permission, opt the device in, tag it with `store_id` (so the backend's
+ * tag filter targets only this store's staff), and `login(userId)`.
  *
  * Show rules — ALL must hold, else the banner stays hidden:
  *  - user is authenticated staff with at least order-read access (push targets
  *    people who should see orders);
- *  - a store is selected (push is per-store);
- *  - the browser supports push AND a VAPID public key is configured;
+ *  - a store is selected (push is per-store — the tag is the selected store);
+ *  - the browser supports push AND the Orders OneSignal app id is configured;
  *  - the device isn't already subscribed;
  *  - the OS permission is still `default` (never re-prompt after grant/deny —
  *    a denied user must re-enable in browser settings, surfaced as a message);
  *  - the user hasn't dismissed the banner before (localStorage);
- *  - iOS Safari: a web app can only subscribe to push when running as an
- *    INSTALLED PWA (display-mode: standalone). Before install, iOS throws on
- *    pushManager.subscribe, so we show an install hint instead of the CTA and
- *    never attempt the subscribe — and the actual subscribe always runs from
- *    the button click (a user gesture), which iOS requires.
+ *  - iOS Safari: web push only works when running as an INSTALLED PWA
+ *    (display-mode: standalone). Before install, iOS can't subscribe, so we
+ *    show an install hint instead of the CTA and never attempt the subscribe.
  */
 export function EnableNotifications() {
   const { user } = useAuth();
@@ -51,7 +54,7 @@ export function EnableNotifications() {
 
       const support = pushSupport();
       if (support === 'unsupported') return;
-      if (support === 'no-vapid-key') return; // misconfig — silent, not the staff's problem
+      if (support === 'no-app-id') return; // misconfig — silent, not the staff's problem
 
       // Already made a choice at the OS level? Don't nag.
       if (Notification.permission !== 'default') return;
@@ -80,7 +83,7 @@ export function EnableNotifications() {
   }, [user, selectedStoreId]);
 
   if (!visible || !selectedStoreId) return null;
-  if (!vapidPublicKey()) return null;
+  if (!onesignalAppId()) return null;
 
   function dismiss() {
     try {
@@ -92,10 +95,10 @@ export function EnableNotifications() {
   }
 
   async function enable() {
-    if (!selectedStoreId || busy) return;
+    if (!selectedStoreId || !user || busy) return;
     setBusy(true);
     try {
-      const result = await subscribeToOrderPush(selectedStoreId);
+      const result = await enableOrderPush(selectedStoreId, user.id);
       if (result === 'subscribed') {
         notify(t.notifications.enabled, 'success');
         try {
@@ -107,12 +110,6 @@ export function EnableNotifications() {
       } else if (result === 'denied') {
         notify(t.notifications.denied, 'error');
         setVisible(false); // permission is now non-default; don't keep showing
-      } else if (result === 'sw-not-ready') {
-        // Service worker never activated — actionable: reopen the app.
-        notify(t.notifications.swNotReady, 'error');
-      } else if (result === 'server-rejected') {
-        // The API refused the subscription (see the console warn for the body).
-        notify(t.notifications.serverError, 'error');
       } else {
         notify(t.notifications.failed, 'error');
       }

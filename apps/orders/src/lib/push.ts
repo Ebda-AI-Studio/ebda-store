@@ -1,30 +1,32 @@
 /**
- * Orders PWA — VAPID web-push subscription helper.
+ * Orders PWA — OneSignal push helper.
  *
- * Standards-based Web Push (W3C Push API / RFC 8030), the SAME stack the
- * storefront uses (apps/web PushNotificationPrompt + apps/api push.service.ts).
- * We deliberately do NOT use OneSignal here: OneSignal locks each app to a
- * single `chrome_web_origin`, and the existing admin OneSignal app is pinned to
- * app.forcemediakw.com — this PWA lives on a different origin
- * (orders.forcemediakw.com), so reusing it is impossible. VAPID is platform-wide
- * and origin-agnostic, with a subscription table + delivery service already in
- * place. Reuse, don't invent.
+ * Replaces the old VAPID web-push flow (server 403 + unreliable on iOS). We
+ * MIMIC the working admin OneSignal integration (apps/admin OneSignalInit):
+ * the OneSignal Web SDK owns subscription + delivery, and the backend targets
+ * staff devices by a `store_id` TAG written here at enable time — no server
+ * player-id storage and no server-side subscribe POST (which is the 403 path
+ * the VAPID flow hit).
  *
- * The staff device registers against the `orders_app` audience via the
- * AUTHENTICATED route `/api/v1/stores/:storeId/orders-app/push/subscribe`, so
- * the order-created fanout pings only staff devices, never shoppers.
+ * OneSignal locks each app to a single `chrome_web_origin`, so the Orders PWA
+ * (orders.forcemediakw.com) uses its OWN OneSignal app, distinct from the admin
+ * (app.forcemediakw.com) and storefront (store.forcemediakw.com) ones. The app
+ * id comes from NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID (Vercel env).
+ *
+ * SDK init runs once (idempotent) in OneSignalInit; this module owns the
+ * user-gesture opt-in + tagging that EnableNotifications drives.
  */
 
-import { apiPost } from './api';
+import OneSignal from 'react-onesignal';
 
 export type PushSupport =
   | 'supported'
   | 'unsupported' // browser lacks SW / PushManager / Notification
-  | 'no-vapid-key'; // platform misconfig — public key env missing
+  | 'no-app-id'; // platform misconfig — OneSignal app id env missing
 
-/** The VAPID public key, injected at build time. Falsy ⇒ push disabled. */
-export function vapidPublicKey(): string | null {
-  return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null;
+/** The Orders OneSignal app id, injected at build time. Falsy ⇒ push disabled. */
+export function onesignalAppId(): string | null {
+  return process.env.NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID || null;
 }
 
 export function pushSupport(): PushSupport {
@@ -32,123 +34,61 @@ export function pushSupport(): PushSupport {
   if (!('serviceWorker' in navigator)) return 'unsupported';
   if (!('PushManager' in window)) return 'unsupported';
   if (typeof Notification === 'undefined') return 'unsupported';
-  if (!vapidPublicKey()) return 'no-vapid-key';
+  if (!onesignalAppId()) return 'no-app-id';
   return 'supported';
 }
 
-/** Web Push application-server keys are base64url; PushManager wants a Uint8Array. */
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i);
-  return out;
-}
-
-/**
- * Resolve the active service-worker registration, but NEVER hang.
- *
- * `navigator.serviceWorker.ready` is a promise that stays pending FOREVER when
- * no SW ever activates for the scope (registration failed, a stale install is
- * stuck, the SW file 404s). Awaiting it bare is what froze the "Enabling…"
- * button indefinitely. We:
- *   1. kick a registration in case the post-load `registerServiceWorker()` ran
- *      before the SW file was reachable (idempotent — register resolves to the
- *      existing registration if one exists);
- *   2. race `ready` against a timeout so the caller always gets an answer.
- * Returns null on timeout/failure so callers surface a real error instead of
- * spinning.
- */
-async function readyRegistration(timeoutMs = 8000): Promise<ServiceWorkerRegistration | null> {
-  try {
-    // Best-effort (re)register; harmless if already registered.
-    await navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => undefined);
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<null>(resolve => {
-      timer = setTimeout(() => resolve(null), timeoutMs);
-    });
-    const reg = await Promise.race([navigator.serviceWorker.ready, timeout]);
-    if (timer) clearTimeout(timer);
-    return reg ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** True only when a usable push subscription is already active for this device. */
+/** True only when this device already has an active OneSignal push opt-in. */
 export async function isSubscribed(): Promise<boolean> {
   if (pushSupport() !== 'supported') return false;
-  if (Notification.permission !== 'granted') return false;
+  if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') return false;
   try {
-    const reg = await readyRegistration();
-    if (!reg) return false;
-    const sub = await reg.pushManager.getSubscription();
-    return !!sub;
+    // OneSignal v16 SDK: User.PushSubscription.optedIn reflects the live state.
+    return OneSignal.User?.PushSubscription?.optedIn === true;
   } catch {
     return false;
   }
 }
 
 /**
- * Request permission (if needed), create a VAPID push subscription, and
- * register it server-side against the `orders_app` audience for `storeId`.
+ * Request permission (from a user gesture) + opt the device in, then tag it
+ * with `store_id` (so the backend's tag filter targets only this store's staff)
+ * and `login(userId)` for an external-id link. MUST be called from a button
+ * click — iOS/Safari requires the permission prompt to ride a user gesture.
  *
- * Returns the granted/denied/error outcome so the caller can drive UX. MUST be
- * called from a user gesture (button click) — Safari/iOS requires it and
- * Chrome warns otherwise.
+ * Returns the outcome so the caller can drive UX. The SDK must already be
+ * init'd (OneSignalInit runs it post-auth) — if it isn't, we surface 'error'.
  */
-export async function subscribeToOrderPush(
-  storeId: string
-): Promise<'subscribed' | 'denied' | 'unsupported' | 'sw-not-ready' | 'server-rejected' | 'error'> {
+export async function enableOrderPush(
+  storeId: string,
+  userId: string
+): Promise<'subscribed' | 'denied' | 'unsupported' | 'error'> {
   const support = pushSupport();
   if (support !== 'supported') return 'unsupported';
 
   try {
-    const permission =
-      Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
-    if (permission !== 'granted') return 'denied';
-
-    const reg = await readyRegistration();
-    if (!reg) {
-      // The service worker never became ready (failed/stale registration). Bail
-      // with a real error instead of leaving the caller's button spinning.
-      console.warn(
-        '[push] service worker not ready — push subscribe aborted. ' +
-          'Fully close and reopen the app to pick up the latest build.'
-      );
-      return 'sw-not-ready';
+    // Drive the native permission prompt from this user gesture. On a device
+    // that already granted permission this resolves immediately. v16 SDK
+    // resolves to the boolean grant state.
+    const granted = await OneSignal.Notifications.requestPermission();
+    if (
+      granted !== true &&
+      OneSignal.Notifications?.permission !== true &&
+      !(typeof Notification !== 'undefined' && Notification.permission === 'granted')
+    ) {
+      return 'denied';
     }
 
-    // Reuse an existing subscription if present, else create one.
-    const existing = await reg.pushManager.getSubscription();
-    const subscription =
-      existing ??
-      (await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        // TS 5.7 types Uint8Array as Uint8Array<ArrayBufferLike>, which isn't
-        // directly assignable to BufferSource on PushSubscriptionOptionsInit.
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey() as string) as BufferSource,
-      }));
+    // Ensure the device is opted in (creates the push subscription).
+    await OneSignal.User?.PushSubscription?.optIn?.();
 
-    const json = subscription.toJSON() as {
-      endpoint?: string;
-      keys?: { p256dh?: string; auth?: string };
-    };
-
-    const { error } = await apiPost(`/api/v1/stores/${storeId}/orders-app/push/subscribe`, {
-      endpoint: json.endpoint,
-      keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth },
-      deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 255) : undefined,
-    });
-
-    if (error) {
-      console.warn('[push] server-side subscribe failed:', error);
-      // Registration failed server-side — roll back the local subscription so
-      // we don't end up with a device the API doesn't know about (it would
-      // never receive pushes and would block re-subscribe attempts).
-      await subscription.unsubscribe().catch(() => undefined);
-      return 'server-rejected';
+    // Tag + external-id so the backend can target this store's staff. The
+    // backend filters on `store_id`; `login` links the device to the user
+    // for future per-user revocation without depending on tags. addTag is
+    // synchronous (returns void) in the v16 SDK — don't await it.
+    OneSignal.User.addTag('store_id', storeId);
+    if (userId) {
+      await OneSignal.login(userId).catch(() => undefined);
     }
 
     return 'subscribed';
@@ -157,19 +97,35 @@ export async function subscribeToOrderPush(
   }
 }
 
-/** Tear down the device subscription locally + server-side. Best-effort. */
-export async function unsubscribeFromOrderPush(storeId: string): Promise<void> {
+/**
+ * Keep the device's `store_id` tag in sync with the currently-selected store.
+ *
+ * The tag decides which store's order pushes this device receives. It's set at
+ * enable time, but a staff member who manages multiple stores can switch the
+ * active store afterwards — without this re-tag they'd stay tagged to the store
+ * they enabled on and receive ITS pushes while working in another (the
+ * wrong-store / "stores getting mixed" bug). Called from OneSignalInit on every
+ * selectedStoreId change. No-ops unless the device is already subscribed, so it
+ * never prompts; OneSignal tags are single-valued, so this overwrites (a device
+ * is only ever tagged to ONE store = the one currently open).
+ */
+export async function syncStoreTag(storeId: string | null | undefined): Promise<void> {
+  if (!storeId) return;
+  if (!(await isSubscribed())) return;
+  try {
+    OneSignal.User.addTag('store_id', storeId);
+  } catch {
+    // best-effort — a failed re-tag just means the next page load retries
+  }
+}
+
+/** Tear down the device opt-in + clear the store tag. Best-effort. */
+export async function disableOrderPush(): Promise<void> {
   if (pushSupport() !== 'supported') return;
   try {
-    const reg = await readyRegistration();
-    if (!reg) return;
-    const sub = await reg.pushManager.getSubscription();
-    if (!sub) return;
-    const endpoint = sub.endpoint;
-    await sub.unsubscribe().catch(() => undefined);
-    await apiPost(`/api/v1/stores/${storeId}/orders-app/push/unsubscribe`, { endpoint }).catch(
-      () => undefined
-    );
+    await OneSignal.User?.PushSubscription?.optOut?.();
+    // removeTag is synchronous (returns void) in the v16 SDK — don't await.
+    OneSignal.User.removeTag('store_id');
   } catch {
     // best-effort
   }

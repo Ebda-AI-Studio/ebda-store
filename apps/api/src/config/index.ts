@@ -43,6 +43,10 @@ export const config = {
   webUrl: process.env.WEB_URL || 'http://localhost:3000',
   adminUrl: process.env.ADMIN_URL || 'http://localhost:3001',
   apiUrl: process.env.API_URL || 'http://localhost:4000',
+  // Orders PWA base URL — used to build OneSignal deep-links to the order
+  // detail page (orders.forcemediakw.com/orders/:id?store=:storeId). Dev
+  // default matches the orders app's dev port (next dev -p 3002).
+  ordersUrl: process.env.ORDERS_URL || 'http://localhost:3002',
 
   // Database
   databaseUrl: getRequiredSecret('DATABASE_URL', 'Database URL'),
@@ -151,6 +155,14 @@ export const config = {
   onesignalAdminAppId: process.env.ONESIGNAL_ADMIN_APP_ID || process.env.ONESIGNAL_APP_ID || '',
   onesignalAdminRestApiKey:
     process.env.ONESIGNAL_ADMIN_REST_API_KEY || process.env.ONESIGNAL_REST_API_KEY || '',
+  // Orders PWA OneSignal app — push notifications to store staff about new
+  // orders on the Orders PWA (origin orders.forcemediakw.com). OneSignal locks
+  // each app to a single chrome_web_origin, so the Orders app needs its OWN
+  // OneSignal app distinct from the admin one (app.forcemediakw.com). No
+  // fallback to the admin app id — an origin mismatch would silently fail to
+  // subscribe Orders devices, so we leave it empty and skip sends when unset.
+  onesignalOrdersAppId: process.env.ONESIGNAL_ORDERS_APP_ID || '',
+  onesignalOrdersRestApiKey: process.env.ONESIGNAL_ORDERS_REST_API_KEY || '',
 
   // Email
   smtpHost: process.env.SMTP_HOST || 'localhost',

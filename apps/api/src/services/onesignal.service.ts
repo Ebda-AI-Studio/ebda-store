@@ -58,6 +58,21 @@ function formatPaymentMethod(method: string | undefined): string {
   return normalized.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/** Input for an Orders-PWA new-order push. Mirrors NotifyOrderInput but the
+ *  Orders app doesn't need storeName/paymentMethod (it targets a single store
+ *  by tag and the staff already know which store they're in). */
+interface NotifyOrdersAppInput {
+  orderId: string;
+  orderNumber: string;
+  storeId: string;
+  total: number; // fils
+  currency: string;
+  customerName: string;
+  /** Buyer locale — only used to pick which contents string leads (both
+   *  en + ar are always sent so OneSignal renders the device's language). */
+  locale?: 'en' | 'ar';
+}
+
 export interface BroadcastInput {
   storeId: string;
   titleEn: string;
@@ -118,6 +133,15 @@ function isAdminConfigured(): boolean {
   return !!(config.onesignalAdminAppId && config.onesignalAdminRestApiKey);
 }
 
+/** Orders PWA — used by `notifyOrdersAppOfOrder` (new-order pings to store
+ *  staff running the Orders app). Origin: https://orders.forcemediakw.com.
+ *  A SEPARATE OneSignal app from both the admin and storefront ones because
+ *  OneSignal locks each app to a single origin. No fallback — when unset we
+ *  skip the send silently (see `notifyOrdersAppOfOrder`). */
+function isOrdersConfigured(): boolean {
+  return !!(config.onesignalOrdersAppId && config.onesignalOrdersRestApiKey);
+}
+
 // Backwards-compat alias for code paths not yet split into admin vs storefront.
 function isConfigured(): boolean {
   return isStorefrontConfigured();
@@ -125,6 +149,13 @@ function isConfigured(): boolean {
 
 function adminOrderUrl(storeId: string, orderId: string): string {
   return `${config.adminUrl}/stores/${storeId}/orders/${orderId}`;
+}
+
+/** Deep-link to the order on the Orders PWA. The Orders app route is
+ *  `/orders/[orderId]` and reads the active store from `?store=`. OneSignal
+ *  opens this `url` natively on notification click → straight to the order. */
+function ordersAppOrderUrl(orderId: string, storeId: string): string {
+  return `${config.ordersUrl}/orders/${orderId}?store=${encodeURIComponent(storeId)}`;
 }
 
 function formatMoney(fils: number, currency: string): string {
@@ -275,6 +306,102 @@ export class OneSignalService {
     // Fire both in parallel — a slow OneSignal response shouldn't block
     // the other audience's push.
     await Promise.all([send(storeAdminBody, 'store_admin'), send(superAdminBody, 'super_admin')]);
+  }
+
+  /**
+   * Push a "New order" notification to the staff running the Orders PWA
+   * (orders.forcemediakw.com) for THIS store. Distinct from
+   * `notifyAdminsOfOrder` (admin PWA, app.forcemediakw.com) — a different
+   * device set + a different OneSignal app, so the two never double-send.
+   *
+   * Targeting is TAG-BASED: the Orders app tags each subscribed device with
+   * `store_id = <selectedStoreId>` at enable time, and we filter on that tag
+   * here. No DB player-id storage and no server-side subscribe POST — that
+   * avoids the 403 server-subscribe path the old VAPID flow tripped on.
+   *
+   * Fire-and-forget: failures are logged but never propagate to the caller
+   * because order creation must not roll back over a notification glitch.
+   * Skips silently when the Orders OneSignal app isn't configured.
+   */
+  static async notifyOrdersAppOfOrder(input: NotifyOrdersAppInput): Promise<void> {
+    if (!isOrdersConfigured()) {
+      logger.warn(
+        {
+          hasAppId: !!config.onesignalOrdersAppId,
+          hasRestKey: !!config.onesignalOrdersRestApiKey,
+        },
+        'Orders OneSignal not configured — skipping orders-app notification (set ONESIGNAL_ORDERS_APP_ID and ONESIGNAL_ORDERS_REST_API_KEY)'
+      );
+      return;
+    }
+
+    const url = ordersAppOrderUrl(input.orderId, input.storeId);
+    const moneyText = formatMoney(input.total, input.currency);
+
+    const body = {
+      app_id: config.onesignalOrdersAppId,
+      url,
+      web_buttons: [{ id: 'view-order', text: 'View order', url }],
+      data: {
+        type: 'order.created',
+        orderId: input.orderId,
+        storeId: input.storeId,
+      },
+      headings: { en: 'New order', ar: 'طلب جديد' },
+      contents: {
+        en: `${input.orderNumber} — ${input.customerName} — ${moneyText}`,
+        ar: `${input.orderNumber} — ${input.customerName} — ${moneyText}`,
+      },
+      // Tag-based targeting — the Orders app sets `store_id` on enable. Only
+      // devices tagged with THIS store's id receive the push, so one store's
+      // staff never sees another tenant's orders.
+      filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }],
+    };
+
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Key ${config.onesignalOrdersRestApiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const responseText = await res.text().catch(() => '');
+      if (!res.ok) {
+        logger.error(
+          { status: res.status, body: responseText, storeId: input.storeId },
+          'OneSignal orders-app push failed'
+        );
+        return;
+      }
+      // 2xx ≠ delivered. OneSignal returns 200 with `recipients: 0` when the
+      // tag filter matches no devices — log the count so a missing push has a
+      // clear cause (no staff enabled / store_id tag not set).
+      let parsed: { id?: string; recipients?: number; errors?: unknown } = {};
+      try {
+        parsed = JSON.parse(responseText);
+      } catch {
+        // unparseable body — fall through to the generic log
+      }
+      const recipients = typeof parsed.recipients === 'number' ? parsed.recipients : -1;
+      const meta = {
+        storeId: input.storeId,
+        notificationId: parsed.id,
+        recipients,
+        errors: parsed.errors,
+      };
+      if (recipients === 0) {
+        logger.warn(
+          meta,
+          'OneSignal orders-app push delivered to 0 devices — check that staff enabled notifications and the store_id tag is set'
+        );
+      } else {
+        logger.info(meta, 'OneSignal orders-app push sent');
+      }
+    } catch (err) {
+      logger.error({ err, storeId: input.storeId }, 'OneSignal orders-app push threw');
+    }
   }
 
   /**
