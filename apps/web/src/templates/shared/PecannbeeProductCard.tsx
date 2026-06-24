@@ -180,6 +180,8 @@ function PecannbeeProductCardImpl({
   const resolvedOosLabelColor = defaults?.oosLabelColor;
   const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
   const nameCase = defaults?.productNameCase;
+  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
+  const viewOnly = defaults?.ctaMode === 'viewOnly';
 
   // CTA shape + size classes (additive — '' when unset so pack styles win).
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
@@ -363,7 +365,7 @@ function PecannbeeProductCardImpl({
                 <p
                   id={`prod-${product.id}-name`}
                   data-zone="productName"
-                  className={`line-clamp-2 font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                  className={`line-clamp-2 min-h-[2.5em] font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   style={{
                     textWrap: 'balance',
                     fontFamily: productNameZone?.fontFamily,
@@ -429,7 +431,7 @@ function PecannbeeProductCardImpl({
             variants add to cart directly. Matches pecannbee target IMG_7994
             where two adjacent cards show different button texts based on
             inventory state. */}
-        {product.variants && product.variants.length > 0 ? (
+        {(product.variants && product.variants.length > 0) || viewOnly ? (
           <Link
             href={href}
             prefetch={false}

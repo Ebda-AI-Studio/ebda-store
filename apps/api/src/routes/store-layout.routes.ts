@@ -575,6 +575,10 @@ const layoutSchemaInternal = z
         oosLabelTextColor: colorValue,
         oosDimColor: colorValue,
         productNameCase: z.enum(['normal', 'uppercase']).optional(),
+        // 2026-06-24: CTA mode — view-only vs auto (view+add-to-cart). Must be
+        // listed or Zod silently strips it on every PUT (no .passthrough()).
+        // Keep in sync with ProductCardDefaults in packages/shared/src/types/store-layout.ts.
+        ctaMode: z.enum(['auto', 'viewOnly']).optional(),
       })
       .partial()
       .optional(),

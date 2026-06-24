@@ -118,6 +118,8 @@ function BoldProductCard({
   const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
   // Task 6: merchant-controlled name casing (default = normal, no forced caps).
   const nameCase = layout?.productCardDefaults?.productNameCase;
+  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
+  const viewOnly = defaults?.ctaMode === 'viewOnly';
 
   return (
     <article
@@ -276,6 +278,7 @@ function BoldProductCard({
               ctaLabelTextAr={resolvedCtaLabelTextAr}
               oosDimColor={resolvedOosDimColor}
               theme={store.theme}
+              viewOnly={viewOnly}
             />
           </div>
         </div>
@@ -287,7 +290,7 @@ function BoldProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`font-black ${textSizes.name} ${nameCase === 'uppercase' ? 'uppercase' : ''} tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200`}
+                className={`font-black ${textSizes.name} ${nameCase === 'uppercase' ? 'uppercase' : ''} tracking-tight line-clamp-1 min-h-[1.5em] group-hover:text-primary transition-colors duration-200`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

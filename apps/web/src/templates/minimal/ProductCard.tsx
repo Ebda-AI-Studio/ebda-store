@@ -118,6 +118,8 @@ function MinimalProductCard({
   const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
   // Task 6: merchant-controlled name casing (default = normal, no forced caps).
   const nameCase = layout?.productCardDefaults?.productNameCase;
+  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
+  const viewOnly = defaults?.ctaMode === 'viewOnly';
 
   return (
     <article
@@ -282,6 +284,7 @@ function MinimalProductCard({
               ctaLabelTextAr={resolvedCtaLabelTextAr}
               oosDimColor={resolvedOosDimColor}
               theme={store.theme}
+              viewOnly={viewOnly}
             />
           </div>
         </div>
@@ -295,7 +298,7 @@ function MinimalProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug`}
+                className={`${textSizes.name} tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug line-clamp-2 min-h-[2.5em]`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

@@ -134,6 +134,8 @@ function ModernProductCard({
   const resolvedOosLabelColor = defaults?.oosLabelColor;
   const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
   const nameCase = defaults?.productNameCase;
+  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
+  const viewOnly = defaults?.ctaMode === 'viewOnly';
 
   return (
     <article
@@ -315,6 +317,7 @@ function ModernProductCard({
                 ctaLabelTextAr={resolvedCtaLabelTextAr}
                 oosDimColor={resolvedOosDimColor}
                 theme={store.theme}
+                viewOnly={viewOnly}
               />
             </div>
           </div>
@@ -339,7 +342,7 @@ function ModernProductCard({
                 <h3
                   id={`prod-${product.id}-name`}
                   data-zone="productName"
-                  className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 leading-snug tracking-tight ${isRtl ? 'text-right' : ''}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                  className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 min-h-[2.5em] leading-snug tracking-tight ${isRtl ? 'text-right' : ''}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   itemProp="name"
                 >
                   {isRtl && product.nameAr ? product.nameAr : product.name}

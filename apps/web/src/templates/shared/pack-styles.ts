@@ -98,7 +98,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardPrice: 'font-serif font-medium text-foreground tracking-tight',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-sm font-serif uppercase tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out min-h-[44px]',
+      'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-sm font-serif tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-normal tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
@@ -131,11 +131,11 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryCaption:
       'text-base font-extralight tracking-[0.22em] uppercase text-muted-foreground group-hover:text-foreground transition-colors duration-500',
     productCardName:
-      'tracking-[0.18em] uppercase font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-500',
+      'tracking-[0.18em] font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-500',
     productCardPrice: 'tracking-wide font-extralight text-muted-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-sm font-medium uppercase tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
+      'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-sm font-medium tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
@@ -156,10 +156,10 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryFrame:
       'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-200 ease-out',
     categoryCaption: 'text-base font-black uppercase tracking-[0.05em] text-foreground',
-    productCardName: 'font-black uppercase tracking-[0.02em] text-foreground leading-tight',
+    productCardName: 'font-black tracking-[0.02em] text-foreground leading-tight',
     productCardPrice: 'font-black text-foreground tracking-tight',
     productCardCta:
-      'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-200 ease-out min-h-[44px]',
+      'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-200 ease-out min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black uppercase tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
@@ -184,11 +184,11 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     categoryCaption:
       'text-base font-extralight uppercase tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
     productCardName:
-      'font-light uppercase tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
+      'font-light tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
     productCardPrice: 'font-light tracking-wide text-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium uppercase tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
+      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1] text-balance',
     sectionSeeAll:

@@ -58,6 +58,12 @@ interface ProductCardCtaProps {
   ctaLabelTextAr?: string;
   oosDimColor?: string;
   theme?: StoreTheme;
+  /**
+   * When true, renders the "View" link to the PDP even for no-variant
+   * in-stock products — same as the hasVariants path.
+   * Driven by productCardDefaults.ctaMode === 'viewOnly'.
+   */
+  viewOnly?: boolean;
 }
 
 export function ProductCardCta({
@@ -80,6 +86,7 @@ export function ProductCardCta({
   ctaLabelTextAr,
   oosDimColor,
   theme,
+  viewOnly = false,
 }: ProductCardCtaProps) {
   const router = useRouter();
 
@@ -102,7 +109,8 @@ export function ProductCardCta({
       ? { backgroundColor: resolveColor(oosDimColor, theme), opacity: 1 }
       : {};
 
-  if (hasVariants && viewHref) {
+  // viewOnly: force the View link path for no-variant in-stock products too.
+  if ((hasVariants || viewOnly) && viewHref) {
     const viewLabel =
       (isRtl ? ctaLabelTextAr : ctaLabelTextEn) ?? labels?.view ?? (isRtl ? 'عرض' : 'View');
     const finalCls =

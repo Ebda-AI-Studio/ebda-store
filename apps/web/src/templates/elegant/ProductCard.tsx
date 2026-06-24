@@ -131,6 +131,8 @@ function ElegantProductCard({
   const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
   // Task 6: merchant-controlled name casing (default = normal, no forced caps).
   const nameCase = layout?.productCardDefaults?.productNameCase;
+  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
+  const viewOnly = defaults?.ctaMode === 'viewOnly';
 
   return (
     <article
@@ -326,6 +328,7 @@ function ElegantProductCard({
               ctaLabelTextAr={resolvedCtaLabelTextAr}
               oosDimColor={resolvedOosDimColor}
               theme={store.theme}
+              viewOnly={viewOnly}
             />
           </div>
         </div>
@@ -338,7 +341,7 @@ function ElegantProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1`}
+                className={`${textSizes.name} tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1 min-h-[1.5em]`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

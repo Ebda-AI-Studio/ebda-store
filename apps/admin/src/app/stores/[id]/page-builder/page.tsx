@@ -2437,6 +2437,33 @@ export default function StoreLayoutPage() {
                   {/* Call-to-action button group */}
                   <div className="rounded-lg border border-border bg-card p-4 space-y-4">
                     <p className="text-sm font-semibold text-foreground">Call-to-action button</p>
+                    {/* Card button mode — controls whether no-variant in-stock products
+                        show an inline Add-to-cart button (auto) or a View link (viewOnly). */}
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">
+                        Card button mode / وضع زر البطاقة
+                      </label>
+                      <select
+                        value={layout.productCardDefaults?.ctaMode ?? ''}
+                        onChange={e =>
+                          setLayout(prev =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  productCardDefaults: {
+                                    ...(prev.productCardDefaults ?? {}),
+                                    ctaMode: (e.target.value as 'auto' | 'viewOnly') || undefined,
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Auto (View + Add to cart) — تلقائي</option>
+                        <option value="viewOnly">View only — عرض فقط</option>
+                      </select>
+                    </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">

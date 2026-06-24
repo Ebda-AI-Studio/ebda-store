@@ -114,6 +114,8 @@ export function ProductCarousel({
   const resolvedOosLabelColor = cardDefaults?.oosLabelColor;
   const resolvedOosLabelTextColor = cardDefaults?.oosLabelTextColor;
   const nameCase = cardDefaults?.productNameCase;
+  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
+  const viewOnly = cardDefaults?.ctaMode === 'viewOnly';
   // Build CTA extra classes for inline carousel CTA buttons.
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
     .filter(Boolean)
@@ -340,7 +342,7 @@ export function ProductCarousel({
                       frame for the same micro-payoff PecannbeeProductCard
                       now uses. Mobile loses nothing (no hover state). */}
                   <div
-                    className={`overflow-hidden transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${shape.radius} ${styles.card}`}
+                    className={`flex flex-col h-full overflow-hidden transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${shape.radius} ${styles.card}`}
                   >
                     <Link
                       href={href}
@@ -441,7 +443,7 @@ export function ProductCarousel({
                             parent + onAddToCart handler present. Position
                             bottom-end of image so it doesn't fight the
                             wishlist heart top-start. */}
-                        {showQuickAdd && orderable && !hasVariants && onAddToCart && (
+                        {showQuickAdd && orderable && !hasVariants && !viewOnly && onAddToCart && (
                           <button
                             type="button"
                             onClick={e => {
@@ -505,11 +507,11 @@ export function ProductCarousel({
                           })();
                           return (
                             <div
-                              className={`${textSizes.pad} space-y-2 ${styles.productCardBody ?? ''}`}
+                              className={`flex flex-1 flex-col ${textSizes.pad} gap-2 ${styles.productCardBody ?? ''}`}
                             >
                               {nameVisible && (
                                 <p
-                                  className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+                                  className={`line-clamp-2 min-h-[2.5em] ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                                   data-zone="productName"
                                   style={{
                                     fontFamily: productNameZone?.fontFamily,
@@ -566,96 +568,101 @@ export function ProductCarousel({
                         overlay above IS the addable affordance — hiding
                         the bottom Add-to-cart button removes the
                         redundancy. View + Out Of Stock buttons still
-                        render because the (+) doesn't cover those cases. */}
+                        render because the (+) doesn't cover those cases.
+                        mt-auto pushes the CTA to the bottom of the flex
+                        column so all carousel cards align at the same level
+                        regardless of how many lines the product name wraps. */}
                     {/* CTA zone inline style applied via a shared style object
                         so all three CTA variants (View / OOS / Add to cart)
                         reflect the merchant's productCta typography override. */}
-                    {(() => {
-                      // Contrast-guard the CTA color against the button's own bg so a
-                      // baseline/zone color (e.g. token:foreground) can't render
-                      // dark-on-dark on a filled button. See guardedCtaColor.
-                      // Task 3 B3: ctaColor/ctaTextColor/oosDimColor from productCardDefaults.
-                      const resolvedBg =
-                        resolvedCtaColor && store.theme
-                          ? resolveColor(resolvedCtaColor, store.theme)
-                          : undefined;
-                      const resolvedText =
-                        resolvedCtaTextColor && store.theme
-                          ? resolveColor(resolvedCtaTextColor, store.theme)
-                          : undefined;
-                      const ctaStyle: React.CSSProperties = {
-                        fontFamily: productCtaZone?.fontFamily,
-                        fontSize: responsiveFontSize(productCtaZone?.fontSize),
-                        fontWeight: productCtaZone?.fontWeight,
-                        color:
-                          resolvedText ??
-                          guardedCtaColor(
-                            productCtaZone?.color,
-                            styles.productCardCta,
-                            store.theme
-                          ),
-                        letterSpacing: productCtaZone?.letterSpacing,
-                        lineHeight: productCtaZone?.lineHeight,
-                        textTransform:
-                          productCtaZone?.textTransform as React.CSSProperties['textTransform'],
-                        ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
-                      };
-                      const oosCtaStyle: React.CSSProperties = {
-                        ...ctaStyle,
-                        ...(!orderable && resolvedOosDimColor && store.theme
-                          ? {
-                              backgroundColor: resolveColor(resolvedOosDimColor, store.theme),
-                              opacity: 1,
-                            }
-                          : {}),
-                      };
-                      const ctaViewLabel =
-                        (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
-                        (isRtl ? 'عرض' : 'View');
-                      const ctaOosLabel =
-                        (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
-                        (isRtl ? 'نفدت الكمية' : 'Out Of Stock');
-                      const ctaAddLabel =
-                        (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
-                        (isRtl ? 'إضافة للسلة' : 'Add to cart');
-                      const ctaExtraFull = ctaExtraCls ? ` ${ctaExtraCls}` : '';
-                      return hasVariants ? (
-                        <Link
-                          href={href}
-                          prefetch={false}
-                          className={`block w-full text-center cursor-pointer ${styles.productCardCta}${ctaExtraFull}`}
-                          data-zone="productCta"
-                          data-cta="button"
-                          style={ctaStyle}
-                        >
-                          {ctaViewLabel}
-                        </Link>
-                      ) : !orderable ? (
-                        <button
-                          type="button"
-                          disabled
-                          className={`block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}${ctaExtraFull}`}
-                          data-zone="productCta"
-                          style={oosCtaStyle}
-                        >
-                          {ctaOosLabel}
-                        </button>
-                      ) : (
-                        !showQuickAdd &&
-                        onAddToCart && (
-                          <button
-                            type="button"
-                            onClick={() => onAddToCart(product.id)}
+                    <div className="mt-auto">
+                      {(() => {
+                        // Contrast-guard the CTA color against the button's own bg so a
+                        // baseline/zone color (e.g. token:foreground) can't render
+                        // dark-on-dark on a filled button. See guardedCtaColor.
+                        // Task 3 B3: ctaColor/ctaTextColor/oosDimColor from productCardDefaults.
+                        const resolvedBg =
+                          resolvedCtaColor && store.theme
+                            ? resolveColor(resolvedCtaColor, store.theme)
+                            : undefined;
+                        const resolvedText =
+                          resolvedCtaTextColor && store.theme
+                            ? resolveColor(resolvedCtaTextColor, store.theme)
+                            : undefined;
+                        const ctaStyle: React.CSSProperties = {
+                          fontFamily: productCtaZone?.fontFamily,
+                          fontSize: responsiveFontSize(productCtaZone?.fontSize),
+                          fontWeight: productCtaZone?.fontWeight,
+                          color:
+                            resolvedText ??
+                            guardedCtaColor(
+                              productCtaZone?.color,
+                              styles.productCardCta,
+                              store.theme
+                            ),
+                          letterSpacing: productCtaZone?.letterSpacing,
+                          lineHeight: productCtaZone?.lineHeight,
+                          textTransform:
+                            productCtaZone?.textTransform as React.CSSProperties['textTransform'],
+                          ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
+                        };
+                        const oosCtaStyle: React.CSSProperties = {
+                          ...ctaStyle,
+                          ...(!orderable && resolvedOosDimColor && store.theme
+                            ? {
+                                backgroundColor: resolveColor(resolvedOosDimColor, store.theme),
+                                opacity: 1,
+                              }
+                            : {}),
+                        };
+                        const ctaViewLabel =
+                          (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+                          (isRtl ? 'عرض' : 'View');
+                        const ctaOosLabel =
+                          (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+                          (isRtl ? 'نفدت الكمية' : 'Out Of Stock');
+                        const ctaAddLabel =
+                          (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+                          (isRtl ? 'إضافة للسلة' : 'Add to cart');
+                        const ctaExtraFull = ctaExtraCls ? ` ${ctaExtraCls}` : '';
+                        return hasVariants || viewOnly ? (
+                          <Link
+                            href={href}
+                            prefetch={false}
                             className={`block w-full text-center cursor-pointer ${styles.productCardCta}${ctaExtraFull}`}
                             data-zone="productCta"
                             data-cta="button"
                             style={ctaStyle}
                           >
-                            {ctaAddLabel}
+                            {ctaViewLabel}
+                          </Link>
+                        ) : !orderable ? (
+                          <button
+                            type="button"
+                            disabled
+                            className={`block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}${ctaExtraFull}`}
+                            data-zone="productCta"
+                            style={oosCtaStyle}
+                          >
+                            {ctaOosLabel}
                           </button>
-                        )
-                      );
-                    })()}
+                        ) : (
+                          !showQuickAdd &&
+                          onAddToCart && (
+                            <button
+                              type="button"
+                              onClick={() => onAddToCart(product.id)}
+                              className={`block w-full text-center cursor-pointer ${styles.productCardCta}${ctaExtraFull}`}
+                              data-zone="productCta"
+                              data-cta="button"
+                              style={ctaStyle}
+                            >
+                              {ctaAddLabel}
+                            </button>
+                          )
+                        );
+                      })()}
+                    </div>
                   </div>
                 </li>
               );

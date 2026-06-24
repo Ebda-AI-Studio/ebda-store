@@ -66,6 +66,8 @@ export function ProductListItem({
   const resolvedOosLabelColor = defaults?.oosLabelColor;
   const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
   const nameCase = defaults?.productNameCase;
+  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
+  const viewOnly = defaults?.ctaMode === 'viewOnly';
 
   // CTA shape + size extra classes.
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
@@ -80,6 +82,8 @@ export function ProductListItem({
   const ctaAddLabel =
     (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
     t('Add to Cart', translations['Add to Cart']);
+  const ctaViewLabel =
+    (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ?? (isRtl ? 'عرض' : 'View');
 
   return (
     <Link
@@ -212,28 +216,46 @@ export function ProductListItem({
               </svg>
             </button>
 
-            {/* Task 3 B3: CTA shape/size/color/label customization + OOS dim. */}
-            <button
-              className={`flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90${ctaExtraCls ? ` ${ctaExtraCls}` : ''}`}
-              onClick={e => onAddToCart(product, e)}
-              style={{
-                ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
-                ...(resolvedText ? { color: resolvedText } : {}),
-                ...(!orderable && resolvedOosDimColor && store.theme
-                  ? { backgroundColor: resolveColor(resolvedOosDimColor, store.theme), opacity: 1 }
-                  : {}),
-              }}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              {ctaAddLabel}
-            </button>
+            {/* Task 3 B3: CTA shape/size/color/label customization + OOS dim.
+                When ctaMode==='viewOnly', show a View label instead of Add to cart.
+                The entire ProductListItem is wrapped in a Link so no nested anchor
+                is needed — a span with the same visual chrome suffices. */}
+            {viewOnly ? (
+              <span
+                className={`flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white pointer-events-none${ctaExtraCls ? ` ${ctaExtraCls}` : ''}`}
+                style={{
+                  ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
+                  ...(resolvedText ? { color: resolvedText } : {}),
+                }}
+              >
+                {ctaViewLabel}
+              </span>
+            ) : (
+              <button
+                className={`flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90${ctaExtraCls ? ` ${ctaExtraCls}` : ''}`}
+                onClick={e => onAddToCart(product, e)}
+                style={{
+                  ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
+                  ...(resolvedText ? { color: resolvedText } : {}),
+                  ...(!orderable && resolvedOosDimColor && store.theme
+                    ? {
+                        backgroundColor: resolveColor(resolvedOosDimColor, store.theme),
+                        opacity: 1,
+                      }
+                    : {}),
+                }}
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                {ctaAddLabel}
+              </button>
+            )}
           </div>
         </div>
       </div>

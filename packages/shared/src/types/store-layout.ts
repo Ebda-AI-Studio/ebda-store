@@ -851,6 +851,17 @@ export interface ProductCardDefaults {
   oosDimColor?: string;
   /** Product-name case override (Task 6 uses this too). */
   productNameCase?: 'normal' | 'uppercase';
+  /**
+   * CTA mode — controls what the CTA button shows on no-variant products.
+   *   'auto'     (default / unset) — current behavior: variant products show
+   *              "View" link; no-variant in-stock products show inline
+   *              "Add to Cart" button; OOS is disabled.
+   *   'viewOnly' — EVERY card shows a "View" link to the PDP, regardless
+   *              of whether the product has variants. No inline add-to-cart
+   *              button appears even when a no-variant product is in stock.
+   *              OOS state still applies (card still shows as disabled/dim).
+   */
+  ctaMode?: 'auto' | 'viewOnly';
 }
 
 export interface StoreLayoutSettings {
