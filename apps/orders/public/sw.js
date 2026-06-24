@@ -11,11 +11,14 @@
  *    is the in-foreground complement to these background notifications.
  */
 
-// Bumped to v4 — purges the `force-orders-v3` shell so an already-installed PWA
-// stops serving the stale app build (the pre-#320 shell had the toast pinned
-// top-center + the old notification-failure copy). The activate step deletes
-// every cache key != CACHE, so a new sw.js byte-change forces a fresh precache.
-const CACHE = 'force-orders-v4';
+// Bumped to v5 — purges the `force-orders-v4` shell so already-installed PWAs
+// stop serving the stale app build. The previous strategy cached the `/orders`
+// navigation (HTML) and only revalidated it lazily, so an installed PWA kept
+// pinning an OLD build's hashed chunk references after a deploy (e.g. the order
+// cards missing the guest-name fix) until sw.js itself changed. Navigations are
+// now NETWORK-FIRST (see the fetch handler) so every deploy shows immediately;
+// hashed static assets stay stale-while-revalidate (they're immutable).
+const CACHE = 'force-orders-v5';
 const APP_SHELL = ['/orders', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
@@ -46,7 +49,35 @@ self.addEventListener('fetch', event => {
   // Never intercept cross-origin requests (the API lives on another origin).
   if (url.origin !== self.location.origin) return;
 
-  // Stale-while-revalidate for same-origin app assets.
+  // Navigations (the HTML app shell) are NETWORK-FIRST so a new deploy always
+  // shows on the next launch. Caching the shell (the old strategy) pinned an
+  // old build's hashed chunk references in installed PWAs — they'd serve a
+  // stale bundle (missing recent fixes) until sw.js changed. We still cache the
+  // fresh shell as an OFFLINE fallback only.
+  const isNavigation =
+    request.mode === 'navigate' || (request.headers.get('accept') || '').includes('text/html');
+  if (isNavigation) {
+    event.respondWith(
+      fetch(request)
+        .then(res => {
+          if (res && res.status === 200 && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(CACHE).then(cache => cache.put(request, copy));
+          }
+          return res;
+        })
+        .catch(() =>
+          caches
+            .open(CACHE)
+            .then(cache => cache.match(request).then(c => c || cache.match('/orders')))
+        )
+    );
+    return;
+  }
+
+  // Hashed static assets + other same-origin GETs: stale-while-revalidate
+  // (Next.js content-hashes chunk filenames, so a cached chunk is immutable —
+  // safe to serve fast, and a new build references new filenames).
   event.respondWith(
     caches.open(CACHE).then(async cache => {
       const cached = await cache.match(request);
