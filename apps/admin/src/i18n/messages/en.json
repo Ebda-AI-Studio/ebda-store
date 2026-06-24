@@ -3598,7 +3598,12 @@
       "colPriority": "Priority",
       "colTtl": "TTL",
       "wwwAutoAttachedTitle": "www subdomain handled automatically",
-      "wwwAutoAttachedMessage": "Visitors typing www.{domain} will also reach your storefront. No extra DNS action is needed for the www subdomain — we attach it at the platform level when you save the apex domain."
+      "wwwAutoAttachedMessage": "Visitors typing www.{domain} will also reach your storefront. No extra DNS action is needed for the www subdomain — we attach it at the platform level when you save the apex domain.",
+      "providerTitle": "Frontend hosting (super-admin)",
+      "providerSubtitle": "Choose which platform serves this store’s custom domain. Switching only changes what we provision/query — you still move DNS yourself.",
+      "providerCurrent": "Current provider:",
+      "providerHint": "Cloudflare uses Cloudflare-for-SaaS custom hostnames; Vercel is the default. After switching to Cloudflare, set the merchant’s CNAME to the Cloudflare target and wait for SSL to go active.",
+      "providerSwitchError": "Failed to switch hosting provider. Please try again."
     }
   },
   "categories": {

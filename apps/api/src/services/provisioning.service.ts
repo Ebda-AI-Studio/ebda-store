@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma, Prisma, StoreStatus, withMoneyTx, withRlsBypass } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
-import { VercelDomainService } from './vercel-domain.service';
+import { resolveDomainService } from './domain-provider';
 import { ResendService } from './resend.service';
 import logger from '../lib/logger';
 
@@ -17,6 +17,8 @@ export interface ProvisionStoreInput {
   storeName: string;
   storeSlug?: string;
   domain?: string;
+  // Frontend hosting provider for the custom domain. Omitted/null → DOMAIN_PROVIDER env default.
+  domainProvider?: 'vercel' | 'cloudflare';
   plan?: 'free' | 'starter' | 'professional' | 'enterprise';
 
   // Owner details
@@ -89,18 +91,22 @@ export class ProvisioningService {
       }
     }
 
-    // Add domain to Vercel BEFORE the DB transaction. If Vercel succeeds but
-    // the transaction below fails (slug collision in concurrent provision,
-    // owner email race, etc.), we MUST remove the domain from Vercel — a
-    // phantom Vercel domain serves traffic + bills us but is invisible to
-    // admin since no Store row references it.
-    let vercelAdded = false;
+    // Add domain to the resolved provider BEFORE the DB transaction. If the
+    // provider succeeds but the transaction below fails (slug collision in
+    // concurrent provision, owner email race, etc.), we MUST remove the domain —
+    // a phantom domain serves traffic + bills us but is invisible to admin since
+    // no Store row references it. Provider = input.domainProvider → env default.
+    const domainSvc = resolveDomainService({ domainProvider: input.domainProvider });
+    let domainAdded = false;
     if (domain) {
       try {
-        await VercelDomainService.addDomain(domain);
-        vercelAdded = true;
+        await domainSvc.addDomain(domain);
+        domainAdded = true;
       } catch (error) {
-        logger.error({ err: error, domain }, 'Failed to add domain to Vercel during provisioning');
+        logger.error(
+          { err: error, domain, provider: domainSvc.providerName },
+          'Failed to add domain to provider during provisioning'
+        );
       }
     }
 
@@ -159,6 +165,7 @@ export class ProvisioningService {
             name: storeName,
             slug,
             domain,
+            domainProvider: input.domainProvider ?? null,
             ownerId: owner.id,
             status: 'active',
             plan,
@@ -205,10 +212,10 @@ export class ProvisioningService {
         return { store, owner, isNewUser };
       });
 
-      // Transaction committed — disarm the Vercel rollback so a successful
+      // Transaction committed — disarm the domain rollback so a successful
       // provision is never undone by a downstream error (e.g. welcome email
       // failure handled below).
-      vercelAdded = false;
+      domainAdded = false;
 
       // Per-store Resend provisioning for the newly-created store. Best-effort:
       // failures don't roll back the provisioning — storefront works on Vercel;
@@ -224,18 +231,20 @@ export class ProvisioningService {
         }
       }
     } catch (error) {
-      // Compensating action: if we registered the domain with Vercel but the
-      // DB transaction failed, remove it so we don't strand a phantom domain
+      // Compensating action: if we registered the domain with the provider but
+      // the DB transaction failed, remove it so we don't strand a phantom domain
       // billing + serving traffic with no admin visibility. Fire-and-forget;
       // log on failure so ops can manually clean up.
-      if (vercelAdded && domain) {
+      if (domainAdded && domain) {
         const domainToRollback = domain;
-        void VercelDomainService.removeDomain(domainToRollback).catch(rollbackErr =>
-          logger.error(
-            { err: rollbackErr, domain: domainToRollback },
-            '[PROVISIONING] Failed to roll back Vercel domain after transaction failure — manual cleanup required'
-          )
-        );
+        void domainSvc
+          .removeDomain(domainToRollback)
+          .catch(rollbackErr =>
+            logger.error(
+              { err: rollbackErr, domain: domainToRollback, provider: domainSvc.providerName },
+              '[PROVISIONING] Failed to roll back domain after transaction failure — manual cleanup required'
+            )
+          );
       }
       throw error;
     }

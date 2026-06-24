@@ -198,6 +198,17 @@ export const config = {
   vercelProjectId: process.env.VERCEL_PROJECT_ID || '',
   vercelTeamId: process.env.VERCEL_TEAM_ID || '',
 
+  // Frontend custom-domain provider. 'vercel' (default, live) or 'cloudflare'
+  // (Cloudflare-for-SaaS). Per-store `Store.domainProvider` overrides this.
+  domainProvider: (process.env.DOMAIN_PROVIDER as 'vercel' | 'cloudflare') || 'vercel',
+  // Cloudflare-for-SaaS Custom Hostnames. Unset → CloudflareDomainService
+  // reports not-configured and the resolver no-ops the CF path (like Vercel today).
+  cfApiToken: process.env.CF_API_TOKEN || '',
+  cfZoneId: process.env.CF_ZONE_ID || '',
+  // The CNAME target a merchant points their hostname at (a hostname in our CF
+  // zone that fronts the Worker / fallback origin), e.g. 'cf.forcemediakw.com'.
+  cfFallbackOrigin: process.env.CF_FALLBACK_ORIGIN || '',
+
   // AI features — Force AI Store AI assistant uses Google Gemini 2.0 Flash
   // for translation, SEO meta generation, and category suggestions.
   // Free tier covers 15 req/min and ~1500 req/day per project, which

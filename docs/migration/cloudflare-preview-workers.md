@@ -103,3 +103,5 @@ This is triggered by the **mere presence** of `instrumentation.ts`, independent 
 1. Re-check newer `@opennextjs/cloudflare` for the `copyTracedFiles` instrumentation fix; if shipped, drop the move-aside. Otherwise `@sentry/cloudflare` across web + admin.
 2. Commit the build tooling (devDeps + worker config) + wire a CI build job, lockfile regenerated with npm 10.8.2.
 3. Cloudflare for SaaS custom-hostname onboarding per client domain (production DNS — canary 1–2 stores first, per `cloudflare-readiness.md`).
+
+> **The per-tenant cutover is now scripted + env-gated.** See **[`cloudflare-cutover-runbook.md`](./cloudflare-cutover-runbook.md)** for the full procedure (`scripts/cf-setup-local.sh` clones these git-ignored build files for you; `scripts/cf-migrate-store.sh <slug>` provisions the CF hostname + flips the store, `--rollback` reverts). The `DomainProvider` resolver keeps every un-flipped store on Vercel.

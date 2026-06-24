@@ -89,6 +89,19 @@ Low-risk because the backend (Railway) + images (R2) are shared, and DNS is per-
 - Per-project: WBS frontend (instrumentation fix only), CRM/om-hassan/digital-card (clean — config + deploy).
 - **Realistic total to a validated, dual-running cutover-ready state: ~1–2 weeks** focused, then incremental per-tenant migration.
 
+## Status (2026-06-24) — code-ready, env-gated
+
+**DONE (in the repo, behind env, zero Vercel impact):**
+
+- `DomainProvider` abstraction + `resolveDomainService(store)` — picks provider from per-store `Store.domainProvider` → `DOMAIN_PROVIDER` env → `vercel` default (9/9 unit tests).
+- `CloudflareDomainService` — Cloudflare-for-SaaS Custom Hostnames API (create / status / delete), no-ops until `CF_*` set.
+- Provisioning + `GET`/`PUT /:id/domain` route through the resolver (Vercel stays default).
+- Super-admin `PATCH /:id/domain-provider` + admin Domain-page provider switch.
+- `scripts/cf-setup-local.sh` (clone the git-ignored OpenNext build files) + `scripts/cf-migrate-store.sh` (per-tenant cutover + `--rollback`).
+- **[`cloudflare-cutover-runbook.md`](./cloudflare-cutover-runbook.md)** — the step-by-step procedure.
+
+**REMAINING (live activation, Ahmad):** enable SSL-for-SaaS on a CF zone, create the API token + fallback origin, set `CF_API_TOKEN`/`CF_ZONE_ID`/`CF_FALLBACK_ORIGIN` in Railway, then run the canary per the runbook.
+
 ## Trigger to actually move
 
 When monthly Vercel **usage** (above the $20 base) consistently crosses ~$300–500/mo, **or** when onboarding custom-domain stores at volume (~15–25+). Until then: stay on Vercel, keep storefronts ISR/edge-cached, keep images on R2, and avoid Vercel-only lock-in (Edge Config, Vercel KV/Postgres/Cron) so the move stays a config swap.

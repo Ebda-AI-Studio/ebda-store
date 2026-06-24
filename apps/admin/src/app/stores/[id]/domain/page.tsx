@@ -5,8 +5,9 @@ import { useParams } from 'next/navigation';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
-import { apiGet, apiPost, apiPut } from '../../../../lib/api';
+import { apiGet, apiPatch, apiPost, apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
+import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 
 export default function StoreDomainPage() {
@@ -14,6 +15,12 @@ export default function StoreDomainPage() {
   const storeId = params?.id as string;
   const t = useT('domain.page');
   const { store, isLoading, refetch: refetchStore } = useCurrentStore(storeId);
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  // ----- Frontend host provider (super-admin canary cutover) -----
+  const [isSwitchingProvider, setIsSwitchingProvider] = useState(false);
+  const [providerError, setProviderError] = useState('');
 
   // ----- Domain section state -----
   const [isEditing, setIsEditing] = useState(false);
@@ -116,6 +123,27 @@ export default function StoreDomainPage() {
       // non-critical
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleSwitchProvider(provider: 'vercel' | 'cloudflare') {
+    if (provider === (store?.domainProvider || 'vercel')) return;
+    setIsSwitchingProvider(true);
+    setProviderError('');
+    try {
+      const { error: apiError } = await apiPatch(`/api/v1/stores/${storeId}/domain-provider`, {
+        provider,
+      });
+      if (apiError) {
+        setProviderError(apiError.message || t('providerSwitchError'));
+      } else {
+        await refetchStore();
+        if (store?.domain) await checkDns();
+      }
+    } catch {
+      setProviderError(t('providerSwitchError'));
+    } finally {
+      setIsSwitchingProvider(false);
     }
   }
 
@@ -509,6 +537,49 @@ export default function StoreDomainPage() {
             )}
           </div>
         </div>
+
+        {/* Frontend hosting provider — super-admin only. Canary cutover between
+            Vercel and Cloudflare-for-SaaS. Flipping the provider only changes
+            what the platform provisions/queries for this store's custom domain;
+            DNS is moved out-of-band (scripts/cf-migrate-store.sh + runbook). */}
+        {isSuperAdmin && (
+          <div className="mt-6 rounded-lg border border-border bg-card p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-foreground">{t('providerTitle')}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t('providerSubtitle')}</p>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">{t('providerCurrent')}</span>
+                <Badge variant={store.domainProvider === 'cloudflare' ? 'secondary' : 'default'}>
+                  {store.domainProvider === 'cloudflare' ? 'Cloudflare' : 'Vercel'}
+                </Badge>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={(store.domainProvider || 'vercel') === 'vercel' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleSwitchProvider('vercel')}
+                  disabled={isSwitchingProvider || (store.domainProvider || 'vercel') === 'vercel'}
+                >
+                  Vercel
+                </Button>
+                <Button
+                  variant={store.domainProvider === 'cloudflare' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleSwitchProvider('cloudflare')}
+                  disabled={isSwitchingProvider || store.domainProvider === 'cloudflare'}
+                >
+                  Cloudflare
+                </Button>
+              </div>
+            </div>
+
+            {providerError && <p className="mt-3 text-sm text-destructive">{providerError}</p>}
+            <p className="mt-3 text-xs text-muted-foreground">{t('providerHint')}</p>
+          </div>
+        )}
 
         {/* Email sender card */}
         <div className="mt-6 rounded-lg border border-border bg-card p-6">

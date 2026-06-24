@@ -5,8 +5,9 @@ import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { Prisma, prisma, StoreStatus } from '@force/database';
 import { StoreService } from '../services/store.service';
-import { VercelDomainService } from '../services/vercel-domain.service';
+import { resolveDomainService } from '../services/domain-provider';
 import { ResendService } from '../services/resend.service';
+import { config } from '../config';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { getAuthUser } from '../utils/store-helpers';
@@ -642,6 +643,60 @@ router.patch(
   }
 );
 
+// PATCH /stores/:id/domain-provider - Flip a store's frontend host between
+// Vercel and Cloudflare-for-SaaS (canary cutover). super_admin only. This only
+// changes which provider the API provisions/queries for THIS store's custom
+// domain — it does NOT move DNS (the merchant/operator does that out-of-band
+// via scripts/cf-migrate-store.sh + the runbook).
+router.patch(
+  '/:id/domain-provider',
+  authenticate,
+  requireMfaEnrolled,
+  authorize('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const provider = (req.body as { provider?: string }).provider;
+      if (provider !== 'vercel' && provider !== 'cloudflare') {
+        throw new AppError(
+          400,
+          'INVALID_DOMAIN_PROVIDER',
+          'provider must be "vercel" or "cloudflare"'
+        );
+      }
+
+      const store = await prisma.store.update({
+        where: { id: req.params.id },
+        data: { domainProvider: provider },
+        select: { id: true, domainProvider: true },
+      });
+
+      await prisma.auditLog
+        .create({
+          data: {
+            action: 'store.domain_provider_change',
+            userId: req.user!.userId,
+            storeId: req.params.id,
+            resourceType: 'store',
+            resourceId: req.params.id,
+            details: { newProvider: provider },
+            ipAddress: req.ip ?? null,
+            userAgent: req.headers['user-agent'] ?? null,
+          },
+        })
+        .catch(err => {
+          logger.warn(
+            { err, storeId: req.params.id },
+            '[store.domain-provider] audit log write failed'
+          );
+        });
+
+      res.json({ success: true, data: { domainProvider: store.domainProvider } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // PUT /stores/:id/template - Update store template
 router.put(
   '/:id/template',
@@ -989,7 +1044,12 @@ router.get(
       const store = await StoreService.getById(id);
       const storeRow = await prisma.store.findUnique({
         where: { id },
-        select: { emailDomainId: true, emailDomainStatus: true, emailDomainVerifiedAt: true },
+        select: {
+          emailDomainId: true,
+          emailDomainStatus: true,
+          emailDomainVerifiedAt: true,
+          domainProvider: true,
+        },
       });
 
       // No custom domain at all — neither Vercel nor Resend state is meaningful.
@@ -1010,7 +1070,11 @@ router.get(
         return;
       }
 
-      const vercelStatus = await VercelDomainService.getDomain(store.domain);
+      // Resolve the frontend host provider for THIS store (per-store override →
+      // DOMAIN_PROVIDER env → vercel). The returned DomainStatus shape is
+      // identical across providers, so the rest of the handler is unchanged.
+      const domainSvc = resolveDomainService({ domainProvider: storeRow?.domainProvider });
+      const providerStatus = await domainSvc.getDomain(store.domain);
 
       // Best-effort: refresh Resend status alongside. Failure shouldn't block
       // the admin page from rendering — the storefront domain status is the
@@ -1044,26 +1108,27 @@ router.get(
         }
       }
 
-      // Merge Vercel + Resend DNS records into one panel. The admin renders
+      // Merge provider + Resend DNS records into one panel. The admin renders
       // this list under a neutral 'DNS records to add at your registrar'
-      // heading so merchants never see provider names. The fallback when
-      // Vercel API is unreachable now mirrors the apex-vs-subdomain split
-      // from VercelDomainService: an apex like `wadyaljuz.com` gets the
-      // simple `A @ → 76.76.21.21` instruction; a subdomain like
-      // `shop.example.com` keeps the CNAME path. www handling is automatic
-      // (the service pre-attaches the www variant when an apex is added).
+      // heading so merchants never see provider names. The fallback when the
+      // provider API is unreachable is provider-aware: Cloudflare-for-SaaS is a
+      // single CNAME to the zone target; Vercel mirrors the apex-vs-subdomain
+      // split (an apex like `wadyaljuz.com` gets `A @ → 76.76.21.21`, a
+      // subdomain keeps the CNAME). www handling is automatic on the Vercel side.
       const isApexFallback = store.domain.split('.').filter(Boolean).length === 2;
-      const vercelRecords =
-        vercelStatus?.dnsRecords ??
-        (isApexFallback
-          ? [{ type: 'A', name: '@', value: '76.76.21.21' }]
-          : [{ type: 'CNAME', name: store.domain, value: 'cname.vercel-dns.com' }]);
-      const mergedDns = [...vercelRecords, ...resendRecords];
+      const providerFallbackRecords =
+        domainSvc.providerName === 'cloudflare'
+          ? [{ type: 'CNAME', name: store.domain, value: config.cfFallbackOrigin }]
+          : isApexFallback
+            ? [{ type: 'A', name: '@', value: '76.76.21.21' }]
+            : [{ type: 'CNAME', name: store.domain, value: 'cname.vercel-dns.com' }];
+      const providerRecords = providerStatus?.dnsRecords ?? providerFallbackRecords;
+      const mergedDns = [...providerRecords, ...resendRecords];
 
       res.json({
         success: true,
         data: {
-          ...(vercelStatus ?? {
+          ...(providerStatus ?? {
             domain: store.domain,
             verified: false,
             misconfigured: true,
@@ -1091,11 +1156,11 @@ router.put(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     // Compensation context for partial-success rollback: if we successfully
-    // register a new domain with Vercel but the subsequent DB update fails,
-    // we must remove the domain from Vercel so it doesn't strand as a
-    // phantom (admin can't see it, but Vercel is still serving / billing).
-    // Cleared once the DB update commits.
-    let rollbackVercelAdd: (() => Promise<void>) | null = null;
+    // register a new domain with the provider but the subsequent DB update fails,
+    // we must remove the domain so it doesn't strand as a phantom (admin can't
+    // see it, but the provider is still serving / billing). Cleared once the DB
+    // update commits.
+    let rollbackDomainAdd: (() => Promise<void>) | null = null;
 
     try {
       const { id } = req.params;
@@ -1114,9 +1179,14 @@ router.put(
 
       const previousEmailRow = await prisma.store.findUnique({
         where: { id },
-        select: { emailDomainId: true },
+        select: { emailDomainId: true, domainProvider: true },
       });
       const previousEmailDomainId = previousEmailRow?.emailDomainId ?? null;
+
+      // Resolve the frontend host provider for this store (per-store override →
+      // DOMAIN_PROVIDER env → vercel). All attach/remove/status calls below go
+      // through it so a Cloudflare-flipped store provisions on Cloudflare.
+      const domainSvc = resolveDomainService({ domainProvider: previousEmailRow?.domainProvider });
 
       // Add new domain to Vercel FIRST (before touching the old one). If we
       // removed the old domain first and then add-new failed, the storefront
@@ -1126,8 +1196,8 @@ router.put(
       // succeeds; old-domain removal moves to AFTER the DB commit below.
       if (domain && domain !== oldDomain) {
         // Check platform configuration first — domain feature is unusable
-        // without the Vercel API credentials configured on the API
-        if (!VercelDomainService.isConfigured()) {
+        // without the resolved provider's API credentials configured on the API
+        if (!domainSvc.isConfigured()) {
           res.status(503).json({
             success: false,
             error: {
@@ -1149,8 +1219,8 @@ router.put(
           return;
         }
 
-        const vercelResult = await VercelDomainService.addDomain(domain);
-        if (!vercelResult) {
+        const addResult = await domainSvc.addDomain(domain);
+        if (!addResult) {
           res.status(502).json({
             success: false,
             error: {
@@ -1162,25 +1232,26 @@ router.put(
           return;
         }
 
-        // Vercel-add succeeded — arm the compensating action in case the DB
+        // Provider-add succeeded — arm the compensating action in case the DB
         // update below throws (slug collision race, DB hiccup, etc.). Without
-        // this, the domain would be registered in Vercel but invisible to
-        // the admin in our DB.
+        // this, the domain would be registered with the provider but invisible
+        // to the admin in our DB.
         const domainToRollback = domain;
-        rollbackVercelAdd = async () => {
+        rollbackDomainAdd = async () => {
           try {
-            await VercelDomainService.removeDomain(domainToRollback);
+            await domainSvc.removeDomain(domainToRollback);
             logger.info(
-              { domain: domainToRollback },
-              '[STORE] Rolled back Vercel domain after DB update failure'
+              { domain: domainToRollback, provider: domainSvc.providerName },
+              '[STORE] Rolled back domain after DB update failure'
             );
           } catch (rollbackError) {
             logger.error(
               {
                 err: rollbackError instanceof Error ? rollbackError.message : 'Unknown error',
                 domain: domainToRollback,
+                provider: domainSvc.providerName,
               },
-              '[STORE] Failed to roll back Vercel domain — manual cleanup required'
+              '[STORE] Failed to roll back domain — manual cleanup required'
             );
           }
         };
@@ -1199,7 +1270,7 @@ router.put(
 
       // DB update committed — disarm the rollback so a successful change is
       // never undone by a downstream error (e.g. CORS-cache bust, status fetch).
-      rollbackVercelAdd = null;
+      rollbackDomainAdd = null;
 
       // Per-store Resend provisioning. Run only on actual domain change.
       // Order matters: remove the OLD Resend record BEFORE provisioning the
@@ -1239,13 +1310,14 @@ router.put(
       // customer impact, just manual cleanup).
       if (oldDomain && oldDomain !== domain) {
         const domainToRemove = oldDomain;
-        void VercelDomainService.removeDomain(domainToRemove).catch(error =>
+        void domainSvc.removeDomain(domainToRemove).catch(error =>
           logger.error(
             {
               err: error instanceof Error ? error.message : 'Unknown error',
               oldDomain: domainToRemove,
+              provider: domainSvc.providerName,
             },
-            '[STORE] Failed to remove old domain from Vercel after DB commit — manual cleanup may be required'
+            '[STORE] Failed to remove old domain from provider after DB commit — manual cleanup may be required'
           )
         );
       }
@@ -1255,10 +1327,12 @@ router.put(
       if (oldDomain && oldDomain !== domain) bustCorsCache(oldDomain);
 
       // Get verification status
-      let domainStatus: import('../services/vercel-domain.service').DomainStatus | null = null;
+      let domainStatus: import('../services/domain-provider').DomainStatus | null = null;
       if (domain) {
-        domainStatus = await VercelDomainService.getDomain(domain);
+        domainStatus = await domainSvc.getDomain(domain);
       }
+      const fallbackDnsValue =
+        domainSvc.providerName === 'cloudflare' ? config.cfFallbackOrigin : 'cname.vercel-dns.com';
 
       res.json({
         success: true,
@@ -1271,15 +1345,15 @@ router.put(
                   domain,
                   verified: false,
                   misconfigured: true,
-                  dnsRecords: [{ type: 'CNAME', name: domain, value: 'cname.vercel-dns.com' }],
+                  dnsRecords: [{ type: 'CNAME', name: domain, value: fallbackDnsValue }],
                 }
               : null),
         },
       });
     } catch (error) {
       // Run any compensating action that was armed above
-      if (rollbackVercelAdd) {
-        await rollbackVercelAdd();
+      if (rollbackDomainAdd) {
+        await rollbackDomainAdd();
       }
       next(error);
     }

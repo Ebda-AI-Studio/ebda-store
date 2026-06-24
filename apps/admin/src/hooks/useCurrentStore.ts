@@ -15,6 +15,9 @@ export interface Store {
   nameAr?: string;
   slug: string;
   domain?: string;
+  // Frontend hosting provider for the custom domain: 'vercel' (default/null) or
+  // 'cloudflare'. Super-admin-only switch on the /domain page (canary cutover).
+  domainProvider?: string | null;
   logo?: string;
   logoAr?: string;
   favicon?: string;

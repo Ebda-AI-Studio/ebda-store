@@ -3598,7 +3598,12 @@
       "colPriority": "الأولوية",
       "colTtl": "TTL",
       "wwwAutoAttachedTitle": "تم ربط النطاق الفرعي www تلقائياً",
-      "wwwAutoAttachedMessage": "سيصل الزوار الذين يكتبون www.{domain} إلى متجرك أيضاً. لا تحتاج إلى أي إعداد إضافي في DNS لـ www — نقوم بربطه تلقائياً على مستوى المنصة عند حفظ النطاق."
+      "wwwAutoAttachedMessage": "سيصل الزوار الذين يكتبون www.{domain} إلى متجرك أيضاً. لا تحتاج إلى أي إعداد إضافي في DNS لـ www — نقوم بربطه تلقائياً على مستوى المنصة عند حفظ النطاق.",
+      "providerTitle": "استضافة الواجهة (مدير عام)",
+      "providerSubtitle": "اختر المنصة التي تخدم النطاق المخصص لهذا المتجر. التبديل يغير فقط ما نقوم بتوفيره — تبقى إدارة الـ DNS عليك.",
+      "providerCurrent": "المزود الحالي:",
+      "providerHint": "تستخدم Cloudflare أسماء المضيفين المخصصة (Cloudflare-for-SaaS)؛ Vercel هي الافتراضي. بعد التبديل إلى Cloudflare، اضبط سجل CNAME للتاجر على هدف Cloudflare وانتظر تفعيل SSL.",
+      "providerSwitchError": "تعذر تبديل مزود الاستضافة. حاول مرة أخرى."
     }
   },
   "categories": {

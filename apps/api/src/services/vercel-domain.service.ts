@@ -37,6 +37,8 @@ export interface DomainStatus {
 }
 
 export class VercelDomainService {
+  static readonly providerName = 'vercel' as const;
+
   static isConfigured(): boolean {
     return !!(config.vercelApiToken && config.vercelProjectId);
   }
