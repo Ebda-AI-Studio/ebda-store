@@ -25,8 +25,10 @@
     "bcryptjs": "^3.0.3"
   },
   "devDependencies": {
+    "@force/shared": "*",
     "prisma": "^6.19.3",
     "tsx": "^4.6.2",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitest": "^4.0.0"
   }
 }
