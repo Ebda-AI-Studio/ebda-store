@@ -22,22 +22,9 @@
  * authenticates via 'accessToken' with session/store headers, while the
  * admin app uses a simpler 'authToken' approach.
  */
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { isIosWebkit } from '@force/shared';
 
-/**
- * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where the
- * cross-origin httpOnly auth cookie is unreliable for installed PWAs (ITP
- * purges it). On all other browsers (desktop Chrome/Firefox, Android Chrome)
- * the httpOnly cookie carries the session and the refresh token must NOT be
- * persisted to localStorage (JS-readable, XSS exposure).
- */
-function isIosWebkit(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  if (/iP(hone|ad|od)/i.test(navigator.userAgent)) return true;
-  // iPadOS 13+ desktop-mode fingerprint (Apple's documented detection)
-  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
-  return false;
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 // Common types
 interface User {

@@ -1,6 +1,7 @@
 // Shared Utilities
 
 // Export utility modules
+export * from './platform';
 export * from './discount';
 export * from './accounting';
 export * from './image';
@@ -20,6 +21,8 @@ export {
   footerLogoContrastFilter,
   colorToHslTriplet,
   rgbToHslTriplet,
+  hexToHsl,
+  hslToHex,
 } from './color';
 export type { ColorValue, ColorToken, Rgb } from './color';
 export { lightenColor, darkenColor, generateSectionPalette, deriveCoreBrandTokens } from './color';

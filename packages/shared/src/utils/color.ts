@@ -198,6 +198,63 @@ export function rgbToHslTriplet(rgb: Rgb): string {
 }
 
 /**
+ * Convert a hex color string to a bare HSL triplet string used by
+ * Tailwind/shadcn CSS vars (e.g. `"#FF6E01"` → `"26 100% 50%"`).
+ *
+ * Implemented on top of the existing `parseColorToRgb` + `rgbToHslTriplet`
+ * primitives so rounding behaviour is identical to the rest of the engine.
+ */
+export function hexToHsl(hex: string): string {
+  const rgb = parseColorToRgb(hex);
+  if (!rgb) return '0 0% 0%';
+  return rgbToHslTriplet(rgb);
+}
+
+/**
+ * Convert a bare HSL triplet string (e.g. `"26 100% 50%"`) to a lowercase
+ * hex color (e.g. `"#ff6e01"`).  The output format matches what
+ * `apps/admin/src/lib/color.ts::hslToHex` produced so existing callers are
+ * unaffected.
+ *
+ * Also accepts an already-hex input (passes through unchanged) so callers that
+ * store `store.theme.primaryColor` — which can be a bare triplet OR a `#rrggbb`
+ * string depending on how it was saved — never need their own guard.
+ *
+ * Returns `"#000000"` on unparseable input.
+ */
+export function hslToHex(hsl: string): string {
+  if (hsl.trim().startsWith('#')) return hsl.trim();
+  const parts = hsl.match(/[\d.]+/g);
+  if (!parts || parts.length < 3) return '#000000';
+
+  const h = parseFloat(parts[0]) / 360;
+  const s = parseFloat(parts[1]) / 100;
+  const l = parseFloat(parts[2]) / 100;
+
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return `#${v.toString(16).padStart(2, '0').repeat(3)}`;
+  }
+
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const r = Math.round(hue2rgb(p, q, h + 1 / 3) * 255);
+  const g = Math.round(hue2rgb(p, q, h) * 255);
+  const b = Math.round(hue2rgb(p, q, h - 1 / 3) * 255);
+
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
  * Normalize ANY stored color value to the bare Tailwind HSL triplet that the
  * storefront CSS vars require (they are consumed as `hsl(var(--token))`).
  *

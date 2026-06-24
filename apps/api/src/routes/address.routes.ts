@@ -1,31 +1,26 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
+import { kuwaitAddressSchema } from '@force/shared';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
 // Validation schema for creating/updating an address.
 //
-// Kuwait-friendly: state is optional (Kuwait has no states; the storefront
-// repurposes this to hold the delivery area, but a saved address may pre-date
-// that change), and postalCode is optional (Kuwait does not use postal codes
-// for delivery). Generous max lengths bound abuse without rejecting normal
-// Arabic or English input.
-const addressSchema = z.object({
+// Derives from the canonical `kuwaitAddressSchema` in @force/shared which
+// covers the full Kuwait field set (governorate / governorateAr / area /
+// areaAr / state / ...).  The `isDefault` flag is the only address-book-
+// specific addition.  This fixes the silent-drop bug where governorate +
+// governorateAr + areaAr were accepted by the checkout form but stripped
+// here before reaching the DB.
+const addressSchema = kuwaitAddressSchema.extend({
+  // Tighten validation messages for fields most likely to trigger errors.
   firstName: z.string().trim().min(1, 'First name is required').max(100),
   lastName: z.string().trim().min(1, 'Last name is required').max(100),
   address1: z.string().trim().min(1, 'Street address is required').max(500),
-  address2: z.string().max(500).optional(),
-  // Kuwait uses no postal-code and city is not a meaningful address field
-  // (the storefront's "city" input is always left blank). Mirror the P0 fix
-  // from public.routes.ts: accept '' by making city optional with a default.
-  city: z.string().trim().max(150).optional().default(''),
-  state: z.string().max(150).optional(),
-  area: z.string().max(150).optional(),
-  postalCode: z.string().max(30).optional(),
   country: z.string().trim().min(2, 'Country is required').max(60),
-  phone: z.string().max(40).optional(),
+  // Address-book-specific flag not present in the base checkout schema.
   isDefault: z.boolean().optional(),
 });
 
@@ -88,10 +83,13 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
         address1: data.address1,
         address2: data.address2,
         city: data.city,
+        governorate: data.governorate ?? '',
+        governorateAr: data.governorateAr ?? '',
         // `state` is required by the DB but optional in the API since Kuwait
         // doesn't really use it. Persist an empty string when omitted.
         state: data.state ?? '',
         area: data.area,
+        areaAr: data.areaAr ?? '',
         postalCode: data.postalCode,
         country: data.country,
         phone: data.phone,
@@ -164,8 +162,11 @@ router.put('/:id', authenticate, async (req: Request, res: Response, next: NextF
         ...(data.address1 !== undefined && { address1: data.address1 }),
         ...(data.address2 !== undefined && { address2: data.address2 }),
         ...(data.city !== undefined && { city: data.city }),
+        ...(data.governorate !== undefined && { governorate: data.governorate }),
+        ...(data.governorateAr !== undefined && { governorateAr: data.governorateAr }),
         ...(data.state !== undefined && { state: data.state }),
         ...(data.area !== undefined && { area: data.area }),
+        ...(data.areaAr !== undefined && { areaAr: data.areaAr }),
         ...(data.postalCode !== undefined && { postalCode: data.postalCode }),
         ...(data.country !== undefined && { country: data.country }),
         ...(data.phone !== undefined && { phone: data.phone }),

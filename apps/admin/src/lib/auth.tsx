@@ -11,26 +11,7 @@ import {
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getApiUrl, refreshAccessToken } from './api';
-
-/**
- * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where
- * the cross-origin auth cookie is unreliable for installed PWAs (ITP
- * purges it). On all other browsers (desktop Chrome/Firefox, Android
- * Chrome) the HTTP-only cookie carries the session and tokens must NOT
- * be persisted to localStorage (JS-readable, XSS exposure).
- *
- * Detection logic:
- *  - Classic iOS: /iP(hone|ad|od)/i in the UA
- *  - iPadOS 13+ desktop-mode: navigator.platform === 'MacIntel' with
- *    maxTouchPoints > 1 (Apple's own documented fingerprint for this case)
- */
-function isIosWebkit(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  if (/iP(hone|ad|od)/i.test(navigator.userAgent)) return true;
-  // iPadOS 13+ reports MacIntel + touch points
-  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
-  return false;
-}
+import { isIosWebkit } from '@force/shared';
 
 interface User {
   id: string;

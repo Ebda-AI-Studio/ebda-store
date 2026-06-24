@@ -2036,10 +2036,13 @@ model Address {
   company    String?
   address1   String
   address2   String?
-  city       String
-  state      String
-  area       String? // Kuwait-specific area/block
-  block      String? // Kuwait-specific block
+  city         String
+  state        String
+  governorate  String   @default("") @map("governorate")
+  governorateAr String  @default("") @map("governorate_ar")
+  area         String?  // Kuwait-specific area/district (English)
+  areaAr       String   @default("") @map("area_ar")
+  block        String? // Kuwait-specific block
   street     String?
   building   String?
   floor      String?

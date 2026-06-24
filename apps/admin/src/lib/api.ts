@@ -20,6 +20,8 @@
  * session IDs and store IDs in headers.
  */
 
+import { isIosWebkit } from '@force/shared';
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
@@ -70,20 +72,6 @@ export interface ApiError {
  */
 export function getApiUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-}
-
-/**
- * Returns true on iOS/iPadOS Safari/WebKit — the only browsers where the
- * cross-origin auth cookie is unreliable for installed PWAs (ITP purges it).
- * On all other browsers the httpOnly cookie carries the session and tokens
- * must NOT be persisted to localStorage (JS-readable, XSS exposure).
- */
-function isIosWebkit(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  if (/iP(hone|ad|od)/i.test(navigator.userAgent)) return true;
-  // iPadOS 13+ desktop-mode fingerprint (Apple's documented detection)
-  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
-  return false;
 }
 
 /**

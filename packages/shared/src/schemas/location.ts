@@ -1,5 +1,43 @@
 import { z } from 'zod';
 
+/**
+ * Canonical Kuwait address schema — shared across all three address Zod
+ * definitions that previously drifted:
+ *   - apps/api/src/routes/address.routes.ts   (user saved-address book)
+ *   - apps/api/src/routes/public.routes.ts    (checkout shipping address)
+ *   - apps/api/src/routes/order.routes.ts     (admin manual order form)
+ *
+ * The BUG fixed here: address.routes.ts was missing `governorate` /
+ * `governorateAr` / `areaAr`, so those fields were silently stripped when a
+ * customer saved an address after the GovernorateAreaSelect checkout step.
+ *
+ * Field notes:
+ *  - `governorate` / `governorateAr`: top-level KW administrative division
+ *    (Capital, Hawally, Farwaniya, Ahmadi, Jahra, Mubarak Al-Kabeer).
+ *  - `area` / `areaAr`: sub-district within the governorate (e.g. Salmiya).
+ *  - `state`: legacy/generic field kept for backwards compat; overlaps `area`
+ *    in older orders.  Both are accepted simultaneously.
+ *  - `city`: Kuwait has no city concept in addresses; accepted but defaults to
+ *    '' so the checkout never 400s on an empty value.
+ *  - `postalCode`: not used in Kuwait; accepted and stored but not required.
+ */
+export const kuwaitAddressSchema = z.object({
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  address1: z.string().trim().min(1).max(500),
+  address2: z.string().max(500).optional(),
+  city: z.string().trim().max(150).optional().default(''),
+  governorate: z.string().max(60).optional().default(''),
+  governorateAr: z.string().max(60).optional().default(''),
+  area: z.string().max(150).optional().default(''),
+  areaAr: z.string().max(150).optional().default(''),
+  state: z.string().max(150).optional().default(''),
+  postalCode: z.string().max(30).optional().default(''),
+  country: z.string().trim().min(2).max(60),
+  phone: z.string().max(40).optional(),
+});
+export type KuwaitAddressInput = z.infer<typeof kuwaitAddressSchema>;
+
 const httpsUrl = z
   .string()
   .trim()
