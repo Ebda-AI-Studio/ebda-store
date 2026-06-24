@@ -7,6 +7,7 @@ import Link from 'next/link';
 import type { ProductCardProps } from '../types';
 import type { TemplateId, ProductCardSize } from '@force/shared';
 import { getProductCardTextSizes, resolveColor } from '@force/shared';
+import { cn } from '@force/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { getPackStyles } from './pack-styles';
@@ -442,7 +443,10 @@ function PecannbeeProductCardImpl({
           <Link
             href={href}
             prefetch={false}
-            className={`mt-auto inline-flex w-full items-center justify-center gap-2 ${textSizes.btn} ${textSizes.cta} ${styles.productCardCta}${ctaExtraCls ? ` ${ctaExtraCls}` : ''}`}
+            className={cn(
+              `mt-auto inline-flex w-full items-center justify-center gap-2 ${textSizes.btn} ${textSizes.cta} ${styles.productCardCta}`,
+              ctaExtraCls
+            )}
             data-cta="button"
             style={{
               fontFamily: productCtaZone?.fontFamily,
@@ -465,7 +469,10 @@ function PecannbeeProductCardImpl({
             disabled={!orderable || isAdding}
             onClick={handleAdd}
             data-cta="button"
-            className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta}${ctaExtraCls ? ` ${ctaExtraCls}` : ''} disabled:cursor-not-allowed disabled:opacity-60`}
+            className={cn(
+              `mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`,
+              ctaExtraCls
+            )}
             style={{
               fontFamily: productCtaZone?.fontFamily,
               fontSize: responsiveFontSize(productCtaZone?.fontSize),

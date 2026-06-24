@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useRouter } from 'next/navigation';
-import { AddToCartButton } from '@force/ui';
+import { AddToCartButton, cn } from '@force/ui';
 import type { StoreTheme } from '@force/shared';
 import { resolveColor } from '@force/shared';
 import type { CtaShape, CtaSize } from './card-size';
@@ -111,10 +111,14 @@ export function ProductCardCta({
   if ((hasVariants || viewOnly) && viewHref) {
     const viewLabel =
       (isRtl ? ctaLabelTextAr : ctaLabelTextEn) ?? labels?.view ?? (isRtl ? 'عرض' : 'View');
-    const finalCls =
-      (className ||
-        'inline-flex w-full items-center justify-center min-h-[44px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors px-4 py-2 text-sm font-medium cursor-pointer') +
-      (extraCls ? ` ${extraCls}` : '');
+    // cn() runs tailwind-merge so the merchant's ctaShape/ctaSize classes
+    // (extraCls) override the base button's hardcoded rounded-*/padding/size
+    // utilities instead of silently losing the Tailwind source-order battle.
+    const finalCls = cn(
+      className ||
+        'inline-flex w-full items-center justify-center min-h-[44px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors px-4 py-2 text-sm font-medium cursor-pointer',
+      extraCls
+    );
     return (
       <button
         type="button"
@@ -144,7 +148,9 @@ export function ProductCardCta({
       : {}),
   };
 
-  const finalClassName = className + (extraCls ? ` ${extraCls}` : '');
+  // cn()/tailwind-merge so extraCls (ctaShape/ctaSize) wins over the theme
+  // button's hardcoded rounded-*/size utilities.
+  const finalClassName = cn(className, extraCls);
 
   return (
     <AddToCartButton

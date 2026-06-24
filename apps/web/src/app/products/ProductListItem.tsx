@@ -8,6 +8,7 @@ import { formatPrice } from '@/lib/format';
 import { getProductPricing } from '@/lib/product-pricing';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
+import { cn } from '@force/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
 import type { CtaShape, CtaSize } from '../../templates/shared/card-size';
@@ -225,7 +226,10 @@ export function ProductListItem({
                 is needed — a span with the same visual chrome suffices. */}
             {viewOnly ? (
               <span
-                className={`flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white pointer-events-none${ctaExtraCls ? ` ${ctaExtraCls}` : ''}`}
+                className={cn(
+                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white pointer-events-none',
+                  ctaExtraCls
+                )}
                 style={{
                   ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
                   ...(resolvedText ? { color: resolvedText } : {}),
@@ -235,7 +239,10 @@ export function ProductListItem({
               </span>
             ) : (
               <button
-                className={`flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90${ctaExtraCls ? ` ${ctaExtraCls}` : ''}`}
+                className={cn(
+                  'flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90',
+                  ctaExtraCls
+                )}
                 onClick={e => onAddToCart(product, e)}
                 style={{
                   ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),

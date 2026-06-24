@@ -24,6 +24,7 @@ import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { getProductCardTextSizes, resolveColor } from '@force/shared';
+import { cn } from '@force/ui';
 import type { ProductCarouselProps } from '../types';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 
@@ -624,12 +625,14 @@ export function ProductCarousel({
                         const ctaAddLabel =
                           (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
                           (isRtl ? 'إضافة للسلة' : 'Add to cart');
-                        const ctaExtraFull = ctaExtraCls ? ` ${ctaExtraCls}` : '';
                         return hasVariants || viewOnly ? (
                           <Link
                             href={href}
                             prefetch={false}
-                            className={`block w-full text-center cursor-pointer ${styles.productCardCta}${ctaExtraFull}`}
+                            className={cn(
+                              `block w-full text-center cursor-pointer ${styles.productCardCta}`,
+                              ctaExtraCls
+                            )}
                             data-zone="productCta"
                             data-cta="button"
                             style={ctaStyle}
@@ -640,7 +643,10 @@ export function ProductCarousel({
                           <button
                             type="button"
                             disabled
-                            className={`block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}${ctaExtraFull}`}
+                            className={cn(
+                              `block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}`,
+                              ctaExtraCls
+                            )}
                             data-zone="productCta"
                             style={oosCtaStyle}
                           >
@@ -652,7 +658,10 @@ export function ProductCarousel({
                             <button
                               type="button"
                               onClick={() => onAddToCart(product.id)}
-                              className={`block w-full text-center cursor-pointer ${styles.productCardCta}${ctaExtraFull}`}
+                              className={cn(
+                                `block w-full text-center cursor-pointer ${styles.productCardCta}`,
+                                ctaExtraCls
+                              )}
                               data-zone="productCta"
                               data-cta="button"
                               style={ctaStyle}

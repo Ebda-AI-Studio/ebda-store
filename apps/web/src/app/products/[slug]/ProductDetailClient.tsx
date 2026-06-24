@@ -29,6 +29,7 @@ import { ProductCarousel } from '../../../templates/shared/ProductCarousel';
 import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 import { SpecTable } from '../../../templates/shared/SpecTable';
+import { OosImageDim, OutOfStockRibbon } from '../../../templates/shared/ProductCardCta';
 import { formatPrice } from '@/lib/format';
 
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
@@ -482,6 +483,21 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               {t('Products', translations['Products'])}
             </Link>
             <span>/</span>
+            {/* Category segment — links back to the PLP filtered to this
+                product's primary category (home / products / <category> /
+                <product>). Locale-aware label; only renders when the product
+                has a category. */}
+            {categoryName && cat0?.category?.slug && (
+              <>
+                <Link
+                  href={storeUrl(`/products?category=${cat0.category.slug}`)}
+                  className="hover:text-primary"
+                >
+                  {categoryName}
+                </Link>
+                <span>/</span>
+              </>
+            )}
             <span className="text-foreground">{displayName}</span>
           </nav>
 
@@ -490,7 +506,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             {/* Images */}
             <div className="space-y-4 md:col-span-5">
               <div
-                className={`${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
+                className={`relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
               >
                 {images[selectedImage]?.url ? (
                   <Image
@@ -521,6 +537,27 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     </div>
                   </div>
                 )}
+                {/* Out-of-stock label + image dim — same platform OOS system as
+                    the product cards (productCardDefaults oosLabel + oosDimColor),
+                    so the PDP matches the listing. orderable honors backorder:
+                    a backorder-able OOS product is still orderable so no label. */}
+                <OosImageDim
+                  orderable={!outOfStock || canBackorder}
+                  oosDimColor={productCardDefaults?.oosDimColor}
+                  theme={store?.theme}
+                />
+                <OutOfStockRibbon
+                  inStock={!outOfStock || canBackorder}
+                  isRtl={language === 'ar'}
+                  oosLabel={productCardDefaults?.oosLabel}
+                  oosLabelTextEn={productCardDefaults?.oosLabelTextEn}
+                  oosLabelTextAr={productCardDefaults?.oosLabelTextAr}
+                  oosLabelShape={productCardDefaults?.oosLabelShape}
+                  oosLabelPlacement={productCardDefaults?.oosLabelPlacement}
+                  oosLabelColor={productCardDefaults?.oosLabelColor}
+                  oosLabelTextColor={productCardDefaults?.oosLabelTextColor}
+                  theme={store?.theme}
+                />
               </div>
               {images.length > 1 && (
                 <div className="grid grid-cols-4 gap-4">
