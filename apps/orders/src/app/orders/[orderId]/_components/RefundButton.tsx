@@ -83,9 +83,15 @@ export function RefundButton({
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled || busy}
-        className="inline-flex h-11 min-w-[8rem] flex-1 items-center justify-center gap-2 rounded-xl border-2 border-destructive bg-destructive/5 px-4 text-sm font-semibold text-destructive active:bg-destructive/10 disabled:opacity-60"
+        className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-destructive bg-destructive/5 px-3 text-center text-xs font-semibold leading-tight text-destructive active:bg-destructive/10 disabled:opacity-60"
       >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+        <svg
+          className="h-4 w-4 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -93,7 +99,7 @@ export function RefundButton({
             d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
           />
         </svg>
-        {ta.refundViaProvider}
+        <span className="min-w-0">{ta.refundViaProvider}</span>
       </button>
 
       {open && (

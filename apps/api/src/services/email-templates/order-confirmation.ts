@@ -79,7 +79,7 @@ export const orderConfirmationTemplate = {
       .map(
         item => `
       <tr>
-        <td>${escapeHtml(item.name)}</td>
+        <td>${escapeHtml(item.nameAr || item.name)}</td>
         <td style="text-align: center;">${item.quantity}</td>
         <td style="text-align: right;">${(item.price / 1000).toFixed(3)} د.ك</td>
       </tr>`

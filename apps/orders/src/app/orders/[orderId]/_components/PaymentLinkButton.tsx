@@ -133,10 +133,10 @@ export function PaymentLinkButton({
           type="button"
           onClick={() => setOpen(true)}
           disabled={disabled || isIssuing}
-          className="inline-flex h-11 min-w-[8rem] flex-1 items-center justify-center gap-2 rounded-xl border-2 border-info bg-info/5 px-4 text-sm font-semibold text-info active:bg-info/10 disabled:opacity-60"
+          className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border-2 border-info bg-info/5 px-3 text-center text-xs font-semibold leading-tight text-info active:bg-info/10 disabled:opacity-60"
         >
           <svg
-            className="h-4 w-4"
+            className="h-4 w-4 shrink-0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -149,7 +149,7 @@ export function PaymentLinkButton({
               d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-2.828 2.828a4 4 0 01-5.656 0L11 18.828m-1.828-7.656a4 4 0 00-5.656 0L1.69 12.586a4 4 0 000 5.656l2.828 2.828a4 4 0 005.656 0L11.828 19.5"
             />
           </svg>
-          {ta.paymentLink}
+          <span className="min-w-0">{ta.paymentLink}</span>
         </button>
       )}
 

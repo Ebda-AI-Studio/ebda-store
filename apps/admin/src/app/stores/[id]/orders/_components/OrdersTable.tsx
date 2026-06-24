@@ -197,7 +197,9 @@ export function OrdersTable({
       cell: order => {
         const isUpdating = updatingId === order.id;
         const isCodUnpaid =
-          order.paymentStatus === 'unpaid' && order.payments?.some(p => p.provider === 'cod');
+          order.paymentStatus === 'unpaid' &&
+          !['cancelled', 'refunded'].includes(order.status) &&
+          order.payments?.some(p => p.provider === 'cod');
         return (
           <div className="flex items-center gap-2 md:justify-end md:flex-wrap">
             {isCodUnpaid && (

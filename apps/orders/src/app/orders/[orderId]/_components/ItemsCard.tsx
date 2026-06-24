@@ -64,15 +64,18 @@ export function ItemsCard({ order, previewLimit = 5 }: ItemsCardProps) {
 }
 
 function ItemRow({ item, currency }: { item: OrderLineItem; currency?: string }) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const img = item.product?.images?.[0]?.url;
   const lineTotal = item.total ?? (item.price ?? 0) * item.quantity;
+  // order_items only snapshots the English productName; in Arabic, prefer the
+  // live product's name_ar (falls back to the snapshot when absent / deleted).
+  const displayName = locale === 'ar' ? item.product?.nameAr || item.productName : item.productName;
 
   return (
     <li className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
         {img ? (
-          <Image src={img} alt={item.productName} fill className="object-cover" sizes="56px" />
+          <Image src={img} alt={displayName} fill className="object-cover" sizes="56px" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <svg
@@ -94,9 +97,7 @@ function ItemRow({ item, currency }: { item: OrderLineItem; currency?: string })
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="line-clamp-2 min-w-0 text-sm font-medium text-foreground">
-            {item.productName}
-          </p>
+          <p className="line-clamp-2 min-w-0 text-sm font-medium text-foreground">{displayName}</p>
           <p className="shrink-0 text-sm font-semibold text-foreground">
             {formatMoney(lineTotal, currency)}
           </p>

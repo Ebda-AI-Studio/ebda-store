@@ -256,6 +256,8 @@ export interface OrderEmailData {
   customerEmail: string;
   items: Array<{
     name: string;
+    /** Live product's Arabic name; Arabic template prefers it over `name`. */
+    nameAr?: string | null;
     quantity: number;
     price: number;
   }>;

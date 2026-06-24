@@ -78,7 +78,10 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           where: { id: orderId },
           include: {
             customer: true,
-            items: true,
+            // Pull the live product's Arabic name so the Arabic confirmation
+            // email can localize line items (order_items only snapshots the
+            // English productName). Falls back to productName when absent.
+            items: { include: { product: { select: { nameAr: true } } } },
           },
         });
         if (!row) throw new Error(`Order ${orderId} not found`);
@@ -108,13 +111,19 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       orderNumber: order.orderNumber,
       customerName,
       customerEmail: order.customer?.email || guestEmail,
-      items: (order.items as Array<{ productName: string; quantity: number; price: number }>).map(
-        item => ({
-          name: item.productName,
-          quantity: item.quantity,
-          price: item.price,
-        })
-      ),
+      items: (
+        order.items as Array<{
+          productName: string;
+          quantity: number;
+          price: number;
+          product?: { nameAr?: string | null } | null;
+        }>
+      ).map(item => ({
+        name: item.productName,
+        nameAr: item.product?.nameAr ?? null,
+        quantity: item.quantity,
+        price: item.price,
+      })),
       subtotal: order.subtotal,
       tax: order.tax,
       shipping: order.shipping,

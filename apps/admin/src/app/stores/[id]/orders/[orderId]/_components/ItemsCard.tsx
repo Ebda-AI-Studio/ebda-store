@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { useLocale } from 'next-intl';
 import { useT } from '@/i18n/useT';
 import { formatMoney } from './format';
 import type { OrderDetail, OrderItemDetail } from './types';
@@ -60,13 +61,17 @@ export function ItemsCard({ order, previewLimit = 5 }: ItemsCardProps) {
 
 function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }) {
   const t = useT('orders.detail');
+  const locale = useLocale();
   const img = item.product?.images?.[0]?.url;
+  // order_items only snapshots the English productName; in Arabic, prefer the
+  // live product's name_ar (falls back to the snapshot when absent / deleted).
+  const displayName = locale === 'ar' ? item.product?.nameAr || item.productName : item.productName;
 
   return (
     <li className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
         {img ? (
-          <Image src={img} alt={item.productName} fill className="object-cover" sizes="56px" />
+          <Image src={img} alt={displayName} fill className="object-cover" sizes="56px" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <svg
@@ -88,9 +93,7 @@ function ItemRow({ item, currency }: { item: OrderItemDetail; currency: string }
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2 flex-wrap">
-          <p className="text-sm font-medium text-foreground line-clamp-2 min-w-0">
-            {item.productName}
-          </p>
+          <p className="text-sm font-medium text-foreground line-clamp-2 min-w-0">{displayName}</p>
           <p className="text-sm font-semibold text-foreground shrink-0">
             {formatMoney(item.total, currency)}
           </p>

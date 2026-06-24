@@ -34,6 +34,9 @@ export interface OrderItemDetail {
   total: number;
   product?: {
     id: string;
+    // Arabic product name from the live product (order_items only snapshots
+    // the English productName); used to localize the item label in RTL.
+    nameAr?: string | null;
     images?: Array<{ url: string; alt?: string | null }>;
   };
 }

@@ -107,14 +107,14 @@ export function ActionFooter({
             type="button"
             onClick={() => onStatusChange(nextStatus)}
             disabled={isUpdating}
-            className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-2.5 text-sm font-semibold text-success-foreground hover:bg-success/90 disabled:opacity-60 transition-colors cursor-pointer"
+            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center gap-2 rounded-xl bg-success px-3 py-2.5 text-center text-sm font-semibold leading-tight text-success-foreground hover:bg-success/90 disabled:opacity-60 transition-colors cursor-pointer"
           >
             {isUpdating ? (
               '…'
             ) : (
               <>
                 <svg
-                  className="h-4 w-4"
+                  className="h-4 w-4 shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -127,7 +127,7 @@ export function ActionFooter({
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                {tStatus(nextStatus) || t('processed')}
+                <span className="min-w-0">{tStatus(nextStatus) || t('processed')}</span>
               </>
             )}
           </button>
@@ -200,10 +200,10 @@ export function ActionFooter({
             type="button"
             onClick={onMarkPaid}
             disabled={isUpdating}
-            className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
+            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-3 py-2.5 text-center text-sm font-semibold leading-tight text-primary hover:bg-primary/10 disabled:opacity-60 transition-colors cursor-pointer"
           >
             <svg
-              className="h-4 w-4"
+              className="h-4 w-4 shrink-0"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -216,7 +216,7 @@ export function ActionFooter({
                 d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            {t('markPaid')}
+            <span className="min-w-0">{t('markPaid')}</span>
           </button>
         )}
         {canCancel && !isFinal && (
@@ -224,9 +224,9 @@ export function ActionFooter({
             type="button"
             onClick={() => onStatusChange('cancelled')}
             disabled={isUpdating}
-            className="flex-1 min-w-[8rem] inline-flex items-center justify-center rounded-xl border-2 border-destructive bg-card px-4 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-60 transition-colors cursor-pointer"
+            className="flex-1 min-w-0 basis-[8rem] inline-flex items-center justify-center rounded-xl border-2 border-destructive bg-card px-3 py-2.5 text-center text-sm font-semibold leading-tight text-destructive hover:bg-destructive/5 disabled:opacity-60 transition-colors cursor-pointer"
           >
-            {t('cancel')}
+            <span className="min-w-0">{t('cancel')}</span>
           </button>
         )}
 

@@ -86,9 +86,15 @@ export function InvoiceButton({ storeId, orderId, disabled = false }: InvoiceBut
         type="button"
         onClick={viewInvoice}
         disabled={disabled || viewing}
-        className="inline-flex h-11 min-w-[8rem] flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground active:bg-muted disabled:opacity-60"
+        className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 text-center text-xs font-semibold leading-tight text-foreground active:bg-muted disabled:opacity-60"
       >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+        <svg
+          className="h-4 w-4 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -96,15 +102,21 @@ export function InvoiceButton({ storeId, orderId, disabled = false }: InvoiceBut
             d="M9 17v-2a4 4 0 014-4h6m0 0l-3-3m3 3l-3 3M3 12a9 9 0 1018 0 9 9 0 00-18 0z"
           />
         </svg>
-        {t.detail.openInvoice}
+        <span className="min-w-0">{t.detail.openInvoice}</span>
       </button>
       <button
         type="button"
         onClick={emailInvoice}
         disabled={disabled || emailing}
-        className="inline-flex h-11 min-w-[8rem] flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground active:bg-muted disabled:opacity-60"
+        className="inline-flex h-11 min-w-0 flex-1 basis-[8rem] items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 text-center text-xs font-semibold leading-tight text-foreground active:bg-muted disabled:opacity-60"
       >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+        <svg
+          className="h-4 w-4 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -112,7 +124,7 @@ export function InvoiceButton({ storeId, orderId, disabled = false }: InvoiceBut
             d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
           />
         </svg>
-        {t.detail.emailInvoice}
+        <span className="min-w-0">{t.detail.emailInvoice}</span>
       </button>
     </>
   );

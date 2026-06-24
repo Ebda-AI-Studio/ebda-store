@@ -62,7 +62,13 @@ function resolvePreset(preset: DatePreset, custom?: CustomRange): { from: string
   return { from: toDateStr(start), to: toDateStr(now) };
 }
 
+// Terminal statuses can never be marked paid → never selectable for the bulk
+// mark-paid action. Used by both selectableIds (select-all + "N selected" counts)
+// and the per-card checkbox, so excluding here hides the checkbox everywhere.
+const TERMINAL_ORDER_STATUSES = ['cancelled', 'refunded'];
+
 function isCodUnpaid(order: Order): boolean {
+  if (TERMINAL_ORDER_STATUSES.includes(order.status)) return false;
   if (order.paymentStatus === 'paid') return false;
   const payments = order.payments ?? [];
   if (payments.length === 0) return true; // no payments recorded = COD
