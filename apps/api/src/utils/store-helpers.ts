@@ -4,18 +4,6 @@ import { AppError } from '../middleware/error-handler';
 import { AuthPayload } from '../middleware/auth';
 
 /**
- * Returns the ID of the first store ordered by creation date.
- * Throws AppError 404 if no store exists.
- */
-export async function getDefaultStoreId(): Promise<string> {
-  const store = await prisma.store.findFirst({ orderBy: { createdAt: 'asc' } });
-  if (!store) {
-    throw new AppError(404, 'NO_STORE', 'No store configured');
-  }
-  return store.id;
-}
-
-/**
  * Extracts the authenticated user from the request.
  * Use in routes that run after the `authenticate` middleware —
  * this replaces the `req.user!` non-null assertion with a proper runtime check.

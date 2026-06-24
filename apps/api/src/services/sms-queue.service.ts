@@ -310,7 +310,7 @@ export const smsQueue = new SmsQueueService();
 /**
  * Convenience function to queue an SMS
  */
-export async function queueSms(message: {
+async function queueSms(message: {
   storeId: string;
   event: string;
   recipientPhone: string;

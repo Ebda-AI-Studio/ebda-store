@@ -91,7 +91,7 @@ function safeUrl(url: string): string {
  * them with Zod, but a defensive fallback keeps a malformed row from
  * breaking the storefront.
  */
-export function renderBlocksToHtml(blocks: unknown): string {
+function renderBlocksToHtml(blocks: unknown): string {
   if (!Array.isArray(blocks)) return '';
   const out: string[] = [];
 

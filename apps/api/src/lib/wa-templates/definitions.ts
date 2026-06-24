@@ -359,20 +359,3 @@ export const TEMPLATES: TemplateDefinition[] = [
     ],
   },
 ];
-
-/**
- * Lookup helper — find every language variant of a given source key.
- */
-export function templatesByKey(sourceKey: TemplateSourceKey): TemplateDefinition[] {
-  return TEMPLATES.filter(t => t.sourceKey === sourceKey);
-}
-
-/**
- * Lookup helper — find the canonical template for a (sourceKey, language) pair.
- */
-export function findTemplate(
-  sourceKey: TemplateSourceKey,
-  language: TemplateLanguage
-): TemplateDefinition | undefined {
-  return TEMPLATES.find(t => t.sourceKey === sourceKey && t.language === language);
-}

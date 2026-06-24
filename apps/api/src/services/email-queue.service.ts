@@ -228,6 +228,6 @@ export const emailQueue = new EmailQueueService();
 /**
  * Convenience function to queue an email (no store context — platform sender).
  */
-export async function queueEmail(options: EmailOptions): Promise<string> {
+async function queueEmail(options: EmailOptions): Promise<string> {
   return emailQueue.enqueue(null, options);
 }

@@ -87,5 +87,3 @@ export async function withLeaderLock(
 
   return true;
 }
-
-export { INSTANCE_ID };

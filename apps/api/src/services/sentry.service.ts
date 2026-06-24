@@ -194,6 +194,3 @@ export class SentryService {
     await Sentry.close(timeout);
   }
 }
-
-// Export Sentry for direct access if needed
-export { Sentry };

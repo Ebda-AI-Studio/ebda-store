@@ -112,15 +112,6 @@ export function sectionSpacingClasses(s: SectionPaddingMaxWidthVisibility | unde
 }
 
 /**
- * Convenience wrapper: returns just the wrapper class string.
- * Avoids destructuring noise when the caller only needs the outer section
- * padding/visibility and doesn't control the inner container.
- */
-export function sectionWrapperClass(s: SectionPaddingMaxWidthVisibility | undefined): string {
-  return sectionSpacingClasses(s).wrapperClass;
-}
-
-/**
  * Returns only the breakpoint visibility class for a section.
  * Use this when the section manages its own internal padding/layout
  * (e.g. the hero, which has its own aspect-ratio-driven height) and

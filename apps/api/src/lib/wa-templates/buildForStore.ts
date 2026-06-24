@@ -44,7 +44,7 @@ export interface StoreBrandingForTemplates {
  * store.slug is already lowercase + hyphens (URL-safe); we only need
  * hyphens→underscores. Defensive: strip anything non [a-z0-9_].
  */
-export function slugToTemplatePrefix(slug: string): string {
+function slugToTemplatePrefix(slug: string): string {
   return slug
     .toLowerCase()
     .replace(/-/g, '_')

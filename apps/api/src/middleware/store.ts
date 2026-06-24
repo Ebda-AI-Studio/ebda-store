@@ -20,16 +20,3 @@ export function requireStore(req: Request, _res: Response, next: NextFunction): 
   req.storeId = storeId;
   next();
 }
-
-/**
- * Optional store middleware - sets req.storeId if available
- */
-export function optionalStore(req: Request, _res: Response, next: NextFunction): void {
-  const storeId = req.params.storeId;
-
-  if (storeId) {
-    req.storeId = storeId;
-  }
-
-  next();
-}

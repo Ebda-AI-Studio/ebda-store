@@ -3,7 +3,6 @@
  * Prevents cascade failures when external services are down
  */
 
-import { Request, Response, NextFunction } from 'express';
 import logger from '../lib/logger';
 
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
@@ -229,23 +228,4 @@ export async function withCircuitBreaker<T>(
     }
     throw error;
   }
-}
-
-/**
- * Circuit breaker middleware for Express
- */
-export function circuitBreakerMiddleware(name: string) {
-  return (_req: Request, res: Response, next: NextFunction): void => {
-    if (!circuitBreaker.canRequest(name)) {
-      res.status(503).json({
-        success: false,
-        error: {
-          code: 'SERVICE_UNAVAILABLE',
-          message: 'Service temporarily unavailable. Please try again later.',
-        },
-      });
-      return;
-    }
-    next();
-  };
 }

@@ -36,7 +36,7 @@
  * prompted for pure JSON. Slice from the first `{`/`[` to the last
  * matching `}`/`]`.
  */
-export function stripFences(text: string): string {
+function stripFences(text: string): string {
   let s = text
     .trim()
     .replace(/^```(?:json)?\s*/i, '')

@@ -32,7 +32,7 @@ if (axiomToken && axiomDataset) {
   });
 }
 
-export const logger = pino(
+const logger = pino(
   {
     level: config.nodeEnv === 'production' ? 'info' : 'debug',
     base: { env: config.nodeEnv },

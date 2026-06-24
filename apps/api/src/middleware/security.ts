@@ -76,14 +76,6 @@ async function verifyCsrfToken(sessionId: string, token: string): Promise<boolea
   return stored.token === token;
 }
 
-export async function deleteCsrfToken(sessionId: string): Promise<void> {
-  if (redis.isAvailable()) {
-    await redis.deleteCsrfToken(sessionId);
-  } else {
-    csrfTokensMemory.delete(sessionId);
-  }
-}
-
 export function csrfProtection(req: Request, res: Response, next: NextFunction) {
   // Skip for safe methods
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
@@ -276,23 +268,6 @@ export const authLimiter = rateLimit({
     const email = req.body?.email || 'unknown';
     return `${ipKeyGenerator(req.ip ?? '')}-${email}`;
   },
-});
-
-// Limiter for password reset
-export const passwordResetLimiter = rateLimit({
-  store: makeRateLimitStore(redis.getClient(), 'pwreset'),
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // 3 attempts per hour
-  message: {
-    success: false,
-    error: {
-      code: 'RATE_LIMITED',
-      message: 'Too many password reset requests, please try again later.',
-    },
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: skipForLoadTest,
 });
 
 // Limiter for API writes (orders, payments)
@@ -524,28 +499,6 @@ export async function auditLog(entry: AuditLogEntry) {
     // Don't fail the request if audit logging fails
     logger.error({ err: error }, '[AUDIT ERROR] Failed to write audit log');
   }
-}
-
-export function auditMiddleware(action: string, resourceType: string) {
-  return async (req: Request, _res: Response, next: NextFunction) => {
-    const resourceId = req.params.id || req.params.orderId || req.body?.id;
-
-    await auditLog({
-      action,
-      userId: req.user?.userId,
-      resourceType,
-      resourceId,
-      details: {
-        method: req.method,
-        path: req.path,
-        queryString: Object.keys(req.query).length > 0 ? JSON.stringify(req.query) : null,
-      },
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
-
-    next();
-  };
 }
 
 // ==========================================

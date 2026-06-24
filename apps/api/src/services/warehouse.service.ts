@@ -774,5 +774,4 @@ export class WarehouseService {
 
 // ─── Haversine distance (km) ──────────────────────────────────────────────────
 
-// haversineKm is re-exported from lib/haversine for callers that import from this module
-export { haversineKm } from '../lib/haversine';
+// haversineKm is available in lib/haversine; this re-export is intentionally removed

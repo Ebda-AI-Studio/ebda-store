@@ -79,7 +79,7 @@ export async function recordPaymentEvent(input: RecordPaymentEventInput): Promis
  * Convenience for call sites that have the paymentId but not the
  * orderId/storeId in scope (webhook handler, admin routes).
  */
-export async function lookupPaymentContext(
+async function lookupPaymentContext(
   paymentId: string
 ): Promise<{ orderId: string; storeId: string } | null> {
   const payment = await prisma.payment.findUnique({

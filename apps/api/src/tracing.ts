@@ -92,5 +92,3 @@ function clampRatio(raw: string | undefined, fallback: number): number {
   if (Number.isFinite(n) && n >= 0 && n <= 1) return n;
   return fallback;
 }
-
-export { sdk };

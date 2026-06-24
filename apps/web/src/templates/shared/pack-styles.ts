@@ -49,7 +49,7 @@ export interface PackStyles {
   testimonialAuthor: string;
 }
 
-export const PACK_STYLES: Record<TemplateId, PackStyles> = {
+const PACK_STYLES: Record<TemplateId, PackStyles> = {
   modern: {
     // 2026-05-17 night persona refresh: tech / SaaS / DTC software-y target.
     // Changes from baseline: (1) card hover shadow 0.12→0.18 (more lift),

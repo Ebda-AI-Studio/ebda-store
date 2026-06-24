@@ -2,7 +2,7 @@
 // iCarry Carrier Implementation
 // ==========================================
 
-import { logger } from '../../lib/logger';
+import logger from '../../lib/logger';
 import {
   CarrierShipmentRequest,
   CarrierShipmentResponse,

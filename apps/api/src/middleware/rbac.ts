@@ -129,17 +129,9 @@ const rolePermissions: Record<Role, Permission[]> = {
 // Permission Checking
 // ==========================================
 
-export function hasPermission(role: Role, permission: Permission): boolean {
+function hasPermission(role: Role, permission: Permission): boolean {
   const permissions = rolePermissions[role];
   return permissions?.includes(permission) || false;
-}
-
-export function hasAnyPermission(role: Role, permissions: Permission[]): boolean {
-  return permissions.some(p => hasPermission(role, p));
-}
-
-export function hasAllPermissions(role: Role, permissions: Permission[]): boolean {
-  return permissions.every(p => hasPermission(role, p));
 }
 
 // ==========================================
@@ -167,66 +159,6 @@ export function requirePermission(permission: Permission) {
         error: {
           code: 'FORBIDDEN',
           message: `Missing required permission: ${permission}`,
-        },
-      });
-      return;
-    }
-
-    next();
-  };
-}
-
-/**
- * Require any of the specified permissions
- */
-export function requireAnyPermission(permissions: Permission[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
-      });
-      return;
-    }
-
-    const userRole = req.user.role as Role;
-
-    if (!hasAnyPermission(userRole, permissions)) {
-      res.status(403).json({
-        success: false,
-        error: {
-          code: 'FORBIDDEN',
-          message: `Missing required permissions: ${permissions.join(' or ')}`,
-        },
-      });
-      return;
-    }
-
-    next();
-  };
-}
-
-/**
- * Require all of the specified permissions
- */
-export function requireAllPermissions(permissions: Permission[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
-      });
-      return;
-    }
-
-    const userRole = req.user.role as Role;
-
-    if (!hasAllPermissions(userRole, permissions)) {
-      res.status(403).json({
-        success: false,
-        error: {
-          code: 'FORBIDDEN',
-          message: `Missing required permissions: ${permissions.join(' and ')}`,
         },
       });
       return;
@@ -265,47 +197,5 @@ export function requireRole(roles: Role | Role[]) {
     }
 
     next();
-  };
-}
-
-/**
- * Allow owner or admin access
- * Used for resources where the user can access their own data, or admins can access any data
- */
-export function ownerOrAdmin(getOwnerId: (req: Request) => string | Promise<string>) {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
-      });
-      return;
-    }
-
-    const userRole = req.user.role as Role;
-
-    // Store/super admins pass here. Staff are NOT blanket-allowed — that would be a
-    // fail-open IDOR (staff could reach ANY store's resources). Staff access to
-    // store-scoped resources is enforced by `requireStoreAccess` (StoreStaff
-    // membership check) placed ahead of this guard; here they fall through to the
-    // owner check and are denied unless they are the owner.
-    if (userRole === 'store_admin' || userRole === 'super_admin') {
-      return next();
-    }
-
-    // Check if user is the owner
-    try {
-      const ownerId = await getOwnerId(req);
-      if (ownerId === req.user.userId) {
-        return next();
-      }
-    } catch {
-      // If we can't determine the owner, deny access
-    }
-
-    res.status(403).json({
-      success: false,
-      error: { code: 'FORBIDDEN', message: 'Access denied' },
-    });
   };
 }

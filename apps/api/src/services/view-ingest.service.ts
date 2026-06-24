@@ -61,11 +61,6 @@ const _cleanupInterval = setInterval(
   5 * 60 * 1000
 );
 
-// Allow Jest teardown to clear this interval (see CI/CD standard in CLAUDE.md).
-export function clearViewDebounceInterval(): void {
-  clearInterval(_cleanupInterval);
-}
-
 // ---------------------------------------------------------------------------
 // Core ingest function
 // ---------------------------------------------------------------------------

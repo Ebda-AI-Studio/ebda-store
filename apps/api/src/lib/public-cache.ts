@@ -21,7 +21,7 @@ import { BoundedMap } from './bounded-map';
  * (which can't import from `routes/`) can bust caches at write time
  * without circular dependencies.
  */
-export const memoryCache = new BoundedMap<string, { data: unknown; expiresAt: number }>(1000);
+const memoryCache = new BoundedMap<string, { data: unknown; expiresAt: number }>(1000);
 
 export async function getCached<T>(
   key: string,
