@@ -20,7 +20,7 @@ import {
   ctaSizeClass,
 } from './card-size';
 import type { CtaShape, CtaSize } from './card-size';
-import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { getProductCardTextSizes, resolveColor } from '@force/shared';
@@ -365,6 +365,13 @@ export function ProductCarousel({
                           oosLabelTextColor={resolvedOosLabelTextColor}
                           theme={store.theme}
                         />
+                        {/* Image overlay tint when out-of-stock. z-[5] sits under
+                            the OOS badge (z-10) and above the product image. */}
+                        <OosImageDim
+                          orderable={orderable}
+                          oosDimColor={resolvedOosDimColor}
+                          theme={store.theme}
+                        />
                         {/* Sprint 2: NEW orange pill top-START when new OR
                             <14 days old. Doesn't collide with OOS ribbon
                             because OOS hides NEW (see isProductNew gate). */}
@@ -606,15 +613,8 @@ export function ProductCarousel({
                             productCtaZone?.textTransform as React.CSSProperties['textTransform'],
                           ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
                         };
-                        const oosCtaStyle: React.CSSProperties = {
-                          ...ctaStyle,
-                          ...(!orderable && resolvedOosDimColor && store.theme
-                            ? {
-                                backgroundColor: resolveColor(resolvedOosDimColor, store.theme),
-                                opacity: 1,
-                              }
-                            : {}),
-                        };
+                        // oosDimColor is an IMAGE overlay (OosImageDim) — not a CTA background.
+                        const oosCtaStyle: React.CSSProperties = { ...ctaStyle };
                         const ctaViewLabel =
                           (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
                           (isRtl ? 'عرض' : 'View');

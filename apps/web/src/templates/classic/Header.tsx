@@ -127,7 +127,7 @@ export default function ClassicHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative text-lg font-serif tracking-widest uppercase text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-all after:duration-300 hover:after:w-full"
+                className="relative text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-all after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -163,7 +163,7 @@ export default function ClassicHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative text-lg font-serif tracking-widest uppercase text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-all after:duration-300 hover:after:w-full"
+                className="relative text-lg font-serif tracking-widest ui-caps-toggle text-foreground/70 hover:text-foreground transition-colors duration-500 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-px after:bg-foreground after:transition-all after:duration-300 hover:after:w-full"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -340,7 +340,7 @@ export default function ClassicHeader({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="block font-serif tracking-wider uppercase text-lg py-2.5 border-b border-border/20 text-foreground/70 hover:text-foreground transition-colors duration-500"
+                    className="block font-serif tracking-wider ui-caps-toggle text-lg py-2.5 border-b border-border/20 text-foreground/70 hover:text-foreground transition-colors duration-500"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}

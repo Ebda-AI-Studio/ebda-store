@@ -86,7 +86,7 @@ export default function MinimalFooter({
                 }
               />
             ) : (
-              <span className="text-xs tracking-[0.25em] uppercase font-light text-foreground">
+              <span className="text-xs tracking-[0.25em] ui-caps-toggle font-light text-foreground">
                 {displayName}
               </span>
             )}

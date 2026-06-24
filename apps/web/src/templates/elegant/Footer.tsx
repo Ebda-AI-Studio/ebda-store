@@ -92,7 +92,7 @@ export default function ElegantFooter({
         <div className="border-b border-border/50">
           <div className="container mx-auto px-4 py-14 sm:py-16 md:py-20">
             <div className="max-w-xl mx-auto text-center">
-              <h3 className="text-xs tracking-[0.3em] uppercase text-muted-foreground/70 mb-4 font-serif">
+              <h3 className="text-xs tracking-[0.3em] ui-caps-toggle text-muted-foreground/70 mb-4 font-serif">
                 {isRtl ? 'النشرة البريدية' : 'Newsletter'}
               </h3>
               {/* Body line — render the merchant's brand description when
@@ -129,7 +129,7 @@ export default function ElegantFooter({
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="h-12 px-8 bg-foreground text-background text-xs tracking-[0.2em] uppercase hover:bg-foreground/80 transition-colors duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="h-12 px-8 bg-foreground text-background text-xs tracking-[0.2em] ui-caps-toggle hover:bg-foreground/80 transition-colors duration-300 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {submitting
                         ? isRtl
@@ -207,7 +207,7 @@ export default function ElegantFooter({
           {footerSections.length > 0 ? (
             footerSections.map(section => (
               <div key={section.key}>
-                <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground mb-6 font-serif">
+                <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-semibold text-foreground mb-6 font-serif">
                   {section.heading}
                 </h4>
                 <ul className="space-y-4">
@@ -228,7 +228,7 @@ export default function ElegantFooter({
             ))
           ) : (
             <div>
-              <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground mb-6 font-serif">
+              <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-semibold text-foreground mb-6 font-serif">
                 {isRtl ? 'التصفح' : 'Explore'}
               </h4>
               <ul className="space-y-4">
@@ -250,7 +250,7 @@ export default function ElegantFooter({
               configured. Empty heading + empty list looks unfinished. */}
           {(contact.email || displayPhone || displayAddress) && (
             <div>
-              <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground mb-6 font-serif">
+              <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-semibold text-foreground mb-6 font-serif">
                 {isRtl ? 'تواصل' : 'Contact'}
               </h4>
               <ul className="space-y-4 text-sm">
@@ -299,7 +299,7 @@ export default function ElegantFooter({
           {socialLinks.length > 0 && (
             <div>
               <div className="flex items-center mb-6">
-                <h4 className="text-xs tracking-[0.25em] uppercase font-semibold text-foreground font-serif">
+                <h4 className="text-xs tracking-[0.25em] ui-caps-toggle font-semibold text-foreground font-serif">
                   {isRtl ? 'تابعنا' : 'Follow'}
                 </h4>
               </div>

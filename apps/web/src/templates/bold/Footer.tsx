@@ -91,7 +91,7 @@ export default function BoldFooter({
                 }
               />
             ) : (
-              <h3 className="hidden md:block text-3xl font-black uppercase tracking-wider mb-6 text-foreground">
+              <h3 className="hidden md:block text-3xl font-black ui-caps-toggle tracking-wider mb-6 text-foreground">
                 {displayName}
               </h3>
             )}
@@ -129,7 +129,7 @@ export default function BoldFooter({
           {footerSections.length > 0 ? (
             footerSections.map(section => (
               <div key={section.key}>
-                <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-foreground">
+                <h4 className="text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 text-foreground">
                   {section.heading}
                 </h4>
                 <ul className="space-y-3">
@@ -149,7 +149,7 @@ export default function BoldFooter({
             ))
           ) : (
             <div>
-              <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-foreground">
+              <h4 className="text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 text-foreground">
                 {isRtl ? 'روابط سريعة' : 'Quick Links'}
               </h4>
               <ul className="space-y-3">
@@ -172,7 +172,7 @@ export default function BoldFooter({
               hollow column. */}
           {hasContact && (
             <div>
-              <h4 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-foreground">
+              <h4 className="text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 text-foreground">
                 {isRtl ? 'تواصل معنا' : 'Get in Touch'}
               </h4>
               <ul className="space-y-3">

@@ -102,14 +102,14 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-normal tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-serif uppercase tracking-[0.22em] text-foreground/70 hover:text-foreground transition-colors duration-500',
+      'text-sm font-serif ui-caps-toggle tracking-[0.22em] text-foreground/70 hover:text-foreground transition-colors duration-500',
     heroOverlay: 'bg-gradient-to-b from-foreground/10 via-foreground/15 to-foreground/40',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif font-normal tracking-tight drop-shadow-xl leading-[1.05]',
     heroCta:
-      'border border-white bg-transparent px-10 py-4 font-serif text-sm tracking-[0.22em] uppercase text-white hover:bg-white hover:text-foreground transition-colors duration-500 ease-out min-h-[44px]',
+      'border border-white bg-transparent px-10 py-4 font-serif text-sm tracking-[0.22em] ui-caps-toggle text-white hover:bg-white hover:text-foreground transition-colors duration-500 ease-out min-h-[44px]',
     testimonialCard: 'border border-border bg-background p-7',
-    testimonialAuthor: 'text-sm font-serif uppercase tracking-[0.22em] text-foreground',
+    testimonialAuthor: 'text-sm font-serif ui-caps-toggle tracking-[0.22em] text-foreground',
   },
   minimal: {
     // 2026-05-17 night persona refresh: editorial / fashion / magazine
@@ -129,7 +129,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // Minimal's identity is whitespace + tiny tracking + ULTRA-light weight.
     // Main text still hits 16px floor for legibility (Ahmad standing rule).
     categoryCaption:
-      'text-base font-extralight tracking-[0.22em] uppercase text-muted-foreground group-hover:text-foreground transition-colors duration-500',
+      'text-base font-extralight tracking-[0.22em] ui-caps-toggle text-muted-foreground group-hover:text-foreground transition-colors duration-500',
     productCardName:
       'tracking-[0.18em] font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-500',
     productCardPrice: 'tracking-wide font-extralight text-muted-foreground',
@@ -139,12 +139,12 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-extralight uppercase tracking-[0.28em] text-muted-foreground hover:text-foreground transition-colors duration-500',
+      'text-sm font-extralight ui-caps-toggle tracking-[0.28em] text-muted-foreground hover:text-foreground transition-colors duration-500',
     heroOverlay: 'bg-gradient-to-b from-transparent via-transparent to-foreground/30',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-tight drop-shadow-xl leading-[1.05]',
     heroCta:
-      'inline-block border-b border-white pb-2 text-sm font-medium uppercase tracking-[0.22em] text-white hover:border-white/50 hover:text-white/80 transition-colors duration-500 ease-out min-h-[44px]',
+      'inline-block border-b border-white pb-2 text-sm font-medium ui-caps-toggle tracking-[0.22em] text-white hover:border-white/50 hover:text-white/80 transition-colors duration-500 ease-out min-h-[44px]',
     testimonialCard: 'border-t border-border/40 bg-transparent py-10',
     testimonialAuthor: 'text-sm font-extralight text-foreground tracking-wide',
   },
@@ -155,22 +155,22 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     card: 'border-2 border-primary bg-card hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--primary)/0.92)] transition-all duration-200 ease-out',
     categoryFrame:
       'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-200 ease-out',
-    categoryCaption: 'text-base font-black uppercase tracking-[0.05em] text-foreground',
+    categoryCaption: 'text-base font-black ui-caps-toggle tracking-[0.05em] text-foreground',
     productCardName: 'font-black tracking-[0.02em] text-foreground leading-tight',
     productCardPrice: 'font-black text-foreground tracking-tight',
     productCardCta:
       'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-200 ease-out min-h-[44px]',
     sectionHeading:
-      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black uppercase tracking-tight text-foreground leading-[1.1] text-balance',
+      'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black ui-caps-toggle tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-black uppercase tracking-[0.18em] text-foreground hover:text-primary transition-colors duration-200',
+      'text-sm font-black ui-caps-toggle tracking-[0.18em] text-foreground hover:text-primary transition-colors duration-200',
     heroOverlay: 'bg-gradient-to-b from-foreground/20 via-foreground/30 to-foreground/65',
     heroHeadline:
-      'text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black uppercase tracking-tight drop-shadow-2xl leading-[0.9]',
+      'text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black ui-caps-toggle tracking-tight drop-shadow-2xl leading-[0.9]',
     heroCta:
-      'border-2 border-white bg-transparent px-8 py-4 text-base font-black uppercase tracking-[0.18em] text-white hover:bg-white hover:text-foreground transition-colors duration-200 ease-out min-h-[44px]',
+      'border-2 border-white bg-transparent px-8 py-4 text-base font-black ui-caps-toggle tracking-[0.18em] text-white hover:bg-white hover:text-foreground transition-colors duration-200 ease-out min-h-[44px]',
     testimonialCard: 'border-2 border-foreground bg-card p-7',
-    testimonialAuthor: 'text-base font-black uppercase tracking-[0.05em] text-foreground',
+    testimonialAuthor: 'text-base font-black ui-caps-toggle tracking-[0.05em] text-foreground',
   },
   elegant: {
     // Hairline borders only — `border-foreground/10` to /20. Strict 200–500
@@ -182,7 +182,7 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // text still hits 16px floor. Tracking + extralight weight carry
     // the elegant voice; size carries the legibility.
     categoryCaption:
-      'text-base font-extralight uppercase tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
+      'text-base font-extralight ui-caps-toggle tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
     productCardName:
       'font-light tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
     productCardPrice: 'font-light tracking-wide text-foreground',
@@ -192,14 +192,14 @@ export const PACK_STYLES: Record<TemplateId, PackStyles> = {
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-light uppercase tracking-[0.32em] text-foreground/60 hover:text-foreground transition-colors duration-700',
+      'text-sm font-light ui-caps-toggle tracking-[0.32em] text-foreground/60 hover:text-foreground transition-colors duration-700',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/10 to-foreground/30',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-[-0.01em] drop-shadow-xl leading-[1.05]',
     heroCta:
-      'border border-white bg-transparent px-10 py-4 text-sm font-medium uppercase tracking-[0.32em] text-white hover:bg-white hover:text-foreground transition-all duration-700 ease-out min-h-[44px]',
+      'border border-white bg-transparent px-10 py-4 text-sm font-medium ui-caps-toggle tracking-[0.32em] text-white hover:bg-white hover:text-foreground transition-all duration-700 ease-out min-h-[44px]',
     testimonialCard: 'border-t border-foreground/15 bg-transparent py-10',
-    testimonialAuthor: 'text-sm font-light uppercase tracking-[0.22em] text-foreground/80',
+    testimonialAuthor: 'text-sm font-light ui-caps-toggle tracking-[0.22em] text-foreground/80',
   },
 };
 

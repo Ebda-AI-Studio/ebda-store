@@ -177,7 +177,7 @@ export default function ClassicFooter({
           {footerSections.length > 0
             ? footerSections.map(section => (
                 <div key={section.key}>
-                  <h4 className="font-serif font-bold text-xs uppercase tracking-[0.2em] text-foreground mb-5">
+                  <h4 className="font-serif font-bold text-xs ui-caps-toggle tracking-[0.2em] text-foreground mb-5">
                     {section.heading}
                   </h4>
                   <ul className="space-y-3">
@@ -196,7 +196,7 @@ export default function ClassicFooter({
               ))
             : navChunks.map((chunk, ci) => (
                 <div key={ci}>
-                  <h4 className="font-serif font-bold text-xs uppercase tracking-[0.2em] text-foreground mb-5">
+                  <h4 className="font-serif font-bold text-xs ui-caps-toggle tracking-[0.2em] text-foreground mb-5">
                     {ci === 0
                       ? isRtl
                         ? 'روابط'

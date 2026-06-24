@@ -26,7 +26,7 @@ import { getProductPricing } from '../../lib/product-pricing';
 import { productCardPropsEqual } from './product-card-memo';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
-import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 
 interface PecannbeeProductCardProps extends ProductCardProps {
@@ -321,6 +321,13 @@ function PecannbeeProductCardImpl({
             oosLabelTextColor={resolvedOosLabelTextColor}
             theme={store.theme}
           />
+          {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
+              badge (z-10) and above the product image. */}
+          <OosImageDim
+            orderable={orderable}
+            oosDimColor={resolvedOosDimColor}
+            theme={store.theme}
+          />
           {showNewBadge && (
             <span
               className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
@@ -470,9 +477,6 @@ function PecannbeeProductCardImpl({
               lineHeight: productCtaZone?.lineHeight,
               textTransform: productCtaZone?.textTransform as React.CSSProperties['textTransform'],
               ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
-              ...(!orderable && resolvedOosDimColor && store.theme
-                ? { backgroundColor: resolveColor(resolvedOosDimColor, store.theme), opacity: 1 }
-                : {}),
             }}
           >
             {!orderable ? (

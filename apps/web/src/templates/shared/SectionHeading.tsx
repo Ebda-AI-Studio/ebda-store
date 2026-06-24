@@ -255,7 +255,7 @@ export function SectionHeading({
                 />
               )}
               <span
-                className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/70"
+                className="text-xs font-semibold ui-caps-toggle tracking-[0.18em] text-foreground/70"
                 data-zone="sectionKicker"
                 style={{
                   fontFamily: kickerZone?.fontFamily,

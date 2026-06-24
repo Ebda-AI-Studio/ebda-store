@@ -272,6 +272,36 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         </label>
       </div>
 
+      {/* ── Uppercase styling ─────────────────────────────────────────────── */}
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            Uppercase text styling (nav, headings, labels) / نمط الأحرف الكبيرة
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            When enabled, nav links, footer column headings, section headings, category captions,
+            hero text, and testimonial author names render in uppercase. Off by default (natural
+            case). Product names have their own control on Page Builder.
+          </p>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={branding.theme.uppercaseStyle === true}
+            onChange={e =>
+              onChange({
+                ...branding,
+                theme: { ...branding.theme, uppercaseStyle: e.target.checked },
+              })
+            }
+            className="h-4 w-4 cursor-pointer accent-primary"
+          />
+          <span className="text-xs text-foreground">
+            Enable uppercase chrome styling / تفعيل نمط الأحرف الكبيرة في الواجهة
+          </span>
+        </label>
+      </div>
+
       {/* ── Footer logo ───────────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>

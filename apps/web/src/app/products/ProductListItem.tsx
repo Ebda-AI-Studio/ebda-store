@@ -8,7 +8,7 @@ import { formatPrice } from '@/lib/format';
 import { getProductPricing } from '@/lib/product-pricing';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
-import { OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
+import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
 import type { CtaShape, CtaSize } from '../../templates/shared/card-size';
 
@@ -115,6 +115,9 @@ export function ProductListItem({
           oosLabelTextColor={resolvedOosLabelTextColor}
           theme={store.theme}
         />
+        {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
+            badge (z-10) and above the product image. */}
+        <OosImageDim orderable={orderable} oosDimColor={resolvedOosDimColor} theme={store.theme} />
         {product.images?.[0]?.url ? (
           <Image
             src={product.images[0].url}
@@ -237,12 +240,6 @@ export function ProductListItem({
                 style={{
                   ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
                   ...(resolvedText ? { color: resolvedText } : {}),
-                  ...(!orderable && resolvedOosDimColor && store.theme
-                    ? {
-                        backgroundColor: resolveColor(resolvedOosDimColor, store.theme),
-                        opacity: 1,
-                      }
-                    : {}),
                 }}
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

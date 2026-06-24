@@ -24,7 +24,7 @@ import { calculateDiscount } from '../shared/display-helpers';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
-import { ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
 
 /**
  * Bold Template - Product Card
@@ -216,6 +216,14 @@ function BoldProductCard({
               <PlaceholderImageIcon className="w-16 h-16" strokeWidth={1.5} />
             </div>
           )}
+
+          {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
+              badge (z-10) and above the product image. */}
+          <OosImageDim
+            orderable={orderable}
+            oosDimColor={resolvedOosDimColor}
+            theme={store.theme}
+          />
 
           {/* Badges */}
           <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>

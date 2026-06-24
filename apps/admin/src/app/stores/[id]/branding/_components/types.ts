@@ -82,6 +82,12 @@ export interface StoreTheme {
    * uses each kind's registered brand color. Default false. 2026-06-24.
    */
   floatingWidgetOriginalColor?: boolean;
+  /**
+   * Restore the uppercase chrome styling — nav/footer/headings/labels.
+   * Default false = natural case. When true, site-chrome elements render
+   * uppercase via [data-ui-uppercase='true'] .ui-caps-toggle in globals.css.
+   */
+  uppercaseStyle?: boolean;
 }
 
 export interface StoreBranding {

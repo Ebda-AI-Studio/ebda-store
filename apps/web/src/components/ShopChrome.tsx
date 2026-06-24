@@ -315,7 +315,10 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
     // a visible pink gap between the footer and the cookieFallback row
     // (Ahmad 2026-05-17 night: 'white space between footer and
     // underneath it'). Removed; body-pb is the single source of truth.
-    <div className="flex min-h-screen flex-col bg-background">
+    <div
+      className="flex min-h-screen flex-col bg-background"
+      data-ui-uppercase={store?.theme?.uppercaseStyle ? 'true' : undefined}
+    >
       {/* `data-zone` wrappers let the per-store typography rules in
           apps/web/src/app/layout.tsx target each storefront zone
           without having to rewrite the templates' internal markup.

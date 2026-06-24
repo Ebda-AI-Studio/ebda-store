@@ -67,7 +67,7 @@ export default function BoldHeader({
                 <StoreLogo src={displayLogo} alt={displayName} priority invert />
               ) : (
                 <span
-                  className="text-xl font-black uppercase tracking-wider text-white"
+                  className="text-xl font-black ui-caps-toggle tracking-wider text-white"
                   data-zone="storeName"
                 >
                   {displayName}
@@ -81,7 +81,7 @@ export default function BoldHeader({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="relative px-4 py-2 text-lg font-bold uppercase tracking-wider text-white/70 hover:text-white transition-colors duration-200 group cursor-pointer"
+                  className="relative px-4 py-2 text-lg font-bold ui-caps-toggle tracking-wider text-white/70 hover:text-white transition-colors duration-200 group cursor-pointer"
                 >
                   {isRtl && item.labelAr ? item.labelAr : item.label}
                   <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left" />
@@ -250,7 +250,7 @@ export default function BoldHeader({
               />
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg font-black uppercase tracking-wider text-sm hover:bg-primary/80 transition-colors duration-200 cursor-pointer"
+                className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg font-black ui-caps-toggle tracking-wider text-sm hover:bg-primary/80 transition-colors duration-200 cursor-pointer"
               >
                 {isRtl ? 'بحث' : 'Go'}
               </button>
@@ -282,7 +282,7 @@ export default function BoldHeader({
         aria-label={isRtl ? 'قائمة التنقل' : 'Navigation menu'}
       >
         <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <span className="font-black uppercase tracking-wider text-white text-sm">
+          <span className="font-black ui-caps-toggle tracking-wider text-white text-sm">
             {isRtl ? 'القائمة' : 'Menu'}
           </span>
           <button
@@ -311,7 +311,7 @@ export default function BoldHeader({
             <Link
               key={item.href}
               href={item.href}
-              className="px-4 py-3 text-lg font-bold uppercase tracking-wider text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200 cursor-pointer"
+              className="px-4 py-3 text-lg font-bold ui-caps-toggle tracking-wider text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200 cursor-pointer"
               onClick={() => setIsMenuOpen(false)}
             >
               {isRtl && item.labelAr ? item.labelAr : item.label}

@@ -269,6 +269,19 @@
   }
 }
 
+/* ── Uppercase-style toggle ─────────────────────────────────────────────────
+   When a store enables StoreTheme.uppercaseStyle, the storefront root
+   receives data-ui-uppercase="true". This single rule re-applies uppercase
+   to every chrome element that carries the marker class ui-caps-toggle
+   (nav links, footer column headings, see-all links, category captions,
+   section headings, hero CTA/headline, testimonial author, section kicker).
+   Default OFF = natural case everywhere (the marker class alone has no
+   text-transform effect). Product names use productNameCase, not this flag.
+   ──────────────────────────────────────────────────────────────────────── */
+[data-ui-uppercase='true'] .ui-caps-toggle {
+  text-transform: uppercase;
+}
+
 @layer components {
   /* Product Card */
   .product-card {

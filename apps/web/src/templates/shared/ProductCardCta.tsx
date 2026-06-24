@@ -84,7 +84,7 @@ export function ProductCardCta({
   ctaTextColor,
   ctaLabelTextEn,
   ctaLabelTextAr,
-  oosDimColor,
+  oosDimColor: _oosDimColor,
   theme,
   viewOnly = false,
 }: ProductCardCtaProps) {
@@ -103,11 +103,9 @@ export function ProductCardCta({
     ...(resolvedText ? { color: resolvedText } : {}),
   };
 
-  // OOS dim color for disabled state.
-  const oosDimStyle: React.CSSProperties =
-    !inStock && oosDimColor && theme
-      ? { backgroundColor: resolveColor(oosDimColor, theme), opacity: 1 }
-      : {};
+  // oosDimColor is an IMAGE overlay (see OosImageDim) — not a CTA background.
+  // No CTA-specific oosDim styling here.
+  const oosDimStyle: React.CSSProperties = {};
 
   // viewOnly: force the View link path for no-variant in-stock products too.
   if ((hasVariants || viewOnly) && viewHref) {
@@ -240,8 +238,17 @@ export function OutOfStockRibbon({
       (isRtl ? oosLabelTextAr : oosLabelTextEn) ?? (isRtl ? 'نفدت الكمية' : 'Out of stock');
     const placementCls = oosPlacementClass(oosLabelPlacement);
     const shapeCls = labelShapeClass(oosLabelShape);
-    const bgColor = oosLabelColor && theme ? resolveColor(oosLabelColor, theme) : 'hsl(15 60% 33%)';
-    const textColor = oosLabelTextColor && theme ? resolveColor(oosLabelTextColor, theme) : '#fff';
+    // Defaults match the admin ColorField inheritFromToken hints (muted bg /
+    // foreground text) so an UNSET color renders the same token the merchant saw
+    // in admin — not a hardcoded white. (The ColorField persists undefined when
+    // the pick equals the inherited token; the storefront must mirror that token,
+    // else "saved black" appeared as white.) Rule 15: token → hsl(var(--key)).
+    const bgColor =
+      oosLabelColor && theme ? resolveColor(oosLabelColor, theme) : 'hsl(var(--muted))';
+    const textColor =
+      oosLabelTextColor && theme
+        ? resolveColor(oosLabelTextColor, theme)
+        : 'hsl(var(--foreground))';
 
     return (
       <span
@@ -274,6 +281,34 @@ export function OutOfStockRibbon({
         {isRtl ? 'نفدت الكمية' : 'Out of Stock'}
       </span>
     </div>
+  );
+}
+
+/**
+ * Out-of-stock IMAGE overlay tint. Render INSIDE a card's (relative) image
+ * container. When the product isn't orderable AND the merchant set an
+ * `oosDimColor`, paints a semi-transparent tint over the image — matching the
+ * admin control's description ("overlay tint applied to the card image when out
+ * of stock"). Returns null otherwise (zero change for stores that don't set it).
+ */
+export function OosImageDim({
+  orderable,
+  oosDimColor,
+  theme,
+}: {
+  orderable: boolean;
+  oosDimColor?: string;
+  theme?: StoreTheme;
+}) {
+  if (orderable || !oosDimColor || !theme) return null;
+  const tint = resolveColor(oosDimColor, theme);
+  if (!tint) return null;
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-[5]"
+      style={{ backgroundColor: tint, opacity: 0.45 }}
+      aria-hidden
+    />
   );
 }
 

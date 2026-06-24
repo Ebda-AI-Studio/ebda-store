@@ -79,7 +79,7 @@ export default function MinimalHeader({
               <StoreLogo src={displayLogo} alt={displayName} priority />
             ) : (
               <span
-                className="text-xs tracking-[0.3em] uppercase font-light text-foreground"
+                className="text-xs tracking-[0.3em] ui-caps-toggle font-light text-foreground"
                 data-zone="storeName"
               >
                 {displayName}
@@ -97,7 +97,7 @@ export default function MinimalHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-[11px] tracking-[0.18em] uppercase font-light text-muted-foreground hover:text-foreground transition-colors duration-200"
+                className="text-[11px] tracking-[0.18em] ui-caps-toggle font-light text-muted-foreground hover:text-foreground transition-colors duration-200"
               >
                 {isRtl && item.labelAr ? item.labelAr : item.label}
               </Link>
@@ -288,7 +288,7 @@ export default function MinimalHeader({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-[11px] tracking-[0.18em] uppercase font-light text-muted-foreground hover:text-foreground transition-colors duration-200"
+                    className="text-[11px] tracking-[0.18em] ui-caps-toggle font-light text-muted-foreground hover:text-foreground transition-colors duration-200"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {isRtl && item.labelAr ? item.labelAr : item.label}

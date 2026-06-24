@@ -252,6 +252,9 @@ export default function ProductsClient({
     categoryFilter === 'best-sellers'
       ? 'الأكثر مبيعاً'
       : (activeCategory?.nameAr ?? activeCategory?.name ?? translations['All Products']);
+  // Arabic reads "تصفح الدراجية" (with the definite article ال), not "تصفح دراجية".
+  // Prepend ال for the subtitle phrase unless the name already carries it.
+  const ctxArDefinite = ctxAr.startsWith('ال') ? ctxAr : `ال${ctxAr}`;
 
   // Cart-id → quantity is consumed by ProductListItem (list view). The grid
   // view's PecannbeeProductCard handles its own optimistic add state.
@@ -531,7 +534,11 @@ export default function ProductsClient({
             </svg>
             {categoryFilter && (
               <>
-                <Link href={storeUrl('/products')} className="transition-colors hover:text-primary">
+                <Link
+                  href={storeUrl('/products')}
+                  onClick={() => setCategoryFilter('')}
+                  className="transition-colors hover:text-primary"
+                >
                   {t('Products', translations['Products'])}
                 </Link>
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -565,7 +572,7 @@ export default function ProductsClient({
               style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
             >
               {categoryFilter
-                ? t(`Browse ${ctxEn}`, `\u062a\u0635\u0641\u062d ${ctxAr}`)
+                ? t(`Browse ${ctxEn}`, `\u062a\u0635\u0641\u062d ${ctxArDefinite}`)
                 : t(
                     'Browse our collection of premium products',
                     '\u062a\u0635\u0641\u062d \u0645\u062c\u0645\u0648\u0639\u062a\u0646\u0627 \u0645\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0645\u0645\u064a\u0632\u0629'

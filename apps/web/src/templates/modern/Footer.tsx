@@ -170,7 +170,7 @@ export default function ModernFooter({
           {footerSections.length > 0 ? (
             footerSections.map(section => (
               <div key={section.key} className="space-y-4">
-                <h4 className="text-xs font-bold text-foreground uppercase tracking-[0.18em]">
+                <h4 className="text-xs font-bold text-foreground ui-caps-toggle tracking-[0.18em]">
                   {section.heading}
                 </h4>
                 <ul className="space-y-2.5">
@@ -189,7 +189,7 @@ export default function ModernFooter({
             ))
           ) : (
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-foreground uppercase tracking-[0.18em]">
+              <h4 className="text-xs font-bold text-foreground ui-caps-toggle tracking-[0.18em]">
                 {isRtl ? 'الروابط' : 'Links'}
               </h4>
               <ul className="space-y-2.5">
@@ -211,7 +211,7 @@ export default function ModernFooter({
               Empty section with just a heading looks unfinished. */}
           {hasContact && (
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-foreground uppercase tracking-[0.18em]">
+              <h4 className="text-xs font-bold text-foreground ui-caps-toggle tracking-[0.18em]">
                 {isRtl ? 'تواصل معنا' : 'Contact'}
               </h4>
               <ul className="space-y-3">
@@ -316,7 +316,7 @@ export default function ModernFooter({
           {/* Newsletter — hidden when the store explicitly opts out. */}
           {showNewsletter && (
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-foreground uppercase tracking-[0.18em]">
+              <h4 className="text-xs font-bold text-foreground ui-caps-toggle tracking-[0.18em]">
                 {isRtl ? 'النشرة الإخبارية' : 'Newsletter'}
               </h4>
               {/* Body line — render store description when set; previously

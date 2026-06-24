@@ -23,7 +23,12 @@ import { Price } from '@force/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing } from '../../lib/product-pricing';
-import { OutOfStockRibbon, ProductCardCta, isProductNew } from '../shared/ProductCardCta';
+import {
+  OosImageDim,
+  OutOfStockRibbon,
+  ProductCardCta,
+  isProductNew,
+} from '../shared/ProductCardCta';
 import { cn } from '@force/ui';
 
 /**
@@ -157,6 +162,13 @@ function MinimalProductCard({
             oosLabelPlacement={resolvedOosLabelPlacement}
             oosLabelColor={resolvedOosLabelColor}
             oosLabelTextColor={resolvedOosLabelTextColor}
+            theme={store.theme}
+          />
+          {/* Image overlay tint when out-of-stock. z-[5] sits under the OOS
+              badge (z-10) and above the product image. */}
+          <OosImageDim
+            orderable={orderable}
+            oosDimColor={resolvedOosDimColor}
             theme={store.theme}
           />
           {/* Sprint 2 (2026-05-17): NEW badge in minimal kept extra-quiet

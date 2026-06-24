@@ -301,6 +301,17 @@ export interface StoreTheme {
   floatingWidgetOriginalColor?: boolean;
 
   /**
+   * Restore the uppercase chrome styling — nav/footer/headings/labels.
+   * Default false = natural case everywhere.
+   * When true, all site-chrome elements (nav links, footer column headings,
+   * "SEE ALL" / section links, category captions, section headings, hero
+   * CTA/headline, testimonial author, section kicker) render in uppercase
+   * via a single CSS rule on [data-ui-uppercase='true'] .ui-caps-toggle.
+   * Product names are NOT affected (they have their own productNameCase control).
+   */
+  uppercaseStyle?: boolean;
+
+  /**
    * Per-store category product-count unit label (EN + AR).
    * Displayed after the count on category cards, e.g. "4 pieces" / "4 قطعة".
    * When unset, the storefront defaults to EN "pieces" / AR "قطعة".
