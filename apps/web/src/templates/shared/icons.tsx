@@ -1,4 +1,5 @@
 import type React from 'react';
+import Image from 'next/image';
 import { sanitizeUrl } from '@force/shared';
 import type { StoreContact, StoreSocials } from '../types';
 
@@ -365,6 +366,17 @@ export interface SocialLinkEntry {
 }
 
 /**
+ * Full-color brand PNG icons for whatsapp / tiktok / instagram.
+ * Each file is a 512×512 image that already includes the colored
+ * circle/background, so no additional wrapper bg is needed.
+ */
+const BRAND_PNG_ICONS: Record<string, string> = {
+  whatsapp: '/social-icons/whatsapp.png',
+  tiktok: '/social-icons/tiktok.png',
+  instagram: '/social-icons/instagram.png',
+};
+
+/**
  * Official hex brand colors keyed by platform. Used when
  * `originalColors` is true on SocialGlyph so the merchant can opt into
  * showing each icon in its recognizable brand hue instead of the footer's
@@ -420,6 +432,14 @@ export function SocialGlyph({
   // text color. BrandIcon components (instagram/whatsapp full-color SVGs)
   // are rendered when available; all others use the BRAND_COLORS hex map.
   if (originalColors) {
+    // For whatsapp / tiktok / instagram use the new full-color brand PNG
+    // artwork (512×512 circle marks that include their own bg). The PNG src
+    // is static so `unoptimized` skips Next.js image processing — keeps
+    // the bundle small and avoids extra Vercel image credits.
+    const pngSrc = BRAND_PNG_ICONS[entry.key];
+    if (pngSrc) {
+      return <Image src={pngSrc} alt="" width={24} height={24} className={className} unoptimized />;
+    }
     if (entry.BrandIcon) {
       return <entry.BrandIcon className={className} />;
     }

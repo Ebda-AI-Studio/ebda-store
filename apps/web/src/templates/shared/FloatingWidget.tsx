@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { resolveColor } from '@force/shared';
 import type {
   FloatingButton,
@@ -236,6 +237,15 @@ function resolveButtonHref(
 // button bg; themed kinds use a stroke icon over the merchant's bg color.
 const ICON_BOX_CLASS = 'h-7 w-7';
 
+// Full-color brand PNGs (512×512, circle bg included). For these three
+// kinds the button renders the PNG edge-to-edge with a transparent bg so
+// the PNG's own colored circle shows cleanly without a double-ring effect.
+const WIDGET_PNG_ICONS: Partial<Record<FloatingButtonKind, string>> = {
+  whatsapp: '/social-icons/whatsapp.png',
+  instagram: '/social-icons/instagram.png',
+  tiktok: '/social-icons/tiktok.png',
+};
+
 function KindIcon({
   kind,
   color,
@@ -245,6 +255,14 @@ function KindIcon({
   color: string;
   isPlaying?: boolean;
 }) {
+  const pngSrc = WIDGET_PNG_ICONS[kind];
+  if (pngSrc) {
+    // Render the full-color PNG; the caller's button bg is set to
+    // transparent for these kinds so the PNG circle is unobstructed.
+    return (
+      <Image src={pngSrc} alt="" width={28} height={28} className={ICON_BOX_CLASS} unoptimized />
+    );
+  }
   switch (kind) {
     case 'whatsapp':
       return <WhatsappGlyphIcon className={ICON_BOX_CLASS} />;
@@ -409,9 +427,14 @@ function ButtonRender({
   const baseClass =
     'group relative flex h-12 w-12 items-center justify-center rounded-full shadow-lg overflow-hidden transition-all duration-200 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-primary';
 
+  // For PNG-icon kinds (whatsapp/instagram/tiktok) the PNG already carries
+  // its own colored circle. Rendering a button bg behind it creates a
+  // circle-on-circle double-ring. Use transparent so the PNG circle shows
+  // cleanly against whatever surface the widget sits on.
+  const hasPngIcon = button.kind in WIDGET_PNG_ICONS;
   const sharedProps = {
     className: baseClass,
-    style: { backgroundColor: bg },
+    style: { backgroundColor: hasPngIcon ? 'transparent' : bg },
     'aria-label': label,
     title: label,
   };

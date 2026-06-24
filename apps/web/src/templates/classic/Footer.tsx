@@ -163,7 +163,7 @@ export default function ClassicFooter({
                   >
                     <SocialGlyph
                       entry={s}
-                      className="w-5 h-5"
+                      className="w-6 h-6"
                       originalColors={theme?.footerSocialOriginalColor === true}
                     />
                   </a>
