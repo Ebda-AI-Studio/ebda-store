@@ -1647,7 +1647,7 @@ export default function CheckoutClient() {
                 Hidden on lg+ because the desktop button row inside the form
                 is visible there. Only rendered on shipping step (step === 1). */}
             {step === 1 && (
-              <div className="lg:hidden mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="order-3 lg:hidden mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <Link
                   href={storeUrl('/cart')}
                   className="inline-flex min-h-11 items-center text-sm text-primary hover:underline"
