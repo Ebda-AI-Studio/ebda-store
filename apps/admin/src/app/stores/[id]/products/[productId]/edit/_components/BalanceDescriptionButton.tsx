@@ -4,16 +4,17 @@ import { useState } from 'react';
 import { apiPost } from '../../../../../../../lib/api';
 
 /**
- * Per-product description balance / revert button pair.
+ * Per-product language balance / revert button pair.
  *
- * Balance: calls the balance-description endpoint, which reads both
- * description sides and fills the thinner one from the richer one.
- * On success it writes both EN and AR back into the form via `onBalanced`
- * and flips both provenance chips to "ai".
+ * Balance: calls the balance-description endpoint, which reads both the
+ * name and description pairs and fills each thinner side from its richer
+ * counterpart (EN→AR or AR→EN independently for each pair).
+ * On success it writes all four fields back into the form via `onBalanced`
+ * and flips their provenance chips to "ai".
  *
  * Revert: calls the revert-balance endpoint, which restores the originals
- * that were snapshotted before the last balance. On success it writes the
- * restored values back via `onBalanced`.
+ * (name, nameAr, description, descriptionAr) snapshotted before the last
+ * balance. On success it writes the restored values back via `onBalanced`.
  *
  * The component mirrors AiFieldBadge's pattern: apiPost + loading state +
  * failed state + bilingual labels/tooltips.
@@ -25,8 +26,16 @@ export function BalanceDescriptionButton({
 }: {
   storeId?: string;
   productId?: string;
-  /** Called with (descriptionEn, descriptionAr) after a successful balance OR revert. */
-  onBalanced?: (descriptionEn: string, descriptionAr: string) => void;
+  /**
+   * Called with (nameEn, nameAr, descriptionEn, descriptionAr) after a
+   * successful balance OR revert.
+   */
+  onBalanced?: (
+    nameEn: string,
+    nameAr: string,
+    descriptionEn: string,
+    descriptionAr: string
+  ) => void;
 }) {
   const [busyBalance, setBusyBalance] = useState(false);
   const [busyRevert, setBusyRevert] = useState(false);
@@ -58,7 +67,9 @@ export function BalanceDescriptionButton({
           setFailedBalance(false);
           const { data, error } = await apiPost<{
             balanced: boolean;
-            side: string;
+            sides: Record<string, string>;
+            name: string;
+            nameAr: string;
             description: string;
             descriptionAr: string;
           }>(`/api/v1/stores/${storeId}/ai/products/${productId}/ai/balance-description`, {});
@@ -68,7 +79,7 @@ export function BalanceDescriptionButton({
             return;
           }
           setBalanced(true);
-          onBalanced?.(data.description, data.descriptionAr);
+          onBalanced?.(data.name, data.nameAr, data.description, data.descriptionAr);
         }}
         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 transition-colors ${
           failedBalance
@@ -80,12 +91,18 @@ export function BalanceDescriptionButton({
         title={
           failedBalance
             ? 'Balance failed — try again / فشلت الموازنة، حاول مجددًا'
-            : 'Balance descriptions (fill thinner side from richer) / موازنة الأوصاف'
+            : 'Balance languages (name + description EN/AR) / موازنة اللغات'
         }
       >
         {busyBalance ? <SpinIcon /> : <span aria-hidden>⚖️</span>}
         <span>
-          {busyBalance ? '…' : failedBalance ? '⚠ Retry' : balanced ? '✓ Balanced' : 'Balance'}
+          {busyBalance
+            ? '…'
+            : failedBalance
+              ? '⚠ Retry'
+              : balanced
+                ? '✓ Balanced'
+                : 'Balance languages'}
         </span>
       </button>
 
@@ -99,6 +116,8 @@ export function BalanceDescriptionButton({
             setFailedRevert(false);
             const { data, error } = await apiPost<{
               reverted: boolean;
+              name: string;
+              nameAr: string;
               description: string;
               descriptionAr: string;
             }>(`/api/v1/stores/${storeId}/ai/products/${productId}/ai/revert-balance`, {});
@@ -108,7 +127,7 @@ export function BalanceDescriptionButton({
               return;
             }
             setBalanced(false);
-            onBalanced?.(data.description, data.descriptionAr);
+            onBalanced?.(data.name, data.nameAr, data.description, data.descriptionAr);
           }}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium disabled:opacity-50 transition-colors ${
             failedRevert

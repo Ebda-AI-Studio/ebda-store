@@ -4805,25 +4805,25 @@
     "errorFailed": "Failed",
     "sections": {
       "translation": "Translation",
-      "descriptionBalance": "Description language balance",
+      "descriptionBalance": "Language balance",
       "seo": "SEO",
       "aeo": "AEO — Answer Engine Optimization",
       "geo": "GEO — Generative Engine Optimization",
       "geoDescription": "Optimises your store for LLM-powered search — ChatGPT, Perplexity, Google AI Overview, Bing Copilot.",
-      "descriptionRevert": "Revert description balance"
+      "descriptionRevert": "Revert language balance"
     },
     "cards": {
       "balanceDescriptions": {
-        "title": "Balance descriptions",
-        "body": "For every product that has only one language's description, fills the thinner side from the richer one — EN→AR or AR→EN.",
+        "title": "Balance languages",
+        "body": "For each product, makes the English field English and the Arabic field Arabic — for the name AND the description. If both slots hold the same language it translates the missing one (Arabic is the source of truth); if a slot has the wrong language it is corrected.",
         "button": "Run balance",
-        "forceTooltip": "Overwrites existing description on the thinner side even when it has some content."
+        "forceTooltip": "Re-balance even products that already look correct (translate again)."
       },
       "revertBalance": {
         "title": "Revert balance",
-        "body": "Undo the last balance run — restores the original descriptions before balancing was applied.",
+        "body": "Undo the last balance run — restores the original name and description fields (both languages) before balancing was applied.",
         "button": "Revert",
-        "forceTooltip": "Restores the pre-balance originals even if descriptions were edited since."
+        "forceTooltip": "Restores the pre-balance originals even if fields were edited since."
       },
       "fillMissingArabic": {
         "title": "Fill missing Arabic",
@@ -4912,7 +4912,7 @@
       "llmsTxt": "LLMs.txt",
       "citationCopy": "Citation copy",
       "brandFacts": "Brand facts",
-      "descriptionBalance": "Description balance"
+      "descriptionBalance": "Language balance"
     },
     "activeJob": {
       "sweepSuffix": "sweep",

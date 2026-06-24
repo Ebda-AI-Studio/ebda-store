@@ -20,7 +20,7 @@ import { prisma } from '@force/database';
 import { AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import {
   fillProductFields,
-  balanceProductDescription,
+  balanceProductLanguages,
   revertProductBalance,
 } from '../services/ai-autofill.service';
 
@@ -1819,18 +1819,22 @@ router.post(
       const { storeId, productId } = req.params;
       const force = req.body?.force === true;
 
-      const result = await balanceProductDescription(storeId, productId, { force });
+      const result = await balanceProductLanguages(storeId, productId, { force });
 
       const updated = await prisma.product.findFirst({
         where: { id: productId, storeId },
-        select: { description: true, descriptionAr: true },
+        select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
 
       res.json({
         success: true,
         data: {
           balanced: result.balanced,
-          side: result.side,
+          sides: result.sides,
+          // Legacy compat: expose the description side directly
+          side: result.sides.description ?? null,
+          name: updated?.name ?? null,
+          nameAr: updated?.nameAr ?? null,
           description: updated?.description ?? null,
           descriptionAr: updated?.descriptionAr ?? null,
         },
@@ -1853,13 +1857,15 @@ router.post(
 
       const updated = await prisma.product.findFirst({
         where: { id: productId, storeId },
-        select: { description: true, descriptionAr: true },
+        select: { name: true, nameAr: true, description: true, descriptionAr: true },
       });
 
       res.json({
         success: true,
         data: {
           reverted: result.reverted,
+          name: updated?.name ?? null,
+          nameAr: updated?.nameAr ?? null,
           description: updated?.description ?? null,
           descriptionAr: updated?.descriptionAr ?? null,
         },

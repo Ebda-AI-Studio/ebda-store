@@ -2,7 +2,7 @@ import { AI_AUTOFILL_FIELD_NAMES, fieldsNeedingRefresh, type AiFieldSources } fr
 import { prisma } from '@force/database';
 import { AIService } from './ai.service';
 import { isAiQuotaCapError } from '../lib/ai-quota';
-import { descriptionRichness, richerSide } from '../lib/ai/description-richness';
+import { containsArabic } from '../lib/ai/description-richness';
 import logger from '../lib/logger';
 
 /**
@@ -270,118 +270,236 @@ export async function isAutopilotEnabled(storeId: string): Promise<boolean> {
 const STALE_TTL_DAYS = parseInt(process.env.AI_AUTOFILL_STALE_TTL_DAYS ?? '30', 10);
 
 // -----------------------------------------------------------------------
-// Description-language balancer
+// Language balancer (Arabic-authoritative, language-detection-based)
 //
-// Detects which language (EN/AR) has the richer description for a product
-// and translates it into the thinner (or empty) language. Writes a revert
-// snapshot into `aiBalanceBackup` before the first balance so the merchant
-// can always undo. Designed to be idempotent: repeated calls on an already-
-// balanced pair are no-ops (richness within 10% and both sides present).
+// For each pair (en, ar) where `en` should hold English/Latin and `ar`
+// should hold Arabic — we use `containsArabic()` to detect what is
+// actually in each slot and move/translate as needed.
+//
+// Algorithm per pair:
+//   arabicText  = arHasAr ? ar : (enHasAr ? en : null)
+//   englishText = (en && !enHasAr) ? en : ((ar && !arHasAr) ? ar : null)
+//   if (!arabicText && !englishText) → skip (nothing to work with)
+//   if (arabicText) {                 // Arabic is authoritative
+//     newAr = arabicText
+//     newEn = englishText ?? translate(arabicText, ar→en)
+//   } else {                          // only English exists
+//     newEn = englishText
+//     newAr = translate(englishText, en→ar)
+//   }
+//   no-op guard: if newEn===en && newAr===ar → skip (unless opts.force)
+//
+// This correctly handles: both-Arabic, both-English, swapped slots,
+// one-empty, and already-correct (idempotent). force=true re-translates
+// even when both slots are already correct.
+//
+// A revert snapshot of ALL FOUR original fields + aiFieldSources is
+// stored in `aiBalanceBackup` on the FIRST balance only — never overwritten
+// so the true originals are always recoverable.
 // -----------------------------------------------------------------------
 
-const BALANCE_RICHNESS_THRESHOLD = 0.1; // 10% — skip if already balanced
-
 interface BalanceBackup {
+  name?: string | null;
+  nameAr?: string | null;
   description?: string | null;
   descriptionAr?: string | null;
   aiFieldSources?: AiFieldSources;
 }
 
 /**
- * Balance the description fields of a single product.
+ * Balance BOTH the name and description field pairs of a single product
+ * using language detection (Arabic-authoritative).
  *
- * Translates the richer language into the thinner one and snapshots the
- * original values for revert. Returns `{ balanced: false }` when there is
- * nothing to balance (both empty, or already close enough and `force` is
- * not set).
+ * Pairs handled independently:
+ *   - name / nameAr  (kind: 'product-name')
+ *   - description / descriptionAr  (kind: 'product-description')
+ *
+ * Snapshots ALL four original values + aiFieldSources for revert on the
+ * very first balance so the true originals are never lost.
+ * Returns `{ balanced: false }` when no pair needed changes.
  */
-export async function balanceProductDescription(
+export async function balanceProductLanguages(
   storeId: string,
   productId: string,
   opts: { force?: boolean } = {}
-): Promise<{ balanced: boolean; side: 'en' | 'ar' | null }> {
+): Promise<{
+  balanced: boolean;
+  changed: { name?: boolean; description?: boolean };
+  sides: { name?: 'en' | 'ar'; description?: 'en' | 'ar' };
+}> {
   const product = await prisma.product.findFirst({
     where: { id: productId, storeId, deletedAt: null },
     select: {
+      name: true,
+      nameAr: true,
       description: true,
       descriptionAr: true,
       aiFieldSources: true,
       aiBalanceBackup: true,
     },
   });
-  if (!product) return { balanced: false, side: null };
+  if (!product) return { balanced: false, changed: {}, sides: {} };
 
-  const side = richerSide(product.description, product.descriptionAr);
-  if (side === null) return { balanced: false, side: null };
-
-  // Already balanced? Skip unless forced.
-  if (!opts.force) {
-    const enScore = descriptionRichness(product.description);
-    const arScore = descriptionRichness(product.descriptionAr);
-    if (enScore > 0 && arScore > 0) {
-      const richer = Math.max(enScore, arScore);
-      const thinner = Math.min(enScore, arScore);
-      const gap = (richer - thinner) / richer;
-      if (gap <= BALANCE_RICHNESS_THRESHOLD) {
-        return { balanced: false, side };
-      }
-    }
-  }
-
-  // Snapshot for revert — only on the FIRST balance so we preserve the TRUE
-  // original and never overwrite with a previously AI-translated value.
   const sources = (product.aiFieldSources as AiFieldSources) ?? {};
   const existingBackup = (product.aiBalanceBackup ?? {}) as BalanceBackup;
+
+  // Backup is considered present if ANY of the four content fields OR
+  // aiFieldSources is already stored — guards ALL four original values.
   const hasBackup =
+    existingBackup.name !== undefined ||
+    existingBackup.nameAr !== undefined ||
     existingBackup.description !== undefined ||
     existingBackup.descriptionAr !== undefined ||
     existingBackup.aiFieldSources !== undefined;
 
+  // Snapshot ALL four fields + sources on the FIRST balance only.
   const backup: BalanceBackup = hasBackup
     ? existingBackup
     : {
+        name: product.name,
+        nameAr: product.nameAr,
         description: product.description,
         descriptionAr: product.descriptionAr,
         aiFieldSources: sources,
       };
 
-  // Translate the rich side into the thin side.
-  const richText = side === 'en' ? product.description! : product.descriptionAr!;
-  const { translation } = await AIService.translate({
-    storeId,
-    text: richText,
-    from: side,
-    to: side === 'en' ? 'ar' : 'en',
-    kind: 'product-description',
-  });
+  const writes: Partial<Record<string, string | null>> = {};
+  const newSources: AiFieldSources = { ...sources };
+  const sides: { name?: 'en' | 'ar'; description?: 'en' | 'ar' } = {};
+  const changed: { name?: boolean; description?: boolean } = {};
 
-  if (!translation?.trim()) return { balanced: false, side };
+  // ── Language-aware pair balancer ──────────────────────────────────────
+  //
+  // Returns true if anything was written.
+  async function balancePairByLanguage(
+    enVal: string | null | undefined, // the EN-slot value (product.name / product.description)
+    arVal: string | null | undefined, // the AR-slot value (product.nameAr / product.descriptionAr)
+    enField: string, // 'name' or 'description'
+    arField: string, // 'nameAr' or 'descriptionAr'
+    kind: 'product-name' | 'product-description'
+  ): Promise<boolean> {
+    const en = enVal?.trim() || null;
+    const ar = arVal?.trim() || null;
 
-  // The THIN side we just wrote is AI (a translation). The RICH side is only
-  // marked AI if it wasn't human-authored — otherwise a human-written source
-  // would become AI-owned and the 30-day stale sweep could silently re-write it
-  // (the value is preserved in aiBalanceBackup for revert regardless).
-  const richField = side === 'en' ? 'description' : 'descriptionAr';
-  const thinField = side === 'en' ? 'descriptionAr' : 'description';
-  const newSources: AiFieldSources = { ...sources, [thinField]: 'ai' };
-  if (sources[richField] !== 'human') newSources[richField] = 'ai';
+    const enHasAr = containsArabic(en);
+    const arHasAr = containsArabic(ar);
+
+    // Locate the actual Arabic content and English content regardless of which slot they're in
+    const arabicText: string | null = arHasAr ? ar! : enHasAr ? en! : null;
+    const englishText: string | null = en && !enHasAr ? en : ar && !arHasAr ? ar! : null;
+
+    if (!arabicText && !englishText) return false; // nothing to work with
+
+    // Compute target values
+    let newEn: string | null;
+    let newAr: string | null;
+
+    if (arabicText) {
+      // Arabic is authoritative
+      newAr = arabicText;
+      if (englishText && !opts.force) {
+        // English already present and no force → keep it (no translation needed)
+        newEn = englishText;
+      } else {
+        // Either English is missing, OR force:true requests a fresh translation
+        const { translation } = await AIService.translate({
+          storeId,
+          text: arabicText,
+          from: 'ar',
+          to: 'en',
+          kind,
+        });
+        if (!translation?.trim()) return false;
+        newEn = translation;
+      }
+    } else {
+      // Only English exists
+      newEn = englishText!;
+      const { translation } = await AIService.translate({
+        storeId,
+        text: englishText!,
+        from: 'en',
+        to: 'ar',
+        kind,
+      });
+      if (!translation?.trim()) return false;
+      newAr = translation;
+    }
+
+    // No-op guard: if both targets match what's already stored, skip unless force
+    const enUnchanged = (newEn ?? '') === (enVal ?? '');
+    const arUnchanged = (newAr ?? '') === (arVal ?? '');
+    if (!opts.force && enUnchanged && arUnchanged) return false;
+
+    // Write only the fields that actually changed (or all when force:true)
+    if (!enUnchanged || opts.force) {
+      writes[enField] = newEn ?? null;
+      newSources[enField] = 'ai';
+      // Mark the translation direction hint
+      if (arabicText) sides[enField === 'name' ? 'name' : 'description'] = 'ar';
+    }
+    if (!arUnchanged || opts.force) {
+      writes[arField] = newAr ?? null;
+      newSources[arField] = 'ai';
+      if (!arabicText) sides[enField === 'name' ? 'name' : 'description'] = 'en';
+    }
+
+    return true;
+  }
+
+  // ── Pair 1: name / nameAr ─────────────────────────────────────────────
+  const nameChanged = await balancePairByLanguage(
+    product.name,
+    product.nameAr,
+    'name',
+    'nameAr',
+    'product-name'
+  );
+  if (nameChanged) changed.name = true;
+
+  // ── Pair 2: description / descriptionAr ───────────────────────────────
+  const descChanged = await balancePairByLanguage(
+    product.description,
+    product.descriptionAr,
+    'description',
+    'descriptionAr',
+    'product-description'
+  );
+  if (descChanged) changed.description = true;
+
+  const anyChanged = Object.keys(writes).length > 0;
+  if (!anyChanged) return { balanced: false, changed, sides };
 
   await prisma.product.update({
     where: { id: productId, storeId },
     data: {
-      ...(side === 'en' ? { descriptionAr: translation } : { description: translation }),
+      ...(writes as Record<string, string | null>),
       aiFieldSources: newSources,
       aiBalanceBackup: backup as object,
     },
   });
 
-  logger.info({ storeId, productId, side }, '[ai-balance] description balanced');
-  return { balanced: true, side };
+  logger.info({ storeId, productId, changed, sides }, '[ai-balance] language balance applied');
+  return { balanced: true, changed, sides };
 }
 
 /**
- * Revert a product's description fields to the snapshot saved before the
- * last balance operation. Clears the backup afterwards. Returns
+ * Back-compat alias — callers that imported `balanceProductDescription`
+ * continue to work. Forwards to the new language-aware function and maps its
+ * return shape back to the old `{ balanced, side }` shape (description side).
+ */
+export async function balanceProductDescription(
+  storeId: string,
+  productId: string,
+  opts: { force?: boolean } = {}
+): Promise<{ balanced: boolean; side: 'en' | 'ar' | null }> {
+  const result = await balanceProductLanguages(storeId, productId, opts);
+  return { balanced: result.balanced, side: result.sides.description ?? null };
+}
+
+/**
+ * Revert a product's name and description fields to the snapshot saved
+ * before the last balance operation. Clears the backup afterwards. Returns
  * `{ reverted: false }` when no backup exists.
  */
 export async function revertProductBalance(
@@ -396,6 +514,8 @@ export async function revertProductBalance(
 
   const backup = (product.aiBalanceBackup ?? {}) as BalanceBackup;
   if (
+    backup.name === undefined &&
+    backup.nameAr === undefined &&
     backup.description === undefined &&
     backup.descriptionAr === undefined &&
     backup.aiFieldSources === undefined
@@ -406,6 +526,12 @@ export async function revertProductBalance(
   await prisma.product.update({
     where: { id: productId, storeId },
     data: {
+      // `name` is non-nullable, so ?? undefined (no-op when the backup happens to
+      // be empty-string) is safe. `nameAr` IS nullable: a product whose nameAr
+      // was originally null and got filled by balance must revert back to null —
+      // ?? null clears it (?? undefined would leave the balanced value in place).
+      name: backup.name ?? undefined,
+      nameAr: backup.nameAr ?? null,
       description: backup.description ?? null,
       descriptionAr: backup.descriptionAr ?? null,
       aiFieldSources: (backup.aiFieldSources ?? {}) as object,
@@ -413,7 +539,7 @@ export async function revertProductBalance(
     },
   });
 
-  logger.info({ storeId, productId }, '[ai-balance] description reverted');
+  logger.info({ storeId, productId }, '[ai-balance] language balance reverted');
   return { reverted: true };
 }
 const SWEEP_THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS ?? '2500', 10);
@@ -440,11 +566,11 @@ export async function sweepStore(storeId: string): Promise<{ products: number; f
     filled += res.filled;
     await sweepSleep(SWEEP_THROTTLE_MS);
 
-    // Autopilot: balance descriptions after filling so the 3-day sweep
+    // Autopilot: balance names + descriptions after filling so the 3-day sweep
     // keeps both languages in sync. force:false avoids churn on already-
     // balanced pairs. The revert backup ensures the merchant can undo.
     try {
-      const balResult = await balanceProductDescription(storeId, p.id, { force: false });
+      const balResult = await balanceProductLanguages(storeId, p.id, { force: false });
       if (balResult.balanced) {
         filled += 1;
         await sweepSleep(SWEEP_THROTTLE_MS);

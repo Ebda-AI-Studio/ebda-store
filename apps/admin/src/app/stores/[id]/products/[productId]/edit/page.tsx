@@ -255,12 +255,29 @@ export default function EditProductPage() {
     setAiSources(prev => ({ ...prev, [field]: 'ai' }));
   };
 
-  // Two-field balance/revert callback: the balance or revert endpoint returns
-  // fresh values for BOTH description fields. Update both form inputs and flip
-  // both provenance chips to "ai" so the ✨ AI chips render immediately.
-  const handleBalanced = (descriptionEn: string, descriptionAr: string) => {
-    setFormData(prev => ({ ...prev, description: descriptionEn, descriptionAr }));
-    setAiSources(prev => ({ ...prev, description: 'ai', descriptionAr: 'ai' }));
+  // Four-field balance/revert callback: the balance or revert endpoint returns
+  // fresh values for ALL four name+description fields. Update all four form
+  // inputs and flip their provenance chips to "ai" so the ✨ AI chips render.
+  const handleBalanced = (
+    nameEn: string,
+    nameAr: string,
+    descriptionEn: string,
+    descriptionAr: string
+  ) => {
+    setFormData(prev => ({
+      ...prev,
+      name: nameEn,
+      nameAr,
+      description: descriptionEn,
+      descriptionAr,
+    }));
+    setAiSources(prev => ({
+      ...prev,
+      name: 'ai',
+      nameAr: 'ai',
+      description: 'ai',
+      descriptionAr: 'ai',
+    }));
   };
 
   async function generateSeo(mode: 'fill-empty' | 'overwrite') {

@@ -1,6 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, runInTenantContext } from '@force/database';
-import { balanceProductDescription } from '../../../services/ai-autofill.service';
+import { balanceProductLanguages } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { inngest } from '../client';
@@ -73,7 +73,7 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
 
           for (const p of products) {
             try {
-              const result = await balanceProductDescription(storeId, p.id, { force: false });
+              const result = await balanceProductLanguages(storeId, p.id, { force: false });
               if (result.balanced) {
                 balanced++;
                 await sleep(THROTTLE_MS);
