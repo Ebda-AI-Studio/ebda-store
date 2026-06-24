@@ -111,6 +111,12 @@ const KNOWN_APP_ROUTES = new Set([
   // Without this the platform domain treats `landing` as a store slug and 404s
   // the image.
   'landing',
+  // Static asset folder for the social brand icons (e.g. /social-icons/whatsapp.png).
+  // The file extension is on the 2nd segment, so the `firstSegment.includes('.')`
+  // check below doesn't catch it — without this the platform domain reads
+  // `social-icons` as a store slug and 404s the footer/widget brand icons (they
+  // worked on custom domains but broke on store.forcemediakw.com/<slug>).
+  'social-icons',
 ]);
 
 /**
