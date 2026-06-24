@@ -14,6 +14,7 @@ import {
   cardImageAspectClass,
   cardImageRadiusClass,
 } from '../shared/card-size';
+import type { CtaShape, CtaSize } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor, getProductCardTextSizes } from '@force/shared';
@@ -95,6 +96,8 @@ function ModernProductCard({
   // Localized name for alt text + display. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
   const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
+  // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
+  const orderable = product.inStock !== false || product.acceptsBackorder === true;
 
   if (process.env.NODE_ENV !== 'production' && !product.images?.[0]?.url) {
     console.warn(`[ProductCard] Missing image for product "${product.name}" (id: ${product.id})`);
@@ -114,6 +117,24 @@ function ModernProductCard({
   const frameCls =
     `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
 
+  // Task 3 B: read CTA + OOS defaults from productCardDefaults.
+  const defaults = layout?.productCardDefaults;
+  const resolvedCtaShape = defaults?.ctaShape as CtaShape | undefined;
+  const resolvedCtaSize = defaults?.ctaSize as CtaSize | undefined;
+  const resolvedCtaColor = defaults?.ctaColor;
+  const resolvedCtaTextColor = defaults?.ctaTextColor;
+  const resolvedCtaLabelTextEn = defaults?.ctaLabelTextEn;
+  const resolvedCtaLabelTextAr = defaults?.ctaLabelTextAr;
+  const resolvedOosDimColor = defaults?.oosDimColor;
+  const resolvedOosLabel = defaults?.oosLabel;
+  const resolvedOosLabelTextEn = defaults?.oosLabelTextEn;
+  const resolvedOosLabelTextAr = defaults?.oosLabelTextAr;
+  const resolvedOosLabelShape = defaults?.oosLabelShape as CtaShape | undefined;
+  const resolvedOosLabelPlacement = defaults?.oosLabelPlacement;
+  const resolvedOosLabelColor = defaults?.oosLabelColor;
+  const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
+  const nameCase = defaults?.productNameCase;
+
   return (
     <article
       itemScope
@@ -122,13 +143,58 @@ function ModernProductCard({
       // max-w cap matches PecannbeeProductCard so theme grids (PDP related
       // products, category pages) render at the same size as the main
       // listings. Ahmad 2026-05-16 design.md baseline.
-      className={`w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
+      // Task 3 Part A: article has no overflow-hidden so the wishlist button
+      // (now positioned directly on article) is never clipped by card rounding.
+      className={`relative w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
       style={
         showCardFrame && cardFrameColor && store.theme
           ? { borderColor: resolveColor(cardFrameColor, store.theme) }
           : undefined
       }
     >
+      {/* Wishlist heart — lifted OUT of the overflow-hidden Link (Part A fix).
+          Positioned on the article which has no overflow-hidden, so rounded
+          card shapes (rounded-xl etc.) never clip this button.
+          Only shown when not using RemoveFromWishlistButton. */}
+      {!onRemoveFromWishlist && onAddToWishlist !== undefined && (
+        <div
+          className={cn(
+            'absolute top-3 z-20 flex flex-col gap-2 transition-all duration-300',
+            isRtl ? 'left-3' : 'right-3',
+            'opacity-100 translate-x-0',
+            'lg:opacity-0 lg:translate-x-3',
+            isHovered && 'lg:opacity-100 lg:translate-x-0'
+          )}
+        >
+          <button
+            onClick={handleWishlist}
+            className={cn(
+              'h-11 w-11 rounded-full flex items-center justify-center shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out cursor-pointer backdrop-blur-sm',
+              isWishlisted
+                ? 'bg-destructive text-destructive-foreground scale-[1.05]'
+                : 'bg-white/95 text-foreground hover:bg-white hover:scale-[1.05]'
+            )}
+            aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+            aria-pressed={isWishlisted}
+          >
+            <svg
+              className="w-4 h-4"
+              fill={isWishlisted ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
         prefetch={false}
@@ -184,12 +250,22 @@ function ModernProductCard({
 
           {/* Platform-level OOS ribbon (top-start, red, bold) — same visual
               treatment Ahmad shipped on PecannbeeProductCard, now in every
-              theme via the shared component (2026-05-16). */}
-          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
+              theme via the shared component (2026-05-16).
+              Task 3 B4: OOS badge customization via productCardDefaults. */}
+          <OutOfStockRibbon
+            inStock={orderable}
+            isRtl={isRtl}
+            oosLabel={resolvedOosLabel}
+            oosLabelTextEn={resolvedOosLabelTextEn}
+            oosLabelTextAr={resolvedOosLabelTextAr}
+            oosLabelShape={resolvedOosLabelShape}
+            oosLabelPlacement={resolvedOosLabelPlacement}
+            oosLabelColor={resolvedOosLabelColor}
+            oosLabelTextColor={resolvedOosLabelTextColor}
+            theme={store.theme}
+          />
 
-          {/* Per-card actions (compare / wishlist). When a card lives on the
-            /wishlist page, `onRemoveFromWishlist` is provided; the "add to
-            wishlist" heart is hidden to avoid a conflicting second action. */}
+          {/* Per-card actions (compare / RemoveFromWishlist on wishlist page). */}
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
@@ -198,50 +274,12 @@ function ModernProductCard({
               isRtl={isRtl}
             />
           )}
-          {onRemoveFromWishlist ? (
+          {onRemoveFromWishlist && (
             <RemoveFromWishlistButton
               productId={product.id}
               onRemove={onRemoveFromWishlist}
               isRtl={isRtl}
             />
-          ) : (
-            <div
-              className={cn(
-                'absolute top-3 flex flex-col gap-2 transition-all duration-300',
-                isRtl ? 'left-3' : 'right-3',
-                // Always visible on touch; slides in on hover for pointer devices.
-                'opacity-100 translate-x-0',
-                'lg:opacity-0 lg:translate-x-3',
-                isHovered && 'lg:opacity-100 lg:translate-x-0'
-              )}
-            >
-              <button
-                onClick={handleWishlist}
-                className={cn(
-                  'h-11 w-11 rounded-full flex items-center justify-center shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out cursor-pointer backdrop-blur-sm',
-                  isWishlisted
-                    ? 'bg-destructive text-destructive-foreground scale-[1.05]'
-                    : 'bg-white/95 text-foreground hover:bg-white hover:scale-[1.05]'
-                )}
-                aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
-                aria-pressed={isWishlisted}
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill={isWishlisted ? 'currentColor' : 'none'}
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                  />
-                </svg>
-              </button>
-            </div>
           )}
 
           {/* Quick Add Button — always visible on touch; slides up on hover for pointer devices */}
@@ -258,16 +296,25 @@ function ModernProductCard({
               {/* Platform-level dual CTA — products with variants show
                   "View" → PDP; single-variant products keep the inline
                   AddToCart. See templates/shared/ProductCardCta.tsx and
-                  2026-05-16-mobile-ui-ship.md. */}
+                  2026-05-16-mobile-ui-ship.md.
+                  Task 3 B2: thread CTA customization props. */}
               <ProductCardCta
                 productId={product.id}
-                inStock={product.inStock !== false}
+                inStock={orderable}
                 hasVariants={!!product.variants && product.variants.length > 0}
                 viewHref={`${urlPrefix}/products/${product.slug}`}
                 quantityInCart={quantityInCart}
                 isRtl={isRtl}
                 onAddToCart={handleAddToCart}
                 className="w-full py-2.5 text-sm font-semibold rounded-lg inline-flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+                ctaShape={resolvedCtaShape}
+                ctaSize={resolvedCtaSize}
+                ctaColor={resolvedCtaColor}
+                ctaTextColor={resolvedCtaTextColor}
+                ctaLabelTextEn={resolvedCtaLabelTextEn}
+                ctaLabelTextAr={resolvedCtaLabelTextAr}
+                oosDimColor={resolvedOosDimColor}
+                theme={store.theme}
               />
             </div>
           </div>
@@ -292,7 +339,7 @@ function ModernProductCard({
                 <h3
                   id={`prod-${product.id}-name`}
                   data-zone="productName"
-                  className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 leading-snug tracking-tight ${isRtl ? 'text-right' : ''}`}
+                  className={`font-semibold ${textSizes.name} text-foreground group-hover:text-primary transition-colors duration-300 ease-out line-clamp-2 leading-snug tracking-tight ${isRtl ? 'text-right' : ''}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   itemProp="name"
                 >
                   {isRtl && product.nameAr ? product.nameAr : product.name}

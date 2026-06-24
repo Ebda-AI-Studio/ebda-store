@@ -39,6 +39,12 @@ export interface TemplateProduct {
   isFeatured?: boolean;
   inStock?: boolean;
   /**
+   * Server-computed: inventory <= 0 AND allowBackorder. When true the product
+   * is orderable despite being out of stock — the card CTA stays pressable and
+   * the OOS label is suppressed. Task 13.
+   */
+  acceptsBackorder?: boolean;
+  /**
    * Variant pricing snapshot — propagated from the API so listing
    * cards can render `From <min>` instead of the parent's stale
    * standalone price. Each entry is just enough to compute min/max +
@@ -249,6 +255,13 @@ export interface FooterProps {
   contact: StoreContact;
   socials: StoreSocials;
   navigation?: NavItem[];
+  /**
+   * Store theme — forwarded from ShopChrome so footers can read theme flags
+   * without needing their own store context call. Currently used to honor
+   * `footerSocialOriginalColor` (platform brand colors on social icons).
+   * Optional: footers that don't read any theme flag degrade gracefully.
+   */
+  theme?: import('@force/shared').StoreTheme;
   /**
    * Per-store footer columns (shop / company / support) and newsletter
    * toggle. When undefined or every section is empty, the template renders

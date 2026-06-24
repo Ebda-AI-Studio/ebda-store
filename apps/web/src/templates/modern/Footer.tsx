@@ -26,6 +26,7 @@ export default function ModernFooter({
   footerLogo,
   hideFooterLogoMobile,
   footerLogoAutoFilter,
+  theme,
 }: FooterProps) {
   const { isRtl: ctxIsRtl, language } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -153,7 +154,11 @@ export default function ModernFooter({
                     className="text-foreground/75 hover:text-foreground transition-colors duration-300 ease-out cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-5 h-5" />
+                    <SocialGlyph
+                      entry={s}
+                      className="w-5 h-5"
+                      originalColors={theme?.footerSocialOriginalColor === true}
+                    />
                   </a>
                 ))}
               </div>

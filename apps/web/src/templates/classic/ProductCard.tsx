@@ -14,6 +14,7 @@ import {
   cardImageAspectClass,
   cardImageRadiusClass,
 } from '../shared/card-size';
+import type { CtaShape, CtaSize } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor, getProductCardTextSizes } from '@force/shared';
@@ -94,9 +95,29 @@ function ClassicProductCard({
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
+  // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
+  const orderable = product.inStock !== false || product.acceptsBackorder === true;
 
   const frameCls =
     `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
+
+  // Task 3 B: read CTA + OOS defaults from productCardDefaults.
+  const defaults = layout?.productCardDefaults;
+  const resolvedCtaShape = defaults?.ctaShape as CtaShape | undefined;
+  const resolvedCtaSize = defaults?.ctaSize as CtaSize | undefined;
+  const resolvedCtaColor = defaults?.ctaColor;
+  const resolvedCtaTextColor = defaults?.ctaTextColor;
+  const resolvedCtaLabelTextEn = defaults?.ctaLabelTextEn;
+  const resolvedCtaLabelTextAr = defaults?.ctaLabelTextAr;
+  const resolvedOosDimColor = defaults?.oosDimColor;
+  const resolvedOosLabel = defaults?.oosLabel;
+  const resolvedOosLabelTextEn = defaults?.oosLabelTextEn;
+  const resolvedOosLabelTextAr = defaults?.oosLabelTextAr;
+  const resolvedOosLabelShape = defaults?.oosLabelShape as CtaShape | undefined;
+  const resolvedOosLabelPlacement = defaults?.oosLabelPlacement;
+  const resolvedOosLabelColor = defaults?.oosLabelColor;
+  const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
+  const nameCase = defaults?.productNameCase;
 
   return (
     <article
@@ -174,9 +195,10 @@ function ClassicProductCard({
             className="absolute bottom-0 inset-x-0 bg-foreground/90 py-3 translate-y-0 lg:translate-y-full lg:group-hover:translate-y-0 transition-transform duration-300 ease-out"
             onClick={e => e.preventDefault()}
           >
+            {/* Task 3 B2: thread CTA customization props. */}
             <ProductCardCta
               productId={product.id}
-              inStock={product.inStock !== false}
+              inStock={orderable}
               hasVariants={!!product.variants && product.variants.length > 0}
               viewHref={`${urlPrefix}/products/${product.slug}`}
               quantityInCart={quantityInCart}
@@ -195,6 +217,14 @@ function ClassicProductCard({
                 adding: isRtl ? 'جاري الإضافة...' : 'Adding...',
                 view: isRtl ? 'عرض' : 'View',
               }}
+              ctaShape={resolvedCtaShape}
+              ctaSize={resolvedCtaSize}
+              ctaColor={resolvedCtaColor}
+              ctaTextColor={resolvedCtaTextColor}
+              ctaLabelTextEn={resolvedCtaLabelTextEn}
+              ctaLabelTextAr={resolvedCtaLabelTextAr}
+              oosDimColor={resolvedOosDimColor}
+              theme={store.theme}
             />
           </div>
 
@@ -225,8 +255,20 @@ function ClassicProductCard({
           )}
           {/* Platform-level OOS ribbon (red, prominent) — replaces the
               theme-local soldOut badge for visual consistency across
-              every theme (2026-05-16). */}
-          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
+              every theme (2026-05-16).
+              Task 3 B4: OOS badge customization via productCardDefaults. */}
+          <OutOfStockRibbon
+            inStock={orderable}
+            isRtl={isRtl}
+            oosLabel={resolvedOosLabel}
+            oosLabelTextEn={resolvedOosLabelTextEn}
+            oosLabelTextAr={resolvedOosLabelTextAr}
+            oosLabelShape={resolvedOosLabelShape}
+            oosLabelPlacement={resolvedOosLabelPlacement}
+            oosLabelColor={resolvedOosLabelColor}
+            oosLabelTextColor={resolvedOosLabelTextColor}
+            theme={store.theme}
+          />
         </div>
 
         {/* Product info — PC-1: name/price sizes from textSizes; PC-2: pad from textSizes.pad. */}
@@ -238,7 +280,7 @@ function ClassicProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`font-serif ${textSizes.name} text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight`}
+                className={`font-serif ${textSizes.name} text-foreground mb-2 group-hover:text-primary transition-colors duration-500 leading-snug tracking-tight${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

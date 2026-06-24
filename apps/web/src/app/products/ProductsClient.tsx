@@ -215,6 +215,15 @@ export default function ProductsClient({
     ? { color: resolveColor(store.theme.plpSubheadingColor, store.theme) ?? undefined }
     : undefined;
 
+  // Task 7: derive active category context for breadcrumb / H1 / subtitle.
+  const activeCategory = categoryFilter ? categories.find(c => c.slug === categoryFilter) : null;
+  const ctxEn =
+    categoryFilter === 'best-sellers' ? 'Best Sellers' : (activeCategory?.name ?? 'All Products');
+  const ctxAr =
+    categoryFilter === 'best-sellers'
+      ? 'الأكثر مبيعاً'
+      : (activeCategory?.nameAr ?? activeCategory?.name ?? translations['All Products']);
+
   // Cart-id → quantity is consumed by ProductListItem (list view). The grid
   // view's PecannbeeProductCard handles its own optimistic add state.
   const cartQuantities = useMemo<Record<string, number>>(() => {
@@ -442,11 +451,26 @@ export default function ProductsClient({
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
+            {categoryFilter && (
+              <>
+                <Link href={storeUrl('/products')} className="transition-colors hover:text-primary">
+                  {t('Products', translations['Products'])}
+                </Link>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </>
+            )}
             <span
               className="text-foreground"
               style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpBreadcrumbColorStyle }}
             >
-              {t('Products', translations['Products'])}
+              {t(ctxEn, ctxAr)}
             </span>
           </nav>
 
@@ -456,16 +480,18 @@ export default function ProductsClient({
               className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
               style={{ ...zoneStyle(plpHeadingZone, plpScale), ...plpHeadingColorStyle }}
             >
-              {t('All Products', translations['All Products'])}
+              {t(ctxEn, ctxAr)}
             </h1>
             <p
               className="mt-2 text-muted-foreground"
               style={{ ...zoneStyle(plpSubtitleZone, plpScale), ...plpSubheadingColorStyle }}
             >
-              {t(
-                'Browse our collection of premium products',
-                '\u062a\u0635\u0641\u062d \u0645\u062c\u0645\u0648\u0639\u062a\u0646\u0627 \u0645\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0645\u0645\u064a\u0632\u0629'
-              )}
+              {categoryFilter
+                ? t(`Browse ${ctxEn}`, `\u062a\u0635\u0641\u062d ${ctxAr}`)
+                : t(
+                    'Browse our collection of premium products',
+                    '\u062a\u0635\u0641\u062d \u0645\u062c\u0645\u0648\u0639\u062a\u0646\u0627 \u0645\u0646 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0645\u0645\u064a\u0632\u0629'
+                  )}
             </p>
           </div>
 

@@ -224,6 +224,54 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         />
       </label>
 
+      {/* ── Social icon brand colors ────────────────────────────────────── */}
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            Social icon colors / ألوان أيقونات التواصل الاجتماعي
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            By default social icons inherit the footer&apos;s text color (monochrome). Enable
+            original brand colors to show each platform in its registered color (Instagram pink,
+            WhatsApp green, etc.).
+          </p>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={branding.theme.footerSocialOriginalColor === true}
+            onChange={e =>
+              onChange({
+                ...branding,
+                theme: { ...branding.theme, footerSocialOriginalColor: e.target.checked },
+              })
+            }
+            className="h-4 w-4 cursor-pointer accent-primary"
+          />
+          <span className="text-xs text-foreground">
+            Use original brand colors in footer social icons / استخدام ألوان العلامة التجارية
+            الأصلية في أيقونات التواصل الاجتماعي بالتذييل
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={branding.theme.floatingWidgetOriginalColor === true}
+            onChange={e =>
+              onChange({
+                ...branding,
+                theme: { ...branding.theme, floatingWidgetOriginalColor: e.target.checked },
+              })
+            }
+            className="h-4 w-4 cursor-pointer accent-primary"
+          />
+          <span className="text-xs text-foreground">
+            Use original brand colors in floating widget buttons (overrides custom button colors) /
+            استخدام ألوان العلامة التجارية الأصلية في أزرار القطعة العائمة
+          </span>
+        </label>
+      </div>
+
       {/* ── Footer logo ───────────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>

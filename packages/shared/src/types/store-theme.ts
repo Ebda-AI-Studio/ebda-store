@@ -282,6 +282,25 @@ export interface StoreTheme {
   bgSectionAlt?: string;
 
   /**
+   * When true, footer social icons render in each platform's official brand
+   * color (Instagram #E4405F, WhatsApp #25D366, etc.) instead of inheriting
+   * the footer's `currentColor`. Default false — monochrome icons integrate
+   * cleanly with any footer bg; opt-in so existing stores are unaffected.
+   * Toggled via Branding → Theme. 2026-06-24.
+   */
+  footerSocialOriginalColor?: boolean;
+
+  /**
+   * When true, the Floating Widget ignores per-button `bgColor`/`iconColor`
+   * overrides and uses each button kind's registered brand color from
+   * KIND_DEFAULTS (whatsapp #25D366, instagram #E4405F, etc.). Merchant
+   * color customizations are preserved in the data and take effect again
+   * when this flag is set back to false. Default false. Toggled via
+   * Branding → Theme alongside the footer flag. 2026-06-24.
+   */
+  floatingWidgetOriginalColor?: boolean;
+
+  /**
    * Per-store category product-count unit label (EN + AR).
    * Displayed after the count on category cards, e.g. "4 pieces" / "4 قطعة".
    * When unset, the storefront defaults to EN "pieces" / AR "قطعة".

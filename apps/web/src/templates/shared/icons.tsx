@@ -365,19 +365,45 @@ export interface SocialLinkEntry {
 }
 
 /**
+ * Official hex brand colors keyed by platform. Used when
+ * `originalColors` is true on SocialGlyph so the merchant can opt into
+ * showing each icon in its recognizable brand hue instead of the footer's
+ * inherited text color. Sourced from each platform's brand guidelines.
+ */
+const BRAND_COLORS: Record<string, string> = {
+  instagram: '#E4405F',
+  whatsapp: '#25D366',
+  facebook: '#1877F2',
+  twitter: '#000000',
+  tiktok: '#000000',
+  youtube: '#FF0000',
+  snapchat: '#FFFC00',
+  telegram: '#26A5E4',
+  linkedin: '#0A66C2',
+  pinterest: '#BD081C',
+};
+
+/**
  * Render a social link's icon — branded SVG (instagram/whatsapp) or the
  * default monochrome path glyph. Each footer theme uses this so the brand
  * colors land consistently without duplicating the if/else across themes.
  *
  * `className` controls size on the path-glyph branch; the brand-icon branch
  * uses the same class so all glyphs render at one size in the row.
+ *
+ * `originalColors` — when true, renders the icon in its official platform
+ * brand color (see BRAND_COLORS). When false/unset, falls back to the
+ * monochrome `currentColor` path that inherits the footer's text color.
  */
 export function SocialGlyph({
   entry,
   className = 'w-4 h-4',
+  originalColors = false,
 }: {
   entry: SocialLinkEntry;
   className?: string;
+  /** Render in the platform's official brand color instead of currentColor. */
+  originalColors?: boolean;
 }) {
   // 2026-05-21 — every footer icon renders as the single-path monochrome
   // glyph from Simple Icons. Previously WhatsApp + Instagram used their
@@ -387,6 +413,23 @@ export function SocialGlyph({
   // "social logos in footer must have same size without the white frame".
   // Brand identity is preserved in the FloatingWidget context (different
   // code path via KindIcon) — only the footer surface goes monochrome.
+  //
+  // 2026-06-24 — added `originalColors` opt-in: when the merchant enables
+  // `footerSocialOriginalColor` on their theme, each glyph is filled with
+  // its platform's registered brand color instead of inheriting the footer
+  // text color. BrandIcon components (instagram/whatsapp full-color SVGs)
+  // are rendered when available; all others use the BRAND_COLORS hex map.
+  if (originalColors) {
+    if (entry.BrandIcon) {
+      return <entry.BrandIcon className={className} />;
+    }
+    const fill = BRAND_COLORS[entry.key] ?? 'currentColor';
+    return (
+      <svg className={className} fill={fill} viewBox="0 0 24 24" aria-hidden="true">
+        <path d={entry.icon} />
+      </svg>
+    );
+  }
   return (
     <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path d={entry.icon} />

@@ -72,6 +72,16 @@ export interface StoreTheme {
   bgPage?: string;
   /** Paired with bgPage — alternate-section background HSL triplet. */
   bgSectionAlt?: string;
+  /**
+   * When true, footer social icons render in each platform's official brand
+   * color instead of inheriting currentColor. Default false. 2026-06-24.
+   */
+  footerSocialOriginalColor?: boolean;
+  /**
+   * When true, the Floating Widget ignores per-button color overrides and
+   * uses each kind's registered brand color. Default false. 2026-06-24.
+   */
+  floatingWidgetOriginalColor?: boolean;
 }
 
 export interface StoreBranding {

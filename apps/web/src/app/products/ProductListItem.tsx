@@ -6,6 +6,11 @@ import type { Product } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
 import { getProductPricing } from '@/lib/product-pricing';
+import { useStore } from '../../contexts/StoreContext';
+import { resolveColor } from '@force/shared';
+import { OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
+import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
+import type { CtaShape, CtaSize } from '../../templates/shared/card-size';
 
 interface ProductListItemProps {
   product: Product;
@@ -26,6 +31,7 @@ export function ProductListItem({
   showCardPrice,
 }: ProductListItemProps) {
   const { t, isRtl } = useLanguage();
+  const { store, layout } = useStore();
   const priceVisible = showCardPrice !== false;
   // Localized name for alt text + heading. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
@@ -37,6 +43,43 @@ export function ProductListItem({
   // multi-variant products render "From <min>" instead of the parent's
   // (often stale) standalone price.
   const pricing = getProductPricing(product, undefined, 'card');
+  // Task 13: orderable = truly in-stock OR backorder allowed. Derived from
+  // inventory because ProductListItem uses a richer inventory check (undefined
+  // means variant-managed stock → treat as orderable). OOS + backorder = orderable.
+  const orderable =
+    product.inventory === undefined || product.inventory > 0 || product.acceptsBackorder === true;
+
+  // Task 3 B3/B4: read CTA + OOS defaults from productCardDefaults.
+  const defaults = layout?.productCardDefaults;
+  const resolvedCtaShape = defaults?.ctaShape as CtaShape | undefined;
+  const resolvedCtaSize = defaults?.ctaSize as CtaSize | undefined;
+  const resolvedCtaColor = defaults?.ctaColor;
+  const resolvedCtaTextColor = defaults?.ctaTextColor;
+  const resolvedCtaLabelTextEn = defaults?.ctaLabelTextEn;
+  const resolvedCtaLabelTextAr = defaults?.ctaLabelTextAr;
+  const resolvedOosDimColor = defaults?.oosDimColor;
+  const resolvedOosLabel = defaults?.oosLabel;
+  const resolvedOosLabelTextEn = defaults?.oosLabelTextEn;
+  const resolvedOosLabelTextAr = defaults?.oosLabelTextAr;
+  const resolvedOosLabelShape = defaults?.oosLabelShape as CtaShape | undefined;
+  const resolvedOosLabelPlacement = defaults?.oosLabelPlacement;
+  const resolvedOosLabelColor = defaults?.oosLabelColor;
+  const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
+  const nameCase = defaults?.productNameCase;
+
+  // CTA shape + size extra classes.
+  const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
+    .filter(Boolean)
+    .join(' ');
+  const resolvedBg =
+    resolvedCtaColor && store.theme ? resolveColor(resolvedCtaColor, store.theme) : undefined;
+  const resolvedText =
+    resolvedCtaTextColor && store.theme
+      ? resolveColor(resolvedCtaTextColor, store.theme)
+      : undefined;
+  const ctaAddLabel =
+    (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+    t('Add to Cart', translations['Add to Cart']);
 
   return (
     <Link
@@ -55,6 +98,19 @@ export function ProductListItem({
             {t('Sale', 'تخفيض')}
           </span>
         )}
+        {/* Task 3 B4: OOS badge on list view — sits inside the image container. */}
+        <OutOfStockRibbon
+          inStock={orderable}
+          isRtl={isRtl}
+          oosLabel={resolvedOosLabel}
+          oosLabelTextEn={resolvedOosLabelTextEn}
+          oosLabelTextAr={resolvedOosLabelTextAr}
+          oosLabelShape={resolvedOosLabelShape}
+          oosLabelPlacement={resolvedOosLabelPlacement}
+          oosLabelColor={resolvedOosLabelColor}
+          oosLabelTextColor={resolvedOosLabelTextColor}
+          theme={store.theme}
+        />
         {product.images?.[0]?.url ? (
           <Image
             src={product.images[0].url}
@@ -93,7 +149,10 @@ export function ProductListItem({
               {displayCategory}
             </p>
           )}
-          <h3 className="mt-1 text-lg font-semibold text-foreground" data-zone="productName">
+          <h3
+            className={`mt-1 text-lg font-semibold text-foreground${nameCase === 'uppercase' ? ' uppercase' : ''}`}
+            data-zone="productName"
+          >
             {displayName}
           </h3>
         </div>
@@ -153,9 +212,17 @@ export function ProductListItem({
               </svg>
             </button>
 
+            {/* Task 3 B3: CTA shape/size/color/label customization + OOS dim. */}
             <button
-              className="flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+              className={`flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90${ctaExtraCls ? ` ${ctaExtraCls}` : ''}`}
               onClick={e => onAddToCart(product, e)}
+              style={{
+                ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
+                ...(resolvedText ? { color: resolvedText } : {}),
+                ...(!orderable && resolvedOosDimColor && store.theme
+                  ? { backgroundColor: resolveColor(resolvedOosDimColor, store.theme), opacity: 1 }
+                  : {}),
+              }}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -165,7 +232,7 @@ export function ProductListItem({
                   d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
                 />
               </svg>
-              {t('Add to Cart', translations['Add to Cart'])}
+              {ctaAddLabel}
             </button>
           </div>
         </div>

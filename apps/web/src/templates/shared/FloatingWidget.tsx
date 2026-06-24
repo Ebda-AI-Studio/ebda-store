@@ -383,12 +383,24 @@ function ButtonRender({
   // kinds (whatsapp/instagram), the default IS the brand color so the
   // button reads as the brand without the SVG needing to embed its bg.
   // Same glyph size across kinds — Ahmad 2026-05-21 "all icons same size".
-  const bg = button.bgColor
-    ? (resolveColor(button.bgColor, theme as StoreTheme) ?? button.bgColor)
-    : defaults.bg;
-  const iconColor = button.iconColor
-    ? (resolveColor(button.iconColor, theme as StoreTheme) ?? button.iconColor)
-    : defaults.icon;
+  //
+  // 2026-06-24 — when `floatingWidgetOriginalColor` is true on the theme,
+  // ignore per-button color overrides and always use the KIND_DEFAULTS (the
+  // official brand bg + icon color). This restores brand identity for every
+  // button even if the merchant previously set custom colors on individual
+  // buttons. The per-button overrides stay saved so the merchant can toggle
+  // the flag back off and get their customizations back.
+  const useOriginal = theme?.floatingWidgetOriginalColor === true;
+  const bg = useOriginal
+    ? defaults.bg
+    : button.bgColor
+      ? (resolveColor(button.bgColor, theme as StoreTheme) ?? button.bgColor)
+      : defaults.bg;
+  const iconColor = useOriginal
+    ? defaults.icon
+    : button.iconColor
+      ? (resolveColor(button.iconColor, theme as StoreTheme) ?? button.iconColor)
+      : defaults.icon;
   const label = isRtl
     ? (button.labelAr ?? button.label ?? defaults.labelAr)
     : (button.label ?? defaults.label);

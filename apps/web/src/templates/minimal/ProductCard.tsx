@@ -14,6 +14,7 @@ import {
   cardImageAspectClass,
   cardImageRadiusClass,
 } from '../shared/card-size';
+import type { CtaShape, CtaSize } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor, getProductCardTextSizes } from '@force/shared';
@@ -91,11 +92,32 @@ function MinimalProductCard({
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
+  // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
+  const orderable = product.inStock !== false || product.acceptsBackorder === true;
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
   };
   const frameCls =
     `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
+
+  // Task 3 B: read CTA + OOS defaults from productCardDefaults.
+  const defaults = layout?.productCardDefaults;
+  const resolvedCtaShape = defaults?.ctaShape as CtaShape | undefined;
+  const resolvedCtaSize = defaults?.ctaSize as CtaSize | undefined;
+  const resolvedCtaColor = defaults?.ctaColor;
+  const resolvedCtaTextColor = defaults?.ctaTextColor;
+  const resolvedCtaLabelTextEn = defaults?.ctaLabelTextEn;
+  const resolvedCtaLabelTextAr = defaults?.ctaLabelTextAr;
+  const resolvedOosDimColor = defaults?.oosDimColor;
+  const resolvedOosLabel = defaults?.oosLabel;
+  const resolvedOosLabelTextEn = defaults?.oosLabelTextEn;
+  const resolvedOosLabelTextAr = defaults?.oosLabelTextAr;
+  const resolvedOosLabelShape = defaults?.oosLabelShape as CtaShape | undefined;
+  const resolvedOosLabelPlacement = defaults?.oosLabelPlacement;
+  const resolvedOosLabelColor = defaults?.oosLabelColor;
+  const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
+  // Task 6: merchant-controlled name casing (default = normal, no forced caps).
+  const nameCase = layout?.productCardDefaults?.productNameCase;
 
   return (
     <article
@@ -121,8 +143,20 @@ function MinimalProductCard({
         >
           {/* Platform-level OOS ribbon — minimal pack stays chrome-free
               elsewhere, but the OOS state needs unambiguous communication
-              regardless of pack philosophy (2026-05-16). */}
-          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
+              regardless of pack philosophy (2026-05-16).
+              Task 3 B4: OOS badge customization via productCardDefaults. */}
+          <OutOfStockRibbon
+            inStock={orderable}
+            isRtl={isRtl}
+            oosLabel={resolvedOosLabel}
+            oosLabelTextEn={resolvedOosLabelTextEn}
+            oosLabelTextAr={resolvedOosLabelTextAr}
+            oosLabelShape={resolvedOosLabelShape}
+            oosLabelPlacement={resolvedOosLabelPlacement}
+            oosLabelColor={resolvedOosLabelColor}
+            oosLabelTextColor={resolvedOosLabelTextColor}
+            theme={store.theme}
+          />
           {/* Sprint 2 (2026-05-17): NEW badge in minimal kept extra-quiet
               (no shadow, tight padding, primary color via theme token)
               so it doesn't violate the chrome-free identity but still
@@ -217,9 +251,10 @@ function MinimalProductCard({
             )}
             onClick={e => e.preventDefault()}
           >
+            {/* Task 3 B2: thread CTA customization props. */}
             <ProductCardCta
               productId={product.id}
-              inStock={product.inStock !== false}
+              inStock={orderable}
               hasVariants={!!product.variants && product.variants.length > 0}
               viewHref={`${urlPrefix}/products/${product.slug}`}
               quantityInCart={quantityInCart}
@@ -239,6 +274,14 @@ function MinimalProductCard({
                 adding: isRtl ? '...' : '...',
                 view: isRtl ? 'عرض' : 'View',
               }}
+              ctaShape={resolvedCtaShape}
+              ctaSize={resolvedCtaSize}
+              ctaColor={resolvedCtaColor}
+              ctaTextColor={resolvedCtaTextColor}
+              ctaLabelTextEn={resolvedCtaLabelTextEn}
+              ctaLabelTextAr={resolvedCtaLabelTextAr}
+              oosDimColor={resolvedOosDimColor}
+              theme={store.theme}
             />
           </div>
         </div>
@@ -252,7 +295,7 @@ function MinimalProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.18em] uppercase font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug`}
+                className={`${textSizes.name} tracking-[0.18em] ${nameCase === 'uppercase' ? 'uppercase' : ''} font-light text-muted-foreground group-hover:text-foreground transition-colors duration-500 ease-out leading-snug`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

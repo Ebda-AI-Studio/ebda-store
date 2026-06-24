@@ -16,7 +16,10 @@ import {
   productSizeClass,
   cardImageAspectClass,
   cardImageRadiusClass,
+  ctaShapeClass,
+  ctaSizeClass,
 } from './card-size';
+import type { CtaShape, CtaSize } from './card-size';
 import { OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
@@ -86,13 +89,35 @@ export function ProductCarousel({
   // Bucket E3 (2026-05-17): quick-add (+) circle is opt-in per store.
   // When `store.theme.showQuickAdd === true`, in-stock non-variant
   // products get the overlay button; otherwise it's hidden.
-  const { store } = useStore();
+  const { store, layout } = useStore();
   const showQuickAdd = store.theme?.showQuickAdd === true;
   // Sprint 1 (2026-05-17): per-cardSize text-size pair, paired with
   // pack-styles flavor classes. Without this the previous `text-lg`
   // names looked oversized inside `xs`/`sm` card widths and undersized
   // inside `lg`/`xl` widths.
   const textSizes = getProductCardTextSizes(cardSize);
+
+  // Task 3 B: read CTA + OOS defaults from productCardDefaults.
+  const cardDefaults = layout?.productCardDefaults;
+  const resolvedCtaShape = cardDefaults?.ctaShape as CtaShape | undefined;
+  const resolvedCtaSize = cardDefaults?.ctaSize as CtaSize | undefined;
+  const resolvedCtaColor = cardDefaults?.ctaColor;
+  const resolvedCtaTextColor = cardDefaults?.ctaTextColor;
+  const resolvedCtaLabelTextEn = cardDefaults?.ctaLabelTextEn;
+  const resolvedCtaLabelTextAr = cardDefaults?.ctaLabelTextAr;
+  const resolvedOosDimColor = cardDefaults?.oosDimColor;
+  const resolvedOosLabel = cardDefaults?.oosLabel;
+  const resolvedOosLabelTextEn = cardDefaults?.oosLabelTextEn;
+  const resolvedOosLabelTextAr = cardDefaults?.oosLabelTextAr;
+  const resolvedOosLabelShape = cardDefaults?.oosLabelShape as CtaShape | undefined;
+  const resolvedOosLabelPlacement = cardDefaults?.oosLabelPlacement;
+  const resolvedOosLabelColor = cardDefaults?.oosLabelColor;
+  const resolvedOosLabelTextColor = cardDefaults?.oosLabelTextColor;
+  const nameCase = cardDefaults?.productNameCase;
+  // Build CTA extra classes for inline carousel CTA buttons.
+  const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
+    .filter(Boolean)
+    .join(' ');
   const shape = cardShapeClasses(cardShape);
   // Match PecannbeeProductCard + 4/5 theme cards so the same product isn't square
   // in a carousel but portrait in a category grid (audit: ratio consistency).
@@ -289,6 +314,8 @@ export function ProductCarousel({
               // and disable the cart button.
               const hasVariants = !!product.variants && product.variants.length > 0;
               const inStock = product.inStock !== false;
+              // Task 13: backorder-aware orderable signal.
+              const orderable = inStock || product.acceptsBackorder === true;
               const showNewBadge = inStock && isProductNew(product);
 
               return (
@@ -323,7 +350,19 @@ export function ProductCarousel({
                       <div
                         className={`group/img relative ${effectiveAspectCls} ${imgRadiusCls || shape.radius} overflow-hidden bg-muted`}
                       >
-                        <OutOfStockRibbon inStock={inStock} isRtl={isRtl} />
+                        {/* Task 3 B4: OOS badge customization via productCardDefaults. */}
+                        <OutOfStockRibbon
+                          inStock={orderable}
+                          isRtl={isRtl}
+                          oosLabel={resolvedOosLabel}
+                          oosLabelTextEn={resolvedOosLabelTextEn}
+                          oosLabelTextAr={resolvedOosLabelTextAr}
+                          oosLabelShape={resolvedOosLabelShape}
+                          oosLabelPlacement={resolvedOosLabelPlacement}
+                          oosLabelColor={resolvedOosLabelColor}
+                          oosLabelTextColor={resolvedOosLabelTextColor}
+                          theme={store.theme}
+                        />
                         {/* Sprint 2: NEW orange pill top-START when new OR
                             <14 days old. Doesn't collide with OOS ribbon
                             because OOS hides NEW (see isProductNew gate). */}
@@ -402,7 +441,7 @@ export function ProductCarousel({
                             parent + onAddToCart handler present. Position
                             bottom-end of image so it doesn't fight the
                             wishlist heart top-start. */}
-                        {showQuickAdd && inStock && !hasVariants && onAddToCart && (
+                        {showQuickAdd && orderable && !hasVariants && onAddToCart && (
                           <button
                             type="button"
                             onClick={e => {
@@ -470,7 +509,7 @@ export function ProductCarousel({
                             >
                               {nameVisible && (
                                 <p
-                                  className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}`}
+                                  className={`line-clamp-2 ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                                   data-zone="productName"
                                   style={{
                                     fontFamily: productNameZone?.fontFamily,
@@ -535,40 +574,71 @@ export function ProductCarousel({
                       // Contrast-guard the CTA color against the button's own bg so a
                       // baseline/zone color (e.g. token:foreground) can't render
                       // dark-on-dark on a filled button. See guardedCtaColor.
+                      // Task 3 B3: ctaColor/ctaTextColor/oosDimColor from productCardDefaults.
+                      const resolvedBg =
+                        resolvedCtaColor && store.theme
+                          ? resolveColor(resolvedCtaColor, store.theme)
+                          : undefined;
+                      const resolvedText =
+                        resolvedCtaTextColor && store.theme
+                          ? resolveColor(resolvedCtaTextColor, store.theme)
+                          : undefined;
                       const ctaStyle: React.CSSProperties = {
                         fontFamily: productCtaZone?.fontFamily,
                         fontSize: responsiveFontSize(productCtaZone?.fontSize),
                         fontWeight: productCtaZone?.fontWeight,
-                        color: guardedCtaColor(
-                          productCtaZone?.color,
-                          styles.productCardCta,
-                          store.theme
-                        ),
+                        color:
+                          resolvedText ??
+                          guardedCtaColor(
+                            productCtaZone?.color,
+                            styles.productCardCta,
+                            store.theme
+                          ),
                         letterSpacing: productCtaZone?.letterSpacing,
                         lineHeight: productCtaZone?.lineHeight,
                         textTransform:
                           productCtaZone?.textTransform as React.CSSProperties['textTransform'],
+                        ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
                       };
+                      const oosCtaStyle: React.CSSProperties = {
+                        ...ctaStyle,
+                        ...(!orderable && resolvedOosDimColor && store.theme
+                          ? {
+                              backgroundColor: resolveColor(resolvedOosDimColor, store.theme),
+                              opacity: 1,
+                            }
+                          : {}),
+                      };
+                      const ctaViewLabel =
+                        (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+                        (isRtl ? 'عرض' : 'View');
+                      const ctaOosLabel =
+                        (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+                        (isRtl ? 'نفدت الكمية' : 'Out Of Stock');
+                      const ctaAddLabel =
+                        (isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+                        (isRtl ? 'إضافة للسلة' : 'Add to cart');
+                      const ctaExtraFull = ctaExtraCls ? ` ${ctaExtraCls}` : '';
                       return hasVariants ? (
                         <Link
                           href={href}
                           prefetch={false}
-                          className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
+                          className={`block w-full text-center cursor-pointer ${styles.productCardCta}${ctaExtraFull}`}
                           data-zone="productCta"
                           data-cta="button"
                           style={ctaStyle}
                         >
-                          {isRtl ? 'عرض' : 'View'}
+                          {ctaViewLabel}
                         </Link>
-                      ) : !inStock ? (
+                      ) : !orderable ? (
                         <button
                           type="button"
                           disabled
-                          className={`block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}`}
+                          className={`block w-full text-center opacity-60 cursor-not-allowed ${styles.productCardCta}${ctaExtraFull}`}
                           data-zone="productCta"
-                          style={ctaStyle}
+                          style={oosCtaStyle}
                         >
-                          {isRtl ? 'نفدت الكمية' : 'Out Of Stock'}
+                          {ctaOosLabel}
                         </button>
                       ) : (
                         !showQuickAdd &&
@@ -576,12 +646,12 @@ export function ProductCarousel({
                           <button
                             type="button"
                             onClick={() => onAddToCart(product.id)}
-                            className={`block w-full text-center cursor-pointer ${styles.productCardCta}`}
+                            className={`block w-full text-center cursor-pointer ${styles.productCardCta}${ctaExtraFull}`}
                             data-zone="productCta"
                             data-cta="button"
                             style={ctaStyle}
                           >
-                            {isRtl ? 'إضافة للسلة' : 'Add to cart'}
+                            {ctaAddLabel}
                           </button>
                         )
                       );

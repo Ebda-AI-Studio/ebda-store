@@ -14,6 +14,7 @@ import {
   cardImageAspectClass,
   cardImageRadiusClass,
 } from '../shared/card-size';
+import type { CtaShape, CtaSize } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor, getProductCardTextSizes } from '@force/shared';
@@ -89,6 +90,8 @@ function BoldProductCard({
   const normalizeImages = store.theme?.normalizeProductImages === true;
 
   const discount = calculateDiscount(product.price, product.compareAtPrice);
+  // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
+  const orderable = product.inStock !== false || product.acceptsBackorder === true;
 
   const handleAddToCart = async (productId: string) => {
     await onAddToCart?.(productId);
@@ -96,6 +99,25 @@ function BoldProductCard({
 
   const frameCls =
     `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
+
+  // Task 3 B: read CTA + OOS defaults from productCardDefaults.
+  const defaults = layout?.productCardDefaults;
+  const resolvedCtaShape = defaults?.ctaShape as CtaShape | undefined;
+  const resolvedCtaSize = defaults?.ctaSize as CtaSize | undefined;
+  const resolvedCtaColor = defaults?.ctaColor;
+  const resolvedCtaTextColor = defaults?.ctaTextColor;
+  const resolvedCtaLabelTextEn = defaults?.ctaLabelTextEn;
+  const resolvedCtaLabelTextAr = defaults?.ctaLabelTextAr;
+  const resolvedOosDimColor = defaults?.oosDimColor;
+  const resolvedOosLabel = defaults?.oosLabel;
+  const resolvedOosLabelTextEn = defaults?.oosLabelTextEn;
+  const resolvedOosLabelTextAr = defaults?.oosLabelTextAr;
+  const resolvedOosLabelShape = defaults?.oosLabelShape as CtaShape | undefined;
+  const resolvedOosLabelPlacement = defaults?.oosLabelPlacement;
+  const resolvedOosLabelColor = defaults?.oosLabelColor;
+  const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
+  // Task 6: merchant-controlled name casing (default = normal, no forced caps).
+  const nameCase = layout?.productCardDefaults?.productNameCase;
 
   return (
     <article
@@ -122,8 +144,20 @@ function BoldProductCard({
           className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square'}`}
         >
           {/* Platform-level OOS ribbon (red, prominent) — same visual
-              across every theme (2026-05-16). */}
-          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
+              across every theme (2026-05-16).
+              Task 3 B4: OOS badge customization via productCardDefaults. */}
+          <OutOfStockRibbon
+            inStock={orderable}
+            isRtl={isRtl}
+            oosLabel={resolvedOosLabel}
+            oosLabelTextEn={resolvedOosLabelTextEn}
+            oosLabelTextAr={resolvedOosLabelTextAr}
+            oosLabelShape={resolvedOosLabelShape}
+            oosLabelPlacement={resolvedOosLabelPlacement}
+            oosLabelColor={resolvedOosLabelColor}
+            oosLabelTextColor={resolvedOosLabelTextColor}
+            theme={store.theme}
+          />
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
@@ -214,9 +248,10 @@ function BoldProductCard({
             )}
             onClick={e => e.preventDefault()}
           >
+            {/* Task 3 B2: thread CTA customization props. */}
             <ProductCardCta
               productId={product.id}
-              inStock={product.inStock !== false}
+              inStock={orderable}
               hasVariants={!!product.variants && product.variants.length > 0}
               viewHref={`${urlPrefix}/products/${product.slug}`}
               quantityInCart={quantityInCart}
@@ -233,6 +268,14 @@ function BoldProductCard({
                 adding: isRtl ? '...' : '...',
                 view: isRtl ? 'عرض' : 'View',
               }}
+              ctaShape={resolvedCtaShape}
+              ctaSize={resolvedCtaSize}
+              ctaColor={resolvedCtaColor}
+              ctaTextColor={resolvedCtaTextColor}
+              ctaLabelTextEn={resolvedCtaLabelTextEn}
+              ctaLabelTextAr={resolvedCtaLabelTextAr}
+              oosDimColor={resolvedOosDimColor}
+              theme={store.theme}
             />
           </div>
         </div>
@@ -244,7 +287,7 @@ function BoldProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`font-black ${textSizes.name} uppercase tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200`}
+                className={`font-black ${textSizes.name} ${nameCase === 'uppercase' ? 'uppercase' : ''} tracking-tight line-clamp-1 group-hover:text-primary transition-colors duration-200`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

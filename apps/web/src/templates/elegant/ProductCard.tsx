@@ -14,6 +14,7 @@ import {
   cardImageAspectClass,
   cardImageRadiusClass,
 } from '../shared/card-size';
+import type { CtaShape, CtaSize } from '../shared/card-size';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor, getProductCardTextSizes } from '@force/shared';
@@ -106,22 +107,80 @@ function ElegantProductCard({
   // ignored. See lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
+  // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
+  const orderable = product.inStock !== false || product.acceptsBackorder === true;
 
   const frameCls =
     `${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`.trim();
+
+  // Task 3 B: read CTA + OOS defaults from productCardDefaults.
+  const defaults = layout?.productCardDefaults;
+  const resolvedCtaShape = defaults?.ctaShape as CtaShape | undefined;
+  const resolvedCtaSize = defaults?.ctaSize as CtaSize | undefined;
+  const resolvedCtaColor = defaults?.ctaColor;
+  const resolvedCtaTextColor = defaults?.ctaTextColor;
+  const resolvedCtaLabelTextEn = defaults?.ctaLabelTextEn;
+  const resolvedCtaLabelTextAr = defaults?.ctaLabelTextAr;
+  const resolvedOosDimColor = defaults?.oosDimColor;
+  const resolvedOosLabel = defaults?.oosLabel;
+  const resolvedOosLabelTextEn = defaults?.oosLabelTextEn;
+  const resolvedOosLabelTextAr = defaults?.oosLabelTextAr;
+  const resolvedOosLabelShape = defaults?.oosLabelShape as CtaShape | undefined;
+  const resolvedOosLabelPlacement = defaults?.oosLabelPlacement;
+  const resolvedOosLabelColor = defaults?.oosLabelColor;
+  const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
+  // Task 6: merchant-controlled name casing (default = normal, no forced caps).
+  const nameCase = layout?.productCardDefaults?.productNameCase;
 
   return (
     <article
       itemScope
       itemType="https://schema.org/Product"
       aria-labelledby={`prod-${product.id}-name`}
-      className={`w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
+      // Task 3 Part A: article is relative so the absolute wishlist button
+      // positioned here is never clipped by the image div's overflow-hidden.
+      className={`relative w-full mx-auto ${productSizeClass(cardSize)} ${frameCls}`.trim()}
       style={
         showCardFrame && cardFrameColor && store.theme
           ? { borderColor: resolveColor(cardFrameColor, store.theme) }
           : undefined
       }
     >
+      {/* Wishlist heart — lifted OUT of the image div (Part A fix).
+          Positioned on the article, which has no overflow-hidden, so image
+          rounding never clips this button. Keeps the same corner visual. */}
+      {!onRemoveFromWishlist && (
+        <button
+          onClick={handleWishlist}
+          className={cn(
+            'absolute top-4 z-20 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-all duration-300 cursor-pointer',
+            isRtl ? 'left-4' : 'right-4',
+            'opacity-100 lg:opacity-0',
+            (isHovered || isWishlisted) && 'lg:opacity-100'
+          )}
+          aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+          aria-pressed={isWishlisted}
+        >
+          <svg
+            className={cn(
+              'w-5 h-5 transition-colors duration-300',
+              isWishlisted ? 'text-foreground fill-foreground' : 'text-foreground'
+            )}
+            fill={isWishlisted ? 'currentColor' : 'none'}
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            strokeWidth={1}
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
+        </button>
+      )}
+
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
         // RSC prefetch on every product card in a long grid hammered the API's
@@ -141,8 +200,20 @@ function ElegantProductCard({
           className={`relative overflow-hidden bg-gray-50 mb-3 ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {/* Platform-level OOS ribbon (red, prominent) — same visual
-              across every theme, see templates/shared/ProductCardCta.tsx */}
-          <OutOfStockRibbon inStock={product.inStock !== false} isRtl={isRtl} />
+              across every theme, see templates/shared/ProductCardCta.tsx.
+              Task 3 B4: OOS badge customization via productCardDefaults. */}
+          <OutOfStockRibbon
+            inStock={orderable}
+            isRtl={isRtl}
+            oosLabel={resolvedOosLabel}
+            oosLabelTextEn={resolvedOosLabelTextEn}
+            oosLabelTextAr={resolvedOosLabelTextAr}
+            oosLabelShape={resolvedOosLabelShape}
+            oosLabelPlacement={resolvedOosLabelPlacement}
+            oosLabelColor={resolvedOosLabelColor}
+            oosLabelTextColor={resolvedOosLabelTextColor}
+            theme={store.theme}
+          />
           {onToggleCompare && (
             <CompareButton
               productId={product.id}
@@ -194,37 +265,6 @@ function ElegantProductCard({
             </div>
           )}
 
-          {/* Wishlist — always visible on touch; fades in on hover for pointer devices */}
-          <button
-            onClick={handleWishlist}
-            className={cn(
-              'absolute top-4 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-all duration-300 cursor-pointer',
-              isRtl ? 'left-4' : 'right-4',
-              'opacity-100 lg:opacity-0',
-              (isHovered || isWishlisted) && 'lg:opacity-100'
-            )}
-            aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
-            aria-pressed={isWishlisted}
-          >
-            <svg
-              className={cn(
-                'w-5 h-5 transition-colors duration-300',
-                isWishlisted ? 'text-foreground fill-foreground' : 'text-foreground'
-              )}
-              fill={isWishlisted ? 'currentColor' : 'none'}
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={1}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
-          </button>
-
           {/* Badges */}
           <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
             {product.isNew && (
@@ -247,7 +287,8 @@ function ElegantProductCard({
             )}
           </ProductBadgeGroup>
 
-          {/* Quick Add — always visible on touch; slides up on hover for pointer devices */}
+          {/* Quick Add — always visible on touch; slides up on hover for pointer devices.
+              Task 3 B2: thread CTA customization props. */}
           <div
             className={cn(
               'absolute bottom-0 inset-x-0 bg-background/95 backdrop-blur-sm transition-all duration-300',
@@ -259,7 +300,7 @@ function ElegantProductCard({
           >
             <ProductCardCta
               productId={product.id}
-              inStock={product.inStock !== false}
+              inStock={orderable}
               hasVariants={!!product.variants && product.variants.length > 0}
               viewHref={`${urlPrefix}/products/${product.slug}`}
               quantityInCart={quantityInCart}
@@ -277,6 +318,14 @@ function ElegantProductCard({
                 adding: isRtl ? 'جاري...' : 'Adding...',
                 view: isRtl ? 'عرض' : 'View',
               }}
+              ctaShape={resolvedCtaShape}
+              ctaSize={resolvedCtaSize}
+              ctaColor={resolvedCtaColor}
+              ctaTextColor={resolvedCtaTextColor}
+              ctaLabelTextEn={resolvedCtaLabelTextEn}
+              ctaLabelTextAr={resolvedCtaLabelTextAr}
+              oosDimColor={resolvedOosDimColor}
+              theme={store.theme}
             />
           </div>
         </div>
@@ -289,7 +338,7 @@ function ElegantProductCard({
               <h3
                 id={`prod-${product.id}-name`}
                 data-zone="productName"
-                className={`${textSizes.name} tracking-[0.15em] uppercase text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1`}
+                className={`${textSizes.name} tracking-[0.15em] ${nameCase === 'uppercase' ? 'uppercase' : ''} text-foreground/80 group-hover:text-foreground transition-colors duration-300 line-clamp-1`}
                 itemProp="name"
               >
                 {isRtl && product.nameAr ? product.nameAr : product.name}

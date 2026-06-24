@@ -1,7 +1,12 @@
 'use client';
 
+import type React from 'react';
 import { useRouter } from 'next/navigation';
 import { AddToCartButton } from '@force/ui';
+import type { StoreTheme } from '@force/shared';
+import { resolveColor } from '@force/shared';
+import type { CtaShape, CtaSize } from './card-size';
+import { ctaShapeClass, ctaSizeClass, labelShapeClass, oosPlacementClass } from './card-size';
 
 /**
  * Shared platform-level CTA used by EVERY theme's ProductCard.
@@ -22,6 +27,9 @@ import { AddToCartButton } from '@force/ui';
  *                  rich loading / added / out-of-stock state machine).
  *
  * Each theme passes `className` to harmonize with its visual language.
+ *
+ * Task 3 (B1): ctaShape, ctaSize, ctaColor, ctaTextColor, ctaLabelTextEn,
+ * ctaLabelTextAr, oosDimColor, theme — all optional, additive.
  */
 interface ProductCardCtaProps {
   productId: string;
@@ -41,6 +49,15 @@ interface ProductCardCtaProps {
   };
   variant?: 'default' | 'outline' | 'ghost';
   showQuantityBadge?: boolean;
+  /** Task 3 B1 — new customization props (all optional, additive) */
+  ctaShape?: CtaShape;
+  ctaSize?: CtaSize;
+  ctaColor?: string;
+  ctaTextColor?: string;
+  ctaLabelTextEn?: string;
+  ctaLabelTextAr?: string;
+  oosDimColor?: string;
+  theme?: StoreTheme;
 }
 
 export function ProductCardCta({
@@ -55,11 +72,43 @@ export function ProductCardCta({
   labels,
   variant,
   showQuantityBadge = false,
+  ctaShape,
+  ctaSize,
+  ctaColor,
+  ctaTextColor,
+  ctaLabelTextEn,
+  ctaLabelTextAr,
+  oosDimColor,
+  theme,
 }: ProductCardCtaProps) {
   const router = useRouter();
 
+  // Build additive shape + size classes — '' when unset so theme classes win.
+  const shapeClass = ctaShapeClass(ctaShape);
+  const sizeClass = ctaSizeClass(ctaSize);
+  const extraCls = [shapeClass, sizeClass].filter(Boolean).join(' ');
+
+  // Resolve custom colors when provided.
+  const resolvedBg = ctaColor && theme ? resolveColor(ctaColor, theme) : undefined;
+  const resolvedText = ctaTextColor && theme ? resolveColor(ctaTextColor, theme) : undefined;
+  const customStyle: React.CSSProperties = {
+    ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
+    ...(resolvedText ? { color: resolvedText } : {}),
+  };
+
+  // OOS dim color for disabled state.
+  const oosDimStyle: React.CSSProperties =
+    !inStock && oosDimColor && theme
+      ? { backgroundColor: resolveColor(oosDimColor, theme), opacity: 1 }
+      : {};
+
   if (hasVariants && viewHref) {
-    const viewLabel = labels?.view ?? (isRtl ? 'عرض' : 'View');
+    const viewLabel =
+      (isRtl ? ctaLabelTextAr : ctaLabelTextEn) ?? labels?.view ?? (isRtl ? 'عرض' : 'View');
+    const finalCls =
+      (className ||
+        'inline-flex w-full items-center justify-center min-h-[44px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors px-4 py-2 text-sm font-medium cursor-pointer') +
+      (extraCls ? ` ${extraCls}` : '');
     return (
       <button
         type="button"
@@ -70,15 +119,26 @@ export function ProductCardCta({
         }}
         aria-label={viewLabel}
         data-cta="view-variants"
-        className={
-          className ||
-          'inline-flex w-full items-center justify-center min-h-[44px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors px-4 py-2 text-sm font-medium cursor-pointer'
-        }
+        className={finalCls}
+        style={customStyle}
       >
         {viewLabel}
       </button>
     );
   }
+
+  // Build labels with optional text overrides.
+  const mergedLabels = {
+    ...labels,
+    ...(ctaLabelTextEn || ctaLabelTextAr
+      ? {
+          addToCart: (isRtl ? ctaLabelTextAr : ctaLabelTextEn) ?? labels?.addToCart,
+          view: (isRtl ? ctaLabelTextAr : ctaLabelTextEn) ?? labels?.view,
+        }
+      : {}),
+  };
+
+  const finalClassName = className + (extraCls ? ` ${extraCls}` : '');
 
   return (
     <AddToCartButton
@@ -89,8 +149,9 @@ export function ProductCardCta({
       onAddToCart={onAddToCart}
       showQuantityBadge={showQuantityBadge}
       variant={variant}
-      labels={labels}
-      className={className}
+      labels={mergedLabels}
+      className={finalClassName}
+      style={{ ...customStyle, ...oosDimStyle }}
     />
   );
 }
@@ -99,11 +160,24 @@ export function ProductCardCta({
  * Shared "Out Of Stock" red ribbon for the top-start corner of a
  * ProductCard's image container. Visual match to pecannbee IMG_7988 /
  * IMG_7995. Mounts only when stock=0. RTL-aware via `start-3`.
+ *
+ * Task 3 B4: when any oosLabel* field is set render a configurable badge
+ * instead. When oosLabel===false render nothing. When no oosLabel* fields
+ * are set, keep the existing ribbon (full back-compat).
  */
 interface OutOfStockRibbonProps {
   inStock?: boolean;
   isRtl?: boolean;
   className?: string;
+  /** Task 3 B4 — OOS badge customization (all optional, additive) */
+  oosLabel?: boolean;
+  oosLabelTextEn?: string;
+  oosLabelTextAr?: string;
+  oosLabelShape?: CtaShape;
+  oosLabelPlacement?: 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end';
+  oosLabelColor?: string;
+  oosLabelTextColor?: string;
+  theme?: StoreTheme;
 }
 
 /**
@@ -119,13 +193,60 @@ interface OutOfStockRibbonProps {
  * parent + rotated so its ends bleed off-canvas, giving the clean
  * diagonal edge. The card's `overflow-hidden` on the image wrapper
  * does the final clipping to the card's rounded corner.
+ *
+ * Task 3 B4: when any oosLabel* customization field is present, renders
+ * a configurable badge pill instead of the diagonal ribbon. oosLabel===false
+ * suppresses all OOS UI. Falls back to the original ribbon when unset.
  */
 export function OutOfStockRibbon({
   inStock = true,
   isRtl = false,
   className = '',
+  oosLabel,
+  oosLabelTextEn,
+  oosLabelTextAr,
+  oosLabelShape,
+  oosLabelPlacement,
+  oosLabelColor,
+  oosLabelTextColor,
+  theme,
 }: OutOfStockRibbonProps) {
   if (inStock) return null;
+
+  // oosLabel===false → render nothing (merchant explicitly suppressed it).
+  if (oosLabel === false) return null;
+
+  // Check if any badge customization field is set.
+  const hasBadgeConfig = !!(
+    oosLabelTextEn ||
+    oosLabelTextAr ||
+    oosLabelShape ||
+    oosLabelPlacement ||
+    oosLabelColor ||
+    oosLabelTextColor
+  );
+
+  if (hasBadgeConfig) {
+    // Configurable badge pill path.
+    const labelText =
+      (isRtl ? oosLabelTextAr : oosLabelTextEn) ?? (isRtl ? 'نفدت الكمية' : 'Out of stock');
+    const placementCls = oosPlacementClass(oosLabelPlacement);
+    const shapeCls = labelShapeClass(oosLabelShape);
+    const bgColor = oosLabelColor && theme ? resolveColor(oosLabelColor, theme) : 'hsl(15 60% 33%)';
+    const textColor = oosLabelTextColor && theme ? resolveColor(oosLabelTextColor, theme) : '#fff';
+
+    return (
+      <span
+        className={`pointer-events-none absolute z-10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm ${placementCls} ${shapeCls} ${className}`}
+        style={{ backgroundColor: bgColor, color: textColor }}
+        aria-hidden
+      >
+        {labelText}
+      </span>
+    );
+  }
+
+  // Default diagonal ribbon (full back-compat).
   // RTL: corner ribbon flips to start-side (which is visually the
   // right edge of the card). The -45deg rotation also flips sign so
   // the text reads correctly from the corner outward.

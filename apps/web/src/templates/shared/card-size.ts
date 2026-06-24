@@ -320,3 +320,61 @@ export function cardImageRadiusClass(radius: CardImageRadius | undefined): strin
       return '';
   }
 }
+
+/**
+ * CTA button shape (the 4-shape vocabulary: Rounded / Pill / Square / Soft).
+ * Returns '' on 'theme'/undefined so the caller keeps its existing theme class.
+ * Static-string enumeration — don't refactor to dynamic concatenation (JIT).
+ */
+export type CtaShape = 'rounded' | 'pill' | 'square' | 'soft';
+export function ctaShapeClass(shape?: CtaShape): string {
+  switch (shape) {
+    case 'pill':
+      return 'rounded-full';
+    case 'square':
+      return 'rounded-none';
+    case 'soft':
+      return 'rounded-md';
+    case 'rounded':
+      return 'rounded-lg';
+    default:
+      return '';
+  }
+}
+
+/** CTA button size; '' = derive from cardSize textSizes.btn (existing behavior). */
+export type CtaSize = 'sm' | 'md' | 'lg';
+export function ctaSizeClass(size?: CtaSize): string {
+  switch (size) {
+    case 'sm':
+      return 'min-h-8 px-2.5 py-1 text-xs';
+    case 'md':
+      return 'min-h-10 px-4 py-2 text-sm';
+    case 'lg':
+      return 'min-h-12 px-6 py-3 text-base';
+    default:
+      return '';
+  }
+}
+
+/** OOS badge corner shape — same 4-shape vocabulary, defaults to rounded-md. */
+export function labelShapeClass(shape?: CtaShape): string {
+  return ctaShapeClass(shape) || 'rounded-md';
+}
+
+/** OOS badge placement → absolute corner classes (RTL-aware via start/end). */
+export function oosPlacementClass(
+  p?: 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end'
+): string {
+  switch (p) {
+    case 'top-end':
+      return 'top-2 end-2';
+    case 'bottom-start':
+      return 'bottom-2 start-2';
+    case 'bottom-end':
+      return 'bottom-2 end-2';
+    case 'top-start':
+    default:
+      return 'top-2 start-2';
+  }
+}

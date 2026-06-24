@@ -23,6 +23,7 @@ export default function ClassicFooter({
   footerLogo,
   hideFooterLogoMobile,
   footerLogoAutoFilter,
+  theme,
 }: FooterProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -160,7 +161,11 @@ export default function ClassicFooter({
                     className="text-muted-foreground hover:text-foreground overflow-hidden rounded-md transition-colors duration-200 cursor-pointer"
                     aria-label={s.key}
                   >
-                    <SocialGlyph entry={s} className="w-5 h-5" />
+                    <SocialGlyph
+                      entry={s}
+                      className="w-5 h-5"
+                      originalColors={theme?.footerSocialOriginalColor === true}
+                    />
                   </a>
                 ))}
               </div>

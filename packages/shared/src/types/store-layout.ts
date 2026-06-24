@@ -831,6 +831,26 @@ export interface ProductCardDefaults {
    * Default undefined / true → price visible (current behavior).
    */
   showCardPrice?: boolean;
+  /** CTA button on cards: visual + behavior. All optional; unset = current behavior. */
+  ctaLabel?: boolean; // show a text label on the CTA (default: existing per-theme)
+  ctaLabelTextEn?: string; // override label text (EN); empty = theme default ("View"/"Add to cart")
+  ctaLabelTextAr?: string; // override label text (AR)
+  ctaSize?: 'sm' | 'md' | 'lg'; // CTA button size; unset = derive from cardSize
+  ctaShape?: 'rounded' | 'pill' | 'square' | 'soft'; // unset = theme default
+  ctaColor?: string; // token:* or hex; unset = token:primary / theme default
+  ctaTextColor?: string; // token:* or hex; unset = contrast-guarded default
+  /** Out-of-stock label badge: shape/size/placement/color, independent of CTA. */
+  oosLabel?: boolean; // show the OOS label badge (default true = current ribbon)
+  oosLabelTextEn?: string; // default "Out of stock"
+  oosLabelTextAr?: string; // default "نفدت الكمية"
+  oosLabelShape?: 'rounded' | 'pill' | 'square' | 'soft';
+  oosLabelPlacement?: 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end';
+  oosLabelColor?: string; // bg color, token:* or hex
+  oosLabelTextColor?: string; // text color
+  /** When OOS, dim the View/Add CTA in this color instead of disabling silently. */
+  oosDimColor?: string;
+  /** Product-name case override (Task 6 uses this too). */
+  productNameCase?: 'normal' | 'uppercase';
 }
 
 export interface StoreLayoutSettings {

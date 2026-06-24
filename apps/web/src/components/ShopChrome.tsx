@@ -438,6 +438,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
               explicitBg ?? `hsl(${resolveBackgroundPreset(store.theme).bgSectionAlt})`;
             return footerLogoContrastFilter(themeBg, store.theme?.footerLogoInvert);
           })()}
+          theme={store.theme}
         />
       </div>
       {/* afterFooter — empty placeholder so any merchant-injected text

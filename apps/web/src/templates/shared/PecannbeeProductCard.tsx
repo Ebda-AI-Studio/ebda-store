@@ -19,6 +19,8 @@ import {
   cardShapeClasses,
   cardImageAspectClass,
   cardImageRadiusClass,
+  ctaShapeClass,
+  ctaSizeClass,
 } from './card-size';
 import { getProductPricing } from '../../lib/product-pricing';
 import { productCardPropsEqual } from './product-card-memo';
@@ -87,7 +89,7 @@ function PecannbeeProductCardImpl({
   showCardPrice,
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
-  const { store } = useStore();
+  const { store, layout } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
   const textSizes = getProductCardTextSizes(cardSize);
@@ -122,6 +124,9 @@ function PecannbeeProductCardImpl({
   const pricing = getProductPricing(product, undefined, 'card');
 
   const inStock = product.inStock !== false;
+  // Task 13: backorder-aware orderable signal. OOS products with backorder
+  // allowed are still orderable — CTA stays pressable, no OOS label shown.
+  const orderable = inStock || product.acceptsBackorder === true;
   const onSale = !!(product.compareAtPrice && product.compareAtPrice > product.price);
   const discountPct = onSale
     ? Math.round((1 - product.price / (product.compareAtPrice ?? product.price)) * 100)
@@ -145,7 +150,7 @@ function PecannbeeProductCardImpl({
   const handleAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!inStock || !onAddToCart) return;
+    if (!orderable || !onAddToCart) return;
     setIsAdding(true);
     try {
       await onAddToCart(product.id);
@@ -155,6 +160,37 @@ function PecannbeeProductCardImpl({
   };
 
   const showNewBadge = inStock && isProductNew(product);
+
+  // Task 3 B: read CTA + OOS defaults from productCardDefaults.
+  const defaults = layout?.productCardDefaults;
+  const resolvedCtaShape = defaults?.ctaShape as import('./card-size').CtaShape | undefined;
+  const resolvedCtaSize = defaults?.ctaSize as import('./card-size').CtaSize | undefined;
+  const resolvedCtaColor = defaults?.ctaColor;
+  const resolvedCtaTextColor = defaults?.ctaTextColor;
+  const resolvedCtaLabelTextEn = defaults?.ctaLabelTextEn;
+  const resolvedCtaLabelTextAr = defaults?.ctaLabelTextAr;
+  const resolvedOosDimColor = defaults?.oosDimColor;
+  const resolvedOosLabel = defaults?.oosLabel;
+  const resolvedOosLabelTextEn = defaults?.oosLabelTextEn;
+  const resolvedOosLabelTextAr = defaults?.oosLabelTextAr;
+  const resolvedOosLabelShape = defaults?.oosLabelShape as
+    | import('./card-size').CtaShape
+    | undefined;
+  const resolvedOosLabelPlacement = defaults?.oosLabelPlacement;
+  const resolvedOosLabelColor = defaults?.oosLabelColor;
+  const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
+  const nameCase = defaults?.productNameCase;
+
+  // CTA shape + size classes (additive — '' when unset so pack styles win).
+  const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
+    .filter(Boolean)
+    .join(' ');
+  const resolvedBg =
+    resolvedCtaColor && store.theme ? resolveColor(resolvedCtaColor, store.theme) : undefined;
+  const resolvedText =
+    resolvedCtaTextColor && store.theme
+      ? resolveColor(resolvedCtaTextColor, store.theme)
+      : undefined;
 
   return (
     <article
@@ -166,7 +202,10 @@ function PecannbeeProductCardImpl({
       // a micro-payoff on desktop — addresses the friend complaint
       // 'product cards are static'. Mobile loses nothing (no hover state
       // to trigger). `group` enables the inner image scale below.
-      className={`group flex flex-col overflow-hidden w-full mx-auto transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${sizeCap || 'md:max-w-[200px]'} ${frameCls} ${shape.radius} ${styles.card}`}
+      // Task 3 Part A: overflow-hidden REMOVED from article so the absolute
+      // wishlist heart (now a sibling of the Link, not inside the image div)
+      // is never clipped by the article's rounded corners.
+      className={`group relative flex flex-col w-full mx-auto transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${sizeCap || 'md:max-w-[200px]'} ${frameCls} ${shape.radius} ${styles.card}`}
       style={
         showCardFrame && cardFrameColor && store.theme
           ? { borderColor: resolveColor(cardFrameColor, store.theme) }
@@ -177,6 +216,36 @@ function PecannbeeProductCardImpl({
       itemType="https://schema.org/Product"
       aria-labelledby={`prod-${product.id}-name`}
     >
+      {/* Wishlist heart — lifted OUT of the image div (Part A fix).
+          Now a direct child of <article> which has no overflow-hidden,
+          so rounded card shapes never clip this button.
+          Keeps absolute top-3 start-3 z-20 so it sits at the same
+          visual position as before. */}
+      <button
+        type="button"
+        onClick={handleWishlist}
+        aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
+        aria-pressed={isWishlisted}
+        className={`absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out hover:scale-[1.05] hover:bg-white cursor-pointer ${
+          isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
+        }`}
+      >
+        <svg
+          className="h-5 w-5"
+          fill={isWishlisted ? 'currentColor' : 'none'}
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+          />
+        </svg>
+      </button>
+
       <Link
         href={href}
         prefetch={false}
@@ -184,7 +253,8 @@ function PecannbeeProductCardImpl({
       >
         {/* Image: item 8 — aspect+radius driven by per-store cardImageAspect/cardImageRadius;
             falls back to the mobile-square / desktop-portrait theme default. Item 10 —
-            when normalizeImages is on, object-fill bg ensures transparent PNGs read cleanly. */}
+            when normalizeImages is on, object-fill bg ensures transparent PNGs read cleanly.
+            overflow-hidden STAYS on the image div so images still clip to the shape. */}
         <div
           className={`relative overflow-hidden bg-muted ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
@@ -231,38 +301,24 @@ function PecannbeeProductCardImpl({
             </div>
           )}
 
-          {/* Wishlist heart — top-START (RTL right, LTR left) per spec § 4.3 */}
-          <button
-            type="button"
-            onClick={handleWishlist}
-            aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
-            aria-pressed={isWishlisted}
-            className={`absolute top-3 start-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out hover:scale-[1.05] hover:bg-white cursor-pointer ${
-              isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
-            }`}
-          >
-            <svg
-              className="h-5 w-5"
-              fill={isWishlisted ? 'currentColor' : 'none'}
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
-          </button>
-
           {/* Sprint 2 (2026-05-17): replaced the inline OOS pill with the
               shared OutOfStockRibbon component — proper diagonal corner
               ribbon at -45°, consumed by all 5 themes already. NEW
               orange badge added below it (top-START) when product is
-              flagged new OR was created in the last 14 days. */}
-          <OutOfStockRibbon inStock={inStock} isRtl={isRtl} />
+              flagged new OR was created in the last 14 days.
+              Task 3 B4: OOS badge customization via productCardDefaults. */}
+          <OutOfStockRibbon
+            inStock={orderable}
+            isRtl={isRtl}
+            oosLabel={resolvedOosLabel}
+            oosLabelTextEn={resolvedOosLabelTextEn}
+            oosLabelTextAr={resolvedOosLabelTextAr}
+            oosLabelShape={resolvedOosLabelShape}
+            oosLabelPlacement={resolvedOosLabelPlacement}
+            oosLabelColor={resolvedOosLabelColor}
+            oosLabelTextColor={resolvedOosLabelTextColor}
+            theme={store.theme}
+          />
           {showNewBadge && (
             <span
               className="absolute top-3 start-3 z-10 rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary-foreground))] shadow-[0_6px_14px_-6px_hsl(var(--primary)/0.5)]"
@@ -307,7 +363,7 @@ function PecannbeeProductCardImpl({
                 <p
                   id={`prod-${product.id}-name`}
                   data-zone="productName"
-                  className={`line-clamp-2 font-semibold ${textSizes.name} ${styles.productCardName}`}
+                  className={`line-clamp-2 font-semibold ${textSizes.name} ${styles.productCardName}${nameCase === 'uppercase' ? ' uppercase' : ''}`}
                   style={{
                     textWrap: 'balance',
                     fontFamily: productNameZone?.fontFamily,
@@ -377,42 +433,51 @@ function PecannbeeProductCardImpl({
           <Link
             href={href}
             prefetch={false}
-            className={`mt-auto inline-flex w-full items-center justify-center gap-2 ${textSizes.btn} ${textSizes.cta} ${styles.productCardCta}`}
+            className={`mt-auto inline-flex w-full items-center justify-center gap-2 ${textSizes.btn} ${textSizes.cta} ${styles.productCardCta}${ctaExtraCls ? ` ${ctaExtraCls}` : ''}`}
             data-cta="button"
             style={{
               fontFamily: productCtaZone?.fontFamily,
               fontSize: responsiveFontSize(productCtaZone?.fontSize),
               fontWeight: productCtaZone?.fontWeight,
-              color: guardedCtaColor(productCtaZone?.color, styles.productCardCta, store.theme),
+              color:
+                resolvedText ??
+                guardedCtaColor(productCtaZone?.color, styles.productCardCta, store.theme),
               letterSpacing: productCtaZone?.letterSpacing,
               lineHeight: productCtaZone?.lineHeight,
               textTransform: productCtaZone?.textTransform as React.CSSProperties['textTransform'],
+              ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
             }}
           >
-            {isRtl ? 'عرض' : 'View'}
+            {(isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ?? (isRtl ? 'عرض' : 'View')}
           </Link>
         ) : (
           <button
             type="button"
-            disabled={!inStock || isAdding}
+            disabled={!orderable || isAdding}
             onClick={handleAdd}
             data-cta="button"
-            className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta} disabled:cursor-not-allowed disabled:opacity-60`}
+            className={`mt-auto inline-flex w-full items-center justify-center gap-2 min-h-[44px] ${styles.productCardCta}${ctaExtraCls ? ` ${ctaExtraCls}` : ''} disabled:cursor-not-allowed disabled:opacity-60`}
             style={{
               fontFamily: productCtaZone?.fontFamily,
               fontSize: responsiveFontSize(productCtaZone?.fontSize),
               fontWeight: productCtaZone?.fontWeight,
-              color: guardedCtaColor(productCtaZone?.color, styles.productCardCta, store.theme),
+              color:
+                resolvedText ??
+                guardedCtaColor(productCtaZone?.color, styles.productCardCta, store.theme),
               letterSpacing: productCtaZone?.letterSpacing,
               lineHeight: productCtaZone?.lineHeight,
               textTransform: productCtaZone?.textTransform as React.CSSProperties['textTransform'],
+              ...(resolvedBg ? { backgroundColor: resolvedBg } : {}),
+              ...(!orderable && resolvedOosDimColor && store.theme
+                ? { backgroundColor: resolveColor(resolvedOosDimColor, store.theme), opacity: 1 }
+                : {}),
             }}
           >
-            {!inStock ? (
+            {!orderable ? (
               isRtl ? (
-                'نفدت الكمية'
+                (resolvedCtaLabelTextAr ?? 'نفدت الكمية')
               ) : (
-                'Out Of Stock'
+                (resolvedCtaLabelTextEn ?? 'Out Of Stock')
               )
             ) : (
               <>
@@ -434,7 +499,8 @@ function PecannbeeProductCardImpl({
                     />
                   </svg>
                 )}
-                {isRtl ? 'إضافة للسلة' : 'Add to Cart'}
+                {(isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
+                  (isRtl ? 'إضافة للسلة' : 'Add to Cart')}
               </>
             )}
           </button>

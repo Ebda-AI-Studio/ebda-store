@@ -545,6 +545,36 @@ const layoutSchemaInternal = z
         // product card defaults (productName / productPrice / productCta).
         // Must be listed or Zod silently strips — same trap as per-section blocks.
         typography: sectionTypographyOverride,
+        // 2026-06-24: image aspect+radius + name/price visibility. Without these,
+        // Zod silently strips them on every PUT (the top-level object has no
+        // .passthrough()), so the admin reloaded stale defaults even though the
+        // storefront read whatever was last persisted. Keep in sync with
+        // ProductCardDefaults in packages/shared/src/types/store-layout.ts.
+        cardImageAspect: z.enum(['1:1', '4:5', '3:4', '16:9', 'auto']).optional(),
+        cardImageRadius: z.enum(['none', 'sm', 'md', 'lg', 'full']).optional(),
+        showCardName: z.boolean().optional(),
+        showCardPrice: z.boolean().optional(),
+        // 2026-06-24: CTA + OOS-label + name-case controls (Task 4).
+        // Must be listed or Zod silently strips on every PUT (no .passthrough()).
+        // Keep in sync with ProductCardDefaults in packages/shared/src/types/store-layout.ts.
+        ctaLabel: z.boolean().optional(),
+        ctaLabelTextEn: z.string().optional(),
+        ctaLabelTextAr: z.string().optional(),
+        ctaSize: z.enum(['sm', 'md', 'lg']).optional(),
+        ctaShape: z.enum(['rounded', 'pill', 'square', 'soft']).optional(),
+        ctaColor: colorValue,
+        ctaTextColor: colorValue,
+        oosLabel: z.boolean().optional(),
+        oosLabelTextEn: z.string().optional(),
+        oosLabelTextAr: z.string().optional(),
+        oosLabelShape: z.enum(['rounded', 'pill', 'square', 'soft']).optional(),
+        oosLabelPlacement: z
+          .enum(['top-start', 'top-end', 'bottom-start', 'bottom-end'])
+          .optional(),
+        oosLabelColor: colorValue,
+        oosLabelTextColor: colorValue,
+        oosDimColor: colorValue,
+        productNameCase: z.enum(['normal', 'uppercase']).optional(),
       })
       .partial()
       .optional(),

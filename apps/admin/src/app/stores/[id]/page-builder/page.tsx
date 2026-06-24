@@ -2405,6 +2405,418 @@ export default function StoreLayoutPage() {
                           className="h-4 w-4 cursor-pointer accent-primary"
                         />
                       </label>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">
+                          Product name case
+                        </label>
+                        <select
+                          value={layout.productCardDefaults?.productNameCase ?? ''}
+                          onChange={e =>
+                            setLayout(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    productCardDefaults: {
+                                      ...(prev.productCardDefaults ?? {}),
+                                      productNameCase:
+                                        (e.target.value as 'normal' | 'uppercase') || undefined,
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="">Theme default</option>
+                          <option value="normal">Normal</option>
+                          <option value="uppercase">UPPERCASE</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Call-to-action button group */}
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+                    <p className="text-sm font-semibold text-foreground">Call-to-action button</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">
+                          CTA shape
+                        </label>
+                        <select
+                          value={layout.productCardDefaults?.ctaShape ?? ''}
+                          onChange={e =>
+                            setLayout(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    productCardDefaults: {
+                                      ...(prev.productCardDefaults ?? {}),
+                                      ctaShape:
+                                        (e.target.value as
+                                          | 'rounded'
+                                          | 'pill'
+                                          | 'square'
+                                          | 'soft') || undefined,
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="">Theme default</option>
+                          <option value="rounded">Rounded</option>
+                          <option value="pill">Pill</option>
+                          <option value="square">Square</option>
+                          <option value="soft">Soft</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">CTA size</label>
+                        <select
+                          value={layout.productCardDefaults?.ctaSize ?? ''}
+                          onChange={e =>
+                            setLayout(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    productCardDefaults: {
+                                      ...(prev.productCardDefaults ?? {}),
+                                      ctaSize: (e.target.value as 'sm' | 'md' | 'lg') || undefined,
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="">Auto</option>
+                          <option value="sm">Small</option>
+                          <option value="md">Medium</option>
+                          <option value="lg">Large</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-2 pt-1">
+                      <label className="flex items-center justify-between gap-4 cursor-pointer">
+                        <span className="text-sm text-foreground">Custom CTA label</span>
+                        <input
+                          type="checkbox"
+                          checked={layout.productCardDefaults?.ctaLabel === true}
+                          onChange={e =>
+                            setLayout(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    productCardDefaults: {
+                                      ...(prev.productCardDefaults ?? {}),
+                                      ctaLabel: e.target.checked,
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className="h-4 w-4 cursor-pointer accent-primary"
+                        />
+                      </label>
+                      {layout.productCardDefaults?.ctaLabel && (
+                        <div className="grid grid-cols-2 gap-3 ms-4 border-s-2 border-s-primary/30 ps-3">
+                          <div>
+                            <label className="block text-xs text-muted-foreground mb-1">
+                              CTA label (EN)
+                            </label>
+                            <input
+                              type="text"
+                              value={layout.productCardDefaults?.ctaLabelTextEn ?? ''}
+                              onChange={e =>
+                                setLayout(prev =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        productCardDefaults: {
+                                          ...(prev.productCardDefaults ?? {}),
+                                          ctaLabelTextEn: e.target.value || undefined,
+                                        },
+                                      }
+                                    : prev
+                                )
+                              }
+                              placeholder="Add to cart"
+                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-muted-foreground mb-1">
+                              CTA label (AR)
+                            </label>
+                            <input
+                              type="text"
+                              dir="rtl"
+                              value={layout.productCardDefaults?.ctaLabelTextAr ?? ''}
+                              onChange={e =>
+                                setLayout(prev =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        productCardDefaults: {
+                                          ...(prev.productCardDefaults ?? {}),
+                                          ctaLabelTextAr: e.target.value || undefined,
+                                        },
+                                      }
+                                    : prev
+                                )
+                              }
+                              placeholder="أضف للسلة"
+                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <ColorField
+                      label="CTA background color"
+                      value={layout.productCardDefaults?.ctaColor}
+                      onChange={v =>
+                        setLayout(prev =>
+                          prev
+                            ? {
+                                ...prev,
+                                productCardDefaults: {
+                                  ...(prev.productCardDefaults ?? {}),
+                                  ctaColor: v || undefined,
+                                },
+                              }
+                            : prev
+                        )
+                      }
+                      theme={storeInfo?.theme ?? FALLBACK_THEME}
+                      inheritFromToken="primary"
+                    />
+                    <ColorField
+                      label="CTA text color"
+                      value={layout.productCardDefaults?.ctaTextColor}
+                      onChange={v =>
+                        setLayout(prev =>
+                          prev
+                            ? {
+                                ...prev,
+                                productCardDefaults: {
+                                  ...(prev.productCardDefaults ?? {}),
+                                  ctaTextColor: v || undefined,
+                                },
+                              }
+                            : prev
+                        )
+                      }
+                      theme={storeInfo?.theme ?? FALLBACK_THEME}
+                      inheritFromToken="foreground"
+                    />
+                  </div>
+                  {/* Out-of-stock label group */}
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+                    <p className="text-sm font-semibold text-foreground">Out-of-stock label</p>
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between gap-4 cursor-pointer">
+                        <span className="text-sm text-foreground">Show OOS label</span>
+                        <input
+                          type="checkbox"
+                          checked={layout.productCardDefaults?.oosLabel === true}
+                          onChange={e =>
+                            setLayout(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    productCardDefaults: {
+                                      ...(prev.productCardDefaults ?? {}),
+                                      oosLabel: e.target.checked,
+                                    },
+                                  }
+                                : prev
+                            )
+                          }
+                          className="h-4 w-4 cursor-pointer accent-primary"
+                        />
+                      </label>
+                      {layout.productCardDefaults?.oosLabel && (
+                        <div className="space-y-3 ms-4 border-s-2 border-s-primary/30 ps-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-muted-foreground mb-1">
+                                OOS label (EN)
+                              </label>
+                              <input
+                                type="text"
+                                value={layout.productCardDefaults?.oosLabelTextEn ?? ''}
+                                onChange={e =>
+                                  setLayout(prev =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          productCardDefaults: {
+                                            ...(prev.productCardDefaults ?? {}),
+                                            oosLabelTextEn: e.target.value || undefined,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                placeholder="Out of stock"
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-muted-foreground mb-1">
+                                OOS label (AR)
+                              </label>
+                              <input
+                                type="text"
+                                dir="rtl"
+                                value={layout.productCardDefaults?.oosLabelTextAr ?? ''}
+                                onChange={e =>
+                                  setLayout(prev =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          productCardDefaults: {
+                                            ...(prev.productCardDefaults ?? {}),
+                                            oosLabelTextAr: e.target.value || undefined,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                placeholder="نفد المخزون"
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-muted-foreground mb-1">
+                                Label shape
+                              </label>
+                              <select
+                                value={layout.productCardDefaults?.oosLabelShape ?? ''}
+                                onChange={e =>
+                                  setLayout(prev =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          productCardDefaults: {
+                                            ...(prev.productCardDefaults ?? {}),
+                                            oosLabelShape:
+                                              (e.target.value as
+                                                | 'rounded'
+                                                | 'pill'
+                                                | 'square'
+                                                | 'soft') || undefined,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              >
+                                <option value="">Theme default</option>
+                                <option value="rounded">Rounded</option>
+                                <option value="pill">Pill</option>
+                                <option value="square">Square</option>
+                                <option value="soft">Soft</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-muted-foreground mb-1">
+                                Label placement
+                              </label>
+                              <select
+                                value={layout.productCardDefaults?.oosLabelPlacement ?? ''}
+                                onChange={e =>
+                                  setLayout(prev =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          productCardDefaults: {
+                                            ...(prev.productCardDefaults ?? {}),
+                                            oosLabelPlacement:
+                                              (e.target.value as
+                                                | 'top-start'
+                                                | 'top-end'
+                                                | 'bottom-start'
+                                                | 'bottom-end') || undefined,
+                                          },
+                                        }
+                                      : prev
+                                  )
+                                }
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              >
+                                <option value="">Theme default</option>
+                                <option value="top-start">Top start</option>
+                                <option value="top-end">Top end</option>
+                                <option value="bottom-start">Bottom start</option>
+                                <option value="bottom-end">Bottom end</option>
+                              </select>
+                            </div>
+                          </div>
+                          <ColorField
+                            label="OOS label background color"
+                            value={layout.productCardDefaults?.oosLabelColor}
+                            onChange={v =>
+                              setLayout(prev =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      productCardDefaults: {
+                                        ...(prev.productCardDefaults ?? {}),
+                                        oosLabelColor: v || undefined,
+                                      },
+                                    }
+                                  : prev
+                              )
+                            }
+                            theme={storeInfo?.theme ?? FALLBACK_THEME}
+                            inheritFromToken="muted"
+                          />
+                          <ColorField
+                            label="OOS label text color"
+                            value={layout.productCardDefaults?.oosLabelTextColor}
+                            onChange={v =>
+                              setLayout(prev =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      productCardDefaults: {
+                                        ...(prev.productCardDefaults ?? {}),
+                                        oosLabelTextColor: v || undefined,
+                                      },
+                                    }
+                                  : prev
+                              )
+                            }
+                            theme={storeInfo?.theme ?? FALLBACK_THEME}
+                            inheritFromToken="foreground"
+                          />
+                          <ColorField
+                            label="Dim color when out of stock"
+                            value={layout.productCardDefaults?.oosDimColor}
+                            onChange={v =>
+                              setLayout(prev =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      productCardDefaults: {
+                                        ...(prev.productCardDefaults ?? {}),
+                                        oosDimColor: v || undefined,
+                                      },
+                                    }
+                                  : prev
+                              )
+                            }
+                            hint="Overlay tint applied to the card image when out of stock."
+                            theme={storeInfo?.theme ?? FALLBACK_THEME}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
