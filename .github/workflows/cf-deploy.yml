@@ -62,24 +62,34 @@ jobs:
       orders: ${{ steps.f.outputs.orders }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: f
         with:
-          filters: |
-            shared: &shared
-              - 'packages/**'
-              - 'scripts/cf-build.sh'
-              - 'scripts/cf-setup-local.sh'
-              - '.github/workflows/cf-deploy.yml'
-            web:
-              - *shared
-              - 'apps/web/**'
-            admin:
-              - *shared
-              - 'apps/admin/**'
-            orders:
-              - *shared
-              - 'apps/orders/**'
+          # Need the parent commit to diff against. main only ever advances by ONE
+          # squash-merge commit (repo policy), so HEAD~1 is always the prior tip.
+          fetch-depth: 2
+      # Native git diff — no external action. (The previous dorny/paths-filter
+      # step failed on push.) A change under packages/** or the CF tooling marks
+      # all three apps; workflow_dispatch (no diff base) deploys all three.
+      - id: f
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            printf 'web=true\nadmin=true\norders=true\n' >> "$GITHUB_OUTPUT"
+            echo "workflow_dispatch → deploying all three"
+            exit 0
+          fi
+          changed="$(git diff --name-only HEAD~1 HEAD)"
+          echo "Changed files:"; echo "$changed"
+          shared=false
+          if echo "$changed" | grep -qE '^(packages/|scripts/cf-(build|setup-local)\.sh$|\.github/workflows/cf-deploy\.yml$)'; then
+            shared=true
+          fi
+          for app in web admin orders; do
+            if [ "$shared" = "true" ] || echo "$changed" | grep -qE "^apps/$app/"; then
+              echo "$app=true" >> "$GITHUB_OUTPUT"; echo "  → $app: deploy"
+            else
+              echo "$app=false" >> "$GITHUB_OUTPUT"; echo "  → $app: skip"
+            fi
+          done
 
   deploy-web:
     name: Deploy storefront (web)
