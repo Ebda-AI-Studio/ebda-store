@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../../lib/api';
+import { formatPrice } from '@/lib/format';
 
 interface AffiliateEvent {
   id: string;
@@ -282,9 +283,7 @@ export default function AffiliateEventsPage() {
                             {event.details.orderNumber}
                           </Link>
                           {event.details.orderTotal !== undefined && (
-                            <span className="ms-1">
-                              ({(event.details.orderTotal / 1000).toFixed(3)} KWD)
-                            </span>
+                            <span className="ms-1">({formatPrice(event.details.orderTotal)})</span>
                           )}
                         </p>
                       )}
@@ -292,7 +291,7 @@ export default function AffiliateEventsPage() {
                         <p>
                           Commission:{' '}
                           <span className="font-medium text-success">
-                            +{(event.details.commissionAmount / 1000).toFixed(3)} KWD
+                            +{formatPrice(event.details.commissionAmount)}
                           </span>
                         </p>
                       )}
@@ -300,7 +299,7 @@ export default function AffiliateEventsPage() {
                         <p>
                           Amount:{' '}
                           <span className="font-medium text-foreground">
-                            {(event.details.amount / 1000).toFixed(3)} KWD
+                            {formatPrice(event.details.amount)}
                           </span>
                           {event.details.method && (
                             <span className="ms-1">via {event.details.method}</span>

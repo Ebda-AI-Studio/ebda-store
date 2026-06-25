@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { formatPrice, filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -190,7 +191,7 @@ export default function PurchaseOrderDetailPage() {
               </span>
             )}
             <span>
-              {t('total')}: <strong>{(po.totalCost / 1000).toFixed(3)} KWD</strong>
+              {t('total')}: <strong>{formatPrice(po.totalCost)}</strong>
             </span>
           </div>
 
@@ -253,7 +254,7 @@ export default function PurchaseOrderDetailPage() {
                       {remaining}
                     </td>
                     <td className="px-3 py-2 text-end font-mono text-xs">
-                      {(item.unitCost / 1000).toFixed(3)}
+                      {filsToKwd(item.unitCost)}
                     </td>
                     <td className="px-3 py-2 text-end font-mono text-xs">{lineTotal.toFixed(3)}</td>
                     {canReceive && (
@@ -281,7 +282,7 @@ export default function PurchaseOrderDetailPage() {
                   Total
                 </td>
                 <td className="px-3 py-2 text-end font-mono text-sm font-semibold">
-                  {(po.totalCost / 1000).toFixed(3)} KWD
+                  {formatPrice(po.totalCost)}
                 </td>
                 {canReceive && <td />}
               </tr>

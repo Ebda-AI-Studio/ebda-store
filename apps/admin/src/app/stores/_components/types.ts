@@ -54,10 +54,4 @@ export const planConfig = {
   enterprise: { bg: 'bg-amber-50', text: 'text-amber-700', icon: '👑' },
 };
 
-export function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+export { formatDate } from '@/lib/format';

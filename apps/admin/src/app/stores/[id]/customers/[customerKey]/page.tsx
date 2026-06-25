@@ -69,17 +69,10 @@ interface OrderRow {
   payments: PaymentRow[];
 }
 
-function formatDate(dateString: string | null) {
-  if (!dateString) return '—';
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+import { formatDate, formatPrice } from '../../../../../lib/format';
 
 function formatKwd(fils: number): string {
-  return `${(fils / 1000).toFixed(3)} KWD`;
+  return formatPrice(fils);
 }
 
 function StatusChip({ status }: { status: string }) {

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -176,10 +177,10 @@ export default function JournalDetailPage() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-end font-mono text-xs">
-                    {line.debit > 0 ? (line.debit / 1000).toFixed(3) : ''}
+                    {line.debit > 0 ? filsToKwd(line.debit) : ''}
                   </td>
                   <td className="px-3 py-2 text-end font-mono text-xs">
-                    {line.credit > 0 ? (line.credit / 1000).toFixed(3) : ''}
+                    {line.credit > 0 ? filsToKwd(line.credit) : ''}
                   </td>
                 </tr>
               ))}
@@ -191,10 +192,10 @@ export default function JournalDetailPage() {
                   Total
                 </td>
                 <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
-                  {(totalDr / 1000).toFixed(3)}
+                  {filsToKwd(totalDr)}
                 </td>
                 <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
-                  {(totalCr / 1000).toFixed(3)}
+                  {filsToKwd(totalCr)}
                 </td>
               </tr>
             </tfoot>

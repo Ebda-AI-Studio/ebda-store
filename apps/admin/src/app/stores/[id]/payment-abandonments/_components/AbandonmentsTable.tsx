@@ -4,10 +4,10 @@ import Link from 'next/link';
 import { useT } from '@/i18n/useT';
 import type { AbandonmentRecord, ListMeta } from '../_hooks/usePaymentAbandonments';
 
+import { formatPrice } from '@/lib/format';
+
 /** Converts fils (integer) to a KWD display string with 3 decimal places. */
-function formatKwd(fils: number): string {
-  return `${(fils / 1000).toFixed(3)} KWD`;
-}
+const formatKwd = formatPrice;
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {

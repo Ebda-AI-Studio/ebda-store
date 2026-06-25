@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { formatPrice } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,7 +145,7 @@ export default function StockDashboardPage() {
   const kpis = [
     {
       label: t('stockValue'),
-      value: dashboard ? `${(dashboard.stockValue / 1000).toFixed(3)} KWD` : financeErr ? '—' : '…',
+      value: dashboard ? formatPrice(dashboard.stockValue) : financeErr ? '—' : '…',
       highlight: true,
       errMsg: financeErr,
     },

@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { filsToKwd } from '@/lib/format';
 import type { AbandonedCartStats } from './types';
 
 interface StatCardProps {
@@ -23,10 +24,7 @@ interface StatsGridProps {
   stats: AbandonedCartStats | null;
 }
 
-/** Formats fils to a KWD string with 3 decimals. */
-function formatKwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
-}
+const formatKwd = filsToKwd;
 
 /**
  * Four-column summary cards at the top of the abandoned carts page.

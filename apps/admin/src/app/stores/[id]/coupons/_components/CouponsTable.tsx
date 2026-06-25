@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { formatPrice } from '@/lib/format';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
 import type { Coupon } from './types';
 
@@ -68,7 +69,7 @@ export function CouponsTable({
 
   function formatValue(coupon: Coupon): string {
     if (coupon.type === 'percentage') return `${coupon.value}%`;
-    if (coupon.type === 'fixed') return `${(coupon.value / 1000).toFixed(3)} KWD`;
+    if (coupon.type === 'fixed') return formatPrice(coupon.value);
     return tType('freeShipping');
   }
 

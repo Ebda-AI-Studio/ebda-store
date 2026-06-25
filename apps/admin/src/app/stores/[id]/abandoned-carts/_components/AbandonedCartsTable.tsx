@@ -2,14 +2,12 @@
 
 import { useT } from '@/i18n/useT';
 import { CartIcon } from '@force/ui';
+import { filsToKwd } from '@/lib/format';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
 
-/** Formats fils to a KWD string with 3 decimals. */
-function formatKwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
-}
+const formatKwd = filsToKwd;
 
 /** Best-effort display string for the customer column. */
 function customerDisplay(record: AbandonedCartRecord): string {

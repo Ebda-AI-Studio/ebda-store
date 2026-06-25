@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, getApiUrl } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 import {
   isCashOrBankAccount,
   ALLOWED_CURRENCIES,
@@ -534,9 +535,7 @@ export default function NewExpensePage() {
               required
             />
             {isNonKwd && rawAmount > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">
-                = {(kwdAmountFils / 1000).toFixed(3)} KWD
-              </p>
+              <p className="text-xs text-muted-foreground">= {filsToKwd(kwdAmountFils)} KWD</p>
             )}
           </label>
           <label className="block space-y-1">
@@ -552,9 +551,7 @@ export default function NewExpensePage() {
               className="w-full border border-border rounded px-3 py-2 text-base sm:text-sm font-mono"
             />
             {isNonKwd && rawTax > 0 && fxRateNum > 0 && (
-              <p className="text-xs text-muted-foreground">
-                = {(kwdTaxFils / 1000).toFixed(3)} KWD
-              </p>
+              <p className="text-xs text-muted-foreground">= {filsToKwd(kwdTaxFils)} KWD</p>
             )}
           </label>
         </div>

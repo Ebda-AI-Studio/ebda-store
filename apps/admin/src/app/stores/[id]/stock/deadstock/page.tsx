@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { useAuth } from '@/lib/auth';
 import { apiGet, apiPost } from '@/lib/api';
+import { formatPrice } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,10 +36,6 @@ interface ListMeta {
   perPage: number;
   total: number;
   totalPages: number;
-}
-
-function kwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
 }
 
 // ─── Flag card ────────────────────────────────────────────────────────────────
@@ -101,7 +98,7 @@ function FlagCard({
         </div>
         <div>
           <span className="text-muted-foreground">{t('card.stockValue')}: </span>
-          <span className="font-medium font-mono">{kwd(item.stockValueFils)} KWD</span>
+          <span className="font-medium font-mono">{formatPrice(item.stockValueFils)}</span>
         </div>
         <div>
           <span className="text-muted-foreground">{t('card.suggestedDiscount')}: </span>

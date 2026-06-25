@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -206,11 +207,9 @@ export default function InsightsCohortsPage() {
                           <td className="px-3 py-2 font-mono text-xs">{month}</td>
                           <td className="px-3 py-2 text-end font-mono">{total}</td>
                           <td className="px-3 py-2 text-end font-mono">
-                            {(totalRevenue / 1000).toFixed(3)}
+                            {filsToKwd(totalRevenue)}
                           </td>
-                          <td className="px-3 py-2 text-end font-mono">
-                            {(ltv / 1000).toFixed(3)}
-                          </td>
+                          <td className="px-3 py-2 text-end font-mono">{filsToKwd(ltv)}</td>
                         </tr>
                       );
                     })}

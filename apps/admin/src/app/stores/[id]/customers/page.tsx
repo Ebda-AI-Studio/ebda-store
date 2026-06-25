@@ -54,13 +54,7 @@ interface CustomersListResponse {
   };
 }
 
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+import { formatDate, formatPrice } from '@/lib/format';
 
 /**
  * Segment → color classes for the badge. Labels are resolved via i18n
@@ -289,9 +283,7 @@ export default function StoreCustomersPage() {
       header: t('colSpent'),
       alignEnd: true,
       cell: customer => (
-        <span className="font-bold text-foreground">
-          {(customer.totalSpent / 1000).toFixed(3)} KWD
-        </span>
+        <span className="font-bold text-foreground">{formatPrice(customer.totalSpent)}</span>
       ),
     },
     {
@@ -300,7 +292,7 @@ export default function StoreCustomersPage() {
       hideOnMobile: true,
       cell: customer => (
         <div className="text-sm text-foreground">
-          <span className="font-medium">{(customer.lastOrderTotal / 1000).toFixed(3)} KWD</span>
+          <span className="font-medium">{formatPrice(customer.lastOrderTotal)}</span>
           {customer.lastOrderPaymentStatus && (
             <span
               className={`ms-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${

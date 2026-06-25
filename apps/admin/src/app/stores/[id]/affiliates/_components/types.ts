@@ -58,6 +58,4 @@ export const DEFAULT_CONFIG: AffiliateConfig = {
   publicSignupEnabled: true,
 };
 
-export function formatFils(fils: number): string {
-  return `${(fils / 1000).toFixed(3)} KWD`;
-}
+export { formatPrice as formatFils } from '@/lib/format';

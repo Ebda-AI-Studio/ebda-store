@@ -8,6 +8,7 @@ import { useLocale } from 'next-intl';
 import { KUWAIT_GOVERNORATES, areasForGovernorate } from '@force/shared';
 import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet, apiPost } from '../../../../../lib/api';
+import { formatPrice } from '@/lib/format';
 
 interface ProductVariant {
   id: string;
@@ -574,7 +575,7 @@ export default function NewOrderPage() {
                     <p className="font-medium text-success">Free delivery</p>
                   ) : (
                     <p className="font-semibold text-foreground">
-                      {(shippingPreview.shippingCost / 1000).toFixed(3)} KWD
+                      {formatPrice(shippingPreview.shippingCost)}
                       <span className="ms-2 text-xs font-normal text-muted-foreground">
                         (via {shippingPreview.source === 'area-rate' ? 'area rate' : 'zone'})
                       </span>
@@ -608,8 +609,8 @@ export default function NewOrderPage() {
               />
               {typeof shippingOverrideFils === 'number' && (
                 <p className="text-xs text-primary">
-                  Override active: {(shippingOverrideFils / 1000).toFixed(3)} KWD (
-                  {shippingOverrideFils} fils) will be used instead of the calculated fee.
+                  Override active: {formatPrice(shippingOverrideFils)} ({shippingOverrideFils} fils)
+                  will be used instead of the calculated fee.
                 </p>
               )}
             </label>
@@ -640,9 +641,7 @@ export default function NewOrderPage() {
                     >
                       <span className="font-medium">{displayName(p.name, p.nameAr)}</span>
                       {p.sku && <span className="ms-2 text-xs text-muted-foreground">{p.sku}</span>}
-                      <span className="ms-2 text-muted-foreground">
-                        {(p.price / 1000).toFixed(3)} KWD
-                      </span>
+                      <span className="ms-2 text-muted-foreground">{formatPrice(p.price)}</span>
                     </button>
                   </li>
                 ))}
@@ -669,9 +668,7 @@ export default function NewOrderPage() {
                         className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/5 hover:border-primary/40 transition-colors"
                       >
                         {isRtl ? v.titleAr || v.title : v.title || v.titleAr || v.title}
-                        <span className="ms-1.5 text-muted-foreground">
-                          {(v.price / 1000).toFixed(3)} KWD
-                        </span>
+                        <span className="ms-1.5 text-muted-foreground">{formatPrice(v.price)}</span>
                         {v.inventory <= 0 && (
                           <span className="ms-1.5 text-destructive/70 text-[10px]">
                             (out of stock)
@@ -702,9 +699,7 @@ export default function NewOrderPage() {
                   className="flex items-center gap-3 p-3 text-sm"
                 >
                   <span className="flex-1 font-medium text-foreground">{it.productName}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {(it.unitPrice / 1000).toFixed(3)} KWD
-                  </span>
+                  <span className="text-xs text-muted-foreground">{formatPrice(it.unitPrice)}</span>
                   <input
                     type="number"
                     min="1"
@@ -715,7 +710,7 @@ export default function NewOrderPage() {
                     className="w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
                   />
                   <span className="w-24 text-end font-semibold text-foreground">
-                    {((it.unitPrice * it.quantity) / 1000).toFixed(3)} KWD
+                    {formatPrice(it.unitPrice * it.quantity)}
                   </span>
                   <button
                     type="button"
@@ -731,9 +726,7 @@ export default function NewOrderPage() {
           )}
           <div className="mt-4 flex items-center justify-end gap-3 text-sm">
             <span className="text-muted-foreground">Subtotal:</span>
-            <span className="text-lg font-bold text-foreground">
-              {(subtotal / 1000).toFixed(3)} KWD
-            </span>
+            <span className="text-lg font-bold text-foreground">{formatPrice(subtotal)}</span>
           </div>
           {/* Show projected total when shipping is known */}
           {(shippingPreview?.matched || typeof shippingOverrideFils === 'number') && (
@@ -741,10 +734,10 @@ export default function NewOrderPage() {
               <span className="text-muted-foreground">Shipping:</span>
               <span className="font-medium text-foreground">
                 {typeof shippingOverrideFils === 'number'
-                  ? `${(shippingOverrideFils / 1000).toFixed(3)} KWD (override)`
+                  ? `${formatPrice(shippingOverrideFils)} (override)`
                   : shippingPreview?.freeShipping
                     ? 'Free'
-                    : `${(shippingPreview!.shippingCost / 1000).toFixed(3)} KWD`}
+                    : formatPrice(shippingPreview!.shippingCost)}
               </span>
             </div>
           )}
@@ -768,9 +761,7 @@ export default function NewOrderPage() {
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
               {items.length} item{items.length === 1 ? '' : 's'} ·{' '}
-              <span className="font-semibold text-foreground">
-                {(subtotal / 1000).toFixed(3)} KWD
-              </span>
+              <span className="font-semibold text-foreground">{formatPrice(subtotal)}</span>
             </p>
             <Button
               type="button"

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiFetch } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,9 +73,7 @@ interface TaxReportData {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function kwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
-}
+const kwd = filsToKwd;
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);

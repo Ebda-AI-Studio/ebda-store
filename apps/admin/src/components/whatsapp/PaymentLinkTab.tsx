@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, useToast } from '@force/ui';
 import { apiGet, apiPost } from '../../lib/api';
+import { formatPrice } from '../../lib/format';
 
 interface PaymentLinkResponse {
   paymentUrl: string;
@@ -313,7 +314,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                         <span className="truncate text-foreground">
                           {selected.name} —{' '}
                           <span className="font-mono tabular-nums text-muted-foreground">
-                            {(selected.price / 1000).toFixed(3)} KWD
+                            {formatPrice(selected.price)}
                           </span>
                         </span>
                         <button
@@ -357,7 +358,8 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                             >
                               <div className="truncate font-medium text-foreground">{p.name}</div>
                               <div className="text-[11px] text-muted-foreground font-mono tabular-nums">
-                                {(p.price / 1000).toFixed(3)} KWD{p.sku ? ` · ${p.sku}` : ''}
+                                {formatPrice(p.price)}
+                                {p.sku ? ` · ${p.sku}` : ''}
                               </div>
                             </button>
                           ))}

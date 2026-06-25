@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,10 +28,6 @@ interface FunnelData {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function kwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
-}
 
 function dropoff(from: number, to: number): string {
   if (from === 0) return '—';
@@ -186,7 +183,7 @@ export default function InsightsFunnelPage() {
                     {t('revenue')}
                   </p>
                   <p className="text-2xl font-semibold font-mono text-green-700">
-                    {kwd(totals.revenueFils)}
+                    {filsToKwd(totals.revenueFils)}
                   </p>
                   <p className="text-xs text-muted-foreground">KWD</p>
                 </div>
@@ -244,7 +241,9 @@ export default function InsightsFunnelPage() {
                             <td className="px-3 py-2 text-end font-mono">{day.cartsCreated}</td>
                             <td className="px-3 py-2 text-end font-mono">{day.checkoutsStarted}</td>
                             <td className="px-3 py-2 text-end font-mono">{day.ordersCompleted}</td>
-                            <td className="px-3 py-2 text-end font-mono">{kwd(day.revenueFils)}</td>
+                            <td className="px-3 py-2 text-end font-mono">
+                              {filsToKwd(day.revenueFils)}
+                            </td>
                           </tr>
                         ))}
                     </tbody>

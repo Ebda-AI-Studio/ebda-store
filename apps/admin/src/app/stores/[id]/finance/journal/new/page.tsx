@@ -6,6 +6,7 @@ import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -259,10 +260,10 @@ export default function NewJournalEntryPage() {
               <tr className="border-t border-border">
                 <td className="px-3 py-2 font-medium">{tNew('totals')}</td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {(totals.debit / 1000).toFixed(3)}
+                  {filsToKwd(totals.debit)}
                 </td>
                 <td className="px-3 py-2 text-end font-mono font-semibold">
-                  {(totals.credit / 1000).toFixed(3)}
+                  {filsToKwd(totals.credit)}
                 </td>
                 <td className="px-3 py-2" colSpan={2}>
                   {!balanced && totals.debit + totals.credit > 0 && (

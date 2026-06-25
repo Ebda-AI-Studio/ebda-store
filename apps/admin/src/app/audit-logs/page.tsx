@@ -38,16 +38,7 @@ interface Pagination {
   totalPages: number;
 }
 
-function formatDateTime(date: string) {
-  return new Date(date).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
+import { formatDateTime } from '@/lib/format';
 
 const actionColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
   create: 'default',

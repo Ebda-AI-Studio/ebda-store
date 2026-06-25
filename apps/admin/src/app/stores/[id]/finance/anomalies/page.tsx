@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { formatPrice } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ function AnomalyRow({
           <p className="text-muted-foreground">{t('current7d')}</p>
           <p className="font-mono font-medium">
             {item.metric === 'revenue_drop'
-              ? `${(item.current7d / 1000).toFixed(3)} KWD`
+              ? formatPrice(item.current7d)
               : item.current7d.toFixed(2)}
           </p>
         </div>
@@ -123,7 +124,7 @@ function AnomalyRow({
           <p className="text-muted-foreground">{t('baseline28d')}</p>
           <p className="font-mono font-medium">
             {item.metric === 'revenue_drop'
-              ? `${(item.baseline28d / 1000).toFixed(3)} KWD`
+              ? formatPrice(item.baseline28d)
               : item.baseline28d.toFixed(2)}
           </p>
         </div>

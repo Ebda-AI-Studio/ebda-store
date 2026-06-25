@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 import type { Period, ResolvedDateRange } from '../../analytics/_components/types';
 import { resolveDateRange } from '../../analytics/_components/types';
 
@@ -28,9 +29,7 @@ interface ExpenseRow {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function kwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
-}
+const kwd = filsToKwd;
 
 const STATUS_BADGE: Record<ExpenseStatus, string> = {
   draft: 'bg-gray-100 text-gray-700',

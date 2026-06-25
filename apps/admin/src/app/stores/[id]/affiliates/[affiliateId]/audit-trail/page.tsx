@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../../lib/api';
+import { formatPrice } from '@/lib/format';
 
 // ---------------------------------------------------------------------------
 // Types — shape returned by GET /affiliates/:id/audit-trail
@@ -322,7 +323,7 @@ export default function AffiliateAuditTrailPage() {
                             <p>
                               Commission:{' '}
                               <span className="font-medium text-success">
-                                +{(Number(event.details.commissionAmount) / 1000).toFixed(3)} KWD
+                                +{formatPrice(Number(event.details.commissionAmount))}
                               </span>
                             </p>
                           )}
@@ -330,7 +331,7 @@ export default function AffiliateAuditTrailPage() {
                             <p>
                               Payout:{' '}
                               <span className="font-medium">
-                                {(Number(event.details.payoutAmount) / 1000).toFixed(3)} KWD
+                                {formatPrice(Number(event.details.payoutAmount))}
                               </span>
                             </p>
                           )}

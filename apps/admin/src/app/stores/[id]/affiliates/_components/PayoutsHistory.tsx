@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { filsToKwd } from '@/lib/format';
 import { formatFils, type Affiliate } from './types';
 
 interface PayoutsHistoryProps {
@@ -72,7 +73,7 @@ export function PayoutsHistory({
               type="number"
               step="0.001"
               min="0.001"
-              max={(Number(affiliate.pendingBalance) / 1000).toFixed(3)}
+              max={filsToKwd(Number(affiliate.pendingBalance))}
               value={amount}
               onChange={e => onAmountChange(e.target.value)}
               placeholder="0.000"

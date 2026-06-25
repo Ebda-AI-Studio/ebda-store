@@ -76,14 +76,7 @@ const CATEGORY_LABELS: Record<FeatureCategory, { en: string; ar: string }> = {
   engagement: { en: 'Engagement', ar: 'التفاعل' },
 };
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+import { formatDate } from '@/lib/format';
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 

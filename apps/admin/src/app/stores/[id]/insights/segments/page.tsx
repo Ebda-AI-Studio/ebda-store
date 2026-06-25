@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,10 +22,6 @@ interface SegmentsData {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function kwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
-}
 
 const SEGMENT_COLORS: Record<string, string> = {
   vip: 'bg-purple-100 text-purple-900 border-purple-200',
@@ -113,7 +110,9 @@ export default function InsightsSegmentsPage() {
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 Total Monetary Value
               </p>
-              <p className="text-2xl font-semibold font-mono text-green-700">{kwd(totalRevenue)}</p>
+              <p className="text-2xl font-semibold font-mono text-green-700">
+                {filsToKwd(totalRevenue)}
+              </p>
               <p className="text-xs text-muted-foreground">KWD</p>
             </div>
           </div>
@@ -153,7 +152,9 @@ export default function InsightsSegmentsPage() {
                     </div>
                     <div>
                       <p className="text-xs opacity-70">{t('revenue')}</p>
-                      <p className="font-mono font-semibold">{kwd(seg.totalMonetaryFils)} KWD</p>
+                      <p className="font-mono font-semibold">
+                        {filsToKwd(seg.totalMonetaryFils)} KWD
+                      </p>
                       <p className="text-xs opacity-60">{revSharePct}% of total</p>
                     </div>
                   </div>

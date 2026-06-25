@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { DateRangePicker } from '../../../../../components/DateRangePicker';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useNotifications, useUiRefresh } from '@/contexts/NotificationContext';
@@ -182,12 +183,8 @@ export default function JournalListPage() {
                         <td className="px-3 py-2 text-muted-foreground truncate max-w-[12rem]">
                           {entry.memo ?? '—'}
                         </td>
-                        <td className="px-3 py-2 text-end font-mono text-xs">
-                          {(dr / 1000).toFixed(3)}
-                        </td>
-                        <td className="px-3 py-2 text-end font-mono text-xs">
-                          {(cr / 1000).toFixed(3)}
-                        </td>
+                        <td className="px-3 py-2 text-end font-mono text-xs">{filsToKwd(dr)}</td>
+                        <td className="px-3 py-2 text-end font-mono text-xs">{filsToKwd(cr)}</td>
                         <td className="px-3 py-2 text-end">
                           <Link
                             href={`/stores/${storeId}/finance/journal/${entry.id}`}

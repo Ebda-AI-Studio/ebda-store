@@ -6,13 +6,7 @@ import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { RETURN_COLORS } from './types';
 import type { ListMeta, ReturnRecord } from './types';
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+import { formatDate } from '@/lib/format';
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-KW', {

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPatch } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,9 +71,7 @@ interface TxsResponse {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function kwd(fils: number): string {
-  return (fils / 1000).toFixed(3);
-}
+const kwd = filsToKwd;
 
 function fmt(iso: string | null): string {
   if (!iso) return '—';

@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { filsToKwd } from '@/lib/format';
 import type { AffiliateConfig } from './types';
 
 interface AffiliateCommissionFormProps {
@@ -72,7 +73,7 @@ export function AffiliateCommissionForm({
               type="number"
               min="0"
               step="0.001"
-              value={(config.minPayoutAmount / 1000).toFixed(3)}
+              value={filsToKwd(config.minPayoutAmount)}
               onChange={e =>
                 onConfigChange({
                   ...config,

@@ -17,10 +17,10 @@ function StatCard({ label, value }: StatCardProps) {
   );
 }
 
+import { formatPrice } from '@/lib/format';
+
 /** Converts fils (integer) to a KWD display string with 3 decimal places. */
-function formatKwd(fils: number): string {
-  return `${(fils / 1000).toFixed(3)} KWD`;
-}
+const formatKwd = formatPrice;
 
 interface AbandonmentStatsGridProps {
   stats: AbandonmentStats | null;

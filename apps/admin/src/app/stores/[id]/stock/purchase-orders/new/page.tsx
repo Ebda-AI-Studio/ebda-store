@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
+import { formatPrice } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -265,7 +266,7 @@ export default function NewPurchaseOrderPage() {
                       />
                     </td>
                     <td className="px-3 py-2 text-end font-mono text-xs text-muted-foreground">
-                      {lt > 0 ? `${(lt / 1000).toFixed(3)} KWD` : '—'}
+                      {lt > 0 ? formatPrice(lt) : '—'}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <button
@@ -287,7 +288,7 @@ export default function NewPurchaseOrderPage() {
                   {tNew('subtotal')}
                 </td>
                 <td className="px-3 py-2 text-end font-mono text-sm font-semibold">
-                  {(subtotalFils / 1000).toFixed(3)} KWD
+                  {formatPrice(subtotalFils)}
                 </td>
                 <td />
               </tr>

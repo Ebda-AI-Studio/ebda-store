@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { useT } from '@/i18n/useT';
 import { apiGet } from '@/lib/api';
+import { filsToKwd } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ export default function PurchaseOrdersPage() {
                       {po.expectedDate ? new Date(po.expectedDate).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-3 py-2 text-end font-mono text-xs font-semibold">
-                      {(po.totalCost / 1000).toFixed(3)}
+                      {filsToKwd(po.totalCost)}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {new Date(po.createdAt).toLocaleDateString()}
