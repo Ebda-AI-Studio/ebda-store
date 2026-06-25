@@ -94,8 +94,7 @@ force-website-builder/
 ├── packages/
 │   ├── database/       # Prisma schema & client (@force/database)
 │   ├── shared/         # Types, Zod schemas, constants (@force/shared)
-│   ├── ui/             # Shared UI components (@force/ui)
-│   └── config/         # Shared configurations (@force/config)
+│   └── ui/             # Shared UI components (@force/ui)
 ├── tests/              # Unit, integration & e2e tests
 ├── docker/             # Docker Compose for local dev
 ├── docs/               # Documentation

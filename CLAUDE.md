@@ -130,7 +130,6 @@ packages/
   database/     → Prisma ORM + schema (@force/database)
   shared/       → Shared types, utils, constants (@force/shared)
   ui/           → Shared UI components (@force/ui)
-  config/       → Shared config (@force/config)
 ```
 
 ### Deployment
