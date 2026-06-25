@@ -404,7 +404,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # NO `cache: 'npm'` here. On the self-hosted runner the post-job npm
+          # cache SAVE uploads ~600 MB to GitHub's cache backend at a few MB/s,
+          # which repeatedly blew this job's 5-min timeout AFTER all real checks
+          # passed ("Post Setup Node.js" cancelled). The cache is redundant on
+          # self-hosted anyway — the machine's local ~/.npm already speeds
+          # `npm ci`. Dropping it makes the audit job finish well under timeout.
 
       - name: Install dependencies
         run: npm ci
@@ -422,11 +427,38 @@ jobs:
         # Re-evaluate when @lhci/cli ships a refresh.
         run: |
           set -e
+          # `npm audit` calls the registry advisory API, which intermittently
+          # returns "audit endpoint returned an error" (a transient 5xx /
+          # rate-limit), failing the job with no real vulnerability — observed
+          # repeatedly on the self-hosted runner 2026-06-25. Retry ONLY that
+          # transient class; a genuine finding ("N vulnerabilities") fails fast
+          # and is never retried away (zero-vuln policy preserved).
+          audit() {
+            local level="$1" n=0 out rc
+            until [ "$n" -ge 3 ]; do
+              out="$(npm audit --audit-level="$level" --omit=dev 2>&1)"; rc=$?
+              echo "$out"
+              [ "$rc" -eq 0 ] && return 0
+              # Retry ONLY the known transient class (registry advisory API 5xx /
+              # network). ANYTHING else — including a real "N vulnerabilities"
+              # finding — fails fast, so the zero-vuln policy is never retried away.
+              if echo "$out" | grep -qiE "audit endpoint returned an error|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up|registry.*error|503|429"; then
+                n=$((n + 1))
+                echo "npm audit transient endpoint error (attempt $n/3) — retrying in 10s..."
+                sleep 10
+                continue
+              fi
+              echo "::error::npm audit failed with a real finding (audit-level=$level) — failing."
+              return 1
+            done
+            echo "::error::npm audit endpoint kept erroring after 3 attempts (audit-level=$level)."
+            return 1
+          }
           echo "::group::production deps (zero tolerance at low)"
-          npm audit --audit-level=low --omit=dev
+          audit low
           echo "::endgroup::"
           echo "::group::production deps (zero tolerance at high — omit dev)"
-          npm audit --audit-level=high --omit=dev
+          audit high
           echo "::endgroup::"
 
       - name: Ensure jq (trufflehog needs it; self-hosted runner may lack it + can't sudo)
