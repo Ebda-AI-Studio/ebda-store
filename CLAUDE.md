@@ -135,7 +135,8 @@ packages/
 ### Deployment
 
 - **API**: Railway (Railpack build, NOT Dockerfile) at `api-production-c058.up.railway.app`
-- **Admin**: Vercel project `force-admin` → custom domain `app.forcemediakw.com`
+- **Admin**: Vercel project `force-admin` → custom domain `app.forcemediakw.com`. **ALSO auto-deploys to Cloudflare Workers** at `admin.force-ai.co` via `cf-deploy.yml` (push to main touching `apps/admin/**`). Vercel stays live until a deliberate cutover.
+- **Orders PWA**: Vercel project `force-orders` → `orders.forcemediakw.com`. **ALSO auto-deploys to Cloudflare Workers** at `orders.force-ai.co` via `cf-deploy.yml` (push to main touching `apps/orders/**`). Vercel stays live until cutover.
 - **Web**: Vercel project `force-web` → custom domain `wadyaljuz.com` (per-tenant; future tenants attach their own custom domains). **ALSO auto-deploys to Cloudflare Workers** (OpenNext) via `.github/workflows/cf-deploy.yml` on every push to `main` touching `apps/web/**` — runs on the self-hosted runner (zero GH minutes), serves `store.force-ai.co` + every merchant Custom Hostname via the SaaS `*/*` fallback. wadyaljuz.com is LIVE on Cloudflare. Setup: `docs/migration/cloudflare-ci-deploy.md`.
 - _Stale Vercel projects to ignore:_ `force-web-sigma` (no prod deploy), `force-web-sigma-seven.vercel.app` (DEPLOYMENT_NOT_FOUND ghost). Both pre-date the 2026-05-17 rename to the canonical `force-web` / `force-admin` projects. Safe to delete via Vercel dashboard.
 - **Database**: Neon PostgreSQL (serverless) — local .env has stale Supabase URL, production uses Neon
@@ -445,6 +446,7 @@ Optional (feature degrades gracefully if missing):
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL (e.g., `https://api-production-c058.up.railway.app`)
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for the admin PWA (`react-onesignal` in `apps/admin`).
+- `NEXT_PUBLIC_SENTRY_DSN_ADMIN` — admin client Sentry DSN. Initialized in `apps/admin/instrumentation-client.ts` (replaced the dead `sentry.client.config.ts`, same latent bug as web — no `withSentryConfig`, fixed 2026-06-25). Server Sentry off on the CF target (instrumentation.ts moved aside).
 
 ### Web (Vercel)
 

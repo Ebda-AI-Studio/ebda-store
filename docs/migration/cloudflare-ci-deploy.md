@@ -1,10 +1,19 @@
-# Cloudflare CI/CD — auto-deploy the storefront Worker
+# Cloudflare CI/CD — auto-deploy the Next apps as Workers
 
-`.github/workflows/cf-deploy.yml` builds `apps/web` with OpenNext and deploys it
-to Cloudflare Workers on every push to `main` that touches the storefront or its
-shared deps. The deployed worker serves **store.force-ai.co** and — via the
-Cloudflare-for-SaaS `*/*` fallback route — **every merchant Custom Hostname**
-(wadyaljuz.com, …).
+`.github/workflows/cf-deploy.yml` builds the three Next apps with OpenNext and
+deploys them to Cloudflare Workers on every push to `main`. A per-app path filter
+(`detect` job, `dorny/paths-filter`) means a change to one app only rebuilds that
+app; a change to `packages/**` or the CF tooling rebuilds all three; a manual
+`workflow_dispatch` deploys all three.
+
+| App                        | Worker serves                                                                                       |
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| **web** (`apps/web`)       | `store.force-ai.co` + every merchant Custom Hostname (wadyaljuz.com, …) via the SaaS `*/*` fallback |
+| **admin** (`apps/admin`)   | `admin.force-ai.co` — Vercel `app.forcemediakw.com` stays live until a deliberate DNS cutover       |
+| **orders** (`apps/orders`) | `orders.force-ai.co` — Vercel `orders.forcemediakw.com` stays live until cutover                    |
+
+The `custom_domain` routes create the `admin.`/`orders.force-ai.co` DNS records +
+edge certs automatically on first deploy (needs the token's Zone DNS+SSL perms).
 
 It runs on the **self-hosted WSL2 runner** by default (`vars.USE_SELF_HOSTED == 'true'`,
 the same variable `ci.yml`/`deploy.yml` use), so it costs **zero GitHub Actions
@@ -99,13 +108,31 @@ bash scripts/cf-build.sh web
 cd apps/web && npx wrangler deploy
 ```
 
-## Scope / follow-ups
+### Extra repo variables for admin / orders
 
-- **web only** today — admin + orders are still on Vercel. `cf-setup-local.sh`
-  already emits their `admin.force-ai.co` / `orders.force-ai.co` routes, so
-  extending this workflow to them is a copy of the `deploy-web` job once those
-  apps move.
-- **Server-side Sentry** is inactive on the CF target (the OpenNext build moves
-  `instrumentation.ts` aside). Client-side Sentry works via
-  `apps/web/instrumentation-client.ts`. Full SSR Sentry on Workers needs the
+The admin + orders jobs hardcode their non-secret values in the workflow (each app
+needs DIFFERENT values — e.g. admin `NEXT_PUBLIC_API_URL` has **no** `/api/v1`
+suffix, and `APP_NAME` is "Force Admin"), and read only the key-shaped values from
+repo variables:
+
+| Variable                              | App    | Where it comes from        |
+| ------------------------------------- | ------ | -------------------------- |
+| `NEXT_PUBLIC_SENTRY_DSN_ADMIN`        | admin  | Vercel `force-admin` prod  |
+| `NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID` | orders | Vercel `force-orders` prod |
+| `NEXT_PUBLIC_POSTHOG_KEY`             | admin  | shared (already set)       |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`        | orders | shared (already set)       |
+
+## Cutover (later, deliberate)
+
+This workflow deploys admin/orders to the **new** `admin.`/`orders.force-ai.co`
+subdomains. The live Vercel domains (`app.forcemediakw.com`,
+`orders.forcemediakw.com`) are **untouched** — verify the force-ai.co subdomains
+work, then cut their DNS / rebrand when ready (and drop the Vercel projects after
+a soak), exactly as wadyaljuz was cut over for the storefront.
+
+## Follow-ups
+
+- **Server-side Sentry** is inactive on the CF target for web + admin (the OpenNext
+  build moves `instrumentation.ts` aside). Client-side Sentry works via each app's
+  `instrumentation-client.ts`. Full SSR Sentry on Workers needs the
   `@sentry/cloudflare` SDK — separate task.

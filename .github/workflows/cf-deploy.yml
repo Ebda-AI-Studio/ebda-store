@@ -1,36 +1,31 @@
-name: Deploy Storefront (Cloudflare)
+name: Deploy to Cloudflare
 
-# Auto-deploys the storefront (apps/web) to Cloudflare Workers via OpenNext on
-# every push to main that touches the storefront or its shared deps. Runs on the
-# SELF-HOSTED runner by default (vars.USE_SELF_HOSTED == 'true') so it costs ZERO
-# GitHub Actions minutes; falls back to ubuntu-latest when the runner is offline
-# or when dispatched with force_cloud. This deploys the worker that serves
-# store.force-ai.co + every merchant Custom Hostname (wadyaljuz.com, …) via the
-# Cloudflare-for-SaaS `*/*` fallback route.
+# Auto-deploys the three Next apps (web / admin / orders) to Cloudflare Workers
+# via OpenNext on every push to main. A per-app path filter (detect job) means a
+# change to one app only rebuilds that app; a change to packages/** or the CF
+# tooling rebuilds all three. Manual workflow_dispatch deploys all three.
 #
-# REQUIRED repo SECRETS (Settings → Secrets and variables → Actions → Secrets):
-#   CLOUDFLARE_API_TOKEN   — token scoped to: Account › Workers Scripts:Edit,
-#                            Account › Account Settings:Read, Zone › Workers
-#                            Routes:Edit, Zone › DNS:Edit, Zone › SSL and
-#                            Certificates:Edit (the last two are needed for the
-#                            custom_domain routes). Scope the zone perms to the
-#                            force-ai.co zone.
-#   CLOUDFLARE_ACCOUNT_ID  — 9f70414f9a626137f1004fa2f4add904
-#   (TELEGRAM_BOT_TOKEN / TELEGRAM_ALERT_CHAT_ID are already set for ci.yml)
+# Runs on the SELF-HOSTED runner by default (vars.USE_SELF_HOSTED == 'true') so it
+# costs ZERO GitHub Actions minutes; falls back to ubuntu-latest when offline or
+# dispatched with force_cloud.
 #
-# REQUIRED repo VARIABLES (Settings → Secrets and variables → Actions → Variables)
-# — these are the PUBLIC NEXT_PUBLIC_* build values (they ship in the browser
-# bundle; not secrets). Unset ones fall back to the documented prod default below:
-#   NEXT_PUBLIC_API_URL, NEXT_PUBLIC_APP_NAME, NEXT_PUBLIC_SITE_URL,
-#   NEXT_PUBLIC_ONESIGNAL_APP_ID, NEXT_PUBLIC_POSTHOG_HOST,
-#   NEXT_PUBLIC_POSTHOG_KEY, NEXT_PUBLIC_SENTRY_DSN_WEB, NEXT_PUBLIC_VAPID_PUBLIC_KEY
-# See docs/migration/cloudflare-ci-deploy.md for the exact values + setup.
+#   web    → store.force-ai.co + every merchant Custom Hostname (SaaS */* fallback)
+#   admin  → admin.force-ai.co   (Vercel app.forcemediakw.com stays live until cutover)
+#   orders → orders.force-ai.co  (Vercel orders.forcemediakw.com stays live until cutover)
+#
+# REQUIRED repo SECRETS: CLOUDFLARE_API_TOKEN (Workers Scripts:Edit + Account
+# Settings:Read + Zone Workers-Routes/DNS/SSL:Edit on force-ai.co),
+# CLOUDFLARE_ACCOUNT_ID. (TELEGRAM_* already set for ci.yml.)
+# REQUIRED repo VARIABLES (public NEXT_PUBLIC_*, build-time inlined) — see
+# docs/migration/cloudflare-ci-deploy.md for the full list + setup.
 
 on:
   push:
     branches: [main]
     paths:
       - 'apps/web/**'
+      - 'apps/admin/**'
+      - 'apps/orders/**'
       - 'packages/**'
       - 'scripts/cf-build.sh'
       - 'scripts/cf-setup-local.sh'
@@ -44,7 +39,7 @@ on:
 
 # Cancel a superseded deploy if a newer push lands while one is mid-flight.
 concurrency:
-  group: cf-deploy-web-${{ github.ref }}
+  group: cf-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -54,8 +49,42 @@ permissions:
   contents: read
 
 jobs:
+  # Decide which apps to (re)deploy. A change under packages/** or the CF tooling
+  # marks all three. On workflow_dispatch (no diff base) dorny/paths-filter reports
+  # every filter true, so a manual run deploys all three.
+  detect:
+    name: Detect changed apps
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.f.outputs.web }}
+      admin: ${{ steps.f.outputs.admin }}
+      orders: ${{ steps.f.outputs.orders }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            shared: &shared
+              - 'packages/**'
+              - 'scripts/cf-build.sh'
+              - 'scripts/cf-setup-local.sh'
+              - '.github/workflows/cf-deploy.yml'
+            web:
+              - *shared
+              - 'apps/web/**'
+            admin:
+              - *shared
+              - 'apps/admin/**'
+            orders:
+              - *shared
+              - 'apps/orders/**'
+
   deploy-web:
-    name: Build + deploy storefront worker
+    name: Deploy storefront (web)
+    needs: detect
+    if: needs.detect.outputs.web == 'true'
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 25
     env:
@@ -63,40 +92,26 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
       - name: Preflight — require Cloudflare credentials
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set — see docs/migration/cloudflare-ci-deploy.md"
             exit 1
           fi
-
       - name: Install dependencies
         run: npm ci
-
       - name: Build workspace packages (database → shared → ui)
-        # The storefront imports @force/shared + @force/ui (transpilePackages) and
-        # resolves them via package.json "main" → dist/, so the packages must be
-        # built first in a fresh checkout. @force/database build runs
-        # `prisma generate && tsc` (storefront type-deps + Prisma client).
         run: npm run build -w @force/database -w @force/shared -w @force/ui
-
       - name: Setup Cloudflare build tooling (web)
-        # Installs the local-only @opennextjs/cloudflare + wrangler devDeps and
-        # writes apps/web/{open-next.config.ts,wrangler.jsonc} WITH the force-ai.co
-        # routes (store.force-ai.co + cf fallback + */* SaaS catch-all).
         run: bash scripts/cf-setup-local.sh web
-
       - name: Write storefront public env (.env.production.local)
-        # NEXT_PUBLIC_* are BUILD-TIME inlined into the browser bundle, so they
-        # must be present before the OpenNext build. Public values → repo
-        # variables, with prod defaults so a missing var still builds.
+        # NEXT_PUBLIC_* are BUILD-TIME inlined; public values → repo variables,
+        # with prod defaults so a missing var still builds.
         env:
           V_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
           V_APP_NAME: ${{ vars.NEXT_PUBLIC_APP_NAME }}
@@ -118,17 +133,106 @@ jobs:
           NEXT_PUBLIC_VAPID_PUBLIC_KEY=${V_VAPID_PUBLIC_KEY}
           EOF
           echo "wrote apps/web/.env.production.local"
-          # Echo only the non-key values so a misconfig is visible in logs.
-          echo "  API_URL=${V_API_URL:-(default)}  SITE_URL=${V_SITE_URL:-(default)}  POSTHOG_HOST=${V_POSTHOG_HOST:-(default)}"
-
       - name: Build for Cloudflare (OpenNext)
         run: bash scripts/cf-build.sh web
-
       - name: Deploy worker
-        # Run from apps/web so wrangler resolves .open-next/worker.js + assets +
-        # wrangler.jsonc relative to the app (matches cf-build.sh's documented
-        # deploy step). CLOUDFLARE_API_TOKEN/ACCOUNT_ID come from the job env.
         working-directory: apps/web
+        run: npx wrangler deploy
+
+  deploy-admin:
+    name: Deploy admin
+    needs: detect
+    if: needs.detect.outputs.admin == 'true'
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Preflight — require Cloudflare credentials
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set — see docs/migration/cloudflare-ci-deploy.md"
+            exit 1
+          fi
+      - name: Install dependencies
+        run: npm ci
+      - name: Build workspace packages (database → shared → ui)
+        run: npm run build -w @force/database -w @force/shared -w @force/ui
+      - name: Setup Cloudflare build tooling (admin)
+        run: bash scripts/cf-setup-local.sh admin
+      - name: Write admin public env (.env.production.local)
+        # admin's NEXT_PUBLIC_API_URL has NO /api/v1 suffix (the admin apiClient
+        # appends it) — distinct from web. APP_NAME also differs ("Force Admin").
+        env:
+          V_POSTHOG_KEY: ${{ vars.NEXT_PUBLIC_POSTHOG_KEY }}
+          V_SENTRY_DSN_ADMIN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN_ADMIN }}
+        run: |
+          cat > apps/admin/.env.production.local <<EOF
+          NEXT_PUBLIC_API_URL=https://store-api.forcemediakw.com
+          NEXT_PUBLIC_APP_NAME=Force Admin
+          NEXT_PUBLIC_APP_URL=https://app.forcemediakw.com
+          NEXT_PUBLIC_WEB_URL=https://store.forcemediakw.com
+          NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+          NEXT_PUBLIC_POSTHOG_KEY=${V_POSTHOG_KEY}
+          NEXT_PUBLIC_SENTRY_DSN_ADMIN=${V_SENTRY_DSN_ADMIN}
+          EOF
+          echo "wrote apps/admin/.env.production.local"
+      - name: Build for Cloudflare (OpenNext)
+        run: bash scripts/cf-build.sh admin
+      - name: Deploy worker
+        working-directory: apps/admin
+        run: npx wrangler deploy
+
+  deploy-orders:
+    name: Deploy orders PWA
+    needs: detect
+    if: needs.detect.outputs.orders == 'true'
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Preflight — require Cloudflare credentials
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set — see docs/migration/cloudflare-ci-deploy.md"
+            exit 1
+          fi
+      - name: Install dependencies
+        run: npm ci
+      - name: Build workspace packages (database → shared → ui)
+        run: npm run build -w @force/database -w @force/shared -w @force/ui
+      - name: Setup Cloudflare build tooling (orders)
+        run: bash scripts/cf-setup-local.sh orders
+      - name: Write orders public env (.env.production.local)
+        env:
+          V_ONESIGNAL_ORDERS: ${{ vars.NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID }}
+          V_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+        run: |
+          cat > apps/orders/.env.production.local <<EOF
+          NEXT_PUBLIC_API_URL=https://store-api.forcemediakw.com
+          NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID=${V_ONESIGNAL_ORDERS}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY=${V_VAPID_PUBLIC_KEY}
+          EOF
+          echo "wrote apps/orders/.env.production.local"
+      - name: Build for Cloudflare (OpenNext)
+        run: bash scripts/cf-build.sh orders
+      - name: Deploy worker
+        working-directory: apps/orders
         run: npx wrangler deploy
 
   notify-failure:
@@ -137,7 +241,7 @@ jobs:
     name: Notify on failure (main only)
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [deploy-web]
+    needs: [deploy-web, deploy-admin, deploy-orders]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Send Telegram alert
@@ -147,12 +251,16 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
+          WEB_RES: ${{ needs.deploy-web.result }}
+          ADMIN_RES: ${{ needs.deploy-admin.result }}
+          ORDERS_RES: ${{ needs.deploy-orders.result }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ALERT_CHAT_ID" ]; then
             echo "telegram secrets not configured — skipping alert"
             exit 0
           fi
-          TEXT="🔴 CF storefront deploy FAILED
+          TEXT="🔴 CF deploy FAILED
+          web: ${WEB_RES}  admin: ${ADMIN_RES}  orders: ${ORDERS_RES}
           repo: ${REPO}
           sha: ${SHA:0:8}
           https://github.com/${REPO}/actions/runs/${RUN_ID}"
