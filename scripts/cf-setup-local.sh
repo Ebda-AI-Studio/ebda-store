@@ -32,8 +32,15 @@ done
 # ORIGIN, so every merchant Custom Hostname (wadyaljuz.com, …) proxies through
 # the storefront worker. A bare fallback-origin custom domain alone returns HTTP
 # 522 — the `*/*` zone route is what makes the worker actually answer those
-# proxied requests (GOTCHA 4 in the cutover runbook). admin/orders are plain
-# single-host workers (their custom_domain routes win over web's `*/*` catch-all).
+# proxied requests (GOTCHA 4 in the cutover runbook).
+#
+# CRITICAL (GOTCHA 5, 2026-06-25): that `*/*` route OVERRIDES the admin/orders
+# custom domains in the SAME zone — Cloudflare does NOT let a custom domain win
+# over a `*/*` zone route, so admin/orders.force-ai.co would just serve the
+# storefront. The fix: give admin/orders a MORE-SPECIFIC zone route
+# (`admin.force-ai.co/*`) which DOES beat `*/*`. So each carries BOTH its
+# custom_domain (for DNS + edge cert) AND the specific zone route (to win routing
+# priority). wrangler accepts both for the same host. Verified live 2026-06-25.
 for app in "${APPS[@]}"; do
   dir="$ROOT/apps/$app"
   [ -d "$dir" ] || { echo "skip config: no apps/$app"; continue; }
@@ -41,8 +48,8 @@ for app in "${APPS[@]}"; do
   # Interpolating a $VAR mid-string would re-quote the tail and emit literal \n.
   case "$app" in
     web)    ROUTES_JSON=$'  "routes": [\n    { "pattern": "store.force-ai.co", "custom_domain": true },\n    { "pattern": "cf.force-ai.co", "custom_domain": true },\n    { "pattern": "*/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
-    admin)  ROUTES_JSON=$'  "routes": [\n    { "pattern": "admin.force-ai.co", "custom_domain": true }\n  ],\n' ;;
-    orders) ROUTES_JSON=$'  "routes": [\n    { "pattern": "orders.force-ai.co", "custom_domain": true }\n  ],\n' ;;
+    admin)  ROUTES_JSON=$'  "routes": [\n    { "pattern": "admin.force-ai.co", "custom_domain": true },\n    { "pattern": "admin.force-ai.co/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
+    orders) ROUTES_JSON=$'  "routes": [\n    { "pattern": "orders.force-ai.co", "custom_domain": true },\n    { "pattern": "orders.force-ai.co/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
     *)      ROUTES_JSON='' ;;
   esac
   cat > "$dir/open-next.config.ts" <<'EOF'
