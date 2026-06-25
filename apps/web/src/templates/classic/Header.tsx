@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { CartIcon } from '@force/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps, ResolvedUtilityBar } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -221,20 +222,7 @@ export default function ClassicHeader({
                   isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`
                 }
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
+                <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
                 {cartItemCount > 0 && (
                   <span
                     className={`absolute -top-2 ${isRtl ? '-left-2' : '-right-2'} bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full flex items-center justify-center`}
@@ -256,20 +244,7 @@ export default function ClassicHeader({
               className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-foreground/60 hover:text-foreground transition-colors duration-500 cursor-pointer"
               aria-label={isRtl ? 'السلة' : 'Cart'}
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
+              <CartIcon className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
               {cartItemCount > 0 && (
                 <span
                   className={`absolute -top-2 ${isRtl ? '-left-2' : '-right-2'} bg-foreground text-background text-[10px] font-serif w-4 h-4 rounded-full flex items-center justify-center`}

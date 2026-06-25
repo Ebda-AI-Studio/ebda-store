@@ -7,7 +7,7 @@ import Link from 'next/link';
 import type { ProductCardProps } from '../types';
 import type { TemplateId, ProductCardSize } from '@force/shared';
 import { getProductCardTextSizes, resolveColor } from '@force/shared';
-import { cn } from '@force/ui';
+import { cn, CartIcon } from '@force/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { getPackStyles } from './pack-styles';
@@ -497,20 +497,7 @@ function PecannbeeProductCardImpl({
                 {isAdding ? (
                   <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 ) : (
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    aria-hidden
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
+                  <CartIcon className="h-4 w-4" aria-hidden={true} />
                 )}
                 {(isRtl ? resolvedCtaLabelTextAr : resolvedCtaLabelTextEn) ??
                   (isRtl ? 'إضافة للسلة' : 'Add to Cart')}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { CartIcon } from '@force/ui';
 import { OrderStatusBadge } from '../../../../../components/OrderStatusBadge';
 import { ABANDONED_CART_COLORS, CART_STATUS_KEYS } from './types';
 import type { AbandonedCartRecord, ListMeta } from './types';
@@ -72,19 +73,7 @@ export function AbandonedCartsTable({
       {records.length === 0 ? (
         <div className="force-empty-state px-6">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-            <svg
-              className="h-8 w-8 text-muted-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
+            <CartIcon className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
           </div>
           <p className="font-semibold text-foreground">{t('empty')}</p>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button, useToast } from '@force/ui';
+import { Button, useToast, CartIcon } from '@force/ui';
 import { ShopChrome } from '../../components';
 import { useTemplateComponents } from '../../hooks/useTemplateComponents';
 import { useCart } from '../../contexts/CartContext';
@@ -349,19 +349,7 @@ export default function CartClient() {
             ) : (
               <div className="mt-16 flex flex-col items-center justify-center py-12">
                 <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-muted">
-                  <svg
-                    className="h-16 w-16 text-muted-foreground"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1}
-                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
+                  <CartIcon className="h-16 w-16 text-muted-foreground" strokeWidth={1} />
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">
                   {t(
@@ -377,14 +365,7 @@ export default function CartClient() {
                 </p>
                 <Link href={storeUrl('/products')}>
                   <Button className="mt-8 gap-2 rounded-xl shadow-lg shadow-primary/25" size="lg">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                      />
-                    </svg>
+                    <CartIcon className="h-5 w-5" />
                     {t(
                       'Start Shopping',
                       '\u0627\u0628\u062f\u0623 \u0627\u0644\u062a\u0633\u0648\u0642'

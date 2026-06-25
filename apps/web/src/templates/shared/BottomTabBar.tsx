@@ -9,6 +9,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useStoreUrl } from '../../contexts/StoreContext';
 import type { BottomBarSettings, StoreTheme } from '@force/shared';
 import { resolveColor, DEFAULT_THEME } from '@force/shared';
+import { CartIcon } from '@force/ui';
 import type { NavItem } from '../types';
 
 /**
@@ -128,16 +129,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
       href: storeUrl('/cart'),
       labelEn: 'Cart',
       labelAr: 'السلة',
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
-      ),
+      icon: <CartIcon className="h-5 w-5" aria-hidden={true} />,
     },
     {
       key: 'search',
