@@ -15,6 +15,16 @@ const PLATFORM_HOSTS = new Set([
   'admin.forcemediakw.com',
   'app.forcemediakw.com',
   'store.forcemediakw.com',
+  // force-ai.co — the 2026-06 platform domain rebrand (Vercel→Cloudflare).
+  // store.force-ai.co is the path-based storefront platform host (`/<slug>`);
+  // the sibling platform subdomains are listed so the storefront never mistakes
+  // one for a merchant custom domain. Added alongside the forcemediakw.com
+  // entries so both resolve during the cutover; harmless until DNS points here.
+  'force-ai.co',
+  'www.force-ai.co',
+  'store.force-ai.co',
+  'admin.force-ai.co',
+  'orders.force-ai.co',
 ]);
 
 /**
