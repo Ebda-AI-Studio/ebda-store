@@ -136,7 +136,7 @@ packages/
 
 - **API**: Railway (Railpack build, NOT Dockerfile) at `api-production-c058.up.railway.app`
 - **Admin**: Vercel project `force-admin` → custom domain `app.forcemediakw.com`
-- **Web**: Vercel project `force-web` → custom domain `wadyaljuz.com` (per-tenant; future tenants attach their own custom domains)
+- **Web**: Vercel project `force-web` → custom domain `wadyaljuz.com` (per-tenant; future tenants attach their own custom domains). **ALSO auto-deploys to Cloudflare Workers** (OpenNext) via `.github/workflows/cf-deploy.yml` on every push to `main` touching `apps/web/**` — runs on the self-hosted runner (zero GH minutes), serves `store.force-ai.co` + every merchant Custom Hostname via the SaaS `*/*` fallback. wadyaljuz.com is LIVE on Cloudflare. Setup: `docs/migration/cloudflare-ci-deploy.md`.
 - _Stale Vercel projects to ignore:_ `force-web-sigma` (no prod deploy), `force-web-sigma-seven.vercel.app` (DEPLOYMENT_NOT_FOUND ghost). Both pre-date the 2026-05-17 rename to the canonical `force-web` / `force-admin` projects. Safe to delete via Vercel dashboard.
 - **Database**: Neon PostgreSQL (serverless) — local .env has stale Supabase URL, production uses Neon
 - **Redis**: Railway internal (`redis.railway.internal:6379`)
@@ -451,6 +451,8 @@ Optional (feature degrades gracefully if missing):
 - `NEXT_PUBLIC_API_URL` — Railway API URL
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for storefront broadcasts (script-tag init via `OneSignalStorefrontInit.tsx`). Storefront silently no-ops when missing.
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — VAPID public key for the standards-based Web Push subscription path.
+- `NEXT_PUBLIC_SENTRY_DSN_WEB` — client-side Sentry DSN. Initialized in `apps/web/instrumentation-client.ts` (the Next 15.3+/Sentry v10 client hook). NOTE: this REPLACED the old `sentry.client.config.ts`, which never loaded because `next.config.js` isn't wrapped in `withSentryConfig` — so browser Sentry was silently dead until 2026-06-25. Server-side Sentry (`instrumentation.ts` → `sentry.server.config.ts`) works on Vercel but is OFF on the Cloudflare target (cf-build moves `instrumentation.ts` aside); restoring it there needs `@sentry/cloudflare`.
+- **Cloudflare deploy build env**: the CF Workers build (`cf-deploy.yml`) reads all `NEXT_PUBLIC_*` from GitHub repo **variables** (public, build-time inlined). Keep them synced with Vercel's `force-web` prod env. See `docs/migration/cloudflare-ci-deploy.md`.
 
 ### Orders PWA (Vercel — `force-orders`)
 
