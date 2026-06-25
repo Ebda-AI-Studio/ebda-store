@@ -130,6 +130,32 @@ subdomains. The live Vercel domains (`app.forcemediakw.com`,
 work, then cut their DNS / rebrand when ready (and drop the Vercel projects after
 a soak), exactly as wadyaljuz was cut over for the storefront.
 
+## Runner requirements (IMPORTANT — self-hosted only)
+
+This workflow runs **entirely on the self-hosted runner** (Ahmad's Mac, label
+`["self-hosted","linux","wsl2"]`). The account has **no hosted GitHub Actions
+minutes**, so any `ubuntu-latest` job fails before it starts ("Job is about to
+start running on the hosted runner" → failure, no logs). Every job in
+`cf-deploy.yml` — including `detect` and `notify-failure` — therefore uses the
+self-hosted runner.
+
+**Consequence:** a deploy only runs when the **self-hosted runner is online**
+(the Mac is awake with the runner service up). If the Mac is asleep, the deploy
+job **queues** until it wakes — it doesn't fail, it just waits.
+
+- **`force_cloud` workflow_dispatch input:** each job's `runs-on` honours a
+  `force_cloud: true` manual-dispatch flag that switches to `ubuntu-latest`.
+  ⚠️ Because the account has no hosted minutes, **`force_cloud` is currently a
+  no-op escape hatch — it would fail.** Leave it `false`. It exists for the
+  future case where hosted minutes are available (or a different account runs it).
+- **Manual deploy when needed:** Actions → "Deploy to Cloudflare" → "Run
+  workflow" (deploys all three), or push to `main` — both run on the self-hosted
+  runner. If the Mac is off and you need a deploy now, use the local fallback
+  in "Manual deploy (fallback)" above.
+- **`vars.USE_SELF_HOSTED` must stay `true`** (it's what pins the jobs to the
+  self-hosted runner). If it were unset/`false`, jobs would route to the
+  (unavailable) hosted runner and fail.
+
 ## Follow-ups
 
 - **Server-side Sentry** is inactive on the CF target for web + admin (the OpenNext
