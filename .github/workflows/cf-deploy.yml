@@ -54,7 +54,12 @@ jobs:
   # every filter true, so a manual run deploys all three.
   detect:
     name: Detect changed apps
-    runs-on: ubuntu-latest
+    # Self-hosted (same as the deploy jobs). GitHub HOSTED ubuntu-latest runners
+    # were failing this job before any step ran ("about to start on hosted
+    # runner" → failure, no logs), which skipped all three deploys. The
+    # self-hosted runner is healthy (it builds + deploys the workers), so run
+    # detect there too — no hosted-runner dependency anywhere in this workflow.
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 5
     outputs:
       web: ${{ steps.f.outputs.web }}
@@ -249,7 +254,10 @@ jobs:
     # Stays on ubuntu-latest so it still alerts when the self-hosted runner is
     # the thing that died (mirrors ci.yml's fail-open notify job).
     name: Notify on failure (main only)
-    runs-on: ubuntu-latest
+    # Self-hosted too — see the detect job note. A deploy workflow only "fails"
+    # when a build/deploy step errors; if the self-hosted runner itself is down,
+    # the deploys queue (don't fail) so there's nothing to alert about anyway.
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     needs: [deploy-web, deploy-admin, deploy-orders]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
