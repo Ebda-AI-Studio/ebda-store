@@ -133,7 +133,7 @@ export const config = {
   // Web Push (VAPID) - platform-wide keys for standards-based Web Push (RFC 8030)
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',
-  vapidSubject: process.env.VAPID_SUBJECT || 'mailto:contact@forcemediakw.com',
+  vapidSubject: process.env.VAPID_SUBJECT || 'mailto:contact@force-ai.co',
 
   // OneSignal — admin-side push notifications. Tags are scoped per-user with
   // (role, store_id) so notifyAdminsOfOrder() can filter to the order's store
@@ -170,7 +170,7 @@ export const config = {
   smtpUser: process.env.SMTP_USER || '',
   smtpPassword: process.env.SMTP_PASSWORD || '',
   smtpFromName: process.env.SMTP_FROM_NAME || 'Force Media',
-  smtpFromEmail: process.env.SMTP_FROM_EMAIL || 'noreply@forcemediakw.com',
+  smtpFromEmail: process.env.SMTP_FROM_EMAIL || 'noreply@force-ai.co',
 
   // Resend SDK key (single platform-wide account; all merchant domains live
   // under it). Falls back to SMTP_PASSWORD because the pre-existing setup

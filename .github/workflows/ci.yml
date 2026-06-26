@@ -62,7 +62,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
+          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
+          # cancels the job ("The operation was canceled"), failing CI on a
+          # green lint/build. The runner already has a warm local npm cache.
 
       - name: Install dependencies
         run: npm ci
@@ -84,7 +87,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
+          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
+          # cancels the job ("The operation was canceled"), failing CI on a
+          # green lint/build. The runner already has a warm local npm cache.
 
       - name: Install dependencies
         run: npm ci
@@ -124,7 +130,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
+          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
+          # cancels the job ("The operation was canceled"), failing CI on a
+          # green lint/build. The runner already has a warm local npm cache.
 
       - name: Install dependencies
         run: npm ci
@@ -152,7 +161,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
+          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
+          # cancels the job ("The operation was canceled"), failing CI on a
+          # green lint/build. The runner already has a warm local npm cache.
 
       - name: Install dependencies
         run: npm ci
@@ -216,7 +228,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
+          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
+          # cancels the job ("The operation was canceled"), failing CI on a
+          # green lint/build. The runner already has a warm local npm cache.
 
       - name: Install dependencies
         run: npm ci
@@ -351,7 +366,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
+          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
+          # cancels the job ("The operation was canceled"), failing CI on a
+          # green lint/build. The runner already has a warm local npm cache.
 
       - name: Install dependencies
         run: npm ci
