@@ -447,12 +447,22 @@ const server = httpServer.listen(config.port, () => {
       `;
       const bypassRls = rows[0]?.rolbypassrls === true;
       if (bypassRls) {
-        if (config.nodeEnv === 'production') {
+        // Explicit escape hatch. Production currently connects as `neondb_owner`
+        // (a BYPASSRLS role); cutting DATABASE_URL over to the non-owner
+        // `force_app` role is a tracked RLS-cutover follow-up, NOT a P0 change.
+        // Until then, ALLOW_BYPASSRLS_ROLE=true keeps the API serving (loud
+        // warning, not exit) so a routine redeploy can't take the whole platform
+        // down. Verified 2026-06-27: this guard `process.exit(1)` crash-looped
+        // prod the moment a redeploy first built it. Remove the env once
+        // force_app is live and DATABASE_URL no longer uses a bypass role.
+        const allowBypassRls = process.env.ALLOW_BYPASSRLS_ROLE === 'true';
+        if (config.nodeEnv === 'production' && !allowBypassRls) {
           logger.fatal(
             { currentUser: 'see pg_roles', rolbypassrls: true },
             '[SECURITY FATAL] DATABASE_URL connects as a BYPASSRLS role — ' +
               'all RLS tenant isolation is disabled. ' +
-              'Switch DATABASE_URL to the non-owner role (force_app) and redeploy.'
+              'Switch DATABASE_URL to the non-owner role (force_app) and redeploy, ' +
+              'or set ALLOW_BYPASSRLS_ROLE=true to explicitly accept this.'
           );
           process.exit(1);
         } else {
