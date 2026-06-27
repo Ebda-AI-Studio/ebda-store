@@ -175,16 +175,18 @@ const EXPIRE_AFTER_DAYS = 30;
 export async function runReorderScan(storeId: string): Promise<ReorderScanResult> {
   const scanStartedAt = new Date();
 
-  // --- Phase 1: DB reads/writes inside a SHORT RLS-bypass transaction ---------
+  // --- Phase 1: expire stale suggestions + load the product list -------------
   // The bypass GUC is SET LOCAL (transaction-scoped) so all RLS-protected reads
   // (reorder_suggestions, purchase_order_items, backorder_lines, products) must
-  // happen inside a withRlsBypass tx. We do ONLY the DB work here and return the
-  // candidates — the slow Gemini reasoning (phase 2) runs OUTSIDE any open
-  // transaction so it can never blow the 30s interactive-tx timeout or starve
-  // the connection pool (the prior single-tx-around-everything design timed out
-  // at ~112s on stores with many candidates + the 2.5s per-chunk throttle).
+  // happen inside a withRlsBypass tx. This first tx stays tiny (one UPDATE + one
+  // findMany); the per-product metric fan-out is computed below in BOUNDED
+  // chunks (each its own short tx), and the slow Gemini reasoning (phase 2) runs
+  // OUTSIDE any open transaction. Keeping every tx short is what prevents the
+  // 30s interactive-tx timeout ("Transaction not found", P1 2026-06-27) and the
+  // connection-pool starvation the prior single-tx-around-everything design hit
+  // (~112s on stores with many candidates + the 2.5s per-chunk throttle).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { expiredCount, candidates } = await withRlsBypass(async (tx: any) => {
+  const { expiredCount, products } = await withRlsBypass(async (tx: any) => {
     // -------------------------------------------------------------------------
     // Step 1: Mark stale open suggestions as expired
     // -------------------------------------------------------------------------
@@ -230,114 +232,133 @@ export async function runReorderScan(storeId: string): Promise<ReorderScanResult
       },
     });
 
-    // -------------------------------------------------------------------------
-    // Steps 3–4: Compute metrics and collect candidates
-    // -------------------------------------------------------------------------
-    const collected: ReorderCandidate[] = [];
+    return { expiredCount: expired, products };
+  });
 
-    for (const product of products) {
-      const qty7d = await sumOrderQty(product.id, storeId, 7, tx);
-      const qty28d = await sumOrderQty(product.id, storeId, 28, tx);
+  // -------------------------------------------------------------------------
+  // Steps 3–4: Compute metrics + collect candidates in BOUNDED chunks, each in
+  // its OWN short RLS-bypass tx. The per-product fan-out (sumOrderQty ×2,
+  // pickLastSupplierForProduct, 2 aggregates) over a large catalog otherwise
+  // blew the 30s interactive-tx timeout → "Transaction not found" (P1
+  // 2026-06-27, force-api-stock-reorder-scan-cron, stores with many products).
+  // Chunking bounds each tx's duration regardless of catalog size.
+  // -------------------------------------------------------------------------
+  const candidates: ReorderCandidate[] = [];
+  const SCAN_CHUNK_SIZE = 25;
+  for (let chunkStart = 0; chunkStart < products.length; chunkStart += SCAN_CHUNK_SIZE) {
+    const productSlice = products.slice(chunkStart, chunkStart + SCAN_CHUNK_SIZE);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chunkCandidates = await withRlsBypass(async (tx: any) => {
+      const collected: ReorderCandidate[] = [];
 
-      const velocity7d = qty7d / 7;
-      const velocity28d = qty28d / 28;
-      const velocity = Math.max(velocity7d, velocity28d);
+      for (const product of productSlice) {
+        const qty7d = await sumOrderQty(product.id, storeId, 7, tx);
+        const qty28d = await sumOrderQty(product.id, storeId, 28, tx);
 
-      const rule = product.reorderRules[0] ?? null;
+        const velocity7d = qty7d / 7;
+        const velocity28d = qty28d / 28;
+        const velocity = Math.max(velocity7d, velocity28d);
 
-      const minQty = rule?.minQty ?? product.lowStockThreshold;
-      const safetyStockDays = rule?.safetyStockDays ?? 7;
-      const defaultReorderQty = Math.max(Math.round(velocity * 14), minQty * 2);
-      const reorderQty = rule?.reorderQty ?? defaultReorderQty;
+        const rule = product.reorderRules[0] ?? null;
 
-      // Lead-time resolution order (per spec):
-      //   1. ReorderRule.leadTimeDays  — explicit per-product rule (wins when a rule exists)
-      //   2. supplier.leadTimeDays     — last-PO supplier when no rule is configured
-      //   3. 7                         — system-wide default
-      //
-      // Also resolve supplierId here so we can reuse the last-PO lookup for both
-      // lead-time fallback and the suggestion row (avoiding a duplicate DB call).
-      let leadTimeDays: number;
-      let resolvedSupplierId: string | null;
+        const minQty = rule?.minQty ?? product.lowStockThreshold;
+        const safetyStockDays = rule?.safetyStockDays ?? 7;
+        const defaultReorderQty = Math.max(Math.round(velocity * 14), minQty * 2);
+        const reorderQty = rule?.reorderQty ?? defaultReorderQty;
 
-      if (rule !== null) {
-        // A per-product rule always takes priority over the supplier's lead time.
-        leadTimeDays = rule.leadTimeDays;
-        // Supplier for the suggestion: prefer rule's explicit preferred supplier.
-        resolvedSupplierId =
-          rule.preferredSupplierId ?? (await pickLastSupplierForProduct(product.id, tx));
-      } else {
-        // No rule: resolve the supplier first (last PO), then use its leadTimeDays.
-        resolvedSupplierId = await pickLastSupplierForProduct(product.id, tx);
-        const supplierLt = resolvedSupplierId
-          ? await getSupplierLeadTime(resolvedSupplierId, tx)
-          : null;
-        leadTimeDays = supplierLt ?? 7;
+        // Lead-time resolution order (per spec):
+        //   1. ReorderRule.leadTimeDays  — explicit per-product rule (wins when a rule exists)
+        //   2. supplier.leadTimeDays     — last-PO supplier when no rule is configured
+        //   3. 7                         — system-wide default
+        //
+        // Also resolve supplierId here so we can reuse the last-PO lookup for both
+        // lead-time fallback and the suggestion row (avoiding a duplicate DB call).
+        let leadTimeDays: number;
+        let resolvedSupplierId: string | null;
+
+        if (rule !== null) {
+          // A per-product rule always takes priority over the supplier's lead time.
+          leadTimeDays = rule.leadTimeDays;
+          // Supplier for the suggestion: prefer rule's explicit preferred supplier.
+          resolvedSupplierId =
+            rule.preferredSupplierId ?? (await pickLastSupplierForProduct(product.id, tx));
+        } else {
+          // No rule: resolve the supplier first (last PO), then use its leadTimeDays.
+          resolvedSupplierId = await pickLastSupplierForProduct(product.id, tx);
+          const supplierLt = resolvedSupplierId
+            ? await getSupplierLeadTime(resolvedSupplierId, tx)
+            : null;
+          leadTimeDays = supplierLt ?? 7;
+        }
+
+        const onHand = product.inventory;
+
+        // Sum qty - qtyReceived for active PO items (status IN ('sent','partial'))
+        const onOrderAgg = await tx.purchaseOrderItem.aggregate({
+          where: {
+            productId: product.id,
+            po: {
+              storeId,
+              status: { in: ['sent', 'partial'] },
+            },
+          },
+          _sum: { qty: true, qtyReceived: true },
+        });
+        const onOrder = Math.max(
+          0,
+          (onOrderAgg._sum.qty ?? 0) - (onOrderAgg._sum.qtyReceived ?? 0)
+        );
+
+        // Open backlog: qty - qtyFulfilled for unfulfilled, non-cancelled backorder lines
+        const backlogAgg = await tx.backorderLine.aggregate({
+          where: {
+            productId: product.id,
+            storeId,
+            fulfilledAt: null,
+            cancelledAt: null,
+          },
+          _sum: { qty: true, qtyFulfilled: true },
+        });
+        const openBacklog = Math.max(
+          0,
+          (backlogAgg._sum.qty ?? 0) - (backlogAgg._sum.qtyFulfilled ?? 0)
+        );
+
+        const demandDuringLead = velocity * (leadTimeDays + safetyStockDays);
+        const projectedStock = onHand + onOrder - openBacklog - demandDuringLead;
+
+        if (projectedStock >= minQty) continue; // healthy — skip
+
+        const safeVelocity = Math.max(velocity, 0.01);
+        const urgencyDays = Math.round(onHand / safeVelocity);
+        const suggestedQty = Math.max(reorderQty, openBacklog + reorderQty - onHand - onOrder);
+
+        // Use the already-resolved supplierId (avoids a second pickLastSupplierForProduct call).
+        const supplierId = resolvedSupplierId;
+
+        collected.push({
+          productId: product.id,
+          name: product.name,
+          nameAr: product.nameAr,
+          sku: product.sku,
+          velocity7d,
+          velocity28d,
+          onHand,
+          onOrder,
+          openBacklog,
+          urgencyDays,
+          suggestedQty: Math.round(suggestedQty),
+          supplierId,
+          leadTimeDays,
+          safetyStockDays,
+          minQty,
+        });
       }
 
-      const onHand = product.inventory;
-
-      // Sum qty - qtyReceived for active PO items (status IN ('sent','partial'))
-      const onOrderAgg = await tx.purchaseOrderItem.aggregate({
-        where: {
-          productId: product.id,
-          po: {
-            storeId,
-            status: { in: ['sent', 'partial'] },
-          },
-        },
-        _sum: { qty: true, qtyReceived: true },
-      });
-      const onOrder = Math.max(0, (onOrderAgg._sum.qty ?? 0) - (onOrderAgg._sum.qtyReceived ?? 0));
-
-      // Open backlog: qty - qtyFulfilled for unfulfilled, non-cancelled backorder lines
-      const backlogAgg = await tx.backorderLine.aggregate({
-        where: {
-          productId: product.id,
-          storeId,
-          fulfilledAt: null,
-          cancelledAt: null,
-        },
-        _sum: { qty: true, qtyFulfilled: true },
-      });
-      const openBacklog = Math.max(
-        0,
-        (backlogAgg._sum.qty ?? 0) - (backlogAgg._sum.qtyFulfilled ?? 0)
-      );
-
-      const demandDuringLead = velocity * (leadTimeDays + safetyStockDays);
-      const projectedStock = onHand + onOrder - openBacklog - demandDuringLead;
-
-      if (projectedStock >= minQty) continue; // healthy — skip
-
-      const safeVelocity = Math.max(velocity, 0.01);
-      const urgencyDays = Math.round(onHand / safeVelocity);
-      const suggestedQty = Math.max(reorderQty, openBacklog + reorderQty - onHand - onOrder);
-
-      // Use the already-resolved supplierId (avoids a second pickLastSupplierForProduct call).
-      const supplierId = resolvedSupplierId;
-
-      collected.push({
-        productId: product.id,
-        name: product.name,
-        nameAr: product.nameAr,
-        sku: product.sku,
-        velocity7d,
-        velocity28d,
-        onHand,
-        onOrder,
-        openBacklog,
-        urgencyDays,
-        suggestedQty: Math.round(suggestedQty),
-        supplierId,
-        leadTimeDays,
-        safetyStockDays,
-        minQty,
-      });
-    }
-
-    return { expiredCount: expired, candidates: collected };
-  });
+      return collected;
+    });
+    candidates.push(...chunkCandidates);
+  }
 
   if (candidates.length === 0) {
     logger.info({ storeId, scanned: 0, suggested: 0, expiredCount }, 'reorder-scan: no candidates');
