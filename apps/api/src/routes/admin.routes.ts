@@ -10,6 +10,7 @@ import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { streamXlsxResponse } from '../lib/exports/xlsx';
 import {
   prisma,
   withRlsBypass,
@@ -1410,6 +1411,114 @@ router.get(
       });
 
       res.end();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================================
+// GET /admin/export/orders.xlsx — same cross-tenant export as above but
+// returns an Excel workbook instead of CSV. Same auth (super_admin) and
+// same query-param filters (storeId, status, paymentStatus, from, to).
+// All rows are collected first (orders exports are bounded by date range)
+// then flushed as one workbook — avoids chunked streaming complexity.
+// =====================================================================
+
+router.get(
+  '/export/orders.xlsx',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, status, paymentStatus, from, to } = req.query;
+
+      const where: Prisma.OrderWhereInput = {};
+      if (storeId) where.storeId = storeId as string;
+      if (status) where.status = status as OrderStatus;
+      if (paymentStatus) where.paymentStatus = paymentStatus as OrderPaymentStatus;
+      if (from || to) {
+        where.createdAt = {};
+        if (from) where.createdAt.gte = new Date(from as string);
+        if (to) where.createdAt.lte = new Date(to as string);
+      }
+
+      const orders = await withRlsBypass((tx: Prisma.TransactionClient) =>
+        tx.order.findMany({
+          where,
+          orderBy: { createdAt: 'asc' },
+          take: 50000,
+          select: {
+            id: true,
+            orderNumber: true,
+            storeId: true,
+            status: true,
+            paymentStatus: true,
+            total: true,
+            shippingAddress: true,
+            createdAt: true,
+            store: { select: { name: true } },
+            customer: {
+              select: { email: true, firstName: true, lastName: true },
+            },
+          },
+        })
+      );
+
+      const rows = orders.map(o => {
+        const addr = o.shippingAddress as Record<string, string> | null;
+        return {
+          orderNumber: o.orderNumber ?? '',
+          storeId: o.storeId,
+          storeName: o.store?.name ?? '',
+          status: o.status,
+          paymentStatus: o.paymentStatus,
+          total: o.total / 1000,
+          customerEmail: o.customer?.email ?? '',
+          customerName: o.customer ? `${o.customer.firstName} ${o.customer.lastName}`.trim() : '',
+          shippingCountry: addr?.country ?? '',
+          shippingCity: addr?.city ?? '',
+          shippingArea: addr?.area ?? '',
+          createdAt: o.createdAt.toISOString(),
+        };
+      });
+
+      await auditLog({
+        action: 'admin.export.orders',
+        userId: req.user!.userId,
+        resourceType: 'order',
+        details: {
+          type: 'orders_xlsx',
+          totalRows: rows.length,
+          storeId,
+          status,
+          paymentStatus,
+          from,
+          to,
+        },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      const date = new Date().toISOString().slice(0, 10);
+      await streamXlsxResponse(res, {
+        filename: `orders-export-${date}.xlsx`,
+        sheetName: 'Orders',
+        columns: [
+          { header: 'Order Number', key: 'orderNumber', width: 20 },
+          { header: 'Store ID', key: 'storeId', width: 38 },
+          { header: 'Store Name', key: 'storeName', width: 30 },
+          { header: 'Status', key: 'status', width: 16 },
+          { header: 'Payment Status', key: 'paymentStatus', width: 18 },
+          { header: 'Total (KWD)', key: 'total', width: 14, numFmt: '#,##0.000' },
+          { header: 'Customer Email', key: 'customerEmail', width: 34 },
+          { header: 'Customer Name', key: 'customerName', width: 28 },
+          { header: 'Shipping Country', key: 'shippingCountry', width: 18 },
+          { header: 'Shipping City', key: 'shippingCity', width: 18 },
+          { header: 'Shipping Area', key: 'shippingArea', width: 18 },
+          { header: 'Created At', key: 'createdAt', width: 26 },
+        ],
+        rows,
+      });
     } catch (error) {
       next(error);
     }

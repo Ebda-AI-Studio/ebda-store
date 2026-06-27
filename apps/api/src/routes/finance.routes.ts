@@ -33,6 +33,7 @@ import { trialBalance, profitAndLoss, balanceSheet } from '../services/accountin
 import { generateTaxReport } from '../services/accounting/tax-report.service';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import multer from 'multer';
+import ExcelJS from 'exceljs';
 import {
   importBankStatement,
   runAutoMatch,
@@ -1043,13 +1044,16 @@ const statementUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (_req, file, cb) => {
+    const name = file.originalname.toLowerCase();
     const ok =
       file.mimetype === 'text/csv' ||
       file.mimetype === 'text/plain' ||
-      file.originalname.toLowerCase().endsWith('.csv') ||
-      file.originalname.toLowerCase().endsWith('.ofx') ||
       file.mimetype === 'application/x-ofx' ||
-      file.mimetype === 'application/ofx';
+      file.mimetype === 'application/ofx' ||
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      name.endsWith('.csv') ||
+      name.endsWith('.ofx') ||
+      name.endsWith('.xlsx');
     cb(null, ok);
   },
 });
@@ -1088,13 +1092,48 @@ router.post(
 
       const fileName = req.file.originalname;
       const ext = fileName.toLowerCase().split('.').pop();
-      const fileType = ext === 'ofx' ? 'ofx' : 'csv';
+
+      let fileBuffer = req.file.buffer;
+      let fileType: 'csv' | 'ofx';
+
+      if (ext === 'ofx') {
+        fileType = 'ofx';
+      } else if (ext === 'xlsx') {
+        // Convert XLSX → CSV so the existing parseStatementCsv logic handles it.
+        // Read first sheet, emit header + data rows as comma-separated text.
+        const wb = new ExcelJS.Workbook();
+        const ab = fileBuffer.buffer.slice(
+          fileBuffer.byteOffset,
+          fileBuffer.byteOffset + fileBuffer.byteLength
+        ) as ArrayBuffer;
+        await wb.xlsx.load(ab);
+        const sheet = wb.worksheets[0];
+        if (!sheet) {
+          res
+            .status(422)
+            .json({ error: 'empty_xlsx', message: 'The uploaded XLSX file has no sheets.' });
+          return;
+        }
+        const csvLines: string[] = [];
+        sheet.eachRow(row => {
+          const cells: string[] = [];
+          row.eachCell({ includeEmpty: true }, cell => {
+            const v = cell.text ?? '';
+            cells.push(/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+          });
+          csvLines.push(cells.join(','));
+        });
+        fileBuffer = Buffer.from(csvLines.join('\n'), 'utf-8');
+        fileType = 'csv';
+      } else {
+        fileType = 'csv';
+      }
 
       const result = await importBankStatement({
         storeId: req.params.storeId,
         glAccountId: bodyParsed.data.glAccountId,
         fileName,
-        buffer: req.file.buffer,
+        buffer: fileBuffer,
         fileType,
       });
 

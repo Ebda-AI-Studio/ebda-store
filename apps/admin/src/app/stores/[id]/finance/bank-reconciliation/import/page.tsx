@@ -163,12 +163,12 @@ export default function ImportStatementPage() {
               {file ? (
                 <p className="text-sm font-medium text-gray-700">{file.name}</p>
               ) : (
-                <p className="text-sm text-gray-500">CSV or OFX (max 5 MB)</p>
+                <p className="text-sm text-gray-500">CSV, Excel (.xlsx), or OFX (max 5 MB)</p>
               )}
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv,.ofx,text/csv,application/x-ofx"
+                accept=".csv,.xlsx,.ofx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/x-ofx"
                 className="hidden"
                 onChange={handleFileChange}
               />
