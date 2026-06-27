@@ -39,7 +39,7 @@ export function resolveMyFatoorahEmail(
 ): string {
   const real = rawEmail?.trim();
   if (real && MYFATOORAH_EMAIL_RE.test(real)) return real;
-  let host = 'forcemediakw.com';
+  let host = 'force-ai.co';
   try {
     const h = new URL(callbackUrl).hostname;
     if (h) host = h;

@@ -31,7 +31,7 @@ updated: 2026-05-24
 9. Fill in shipping form:
    - First name: `UAT`
    - Last name: `Tester`
-   - Email: `uat@forcemediakw.com`
+   - Email: `uat@force-ai.co`
    - Phone: `+96500000001`
    - Address: `Block 5, Street 10, Building 3`
    - City: `Kuwait City`
@@ -44,7 +44,7 @@ updated: 2026-05-24
 14. Complete payment
 15. Verify redirect back to storefront `/order-confirmation` or `/orders/<id>` page
 16. Verify confirmation page shows: order number, item(s), total amount, estimated delivery
-17. Verify confirmation email arrives at `uat@forcemediakw.com` within 60s (check store SMTP config)
+17. Verify confirmation email arrives at `uat@force-ai.co` within 60s (check store SMTP config)
 18. In admin → Orders list: verify new order appears with status `pending` or `paid`
 19. Verify order details match: items, quantities, shipping address, payment method
 

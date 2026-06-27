@@ -20,7 +20,7 @@ import { prisma } from '@force/database';
 import bcrypt from 'bcryptjs';
 
 const API_URL = 'http://localhost:4000/api/v1';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@forcemediakw.com';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@force-ai.co';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // ─── Shared test fixtures ────────────────────────────────────────────────────

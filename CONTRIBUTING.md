@@ -27,7 +27,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 1. Fork the repository
 2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/force-website-builder.git`
-3. Add the upstream remote: `git remote add upstream https://github.com/forcemedia/force-website-builder.git`
+3. Add the upstream remote: `git remote add upstream https://github.com/ForceAI-KW/force-website-builder.git`
 4. Create a new branch: `git checkout -b feature/your-feature-name`
 
 ## Development Setup

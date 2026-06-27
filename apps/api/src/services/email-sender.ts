@@ -5,7 +5,7 @@
 // gets the cheapest possible unit tests — feed it a plain object, assert
 // the from-line. The full ResendService composes this helper.
 
-const PLATFORM_EMAIL_DOMAIN = 'forcemediakw.com';
+const PLATFORM_EMAIL_DOMAIN = 'force-ai.co';
 
 export interface StoreSenderShape {
   name: string;

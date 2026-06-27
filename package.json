@@ -5,13 +5,13 @@
   "description": "Force Media E-Commerce Website Builder Platform - A multi-tenant SaaS e-commerce solution",
   "author": "Force Media <contact@forcemediakw.com>",
   "license": "UNLICENSED",
-  "homepage": "https://github.com/forcemedia/force-website-builder",
+  "homepage": "https://github.com/ForceAI-KW/force-website-builder",
   "repository": {
     "type": "git",
-    "url": "https://github.com/forcemedia/force-website-builder.git"
+    "url": "https://github.com/ForceAI-KW/force-website-builder.git"
   },
   "bugs": {
-    "url": "https://github.com/forcemedia/force-website-builder/issues"
+    "url": "https://github.com/ForceAI-KW/force-website-builder/issues"
   },
   "engines": {
     "node": ">=20.0.0",

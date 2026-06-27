@@ -8,7 +8,7 @@
 //   RESEND_API_KEY=re_xxx node scripts/smoke-test-per-store-email.mjs
 //
 // Or set RESEND_API_KEY in apps/api/.env and the script reads it from
-// there. The platform fallback path (forcemediakw.com, already verified
+// there. The platform fallback path (force-ai.co, already verified
 // on Resend) is the one this exercises — no custom domain required.
 
 import { config as loadEnv } from 'dotenv';
@@ -65,7 +65,7 @@ try {
       ? store.emailSenderLocalPart.trim()
       : 'noreply';
   const useCustomDomain = store.emailDomainStatus === 'verified' && !!store.domain;
-  const host = useCustomDomain ? store.domain : 'forcemediakw.com';
+  const host = useCustomDomain ? store.domain : 'force-ai.co';
   const fromLine = `${sanitizeDisplayName(store.name)} <${localPart}@${host}>`;
 
   console.log('✓ Computed sender:', fromLine);

@@ -382,7 +382,7 @@ export class EmailService {
     });
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
-      from: 'Force AI Store <noreply@forcemediakw.com>',
+      from: 'Force AI Store <noreply@force-ai.co>',
       to: Array.isArray(args.to) ? args.to : [args.to],
       subject: args.subject,
       html,
@@ -418,7 +418,7 @@ export class EmailService {
   static async sendPlatformRaw(options: EmailOptions): Promise<void> {
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
-      from: 'Force AI Store <noreply@forcemediakw.com>',
+      from: 'Force AI Store <noreply@force-ai.co>',
       to: Array.isArray(options.to) ? options.to : [options.to],
       subject: options.subject,
       html: options.html,
