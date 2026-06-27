@@ -1,59 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { isPlatformHost } from '@/lib/platform-host';
 
 /**
- * Platform hostnames — exact match only.
- * These are the platform's marketing/admin/app domains. Any OTHER subdomain
- * of forcemediakw.com (e.g. shop.forcemediakw.com) is a CUSTOM STORE domain
- * that store owners can configure.
- */
-const PLATFORM_HOSTS = new Set([
-  'localhost',
-  '127.0.0.1',
-  'forcemediakw.com',
-  'www.forcemediakw.com',
-  'admin.forcemediakw.com',
-  'app.forcemediakw.com',
-  'store.forcemediakw.com',
-  // force-ai.co — the 2026-06 platform domain rebrand (Vercel→Cloudflare).
-  // store.force-ai.co is the path-based storefront platform host (`/<slug>`);
-  // the sibling platform subdomains are listed so the storefront never mistakes
-  // one for a merchant custom domain. Added alongside the forcemediakw.com
-  // entries so both resolve during the cutover; harmless until DNS points here.
-  'force-ai.co',
-  'www.force-ai.co',
-  'store.force-ai.co',
-  'admin.force-ai.co',
-  'orders.force-ai.co',
-]);
-
-/**
- * Hosting provider suffixes — any subdomain is platform (preview deploys, tunnels).
- * These are used for development/staging only. Production custom domains never
- * end with these suffixes.
- */
-const PLATFORM_SUFFIXES = [
-  'vercel.app',
-  'netlify.app',
-  'ngrok.io',
-  'ngrok-free.app',
-  // Cloudflare Workers preview domain (the OpenNext deploy target). Like
-  // *.vercel.app, a `*.workers.dev` host is the platform's own preview URL,
-  // NOT a custom merchant domain — so the storefront serves the platform
-  // landing at root and resolves stores by slug (`/<slug>`). Production custom
-  // domains never end in workers.dev, so this is zero-impact on prod traffic.
-  'workers.dev',
-];
-
-/**
- * Check if a hostname is a platform domain (not a custom store domain)
+ * Check if a hostname is a platform domain (not a custom store domain).
+ * Delegates to the shared `isPlatformHost` so the server (this middleware) and
+ * the client (`useStoreUrl` in StoreContext) can never drift — drift is exactly
+ * what broke store.force-ai.co (see `lib/platform-host.ts`).
  */
 function isPlatformDomain(hostname: string): boolean {
-  // Remove port if present, normalize to lowercase
-  const host = hostname.split(':')[0].toLowerCase();
-
-  if (PLATFORM_HOSTS.has(host)) return true;
-  return PLATFORM_SUFFIXES.some(suffix => host.endsWith(`.${suffix}`));
+  return isPlatformHost(hostname);
 }
 
 /**
@@ -274,7 +230,18 @@ export function middleware(request: NextRequest) {
     // request forces Next to mark the response uncacheable
     // (`Cache-Control: no-store`), which hurts crawl budget on the storefront.
     if (request.cookies.get('x-store-slug')?.value !== slugInfo.slug) {
-      response.cookies.set('x-store-slug', slugInfo.slug, { path: '/', httpOnly: true });
+      // maxAge (30d) is REQUIRED: without it this is a session cookie that
+      // dies on browser close, so a next-day refresh of a bare deep route on
+      // a platform host (e.g. store.force-ai.co/account) has no slug in the URL
+      // AND no cookie → falls back to the demo store → "Unable to resolve store
+      // context". Persisting it keeps server-side store resolution working
+      // across restarts. (CF-migration regression, fixed 2026-06-27.)
+      response.cookies.set('x-store-slug', slugInfo.slug, {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+      });
     }
     return draftCookie(response);
   }

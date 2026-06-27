@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { api, API_URL } from '../lib/api';
+import { isPlatformHost } from '../lib/platform-host';
 import { setCompareStoreId } from '../lib/compare';
 import {
   type StoreTheme,
@@ -443,17 +444,12 @@ export function useStoreUrl() {
   // root path so no prefix is needed.
   const [isPlatform, setIsPlatform] = useState(false);
   useEffect(() => {
-    const host = window.location.hostname;
-    setIsPlatform(
-      host.endsWith('.vercel.app') ||
-        // Cloudflare Workers preview host (OpenNext deploy) — same class as
-        // *.vercel.app: a platform host where store links need the /<slug>
-        // prefix. Must mirror PLATFORM_SUFFIXES in middleware.ts.
-        host.endsWith('.workers.dev') ||
-        host === 'localhost' ||
-        host === '127.0.0.1' ||
-        host === 'store.forcemediakw.com'
-    );
+    // Use the SHARED platform-host list (lib/platform-host.ts) so this never
+    // drifts from the middleware. The old hardcoded subset here was missing
+    // `store.force-ai.co`, so after the CF migration store links on that host
+    // dropped the `/<slug>` prefix and the Home link went to the platform
+    // landing / demo store. (Regression fixed 2026-06-27.)
+    setIsPlatform(isPlatformHost(window.location.hostname));
   }, []);
 
   const prefix = isPlatform && store.slug && store.id !== 'demo' ? `/${store.slug}` : '';

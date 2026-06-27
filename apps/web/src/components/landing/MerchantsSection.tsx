@@ -26,14 +26,14 @@ const MERCHANTS: Merchant[] = [
     logo: 'https://pub-ff2bd6a1f8dd4567b9dd4c92e7a8b0f7.r2.dev/stores/359afc1f-ea5b-4f8d-b372-c038c6c057f7/logos/922a161f-6a7b-41b7-b597-81ec7e9e7486-4175480730368983c07345ad2_37965252.png',
     quoteEn: 'The AI writes our product pages in Arabic and English. We just sell.',
     quoteAr: 'الذكاء الاصطناعي يكتب صفحات منتجاتنا بالعربي والإنجليزي. نحن نبيع فقط.',
-    url: 'https://store.forcemediakw.com/pecannbee',
+    url: 'https://store.force-ai.co/pecannbee',
   },
   {
     name: 'Palora',
     logo: 'https://pub-ff2bd6a1f8dd4567b9dd4c92e7a8b0f7.r2.dev/branding/98ef3992-fb82-4164-8cf8-8e9f15780e4c.png',
     quoteEn: 'Payments, delivery and books all in one place. Setup took an afternoon.',
     quoteAr: 'الدفع والتوصيل والطلبات في مكان واحد. الإعداد استغرق بعد الظهر فقط.',
-    url: 'https://store.forcemediakw.com/palora',
+    url: 'https://store.force-ai.co/palora',
   },
 ];
 

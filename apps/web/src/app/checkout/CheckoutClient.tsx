@@ -222,12 +222,6 @@ export default function CheckoutClient() {
   // Payment
   const [selectedProvider, setSelectedProvider] = useState('');
 
-  // Customer SMS marketing opt-in. Default false — never opt in silently.
-  // Only affects promotional SMS (cart reminders, back-in-stock alerts).
-  // Transactional notifications (order confirmed, shipped, etc.) are not
-  // gated on this and send whenever the channel is configured.
-  const [smsOptIn, setSmsOptIn] = useState(false);
-
   // "Save my info" — persists contact + address to localStorage (device-local,
   // store-scoped). Default false. Never stores payment data.
   const [saveInfo, setSaveInfo] = useState(false);
@@ -878,7 +872,6 @@ export default function CheckoutClient() {
         paymentMethod: selectedProvider,
         notes: formData.notes,
         couponCode: appliedCoupon?.code,
-        smsOptIn,
         // Only send a redemption request when the customer opted in AND the
         // amount clears the store minimum. The server re-validates against the
         // real balance + caps regardless.
@@ -1501,27 +1494,6 @@ export default function CheckoutClient() {
                         />
                       </div>
                     </div>
-
-                    {/* SMS marketing opt-in \u2014 shown only when the phone field
-                        has a value so the checkbox is contextually relevant. */}
-                    {formData.phone.trim() && (
-                      <div className="pt-2">
-                        <label className="flex items-start gap-3 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={smsOptIn}
-                            onChange={e => setSmsOptIn(e.target.checked)}
-                            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-2 focus:ring-primary/20"
-                          />
-                          <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                            {t(
-                              'I agree to receive promotional SMS messages (offers, alerts). You can unsubscribe at any time.',
-                              '\u0623\u0648\u0627\u0641\u0642 \u0639\u0644\u0649 \u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0631\u0633\u0627\u0626\u0644 SMS \u062a\u0631\u0648\u064a\u062c\u064a\u0629 (\u0639\u0631\u0648\u0636\u060c \u062a\u0646\u0628\u064a\u0647\u0627\u062a). \u064a\u0645\u0643\u0646\u0643 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0627\u0634\u062a\u0631\u0627\u0643 \u0641\u064a \u0623\u064a \u0648\u0642\u062a.'
-                            )}
-                          </span>
-                        </label>
-                      </div>
-                    )}
 
                     {/* Save my info \u2014 device-local localStorage persistence.
                         NO payment data stored. Store-scoped key. */}

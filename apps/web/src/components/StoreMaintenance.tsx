@@ -171,7 +171,7 @@ export function StoreMaintenance() {
 
         <footer className="mt-16 text-xs text-muted-foreground">
           <a
-            href="https://store.forcemediakw.com"
+            href="https://store.force-ai.co"
             target="_blank"
             rel="noopener noreferrer"
             className="transition-colors hover:text-foreground"

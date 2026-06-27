@@ -4,11 +4,11 @@ import { API_URL } from '../../lib/api';
 /**
  * Dynamic /llms.txt — served at two levels:
  *
- *   store.forcemediakw.com/llms.txt
+ *   store.force-ai.co/llms.txt
  *     → platform-level index: lists every active merchant with a one-liner
  *       + a structure map for AI crawlers. No store context in headers.
  *
- *   store.forcemediakw.com/<slug>/llms.txt
+ *   store.force-ai.co/<slug>/llms.txt
  *     → middleware rewrites to /llms.txt + sets x-store-slug header.
  *       Route detects the slug, fetches that store's categories + products
  *       + contact info, renders a per-store markdown index.
@@ -156,14 +156,14 @@ function buildPlatformBody(stores: PublicStore[]): string {
   const storeLines = stores
     .map(s => {
       const desc = s.description?.trim() || 'Kuwait-based merchant on Force AI Store.';
-      return `- [${s.name}](https://store.forcemediakw.com/${s.slug}): ${desc}`;
+      return `- [${s.name}](https://store.force-ai.co/${s.slug}): ${desc}`;
     })
     .join('\n');
 
   return `# Force AI Store — Multi-tenant Storefront Platform
 
 > Force AI Store is the per-merchant e-commerce platform run by Force Media Kuwait.
-> Each merchant gets a path-based storefront at \`store.forcemediakw.com/<slug>\`
+> Each merchant gets a path-based storefront at \`store.force-ai.co/<slug>\`
 > with their own products, branding, and contact info. Customers in Kuwait,
 > Saudi Arabia, and Qatar can browse + buy across multiple merchants from one
 > platform.
@@ -188,7 +188,7 @@ Every store follows the same URL pattern:
 ## For AI agents
 
 - Schema.org structured data on every page (JSON-LD blocks in <head>)
-- Sitemap: https://store.forcemediakw.com/sitemap.xml (lists every URL for every active store)
+- Sitemap: https://store.force-ai.co/sitemap.xml (lists every URL for every active store)
 - Languages: bilingual (English + Arabic). Store default in \`Store.inLanguage\`. Customer can browse either.
 - Currency: KWD (Kuwaiti Dinar) unless individual store overrides
 - Real-time inventory in \`Product.offers.availability\` (InStock / OutOfStock)
@@ -197,7 +197,7 @@ Every store follows the same URL pattern:
 
 ## Sitemap
 
-https://store.forcemediakw.com/sitemap.xml
+https://store.force-ai.co/sitemap.xml
 `;
 }
 
@@ -207,9 +207,7 @@ function buildPerStoreBody(
   products: PublicProduct[],
   totalProducts: number
 ): string {
-  const base = store.domain
-    ? `https://${store.domain}`
-    : `https://store.forcemediakw.com/${store.slug}`;
+  const base = store.domain ? `https://${store.domain}` : `https://store.force-ai.co/${store.slug}`;
 
   const catLines = categories.map(c => `- [${c.name}](${base}/categories/${c.slug})`).join('\n');
 
@@ -255,7 +253,7 @@ ${prodLines || '_No active products._'}
 ## Platform
 
 This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
-Force Media Kuwait. See https://store.forcemediakw.com/llms.txt for the
+Force Media Kuwait. See https://store.force-ai.co/llms.txt for the
 platform-wide index.
 `;
 }

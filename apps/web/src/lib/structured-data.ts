@@ -334,5 +334,11 @@ export function getSiteUrl(store?: ResolvedStore): string {
   if (store?.domain) {
     return `https://${store.domain.trim()}`;
   }
-  return 'https://store.forcemediakw.com';
+  // Canonical platform host after the 2026-06 Cloudflare rebrand. Fallback for
+  // platform-path stores (no custom domain); drives master sitemap URLs, the
+  // robots `Sitemap:` directive, OG `og:url`/`og:image`, and `rel=canonical`.
+  // It MUST be the live canonical domain — it was still `store.forcemediakw.com`
+  // after the CF cutover, so sitemap + OG advertised the old domain on
+  // store.force-ai.co (regression fixed 2026-06-27).
+  return 'https://store.force-ai.co';
 }
