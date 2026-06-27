@@ -438,7 +438,18 @@ export function SocialGlyph({
     // the bundle small and avoids extra Vercel image credits.
     const pngSrc = BRAND_PNG_ICONS[entry.key];
     if (pngSrc) {
-      return <Image src={pngSrc} alt="" width={24} height={24} className={className} unoptimized />;
+      // `object-contain` ensures the square PNG asset fills the icon box
+      // without distortion regardless of caller-supplied className dimensions.
+      return (
+        <Image
+          src={pngSrc}
+          alt=""
+          width={24}
+          height={24}
+          className={`${className} object-contain`}
+          unoptimized
+        />
+      );
     }
     if (entry.BrandIcon) {
       return <entry.BrandIcon className={className} />;

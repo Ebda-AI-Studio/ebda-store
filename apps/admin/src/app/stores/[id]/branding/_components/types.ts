@@ -78,6 +78,12 @@ export interface StoreTheme {
    */
   footerSocialOriginalColor?: boolean;
   /**
+   * When true, the storefront web-push prompt + OneSignal SDK are active.
+   * Default false — no push UI even when the push_notifications plan feature
+   * is on. Toggled via Branding → Theme. 2026-06-27.
+   */
+  storefrontWebPushEnabled?: boolean;
+  /**
    * Merchant-controlled display order for footer social icons.
    * Array of platform keys (e.g. ['tiktok','instagram','whatsapp']).
    * Edited in Branding → Social Links. 2026-06-27.

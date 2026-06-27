@@ -36,6 +36,9 @@ export function PushNotificationPrompt() {
 
   useEffect(() => {
     if (!isEnabled('push_notifications')) return;
+    // Merchant must explicitly opt in via Branding → Theme. Default false
+    // so existing Professional stores get no push UI until they choose to.
+    if (store?.theme?.storefrontWebPushEnabled !== true) return;
     if (typeof window === 'undefined') return;
 
     const handleOpen = () => {
@@ -52,7 +55,7 @@ export function PushNotificationPrompt() {
 
     window.addEventListener('force:open-push-prompt', handleOpen);
     return () => window.removeEventListener('force:open-push-prompt', handleOpen);
-  }, [isEnabled]);
+  }, [isEnabled, store?.theme?.storefrontWebPushEnabled]);
 
   if (!visible) return null;
 
@@ -86,32 +89,48 @@ export function PushNotificationPrompt() {
     setVisible(false);
   }
 
-  // Pick the locale-appropriate logo. The merchant uploads `logoAr` for
-  // a flipped/Arabic mark; fall back to the default logo when missing.
-  const logo = (isRtl ? store.logoAr : null) || store.logo || null;
+  // Pick the locale-appropriate logo: prefer logoAr on RTL (Arabic wordmark),
+  // fall back to the default logo, then the hero image as a last resort.
+  const logo = (isRtl ? store?.logoAr : null) || store?.logo || store?.heroImage || null;
   const storeName = isRtl ? store.nameAr || store.name : store.name;
+
+  // Bilingual alt text: already locale-aware via storeName (Arabic or English
+  // per isRtl). The aria-label on the dialog handles the SR announce.
+  const logoAlt = storeName
+    ? t(`${storeName} logo`, `شعار ${storeName}`)
+    : t('Store logo', 'شعار المتجر');
 
   // Lift above the mobile BottomTabBar (56px, fixed bottom-0) so this prompt
   // never overlaps / blocks the bar's tabs on mobile (rule 6: other fixed-bottom
   // UI lifts above the primary bar). Desktop has no bar → bottom-4 at md+.
+  // Layout: vertical card — logo centred at top, title + subtitle below, then
+  // action buttons, so the merchant's identity is the first thing the shopper
+  // sees rather than a generic browser-style permission chrome.
   return (
     <div
       role="dialog"
       aria-label={t('Enable push notifications', 'تفعيل الإشعارات')}
-      className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] md:bottom-4 left-1/2 z-[9999] flex w-[min(92vw,420px)] -translate-x-1/2 items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-2xl"
+      className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] md:bottom-4 left-1/2 z-[9999] flex w-[min(92vw,340px)] -translate-x-1/2 flex-col items-center rounded-2xl border border-border bg-card px-5 py-4 shadow-2xl text-center gap-1"
     >
+      {/* Store logo centred at top — shrunk to a compact badge size */}
       {logo ? (
         <Image
           src={logo}
-          alt={storeName || ''}
-          width={48}
-          height={48}
-          className="h-12 w-12 shrink-0 rounded-xl object-contain bg-background"
+          alt={logoAlt}
+          width={52}
+          height={52}
+          className="mb-1 h-[52px] w-[52px] rounded-xl object-contain bg-background"
           unoptimized
         />
       ) : (
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -121,19 +140,21 @@ export function PushNotificationPrompt() {
           </svg>
         </div>
       )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-semibold text-foreground">
-          {storeName || t('Push notifications', 'الإشعارات')}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {t('Enable notifications to get order updates', 'فعّل الإشعارات لتلقي تحديثات الطلبات')}
-        </span>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
+
+      {/* Store name above subtitle */}
+      <span className="text-sm font-semibold text-foreground leading-snug">
+        {storeName || t('Push notifications', 'الإشعارات')}
+      </span>
+      <span className="text-xs text-muted-foreground leading-snug">
+        {t('Enable notifications to get order updates', 'فعّل الإشعارات لتلقي تحديثات الطلبات')}
+      </span>
+
+      {/* Action buttons */}
+      <div className="mt-2 flex items-center gap-2">
         <button
           type="button"
           onClick={handleAccept}
-          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+          className="rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
         >
           {t('Accept', 'السماح')}
         </button>
@@ -141,7 +162,7 @@ export function PushNotificationPrompt() {
           type="button"
           onClick={handleDismiss}
           aria-label={t('Dismiss notification prompt', 'تجاهل إشعار التنبيه')}
-          className="rounded-lg border border-border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+          className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
         >
           {t('Dismiss', 'ليس الآن')}
         </button>

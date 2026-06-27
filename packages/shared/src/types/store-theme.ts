@@ -291,6 +291,16 @@ export interface StoreTheme {
   footerSocialOriginalColor?: boolean;
 
   /**
+   * When true, the storefront web-push subscription prompt
+   * (`PushNotificationPrompt`) and the OneSignal SDK initializer
+   * (`OneSignalStorefrontInit`) are active for this store. Default false —
+   * no push UI appears even when the `push_notifications` plan feature is
+   * enabled, so existing Professional stores are unaffected until the
+   * merchant explicitly opts in. Toggled via Branding → Theme. 2026-06-27.
+   */
+  storefrontWebPushEnabled?: boolean;
+
+  /**
    * Merchant-controlled display order for footer social icons.
    * An array of platform keys (e.g. ['tiktok','instagram','whatsapp']) that
    * defines the left-to-right (or start-to-end in RTL) sequence in the footer.

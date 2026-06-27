@@ -83,6 +83,9 @@ export function OneSignalStorefrontInit() {
   useEffect(() => {
     // Hard-gate: only mount when the merchant turned push on AND env is set.
     if (!isEnabled('push_notifications')) return;
+    // Per-store opt-in flag — default false so existing Professional stores
+    // are unaffected until the merchant enables it in Branding → Theme.
+    if (store?.theme?.storefrontWebPushEnabled !== true) return;
     const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
     if (!appId) return;
     if (!store?.id) return;
@@ -173,7 +176,7 @@ export function OneSignalStorefrontInit() {
     return () => {
       cancelled = true;
     };
-  }, [store?.id, isEnabled]);
+  }, [store?.id, store?.theme?.storefrontWebPushEnabled, isEnabled]);
 
   return null;
 }

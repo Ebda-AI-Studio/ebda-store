@@ -260,7 +260,14 @@ function KindIcon({
     // Render the full-color PNG; the caller's button bg is set to
     // transparent for these kinds so the PNG circle is unobstructed.
     return (
-      <Image src={pngSrc} alt="" width={28} height={28} className={ICON_BOX_CLASS} unoptimized />
+      <Image
+        src={pngSrc}
+        alt=""
+        width={28}
+        height={28}
+        className={`${ICON_BOX_CLASS} object-contain`}
+        unoptimized
+      />
     );
   }
   switch (kind) {
