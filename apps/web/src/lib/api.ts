@@ -107,6 +107,12 @@ interface Product {
    *  enabled for out-of-stock backorderable products (the cart/order API
    *  honors backorders; the storefront must not silently block them). */
   acceptsBackorder?: boolean;
+  /** Server-computed aggregate (enrichStockFlags): effectiveInventory > 0,
+   *  where effectiveInventory aggregates variant stock for variant products.
+   *  Use this for the OOS decision when no variant is selected — product-level
+   *  `inventory` is 0/null for variant products (stock lives on the variants),
+   *  so reading it directly mis-reports a stocked product as out of stock. */
+  inStock?: boolean;
   status: string;
   images: Array<{ id: string; url: string; alt?: string }>;
   categories?: ProductCategory[];

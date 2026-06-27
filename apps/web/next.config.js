@@ -148,7 +148,11 @@ const nextConfig = {
               // other origins stays blocked.
               `frame-ancestors 'self' ${
                 process.env.STOREFRONT_FRAME_ANCESTORS ??
-                'https://app.forcemediakw.com https://*.vercel.app http://localhost:3001 http://localhost:3000'
+                // admin.force-ai.co is the Cloudflare admin host — without it
+                // the page-builder live-preview iframe is CSP-blocked on CF
+                // (the storefront refuses to be framed). Kept alongside the
+                // legacy app.forcemediakw.com (Vercel admin) during cutover.
+                'https://admin.force-ai.co https://app.forcemediakw.com https://*.vercel.app http://localhost:3001 http://localhost:3000'
               }`,
             ].join('; '),
           },

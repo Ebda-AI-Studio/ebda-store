@@ -434,7 +434,14 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
 
   // Derived add-to-cart state
   const variantRequired = hasVariants && !selectedVariant;
-  const outOfStock = effectiveInventory === 0;
+  // OOS decision: with a variant selected use that variant's stock; with NO
+  // variant selected use the server's aggregate `inStock` flag, NOT
+  // product.inventory directly — variant products carry 0/null product-level
+  // inventory (stock lives on the variants), so reading it raw made every
+  // variant product's PDP either falsely show OOS or (when null) never show the
+  // OOS label. The API's inStock already aggregates variant stock and respects
+  // untracked inventory. (Fixed 2026-06-27.)
+  const outOfStock = selectedVariant ? selectedVariant.inventory === 0 : product.inStock === false;
   // Backorder: when the product (or selected variant) accepts backorders, an
   // out-of-stock item stays orderable — the cart + order API already honor
   // allowBackorder (product.service.ts enrichStockFlags → acceptsBackorder).
