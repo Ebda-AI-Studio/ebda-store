@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useRouter } from 'next/navigation';
+import { useT } from '@/i18n/useT';
 
 interface StaffMember {
   membershipId: string;
@@ -25,6 +26,7 @@ export default function StoreStaffPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
+  const t = useT('staff');
 
   // Only store owners and super_admin can manage staff
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function StoreStaffPage() {
   }
 
   function formatDate(date: string | null) {
-    if (!date) return 'Never';
+    if (!date) return t('formatDate.never');
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -73,14 +75,14 @@ export default function StoreStaffPage() {
       if (data) {
         setStaff(data.staff || []);
       } else if (apiError) {
-        setError(apiError.message || 'Failed to load staff.');
+        setError(apiError.message || t('errors.loadFailed'));
       }
     } catch {
-      setError('Network error. Please try again.');
+      setError(t('errors.networkError'));
     } finally {
       setIsLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, t]);
 
   useEffect(() => {
     if (storeId) fetchStaff();
@@ -93,15 +95,15 @@ export default function StoreStaffPage() {
     try {
       const { error: apiError } = await apiPost(`/api/v1/stores/${storeId}/staff`, inviteForm);
       if (apiError) {
-        setInviteError(apiError.message || 'Failed to add staff member.');
+        setInviteError(apiError.message || t('toasts.addFailedDefault'));
         return;
       }
-      toastSuccess('Staff member added', `${inviteForm.firstName} can now log in.`);
+      toastSuccess(t('toasts.addedTitle'), t('toasts.addedDesc', { name: inviteForm.firstName }));
       setInviteOpen(false);
       resetInviteForm();
       await fetchStaff();
     } catch {
-      setInviteError('Network error. Please try again.');
+      setInviteError(t('errors.networkError'));
     } finally {
       setInviting(false);
     }
@@ -115,14 +117,17 @@ export default function StoreStaffPage() {
         `/api/v1/stores/${storeId}/staff/${removeTarget.id}`
       );
       if (apiError) {
-        toastError('Failed to remove staff member', apiError.message);
+        toastError(t('toasts.removeFailedTitle'), apiError.message);
         return;
       }
-      toastSuccess('Staff member removed', `${removeTarget.firstName} no longer has access.`);
+      toastSuccess(
+        t('toasts.removedTitle'),
+        t('toasts.removedDesc', { name: removeTarget.firstName })
+      );
       setRemoveTarget(null);
       await fetchStaff();
     } catch {
-      toastError('Error', 'Network error. Please try again.');
+      toastError(t('toasts.errorTitle'), t('errors.networkError'));
     } finally {
       setRemoving(false);
     }
@@ -130,14 +135,14 @@ export default function StoreStaffPage() {
 
   return (
     <AdminLayout
-      title="Staff Members"
-      subtitle="Manage who has access to this store. Staff can manage orders, products, and inventory."
+      title={t('page.title')}
+      subtitle={t('page.subtitle')}
       actions={
         <Button size="sm" onClick={() => setInviteOpen(true)}>
           <svg className="me-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Add Staff Member
+          {t('page.addButton')}
         </Button>
       }
     >
@@ -148,23 +153,23 @@ export default function StoreStaffPage() {
       )}
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden overflow-x-auto">
-        <table className="w-full" aria-label="Staff members">
+        <table className="w-full" aria-label={t('table.ariaLabel')}>
           <thead className="bg-muted border-b">
             <tr>
               <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Member
+                {t('table.colMember')}
               </th>
               <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Status
+                {t('table.colStatus')}
               </th>
               <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Added
+                {t('table.colAdded')}
               </th>
               <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Last login
+                {t('table.colLastLogin')}
               </th>
               <th className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Actions
+                {t('table.colActions')}
               </th>
             </tr>
           </thead>
@@ -205,10 +210,8 @@ export default function StoreStaffPage() {
                         d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                       />
                     </svg>
-                    <p className="mt-4 text-muted-foreground">No staff members yet.</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Add team members so they can manage orders and products.
-                    </p>
+                    <p className="mt-4 text-muted-foreground">{t('empty.title')}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{t('empty.description')}</p>
                   </div>
                 </td>
               </tr>
@@ -252,7 +255,7 @@ export default function StoreStaffPage() {
                   </td>
                   <td className="px-6 py-4 text-end">
                     <Button variant="outline" size="sm" onClick={() => setRemoveTarget(member)}>
-                      Remove
+                      {t('removeModal.removeButton')}
                     </Button>
                   </td>
                 </tr>
@@ -269,17 +272,14 @@ export default function StoreStaffPage() {
           setInviteOpen(false);
           resetInviteForm();
         }}
-        title="Add Staff Member"
+        title={t('addModal.title')}
         size="md"
       >
         <form onSubmit={handleInvite}>
           <ModalBody className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Staff members can manage orders, products, and inventory but cannot change store
-              settings, payment configuration, or financial records.
-            </p>
+            <p className="text-sm text-muted-foreground">{t('addModal.description')}</p>
             <div>
-              <Label htmlFor="staff-email">Email</Label>
+              <Label htmlFor="staff-email">{t('addModal.emailLabel')}</Label>
               <Input
                 id="staff-email"
                 type="email"
@@ -291,7 +291,7 @@ export default function StoreStaffPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="staff-first">First name</Label>
+                <Label htmlFor="staff-first">{t('addModal.firstNameLabel')}</Label>
                 <Input
                   id="staff-first"
                   required
@@ -300,7 +300,7 @@ export default function StoreStaffPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="staff-last">Last name</Label>
+                <Label htmlFor="staff-last">{t('addModal.lastNameLabel')}</Label>
                 <Input
                   id="staff-last"
                   required
@@ -310,7 +310,7 @@ export default function StoreStaffPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="staff-password">Initial password</Label>
+              <Label htmlFor="staff-password">{t('addModal.passwordLabel')}</Label>
               <Input
                 id="staff-password"
                 type="password"
@@ -320,9 +320,7 @@ export default function StoreStaffPage() {
                 value={inviteForm.password}
                 onChange={e => setInviteForm({ ...inviteForm, password: e.target.value })}
               />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Share this with the staff member. They can change it after first login.
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('addModal.passwordHint')}</p>
             </div>
             {inviteError && (
               <p className="text-sm text-destructive" role="alert">
@@ -340,10 +338,10 @@ export default function StoreStaffPage() {
               }}
               disabled={inviting}
             >
-              Cancel
+              {t('addModal.cancelButton')}
             </Button>
             <Button type="submit" disabled={inviting} isLoading={inviting}>
-              {inviting ? 'Adding…' : 'Add Staff Member'}
+              {inviting ? t('addModal.addingButton') : t('addModal.submitButton')}
             </Button>
           </ModalFooter>
         </form>
@@ -353,7 +351,7 @@ export default function StoreStaffPage() {
       <Modal
         isOpen={!!removeTarget}
         onClose={() => setRemoveTarget(null)}
-        title="Remove Staff Member"
+        title={t('removeModal.title')}
         size="sm"
       >
         <p className="text-sm text-muted-foreground">
@@ -365,7 +363,7 @@ export default function StoreStaffPage() {
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setRemoveTarget(null)} disabled={removing}>
-            Cancel
+            {t('removeModal.cancelButton')}
           </Button>
           <Button
             variant="destructive"
@@ -373,7 +371,7 @@ export default function StoreStaffPage() {
             disabled={removing}
             isLoading={removing}
           >
-            {removing ? 'Removing…' : 'Remove'}
+            {removing ? t('removeModal.removingButton') : t('removeModal.removeButton')}
           </Button>
         </div>
       </Modal>

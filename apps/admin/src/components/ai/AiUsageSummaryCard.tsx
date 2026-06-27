@@ -24,6 +24,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { apiGet } from '../../lib/api';
+import { useT } from '@/i18n/useT';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -51,9 +52,10 @@ interface SparklineProps {
   data: Array<{ day: string; total: number }>;
   /** Height in pixels (default 40 for embedded, 60 for standalone). */
   height?: number;
+  ariaLabel: string;
 }
 
-function Sparkline({ data, height = 60 }: SparklineProps) {
+function Sparkline({ data, height = 60, ariaLabel }: SparklineProps) {
   if (!data.length) return null;
 
   const max = Math.max(...data.map(d => d.total), 1);
@@ -69,12 +71,7 @@ function Sparkline({ data, height = 60 }: SparklineProps) {
   });
 
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="w-full"
-      aria-label="Last 30 days AI usage sparkline"
-      role="img"
-    >
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" aria-label={ariaLabel} role="img">
       <line
         x1={pad}
         y1={height - pad}
@@ -100,13 +97,11 @@ function Sparkline({ data, height = 60 }: SparklineProps) {
 
 function QuotaBar({
   label,
-  labelAr,
   current,
   cap,
   pct,
 }: {
   label: string;
-  labelAr: string;
   current: number;
   cap: number;
   pct: number;
@@ -117,9 +112,6 @@ function QuotaBar({
       <div className="mb-1 flex items-center justify-between text-xs">
         <span className="font-medium text-foreground">
           {label} — {current.toLocaleString()} / {cap.toLocaleString()} ({pct}%)
-        </span>
-        <span className="text-muted-foreground" dir="rtl">
-          {labelAr}
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -135,6 +127,7 @@ function QuotaBar({
 // ── Main component ─────────────────────────────────────────────────────
 
 export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummaryCardProps) {
+  const t = useT('components.aiUsageSummaryCard');
   const [summary, setSummary] = useState<AiUsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -175,7 +168,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
       >
         <div className="flex items-center gap-2">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <span className="text-xs text-muted-foreground">Loading AI quota… / جارٍ التحميل…</span>
+          <span className="text-xs text-muted-foreground">{t('loading')}</span>
         </div>
       </div>
     );
@@ -188,9 +181,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
       <div
         className={`rounded-xl border border-destructive/20 bg-card shadow-sm ${embedded ? 'px-4 py-3' : 'p-6'}`}
       >
-        <p className="text-xs text-destructive">
-          Failed to load AI quota / تعذّر تحميل بيانات الحصة
-        </p>
+        <p className="text-xs text-destructive">{t('loadError')}</p>
       </div>
     );
   }
@@ -229,15 +220,13 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
                 d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"
               />
             </svg>
-            <span className="text-sm font-semibold text-foreground">
-              AI Quota / حصة الذكاء الاصطناعي
-            </span>
+            <span className="text-sm font-semibold text-foreground">{t('header')}</span>
           </div>
           <Link
             href={`/stores/${storeId}/ai-usage`}
             className="text-xs text-primary hover:underline"
           >
-            View detailed log / عرض السجل التفصيلي →
+            {t('viewLog')}
           </Link>
         </div>
 
@@ -246,15 +235,13 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
           {/* Left: quota bars */}
           <div className="space-y-3">
             <QuotaBar
-              label="Daily"
-              labelAr="يومي"
+              label={t('quotaBarDaily')}
               current={summary.today}
               cap={summary.dailyCap}
               pct={dailyPct}
             />
             <QuotaBar
-              label="Monthly"
-              labelAr="شهري"
+              label={t('quotaBarMonthly')}
               current={summary.thisMonth}
               cap={summary.monthlyCap}
               pct={monthlyPct}
@@ -264,7 +251,7 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
           {/* Right: mini stats + sparkline */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Remaining today / المتبقي اليوم</span>
+              <span className="text-muted-foreground">{t('remainingToday')}</span>
               <span
                 className={`font-bold tabular-nums ${remainingWarn ? 'text-destructive' : 'text-foreground'}`}
               >
@@ -273,7 +260,11 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
             </div>
             {summary.last30Days.length > 0 && (
               <div className="mt-1">
-                <Sparkline data={summary.last30Days} height={40} />
+                <Sparkline
+                  data={summary.last30Days}
+                  height={40}
+                  ariaLabel={t('sparklineAriaLabel')}
+                />
                 <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
                   <span>{summary.last30Days[0]?.day ?? ''}</span>
                   <span>{summary.last30Days[summary.last30Days.length - 1]?.day ?? ''}</span>
@@ -291,24 +282,22 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
   return (
     <div className="rounded-xl border bg-card p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-foreground">Quota Usage / استخدام الحصة</h2>
+        <h2 className="text-base font-semibold text-foreground">{t('standaloneHeader')}</h2>
         <Link href={`/stores/${storeId}/ai-usage`} className="text-xs text-primary hover:underline">
-          View detailed log →
+          {t('viewLog')}
         </Link>
       </div>
 
       {/* Quota bars */}
       <div className="space-y-4 mb-6">
         <QuotaBar
-          label="Daily"
-          labelAr="يومي"
+          label={t('quotaBarDaily')}
           current={summary.today}
           cap={summary.dailyCap}
           pct={dailyPct}
         />
         <QuotaBar
-          label="Monthly"
-          labelAr="شهري"
+          label={t('quotaBarMonthly')}
           current={summary.thisMonth}
           cap={summary.monthlyCap}
           pct={monthlyPct}
@@ -318,25 +307,25 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
       {/* Stat chips */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg bg-muted/40 px-3 py-2">
-          <p className="text-xs text-muted-foreground">Today / اليوم</p>
+          <p className="text-xs text-muted-foreground">{t('statToday')}</p>
           <p className="text-lg font-bold tabular-nums text-primary">
             {summary.today.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
-          <p className="text-xs text-muted-foreground">This month / الشهر</p>
+          <p className="text-xs text-muted-foreground">{t('statThisMonth')}</p>
           <p className="text-lg font-bold tabular-nums text-foreground">
             {summary.thisMonth.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
-          <p className="text-xs text-muted-foreground">Daily cap / الحد اليومي</p>
+          <p className="text-xs text-muted-foreground">{t('statDailyCap')}</p>
           <p className="text-lg font-bold tabular-nums text-foreground">
             {summary.dailyCap.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2">
-          <p className="text-xs text-muted-foreground">Remaining / المتبقي</p>
+          <p className="text-xs text-muted-foreground">{t('statRemaining')}</p>
           <p
             className={`text-lg font-bold tabular-nums ${remainingWarn ? 'text-destructive' : 'text-foreground'}`}
           >
@@ -349,9 +338,9 @@ export function AiUsageSummaryCard({ storeId, embedded = false }: AiUsageSummary
       {summary.last30Days.length > 0 && (
         <div>
           <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-            <span>Last 30 days / آخر 30 يوماً</span>
+            <span>{t('last30Days')}</span>
           </div>
-          <Sparkline data={summary.last30Days} height={60} />
+          <Sparkline data={summary.last30Days} height={60} ariaLabel={t('sparklineAriaLabel')} />
           <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
             <span>{summary.last30Days[0]?.day ?? ''}</span>
             <span>{summary.last30Days[summary.last30Days.length - 1]?.day ?? ''}</span>

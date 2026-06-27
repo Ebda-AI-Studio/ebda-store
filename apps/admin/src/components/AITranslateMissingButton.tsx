@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { apiPost } from '../lib/api';
+import { useT } from '@/i18n/useT';
 
 /**
  * Page-level "Translate missing Arabic / English" button.
@@ -66,6 +67,7 @@ export function AITranslateMissingButton({
   label,
   className,
 }: AITranslateMissingButtonProps) {
+  const t = useT('components.aiTranslateButton');
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [summary, setSummary] = useState<RunSummary | null>(null);
@@ -142,10 +144,10 @@ export function AITranslateMissingButton({
   const buttonLabel =
     label ??
     (running && progress
-      ? `Translating ${progress.done}/${progress.total}…`
+      ? t('translating', { done: progress.done, total: progress.total })
       : candidatePairs.length === 0
-        ? 'Nothing to translate'
-        : `Translate ${candidatePairs.length} missing field${candidatePairs.length === 1 ? '' : 's'}`);
+        ? t('nothing')
+        : t('translate', { count: candidatePairs.length }));
 
   return (
     <div className={className}>
@@ -178,15 +180,17 @@ export function AITranslateMissingButton({
       </button>
       {summary && (
         <p className="mt-2 text-xs text-muted-foreground">
-          {summary.filled > 0 && <span>Filled {summary.filled}. </span>}
+          {summary.filled > 0 && <span>{t('summaryFilled', { count: summary.filled })}</span>}
           {summary.skippedReasons.both > 0 && (
-            <span>Skipped {summary.skippedReasons.both} already-translated. </span>
+            <span>{t('summarySkippedBoth', { count: summary.skippedReasons.both })}</span>
           )}
           {summary.skippedReasons.empty > 0 && (
-            <span>Skipped {summary.skippedReasons.empty} empty. </span>
+            <span>{t('summarySkippedEmpty', { count: summary.skippedReasons.empty })}</span>
           )}
           {summary.failed > 0 && (
-            <span className="text-destructive">Failed {summary.failed}. </span>
+            <span className="text-destructive">
+              {t('summaryFailed', { count: summary.failed })}
+            </span>
           )}
         </p>
       )}

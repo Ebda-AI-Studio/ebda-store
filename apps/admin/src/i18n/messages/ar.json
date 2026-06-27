@@ -1404,6 +1404,33 @@
       "provisionButton": "إعداد تلقائي",
       "provisioningButton": "جارٍ الإعداد…"
     },
+    "superAdmin": {
+      "planLabel": "باقة المتجر",
+      "loadingPlan": "جارٍ التحميل…",
+      "changePlanPlaceholder": "تغيير الباقة…",
+      "dangerZoneTitle": "منطقة خطرة",
+      "reactivateTitle": "إعادة تفعيل المتجر",
+      "suspendTitle": "إيقاف المتجر مؤقتاً",
+      "reactivateDesc": "السماح للعملاء بالوصول إلى المتجر والشراء منه مجدداً.",
+      "suspendDesc": "منع وصول العملاء إلى المتجر دون حذف أي بيانات.",
+      "reactivateModalBody": "إعادة تفعيل {name}؟ سيستعيد العملاء وصولهم فوراً.",
+      "suspendModalBody": "إيقاف {name}؟ لن يتمكن العملاء من الوصول إلى المتجر أو الشراء منه.",
+      "reactivateButton": "إعادة تفعيل",
+      "suspendButton": "إيقاف مؤقت",
+      "changePlanModalTitle": "تغيير الباقة",
+      "changePlanModalBody": "تغيير الباقة إلى {plan}. ستُحفظ الإعدادات المخصصة. المتابعة؟"
+    },
+    "whatsappStatus": {
+      "connected": "متصل",
+      "savedNotVerified": "تم الحفظ · غير موثق",
+      "notConnected": "غير متصل",
+      "dmOrdering": "طلب عن طريق الدايركت:"
+    },
+    "aiAutopilotChip": {
+      "label": "الطيار الآلي الذكي:",
+      "on": "مُفعّل",
+      "off": "معطّل"
+    },
     "settingsSearch": {
       "placeholder": "ابحث في الإعدادات...",
       "noResults": "لا توجد إعدادات"
@@ -1457,6 +1484,7 @@
     },
     "theme": {
       "borderRadius": "انحناء الحواف",
+      "footerLogoLabel": "رفع شعار التذييل",
       "hex": "HEX",
       "presets": {
         "orange": "برتقالي",
@@ -1623,6 +1651,65 @@
         "moveDown": "تحريك لأسفل",
         "empty": "أضف رابط تواصل اجتماعي واحداً على الأقل أعلاه لتغيير الترتيب."
       }
+    },
+    "locations": {
+      "enableTitle": "تفعيل الفروع",
+      "enableDescription": "إظهار صفحة الفروع في متجرك. لكي يتمكن العملاء من العثور على فروعك.",
+      "disabledTitle": "الفروع معطلة حالياً",
+      "disabledDescription": "الفروع التي تضيفها هنا تُحفظ ولكن لن تظهر في المتجر إلا بعد تفعيل الخيار أعلاه.",
+      "navHint": "أضف رابط الفروع إلى متجرك عبر مُنشئ الصفحات ← تنقل الترويسة أو روابط التذييل أو الشريط العلوي.",
+      "count": "{count, plural, =0 {لا توجد فروع} one {فرع واحد} two {فرعان} few {# فروع} many {# فرعًا} other {# فرع}}",
+      "addButton": "+ إضافة فرع",
+      "formNewTitle": "فرع جديد",
+      "formEditTitle": "تعديل الفرع",
+      "fieldName": "الاسم",
+      "fieldNameAr": "الاسم (بالعربي)",
+      "fieldCountry": "الدولة",
+      "fieldCountryAr": "الدولة (بالعربي)",
+      "fieldAddress": "العنوان",
+      "fieldAddressAr": "العنوان (بالعربي)",
+      "fieldPhone": "الهاتف",
+      "fieldWhatsapp": "واتساب",
+      "fieldHours": "ساعات العمل",
+      "fieldHoursAr": "ساعات العمل (بالعربي)",
+      "fieldMapsUrl": "رابط خرائط جوجل",
+      "fieldMapsEmbedUrl": "رابط تضمين الخريطة",
+      "fieldPosition": "الترتيب",
+      "fieldPublished": "منشور (مرئي للعملاء في المتجر)",
+      "phName": "مثال: الفرع الرئيسي",
+      "phNameAr": "مثال: الفرع الرئيسي",
+      "phCountry": "مثال: الكويت",
+      "phCountryAr": "مثال: الكويت",
+      "phAddress": "مثال: قطعة 5، شارع سالم المبارك، السالمية",
+      "phAddressAr": "مثال: قطعة 5، شارع سالم المبارك، السالمية",
+      "phPhone": "مثال: 2222 2222 965+",
+      "phWhatsapp": "مثال: 99999999 965+",
+      "phHours": "مثال: السبت–الخميس 9ص–10م",
+      "phHoursAr": "مثال: السبت–الخميس 9ص–10م",
+      "phMapsUrl": "https://maps.google.com/...",
+      "phMapsEmbedUrl": "https://www.google.com/maps/embed?pb=...",
+      "saving": "جاري الحفظ...",
+      "create": "إنشاء",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "colName": "الاسم",
+      "colCountry": "الدولة",
+      "colAddress": "العنوان",
+      "colStatus": "الحالة",
+      "colPos": "الترتيب",
+      "colActions": "الإجراءات",
+      "statusPublished": "منشور",
+      "statusDraft": "مسودة",
+      "deleteConfirm": "هل تود الحذف؟",
+      "deleteYes": "نعم، حذف",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "emptyTitle": "لا توجد فروع حالياً",
+      "emptyDescription": "أضف فروع متجرك لكي يتمكن العملاء من الوصول إليك.",
+      "emptyCta": "أضف فرعك الأول ←",
+      "errCreate": "فشل في إنشاء الفرع",
+      "errUpdate": "فشل في تحديث الفرع",
+      "errDelete": "فشل في الحذف"
     }
   },
   "coupons": {
@@ -3477,6 +3564,15 @@
       "successMessage": "تم حفظ إعدادات SEO بنجاح",
       "failedMessage": "تعذّر حفظ إعدادات SEO",
       "connectionError": "تعذّر الاتصال بالخادم",
+      "aiGenerateTooltip": "إنشاء سيو بالذكاء الاصطناعي — يعبئ الحقول الفارغة فقط",
+      "aeoTitle": "تحسين نتائج محركات البحث الذكية",
+      "aeoHint": "تم تعبئة البيانات تلقائياً بواسطة نظام البحث الذكي، تقدر تعدل عليها حسب كل جهة.",
+      "aeoLabelEn": "وصف الميتا الخاص بـ AEO (إنجليزي)",
+      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is a Kuwait-based online grocery store specializing in…»",
+      "aeoHintText": "اترك الحقل فارغاً ليقوم نظام AEO بتعبئته تلقائياً. أسلوب إجابة مباشر، 130–160 حرف.",
+      "aeoLabelAr": "وصف ميتا لـ AEO (عربي)",
+      "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني كويتي متخصص في…»",
+      "senderPrefixPlaceholder": "noreply",
       "senderPrefix": "بادئة البريد الإلكتروني",
       "senderPrefixHint": "الجزء قبل @ في البريد الصادر. الافتراضي: noreply. أمثلة: hello, orders, support. حروف وأرقام ونقطة وشرطة وشرطة سفلية فقط.",
       "faqsTitle": "الأسئلة الشائعة",
@@ -4056,6 +4152,38 @@
     },
     "brand": {
       "forceMediaAlt": "Force AI"
+    },
+    "aiUsageSummaryCard": {
+      "loading": "جاري تحميل رصيد الذكاء الاصطناعي...",
+      "loadError": "فشل تحميل رصيد الذكاء الاصطناعي",
+      "header": "حصتك من الذكاء الاصطناعي",
+      "viewLog": "عرض السجل التفصيلي →",
+      "quotaBarDaily": "يومي",
+      "quotaBarMonthly": "شهري",
+      "remainingToday": "باقي اليوم",
+      "standaloneHeader": "استهلاك الحصة",
+      "statToday": "اليوم",
+      "statThisMonth": "هالشهر",
+      "statDailyCap": "الحد اليومي",
+      "statRemaining": "المتبقي",
+      "last30Days": "آخر 30 يوماً",
+      "sparklineAriaLabel": "رسم بياني لاستخدام الذكاء الاصطناعي في آخر 30 يوم"
+    },
+    "aiCategorySuggestions": {
+      "loading": "الذكاء الاصطناعي يقترح الفئات…",
+      "error": "اقتراح الذكاء الاصطناعي: {error}",
+      "suggests": "اقتراحات الذكاء الاصطناعي:",
+      "confidence": "مستوى الثقة: {level}",
+      "confidenceHigh": "·عالي"
+    },
+    "aiTranslateButton": {
+      "translating": "جاري الترجمة {done}/{total}…",
+      "nothing": "لا يوجد ما يُترجم",
+      "translate": "ترجمة {count, plural, one {حقل ناقص} other {# حقول ناقصة}}",
+      "summaryFilled": "تم التعبئة {count}. ",
+      "summarySkippedBoth": "تجاوزت {count} من العناصر المترجمة مسبقاً. ",
+      "summarySkippedEmpty": "تم تخطي {count} فارغ. ",
+      "summaryFailed": "فشل {count}. "
     }
   },
   "finance": {
@@ -5030,6 +5158,75 @@
       "dateTo": "إلى",
       "dateApply": "تطبيق",
       "guest": "زائر"
+    }
+  },
+  "whatsappIntegration": {
+    "page": {
+      "title": "ربط واتساب",
+      "subtitle": "منصة Force AI للأعمال عبر واتساب · القوالب · تحديثات الطلبات · روابط الدفع",
+      "navAriaLabel": "إعدادات واتساب"
+    },
+    "tabs": {
+      "connection": "الاتصال",
+      "botConfig": "إعدادات البوت",
+      "templates": "القوالب",
+      "orderUpdates": "تحديثات الطلب",
+      "paymentLink": "رابط الدفع",
+      "botCopy": "نسخ البوت",
+      "botAnalytics": "تحليلات البوت"
+    }
+  },
+  "staff": {
+    "page": {
+      "title": "الموظفون",
+      "subtitle": "إدارة صلاحيات الوصول للمتجر. يمكن للموظفين إدارة الطلبات والمنتجات والمخزون.",
+      "addButton": "إضافة موظف"
+    },
+    "table": {
+      "ariaLabel": "أعضاء الفريق",
+      "colMember": "عضو",
+      "colStatus": "الحالة",
+      "colAdded": "تمت الإضافة",
+      "colLastLogin": "آخر دخول",
+      "colActions": "إجراءات"
+    },
+    "empty": {
+      "title": "لا يوجد موظفون بعد.",
+      "description": "أضف أعضاء للفريق ليتمكنوا من إدارة الطلبات والمنتجات."
+    },
+    "errors": {
+      "loadFailed": "تعذّر تحميل الموظفين.",
+      "networkError": "خطأ في الاتصال. يرجى المحاولة مرة أخرى."
+    },
+    "toasts": {
+      "addedTitle": "تمت إضافة الموظف",
+      "addedDesc": "يمكن لـ {name} الآن تسجيل الدخول.",
+      "removeFailedTitle": "تعذّر حذف الموظف",
+      "errorTitle": "خطأ",
+      "removedTitle": "تمت إزالة الموظف",
+      "removedDesc": "{name} لم يعد يملك صلاحية الوصول.",
+      "addFailedDefault": "تعذّرت إضافة الموظف."
+    },
+    "formatDate": {
+      "never": "أبداً"
+    },
+    "addModal": {
+      "title": "إضافة موظف",
+      "description": "يمكن للموظفين إدارة الطلبات والمنتجات والمخزون، لكن لا يمكنهم تغيير إعدادات المتجر أو إعدادات الدفع أو السجلات المالية.",
+      "emailLabel": "البريد الإلكتروني",
+      "firstNameLabel": "الاسم الأول",
+      "lastNameLabel": "اسم العائلة",
+      "passwordLabel": "كلمة السر المؤقتة",
+      "passwordHint": "شارك هذه مع الموظف. يمكنه تغييرها بعد أول تسجيل دخول.",
+      "cancelButton": "إلغاء",
+      "addingButton": "جاري الإضافة…",
+      "submitButton": "إضافة موظف"
+    },
+    "removeModal": {
+      "title": "حذف موظف",
+      "cancelButton": "إلغاء",
+      "removingButton": "جاري الحذف…",
+      "removeButton": "حذف"
     }
   }
 }

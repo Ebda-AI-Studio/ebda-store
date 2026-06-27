@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../lib/api';
 
 interface Location {
@@ -69,6 +70,7 @@ interface StoreInfo {
  * Mirrors the blog list page structure and conventions exactly.
  */
 export function LocationsTab({ storeId }: { storeId: string }) {
+  const t = useT('branding.locations');
   const [locations, setLocations] = useState<Location[]>([]);
   const [store, setStore] = useState<StoreInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -162,7 +164,7 @@ export function LocationsTab({ storeId }: { storeId: string }) {
         body
       );
       if (error) {
-        setFormError(error.message || 'Failed to create location');
+        setFormError(error.message || t('errCreate'));
       } else if (data?.location) {
         setLocations(prev => [...prev, data.location]);
         closeForm();
@@ -173,7 +175,7 @@ export function LocationsTab({ storeId }: { storeId: string }) {
         body
       );
       if (error) {
-        setFormError(error.message || 'Failed to update location');
+        setFormError(error.message || t('errUpdate'));
       } else if (data?.location) {
         setLocations(prev => prev.map(l => (l.id === formMode ? data.location : l)));
         closeForm();
@@ -192,7 +194,7 @@ export function LocationsTab({ storeId }: { storeId: string }) {
     } else {
       // Surface delete error in a non-blocking way — set a temporary state
       // that auto-clears. No window.alert.
-      setFormError(error.message || 'Delete failed');
+      setFormError(error.message || t('errDelete'));
     }
   }
 
@@ -214,10 +216,8 @@ export function LocationsTab({ storeId }: { storeId: string }) {
       {/* Enable Locations toggle */}
       <div className="flex items-center justify-between rounded-xl border bg-card p-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">Enable Locations</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Show the Locations page on your storefront. Customers can find your branches.
-          </p>
+          <p className="text-sm font-semibold text-foreground">{t('enableTitle')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('enableDescription')}</p>
         </div>
         <button
           type="button"
@@ -240,22 +240,15 @@ export function LocationsTab({ storeId }: { storeId: string }) {
       {/* Locations not enabled callout */}
       {store && !isEnabled && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
-          <p className="font-semibold text-amber-900">Locations are currently disabled</p>
-          <p className="mt-1 text-amber-800">
-            Locations you add here are saved but won&apos;t be visible on the storefront until you
-            enable the toggle above.
-          </p>
+          <p className="font-semibold text-amber-900">{t('disabledTitle')}</p>
+          <p className="mt-1 text-amber-800">{t('disabledDescription')}</p>
         </div>
       )}
 
       {/* Nav placement hint */}
       {store && isEnabled && (
         <p className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          Add the Locations link to your storefront via Page Builder → header navigation, footer
-          links, or top utility bar. |{' '}
-          <span lang="ar" dir="rtl" className="inline">
-            أضف رابط الفروع من منشئ الصفحات ← تنقل الترويسة أو روابط التذييل أو الشريط العلوي.
-          </span>
+          {t('navHint')}
         </p>
       )}
 
@@ -263,14 +256,14 @@ export function LocationsTab({ storeId }: { storeId: string }) {
       {formMode === null && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {!isLoading && `${locations.length} location${locations.length === 1 ? '' : 's'}`}
+            {!isLoading && t('count', { count: locations.length })}
           </p>
           <button
             type="button"
             onClick={openNew}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
           >
-            + Add location
+            {t('addButton')}
           </button>
         </div>
       )}
@@ -279,7 +272,7 @@ export function LocationsTab({ storeId }: { storeId: string }) {
       {formMode !== null && (
         <div className="rounded-xl border bg-card p-5 space-y-4">
           <h3 className="text-base font-semibold text-foreground">
-            {formMode === 'new' ? 'New Location' : 'Edit Location'}
+            {formMode === 'new' ? t('formNewTitle') : t('formEditTitle')}
           </h3>
 
           {formError && (
@@ -292,148 +285,164 @@ export function LocationsTab({ storeId }: { storeId: string }) {
             {/* Name EN */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-foreground">
-                Name <span className="text-destructive">*</span>
+                {t('fieldName')} <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. Main Branch"
+                placeholder={t('phName')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Name AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">Name (Arabic)</label>
+              <label className="block text-xs font-medium text-foreground">
+                {t('fieldNameAr')}
+              </label>
               <input
                 type="text"
                 dir="rtl"
                 value={formData.nameAr}
                 onChange={e => setFormData(p => ({ ...p, nameAr: e.target.value }))}
-                placeholder="مثال: الفرع الرئيسي"
+                placeholder={t('phNameAr')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Country EN */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-foreground">
-                Country <span className="text-destructive">*</span>
+                {t('fieldCountry')} <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
                 value={formData.country}
                 onChange={e => setFormData(p => ({ ...p, country: e.target.value }))}
-                placeholder="e.g. Kuwait"
+                placeholder={t('phCountry')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Country AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">Country (Arabic)</label>
+              <label className="block text-xs font-medium text-foreground">
+                {t('fieldCountryAr')}
+              </label>
               <input
                 type="text"
                 dir="rtl"
                 value={formData.countryAr}
                 onChange={e => setFormData(p => ({ ...p, countryAr: e.target.value }))}
-                placeholder="مثال: الكويت"
+                placeholder={t('phCountryAr')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Address EN */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-foreground">
-                Address <span className="text-destructive">*</span>
+                {t('fieldAddress')} <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
                 value={formData.address}
                 onChange={e => setFormData(p => ({ ...p, address: e.target.value }))}
-                placeholder="e.g. Block 5, Salem Al Mubarak St, Salmiya"
+                placeholder={t('phAddress')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Address AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">Address (Arabic)</label>
+              <label className="block text-xs font-medium text-foreground">
+                {t('fieldAddressAr')}
+              </label>
               <input
                 type="text"
                 dir="rtl"
                 value={formData.addressAr}
                 onChange={e => setFormData(p => ({ ...p, addressAr: e.target.value }))}
-                placeholder="مثال: قطعة 5، شارع سالم المبارك، السالمية"
+                placeholder={t('phAddressAr')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Phone */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">Phone</label>
+              <label className="block text-xs font-medium text-foreground">{t('fieldPhone')}</label>
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
-                placeholder="e.g. +965 2222 2222"
+                placeholder={t('phPhone')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* WhatsApp */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">WhatsApp</label>
+              <label className="block text-xs font-medium text-foreground">
+                {t('fieldWhatsapp')}
+              </label>
               <input
                 type="tel"
                 value={formData.whatsapp}
                 onChange={e => setFormData(p => ({ ...p, whatsapp: e.target.value }))}
-                placeholder="e.g. +96599999999"
+                placeholder={t('phWhatsapp')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Hours EN */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">Hours</label>
+              <label className="block text-xs font-medium text-foreground">{t('fieldHours')}</label>
               <input
                 type="text"
                 value={formData.hours}
                 onChange={e => setFormData(p => ({ ...p, hours: e.target.value }))}
-                placeholder="e.g. Sat–Thu 9am–10pm"
+                placeholder={t('phHours')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Hours AR */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">Hours (Arabic)</label>
+              <label className="block text-xs font-medium text-foreground">
+                {t('fieldHoursAr')}
+              </label>
               <input
                 type="text"
                 dir="rtl"
                 value={formData.hoursAr}
                 onChange={e => setFormData(p => ({ ...p, hoursAr: e.target.value }))}
-                placeholder="مثال: السبت–الخميس 9ص–10م"
+                placeholder={t('phHoursAr')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Maps URL */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">Maps Link URL</label>
+              <label className="block text-xs font-medium text-foreground">
+                {t('fieldMapsUrl')}
+              </label>
               <input
                 type="url"
                 value={formData.mapsUrl}
                 onChange={e => setFormData(p => ({ ...p, mapsUrl: e.target.value }))}
-                placeholder="https://maps.google.com/..."
+                placeholder={t('phMapsUrl')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Maps Embed URL */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">Maps Embed URL</label>
+              <label className="block text-xs font-medium text-foreground">
+                {t('fieldMapsEmbedUrl')}
+              </label>
               <input
                 type="url"
                 value={formData.mapsEmbedUrl}
                 onChange={e => setFormData(p => ({ ...p, mapsEmbedUrl: e.target.value }))}
-                placeholder="https://www.google.com/maps/embed?pb=..."
+                placeholder={t('phMapsEmbedUrl')}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             {/* Position */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-foreground">Position</label>
+              <label className="block text-xs font-medium text-foreground">
+                {t('fieldPosition')}
+              </label>
               <input
                 type="number"
                 min={0}
@@ -457,7 +466,7 @@ export function LocationsTab({ storeId }: { storeId: string }) {
               className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
             />
             <label htmlFor="loc-published" className="text-sm text-foreground">
-              Published (visible on storefront)
+              {t('fieldPublished')}
             </label>
           </div>
 
@@ -469,14 +478,14 @@ export function LocationsTab({ storeId }: { storeId: string }) {
               onClick={handleSave}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
             >
-              {isSaving ? 'Saving…' : formMode === 'new' ? 'Create' : 'Save'}
+              {isSaving ? t('saving') : formMode === 'new' ? t('create') : t('save')}
             </button>
             <button
               type="button"
               onClick={closeForm}
               className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
             >
-              Cancel
+              {t('cancel')}
             </button>
           </div>
         </div>
@@ -514,17 +523,15 @@ export function LocationsTab({ storeId }: { storeId: string }) {
                 <circle cx="12" cy="9" r="2.5" />
               </svg>
             </div>
-            <p className="text-base font-semibold text-foreground">No locations yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Add your store branches so customers can find you.
-            </p>
+            <p className="text-base font-semibold text-foreground">{t('emptyTitle')}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t('emptyDescription')}</p>
             {formMode === null && (
               <button
                 type="button"
                 onClick={openNew}
                 className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
               >
-                Add your first location →
+                {t('emptyCta')}
               </button>
             )}
           </div>
@@ -533,12 +540,12 @@ export function LocationsTab({ storeId }: { storeId: string }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-3">Name</th>
-                  <th className="hidden px-4 py-3 sm:table-cell">Country</th>
-                  <th className="hidden px-4 py-3 md:table-cell">Address</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Pos</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3">{t('colName')}</th>
+                  <th className="hidden px-4 py-3 sm:table-cell">{t('colCountry')}</th>
+                  <th className="hidden px-4 py-3 md:table-cell">{t('colAddress')}</th>
+                  <th className="px-4 py-3">{t('colStatus')}</th>
+                  <th className="px-4 py-3">{t('colPos')}</th>
+                  <th className="px-4 py-3 text-right">{t('colActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -568,7 +575,7 @@ export function LocationsTab({ storeId }: { storeId: string }) {
                               : 'bg-amber-100 text-amber-800'
                           }`}
                         >
-                          {loc.isPublished ? 'Published' : 'Draft'}
+                          {loc.isPublished ? t('statusPublished') : t('statusDraft')}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{loc.position}</td>
@@ -577,21 +584,23 @@ export function LocationsTab({ storeId }: { storeId: string }) {
                           {/* Inline delete confirm */}
                           {confirmDeleteId === loc.id ? (
                             <>
-                              <span className="text-xs text-destructive font-medium">Delete?</span>
+                              <span className="text-xs text-destructive font-medium">
+                                {t('deleteConfirm')}
+                              </span>
                               <button
                                 type="button"
                                 disabled={deletingId === loc.id}
                                 onClick={() => handleDelete(loc.id)}
                                 className="inline-flex items-center rounded-lg bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
                               >
-                                {deletingId === loc.id ? '…' : 'Yes, delete'}
+                                {deletingId === loc.id ? '…' : t('deleteYes')}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteId(null)}
                                 className="inline-flex items-center rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted"
                               >
-                                Cancel
+                                {t('cancel')}
                               </button>
                             </>
                           ) : (
@@ -601,14 +610,14 @@ export function LocationsTab({ storeId }: { storeId: string }) {
                                 onClick={() => openEdit(loc)}
                                 className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
                               >
-                                Edit
+                                {t('edit')}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteId(loc.id)}
                                 className="inline-flex items-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
                               >
-                                Delete
+                                {t('delete')}
                               </button>
                             </>
                           )}

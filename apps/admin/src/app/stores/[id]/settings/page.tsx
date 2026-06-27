@@ -23,6 +23,7 @@ import { SettingsSearch } from '../../../../components/SettingsSearch';
  * without requiring a click-through to Settings → WhatsApp → Connection tab.
  */
 function WhatsAppStatusInline({ storeId }: { storeId: string }) {
+  const t = useT('settings');
   const [status, setStatus] = useState<{
     /** credentials saved in the DB (API key present + WBS toggle on) */
     saved: boolean;
@@ -75,7 +76,11 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
   const dot =
     tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-gray-400';
   const label =
-    tone === 'green' ? 'Connected' : tone === 'amber' ? 'Saved · not verified' : 'Not connected';
+    tone === 'green'
+      ? t('whatsappStatus.connected')
+      : tone === 'amber'
+        ? t('whatsappStatus.savedNotVerified')
+        : t('whatsappStatus.notConnected');
 
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -93,7 +98,8 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
               : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
           }`}
         >
-          DM ordering: {status.waOrdering ? 'ON' : 'OFF'}
+          {t('whatsappStatus.dmOrdering')}{' '}
+          {status.waOrdering ? t('aiAutopilotChip.on') : t('aiAutopilotChip.off')}
         </span>
       )}
     </div>
@@ -107,6 +113,7 @@ function WhatsAppStatusInline({ storeId }: { storeId: string }) {
  * — it piggybacks on the same /api/v1/stores/:id endpoint that useBranding uses.
  */
 function AiAutopilotChip({ storeId }: { storeId: string }) {
+  const t = useT('settings');
   const [autopilot, setAutopilot] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -134,10 +141,8 @@ function AiAutopilotChip({ storeId }: { storeId: string }) {
             : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
         }`}
       >
-        ✨ AI Autopilot: <strong>{autopilot ? 'ON' : 'OFF'}</strong>
-        <span className="sr-only" dir="rtl">
-          {autopilot ? 'الطيار الذكي: تشغيل' : 'الطيار الذكي: إيقاف'}
-        </span>
+        ✨ {t('aiAutopilotChip.label')}{' '}
+        <strong>{autopilot ? t('aiAutopilotChip.on') : t('aiAutopilotChip.off')}</strong>
       </span>
     </div>
   );
@@ -168,6 +173,7 @@ export default function StoreSettingsPage() {
   const isSuperAdmin = user?.role === 'super_admin';
   const t = useT('settings');
   const tCards = useT('settings.cards');
+  const tCommon = useT('common');
   const { success: toastSuccess, error: toastError } = useToast();
 
   // Store info (plan + status) — needed for super_admin danger zone
@@ -528,11 +534,11 @@ export default function StoreSettingsPage() {
           {/* Plan row */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-card p-5">
             <div>
-              <p className="text-sm font-medium text-foreground">Store Plan</p>
+              <p className="text-sm font-medium text-foreground">{t('superAdmin.planLabel')}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {storeInfo
                   ? `${PLAN_LABELS[storeInfo.plan]?.en ?? storeInfo.plan} — ${PLAN_LABELS[storeInfo.plan]?.ar ?? ''}`
-                  : 'Loading…'}
+                  : t('superAdmin.loadingPlan')}
               </p>
             </div>
             {storeInfo && (
@@ -551,7 +557,7 @@ export default function StoreSettingsPage() {
                     }
                   }}
                 >
-                  <option value="">Change plan…</option>
+                  <option value="">{t('superAdmin.changePlanPlaceholder')}</option>
                   {STORE_PLANS.filter(p => p !== storeInfo.plan).map(p => (
                     <option key={p} value={p}>
                       {PLAN_LABELS[p].en} — {PLAN_LABELS[p].ar}
@@ -564,22 +570,21 @@ export default function StoreSettingsPage() {
 
           {/* Danger Zone */}
           <div>
-            <h2 className="mb-3 font-semibold text-destructive">Danger Zone</h2>
+            <h2 className="mb-3 font-semibold text-destructive">
+              {t('superAdmin.dangerZoneTitle')}
+            </h2>
             <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-foreground">
-                    {storeInfo?.status === 'suspended' ? 'Reactivate Store' : 'Suspend Store'}
+                    {storeInfo?.status === 'suspended'
+                      ? t('superAdmin.reactivateTitle')
+                      : t('superAdmin.suspendTitle')}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {storeInfo?.status === 'suspended'
-                      ? 'Allow customers to access and purchase from this store again.'
-                      : 'Block customer access without deleting any data.'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5" dir="rtl">
-                    {storeInfo?.status === 'suspended'
-                      ? 'السماح للعملاء بالوصول إلى المتجر والشراء منه مجدداً.'
-                      : 'منع وصول العملاء إلى المتجر دون حذف أي بيانات.'}
+                      ? t('superAdmin.reactivateDesc')
+                      : t('superAdmin.suspendDesc')}
                   </p>
                 </div>
                 <div className="shrink-0">
@@ -588,7 +593,9 @@ export default function StoreSettingsPage() {
                     onClick={() => setSuspendModalOpen(true)}
                     disabled={statusChanging || !storeInfo}
                   >
-                    {storeInfo?.status === 'suspended' ? 'Reactivate Store' : 'Suspend Store'}
+                    {storeInfo?.status === 'suspended'
+                      ? t('superAdmin.reactivateTitle')
+                      : t('superAdmin.suspendTitle')}
                   </Button>
                 </div>
               </div>
@@ -606,16 +613,13 @@ export default function StoreSettingsPage() {
           setPlanModalOpen(false);
           setPendingPlan(null);
         }}
-        title="Change Plan"
+        title={t('superAdmin.changePlanModalTitle')}
         size="sm"
       >
         <p className="text-sm text-muted-foreground">
-          Changing plan to <strong>{pendingPlan ? PLAN_LABELS[pendingPlan].en : ''}</strong>.
-          Feature overrides will be preserved. Continue?
-        </p>
-        <p className="text-sm text-muted-foreground mt-1" dir="rtl">
-          تغيير الخطة إلى <strong>{pendingPlan ? PLAN_LABELS[pendingPlan].ar : ''}</strong>. ستُحفظ
-          الإعدادات المخصصة. المتابعة؟
+          {t('superAdmin.changePlanModalBody', {
+            plan: pendingPlan ? PLAN_LABELS[pendingPlan].en : '',
+          })}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button
@@ -626,7 +630,7 @@ export default function StoreSettingsPage() {
             }}
             disabled={planChanging}
           >
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             variant="default"
@@ -634,7 +638,7 @@ export default function StoreSettingsPage() {
             disabled={planChanging}
             isLoading={planChanging}
           >
-            Confirm
+            {tCommon('confirm')}
           </Button>
         </div>
       </Modal>
@@ -643,13 +647,17 @@ export default function StoreSettingsPage() {
       <Modal
         isOpen={suspendModalOpen}
         onClose={() => setSuspendModalOpen(false)}
-        title={storeInfo?.status === 'suspended' ? 'Reactivate Store' : 'Suspend Store'}
+        title={
+          storeInfo?.status === 'suspended'
+            ? t('superAdmin.reactivateTitle')
+            : t('superAdmin.suspendTitle')
+        }
         size="sm"
       >
         <p className="text-sm text-muted-foreground">
           {storeInfo?.status === 'suspended'
-            ? `Reactivate ${storeInfo?.name ?? 'this store'}? Customers will regain access immediately.`
-            : `Suspend ${storeInfo?.name ?? 'this store'}? Customers will not be able to access or purchase from the store.`}
+            ? t('superAdmin.reactivateModalBody', { name: storeInfo?.name ?? 'this store' })
+            : t('superAdmin.suspendModalBody', { name: storeInfo?.name ?? 'this store' })}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button
@@ -657,7 +665,7 @@ export default function StoreSettingsPage() {
             onClick={() => setSuspendModalOpen(false)}
             disabled={statusChanging}
           >
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             variant={storeInfo?.status === 'suspended' ? 'default' : 'destructive'}
@@ -665,7 +673,9 @@ export default function StoreSettingsPage() {
             disabled={statusChanging}
             isLoading={statusChanging}
           >
-            {storeInfo?.status === 'suspended' ? 'Reactivate' : 'Suspend'}
+            {storeInfo?.status === 'suspended'
+              ? t('superAdmin.reactivateButton')
+              : t('superAdmin.suspendButton')}
           </Button>
         </div>
       </Modal>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { apiPost } from '../lib/api';
+import { useT } from '@/i18n/useT';
 
 /**
  * Auto-fetches AI category suggestions when the product name +
@@ -44,6 +45,7 @@ export function AICategorySuggestions({
   hasSelection,
   onSelect,
 }: AICategorySuggestionsProps) {
+  const t = useT('components.aiCategorySuggestions');
   const [suggestions, setSuggestions] = useState<CategorySuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,13 +82,13 @@ export function AICategorySuggestions({
           description: desc,
         });
         if (apiError || !data) {
-          setError(apiError?.message ?? 'AI suggestion failed');
+          setError(apiError?.message ?? t('error', { error: 'failed' }));
           setSuggestions([]);
         } else {
           setSuggestions(data.suggestions ?? []);
         }
       } catch {
-        setError('Network error');
+        setError(t('error', { error: 'network' }));
         setSuggestions([]);
       } finally {
         setLoading(false);
@@ -96,25 +98,25 @@ export function AICategorySuggestions({
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [storeId, productName, productDescription, hasSelection]);
+  }, [storeId, productName, productDescription, hasSelection, t]);
 
   if (hasSelection) return null;
   if (loading) {
     return (
       <p className="mt-2 text-xs text-muted-foreground">
-        <span aria-hidden>✨</span> AI is suggesting categories…
+        <span aria-hidden>✨</span> {t('loading')}
       </p>
     );
   }
   if (error) {
-    return <p className="mt-2 text-xs text-destructive">AI suggestion: {error}</p>;
+    return <p className="mt-2 text-xs text-destructive">{error}</p>;
   }
   if (suggestions.length === 0) return null;
 
   return (
     <div className="mt-2">
       <p className="mb-1.5 text-xs text-muted-foreground">
-        <span aria-hidden>✨</span> AI suggests:
+        <span aria-hidden>✨</span> {t('suggests')}
       </p>
       <div className="flex flex-wrap gap-1.5">
         {suggestions.map(s => (
@@ -123,11 +125,13 @@ export function AICategorySuggestions({
             type="button"
             onClick={() => onSelect(s.id)}
             className="inline-flex items-center gap-1.5 rounded-full border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-3 py-1 text-xs font-medium text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10"
-            title={`Confidence: ${s.confidence}`}
+            title={t('confidence', { level: s.confidence })}
           >
             <span>{s.name}</span>
             {s.confidence === 'high' && (
-              <span className="text-[10px] uppercase tracking-wide opacity-60">·high</span>
+              <span className="text-[10px] uppercase tracking-wide opacity-60">
+                {t('confidenceHigh')}
+              </span>
             )}
           </button>
         ))}

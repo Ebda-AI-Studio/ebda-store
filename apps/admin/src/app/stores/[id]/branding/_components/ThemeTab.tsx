@@ -328,7 +328,7 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
           folder="logos"
           storeId={storeId}
           accept="image/*"
-          label="Upload footer logo"
+          label={t('footerLogoLabel')}
         />
         <label className="flex cursor-pointer items-center gap-2">
           <input

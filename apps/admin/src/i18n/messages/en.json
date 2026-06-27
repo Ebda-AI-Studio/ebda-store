@@ -1404,6 +1404,33 @@
       "provisionButton": "Provision automatically",
       "provisioningButton": "Provisioning…"
     },
+    "superAdmin": {
+      "planLabel": "Store Plan",
+      "loadingPlan": "Loading…",
+      "changePlanPlaceholder": "Change plan…",
+      "dangerZoneTitle": "Danger Zone",
+      "reactivateTitle": "Reactivate Store",
+      "suspendTitle": "Suspend Store",
+      "reactivateDesc": "Allow customers to access and purchase from this store again.",
+      "suspendDesc": "Block customer access without deleting any data.",
+      "reactivateModalBody": "Reactivate {name}? Customers will regain access immediately.",
+      "suspendModalBody": "Suspend {name}? Customers will not be able to access or purchase from the store.",
+      "reactivateButton": "Reactivate",
+      "suspendButton": "Suspend",
+      "changePlanModalTitle": "Change Plan",
+      "changePlanModalBody": "Changing plan to {plan}. Feature overrides will be preserved. Continue?"
+    },
+    "whatsappStatus": {
+      "connected": "Connected",
+      "savedNotVerified": "Saved · not verified",
+      "notConnected": "Not connected",
+      "dmOrdering": "DM ordering:"
+    },
+    "aiAutopilotChip": {
+      "label": "AI Autopilot:",
+      "on": "ON",
+      "off": "OFF"
+    },
     "settingsSearch": {
       "placeholder": "Search settings...",
       "noResults": "No settings found"
@@ -1457,6 +1484,7 @@
     },
     "theme": {
       "borderRadius": "Border Radius",
+      "footerLogoLabel": "Upload footer logo",
       "hex": "HEX",
       "presets": {
         "orange": "Orange",
@@ -1623,6 +1651,65 @@
         "moveDown": "Move down",
         "empty": "Add at least one social link URL above to reorder icons."
       }
+    },
+    "locations": {
+      "enableTitle": "Enable Locations",
+      "enableDescription": "Show the Locations page on your storefront. Customers can find your branches.",
+      "disabledTitle": "Locations are currently disabled",
+      "disabledDescription": "Locations you add here are saved but won't be visible on the storefront until you enable the toggle above.",
+      "navHint": "Add the Locations link to your storefront via Page Builder → header navigation, footer links, or top utility bar.",
+      "count": "{count, plural, =0 {No locations} one {# location} other {# locations}}",
+      "addButton": "+ Add location",
+      "formNewTitle": "New Location",
+      "formEditTitle": "Edit Location",
+      "fieldName": "Name",
+      "fieldNameAr": "Name (Arabic)",
+      "fieldCountry": "Country",
+      "fieldCountryAr": "Country (Arabic)",
+      "fieldAddress": "Address",
+      "fieldAddressAr": "Address (Arabic)",
+      "fieldPhone": "Phone",
+      "fieldWhatsapp": "WhatsApp",
+      "fieldHours": "Hours",
+      "fieldHoursAr": "Hours (Arabic)",
+      "fieldMapsUrl": "Maps Link URL",
+      "fieldMapsEmbedUrl": "Maps Embed URL",
+      "fieldPosition": "Position",
+      "fieldPublished": "Published (visible on storefront)",
+      "phName": "e.g. Main Branch",
+      "phNameAr": "e.g. Main Branch",
+      "phCountry": "e.g. Kuwait",
+      "phCountryAr": "e.g. Kuwait",
+      "phAddress": "e.g. Block 5, Salem Al Mubarak St, Salmiya",
+      "phAddressAr": "e.g. Block 5, Salem Al Mubarak St, Salmiya",
+      "phPhone": "e.g. +965 2222 2222",
+      "phWhatsapp": "e.g. +96599999999",
+      "phHours": "e.g. Sat–Thu 9am–10pm",
+      "phHoursAr": "e.g. Sat–Thu 9am–10pm",
+      "phMapsUrl": "https://maps.google.com/...",
+      "phMapsEmbedUrl": "https://www.google.com/maps/embed?pb=...",
+      "saving": "Saving…",
+      "create": "Create",
+      "save": "Save",
+      "cancel": "Cancel",
+      "colName": "Name",
+      "colCountry": "Country",
+      "colAddress": "Address",
+      "colStatus": "Status",
+      "colPos": "Pos",
+      "colActions": "Actions",
+      "statusPublished": "Published",
+      "statusDraft": "Draft",
+      "deleteConfirm": "Delete?",
+      "deleteYes": "Yes, delete",
+      "edit": "Edit",
+      "delete": "Delete",
+      "emptyTitle": "No locations yet",
+      "emptyDescription": "Add your store branches so customers can find you.",
+      "emptyCta": "Add your first location →",
+      "errCreate": "Failed to create location",
+      "errUpdate": "Failed to update location",
+      "errDelete": "Delete failed"
     }
   },
   "coupons": {
@@ -3477,6 +3564,15 @@
       "successMessage": "SEO settings saved successfully",
       "failedMessage": "Failed to save SEO settings",
       "connectionError": "Unable to connect to the server",
+      "aiGenerateTooltip": "Generate SEO with AI — only fills empty fields",
+      "aeoTitle": "Answer Engine Optimization",
+      "aeoHint": "Conversational copy for AI answer engines (Perplexity, Google AI Overview, Bing Copilot). Auto-filled by the AEO sweep; you can edit per-entity.",
+      "aeoLabelEn": "AEO meta description (EN)",
+      "aeoPlaceholderEn": "Conversational answer-engine copy. e.g. «Wady Aljuz is a Kuwait-based online grocery store specializing in…»",
+      "aeoHintText": "Direct-answer style, 130–160 chars. Leave blank to let the AEO sweep fill it.",
+      "aeoLabelAr": "AEO meta description (AR)",
+      "aeoPlaceholderAr": "نسخة عربية لمحركات الإجابة — مثال: «وادي الجوز متجر إلكتروني كويتي متخصص في…»",
+      "senderPrefixPlaceholder": "noreply",
       "senderPrefix": "Email sender prefix",
       "senderPrefixHint": "The part before the @ on outgoing emails. Default: noreply. Examples: hello, orders, support. Letters/digits/dot/hyphen/underscore only.",
       "faqsTitle": "Frequently Asked Questions",
@@ -4056,6 +4152,38 @@
     },
     "brand": {
       "forceMediaAlt": "Force AI"
+    },
+    "aiUsageSummaryCard": {
+      "loading": "Loading AI quota…",
+      "loadError": "Failed to load AI quota",
+      "header": "AI Quota",
+      "viewLog": "View detailed log →",
+      "quotaBarDaily": "Daily",
+      "quotaBarMonthly": "Monthly",
+      "remainingToday": "Remaining today",
+      "standaloneHeader": "Quota Usage",
+      "statToday": "Today",
+      "statThisMonth": "This month",
+      "statDailyCap": "Daily cap",
+      "statRemaining": "Remaining",
+      "last30Days": "Last 30 days",
+      "sparklineAriaLabel": "Last 30 days AI usage sparkline"
+    },
+    "aiCategorySuggestions": {
+      "loading": "AI is suggesting categories…",
+      "error": "AI suggestion: {error}",
+      "suggests": "AI suggests:",
+      "confidence": "Confidence: {level}",
+      "confidenceHigh": "·high"
+    },
+    "aiTranslateButton": {
+      "translating": "Translating {done}/{total}…",
+      "nothing": "Nothing to translate",
+      "translate": "Translate {count, plural, one {# missing field} other {# missing fields}}",
+      "summaryFilled": "Filled {count}. ",
+      "summarySkippedBoth": "Skipped {count} already-translated. ",
+      "summarySkippedEmpty": "Skipped {count} empty. ",
+      "summaryFailed": "Failed {count}. "
     }
   },
   "finance": {
@@ -5030,6 +5158,75 @@
       "dateTo": "To",
       "dateApply": "Apply",
       "guest": "Guest"
+    }
+  },
+  "whatsappIntegration": {
+    "page": {
+      "title": "WhatsApp Integration",
+      "subtitle": "Force AI WhatsApp Business Platform · templates · order updates · payment links",
+      "navAriaLabel": "WhatsApp settings"
+    },
+    "tabs": {
+      "connection": "Connection",
+      "botConfig": "Bot Config",
+      "templates": "Templates",
+      "orderUpdates": "Order Updates",
+      "paymentLink": "Payment Link",
+      "botCopy": "Bot Copy",
+      "botAnalytics": "Bot Analytics"
+    }
+  },
+  "staff": {
+    "page": {
+      "title": "Staff Members",
+      "subtitle": "Manage who has access to this store. Staff can manage orders, products, and inventory.",
+      "addButton": "Add Staff Member"
+    },
+    "table": {
+      "ariaLabel": "Staff members",
+      "colMember": "Member",
+      "colStatus": "Status",
+      "colAdded": "Added",
+      "colLastLogin": "Last login",
+      "colActions": "Actions"
+    },
+    "empty": {
+      "title": "No staff members yet.",
+      "description": "Add team members so they can manage orders and products."
+    },
+    "errors": {
+      "loadFailed": "Failed to load staff.",
+      "networkError": "Network error. Please try again."
+    },
+    "toasts": {
+      "addedTitle": "Staff member added",
+      "addedDesc": "{name} can now log in.",
+      "removeFailedTitle": "Failed to remove staff member",
+      "errorTitle": "Error",
+      "removedTitle": "Staff member removed",
+      "removedDesc": "{name} no longer has access.",
+      "addFailedDefault": "Failed to add staff member."
+    },
+    "formatDate": {
+      "never": "Never"
+    },
+    "addModal": {
+      "title": "Add Staff Member",
+      "description": "Staff members can manage orders, products, and inventory but cannot change store settings, payment configuration, or financial records.",
+      "emailLabel": "Email",
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name",
+      "passwordLabel": "Initial password",
+      "passwordHint": "Share this with the staff member. They can change it after first login.",
+      "cancelButton": "Cancel",
+      "addingButton": "Adding…",
+      "submitButton": "Add Staff Member"
+    },
+    "removeModal": {
+      "title": "Remove Staff Member",
+      "cancelButton": "Cancel",
+      "removingButton": "Removing…",
+      "removeButton": "Remove"
     }
   }
 }
