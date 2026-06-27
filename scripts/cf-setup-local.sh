@@ -52,11 +52,58 @@ for app in "${APPS[@]}"; do
     orders) ROUTES_JSON=$'  "routes": [\n    { "pattern": "orders.force-ai.co", "custom_domain": true },\n    { "pattern": "orders.force-ai.co/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
     *)      ROUTES_JSON='' ;;
   esac
-  cat > "$dir/open-next.config.ts" <<'EOF'
+  # OpenNext cache config (2026-06-27). DEFAULT = empty config = current
+  # behaviour, ZERO risk. When OPENNEXT_CACHE=true (a repo variable threaded by
+  # cf-deploy.yml) AND this is the storefront (web), emit the R2 incremental
+  # cache + sharded-Durable-Object tag cache + DO queue so revalidateTag works
+  # ACROSS isolates — a merchant theme/brand-color save then applies in ~1s
+  # instead of up to ~15s (each isolate's memory cache was independent).
+  #
+  # PRE-REQS before enabling: the R2 bucket `force-web-opennext-cache` must exist
+  # (cf-deploy.yml creates it idempotently), and the change MUST be verified on a
+  # CF PREVIEW deploy first — the DO binding class names below are the documented
+  # OpenNext names and must match `.open-next/worker.js`'s exports for that
+  # version. Import paths + default-export shapes verified against
+  # @opennextjs/cloudflare@1.19.11. See docs/migration/cf-opennext-hardening-plan.md.
+  if [ "${OPENNEXT_CACHE:-}" = "true" ] && [ "$app" = "web" ]; then
+    cat > "$dir/open-next.config.ts" <<'EOF'
+import { defineCloudflareConfig } from '@opennextjs/cloudflare';
+import r2IncrementalCache from '@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache';
+import doShardedTagCache from '@opennextjs/cloudflare/overrides/tag-cache/do-sharded-tag-cache';
+import doQueue from '@opennextjs/cloudflare/overrides/queue/do-queue';
+import queueCache from '@opennextjs/cloudflare/overrides/queue/queue-cache';
+
+// All four are DEFAULT exports in @opennextjs/cloudflare@1.19.11 (verified).
+export default defineCloudflareConfig({
+  incrementalCache: r2IncrementalCache,
+  tagCache: doShardedTagCache({ baseShardSize: 12, regionalCache: true }),
+  queue: queueCache(doQueue),
+  enableCacheInterception: true,
+});
+EOF
+    cat > "$dir/wrangler.jsonc" <<EOF
+{
+  "name": "force-$app-cf-preview",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "force-$app-cf-preview" }],
+  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "force-web-opennext-cache" }],
+  "durable_objects": { "bindings": [
+    { "name": "NEXT_TAG_CACHE_DO_SHARDED", "class_name": "DOShardedTagCache" },
+    { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DurableObjectQueueHandler" }
+  ] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DOShardedTagCache", "DurableObjectQueueHandler"] }],
+${ROUTES_JSON}  "observability": { "enabled": true }
+}
+EOF
+  else
+    cat > "$dir/open-next.config.ts" <<'EOF'
 import { defineCloudflareConfig } from '@opennextjs/cloudflare';
 export default defineCloudflareConfig({});
 EOF
-  cat > "$dir/wrangler.jsonc" <<EOF
+    cat > "$dir/wrangler.jsonc" <<EOF
 {
   "name": "force-$app-cf-preview",
   "main": ".open-next/worker.js",
@@ -66,6 +113,7 @@ EOF
 ${ROUTES_JSON}  "observability": { "enabled": true }
 }
 EOF
+  fi
   echo "✓ wrote apps/$app/{open-next.config.ts,wrangler.jsonc}"
 done
 

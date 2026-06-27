@@ -123,6 +123,13 @@ jobs:
       - name: Build workspace packages (database → shared → ui)
         run: npm run build -w @force/database -w @force/shared -w @force/ui
       - name: Setup Cloudflare build tooling (web)
+        env:
+          # Unset (default) → empty OpenNext config = current behaviour.
+          # Set repo variable OPENNEXT_CACHE=true to emit the R2 + sharded-DO
+          # revalidateTag cache (theme saves apply in ~1s instead of ~15s).
+          # Verify on a preview deploy before enabling — see
+          # docs/migration/cf-opennext-hardening-plan.md.
+          OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
         run: bash scripts/cf-setup-local.sh web
       - name: Write storefront public env (.env.production.local)
         # NEXT_PUBLIC_* are BUILD-TIME inlined; public values → repo variables,
@@ -150,6 +157,12 @@ jobs:
           echo "wrote apps/web/.env.production.local"
       - name: Build for Cloudflare (OpenNext)
         run: bash scripts/cf-build.sh web
+      - name: Ensure R2 cache bucket
+        # Only when the OpenNext cache is enabled. Idempotent — ignores the
+        # "already exists" error so reruns are safe.
+        if: vars.OPENNEXT_CACHE == 'true'
+        working-directory: apps/web
+        run: npx wrangler r2 bucket create force-web-opennext-cache || true
       - name: Deploy worker
         working-directory: apps/web
         run: npx wrangler deploy
