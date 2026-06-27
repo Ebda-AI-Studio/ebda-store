@@ -1403,6 +1403,10 @@
       "provisionDescription": "Creates a new Commerce Catalog under the Force AI parent Business Manager and fills in the three fields above. Saves the merchant from navigating Meta Business Manager. You still need to submit the catalog for Meta review afterwards.",
       "provisionButton": "Provision automatically",
       "provisioningButton": "Provisioning…"
+    },
+    "settingsSearch": {
+      "placeholder": "Search settings...",
+      "noResults": "No settings found"
     }
   },
   "branding": {

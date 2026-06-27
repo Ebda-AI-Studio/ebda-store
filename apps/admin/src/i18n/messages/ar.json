@@ -1403,6 +1403,10 @@
       "provisionDescription": "ينشئ كتالوج تجاري جديد ضمن حساب Business Manager الرئيسي لـ Force AI ويملأ الحقول الثلاثة أعلاه. يغني المتجر عن التنقل داخل Meta Business Manager. ستحتاج لاحقًا إلى تقديم الكتالوج لمراجعة ميتا.",
       "provisionButton": "إعداد تلقائي",
       "provisioningButton": "جارٍ الإعداد…"
+    },
+    "settingsSearch": {
+      "placeholder": "ابحث في الإعدادات...",
+      "noResults": "لا توجد إعدادات"
     }
   },
   "branding": {
