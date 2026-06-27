@@ -156,7 +156,7 @@ export default function ModernFooter({
                   >
                     <SocialGlyph
                       entry={s}
-                      className="w-6 h-6"
+                      className="w-7 h-7"
                       originalColors={theme?.footerSocialOriginalColor === true}
                     />
                   </a>
