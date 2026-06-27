@@ -8,7 +8,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
  * "Powered by Force AI" -> "مدعوم من Force AI" (added to LanguageContext
  * 2026-05-16).
  *
- * Now an anchor linking to the Force Media marketing site. `rel="noopener
+ * Now an anchor linking to the Force AI website. `rel="noopener
  * noreferrer"` because external + visited by anonymous customers; `target=
  * "_blank"` so it doesn't unload the merchant's storefront when clicked.
  *
@@ -29,7 +29,7 @@ export function PoweredByForce() {
       className={`mt-3 border-t border-border/40 pt-3 text-sm sm:text-base tracking-wide text-muted-foreground/70 ${align}`}
     >
       <a
-        href="https://store.forcemediakw.com"
+        href="https://force-ai.co"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Powered by Force AI"

@@ -16,12 +16,11 @@ import { useState, useEffect } from 'react';
  *
  * Self-contained chrome (header + footer) so it doesn't pick up the
  * merchant template's storefront UI when a real store can't be
- * resolved. Force Media palette + Poppins/Tajawal typography mirrors
- * the parent marketing site at forcemediakw.com.
+ * resolved. Force AI palette + Poppins/Tajawal typography mirrors
+ * the Force AI brand identity at force-ai.co.
  */
 
 const ORANGE = '#fc6b02';
-const ORANGE_DARK = '#3D1F1F';
 
 type Lang = 'en' | 'ar';
 
@@ -96,16 +95,6 @@ const COPY = {
     ar: 'معظم المنصات تعطيك لوحة تحكم وتختفي. نحن نُجهّز كل شيء معك.',
   },
 
-  marketingCalloutTitle: {
-    en: 'Need marketing too?',
-    ar: 'تبحث عن التسويق أيضاً؟',
-  },
-  marketingCalloutBody: {
-    en: 'Force Media is our parent brand running full-service marketing across Kuwait, Saudi Arabia, and Qatar — strategy, content, paid ads, social, and influencer campaigns. 250+ companies trust them with their growth.',
-    ar: 'فورس ميديا هي شركتنا الأم التي تقدم خدمات التسويق المتكاملة في الكويت والسعودية وقطر — استراتيجية، محتوى، إعلانات ممولة، تواصل اجتماعي، وحملات المؤثرين. أكثر من 250 شركة تثق بها في نموها.',
-  },
-  marketingCalloutCta: { en: 'Visit Force Media →', ar: 'زيارة فورس ميديا ←' },
-
   wbsCalloutTitle: {
     en: 'Already have a list of customers?',
     ar: 'لديك قائمة عملاء جاهزة؟',
@@ -129,8 +118,8 @@ const COPY = {
     ar: 'Force AI Store و Force AI WhatsApp Business Platform · من إنتاج Force AI في الكويت.',
   },
   footerCopyright: {
-    en: '© 2026 Force Media Kuwait. All rights reserved.',
-    ar: '© 2026 فورس ميديا الكويت. جميع الحقوق محفوظة.',
+    en: '© 2026 Force AI. All rights reserved.',
+    ar: '© 2026 Force AI. جميع الحقوق محفوظة.',
   },
 };
 
@@ -353,8 +342,8 @@ const STEPS: Array<{
 
 const WHATSAPP_URL = 'https://wa.me/96566740311';
 const PHONE = '+965 66740311';
-const EMAIL = 'info@forcemediakw.com';
-const FORCE_MEDIA_URL = 'https://forcemediakw.com';
+const EMAIL = 'info@force-ai.co';
+const FORCE_AI_URL = 'https://force-ai.co';
 
 interface PlatformLandingProps {
   /**
@@ -657,30 +646,6 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
         </div>
       </section>
 
-      {/* Marketing callout — parent brand cross-sell */}
-      <section className="pb-20">
-        <div className="mx-auto max-w-4xl px-4">
-          <div
-            className="overflow-hidden rounded-2xl p-8 text-white shadow-xl md:p-12"
-            style={{
-              background: `linear-gradient(135deg, ${ORANGE_DARK}, ${ORANGE})`,
-            }}
-          >
-            <h2 className="mb-3 text-2xl font-bold md:text-3xl">{t(COPY.marketingCalloutTitle)}</h2>
-            <p className="mb-6 text-base opacity-95 md:text-lg">{t(COPY.marketingCalloutBody)}</p>
-            <a
-              href={FORCE_MEDIA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
-              style={{ color: ORANGE }}
-            >
-              {t(COPY.marketingCalloutCta)}
-            </a>
-          </div>
-        </div>
-      </section>
-
       {/* Contact */}
       <section id="contact" className="bg-gray-50 py-20">
         <div className="mx-auto max-w-4xl px-4">
@@ -750,12 +715,12 @@ export function PlatformLanding({ notFoundBanner = false }: PlatformLandingProps
           </div>
           <div className="flex items-center gap-4">
             <a
-              href={FORCE_MEDIA_URL}
+              href={FORCE_AI_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-gray-700"
             >
-              forcemediakw.com
+              force-ai.co
             </a>
             <span className="text-xs">{t(COPY.footerCopyright)}</span>
           </div>

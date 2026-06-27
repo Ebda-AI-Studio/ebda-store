@@ -162,7 +162,7 @@ function buildPlatformBody(stores: PublicStore[]): string {
 
   return `# Force AI Store — Multi-tenant Storefront Platform
 
-> Force AI Store is the per-merchant e-commerce platform run by Force Media Kuwait.
+> Force AI Store is the per-merchant e-commerce platform by Force AI.
 > Each merchant gets a path-based storefront at \`store.force-ai.co/<slug>\`
 > with their own products, branding, and contact info. Customers in Kuwait,
 > Saudi Arabia, and Qatar can browse + buy across multiple merchants from one
@@ -253,7 +253,7 @@ ${prodLines || '_No active products._'}
 ## Platform
 
 This store is hosted on Force AI Store, a multi-tenant e-commerce platform by
-Force Media Kuwait. See https://store.force-ai.co/llms.txt for the
+Force AI. See https://store.force-ai.co/llms.txt for the
 platform-wide index.
 `;
 }

@@ -304,8 +304,8 @@ export function FlickeringFooter() {
       title: t('Get in touch', 'تواصل معنا'),
       links: [
         { label: t('WhatsApp', 'واتساب'), href: 'https://wa.me/96566740311' },
-        { label: t('Email', 'البريد'), href: 'mailto:info@forcemediakw.com' },
-        { label: t('Force Media', 'فورس ميديا'), href: 'https://forcemediakw.com' },
+        { label: t('Email', 'البريد'), href: 'mailto:info@force-ai.co' },
+        { label: t('Force AI', 'فورس إيه آي'), href: 'https://force-ai.co' },
       ],
     },
   ];
@@ -338,11 +338,8 @@ export function FlickeringFooter() {
               >
                 WhatsApp · +965 6674 0311
               </a>
-              <a
-                href="mailto:info@forcemediakw.com"
-                className="hover:text-primary transition-colors"
-              >
-                info@forcemediakw.com
+              <a href="mailto:info@force-ai.co" className="hover:text-primary transition-colors">
+                info@force-ai.co
               </a>
             </div>
           </div>

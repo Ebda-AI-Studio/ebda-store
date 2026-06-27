@@ -2,7 +2,7 @@
 
 /**
  * Persistent bottom-right WhatsApp CTA — the always-visible "escape hatch"
- * conversion button (cohesion lesson from the Force Media reference landing).
+ * conversion button (cohesion lesson from the Force AI reference landing).
  */
 export function FloatingWhatsApp() {
   return (

@@ -85,7 +85,7 @@ export default function CtaSection() {
           >
             {t('Talk on WhatsApp', 'تواصل عبر واتساب')}
           </LiquidLink>
-          <LiquidLink href="mailto:info@forcemediakw.com" size="xl" className="text-white">
+          <LiquidLink href="mailto:info@force-ai.co" size="xl" className="text-white">
             {t('Email us', 'راسلنا')}
           </LiquidLink>
         </div>

@@ -63,7 +63,7 @@ export function HeroSection() {
 
             {/* Secondary CTA — Email */}
             <a
-              href="mailto:info@forcemediakw.com"
+              href="mailto:info@force-ai.co"
               className={cn(liquidbuttonVariants({ size: 'lg' }))}
               style={GLASS_STYLE}
             >

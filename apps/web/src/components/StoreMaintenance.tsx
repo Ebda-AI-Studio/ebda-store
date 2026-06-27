@@ -7,7 +7,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 /**
  * Branded "we'll be back soon" page rendered when the resolved store has
  * `status === 'suspended'`. Replaces the normal storefront chrome on every
- * route so the customer feels like the merchant — not Force Media — is in
+ * route so the customer feels like the merchant — not Force AI — is in
  * maintenance.
  *
  * Wired in via `StoreMaintenanceGate` (used in `app/layout.tsx`) so every
