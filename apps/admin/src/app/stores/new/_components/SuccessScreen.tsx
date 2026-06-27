@@ -132,7 +132,7 @@ export function SuccessScreen({ store, owner }: SuccessScreenProps) {
                       <tr>
                         <td className="px-3 py-2 font-mono text-xs">CNAME</td>
                         <td className="px-3 py-2 font-mono text-xs">{store.domain}</td>
-                        <td className="px-3 py-2 font-mono text-xs">cname.vercel-dns.com</td>
+                        <td className="px-3 py-2 font-mono text-xs">cf.force-ai.co</td>
                       </tr>
                     )}
                   </tbody>
