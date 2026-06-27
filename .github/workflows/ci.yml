@@ -16,15 +16,12 @@ on:
       - '.editorconfig'
   pull_request:
     # main-only (2026-06-13): staging/develop retired (see push trigger above).
+    # NO paths-ignore here (2026-06-27): with it, a docs-only PR skipped the
+    # WHOLE workflow, so the REQUIRED checks (Lint / Type Check / Security Audit)
+    # never reported and branch protection blocked the PR forever. The workflow
+    # now always runs; the heavy build + test jobs are gated on the `changes`
+    # job below, so a docs-only PR runs only the 3 fast required jobs.
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - '.gitleaksignore'
-      - '.gitleaks.toml'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.vscode/**'
-      - '.editorconfig'
   workflow_dispatch:
     inputs:
       force_cloud:
@@ -49,6 +46,37 @@ permissions:
   contents: read
 
 jobs:
+  # Detects whether a PR touches any non-docs file. The heavy build + test jobs
+  # gate on this (so docs-only PRs stay cheap), while the REQUIRED jobs
+  # (Lint / Type Check / Security Audit — no `needs`) still run + report on
+  # every PR so branch protection is always satisfied. (2026-06-27)
+  changes:
+    name: Detect code changes
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: filter
+        name: Detect non-docs changes
+        env:
+          # GitHub-controlled SHA (not user text); bound via env per workflow-injection hygiene.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Push events have no PR base → run the full pipeline.
+          if [ -z "$BASE_SHA" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE_SHA" HEAD \
+              | grep -qvE '^(docs/|.*\.md$|\.gitleaksignore$|\.gitleaks\.toml$|\.github/ISSUE_TEMPLATE/|\.vscode/|\.editorconfig$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   lint:
     name: Lint
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
@@ -62,10 +90,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
-          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
-          # cancels the job ("The operation was canceled"), failing CI on a
-          # green lint/build. The runner already has a warm local npm cache.
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -87,10 +112,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
-          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
-          # cancels the job ("The operation was canceled"), failing CI on a
-          # green lint/build. The runner already has a warm local npm cache.
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -118,11 +140,14 @@ jobs:
 
   build:
     name: Build
+    # Skip on docs-only PRs (the required Lint/Type Check/Security Audit still
+    # run). On push events `changes.code` is 'true', so build always runs there.
+    if: needs.changes.outputs.code == 'true'
     # build runs on self-hosted by default; force_cloud overrides to ubuntu-latest.
     # inputs.force_cloud is falsy (not set) for push/pull_request triggers — safe.
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 15
-    needs: [lint, typecheck]
+    needs: [lint, typecheck, changes]
     steps:
       - uses: actions/checkout@v4
 
@@ -130,10 +155,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
-          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
-          # cancels the job ("The operation was canceled"), failing CI on a
-          # green lint/build. The runner already has a warm local npm cache.
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -161,10 +183,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
-          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
-          # cancels the job ("The operation was canceled"), failing CI on a
-          # green lint/build. The runner already has a warm local npm cache.
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -228,10 +247,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
-          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
-          # cancels the job ("The operation was canceled"), failing CI on a
-          # green lint/build. The runner already has a warm local npm cache.
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -366,10 +382,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # NO `cache: 'npm'` — on the self-hosted runner the post-job cache
-          # upload (~700MB @ ~1MB/s) overruns the job timeout and the runner
-          # cancels the job ("The operation was canceled"), failing CI on a
-          # green lint/build. The runner already has a warm local npm cache.
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -422,12 +435,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # NO `cache: 'npm'` here. On the self-hosted runner the post-job npm
-          # cache SAVE uploads ~600 MB to GitHub's cache backend at a few MB/s,
-          # which repeatedly blew this job's 5-min timeout AFTER all real checks
-          # passed ("Post Setup Node.js" cancelled). The cache is redundant on
-          # self-hosted anyway — the machine's local ~/.npm already speeds
-          # `npm ci`. Dropping it makes the audit job finish well under timeout.
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -445,38 +453,11 @@ jobs:
         # Re-evaluate when @lhci/cli ships a refresh.
         run: |
           set -e
-          # `npm audit` calls the registry advisory API, which intermittently
-          # returns "audit endpoint returned an error" (a transient 5xx /
-          # rate-limit), failing the job with no real vulnerability — observed
-          # repeatedly on the self-hosted runner 2026-06-25. Retry ONLY that
-          # transient class; a genuine finding ("N vulnerabilities") fails fast
-          # and is never retried away (zero-vuln policy preserved).
-          audit() {
-            local level="$1" n=0 out rc
-            until [ "$n" -ge 3 ]; do
-              out="$(npm audit --audit-level="$level" --omit=dev 2>&1)"; rc=$?
-              echo "$out"
-              [ "$rc" -eq 0 ] && return 0
-              # Retry ONLY the known transient class (registry advisory API 5xx /
-              # network). ANYTHING else — including a real "N vulnerabilities"
-              # finding — fails fast, so the zero-vuln policy is never retried away.
-              if echo "$out" | grep -qiE "audit endpoint returned an error|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up|registry.*error|503|429"; then
-                n=$((n + 1))
-                echo "npm audit transient endpoint error (attempt $n/3) — retrying in 10s..."
-                sleep 10
-                continue
-              fi
-              echo "::error::npm audit failed with a real finding (audit-level=$level) — failing."
-              return 1
-            done
-            echo "::error::npm audit endpoint kept erroring after 3 attempts (audit-level=$level)."
-            return 1
-          }
           echo "::group::production deps (zero tolerance at low)"
-          audit low
+          npm audit --audit-level=low --omit=dev
           echo "::endgroup::"
           echo "::group::production deps (zero tolerance at high — omit dev)"
-          audit high
+          npm audit --audit-level=high --omit=dev
           echo "::endgroup::"
 
       - name: Ensure jq (trufflehog needs it; self-hosted runner may lack it + can't sudo)
