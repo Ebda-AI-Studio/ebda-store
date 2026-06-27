@@ -31,7 +31,7 @@ export default function BoldFooter({
 
   // Pass `contact` so a stored WhatsApp phone produces a wa.me icon in the
   // social row even when `socials.whatsapp` is empty.
-  const socialLinks = getSocialLinks(socials, contact);
+  const socialLinks = getSocialLinks(socials, contact, theme?.socialOrder);
   // Per-store columns replace the single "Quick Links" block; with nothing
   // configured we keep the navigation-driven default below. Bold has no
   // newsletter form so newsletterEnabled does not apply here.

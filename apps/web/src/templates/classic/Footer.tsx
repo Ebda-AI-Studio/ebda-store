@@ -37,7 +37,7 @@ export default function ClassicFooter({
 
   // Pass `contact` so the WhatsApp icon appears in the social row when only
   // the merchant's WhatsApp phone is set (no full URL in `socials`).
-  const socialLinks = getSocialLinks(socials, contact);
+  const socialLinks = getSocialLinks(socials, contact, theme?.socialOrder);
 
   // Per-store footer columns take priority. Fall back to chunking the
   // navigation into up to 3 columns when no footerLinks have been saved so

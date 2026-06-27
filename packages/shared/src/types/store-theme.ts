@@ -291,6 +291,19 @@ export interface StoreTheme {
   footerSocialOriginalColor?: boolean;
 
   /**
+   * Merchant-controlled display order for footer social icons.
+   * An array of platform keys (e.g. ['tiktok','instagram','whatsapp']) that
+   * defines the left-to-right (or start-to-end in RTL) sequence in the footer.
+   * After filtering to entries with a URL, icons whose key appears in this
+   * array are sorted to the front in that sequence; icons not listed retain
+   * their existing default order (stable sort, Infinity fallback).
+   * When empty or undefined, the built-in candidate order is preserved so
+   * existing stores are unaffected. Toggled via Branding → Social Links.
+   * 2026-06-27.
+   */
+  socialOrder?: string[];
+
+  /**
    * When true, the Floating Widget ignores per-button `bgColor`/`iconColor`
    * overrides and uses each button kind's registered brand color from
    * KIND_DEFAULTS (whatsapp #25D366, instagram #E4405F, etc.). Merchant

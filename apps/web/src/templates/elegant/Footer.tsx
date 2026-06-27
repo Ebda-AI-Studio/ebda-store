@@ -37,7 +37,7 @@ export default function ElegantFooter({
 
   // Pass `contact` so the merchant's WhatsApp phone shows up in the social
   // row even when no full URL is saved in `socials.whatsapp`.
-  const socialLinks = getSocialLinks(socials, contact);
+  const socialLinks = getSocialLinks(socials, contact, theme?.socialOrder);
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [submitting, setSubmitting] = useState(false);

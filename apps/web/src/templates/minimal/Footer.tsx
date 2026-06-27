@@ -45,7 +45,7 @@ export default function MinimalFooter({
   // also synthesises a wa.me entry from `contact.whatsapp` when no full
   // social URL is set, so the merchant's contact phone doubles as a chat
   // link without manual configuration.
-  const socialLinks = getSocialLinks(socials, contact);
+  const socialLinks = getSocialLinks(socials, contact, theme?.socialOrder);
 
   return (
     <footer

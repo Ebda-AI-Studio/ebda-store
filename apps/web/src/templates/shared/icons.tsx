@@ -471,7 +471,8 @@ export function SocialGlyph({
  */
 export function getSocialLinks(
   socials: StoreSocials,
-  contact?: Pick<StoreContact, 'whatsapp'>
+  contact?: Pick<StoreContact, 'whatsapp'>,
+  order?: string[]
 ): SocialLinkEntry[] {
   const contactWhatsapp = contact?.whatsapp?.trim();
   const whatsappUrl = contactWhatsapp
@@ -504,8 +505,18 @@ export function getSocialLinks(
   // at render time. `sanitizeUrl` returns '#' for unsafe values; we drop
   // those so the footer never shows a dead '#' link for a legitimate social URL
   // that was simply not set.
-  return candidates
+  const filtered = candidates
     .filter((s): s is typeof s & { url: string } => !!s.url)
     .map(s => ({ ...s, url: sanitizeUrl(s.url, '') }))
     .filter((s): s is SocialLinkEntry => !!s.url);
+
+  if (!order || order.length === 0) return filtered;
+
+  // Stable sort: entries whose key appears in `order` come first in that
+  // sequence; entries not listed retain their relative position (Infinity
+  // fallback keeps them after all ordered entries, in their original order).
+  const rankMap = new Map(order.map((key, i) => [key, i]));
+  return [...filtered].sort(
+    (a, b) => (rankMap.get(a.key) ?? Infinity) - (rankMap.get(b.key) ?? Infinity)
+  );
 }

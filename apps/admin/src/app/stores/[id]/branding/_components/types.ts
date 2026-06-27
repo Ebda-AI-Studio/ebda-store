@@ -78,6 +78,12 @@ export interface StoreTheme {
    */
   footerSocialOriginalColor?: boolean;
   /**
+   * Merchant-controlled display order for footer social icons.
+   * Array of platform keys (e.g. ['tiktok','instagram','whatsapp']).
+   * Edited in Branding → Social Links. 2026-06-27.
+   */
+  socialOrder?: string[];
+  /**
    * When true, the Floating Widget ignores per-button color overrides and
    * uses each kind's registered brand color. Default false. 2026-06-24.
    */

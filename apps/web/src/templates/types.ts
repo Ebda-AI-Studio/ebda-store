@@ -258,7 +258,8 @@ export interface FooterProps {
   /**
    * Store theme — forwarded from ShopChrome so footers can read theme flags
    * without needing their own store context call. Currently used to honor
-   * `footerSocialOriginalColor` (platform brand colors on social icons).
+   * `footerSocialOriginalColor` (platform brand colors on social icons) and
+   * `socialOrder` (merchant-controlled display order of footer social icons).
    * Optional: footers that don't read any theme flag degrade gracefully.
    */
   theme?: import('@force/shared').StoreTheme;

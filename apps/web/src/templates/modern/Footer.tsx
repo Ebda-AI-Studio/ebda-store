@@ -45,7 +45,7 @@ export default function ModernFooter({
 
   // Pass `contact` so a merchant who saved a WhatsApp phone (without a full
   // wa.me URL in socials) still gets a proper WhatsApp icon in the row.
-  const socialLinks = getSocialLinks(socials, contact);
+  const socialLinks = getSocialLinks(socials, contact, theme?.socialOrder);
   // Per-store footer columns (shop / company / support) replace the single
   // "Links" column when the owner has configured at least one section. With
   // an empty config we fall back to the navigation-driven default below.
