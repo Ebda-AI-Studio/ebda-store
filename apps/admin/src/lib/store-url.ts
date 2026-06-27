@@ -1,11 +1,11 @@
 // Storefront URL composition for admin surfaces.
 //
 // The storefront is path-routed under a single shared subdomain
-// (`store.forcemediakw.com/<slug>`), NOT `<slug>.forcemediakw.com`. Six
+// (`store.force-ai.co/<slug>`), NOT `<slug>.forcemediakw.com`. Six
 // admin call sites previously rolled their own subdomain-style fallback;
 // keep this helper as the single source of truth.
 
-export const PLATFORM_STORE_HOST = 'store.forcemediakw.com';
+export const PLATFORM_STORE_HOST = 'store.force-ai.co';
 
 type StoreUrlInput = { slug: string; domain?: string | null };
 

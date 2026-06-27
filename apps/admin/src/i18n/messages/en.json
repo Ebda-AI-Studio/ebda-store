@@ -3946,7 +3946,7 @@
   "auth": {
     "login": {
       "title": "Admin Login",
-      "subtitle": "Sign in to access the Force Platform",
+      "subtitle": "Sign in to access the Force AI Platform",
       "email": "Email address",
       "emailPlaceholder": "you@example.com",
       "password": "Password",
@@ -3954,8 +3954,8 @@
       "signIn": "Sign in",
       "signingIn": "Signing in…",
       "loginFailed": "Login failed",
-      "footer": "Force Platform Admin Panel",
-      "brandTitle": "Force Platform",
+      "footer": "Force AI Platform Admin Panel",
+      "brandTitle": "Force AI Store",
       "brandSubtitle": "Manage your e-commerce stores, users, and platform settings from one powerful dashboard.",
       "statActiveStores": "Active Stores",
       "statProducts": "Products",
