@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/i18n/useT';
+import { filsToKwd } from '@/lib/format';
 import type { AbandonedCartConfig } from './types';
 
 interface ToggleProps {
@@ -164,10 +165,16 @@ export function RecoveryCampaignForm({
                       type="number"
                       min={0}
                       step={0.001}
-                      value={config.couponMaxDiscount ?? ''}
+                      value={
+                        config.couponMaxDiscount !== null && config.couponMaxDiscount !== undefined
+                          ? filsToKwd(config.couponMaxDiscount)
+                          : ''
+                      }
                       onChange={e =>
                         onPatch({
-                          couponMaxDiscount: e.target.value ? Number(e.target.value) : null,
+                          couponMaxDiscount: e.target.value
+                            ? Math.round(parseFloat(e.target.value) * 1000)
+                            : null,
                         })
                       }
                       placeholder={t('autoCoupon.noLimit')}

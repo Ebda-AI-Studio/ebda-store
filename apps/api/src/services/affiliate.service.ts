@@ -556,7 +556,7 @@ class AffiliateService {
       return null;
     }
 
-    const amount = Number(referral.commissionAmount);
+    const amount = referral.commissionAmount ?? 0;
 
     await prisma.$transaction([
       prisma.affiliateReferral.update({
@@ -648,7 +648,7 @@ class AffiliateService {
       throw new AppError(400, 'INVALID_AMOUNT', 'Payout amount must be greater than zero');
     }
 
-    const pending = Number(affiliate.pendingBalance);
+    const pending = affiliate.pendingBalance;
     if (data.amount > pending) {
       throw new AppError(400, 'INSUFFICIENT_BALANCE', 'Payout amount exceeds pending balance');
     }
@@ -705,7 +705,7 @@ class AffiliateService {
         }),
       ]);
 
-    const commissionPaid = Number(commissionSumResult._sum.totalPaid ?? 0);
+    const commissionPaid = commissionSumResult._sum.totalPaid ?? 0;
 
     return {
       totalAffiliates,

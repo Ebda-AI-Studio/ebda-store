@@ -23,7 +23,7 @@ const upsertConfigSchema = z.object({
   step3DelayMinutes: z.number().int().min(1).optional(),
   autoCouponEnabled: z.boolean().optional(),
   couponDiscountPercent: z.number().min(0).max(100).optional(),
-  couponMaxDiscount: z.number().min(0).nullable().optional(),
+  couponMaxDiscount: z.number().int().min(0).nullable().optional(),
   couponExpiryHours: z.number().int().min(1).optional(),
 });
 

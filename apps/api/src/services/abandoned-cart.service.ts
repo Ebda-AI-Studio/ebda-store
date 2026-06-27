@@ -681,8 +681,7 @@ class AbandonedCartService {
     const customerName = abandonedCart.customer
       ? `${abandonedCart.customer.firstName} ${abandonedCart.customer.lastName}`.trim()
       : 'Customer';
-    const cartTotalDecimal = Number(abandonedCart.cartTotal);
-    const cartTotalFormatted = (cartTotalDecimal / 1000).toFixed(3); // fils → KWD
+    const cartTotalFormatted = (abandonedCart.cartTotal / 1000).toFixed(3); // fils → KWD
 
     const notificationData: NotificationData = {
       customerName,
@@ -751,11 +750,9 @@ class AbandonedCartService {
       const expiresAt = new Date(Date.now() + storeConfig.couponExpiryHours * 60 * 60 * 1000);
 
       // Coupon.value is Int (percentage 0–100 or fixed amount in fils)
-      // couponMaxDiscount in schema is Decimal(12,3) → stored as Int in Coupon.maxDiscount
+      // couponMaxDiscount is now Int (fils) — use directly as Coupon.maxDiscount
       const maxDiscountInt =
-        storeConfig.couponMaxDiscount !== null
-          ? Math.round(storeConfig.couponMaxDiscount * 1000) // convert KWD to fils
-          : undefined;
+        storeConfig.couponMaxDiscount !== null ? storeConfig.couponMaxDiscount : undefined;
 
       const coupon = await prisma.coupon.upsert({
         where: { storeId_code: { storeId, code } },
@@ -838,7 +835,7 @@ class AbandonedCartService {
       step3DelayMinutes: row.step3DelayMinutes,
       autoCouponEnabled: row.autoCouponEnabled,
       couponDiscountPercent: row.couponDiscountPercent,
-      couponMaxDiscount: row.couponMaxDiscount !== null ? Number(row.couponMaxDiscount) : null,
+      couponMaxDiscount: row.couponMaxDiscount,
       couponExpiryHours: row.couponExpiryHours,
     };
   }
@@ -871,7 +868,7 @@ class AbandonedCartService {
       step3DelayMinutes: row.step3DelayMinutes,
       autoCouponEnabled: row.autoCouponEnabled,
       couponDiscountPercent: row.couponDiscountPercent,
-      couponMaxDiscount: row.couponMaxDiscount !== null ? Number(row.couponMaxDiscount) : null,
+      couponMaxDiscount: row.couponMaxDiscount,
       couponExpiryHours: row.couponExpiryHours,
     };
   }

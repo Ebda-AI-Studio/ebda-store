@@ -39,13 +39,13 @@ const updateSchema = z.object({
 const configSchema = z.object({
   defaultCommissionRate: z.number().min(0).max(100).optional(),
   cookieDurationDays: z.number().int().min(1).max(365).optional(),
-  minPayoutAmount: z.number().min(0).optional(),
+  minPayoutAmount: z.number().int().min(0).optional(),
   autoApprove: z.boolean().optional(),
   publicSignupEnabled: z.boolean().optional(),
 });
 
 const payoutSchema = z.object({
-  amount: z.number().positive(),
+  amount: z.number().int().positive(),
   method: z.string().max(50).optional(),
   notes: z.string().max(1000).optional(),
 });
@@ -323,7 +323,7 @@ router.get(
             orderId: r.orderId,
             orderNumber: r.order?.orderNumber,
             orderTotal: r.order?.total ? Number(r.order.total) : undefined,
-            commissionAmount: r.commissionAmount ? Number(r.commissionAmount) : undefined,
+            commissionAmount: r.commissionAmount ?? undefined,
             status: r.status,
           },
         });
@@ -341,7 +341,7 @@ router.get(
           at: (p.paidAt ?? p.createdAt).toISOString(),
           kind,
           details: {
-            amount: Number(p.amount),
+            amount: p.amount,
             method: p.method,
             status: p.status,
             notes: p.notes,
