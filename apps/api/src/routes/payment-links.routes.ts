@@ -35,6 +35,7 @@ import { auditLog, writeLimiter } from '../middleware/security';
 import { encryption } from '../services/encryption.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { getAuthUser } from '../utils/store-helpers';
+import { generateOrderNumber } from '../utils/order-number';
 import logger from '../lib/logger';
 import type { Currency } from '../services/payment-providers/types';
 
@@ -233,7 +234,7 @@ router.post(
       }
 
       // ── Create draft Order ─────────────────────────────────────────────────
-      const orderNumber = `WA-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const orderNumber = generateOrderNumber('WA');
       const draftOrder = await prisma.order.create({
         data: {
           storeId,

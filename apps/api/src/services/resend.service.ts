@@ -21,6 +21,19 @@ export interface DomainDnsRecord {
   priority?: number;
 }
 
+// True when a Resend SDK error represents a missing resource (deleted/unknown
+// domain id). The SDK shapes this as { name: 'not_found', statusCode: 404,
+// message: 'Domain not found' } — match defensively across SDK versions.
+function isResendNotFound(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { name?: string; statusCode?: number; message?: string };
+  return (
+    e.name === 'not_found' ||
+    e.statusCode === 404 ||
+    (typeof e.message === 'string' && /not\s*found/i.test(e.message))
+  );
+}
+
 let _client: Resend | null = null;
 function getClient(): Resend | null {
   if (!config.resendApiKey) return null;
@@ -56,34 +69,57 @@ export class ResendService {
     if (!store.domain) throw new Error('Store has no custom domain to provision');
 
     const client = ensureClient();
+    const domainName = store.domain;
+
+    // Create a brand-new Resend domain and persist its id/status.
+    const createFresh = async (): Promise<DomainDnsRecord[]> => {
+      const { data, error } = await client.domains.create({ name: domainName });
+      if (error || !data) {
+        throw new Error(`Resend create-domain failed: ${error?.message ?? 'unknown'}`);
+      }
+      await prisma.store.update({
+        where: { id: storeId },
+        data: {
+          emailDomainId: (data as { id: string }).id,
+          emailDomainStatus: (data as { status?: string }).status ?? 'pending',
+        },
+      });
+      return ((data as { records?: unknown[] }).records ?? []).map(toDnsRecord);
+    };
 
     if (store.emailDomainId) {
       // Already provisioned — fetch current state.
       const { data, error } = await client.domains.get(store.emailDomainId);
-      if (error || !data) {
-        throw new Error(`Resend get-domain failed: ${error?.message ?? 'unknown'}`);
+
+      if (data) {
+        await prisma.store.update({
+          where: { id: storeId },
+          data: { emailDomainStatus: (data as { status?: string }).status ?? 'pending' },
+        });
+        return ((data as { records?: unknown[] }).records ?? []).map(toDnsRecord);
       }
-      await prisma.store.update({
-        where: { id: storeId },
-        data: { emailDomainStatus: (data as { status?: string }).status ?? 'pending' },
-      });
-      return ((data as { records?: unknown[] }).records ?? []).map(toDnsRecord);
+
+      // The stored id 404s when the domain was deleted on Resend's side (DB
+      // and Resend drifted — verified 2026-06-27: wadyaljuz.com had
+      // emailDomainStatus='verified' locally but Resend returned 404, so the
+      // merchant could never re-add it). Clear the stale id and create fresh
+      // instead of hard-erroring on every retry.
+      if (isResendNotFound(error)) {
+        logger.warn(
+          { storeId, staleDomainId: store.emailDomainId },
+          'Resend domain id no longer exists — clearing stale id and recreating'
+        );
+        await prisma.store.update({
+          where: { id: storeId },
+          data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
+        });
+        return createFresh();
+      }
+
+      throw new Error(`Resend get-domain failed: ${error?.message ?? 'unknown'}`);
     }
 
-    const { data, error } = await client.domains.create({ name: store.domain });
-    if (error || !data) {
-      throw new Error(`Resend create-domain failed: ${error?.message ?? 'unknown'}`);
-    }
-
-    await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        emailDomainId: (data as { id: string }).id,
-        emailDomainStatus: (data as { status?: string }).status ?? 'pending',
-      },
-    });
-
-    return ((data as { records?: unknown[] }).records ?? []).map(toDnsRecord);
+    return createFresh();
   }
 
   /**

@@ -308,6 +308,14 @@ app.use(
   inngestServe({
     client: inngest,
     functions: inngestFunctions,
+    // Advertise the real public origin to Inngest Cloud. Without this the SDK
+    // guesses from the Host header of the registering request — and our
+    // post-boot self-PUT hits 127.0.0.1, registering an unreachable
+    // localhost URL (see config.inngestServeHost). Only pass it when set so
+    // local dev keeps the SDK's default host-introspection.
+    ...(config.inngestServeHost
+      ? { serveHost: config.inngestServeHost, servePath: '/api/v1/inngest' }
+      : {}),
   })
 );
 
@@ -485,12 +493,27 @@ const server = httpServer.listen(config.port, () => {
     );
   }
 
+  // Guard: in production the self-PUT below registers whatever origin the
+  // SDK advertises. With serveHost unset it advertises 127.0.0.1 (the PUT's
+  // own Host), which Inngest Cloud can't reach — jobs then sit queued
+  // forever. Warn loudly so this is caught at boot, not via a 7-hour
+  // queue-depth alert.
+  if (config.nodeEnv === 'production' && !config.inngestServeHost) {
+    logger.warn(
+      'INNGEST_SERVE_HOST is unset in production — Inngest will register the ' +
+        'localhost origin and enqueued jobs will never run. Set it to the public ' +
+        'API origin, e.g. https://store-api.forcemediakw.com'
+    );
+  }
+
   // Self-PUT the Inngest serve endpoint after boot so the new container
   // registers its functions with Inngest cloud. Without this, after a
   // Railway redeploy the new container's function definitions stay
   // unregistered until Inngest cloud happens to ping us — which can take
   // 30+ min. Verified 2026-05-27: 3 bulk-ai jobs queued for 30 min on
   // Wady Aljuz after a redeploy because functions hadn't synced.
+  // With serveHost set (config.inngestServeHost), this PUT still registers
+  // the correct public origin even though it originates from 127.0.0.1.
   //
   // Fire-and-forget. If Inngest cloud is unreachable or the SDK rejects,
   // log + move on — health check still passes, jobs will retry later.

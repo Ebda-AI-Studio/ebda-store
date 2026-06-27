@@ -1,5 +1,5 @@
-import crypto from 'crypto';
 import { prisma, Prisma, OrderStatus, withMoneyTx } from '@force/database';
+import { generateOrderNumber } from '../utils/order-number';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
 import { CouponService } from './coupon.service';
@@ -354,7 +354,7 @@ export class OrderService {
     const total = Math.max(0, subtotal + tax + shipping - discount);
 
     // Generate order number
-    const orderNumber = `ORD-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const orderNumber = generateOrderNumber();
 
     // Resolve the backorder feature flag BEFORE the transaction so we do not
     // make an async service call inside a Prisma interactive transaction
@@ -1420,7 +1420,7 @@ export class OrderService {
     }
 
     const total = Math.max(0, subtotal + tax + shipping - couponDiscount);
-    const orderNumber = `ORD-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const orderNumber = generateOrderNumber();
 
     // Create the order + items in one transaction. Inventory is NOT
     // decremented for admin orders by default — the merchant
