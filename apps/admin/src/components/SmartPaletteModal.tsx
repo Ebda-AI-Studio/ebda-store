@@ -23,6 +23,7 @@ import { hexToHsl } from '../lib/color';
 import { ColorField } from './ColorField';
 import { SectionPreview } from './SectionPreview';
 import { apiPost } from '../lib/api';
+import { useT } from '../i18n/useT';
 
 /**
  * Brand-color updates the parent should persist to StoreTheme on apply.
@@ -89,13 +90,6 @@ const SECTION_KEYS: SectionKey[] = [
   'testimonials',
 ];
 
-const PATTERN_LABELS: Record<PalettePattern, string> = {
-  alternating: 'Alternating',
-  monochrome: 'Monochrome (shaded)',
-  triad: 'Triad',
-  'single-bg': 'Solid background',
-};
-
 const VIBE_IDS: VibeId[] = [
   'luxury',
   'boutique',
@@ -116,6 +110,8 @@ export function SmartPaletteModal({
   storeId,
   storeTemplate,
 }: SmartPaletteModalProps) {
+  const t = useT('components.smartPalette');
+
   // Layer A: template-derived defaults (lowest priority)
   const templateSeeds = getTemplatePresets(storeTemplate);
 
@@ -211,7 +207,7 @@ export function SmartPaletteModal({
   // Layer C: AI logo extraction
   async function handleLogoSuggest() {
     if (!storeId) {
-      setLogoError('Store ID not available.');
+      setLogoError(t('errors.noStoreId'));
       return;
     }
     setLogoLoading(true);
@@ -224,11 +220,11 @@ export function SmartPaletteModal({
       if (res.error) {
         const code = (res.error as { code?: string }).code;
         if (code === 'NO_LOGO') {
-          setLogoError('Upload a store logo first.');
+          setLogoError(t('errors.noLogo'));
         } else if (code === 'AI_QUOTA_EXCEEDED' || code === 'AI_QUOTA_DAILY_EXCEEDED') {
-          setLogoError('AI quota reached. Try again tomorrow.');
+          setLogoError(t('errors.quotaExceeded'));
         } else {
-          setLogoError(res.error.message ?? 'AI extraction failed.');
+          setLogoError(res.error.message ?? t('errors.extractionFailed'));
         }
         return;
       }
@@ -241,7 +237,7 @@ export function SmartPaletteModal({
         setActiveVibe(null);
       }
     } catch {
-      setLogoError('AI extraction failed. Please try again.');
+      setLogoError(t('errors.extractionFailedRetry'));
     } finally {
       setLogoLoading(false);
     }
@@ -251,7 +247,7 @@ export function SmartPaletteModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-foreground">Smart palette</h2>
+          <h2 className="text-xl font-semibold text-foreground">{t('title')}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -260,10 +256,7 @@ export function SmartPaletteModal({
             ✕
           </button>
         </div>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Pick 1–3 colors and we&apos;ll distribute them across every section&apos;s background,
-          card frame, and heading color. Section text auto-fixes for contrast.
-        </p>
+        <p className="mb-4 text-sm text-muted-foreground">{t('description')}</p>
 
         {/* Layer C: AI logo suggestion button */}
         <div className="mb-4 flex items-center gap-3">
@@ -278,60 +271,47 @@ export function SmartPaletteModal({
             ) : (
               <span>✨</span>
             )}
-            {logoLoading ? 'Extracting…' : 'Suggest from my logo'}
+            {logoLoading ? t('extracting') : t('suggestFromLogo')}
           </button>
           {logoError ? (
             <span className="text-xs text-destructive">{logoError}</span>
           ) : (
-            <span className="text-xs text-muted-foreground">
-              Uses Gemini Vision to read dominant brand colors from your store logo
-            </span>
+            <span className="text-xs text-muted-foreground">{t('logoHint')}</span>
           )}
         </div>
 
         {/* Layer B: Vibe picker */}
         <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Vibe (optional — overrides seeds + distribution)
+            {t('vibeSection')}
           </h3>
           <div className="flex flex-wrap gap-2">
-            {VIBE_IDS.map(vibeId => {
-              const vibe = {
-                luxury: 'Luxury',
-                boutique: 'Boutique',
-                grocery: 'Grocery',
-                streetwear: 'Streetwear',
-                minimal: 'Minimal',
-                tech: 'Tech',
-                restaurant: 'Restaurant',
-                cafe: 'Cafe',
-                beauty: 'Beauty',
-              }[vibeId];
-              return (
-                <button
-                  key={vibeId}
-                  type="button"
-                  onClick={() => applyVibe(vibeId)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                    activeVibe === vibeId
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {vibe}
-                </button>
-              );
-            })}
+            {VIBE_IDS.map(vibeId => (
+              <button
+                key={vibeId}
+                type="button"
+                onClick={() => applyVibe(vibeId)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  activeVibe === vibeId
+                    ? 'border-primary bg-primary/10 text-foreground'
+                    : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {t(`vibeLabels.${vibeId}` as Parameters<typeof t>[0])}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Distribution sub-section: pattern + frame thickness */}
         <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Distribution
+            {t('distributionSection')}
           </h3>
           <div className="mb-3">
-            <label className="mb-2 block text-xs font-medium text-muted-foreground">Pattern</label>
+            <label className="mb-2 block text-xs font-medium text-muted-foreground">
+              {t('patternLabel')}
+            </label>
             <div className="grid grid-cols-4 gap-2">
               {(['alternating', 'monochrome', 'triad', 'single-bg'] as const).map(p => (
                 <button
@@ -344,14 +324,14 @@ export function SmartPaletteModal({
                       : 'border-border bg-background text-muted-foreground hover:bg-muted'
                   }`}
                 >
-                  {PATTERN_LABELS[p]}
+                  {t(`patternLabels.${p}` as Parameters<typeof t>[0])}
                 </button>
               ))}
             </div>
           </div>
           <div>
             <label className="mb-2 block text-xs font-medium text-muted-foreground">
-              Card frame thickness
+              {t('frameThicknessLabel')}
             </label>
             <div className="grid grid-cols-4 gap-2">
               {(['thin', 'normal', 'thick', 'xthick'] as const).map(w => (
@@ -359,20 +339,20 @@ export function SmartPaletteModal({
                   key={w}
                   type="button"
                   onClick={() => setPaletteFrameWidth(w)}
-                  className={`rounded border p-2 text-xs font-medium capitalize ${
+                  className={`rounded border p-2 text-xs font-medium ${
                     paletteFrameWidth === w
                       ? 'border-primary bg-primary/10 text-foreground'
                       : 'border-border bg-background text-muted-foreground hover:bg-muted'
                   }`}
                 >
-                  {w}
+                  {t(`frame${w.charAt(0).toUpperCase()}${w.slice(1)}` as Parameters<typeof t>[0])}
                 </button>
               ))}
             </div>
           </div>
           <div className="mt-3">
             <label className="mb-2 block text-xs font-medium text-muted-foreground">
-              Frame size (padding)
+              {t('frameSizeLabel')}
             </label>
             <div className="grid grid-cols-4 gap-2">
               {(['compact', 'normal', 'comfortable', 'spacious'] as const).map(s => (
@@ -396,19 +376,14 @@ export function SmartPaletteModal({
         {/* Seed color inputs + Layer A reset link */}
         <div className="space-y-3">
           <ColorField
-            label="Primary (required)"
+            label={t('primaryLabel')}
             value={primary}
             onChange={setPrimary}
             theme={theme}
           />
+          <ColorField label={t('accentLabel')} value={accent} onChange={setAccent} theme={theme} />
           <ColorField
-            label="Accent (optional — fills one alternating slot)"
-            value={accent}
-            onChange={setAccent}
-            theme={theme}
-          />
-          <ColorField
-            label="Neutral (optional — defaults to white)"
+            label={t('neutralLabel')}
             value={neutral}
             onChange={setNeutral}
             theme={theme}
@@ -421,7 +396,7 @@ export function SmartPaletteModal({
                 onClick={resetToTemplateDefaults}
                 className="text-xs text-muted-foreground underline hover:text-foreground"
               >
-                Reset to template defaults
+                {t('resetToDefaults')}
               </button>
             </div>
           ) : null}
@@ -430,9 +405,7 @@ export function SmartPaletteModal({
         {/* Interactive preview grid — click any section to override */}
         {palette ? (
           <div className="mt-6">
-            <p className="mb-2 text-xs text-muted-foreground">
-              Preview shows pattern + frame thickness · Click a tile to override that section
-            </p>
+            <p className="mb-2 text-xs text-muted-foreground">{t('previewHint')}</p>
             <div className="grid grid-cols-5 gap-2">
               {SECTION_KEYS.map(key => (
                 <div key={key} className="min-h-[180px]">
@@ -466,7 +439,8 @@ export function SmartPaletteModal({
               <div className="mt-3 rounded-lg border border-primary/40 bg-muted/30 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Override: {expandedSection.charAt(0).toUpperCase() + expandedSection.slice(1)}
+                    {t('overridePrefix')}{' '}
+                    {expandedSection.charAt(0).toUpperCase() + expandedSection.slice(1)}
                   </span>
                   <button
                     type="button"
@@ -479,7 +453,7 @@ export function SmartPaletteModal({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <ColorField
-                    label="Background"
+                    label={t('overrideBgLabel')}
                     value={overrides[expandedSection]?.bgColor}
                     onChange={v =>
                       setOverrides(prev => ({
@@ -492,7 +466,7 @@ export function SmartPaletteModal({
                     showContrastPreview={false}
                   />
                   <ColorField
-                    label="Card frame"
+                    label={t('overrideFrameLabel')}
                     value={overrides[expandedSection]?.cardFrameColor}
                     onChange={v =>
                       setOverrides(prev => ({
@@ -505,7 +479,7 @@ export function SmartPaletteModal({
                     showContrastPreview={false}
                   />
                   <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-muted-foreground">Frame thickness</span>
+                    <span className="text-muted-foreground">{t('overrideThicknessLabel')}</span>
                     <select
                       value={
                         overrides[expandedSection]?.cardFrameWidth ??
@@ -522,10 +496,10 @@ export function SmartPaletteModal({
                       }
                       className="rounded border border-border bg-background px-2 py-1 text-sm"
                     >
-                      <option value="thin">Thin (1px)</option>
-                      <option value="normal">Normal (2px)</option>
-                      <option value="thick">Thick (4px)</option>
-                      <option value="xthick">Extra thick (8px)</option>
+                      <option value="thin">{t('frameThin')}</option>
+                      <option value="normal">{t('frameNormal')}</option>
+                      <option value="thick">{t('frameThick')}</option>
+                      <option value="xthick">{t('frameXthick')}</option>
                     </select>
                   </label>
                 </div>
@@ -540,14 +514,11 @@ export function SmartPaletteModal({
                   }
                   className="mt-3 text-xs text-muted-foreground underline hover:text-foreground"
                 >
-                  Reset this section
+                  {t('resetSection')}
                 </button>
               </div>
             ) : null}
-            <p className="mt-2 text-xs text-muted-foreground">
-              Token refs (e.g. <code>token:primary</code>) preview as gray here; storefront resolves
-              at render.
-            </p>
+            <p className="mt-2 text-xs text-muted-foreground">{t('tokenHint')}</p>
           </div>
         ) : null}
 
@@ -557,14 +528,13 @@ export function SmartPaletteModal({
             onClick={onClose}
             className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             type="button"
             onClick={() => {
               if (!palette) return;
-              if (!confirm('This overwrites the current section bg + frame colors. Proceed?'))
-                return;
+              if (!confirm(t('applyConfirm'))) return;
 
               // Build theme updates: only when the merchant entered a raw hex
               // (not a token ref). Convert hex → HSL triplet to match the
@@ -591,7 +561,7 @@ export function SmartPaletteModal({
             disabled={!palette}
             className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
           >
-            Apply to all sections
+            {t('applyAll')}
           </button>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { apiGet } from '../../../../../lib/api';
 import { useRequireFeature } from '../../../../../hooks/useRequireFeature';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
+import { useT } from '@/i18n/useT';
 
 interface LoyaltyTransaction {
   id: string;
@@ -52,23 +53,7 @@ const TYPE_FILTERS = [
   'tier_changed',
 ] as const;
 
-// Bilingual type labels
-const TYPE_LABELS: Record<string, string> = {
-  all: 'All Types / جميع الأنواع',
-  earn_purchase: 'Earn: Purchase / ربح: شراء',
-  earn_signup: 'Earn: Sign-up / ربح: تسجيل',
-  earn_referral: 'Earn: Referral / ربح: إحالة',
-  earn_review: 'Earn: Review / ربح: تقييم',
-  earn_birthday: 'Earn: Birthday / ربح: عيد ميلاد',
-  earn_manual: 'Earn: Manual / ربح: يدوي',
-  redeem_discount: 'Redeem: Discount / استرداد: خصم',
-  redeem_product: 'Redeem: Product / استرداد: منتج',
-  expire: 'Expired / منتهي الصلاحية',
-  adjust: 'Adjustment / تعديل',
-  tier_changed: 'Tier Changed / تغيير المستوى',
-};
-
-function TypeBadge({ type }: { type: string }) {
+function TypeBadge({ type, label }: { type: string; label: string }) {
   let className = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ';
   if (type === 'tier_changed') {
     className += 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
@@ -81,7 +66,7 @@ function TypeBadge({ type }: { type: string }) {
   } else {
     className += 'bg-muted text-muted-foreground';
   }
-  return <span className={className}>{TYPE_LABELS[type] ?? type}</span>;
+  return <span className={className}>{label}</span>;
 }
 
 function PointsCell({ points }: { points: number }) {
@@ -93,6 +78,7 @@ function PointsCell({ points }: { points: number }) {
 
 export default function LoyaltyTransactionsPage() {
   const { gate } = useRequireFeature('loyalty');
+  const t = useT('loyalty.transactions');
 
   const params = useParams();
   const storeId = params?.id as string;
@@ -150,7 +136,7 @@ export default function LoyaltyTransactionsPage() {
 
   const columns: DataTableColumn<LoyaltyTransaction>[] = [
     {
-      header: 'Customer / العميل',
+      header: t('colCustomer'),
       primaryOnMobile: true,
       cell: tx => (
         <div>
@@ -162,7 +148,7 @@ export default function LoyaltyTransactionsPage() {
       ),
     },
     {
-      header: 'Points / النقاط',
+      header: t('colPoints'),
       mobileBadge: true,
       alignEnd: true,
       cell: tx => (
@@ -172,7 +158,7 @@ export default function LoyaltyTransactionsPage() {
       ),
     },
     {
-      header: 'Date / التاريخ',
+      header: t('colDate'),
       cell: tx => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
           {new Date(tx.createdAt).toLocaleDateString('en-US', { dateStyle: 'medium' })}
@@ -180,7 +166,7 @@ export default function LoyaltyTransactionsPage() {
       ),
     },
     {
-      header: 'Order # / الطلب',
+      header: t('colOrder'),
       cell: tx =>
         tx.order ? (
           <Link
@@ -194,11 +180,16 @@ export default function LoyaltyTransactionsPage() {
         ),
     },
     {
-      header: 'Type / النوع',
-      cell: tx => <TypeBadge type={tx.type} />,
+      header: t('colType'),
+      cell: tx => (
+        <TypeBadge
+          type={tx.type}
+          label={t(`typeLabels.${tx.type}` as Parameters<typeof t>[0]) ?? tx.type}
+        />
+      ),
     },
     {
-      header: 'Description / الوصف',
+      header: t('colDescription'),
       hideOnMobile: true,
       cell: tx => (
         <span className="text-sm text-muted-foreground max-w-xs truncate block">
@@ -207,7 +198,7 @@ export default function LoyaltyTransactionsPage() {
       ),
     },
     {
-      header: 'Expires / الانتهاء',
+      header: t('colExpires'),
       hideOnMobile: true,
       cell: tx => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
@@ -222,12 +213,7 @@ export default function LoyaltyTransactionsPage() {
   if (gate) return gate;
 
   return (
-    <AdminLayout
-      mode="store_admin"
-      storeId={storeId}
-      title="Transactions / المعاملات"
-      subtitle="Loyalty Program / برنامج الولاء"
-    >
+    <AdminLayout mode="store_admin" storeId={storeId} title={t('title')} subtitle={t('subtitle')}>
       <div className="mx-auto max-w-7xl px-4 pb-12 pt-4 sm:px-6">
         {/* Breadcrumb */}
         <nav className="mb-5 flex items-center gap-2 text-sm text-muted-foreground">
@@ -235,10 +221,10 @@ export default function LoyaltyTransactionsPage() {
             href={`/stores/${storeId}/loyalty`}
             className="hover:text-foreground transition-colors"
           >
-            Loyalty / الولاء
+            {t('breadcrumbLoyalty')}
           </Link>
           <span>/</span>
-          <span className="text-foreground">Transactions / المعاملات</span>
+          <span className="text-foreground">{t('breadcrumbTransactions')}</span>
         </nav>
 
         {/* Filters */}
@@ -250,9 +236,9 @@ export default function LoyaltyTransactionsPage() {
             aria-label="Filter by transaction type"
             className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            {TYPE_FILTERS.map(t => (
-              <option key={t} value={t}>
-                {TYPE_LABELS[t] ?? t}
+            {TYPE_FILTERS.map(type => (
+              <option key={type} value={type}>
+                {t(`typeLabels.${type}` as Parameters<typeof t>[0]) ?? type}
               </option>
             ))}
           </select>
@@ -289,7 +275,7 @@ export default function LoyaltyTransactionsPage() {
               type="submit"
               className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
             >
-              Search
+              {t('searchButton')}
             </button>
           </form>
         </div>
@@ -306,7 +292,7 @@ export default function LoyaltyTransactionsPage() {
             rowKey={tx => tx.id}
             emptyState={
               <div className="p-12 text-center">
-                <p className="text-muted-foreground">No transactions found / لا توجد معاملات</p>
+                <p className="text-muted-foreground">{t('noTransactions')}</p>
               </div>
             }
           />
@@ -315,7 +301,11 @@ export default function LoyaltyTransactionsPage() {
         {meta && meta.totalPages > 1 && (
           <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-muted px-4 py-3">
             <p className="text-sm text-muted-foreground">
-              Page {meta.page} of {meta.totalPages} &mdash; {meta.total.toLocaleString()} total
+              {t('pageOf', {
+                page: meta.page,
+                totalPages: meta.totalPages,
+                total: meta.total.toLocaleString(),
+              })}
             </p>
             <div className="flex gap-2">
               <button
@@ -324,7 +314,7 @@ export default function LoyaltyTransactionsPage() {
                 disabled={page <= 1}
                 className="rounded border border-border px-3 py-1 text-sm disabled:opacity-50 hover:bg-card"
               >
-                Previous / السابق
+                {t('previous')}
               </button>
               <button
                 type="button"
@@ -332,7 +322,7 @@ export default function LoyaltyTransactionsPage() {
                 disabled={page >= meta.totalPages}
                 className="rounded border border-border px-3 py-1 text-sm disabled:opacity-50 hover:bg-card"
               >
-                Next / التالي
+                {t('next')}
               </button>
             </div>
           </div>

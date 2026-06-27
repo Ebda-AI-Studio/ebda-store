@@ -18,6 +18,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { apiGet, apiPost } from '@/lib/api';
 import { ALLOWED_CURRENCIES } from '@force/shared';
+import { useT } from '@/i18n/useT';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ const NON_KWD_CURRENCIES = ALLOWED_CURRENCIES.filter(c => c !== 'KWD');
 export default function FxRatesPage() {
   const params = useParams();
   const storeId = params?.id as string;
+  const t = useT('finance.fxRates');
 
   const [rates, setRates] = useState<FxRateEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,12 +92,12 @@ export default function FxRatesPage() {
     setFormError(null);
     setFormSuccess(false);
     if (!formCurrency) {
-      setFormError('Currency is required');
+      setFormError(t('errorCurrencyRequired'));
       return;
     }
     const rateNum = Number(formRate);
     if (!formRate || rateNum <= 0 || !isFinite(rateNum)) {
-      setFormError('Rate must be a positive number');
+      setFormError(t('errorRatePositive'));
       return;
     }
 
@@ -107,7 +109,7 @@ export default function FxRatesPage() {
         rateDate: formDate || undefined,
       });
       if (error) {
-        setFormError(error.message ?? 'Failed to save rate');
+        setFormError(error.message ?? t('errorSaveFailed'));
         return;
       }
       setFormSuccess(true);
@@ -124,32 +126,30 @@ export default function FxRatesPage() {
   // Feature not active
   if (featureEnabled === false) {
     return (
-      <AdminLayout title="FX Rate Registry" subtitle="Multi-Currency Accounting">
+      <AdminLayout title={t('title')} subtitle={t('multiCurrencyAccounting')}>
         <div className="max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-          <p className="font-semibold mb-1">Feature not active</p>
-          <p>
-            The <strong>Accounting — Multi-Currency</strong> feature is not enabled for this store.
-            Contact your account manager to enable it on an Enterprise plan.
-          </p>
+          <p className="font-semibold mb-1">{t('featureInactive')}</p>
+          <p>{t('featureInactiveDesc')}</p>
         </div>
       </AdminLayout>
     );
   }
 
   return (
-    <AdminLayout title="FX Rate Registry" subtitle="Record exchange rates for non-KWD transactions">
+    <AdminLayout title={t('title')} subtitle={t('subtitle')}>
       <div className="max-w-3xl space-y-6">
         {/* ── Add Rate Form ─────────────────────────────────────────────── */}
         <div className="rounded-xl border border-border bg-muted/10 p-5 space-y-4">
-          <p className="text-sm font-semibold">Record a New Rate</p>
+          <p className="text-sm font-semibold">{t('recordNewRate')}</p>
           <p className="text-xs text-muted-foreground">
-            Rate meaning: 1 unit of the selected currency = <strong>rate KWD</strong>.<br />
-            Example: USD at 0.307 means 1 USD = 0.307 KWD (307 fils).
+            {t('rateMeaning')}
+            <br />
+            {t('rateExample')}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Currency</span>
+              <span className="text-sm font-medium">{t('currencyLabel')}</span>
               <select
                 value={formCurrency}
                 onChange={e => setFormCurrency(e.target.value)}
@@ -164,7 +164,9 @@ export default function FxRatesPage() {
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Rate (KWD per 1 {formCurrency})</span>
+              <span className="text-sm font-medium">
+                {t('rateLabel', { currency: formCurrency })}
+              </span>
               <input
                 type="number"
                 min="0.000001"
@@ -177,7 +179,7 @@ export default function FxRatesPage() {
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Rate Date</span>
+              <span className="text-sm font-medium">{t('rateDateLabel')}</span>
               <input
                 type="date"
                 value={formDate}
@@ -190,13 +192,16 @@ export default function FxRatesPage() {
           {/* Live KWD preview */}
           {formRate && Number(formRate) > 0 && (
             <p className="text-xs text-muted-foreground">
-              Preview: 1 {formCurrency} = <strong>{Number(formRate).toFixed(6)} KWD</strong> | 100{' '}
-              {formCurrency} = <strong>{(Number(formRate) * 100).toFixed(3)} KWD</strong>
+              {t('ratePreview', {
+                currency: formCurrency,
+                rate: Number(formRate).toFixed(6),
+                rate100: (Number(formRate) * 100).toFixed(3),
+              })}
             </p>
           )}
 
           {formError && <p className="text-red-600 text-sm">{formError}</p>}
-          {formSuccess && <p className="text-green-700 text-sm">Rate saved successfully.</p>}
+          {formSuccess && <p className="text-green-700 text-sm">{t('rateSaved')}</p>}
 
           <button
             type="button"
@@ -204,20 +209,20 @@ export default function FxRatesPage() {
             disabled={submitting}
             className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm font-medium disabled:opacity-50"
           >
-            {submitting ? 'Saving…' : 'Save Rate'}
+            {submitting ? t('saving') : t('saveRate')}
           </button>
         </div>
 
         {/* ── Rate History ──────────────────────────────────────────────── */}
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <p className="text-sm font-semibold">Rate History (last 90 days)</p>
+            <p className="text-sm font-semibold">{t('historyTitle')}</p>
             <select
               value={filterCurrency}
               onChange={e => setFilterCurrency(e.target.value)}
               className="border border-border rounded px-2 py-1 text-xs"
             >
-              <option value="">All currencies</option>
+              <option value="">{t('allCurrencies')}</option>
               {NON_KWD_CURRENCIES.map(c => (
                 <option key={c} value={c}>
                   {c}
@@ -227,25 +232,25 @@ export default function FxRatesPage() {
           </div>
 
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <p className="text-sm text-muted-foreground">{t('loading')}</p>
           ) : rates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No rates recorded yet. Add the first rate above.
-            </p>
+            <p className="text-sm text-muted-foreground">{t('noRates')}</p>
           ) : (
             <div className="rounded-xl border border-border overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-muted/30">
                   <tr>
                     <th className="text-start px-4 py-2 font-medium text-muted-foreground">
-                      Currency
+                      {t('colCurrency')}
                     </th>
                     <th className="text-end px-4 py-2 font-medium text-muted-foreground">
-                      Rate (KWD)
+                      {t('colRate')}
                     </th>
-                    <th className="text-start px-4 py-2 font-medium text-muted-foreground">Date</th>
                     <th className="text-start px-4 py-2 font-medium text-muted-foreground">
-                      Recorded
+                      {t('colDate')}
+                    </th>
+                    <th className="text-start px-4 py-2 font-medium text-muted-foreground">
+                      {t('colRecorded')}
                     </th>
                   </tr>
                 </thead>

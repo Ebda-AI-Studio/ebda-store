@@ -2584,7 +2584,7 @@
       "instructionsTitle": "How to Import Products",
       "step1": "Download the CSV template using the button below",
       "step2": "Fill in your product data following the template format",
-      "step3": "Prices are in fils (1 KWD = 1000 fils)",
+      "step3": "Prices are in KWD (e.g. 12.500)",
       "step4": "For multiple categories/tags/images, separate with commas within quotes",
       "step5": "Upload the completed CSV file and click Import",
       "downloadTemplate": "Download Template",
@@ -2635,7 +2635,7 @@
         "allFields": "All product fields are included in the export",
         "commaSeparated": "Categories, tags, and images are comma-separated within their columns",
         "reImport": "The exported file can be edited and re-imported to update products",
-        "pricesInFils": "Prices are in fils (1 KWD = 1000 fils)"
+        "pricesInFils": "Prices are in KWD (e.g. 12.500)"
       }
     },
     "errors": {
@@ -3370,6 +3370,38 @@
       "awardedTitle": "Points Awarded",
       "awardedDescription": "Points have been awarded to {name}.",
       "awardFailed": "Failed to award points. Please try again."
+    },
+    "transactions": {
+      "title": "Transactions",
+      "subtitle": "Loyalty Program",
+      "breadcrumbLoyalty": "Loyalty",
+      "breadcrumbTransactions": "Transactions",
+      "colCustomer": "Customer",
+      "colPoints": "Points",
+      "colDate": "Date",
+      "colOrder": "Order #",
+      "colType": "Type",
+      "colDescription": "Description",
+      "colExpires": "Expires",
+      "searchButton": "Search",
+      "noTransactions": "No transactions found",
+      "pageOf": "Page {page} of {totalPages} — {total} total",
+      "previous": "Previous",
+      "next": "Next",
+      "typeLabels": {
+        "all": "All Types",
+        "earn_purchase": "Earn: Purchase",
+        "earn_signup": "Earn: Sign-up",
+        "earn_referral": "Earn: Referral",
+        "earn_review": "Earn: Review",
+        "earn_birthday": "Earn: Birthday",
+        "earn_manual": "Earn: Manual",
+        "redeem_discount": "Redeem: Discount",
+        "redeem_product": "Redeem: Product",
+        "expire": "Expired",
+        "adjust": "Adjustment",
+        "tier_changed": "Tier Changed"
+      }
     }
   },
   "paymentSettings": {
@@ -4227,6 +4259,65 @@
       "summarySkippedBoth": "Skipped {count} already-translated. ",
       "summarySkippedEmpty": "Skipped {count} empty. ",
       "summaryFailed": "Failed {count}. "
+    },
+    "orderTimeline": {
+      "sectionTitle": "Order Timeline",
+      "empty": "No timeline events yet",
+      "by": "by {actorName}"
+    },
+    "smartPalette": {
+      "title": "Smart palette",
+      "description": "Pick 1–3 colors and we'll distribute them across every section's background, card frame, and heading color. Section text auto-fixes for contrast.",
+      "suggestFromLogo": "Suggest from my logo",
+      "extracting": "Extracting…",
+      "logoHint": "Uses Gemini Vision to read dominant brand colors from your store logo",
+      "vibeSection": "Vibe (optional — overrides seeds + distribution)",
+      "distributionSection": "Distribution",
+      "patternLabel": "Pattern",
+      "frameThicknessLabel": "Card frame thickness",
+      "frameSizeLabel": "Frame size (padding)",
+      "primaryLabel": "Primary (required)",
+      "accentLabel": "Accent (optional — fills one alternating slot)",
+      "neutralLabel": "Neutral (optional — defaults to white)",
+      "resetToDefaults": "Reset to template defaults",
+      "previewHint": "Preview shows pattern + frame thickness · Click a tile to override that section",
+      "overridePrefix": "Override:",
+      "overrideBgLabel": "Background",
+      "overrideFrameLabel": "Card frame",
+      "overrideThicknessLabel": "Frame thickness",
+      "resetSection": "Reset this section",
+      "tokenHint": "Token refs (e.g. token:primary) preview as gray here; storefront resolves at render.",
+      "cancel": "Cancel",
+      "applyAll": "Apply to all sections",
+      "applyConfirm": "This overwrites the current section bg + frame colors. Proceed?",
+      "frameThin": "Thin (1px)",
+      "frameNormal": "Normal (2px)",
+      "frameThick": "Thick (4px)",
+      "frameXthick": "Extra thick (8px)",
+      "vibeLabels": {
+        "luxury": "Luxury",
+        "boutique": "Boutique",
+        "grocery": "Grocery",
+        "streetwear": "Streetwear",
+        "minimal": "Minimal",
+        "tech": "Tech",
+        "restaurant": "Restaurant",
+        "cafe": "Cafe",
+        "beauty": "Beauty"
+      },
+      "patternLabels": {
+        "alternating": "Alternating",
+        "monochrome": "Monochrome (shaded)",
+        "triad": "Triad",
+        "single-bg": "Solid background"
+      },
+      "errors": {
+        "noStoreId": "Store ID not available.",
+        "noLogo": "Upload a store logo first.",
+        "quotaExceeded": "AI quota reached. Try again tomorrow.",
+        "extractionFailed": "AI extraction failed.",
+        "extractionFailedRetry": "AI extraction failed. Please try again."
+      }
     }
   },
   "finance": {
@@ -4537,6 +4628,34 @@
         "ledgerEntries": "ledger entry/entries",
         "suggestedAction": "Suggested action"
       }
+    },
+    "fxRates": {
+      "title": "FX Rate Registry",
+      "subtitle": "Record exchange rates for non-KWD transactions",
+      "multiCurrencyAccounting": "Multi-Currency Accounting",
+      "featureInactive": "Feature not active",
+      "featureInactiveDesc": "The Accounting — Multi-Currency feature is not enabled for this store. Contact your account manager to enable it on an Enterprise plan.",
+      "recordNewRate": "Record a New Rate",
+      "rateMeaning": "Rate meaning: 1 unit of the selected currency = rate KWD.",
+      "rateExample": "Example: USD at 0.307 means 1 USD = 0.307 KWD (307 fils).",
+      "currencyLabel": "Currency",
+      "rateLabel": "Rate (KWD per 1 {currency})",
+      "rateDateLabel": "Rate Date",
+      "ratePreview": "Preview: 1 {currency} = {rate} KWD | 100 {currency} = {rate100} KWD",
+      "saving": "Saving…",
+      "saveRate": "Save Rate",
+      "rateSaved": "Rate saved successfully.",
+      "errorCurrencyRequired": "Currency is required",
+      "errorRatePositive": "Rate must be a positive number",
+      "errorSaveFailed": "Failed to save rate",
+      "historyTitle": "Rate History (last 90 days)",
+      "allCurrencies": "All currencies",
+      "noRates": "No rates recorded yet. Add the first rate above.",
+      "colCurrency": "Currency",
+      "colRate": "Rate (KWD)",
+      "colDate": "Date",
+      "colRecorded": "Recorded",
+      "loading": "Loading…"
     }
   },
   "stock": {

@@ -2584,7 +2584,7 @@
       "instructionsTitle": "كيفية استيراد المنتجات",
       "step1": "نزّل قالب CSV باستخدام الزر أدناه",
       "step2": "املأ بيانات منتجاتك متبعًا تنسيق القالب",
-      "step3": "الأسعار بالفلس (1 د.ك = 1000 فلس)",
+      "step3": "الأسعار بالدينار الكويتي (مثال: 12.500)",
       "step4": "لتعدد الفئات/الوسوم/الصور، افصل بفواصل داخل علامات الاقتباس",
       "step5": "ارفع ملف CSV المكتمل وانقر على استيراد",
       "downloadTemplate": "تنزيل القالب",
@@ -2635,7 +2635,7 @@
         "allFields": "جميع حقول المنتج مضمنة في التصدير",
         "commaSeparated": "الفئات والوسوم والصور مفصولة بفواصل داخل أعمدتها",
         "reImport": "يمكن تعديل الملف المصدّر وإعادة استيراده لتحديث المنتجات",
-        "pricesInFils": "الأسعار بالفلس (1 د.ك = 1000 فلس)"
+        "pricesInFils": "الأسعار بالدينار الكويتي (مثال: 12.500)"
       }
     },
     "errors": {
@@ -3370,6 +3370,38 @@
       "awardedTitle": "تم منح النقاط",
       "awardedDescription": "تم منح النقاط إلى {name}.",
       "awardFailed": "تعذّر منح النقاط. يرجى المحاولة مرة أخرى."
+    },
+    "transactions": {
+      "title": "المعاملات",
+      "subtitle": "برنامج الولاء",
+      "breadcrumbLoyalty": "الولاء",
+      "breadcrumbTransactions": "المعاملات",
+      "colCustomer": "العميل",
+      "colPoints": "النقاط",
+      "colDate": "التاريخ",
+      "colOrder": "رقم الطلب",
+      "colType": "النوع",
+      "colDescription": "الوصف",
+      "colExpires": "الانتهاء",
+      "searchButton": "بحث",
+      "noTransactions": "لا توجد معاملات",
+      "pageOf": "صفحة {page} من {totalPages} — {total} إجمالاً",
+      "previous": "السابق",
+      "next": "التالي",
+      "typeLabels": {
+        "all": "جميع الأنواع",
+        "earn_purchase": "ربح: شراء",
+        "earn_signup": "ربح: تسجيل",
+        "earn_referral": "ربح: إحالة",
+        "earn_review": "ربح: تقييم",
+        "earn_birthday": "ربح: عيد ميلاد",
+        "earn_manual": "ربح: يدوي",
+        "redeem_discount": "استرداد: خصم",
+        "redeem_product": "استرداد: منتج",
+        "expire": "منتهي الصلاحية",
+        "adjust": "تعديل",
+        "tier_changed": "تغيير المستوى"
+      }
     }
   },
   "paymentSettings": {
@@ -4227,6 +4259,65 @@
       "summarySkippedBoth": "تجاوزت {count} من العناصر المترجمة مسبقاً. ",
       "summarySkippedEmpty": "تم تخطي {count} فارغ. ",
       "summaryFailed": "فشل {count}. "
+    },
+    "orderTimeline": {
+      "sectionTitle": "مسار الطلب",
+      "empty": "لا توجد أحداث حتى الآن",
+      "by": "بواسطة {actorName}"
+    },
+    "smartPalette": {
+      "title": "لوحة الألوان الذكية",
+      "description": "اختر 1–3 ألوان وسنوزعها على خلفيات جميع الأقسام وإطار البطاقات ولون العناوين. يتكيّف نص الأقسام تلقائيًا للتباين.",
+      "suggestFromLogo": "اقتراح من شعاري",
+      "extracting": "جارٍ الاستخراج…",
+      "logoHint": "يستخدم Gemini Vision لقراءة الألوان المهيمنة من شعار متجرك",
+      "vibeSection": "الجو العام (اختياري — يلغي البذور والتوزيع)",
+      "distributionSection": "التوزيع",
+      "patternLabel": "النمط",
+      "frameThicknessLabel": "سماكة إطار البطاقة",
+      "frameSizeLabel": "حجم الإطار (المسافة الداخلية)",
+      "primaryLabel": "اللون الأساسي (مطلوب)",
+      "accentLabel": "اللون المميّز (اختياري — يملأ موقعًا تناوبيًا)",
+      "neutralLabel": "اللون المحايد (اختياري — الافتراضي أبيض)",
+      "resetToDefaults": "إعادة تعيين إلى إعدادات القالب الافتراضية",
+      "previewHint": "تعرض المعاينة النمط وسماكة الإطار · انقر على مربع لتخصيص ذلك القسم",
+      "overridePrefix": "تخصيص:",
+      "overrideBgLabel": "الخلفية",
+      "overrideFrameLabel": "إطار البطاقة",
+      "overrideThicknessLabel": "سماكة الإطار",
+      "resetSection": "إعادة تعيين هذا القسم",
+      "tokenHint": "مراجع الرمز (مثل token:primary) تظهر رمادية هنا؛ تُحلّها الواجهة الأمامية عند العرض.",
+      "cancel": "إلغاء",
+      "applyAll": "تطبيق على جميع الأقسام",
+      "applyConfirm": "سيستبدل هذا ألوان خلفية وإطار الأقسام الحالية. المتابعة؟",
+      "frameThin": "رفيع (1px)",
+      "frameNormal": "عادي (2px)",
+      "frameThick": "سميك (4px)",
+      "frameXthick": "سميك جداً (8px)",
+      "vibeLabels": {
+        "luxury": "فاخر",
+        "boutique": "بوتيك",
+        "grocery": "بقالة",
+        "streetwear": "ملابس شارع",
+        "minimal": "بسيط",
+        "tech": "تقني",
+        "restaurant": "مطعم",
+        "cafe": "كافيه",
+        "beauty": "تجميل"
+      },
+      "patternLabels": {
+        "alternating": "متناوب",
+        "monochrome": "أحادي اللون (مظلل)",
+        "triad": "ثلاثي",
+        "single-bg": "خلفية صلبة"
+      },
+      "errors": {
+        "noStoreId": "معرّف المتجر غير متاح.",
+        "noLogo": "ارفع شعار المتجر أولاً.",
+        "quotaExceeded": "تم الوصول إلى حصة الذكاء الاصطناعي. حاول مرة أخرى غداً.",
+        "extractionFailed": "فشل استخراج الذكاء الاصطناعي.",
+        "extractionFailedRetry": "فشل استخراج الذكاء الاصطناعي. يرجى المحاولة مرة أخرى."
+      }
     }
   },
   "finance": {
@@ -4537,6 +4628,34 @@
         "ledgerEntries": "قيد/قيود",
         "suggestedAction": "الإجراء المقترح"
       }
+    },
+    "fxRates": {
+      "title": "سجل أسعار الصرف",
+      "subtitle": "تسجيل أسعار صرف المعاملات غير الكويتية",
+      "multiCurrencyAccounting": "المحاسبة متعددة العملات",
+      "featureInactive": "الميزة غير مفعّلة",
+      "featureInactiveDesc": "ميزة المحاسبة — متعددة العملات غير مفعّلة لهذا المتجر. تواصل مع مدير حسابك لتفعيلها ضمن خطة Enterprise.",
+      "recordNewRate": "تسجيل سعر جديد",
+      "rateMeaning": "معنى السعر: 1 وحدة من العملة المختارة = السعر بالدينار الكويتي.",
+      "rateExample": "مثال: الدولار الأمريكي بسعر 0.307 يعني 1 دولار = 0.307 دينار كويتي (307 فلوس).",
+      "currencyLabel": "العملة",
+      "rateLabel": "السعر (د.ك مقابل 1 {currency})",
+      "rateDateLabel": "تاريخ السعر",
+      "ratePreview": "معاينة: 1 {currency} = {rate} د.ك | 100 {currency} = {rate100} د.ك",
+      "saving": "جارٍ الحفظ…",
+      "saveRate": "حفظ السعر",
+      "rateSaved": "تم حفظ السعر بنجاح.",
+      "errorCurrencyRequired": "العملة مطلوبة",
+      "errorRatePositive": "يجب أن يكون السعر رقمًا موجبًا",
+      "errorSaveFailed": "تعذّر حفظ السعر",
+      "historyTitle": "سجل الأسعار (آخر 90 يومًا)",
+      "allCurrencies": "جميع العملات",
+      "noRates": "لا توجد أسعار مسجّلة بعد. أضف السعر الأول أعلاه.",
+      "colCurrency": "العملة",
+      "colRate": "السعر (د.ك)",
+      "colDate": "التاريخ",
+      "colRecorded": "وقت التسجيل",
+      "loading": "جارٍ التحميل…"
     }
   },
   "stock": {

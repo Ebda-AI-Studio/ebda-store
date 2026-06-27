@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiGet } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
 interface TimelineRow {
   at: string;
@@ -147,6 +148,7 @@ function StatusChip({ status }: { status: string }) {
 }
 
 export function OrderLifecycleTimeline({ storeId, orderId }: OrderLifecycleTimelineProps) {
+  const t = useT('components.orderTimeline');
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<TimelineRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -182,7 +184,7 @@ export function OrderLifecycleTimeline({ storeId, orderId }: OrderLifecycleTimel
         aria-expanded={expanded}
       >
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          Order Timeline / مسار الطلب
+          {t('sectionTitle')}
         </h2>
         <svg
           className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -204,9 +206,7 @@ export function OrderLifecycleTimeline({ storeId, orderId }: OrderLifecycleTimel
           )}
 
           {!loading && rows.length === 0 && (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              No timeline events yet / لا توجد أحداث حتى الآن
-            </p>
+            <p className="py-4 text-center text-sm text-muted-foreground">{t('empty')}</p>
           )}
 
           {!loading && rows.length > 0 && (
@@ -235,7 +235,9 @@ export function OrderLifecycleTimeline({ storeId, orderId }: OrderLifecycleTimel
                       )}
                     </div>
                     {row.actorName && (
-                      <p className="mt-0.5 text-xs text-muted-foreground">by {row.actorName}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {t('by', { actorName: row.actorName })}
+                      </p>
                     )}
                     {row.location && (
                       <p className="mt-0.5 text-xs text-muted-foreground">{row.location}</p>
