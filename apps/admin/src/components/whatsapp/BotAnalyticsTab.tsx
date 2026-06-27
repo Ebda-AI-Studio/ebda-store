@@ -22,6 +22,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DateRangePicker } from '../DateRangePicker';
 import { apiGet } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 import type { Period, ResolvedDateRange } from '../../app/stores/[id]/analytics/_components/types';
 import { resolveDateRange } from '../../app/stores/[id]/analytics/_components/types';
 
@@ -68,9 +69,12 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 }
 
 function FunnelBar({ step, maxCount }: { step: FunnelStep; maxCount: number }) {
+  const t = useT('whatsappIntegration.botAnalytics');
   const pct = maxCount > 0 ? (step.count / maxCount) * 100 : 0;
   const dropOffDisplay =
-    step.dropOffFromPrev > 0 ? `↓ ${(step.dropOffFromPrev * 100).toFixed(1)}% drop-off` : null;
+    step.dropOffFromPrev > 0
+      ? `↓ ${t('dropOff', { pct: (step.dropOffFromPrev * 100).toFixed(1) })}`
+      : null;
 
   return (
     <div className="flex flex-col gap-1">
@@ -93,6 +97,7 @@ function FunnelBar({ step, maxCount }: { step: FunnelStep; maxCount: number }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function BotAnalyticsTab({ storeId }: { storeId: string }) {
+  const t = useT('whatsappIntegration.botAnalytics');
   const [period, setPeriod] = useState<Period>('last_30');
   const [custom, setCustom] = useState<ResolvedDateRange | undefined>();
   const [data, setData] = useState<BotAnalyticsData | null>(null);
@@ -122,19 +127,19 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
           if (code === 'WBS_NOT_CONNECTED') {
             setNotConnected(true);
           } else {
-            setError(apiError.message || 'Failed to load analytics data.');
+            setError(apiError.message || t('loadDataError'));
           }
           return;
         }
 
         if (result) setData(result);
       } catch (err) {
-        setError('Could not load analytics. Please check your WBS connection.');
+        setError(t('loadError'));
       } finally {
         setLoading(false);
       }
     },
-    [storeId]
+    [storeId, t]
   );
 
   useEffect(() => {
@@ -151,8 +156,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
   if (notConnected) {
     return (
       <div className="rounded-xl border border-border bg-muted/40 p-6 text-center text-sm text-muted-foreground">
-        WBS is not connected for this store. Configure the integration in the{' '}
-        <strong>Connection</strong> tab first.
+        {t('notConnected')}
       </div>
     );
   }
@@ -195,55 +199,53 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
           {/* Top stat cards */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
-              label="Total sessions"
+              label={t('totalSessions')}
               value={data.totalSessions.toLocaleString()}
-              sub="bot conversations started"
+              sub={t('sessionsBot')}
             />
             <StatCard
-              label="Paid orders"
+              label={t('paidOrders')}
               value={(data.funnel.find(s => s.step === 'order_paid')?.count ?? 0).toLocaleString()}
-              sub="confirmed payments"
+              sub={t('confirmedPayments')}
             />
             <StatCard
-              label="Conversion rate"
+              label={t('conversionRate')}
               value={`${(data.conversionRate * 100).toFixed(1)}%`}
-              sub="sessions → paid"
+              sub={t('sessionsToPaid')}
             />
             <StatCard
-              label="LLM calls"
+              label={t('llmCalls')}
               value={data.llmStats.totalLlmCalls.toLocaleString()}
               sub={
                 data.llmStats.avgConfidence != null
-                  ? `avg confidence ${(data.llmStats.avgConfidence * 100).toFixed(0)}%`
-                  : 'Gemini intent classifier'
+                  ? t('avgConfidenceSub', { pct: (data.llmStats.avgConfidence * 100).toFixed(0) })
+                  : t('geminiClassifier')
               }
             />
           </div>
 
           {/* Funnel */}
           <div className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-sm font-semibold mb-4">Conversion Funnel</h3>
+            <h3 className="text-sm font-semibold mb-4">{t('funnelTitle')}</h3>
             <div className="flex flex-col gap-3">
               {data.funnel.map(step => (
                 <FunnelBar key={step.step} step={step} maxCount={maxCount} />
               ))}
             </div>
             {data.totalSessions === 0 && (
-              <p className="text-sm text-muted-foreground mt-4 text-center">
-                No sessions recorded in this date window yet.
-              </p>
+              <p className="text-sm text-muted-foreground mt-4 text-center">{t('noSessions')}</p>
             )}
           </div>
 
           {/* Intent breakdown */}
           {intentEntries.length > 0 && (
             <div className="rounded-xl border border-border bg-card p-5">
-              <h3 className="text-sm font-semibold mb-4">Intent Breakdown</h3>
+              <h3 className="text-sm font-semibold mb-4">{t('intentTitle')}</h3>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="pb-2 text-start font-medium">Intent</th>
-                    <th className="pb-2 text-end font-medium">Count</th>
+                    <th className="pb-2 text-start font-medium">{t('intentColIntent')}</th>
+                    <th className="pb-2 text-end font-medium">{t('intentColCount')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -262,14 +264,14 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Input modality */}
             <div className="rounded-xl border border-border bg-card p-5">
-              <h3 className="text-sm font-semibold mb-3">Input Modality</h3>
+              <h3 className="text-sm font-semibold mb-3">{t('inputModalityTitle')}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {(
                   [
-                    { key: 'text', label: 'Text' },
-                    { key: 'voice', label: 'Voice' },
-                    { key: 'image', label: 'Image' },
-                    { key: 'button_tap', label: 'Button' },
+                    { key: 'text', label: t('inputText') },
+                    { key: 'voice', label: t('inputVoice') },
+                    { key: 'image', label: t('inputImage') },
+                    { key: 'button_tap', label: t('inputButton') },
                   ] as const
                 ).map(({ key, label }) => {
                   const count = data.inputBreakdown[key] ?? 0;
@@ -289,7 +291,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
 
             {/* Language breakdown */}
             <div className="rounded-xl border border-border bg-card p-5">
-              <h3 className="text-sm font-semibold mb-3">Language</h3>
+              <h3 className="text-sm font-semibold mb-3">{t('languageTitle')}</h3>
               {langTotal > 0 ? (
                 <div className="space-y-3">
                   {Object.entries(data.languageBreakdown)
@@ -315,7 +317,7 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
                     })}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No language data yet.</p>
+                <p className="text-sm text-muted-foreground">{t('noLanguageData')}</p>
               )}
             </div>
           </div>
@@ -323,21 +325,21 @@ export function BotAnalyticsTab({ storeId }: { storeId: string }) {
           {/* LLM stats footer */}
           <div className="rounded-xl border border-border bg-muted/30 p-4 flex flex-wrap gap-6 text-sm">
             <div>
-              <span className="text-muted-foreground me-1">Total LLM calls:</span>
+              <span className="text-muted-foreground me-1">{t('totalLlmCallsLabel')}</span>
               <span className="font-medium tabular-nums">
                 {data.llmStats.totalLlmCalls.toLocaleString()}
               </span>
             </div>
             {data.llmStats.avgConfidence != null && (
               <div>
-                <span className="text-muted-foreground me-1">Avg confidence:</span>
+                <span className="text-muted-foreground me-1">{t('avgConfidenceLabel')}</span>
                 <span className="font-medium">
                   {(data.llmStats.avgConfidence * 100).toFixed(1)}%
                 </span>
               </div>
             )}
             <div>
-              <span className="text-muted-foreground me-1">Keyword fallbacks:</span>
+              <span className="text-muted-foreground me-1">{t('keywordFallbacksLabel')}</span>
               <span className="font-medium tabular-nums">
                 {data.llmStats.fallbackToKeyword.toLocaleString()}
               </span>

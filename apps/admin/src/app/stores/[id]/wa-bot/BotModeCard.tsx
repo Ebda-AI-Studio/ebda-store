@@ -12,14 +12,7 @@ import { Button, useToast } from '@force/ui';
 import { apiPut } from '../../../../lib/api';
 import type { BotMode } from '../../../../lib/types/wa-bot';
 import { BOT_MODE_LABELS } from '../../../../lib/types/wa-bot';
-
-const BOT_MODE_DESCRIPTIONS: Record<BotMode, string> = {
-  legacy_chat: 'Customers browse and order via text messages. No Meta Commerce account required.',
-  native_catalog:
-    'WhatsApp opens your Meta Commerce catalog directly. Requires a configured Meta catalog ID below.',
-  native_catalog_with_gemini_agent:
-    'Native catalog + Gemini AI answers customer questions and assists with ordering.',
-};
+import { useT } from '../../../../i18n/useT';
 
 interface BotModeCardProps {
   storeId: string;
@@ -28,6 +21,7 @@ interface BotModeCardProps {
 
 export function BotModeCard({ storeId, initialMode }: BotModeCardProps) {
   const { success: toastSuccess, error: toastError } = useToast();
+  const t = useT('whatsappIntegration.botMode');
   const [mode, setMode] = useState<BotMode>(initialMode);
   const [saving, setSaving] = useState(false);
 
@@ -38,18 +32,16 @@ export function BotModeCard({ storeId, initialMode }: BotModeCardProps) {
     });
     setSaving(false);
     if (error) {
-      toastError(error.message || 'Failed to save bot mode');
+      toastError(error.message || t('saveError'));
     } else {
-      toastSuccess('Bot mode saved');
+      toastSuccess(t('saveSuccess'));
     }
   };
 
   return (
     <div className="rounded-xl border border-border bg-card p-6">
-      <h2 className="text-base font-semibold text-foreground mb-1">Bot Mode</h2>
-      <p className="text-sm text-muted-foreground mb-5">
-        Choose how the WhatsApp bot handles customer product browsing and ordering.
-      </p>
+      <h2 className="text-base font-semibold text-foreground mb-1">{t('title')}</h2>
+      <p className="text-sm text-muted-foreground mb-5">{t('subtitle')}</p>
 
       <div className="space-y-3">
         {(Object.keys(BOT_MODE_LABELS) as BotMode[]).map(key => (
@@ -68,8 +60,12 @@ export function BotModeCard({ storeId, initialMode }: BotModeCardProps) {
               className="mt-0.5 shrink-0 accent-primary"
             />
             <div>
-              <p className="text-sm font-medium text-foreground">{BOT_MODE_LABELS[key]}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{BOT_MODE_DESCRIPTIONS[key]}</p>
+              <p className="text-sm font-medium text-foreground">
+                {t(`label_${key}` as Parameters<typeof t>[0])}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t(`desc_${key}` as Parameters<typeof t>[0])}
+              </p>
             </div>
           </label>
         ))}
@@ -77,7 +73,7 @@ export function BotModeCard({ storeId, initialMode }: BotModeCardProps) {
 
       <div className="mt-5 flex justify-end">
         <Button onClick={handleSave} disabled={saving || mode === initialMode} size="sm">
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('saving') : t('save')}
         </Button>
       </div>
     </div>

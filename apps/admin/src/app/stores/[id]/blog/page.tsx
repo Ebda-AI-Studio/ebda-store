@@ -6,6 +6,7 @@ import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiDelete } from '../../../../lib/api';
+import { useT } from '@/i18n/useT';
 
 interface BlogPost {
   id: string;
@@ -46,6 +47,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // Debounced search term — client-side filter over post title (EN or AR).
   const [search, setSearch] = useState('');
+  const t = useT('blog.page');
 
   useEffect(() => {
     let cancelled = false;
@@ -88,33 +90,33 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
   }, [posts]);
 
   async function handleDelete(postId: string) {
-    if (!confirm('Delete this blog post? This cannot be undone.')) return;
+    if (!confirm(t('postDeleteConfirm'))) return;
     setDeletingId(postId);
     const { error } = await apiDelete(`/api/v1/stores/${storeId}/blog/${postId}`);
     setDeletingId(null);
     if (!error) {
       setPosts(prev => prev.filter(p => p.id !== postId));
     } else {
-      alert(error.message || 'Delete failed');
+      alert(error.message || t('postDeleteFailed'));
     }
   }
 
   return (
     <AdminLayout
-      title="Blog"
-      subtitle="Write articles, news, and stories that show up on your storefront blog."
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div className="flex gap-2">
           <Link href={`/stores/${storeId}`}>
             <Button type="button" variant="outline">
-              Back to store
+              {t('backToStore')}
             </Button>
           </Link>
           <Link
             href={`/stores/${storeId}/blog/new`}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
           >
-            + New post
+            {t('newPost')}
           </Link>
         </div>
       }
@@ -123,14 +125,13 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
       <div className="space-y-6">
         {store && store.blogEnabled === false && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
-            <p className="font-semibold text-amber-900">Blog is currently disabled</p>
+            <p className="font-semibold text-amber-900">{t('disabledTitle')}</p>
             <p className="mt-1 text-amber-800">
-              Your blog isn&apos;t visible on the storefront yet. Posts you create here are saved as
-              drafts.{' '}
+              {t('disabledBody')}{' '}
               <Link href={`/stores/${storeId}/branding`} className="font-semibold underline">
-                Enable it in Branding
+                {t('disabledLink')}
               </Link>{' '}
-              to publish.
+              {t('disabledSuffix')}
             </p>
           </div>
         )}
@@ -140,7 +141,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
           <SearchInput
             value={search}
             onSearch={setSearch}
-            placeholder="Search posts…"
+            placeholder={t('searchPlaceholder')}
             className="w-full sm:w-72"
           />
         </div>
@@ -149,11 +150,13 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              {publishedCount} published
+              {t('publishedCount', { count: publishedCount })}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-700">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              {draftCount} draft{draftCount === 1 ? '' : 's'}
+              {draftCount === 1
+                ? t('draftCount', { count: draftCount })
+                : t('draftsCount', { count: draftCount })}
             </span>
           </div>
         )}
@@ -190,15 +193,13 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 </svg>
               </div>
-              <p className="text-base font-semibold text-foreground">No blog posts yet</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Articles, news, and stories you publish will show up here.
-              </p>
+              <p className="text-base font-semibold text-foreground">{t('emptyTitle')}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t('emptyDescription')}</p>
               <Link
                 href={`/stores/${storeId}/blog/new`}
                 className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
               >
-                Write your first post →
+                {t('emptyCta')}
               </Link>
             </div>
           ) : (
@@ -252,7 +253,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                                 : 'bg-amber-100 text-amber-800'
                             }`}
                           >
-                            {post.isPublished ? 'Published' : 'Draft'}
+                            {post.isPublished ? t('postPublished') : t('postDraft')}
                           </span>
                         </div>
                         {post.titleAr && (
@@ -276,7 +277,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                         href={`/stores/${storeId}/blog/${post.id}`}
                         className="inline-flex flex-1 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted sm:flex-none"
                       >
-                        Edit
+                        {t('postEdit')}
                       </Link>
                       <button
                         type="button"
@@ -284,7 +285,7 @@ export default function BlogListPage({ params }: { params: Promise<{ id: string 
                         onClick={() => handleDelete(post.id)}
                         className="inline-flex items-center justify-center rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-60"
                       >
-                        {deletingId === post.id ? 'Deleting…' : 'Delete'}
+                        {deletingId === post.id ? t('postDeleting') : t('postDelete')}
                       </button>
                     </div>
                   </li>

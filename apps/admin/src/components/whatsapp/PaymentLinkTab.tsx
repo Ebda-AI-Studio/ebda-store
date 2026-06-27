@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button, useToast } from '@force/ui';
 import { apiGet, apiPost } from '../../lib/api';
 import { formatPrice } from '../../lib/format';
+import { useT } from '../../i18n/useT';
 
 interface PaymentLinkResponse {
   paymentUrl: string;
@@ -111,6 +112,7 @@ interface CartLine {
 
 export function PaymentLinkTab({ storeId }: { storeId: string }) {
   const { success: toastSuccess, error: toastError } = useToast();
+  const t = useT('whatsappIntegration.paymentLink');
 
   const [customerPhone, setCustomerPhone] = useState('+965');
   const [customerName, setCustomerName] = useState('');
@@ -213,18 +215,15 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         }
       );
       if (error) {
-        toastError('Could not send', error.message || 'Unknown error');
+        toastError(t('toastCouldNotSendTitle'), error.message || t('toastUnknownError'));
         return;
       }
       if (payload) {
         setResult(payload);
-        toastSuccess(
-          'Payment link sent',
-          `${customerPhone} will receive the MyFatoorah checkout link via WhatsApp.`
-        );
+        toastSuccess(t('toastSentTitle'), t('toastSentBody', { phone: customerPhone }));
       }
     } catch (err) {
-      toastError('Send failed', err instanceof Error ? err.message : String(err));
+      toastError(t('toastSendFailedTitle'), err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
     }
@@ -243,17 +242,13 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <p className="text-sm text-gray-600">
-        Send a customer a one-tap WhatsApp payment link backed by a MyFatoorah invoice. Pick
-        catalogue items, add a custom amount, or both — the customer taps once, lands on the
-        MyFatoorah checkout, and pays. The link stays valid until the order is paid or canceled.
-      </p>
+      <p className="text-sm text-gray-600">{t('description')}</p>
 
       <div className="rounded-lg border bg-card shadow-sm p-5 space-y-4">
         {/* Phone */}
         <div className="space-y-1.5">
           <label htmlFor="pl-phone" className="text-sm font-medium text-foreground">
-            Customer WhatsApp number (E.164)
+            {t('phoneLabel')}
           </label>
           <input
             id="pl-phone"
@@ -264,16 +259,14 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
             className="w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm font-mono"
           />
           {!phoneValid && customerPhone.length > 4 && (
-            <p className="text-[11px] text-red-600 dark:text-red-400">
-              Must start with + and be 8–16 digits.
-            </p>
+            <p className="text-[11px] text-red-600 dark:text-red-400">{t('phoneError')}</p>
           )}
         </div>
 
         {/* Name */}
         <div className="space-y-1.5">
           <label htmlFor="pl-name" className="text-sm font-medium text-foreground">
-            Customer name (optional)
+            {t('nameLabel')}
           </label>
           <input
             id="pl-name"
@@ -289,7 +282,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-foreground">
-              Items {validLines.length > 0 && `(${validLines.length})`}
+              {t('itemsLabel')} {validLines.length > 0 && `(${validLines.length})`}
             </label>
             <button
               type="button"
@@ -297,7 +290,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
               className="inline-flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-medium"
             >
               <PlusIcon className="h-3.5 w-3.5" />
-              Add item
+              {t('addItem')}
             </button>
           </div>
           {cartLines.map((line, idx) => {
@@ -325,7 +318,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                           }}
                           className="ms-2 text-xs text-orange-600 hover:text-orange-700 font-medium"
                         >
-                          Change
+                          {t('change')}
                         </button>
                       </div>
                     ) : (
@@ -336,8 +329,8 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                         disabled={loadingProducts}
                         placeholder={
                           loadingProducts
-                            ? 'Loading products...'
-                            : `Search ${products.length} products by name or SKU…`
+                            ? t('loadingProducts')
+                            : t('searchProducts', { count: products.length })
                         }
                         className="w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm"
                       />
@@ -395,11 +388,8 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         {/* Extra amount — custom charge with no Product. Webhook reconciles
             against Order.total which already includes this. */}
         <div className="space-y-2 rounded-md border border-dashed border-border bg-muted/40 p-3">
-          <label className="text-sm font-medium text-foreground">Custom amount (optional)</label>
-          <p className="text-[11px] text-muted-foreground -mt-1">
-            Add a charge that isn&apos;t a catalogue product — a custom quote, service fee, or
-            deposit. Baked into the order total + reconciled when MyFatoorah callback returns.
-          </p>
+          <label className="text-sm font-medium text-foreground">{t('customAmountLabel')}</label>
+          <p className="text-[11px] text-muted-foreground -mt-1">{t('customAmountHint')}</p>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -415,7 +405,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
               type="text"
               value={extraAmountNote}
               onChange={e => setExtraAmountNote(e.target.value)}
-              placeholder="What is this for? (optional)"
+              placeholder={t('customAmountNote')}
               maxLength={200}
               className="flex-1 rounded-md border bg-background text-foreground px-3 py-2 text-sm"
             />
@@ -427,7 +417,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
           <div className="rounded-md border bg-orange-50 p-3 text-sm space-y-0.5">
             {itemsSubtotalFils > 0 && (
               <div className="flex justify-between text-gray-700">
-                <span>Items subtotal</span>
+                <span>{t('itemsSubtotal')}</span>
                 <span className="font-mono tabular-nums">
                   {(itemsSubtotalFils / 1000).toFixed(3)} {language === 'ar' ? 'د.ك' : 'KWD'}
                 </span>
@@ -435,14 +425,17 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
             )}
             {extraFils > 0 && (
               <div className="flex justify-between text-gray-700">
-                <span>Custom amount{extraAmountNote ? ` (${extraAmountNote})` : ''}</span>
+                <span>
+                  {t('customAmount')}
+                  {extraAmountNote ? ` (${extraAmountNote})` : ''}
+                </span>
                 <span className="font-mono tabular-nums">
                   {(extraFils / 1000).toFixed(3)} {language === 'ar' ? 'د.ك' : 'KWD'}
                 </span>
               </div>
             )}
             <div className="flex justify-between font-semibold text-gray-900 pt-1 border-t border-orange-200">
-              <span>Total</span>
+              <span>{t('total')}</span>
               <span className="font-mono tabular-nums">
                 {(totalFils / 1000).toFixed(3)} {language === 'ar' ? 'د.ك' : 'KWD'}
               </span>
@@ -453,7 +446,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         {/* Language */}
         <div className="space-y-1.5">
           <label htmlFor="pl-lang" className="text-sm font-medium text-foreground">
-            WhatsApp message language
+            {t('messageLanguage')}
           </label>
           <select
             id="pl-lang"
@@ -461,8 +454,8 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
             onChange={e => setLanguage(e.target.value as 'en' | 'ar')}
             className="w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm"
           >
-            <option value="en">English</option>
-            <option value="ar">Arabic</option>
+            <option value="en">{t('langEn')}</option>
+            <option value="ar">{t('langAr')}</option>
           </select>
         </div>
 
@@ -472,7 +465,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
           className="w-full bg-orange-500 hover:bg-orange-600"
         >
           <SendIcon className="me-2 h-4 w-4" />
-          {sending ? 'Sending…' : 'Send payment link via WhatsApp'}
+          {sending ? t('sending') : t('sendLink')}
         </Button>
       </div>
 
@@ -480,13 +473,10 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
         <div className="rounded-lg border bg-emerald-50 border-emerald-200 p-4 space-y-3">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
             <CheckIcon className="h-4 w-4" />
-            Sent successfully
+            {t('sentTitle')}
           </h3>
           <div className="text-xs text-emerald-800 space-y-1.5">
-            <p>
-              Customer receives the WhatsApp message immediately. The MyFatoorah checkout link stays
-              valid until the order is paid or canceled.
-            </p>
+            <p>{t('sentDescription')}</p>
             <p className="flex items-center gap-2 flex-wrap text-[11px] text-emerald-700">
               <span className="font-mono">Order #{result.orderNumber}</span>
               {result.invoiceId && <span className="font-mono">· Invoice {result.invoiceId}</span>}
@@ -494,7 +484,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
                 href={`/stores/${storeId}/orders/${result.orderId}`}
                 className="ms-auto inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-emerald-700 hover:bg-emerald-100 font-medium"
               >
-                View order →
+                {t('viewOrder')}
               </a>
             </p>
             <div className="flex items-center gap-2 mt-2">
@@ -515,7 +505,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
             </div>
             {result.messageId && (
               <p className="text-[10px] text-emerald-600 font-mono">
-                Meta message id: {result.messageId}
+                {t('metaMessageId')} {result.messageId}
               </p>
             )}
           </div>
@@ -523,8 +513,7 @@ export function PaymentLinkTab({ storeId }: { storeId: string }) {
       )}
 
       <div className="rounded-md border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
-        <strong>Requirements:</strong> the <em>paymentLink</em> template must be approved by Meta.
-        Visit the <strong>Templates</strong> tab to generate and sync templates.
+        {t('requirements')}
       </div>
     </div>
   );

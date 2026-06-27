@@ -70,6 +70,7 @@ interface OrderRow {
 }
 
 import { formatDate, formatPrice } from '../../../../../lib/format';
+import { useT } from '../../../../../i18n/useT';
 
 function formatKwd(fils: number): string {
   return formatPrice(fils);
@@ -100,6 +101,7 @@ export default function CustomerDetailPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const t = useT('customers.detail');
 
   const fetchDetail = useCallback(async () => {
     if (!storeId || !customerKey) return;
@@ -111,13 +113,13 @@ export default function CustomerDetailPage() {
         orders: OrderRow[];
       }>(`/api/v1/stores/${storeId}/customers/${encodeURIComponent(customerKey)}`);
       if (apiError) {
-        setError(apiError.message || 'Failed to load customer');
+        setError(apiError.message || t('fetchFailed'));
       } else if (data) {
         setCustomer(data.customer);
         setOrders(data.orders);
       }
     } catch {
-      setError('Failed to load customer');
+      setError(t('fetchFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -130,16 +132,16 @@ export default function CustomerDetailPage() {
   const displayName =
     customer && (customer.firstName || customer.lastName)
       ? `${customer.firstName} ${customer.lastName}`.trim()
-      : customer?.email || customer?.phone || 'Customer';
+      : customer?.email || customer?.phone || t('displayFallback');
 
   return (
     <AdminLayout
       title={displayName}
-      subtitle={customer?.isGuest ? 'Guest customer (no account)' : 'Registered customer'}
+      subtitle={customer?.isGuest ? t('subtitleGuest') : t('subtitleRegistered')}
       actions={
         <Link href={`/stores/${storeId}/customers`}>
           <Button type="button" variant="outline">
-            Back to Customers
+            {t('backToCustomers')}
           </Button>
         </Link>
       }
@@ -158,7 +160,7 @@ export default function CustomerDetailPage() {
             <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
               {error}
               <button type="button" className="ms-4 font-medium underline" onClick={fetchDetail}>
-                Retry
+                {t('retry')}
               </button>
             </div>
           )}
@@ -168,22 +170,22 @@ export default function CustomerDetailPage() {
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="rounded-xl border bg-card p-6 shadow-sm">
                   <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    Contact
+                    {t('contactSection')}
                   </h2>
                   <dl className="space-y-3 text-sm">
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-muted-foreground">Name</dt>
+                      <dt className="text-muted-foreground">{t('fieldName')}</dt>
                       <dd className="font-medium text-foreground text-end">
                         {customer.firstName} {customer.lastName}
                         {customer.isGuest && (
                           <span className="ms-2 inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">
-                            guest
+                            {t('guestBadge')}
                           </span>
                         )}
                       </dd>
                     </div>
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-muted-foreground">Email</dt>
+                      <dt className="text-muted-foreground">{t('fieldEmail')}</dt>
                       <dd className="font-medium text-foreground text-end" dir="ltr">
                         {customer.email ? (
                           <a href={`mailto:${customer.email}`} className="hover:underline">
@@ -195,7 +197,7 @@ export default function CustomerDetailPage() {
                       </dd>
                     </div>
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-muted-foreground">Phone</dt>
+                      <dt className="text-muted-foreground">{t('fieldPhone')}</dt>
                       <dd className="font-medium text-foreground text-end" dir="ltr">
                         {customer.phone ? (
                           <a href={`tel:${customer.phone}`} className="hover:underline">
@@ -207,7 +209,7 @@ export default function CustomerDetailPage() {
                       </dd>
                     </div>
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-muted-foreground">Customer since</dt>
+                      <dt className="text-muted-foreground">{t('fieldSince')}</dt>
                       <dd className="font-medium text-foreground text-end">
                         {formatDate(customer.accountCreatedAt ?? customer.firstOrderDate)}
                       </dd>
@@ -217,7 +219,7 @@ export default function CustomerDetailPage() {
 
                 <div className="rounded-xl border bg-card p-6 shadow-sm">
                   <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    Last shipping address
+                    {t('shippingSection')}
                   </h2>
                   {customer.address ? (
                     <div className="space-y-1 text-sm text-foreground">
@@ -233,7 +235,7 @@ export default function CustomerDetailPage() {
                       )}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No shipping address on file</p>
+                    <p className="text-sm text-muted-foreground">{t('noShipping')}</p>
                   )}
                 </div>
               </div>
@@ -242,13 +244,13 @@ export default function CustomerDetailPage() {
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <div className="rounded-xl border bg-card p-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Total orders
+                    {t('statsOrders')}
                   </p>
                   <p className="mt-1 text-2xl font-bold text-foreground">{customer.totalOrders}</p>
                 </div>
                 <div className="rounded-xl border bg-card p-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Total spent
+                    {t('statsSpent')}
                   </p>
                   <p className="mt-1 text-2xl font-bold text-foreground">
                     {formatKwd(customer.totalSpent)}
@@ -256,7 +258,7 @@ export default function CustomerDetailPage() {
                 </div>
                 <div className="rounded-xl border bg-card p-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Avg order value
+                    {t('statsAvgOrder')}
                   </p>
                   <p className="mt-1 text-2xl font-bold text-foreground">
                     {formatKwd(customer.avgOrderValue)}
@@ -264,7 +266,7 @@ export default function CustomerDetailPage() {
                 </div>
                 <div className="rounded-xl border bg-card p-4">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Last order
+                    {t('statsLastOrder')}
                   </p>
                   <p className="mt-1 text-2xl font-bold text-foreground">
                     {formatDate(customer.lastOrderDate)}
@@ -276,30 +278,30 @@ export default function CustomerDetailPage() {
               <div className="flex flex-wrap items-center gap-3">
                 {customer.paidCount > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">
-                    Paid · {customer.paidCount}
+                    {t('statusPaid')} · {customer.paidCount}
                   </span>
                 )}
                 {customer.pendingCount > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">
-                    Pending · {customer.pendingCount}
+                    {t('statusPending')} · {customer.pendingCount}
                   </span>
                 )}
                 {customer.cancelledCount > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
-                    Cancelled · {customer.cancelledCount}
+                    {t('statusCancelled')} · {customer.cancelledCount}
                   </span>
                 )}
                 {customer.failedCount > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
-                    Failed · {customer.failedCount}
+                    {t('statusFailed')} · {customer.failedCount}
                   </span>
                 )}
                 {customer.refundedCount > 0 && (
                   <span
-                    title={`Total refunded: ${formatKwd(customer.totalRefunded)}`}
+                    title={`${t('refunded')}: ${formatKwd(customer.totalRefunded)}`}
                     className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive"
                   >
-                    Refunded · {customer.refundedCount}
+                    {t('statusRefunded')} · {customer.refundedCount}
                     <span className="text-[10px] text-destructive/70">
                       ({formatKwd(customer.totalRefunded)})
                     </span>
@@ -307,7 +309,7 @@ export default function CustomerDetailPage() {
                 )}
                 {customer.paymentMethods.length > 0 && (
                   <span className="text-xs text-muted-foreground">
-                    Payment methods: {customer.paymentMethods.join(', ')}
+                    {t('paymentMethods')} {customer.paymentMethods.join(', ')}
                   </span>
                 )}
               </div>
@@ -316,7 +318,7 @@ export default function CustomerDetailPage() {
               <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
                 <div className="border-b bg-muted/40 px-6 py-3">
                   <h2 className="text-sm font-semibold text-foreground">
-                    Orders ({orders.length})
+                    {t('ordersSection', { count: orders.length })}
                   </h2>
                 </div>
                 <div className="overflow-x-auto">
@@ -324,25 +326,25 @@ export default function CustomerDetailPage() {
                     <thead className="border-b bg-muted/20">
                       <tr>
                         <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Order #
+                          {t('colOrderNum')}
                         </th>
                         <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Date
+                          {t('colDate')}
                         </th>
                         <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Status
+                          {t('colStatus')}
                         </th>
                         <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Payment
+                          {t('colPayment')}
                         </th>
                         <th className="px-6 py-3 text-start text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">
-                          Items
+                          {t('colItems')}
                         </th>
                         <th className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Total
+                          {t('colTotal')}
                         </th>
                         <th className="px-6 py-3 text-end text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Action
+                          {t('colAction')}
                         </th>
                       </tr>
                     </thead>
@@ -371,14 +373,15 @@ export default function CustomerDetailPage() {
                                 <StatusChip status={order.paymentStatus} />
                                 {order.payments[0] && (
                                   <span className="ms-2 text-xs text-muted-foreground">
-                                    via {order.payments[0].provider}
+                                    {t('via')} {order.payments[0].provider}
                                   </span>
                                 )}
                               </td>
                               <td className="px-6 py-4 hidden md:table-cell text-sm text-muted-foreground">
                                 {order.items.length}{' '}
                                 <span className="text-xs">
-                                  ({order.items.reduce((sum, it) => sum + it.quantity, 0)} units)
+                                  ({order.items.reduce((sum, it) => sum + it.quantity, 0)}{' '}
+                                  {t('units')})
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-end text-sm font-bold text-foreground">
@@ -389,7 +392,7 @@ export default function CustomerDetailPage() {
                                   href={`/stores/${storeId}/orders/${order.id}`}
                                   className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                                 >
-                                  View
+                                  {t('viewOrder')}
                                 </Link>
                               </td>
                             </tr>
@@ -399,19 +402,20 @@ export default function CustomerDetailPage() {
                                   colSpan={7}
                                   className="px-6 py-2 text-xs text-destructive border-t border-destructive/10"
                                 >
-                                  <span className="font-semibold">Refunded</span>
-                                  {' · '}-{formatKwd(refundedPayment.refundedAmount ?? order.total)}
-                                  {' via '}
-                                  {refundedPayment.provider}
+                                  <span className="font-semibold">{t('refunded')}</span>
+                                  {' · '}-{formatKwd(refundedPayment.refundedAmount ?? order.total)}{' '}
+                                  {t('via')} {refundedPayment.provider}
                                   {refundedPayment.metadata?.refundedAt && (
                                     <>
-                                      {' on '}
+                                      {' '}
+                                      {t('refundedOn')}{' '}
                                       {formatDate(refundedPayment.metadata.refundedAt)}
                                     </>
                                   )}
                                   {refundedPayment.metadata?.refundReason && (
                                     <>
-                                      {' · reason: '}
+                                      {' · '}
+                                      {t('refundedReason')}{' '}
                                       <em>{refundedPayment.metadata.refundReason}</em>
                                     </>
                                   )}

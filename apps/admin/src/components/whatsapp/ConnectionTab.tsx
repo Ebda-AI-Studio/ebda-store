@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, useToast } from '@force/ui';
 import { apiGet, apiPut } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ const DEFAULT_CONFIG: WbsConfig = {
 
 export function ConnectionTab({ storeId }: { storeId: string }) {
   const { success: toastSuccess, error: toastError } = useToast();
+  const t = useT('whatsappIntegration.connection');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -120,35 +122,29 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
       });
       if (error) {
         if (error.code === 'INVALID_API_KEY' || error.message?.includes('invalid_api_key')) {
-          toastError('Invalid key', 'The API key was rejected. Generate a new key in WBS admin.');
+          toastError(t('toastInvalidKeyTitle'), t('toastInvalidKeyBody'));
         } else {
-          toastError(
-            'Connection failed',
-            error.message || 'Could not connect to Force AI WhatsApp'
-          );
+          toastError(t('toastConnectFailedTitle'), error.message || t('toastConnectFailedBody'));
         }
       } else {
         const seeded = data?.templatesAutoSeeded;
         const submitted = data?.templatesAutoSubmitted;
         const autoErr = data?.templatesAutoError;
         if (autoErr) {
-          toastSuccess(
-            'Connected',
-            `Force AI WhatsApp connected — but template auto-submit failed: ${autoErr}. Visit Templates tab to retry.`
-          );
+          toastSuccess(t('toastConnectedTitle'), t('toastConnectedAutoErr', { error: autoErr }));
         } else if (seeded && seeded > 0) {
           toastSuccess(
-            'Connected + templates submitted',
-            `${seeded} template${seeded === 1 ? '' : 's'} seeded, ${submitted ?? 0} pending Meta approval (~10min–24h).`
+            t('toastConnectedSeededTitle'),
+            t('toastConnectedSeededBody', { seeded, submitted: submitted ?? 0 })
           );
         } else {
-          toastSuccess('Connected', 'Force AI WhatsApp Business Platform connected');
+          toastSuccess(t('toastConnectedTitle'), t('toastConnectedBody'));
         }
         setApiKeyInput('');
         await fetchConfig();
       }
     } catch {
-      toastError('Connection failed', 'An unexpected error occurred');
+      toastError(t('toastConnectFailedTitle'), t('toastUnexpected'));
     } finally {
       setConnecting(false);
     }
@@ -161,13 +157,16 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
         wbsApiKey: null,
       });
       if (error) {
-        toastError('Disconnect failed', error.message || 'Could not disconnect');
+        toastError(
+          t('toastDisconnectFailedTitle'),
+          error.message || t('toastDisconnectFailedBody')
+        );
       } else {
-        toastSuccess('Disconnected', 'Force WhatsApp integration removed');
+        toastSuccess(t('toastDisconnectedTitle'), t('toastDisconnectedBody'));
         await fetchConfig();
       }
     } catch {
-      toastError('Disconnect failed', 'An unexpected error occurred');
+      toastError(t('toastDisconnectFailedTitle'), t('toastUnexpected'));
     } finally {
       setSaving(false);
     }
@@ -187,16 +186,16 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
       });
       if (error) {
         if (error.code === 'MUST_CONNECT_KEY_FIRST') {
-          toastError('Connect first', 'Please connect a WBS API key before enabling notifications');
+          toastError(t('toastConnectFirstTitle'), t('toastConnectFirstBody'));
         } else {
-          toastError('Save failed', error.message || 'Could not save settings');
+          toastError(t('toastSaveFailedTitle'), error.message || t('toastSaveFailedBody'));
         }
       } else {
-        toastSuccess('Saved', 'WhatsApp notification settings updated');
+        toastSuccess(t('toastSavedTitle'), t('toastSavedBody'));
         await fetchConfig();
       }
     } catch {
-      toastError('Save failed', 'An unexpected error occurred');
+      toastError(t('toastSaveFailedTitle'), t('toastUnexpected'));
     } finally {
       setSaving(false);
     }
@@ -209,20 +208,18 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
         waCustomerOrderingEnabled: newValue,
       });
       if (error) {
-        toastError('Save failed', error.message || 'Could not update WA ordering setting');
+        toastError(t('toastSaveFailedTitle'), error.message || t('toastWaSaveFailedBody'));
         // Revert optimistic update
         setWaOrderingEnabled(!newValue);
       } else {
         toastSuccess(
-          newValue ? 'WA ordering enabled' : 'WA ordering disabled',
-          newValue
-            ? 'Customers can now order directly via WhatsApp DM.'
-            : 'WhatsApp DM ordering has been turned off.'
+          newValue ? t('toastWaOnTitle') : t('toastWaOffTitle'),
+          newValue ? t('toastWaOnBody') : t('toastWaOffBody')
         );
         await fetchConfig();
       }
     } catch {
-      toastError('Save failed', 'An unexpected error occurred');
+      toastError(t('toastSaveFailedTitle'), t('toastUnexpected'));
       setWaOrderingEnabled(!newValue);
     } finally {
       setSavingWaOrdering(false);
@@ -253,15 +250,12 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
       {!isConnected && !keySetNotEnabled && (
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
           <div>
-            <h3 className="font-medium text-foreground">Connect Force AI WhatsApp</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Paste the API key generated in your Force AI WhatsApp Business Platform admin to link
-              this store.
-            </p>
+            <h3 className="font-medium text-foreground">{t('connectTitle')}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{t('connectDescription')}</p>
           </div>
           <div className="space-y-1">
             <label htmlFor="wbsApiKey" className="text-sm font-medium text-foreground">
-              Force AI WhatsApp API Key
+              {t('apiKeyLabel')}
             </label>
             <input
               id="wbsApiKey"
@@ -272,13 +266,10 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
               autoComplete="new-password"
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
-            <p className="text-xs text-muted-foreground">
-              Generate the key in WBS admin → Clients → Force AI Store Bridge icon. Paste it here —
-              the key is verified immediately.
-            </p>
+            <p className="text-xs text-muted-foreground">{t('apiKeyHint')}</p>
           </div>
           <Button onClick={handleConnect} disabled={connecting || !apiKeyInput.trim()}>
-            {connecting ? 'Connecting...' : 'Connect'}
+            {connecting ? t('connecting') : t('connect')}
           </Button>
         </div>
       )}
@@ -287,11 +278,8 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
       {keySetNotEnabled && (
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
           <div>
-            <h3 className="font-medium text-foreground">Finish connecting Force AI WhatsApp</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              An API key is saved but WhatsApp notifications aren&apos;t enabled yet. Select your
-              templates below and enable to activate.
-            </p>
+            <h3 className="font-medium text-foreground">{t('finishTitle')}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{t('finishDescription')}</p>
           </div>
           <div className="flex gap-3">
             <Button
@@ -300,7 +288,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
               onClick={handleDisconnect}
               disabled={saving}
             >
-              {saving ? 'Disconnecting...' : 'Remove key'}
+              {saving ? t('disconnecting') : t('removeKey')}
             </Button>
           </div>
         </div>
@@ -321,7 +309,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
                 <>
                   <div className="flex items-center gap-2">
                     <span className="text-green-700 dark:text-green-400 font-medium">
-                      Connected to {config.connectedTenant.businessName}
+                      {t('connectedTo', { name: config.connectedTenant.businessName })}
                     </span>
                     {config.connectedTenant.phoneNumber && (
                       <span className="text-sm text-green-600 dark:text-green-500">
@@ -330,20 +318,22 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
                     )}
                   </div>
                   <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
-                    {templates.length} approved template{templates.length !== 1 ? 's' : ''}{' '}
-                    available
+                    {templates.length !== 1
+                      ? t('templateCountPlural', { count: templates.length })
+                      : t('templateCount', { count: templates.length })}{' '}
+                    {t('available')}
                   </p>
                 </>
               ) : (
                 <div>
                   <span className="text-amber-700 dark:text-amber-400 font-medium">
-                    Saved — not verified
+                    {t('savedNotVerified')}
                   </span>
                   {tenantDetailsFailed && (
                     <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
                       {config.connectedTenantError === 'invalid_api_key'
-                        ? 'The API key may be invalid. Template sending will fail — disconnect and re-key.'
-                        : "Couldn't reach Force AI WhatsApp to verify this key. It's saved but unconfirmed — use Retry."}
+                        ? t('keyInvalid')
+                        : t('cantVerify')}
                     </p>
                   )}
                 </div>
@@ -352,7 +342,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
             <div className="flex gap-2 flex-shrink-0">
               {tenantDetailsFailed && (
                 <Button size="sm" variant="outline" onClick={fetchConfig} disabled={loading}>
-                  Retry
+                  {t('retry')}
                 </Button>
               )}
               <Button
@@ -362,7 +352,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
                 onClick={handleDisconnect}
                 disabled={saving}
               >
-                {saving ? 'Disconnecting...' : 'Disconnect'}
+                {saving ? t('disconnecting') : t('disconnect')}
               </Button>
             </div>
           </div>
@@ -377,10 +367,9 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-medium text-foreground">Enable WhatsApp Notifications</h3>
+                <h3 className="font-medium text-foreground">{t('notificationsTitle')}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Master switch for outbound WhatsApp messages. Per-event templates and channel
-                  choices live in the Order Updates tab.
+                  {t('notificationsDescription')}
                 </p>
               </div>
               <button
@@ -404,7 +393,7 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
           {/* Save */}
           <div className="flex justify-end">
             <Button onClick={handleSaveTemplates} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Settings'}
+              {saving ? t('saving') : t('saveSettings')}
             </Button>
           </div>
 
@@ -412,15 +401,9 @@ export function ConnectionTab({ storeId }: { storeId: string }) {
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <h3 className="font-medium text-foreground">Customer ordering via WhatsApp DM</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  When enabled, customers who DM the store&apos;s WhatsApp number can browse + order
-                  directly. The bot will guide them through delivery + payment, then a draft order
-                  lands here ready to fulfill.
-                </p>
-                <p className="text-xs text-muted-foreground mt-1.5 italic">
-                  Default off — opt in when you&apos;re ready to handle bot-guided orders.
-                </p>
+                <h3 className="font-medium text-foreground">{t('waOrderingTitle')}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{t('waOrderingDescription')}</p>
+                <p className="text-xs text-muted-foreground mt-1.5 italic">{t('waOrderingNote')}</p>
               </div>
               <button
                 type="button"

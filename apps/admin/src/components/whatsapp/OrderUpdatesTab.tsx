@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, useToast } from '@force/ui';
 import { apiGet, apiPut } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
 const Icon = {
   Check: (p: { className?: string }) => (
@@ -94,16 +95,12 @@ type EventKey = 'orderPaid' | 'orderShipped' | 'orderDelivered' | 'cartAbandoned
 
 interface EventDef {
   key: EventKey;
-  label: string;
-  description: string;
   templateBase: string;
 }
 
 const EVENTS: EventDef[] = [
   {
     key: 'orderPaid',
-    label: 'Order paid',
-    description: 'Send automatically the moment a customer completes payment.',
     // Version-agnostic base (no _v1/_v2 suffix). The matcher accepts
     // any version of the same purpose so v2 templates resolve after
     // a policy-driven rewording without stranding the merchant on
@@ -112,21 +109,14 @@ const EVENTS: EventDef[] = [
   },
   {
     key: 'orderShipped',
-    label: 'Order shipped',
-    description: 'Send when the order is marked as shipped (includes tracking number variable).',
     templateBase: 'order_shipped',
   },
   {
     key: 'orderDelivered',
-    label: 'Order delivered',
-    description: 'Send when the order is marked as delivered.',
     templateBase: 'order_delivered',
   },
   {
     key: 'cartAbandoned',
-    label: 'Cart abandoned',
-    description:
-      'Send a reminder when a customer leaves items in their cart without checking out. Up to 3 steps: 1 h, 4 h, 24 h after abandonment.',
     templateBase: 'cart_abandoned',
   },
 ];
@@ -178,6 +168,7 @@ function findAnyTemplate(
 
 export function OrderUpdatesTab({ storeId }: { storeId: string }) {
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
+  const t = useT('whatsappIntegration.orderUpdates');
   const [config, setConfig] = useState<WbsConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -200,31 +191,31 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
     setLoading(true);
     try {
       const { data, error } = await apiGet<WbsConfig>(`/api/v1/stores/${storeId}/integrations/wbs`);
-      if (error) throw new Error(error.message || 'Load failed');
+      if (error) throw new Error(error.message || t('loadFailed'));
       if (data) {
         setConfig(data);
-        const t = data.wbsTemplates || {};
+        const tmpl = data.wbsTemplates || {};
         setEnabled({
-          orderPaid: Boolean(t.orderPaid?.name),
-          orderShipped: Boolean(t.orderShipped?.name),
-          orderDelivered: Boolean(t.orderDelivered?.name),
-          cartAbandoned: Boolean(t.cartAbandoned?.name),
+          orderPaid: Boolean(tmpl.orderPaid?.name),
+          orderShipped: Boolean(tmpl.orderShipped?.name),
+          orderDelivered: Boolean(tmpl.orderDelivered?.name),
+          cartAbandoned: Boolean(tmpl.cartAbandoned?.name),
         });
-        if (t.orderPaid?.languageCode === 'ar') setLanguage('ar');
+        if (tmpl.orderPaid?.languageCode === 'ar') setLanguage('ar');
         // Restore saved channel state; default both ON when absent
         setChannels({
-          orderPaid: t.orderPaid?.channels ?? { ...DEFAULT_CHANNELS },
-          orderShipped: t.orderShipped?.channels ?? { ...DEFAULT_CHANNELS },
-          orderDelivered: t.orderDelivered?.channels ?? { ...DEFAULT_CHANNELS },
-          cartAbandoned: t.cartAbandoned?.channels ?? { ...DEFAULT_CHANNELS },
+          orderPaid: tmpl.orderPaid?.channels ?? { ...DEFAULT_CHANNELS },
+          orderShipped: tmpl.orderShipped?.channels ?? { ...DEFAULT_CHANNELS },
+          orderDelivered: tmpl.orderDelivered?.channels ?? { ...DEFAULT_CHANNELS },
+          cartAbandoned: tmpl.cartAbandoned?.channels ?? { ...DEFAULT_CHANNELS },
         });
       }
     } catch (e) {
-      toastError('Failed to load', e instanceof Error ? e.message : String(e));
+      toastError(t('loadFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [storeId, toastError]);
+  }, [storeId, toastError, t]);
 
   useEffect(() => {
     load();
@@ -245,8 +236,10 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
           // Warn when both channels are off — the event becomes silent
           if (!evtChannels.whatsapp && !evtChannels.email) {
             toastWarning?.(
-              'Silent event',
-              `${EVENTS.find(e => e.key === evt.key)?.label} has both channels off — no notification will be sent.`
+              t('silentEventTitle'),
+              t('silentEventBody', {
+                event: t(`events.${evt.key}.label` as Parameters<typeof t>[0]),
+              })
             );
           }
           nextTemplates[evt.key] = {
@@ -259,11 +252,11 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
       const { error } = await apiPut(`/api/v1/stores/${storeId}/integrations/wbs`, {
         wbsTemplates: nextTemplates,
       });
-      if (error) throw new Error(error.message || 'Save failed');
-      toastSuccess('Saved', 'Order update settings updated.');
+      if (error) throw new Error(error.message || t('saveFailed'));
+      toastSuccess(t('savedTitle'), t('savedBody'));
       await load();
     } catch (e) {
-      toastError('Save failed', e instanceof Error ? e.message : String(e));
+      toastError(t('saveFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -279,11 +272,8 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
           <div className="flex items-start gap-2">
             <Icon.Alert className="h-4 w-4 mt-0.5 shrink-0" />
             <div>
-              <strong>Not connected yet.</strong>
-              <p className="mt-1">
-                Connect to Force AI WhatsApp Business Platform first from the{' '}
-                <strong>Connection</strong> tab, then come back here.
-              </p>
+              <strong>{t('notConnected')}</strong>
+              <p className="mt-1">{t('notConnectedHint')}</p>
             </div>
           </div>
         </div>
@@ -291,26 +281,24 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
 
       {loading ? (
         <div className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground">
-          Loading…
+          {t('loading')}
         </div>
       ) : (
         connected && (
           <>
             <div className="rounded-lg border bg-card p-4">
               <label htmlFor="lang-ou" className="text-sm font-semibold text-foreground">
-                Message language
+                {t('messageLanguage')}
               </label>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Templates with this language code must be approved by Meta.
-              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('languageHint')}</p>
               <select
                 id="lang-ou"
                 value={language}
                 onChange={e => setLanguage(e.target.value as 'en' | 'ar')}
                 className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
               >
-                <option value="en">English (en)</option>
-                <option value="ar">Arabic (ar)</option>
+                <option value="en">{t('langEn')}</option>
+                <option value="ar">{t('langAr')}</option>
               </select>
             </div>
 
@@ -330,8 +318,12 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                   <div key={evt.key} className="rounded-lg border bg-card p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">{evt.label}</h3>
-                        <p className="text-sm text-muted-foreground mt-0.5">{evt.description}</p>
+                        <h3 className="font-semibold text-foreground">
+                          {t(`events.${evt.key}.label` as Parameters<typeof t>[0])}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          {t(`events.${evt.key}.description` as Parameters<typeof t>[0])}
+                        </p>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                           {matched && (
                             <span className="font-mono text-muted-foreground">{matched.name}</span>
@@ -350,12 +342,12 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                             {status === 'approved' && <Icon.Check className="h-3 w-3" />}
                             {status === 'pending' && <Icon.Clock className="h-3 w-3" />}
                             {status === 'missing' && <Icon.Alert className="h-3 w-3" />}
-                            {status === 'missing' ? 'Template not found' : status}
+                            {status === 'missing' ? t('templateNotFound') : status}
                           </span>
                         </div>
                         {status === 'missing' && (
                           <p className="mt-2 text-xs text-muted-foreground">
-                            Generate templates first from the <strong>Templates</strong> tab.
+                            {t('templateNotFoundHint')}
                           </p>
                         )}
 
@@ -363,7 +355,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                         {enabledForEvent && status !== 'missing' && (
                           <div className="mt-3 flex flex-wrap items-center gap-4">
                             <span className="text-xs font-medium text-muted-foreground">
-                              Send via:
+                              {t('sendVia')}
                             </span>
                             {/* WhatsApp channel toggle */}
                             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -378,7 +370,7 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                                 }
                                 className="h-3.5 w-3.5 rounded border-border accent-green-500"
                               />
-                              <span className="text-xs text-foreground">WhatsApp</span>
+                              <span className="text-xs text-foreground">{t('whatsapp')}</span>
                             </label>
                             {/* Email channel toggle */}
                             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -393,11 +385,11 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                                 }
                                 className="h-3.5 w-3.5 rounded border-border accent-blue-500"
                               />
-                              <span className="text-xs text-foreground">Email</span>
+                              <span className="text-xs text-foreground">{t('email')}</span>
                             </label>
                             {!evtChannels.whatsapp && !evtChannels.email && (
                               <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                                Both off — event will be silent
+                                {t('bothOff')}
                               </span>
                             )}
                           </div>
@@ -425,15 +417,12 @@ export function OrderUpdatesTab({ storeId }: { storeId: string }) {
                 disabled={saving || loading}
                 className="bg-orange-500 hover:bg-orange-600"
               >
-                {saving ? 'Saving…' : 'Save changes'}
+                {saving ? t('saving') : t('saveChanges')}
               </Button>
             </div>
 
             <div className="rounded-md border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
-              <strong>How it works:</strong> when a customer&apos;s order transitions to one of
-              these states, the FWB API fires the corresponding WhatsApp template via your Force
-              WhatsApp Business Platform integration. Use the channel checkboxes to control which
-              notification methods are active per event.
+              {t('howItWorks')}
             </div>
           </>
         )

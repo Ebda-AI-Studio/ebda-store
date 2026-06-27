@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { RequireSuperAdmin } from '@/components/RequireSuperAdmin';
 import { FeatureMatrix } from './FeatureMatrix';
+import { useT } from '@/i18n/useT';
 
 /**
  * Super-admin feature matrix for a store.
@@ -18,10 +19,11 @@ import { FeatureMatrix } from './FeatureMatrix';
 export default function StoreFeaturesPage() {
   const params = useParams();
   const storeId = params.id as string;
+  const t = useT('features.page');
 
   return (
     <RequireSuperAdmin>
-      <AdminLayout title="Manage Features" subtitle="Override feature access for this store">
+      <AdminLayout title={t('manageTitle')} subtitle={t('manageSubtitle')}>
         <FeatureMatrix storeId={storeId} />
       </AdminLayout>
     </RequireSuperAdmin>

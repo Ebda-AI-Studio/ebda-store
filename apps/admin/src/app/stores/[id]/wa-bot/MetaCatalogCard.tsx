@@ -15,6 +15,7 @@ import { Button, useToast } from '@force/ui';
 import { apiPost, apiPut } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import type { MetaCatalogConfig } from '../../../../lib/types/wa-bot';
+import { useT } from '../../../../i18n/useT';
 
 interface MetaCatalogCardProps {
   storeId: string;
@@ -30,6 +31,7 @@ interface ProvisionResponse {
 export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps) {
   const { success: toastSuccess, error: toastError } = useToast();
   const { user } = useAuth();
+  const t = useT('whatsappIntegration.metaCatalog');
   const isSuperAdmin = user?.role === 'super_admin';
 
   const [catalogId, setCatalogId] = useState(initialConfig.metaCatalogId ?? '');
@@ -58,9 +60,9 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
     setSaving(false);
 
     if (error) {
-      toastError(error.message || 'Failed to save Meta catalog config');
+      toastError(error.message || t('saveError'));
     } else {
-      toastSuccess('Meta catalog config saved');
+      toastSuccess(t('saveSuccess'));
       // Clear the token input — it was accepted, never show it again
       if (accessToken.trim()) {
         setAccessToken('');
@@ -71,9 +73,7 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
 
   const handleAutoProvision = async () => {
     const alreadyProvisioned = catalogId.trim().length > 0;
-    const confirmMsg = alreadyProvisioned
-      ? 'A catalog id is already filled in. Clear it first if you really want to provision a new one. Continue anyway?'
-      : 'This will call Meta Graph API to create a brand-new Commerce Catalog under the Force AI parent Business Manager and assign it to this store. Continue?';
+    const confirmMsg = alreadyProvisioned ? t('confirmAlready') : t('confirmNew');
     if (!window.confirm(confirmMsg)) return;
 
     setProvisioning(true);
@@ -83,7 +83,7 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
     setProvisioning(false);
 
     if (error) {
-      toastError(error.message || 'Meta auto-provisioning failed');
+      toastError(error.message || t('provisionError'));
       return;
     }
     if (!data) return;
@@ -92,7 +92,7 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
     setBusinessId(data.metaBusinessId ?? '');
     setHasToken(data.hasMetaToken);
     setAccessToken('');
-    toastSuccess('Meta catalog provisioned — submit it for Meta review next.');
+    toastSuccess(t('provisionSuccess'));
   };
 
   const isDirty =
@@ -102,60 +102,58 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
 
   return (
     <div className="rounded-xl border border-border bg-card p-6">
-      <h2 className="text-base font-semibold text-foreground mb-1">Meta Commerce Catalog</h2>
+      <h2 className="text-base font-semibold text-foreground mb-1">{t('title')}</h2>
       <p className="text-sm text-muted-foreground mb-5">
-        Required for <span className="font-medium">Native Catalog</span> bot modes. Find these IDs
-        in your{' '}
-        <a
-          href="https://business.facebook.com/commerce"
-          target="_blank"
-          rel="noreferrer"
-          className="text-primary underline"
-        >
-          Meta Business Manager
-        </a>
-        .
+        {t.rich('subtitle', {
+          b: chunks => <span className="font-medium">{chunks}</span>,
+          manager: chunks => (
+            <a
+              href="https://business.facebook.com/commerce"
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline"
+            >
+              {chunks}
+            </a>
+          ),
+        })}
       </p>
 
       <div className="space-y-4">
         {/* Catalog ID */}
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Catalog ID</label>
+          <label className="block text-sm font-medium text-foreground mb-1">{t('catalogId')}</label>
           <input
             type="text"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="e.g. 123456789012345"
+            placeholder={t('catalogIdPlaceholder')}
             value={catalogId}
             onChange={e => setCatalogId(e.target.value)}
             autoComplete="off"
           />
-          <p className="mt-1 text-xs text-muted-foreground">
-            From Meta Commerce Manager → Catalog Settings.
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('catalogIdHint')}</p>
         </div>
 
         {/* Business ID */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">
-            Business Account ID
+            {t('businessId')}
           </label>
           <input
             type="text"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="e.g. 987654321098765"
+            placeholder={t('businessIdPlaceholder')}
             value={businessId}
             onChange={e => setBusinessId(e.target.value)}
             autoComplete="off"
           />
-          <p className="mt-1 text-xs text-muted-foreground">
-            From Meta Business Manager → Business Settings → Business Info.
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('businessIdHint')}</p>
         </div>
 
         {/* Access Token — write-only */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">
-            System User Access Token
+            {t('accessToken')}
           </label>
           {hasToken && !accessToken && (
             // Neutral, not green: a token string is stored, but FWB does not
@@ -177,7 +175,7 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
                 />
               </svg>
               <span className="text-sm text-slate-600 dark:text-slate-300">
-                Token saved · not verified
+                {t('accessTokenSaved')}
               </span>
             </div>
           )}
@@ -185,16 +183,16 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
             type="password"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder={
-              hasToken ? 'Type a new token to rotate it' : 'Paste your System User token'
+              hasToken ? t('accessTokenPlaceholderRotate') : t('accessTokenPlaceholderNew')
             }
             value={accessToken}
             onChange={e => setAccessToken(e.target.value)}
             autoComplete="new-password"
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            Create a System User in Meta Business Manager → grant{' '}
-            <code className="bg-muted rounded px-1">catalog_management</code> permission. Token is
-            encrypted at rest and never shown again after saving.
+            {t.rich('accessTokenHint', {
+              code: chunks => <code className="bg-muted rounded px-1">{chunks}</code>,
+            })}
           </p>
         </div>
       </div>
@@ -203,17 +201,8 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
         <div className="mt-5 rounded-md border border-dashed border-primary/40 bg-primary/5 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">
-                Provision automatically · Force AI assisted
-                <span className="ms-1.5 text-xs font-normal text-muted-foreground">
-                  / إعداد تلقائي · مُدار بواسطة Force AI
-                </span>
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Creates a new Commerce Catalog under the Force AI parent Business Manager and fills
-                in the three fields above. Saves the merchant from navigating Meta Business Manager.
-                You still need to submit the catalog for Meta review afterwards.
-              </p>
+              <p className="text-sm font-medium text-foreground">{t('provisionTitle')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('provisionDescription')}</p>
             </div>
             <Button
               onClick={handleAutoProvision}
@@ -222,7 +211,7 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
               variant="outline"
               className="shrink-0"
             >
-              {provisioning ? 'Provisioning…' : 'Provision automatically'}
+              {provisioning ? t('provisioning') : t('provisionButton')}
             </Button>
           </div>
         </div>
@@ -230,7 +219,7 @@ export function MetaCatalogCard({ storeId, initialConfig }: MetaCatalogCardProps
 
       <div className="mt-5 flex justify-end">
         <Button onClick={handleSave} disabled={saving || !isDirty} size="sm">
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('saving') : t('save')}
         </Button>
       </div>
     </div>

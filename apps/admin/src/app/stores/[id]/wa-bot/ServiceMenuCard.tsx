@@ -13,39 +13,18 @@ import { apiPut } from '../../../../lib/api';
 import { Toggle } from '../../../../components/Toggle';
 import type { BotServiceMenu } from '../../../../lib/types/wa-bot';
 import { DEFAULT_SERVICE_MENU } from '../../../../lib/types/wa-bot';
+import { useT } from '../../../../i18n/useT';
 
 interface ServiceMenuItem {
   key: keyof Omit<BotServiceMenu, 'labels'>;
-  label: string;
-  description: string;
   labelKey: string; // key in labels.en / labels.ar
 }
 
 const MENU_ITEMS: ServiceMenuItem[] = [
-  {
-    key: 'orderNow',
-    label: 'Order Now',
-    description: 'Opens the product catalog / ordering flow.',
-    labelKey: 'order_now',
-  },
-  {
-    key: 'subscriptionBoxes',
-    label: 'Subscription Boxes',
-    description: 'Routes customer to subscription info.',
-    labelKey: 'subscription_boxes',
-  },
-  {
-    key: 'locationsHours',
-    label: 'Locations & Hours',
-    description: 'Sends store address, Google Maps link, and business hours.',
-    labelKey: 'locations_hours',
-  },
-  {
-    key: 'chatWithAgent',
-    label: 'Chat with Agent',
-    description: 'Hands conversation off to a human team member.',
-    labelKey: 'chat_with_agent',
-  },
+  { key: 'orderNow', labelKey: 'order_now' },
+  { key: 'subscriptionBoxes', labelKey: 'subscription_boxes' },
+  { key: 'locationsHours', labelKey: 'locations_hours' },
+  { key: 'chatWithAgent', labelKey: 'chat_with_agent' },
 ];
 
 interface ServiceMenuCardProps {
@@ -55,6 +34,7 @@ interface ServiceMenuCardProps {
 
 export function ServiceMenuCard({ storeId, initialMenu }: ServiceMenuCardProps) {
   const { success: toastSuccess, error: toastError } = useToast();
+  const t = useT('whatsappIntegration.serviceMenu');
 
   const [menu, setMenu] = useState<BotServiceMenu>({
     ...DEFAULT_SERVICE_MENU,
@@ -91,26 +71,28 @@ export function ServiceMenuCard({ storeId, initialMenu }: ServiceMenuCardProps) 
     });
     setSaving(false);
     if (error) {
-      toastError(error.message || 'Failed to save service menu');
+      toastError(error.message || t('saveError'));
     } else {
-      toastSuccess('Service menu saved');
+      toastSuccess(t('saveSuccess'));
     }
   };
 
   return (
     <div className="rounded-xl border border-border bg-card p-6">
-      <h2 className="text-base font-semibold text-foreground mb-1">Service Menu</h2>
-      <p className="text-sm text-muted-foreground mb-5">
-        Choose which options appear when a customer first messages the bot.
-      </p>
+      <h2 className="text-base font-semibold text-foreground mb-1">{t('title')}</h2>
+      <p className="text-sm text-muted-foreground mb-5">{t('subtitle')}</p>
 
       <div className="space-y-4">
         {MENU_ITEMS.map(item => (
           <div key={String(item.key)} className="flex items-start gap-3">
             <Toggle checked={menu[item.key] as boolean} onChange={() => toggle(item.key)} />
             <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">{item.label}</p>
-              <p className="text-xs text-muted-foreground">{item.description}</p>
+              <p className="text-sm font-medium text-foreground">
+                {t(`item_${item.key}_label` as Parameters<typeof t>[0])}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t(`item_${item.key}_desc` as Parameters<typeof t>[0])}
+              </p>
             </div>
           </div>
         ))}
@@ -122,27 +104,29 @@ export function ServiceMenuCard({ storeId, initialMenu }: ServiceMenuCardProps) 
         onClick={() => setShowLabels(v => !v)}
         className="mt-5 text-xs text-primary hover:underline focus:outline-none"
       >
-        {showLabels ? '▲ Hide label customisation' : '▼ Customise button labels (optional)'}
+        {showLabels ? t('hideLabels') : t('showLabels')}
       </button>
 
       {showLabels && (
         <div className="mt-4 space-y-5 rounded-lg border border-border bg-muted/30 p-4">
           {MENU_ITEMS.map(item => (
             <div key={item.labelKey}>
-              <p className="text-xs font-medium text-foreground mb-2">{item.label}</p>
+              <p className="text-xs font-medium text-foreground mb-2">
+                {t(`item_${item.key}_label` as Parameters<typeof t>[0])}
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-muted-foreground">English label</label>
+                  <label className="text-xs text-muted-foreground">{t('englishLabel')}</label>
                   <input
                     type="text"
                     className="mt-1 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder={item.label}
+                    placeholder={t(`item_${item.key}_label` as Parameters<typeof t>[0])}
                     value={menu.labels?.en?.[item.labelKey] ?? ''}
                     onChange={e => setLabel('en', item.labelKey, e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Arabic label</label>
+                  <label className="text-xs text-muted-foreground">{t('arabicLabel')}</label>
                   <input
                     type="text"
                     dir="rtl"
@@ -160,7 +144,7 @@ export function ServiceMenuCard({ storeId, initialMenu }: ServiceMenuCardProps) 
 
       <div className="mt-5 flex justify-end">
         <Button onClick={handleSave} disabled={saving} size="sm">
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('saving') : t('save')}
         </Button>
       </div>
     </div>

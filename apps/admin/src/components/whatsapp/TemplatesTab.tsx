@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button, useToast } from '@force/ui';
 import { apiGet, apiPost, apiPut } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
 const Icon = {
   Sparkles: (p: { className?: string }) => (
@@ -162,45 +163,37 @@ interface WbsConfigForToggle {
   storeHasLogo: boolean;
 }
 
-const SOURCE_KEY_LABELS: Record<string, string> = {
-  orderPaid: 'Order Paid',
-  orderShipped: 'Order Shipped',
-  orderDelivered: 'Order Delivered',
-  welcomeBack: 'Welcome Back',
-  cartAbandoned: 'Cart Abandoned',
-  paymentLink: 'Payment Link',
-};
-
 function StatusBadge({ status }: { status: TemplateRow['status'] }) {
+  const t = useT('whatsappIntegration.templates');
   const map: Record<TemplateRow['status'], { label: string; cls: string; icon: React.ReactNode }> =
     {
       draft: {
-        label: 'Draft',
+        label: t('status.draft'),
         cls: 'bg-gray-100 text-gray-700 border-gray-200',
         icon: <Icon.FileText className="h-3 w-3" />,
       },
       pending: {
-        label: 'Pending Meta',
+        label: t('status.pending'),
         cls: 'bg-amber-50 text-amber-700 border-amber-200',
         icon: <Icon.Clock className="h-3 w-3" />,
       },
       approved: {
-        label: 'Approved',
+        label: t('status.approved'),
         cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         icon: <Icon.Check className="h-3 w-3" />,
       },
       rejected: {
-        label: 'Rejected',
+        label: t('status.rejected'),
         cls: 'bg-red-50 text-red-700 border-red-200',
         icon: <Icon.Alert className="h-3 w-3" />,
       },
       paused: {
-        label: 'Paused',
+        label: t('status.paused'),
         cls: 'bg-orange-50 text-orange-700 border-orange-200',
         icon: <Icon.Pause className="h-3 w-3" />,
       },
       disabled: {
-        label: 'Disabled',
+        label: t('status.disabled'),
         cls: 'bg-gray-100 text-gray-500 border-gray-200',
         icon: <Icon.Pause className="h-3 w-3" />,
       },
@@ -218,6 +211,7 @@ function StatusBadge({ status }: { status: TemplateRow['status'] }) {
 
 export function TemplatesTab({ storeId }: { storeId: string }) {
   const { success: toastSuccess, error: toastError } = useToast();
+  const t = useT('whatsappIntegration.templates');
   const [data, setData] = useState<ListResponse | null>(null);
   const [wbsConfig, setWbsConfig] = useState<WbsConfigForToggle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -232,7 +226,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
         apiGet<ListResponse>(`/api/v1/stores/${storeId}/wa-templates`),
         apiGet<WbsConfigForToggle>(`/api/v1/stores/${storeId}/integrations/wbs`),
       ]);
-      if (tmplResp.error) throw new Error(tmplResp.error.message || 'Failed to load');
+      if (tmplResp.error) throw new Error(tmplResp.error.message || t('toastFailedTitle'));
       if (tmplResp.data) setData(tmplResp.data);
       if (cfgResp.data) {
         setWbsConfig({
@@ -241,11 +235,11 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
         });
       }
     } catch (err) {
-      toastError('Failed to load templates', err instanceof Error ? err.message : String(err));
+      toastError(t('toastLoadFailedTitle'), err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, [storeId, toastError]);
+  }, [storeId, toastError, t]);
 
   const toggleLogoHeader = async (next: boolean) => {
     setSavingLogoToggle(true);
@@ -253,16 +247,14 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
       const { error } = await apiPut(`/api/v1/stores/${storeId}/integrations/wbs`, {
         wbsTemplateUseLogoHeader: next,
       });
-      if (error) throw new Error(error.message || 'Save failed');
+      if (error) throw new Error(error.message || t('toastSaveFailedTitle'));
       setWbsConfig(c => (c ? { ...c, wbsTemplateUseLogoHeader: next } : c));
       toastSuccess(
-        next ? 'Logo header enabled' : 'Logo header disabled',
-        next
-          ? 'Next template generation/sync will include your store logo as the message header image.'
-          : 'Future templates will be generated without a header image.'
+        next ? t('toastLogoOnTitle') : t('toastLogoOffTitle'),
+        next ? t('toastLogoOnBody') : t('toastLogoOffBody')
       );
     } catch (err) {
-      toastError('Save failed', err instanceof Error ? err.message : String(err));
+      toastError(t('toastSaveFailedTitle'), err instanceof Error ? err.message : String(err));
     } finally {
       setSavingLogoToggle(false);
     }
@@ -287,18 +279,15 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
         `/api/v1/stores/${storeId}/wa-templates/generate`,
         {}
       );
-      if (error) throw new Error(error.message || 'Generate failed');
+      if (error) throw new Error(error.message || t('toastGenFailedTitle'));
       const created = payload?.created ?? 0;
       toastSuccess(
-        created > 0 ? `Created ${created} templates` : 'No new templates',
-        payload?.message ||
-          (created > 0
-            ? 'Click Sync to submit them to Meta.'
-            : 'All canonical templates are already seeded.')
+        created > 0 ? t('toastCreatedTitle', { count: created }) : t('toastNoNewTitle'),
+        payload?.message || (created > 0 ? t('toastCreatedBody') : t('toastAllSeededBody'))
       );
       await load();
     } catch (err) {
-      toastError('Failed to generate templates', err instanceof Error ? err.message : String(err));
+      toastError(t('toastGenFailedTitle'), err instanceof Error ? err.message : String(err));
     } finally {
       setGenerating(false);
     }
@@ -311,17 +300,15 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
         `/api/v1/stores/${storeId}/wa-templates/sync`,
         {}
       );
-      if (error) throw new Error(error.message || 'Sync failed');
+      if (error) throw new Error(error.message || t('toastSyncFailedTitle'));
       const submitted = payload?.submitted ?? 0;
       toastSuccess(
-        submitted > 0 ? `Submitted ${submitted} templates to Meta` : 'No drafts to sync',
-        submitted > 0
-          ? 'Approval typically takes 10 minutes to 24 hours. Status will update automatically.'
-          : payload?.message || 'All templates have already been submitted.'
+        submitted > 0 ? t('toastSubmittedTitle', { count: submitted }) : t('toastNoDraftsTitle'),
+        submitted > 0 ? t('toastSubmittedBody') : payload?.message || t('toastAllSubmittedBody')
       );
       await load();
     } catch (err) {
-      toastError('Sync failed', err instanceof Error ? err.message : String(err));
+      toastError(t('toastSyncFailedTitle'), err instanceof Error ? err.message : String(err));
     } finally {
       setSyncing(false);
     }
@@ -335,18 +322,15 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
         `/api/v1/stores/${storeId}/wa-templates/reset-rejected`,
         {}
       );
-      if (error) throw new Error(error.message || 'Reset failed');
+      if (error) throw new Error(error.message || t('toastResetFailedTitle'));
       const reset = payload?.reset ?? 0;
       toastSuccess(
-        reset > 0 ? `Reset ${reset} rejected templates` : 'No rejected templates',
-        payload?.message ||
-          (reset > 0
-            ? 'Templates flipped to draft with the latest canonical body. Click Sync to resubmit.'
-            : 'There are no rejected templates to reset.')
+        reset > 0 ? t('toastResetTitle', { count: reset }) : t('toastNoRejectedTitle'),
+        payload?.message || (reset > 0 ? t('toastResetBody') : t('toastNoRejectedBody'))
       );
       await load();
     } catch (err) {
-      toastError('Reset failed', err instanceof Error ? err.message : String(err));
+      toastError(t('toastResetFailedTitle'), err instanceof Error ? err.message : String(err));
     } finally {
       setResetting(false);
     }
@@ -372,7 +356,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
           className="bg-orange-500 hover:bg-orange-600"
         >
           <Icon.Sparkles className="me-2 h-4 w-4" />
-          {generating ? 'Generating…' : hasAnyRows ? 'Add missing defaults' : 'Generate defaults'}
+          {generating ? t('generating') : hasAnyRows ? t('addMissing') : t('generateDefaults')}
         </Button>
         <Button
           onClick={sync}
@@ -381,10 +365,10 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
         >
           <Icon.Send className="me-2 h-4 w-4" />
           {syncing
-            ? 'Submitting…'
+            ? t('submitting')
             : draftCount > 0
-              ? `Sync ${draftCount} to Meta`
-              : 'Nothing to sync'}
+              ? t('syncCount', { count: draftCount })
+              : t('nothingToSync')}
         </Button>
         {rejectedCount > 0 && (
           <Button
@@ -394,12 +378,12 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
             title="Refresh rejected templates from the latest canonical body, then click Sync to resubmit"
           >
             <Icon.Refresh className={`me-2 h-4 w-4 ${resetting ? 'animate-spin' : ''}`} />
-            {resetting ? 'Resetting…' : `Reset ${rejectedCount} rejected to draft`}
+            {resetting ? t('resetting') : t('resetRejectedCount', { count: rejectedCount })}
           </Button>
         )}
         <Button onClick={load} disabled={loading} variant="outline">
           <Icon.Refresh className={`me-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          {t('refresh')}
         </Button>
       </div>
 
@@ -418,22 +402,16 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
             />
             <div className="relative w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500 peer-disabled:opacity-40 peer-disabled:cursor-not-allowed mt-0.5 shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="font-semibold text-sm text-foreground">
-                Use my store logo as the WhatsApp message header
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Customers see your store logo at the top of every order-update message. Applied when
-                you next generate or sync templates.
-              </p>
+              <div className="font-semibold text-sm text-foreground">{t('logoLabel')}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('logoHint')}</p>
               {!wbsConfig.storeHasLogo && (
                 <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                  Set a store logo first under Branding before enabling this.
+                  {t('logoNoLogoWarning')}
                 </p>
               )}
               {wbsConfig.wbsTemplateUseLogoHeader && wbsConfig.storeHasLogo && (
                 <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
-                  On. Next sync will upload your logo to Meta and submit templates with image
-                  headers.
+                  {t('logoEnabledNote')}
                 </p>
               )}
             </div>
@@ -444,16 +422,13 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
       {/* Template list */}
       {loading && !data ? (
         <div className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground">
-          Loading templates…
+          {t('loading')}
         </div>
       ) : !hasAnyRows ? (
         <div className="rounded-md border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
           <Icon.Sparkles className="mx-auto mb-2 h-8 w-8 text-orange-500" />
-          <p className="font-medium text-foreground">No templates set up yet.</p>
-          <p className="mt-1">
-            Click <strong>Generate defaults</strong> to add the 12 canonical Force AI templates as
-            drafts.
-          </p>
+          <p className="font-medium text-foreground">{t('noTemplates')}</p>
+          <p className="mt-1">{t('noTemplatesHint')}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -465,7 +440,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40">
                   <div>
                     <h3 className="font-semibold text-foreground">
-                      {SOURCE_KEY_LABELS[key] || key}
+                      {t(`sourceKeys.${key}` as Parameters<typeof t>[0]) || key}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">{rows[0]?.category}</p>
                   </div>
@@ -498,13 +473,16 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
                         </p>
                         {row.rejectionReason && (
                           <p className="mt-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded px-2 py-1">
-                            Meta rejected: {row.rejectionReason}
+                            {t('metaRejected')} {row.rejectionReason}
                           </p>
                         )}
                         <p className="mt-1.5 text-[10.5px] text-muted-foreground font-mono">
                           {row.metaName}
                           {row.lastSyncedAt && (
-                            <> · last sync {new Date(row.lastSyncedAt).toLocaleString()}</>
+                            <>
+                              {' '}
+                              · {t('lastSync')} {new Date(row.lastSyncedAt).toLocaleString()}
+                            </>
                           )}
                         </p>
                       </div>
@@ -521,9 +499,7 @@ export function TemplatesTab({ storeId }: { storeId: string }) {
       )}
 
       <div className="rounded-md border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
-        <strong>How it works:</strong> Click <em>Generate defaults</em> to create the canonical
-        templates as drafts. Click <em>Sync to Meta</em> to submit them. Meta reviews each template;
-        approval typically takes 10 minutes to 24 hours.
+        {t('howItWorks')}
       </div>
     </div>
   );

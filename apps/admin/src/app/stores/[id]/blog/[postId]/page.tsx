@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { recommendedSizeText } from '@force/shared';
 import { apiGet, apiPost, apiPut } from '../../../../../lib/api';
 import { ImageUpload } from '../../../../../components/ImageUpload';
+import { useT } from '@/i18n/useT';
 
 interface BlogPost {
   id: string;
@@ -75,6 +76,7 @@ export default function BlogPostEditorPage({
   const [isLoading, setIsLoading] = useState(!isNew);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useT('blog.editor');
 
   useEffect(() => {
     if (isNew) {
@@ -121,7 +123,7 @@ export default function BlogPostEditorPage({
     e.preventDefault();
     setError(null);
     if (!form.title.trim() || !form.content.trim() || !form.slug.trim()) {
-      setError('Title, slug, and content are required.');
+      setError(t('validationError'));
       return;
     }
     setIsSaving(true);
@@ -148,7 +150,7 @@ export default function BlogPostEditorPage({
   }
 
   if (isLoading) {
-    return <div className="p-10 text-center text-sm text-muted-foreground">Loading…</div>;
+    return <div className="p-10 text-center text-sm text-muted-foreground">{t('loading')}</div>;
   }
 
   return (
@@ -156,17 +158,15 @@ export default function BlogPostEditorPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">
-            {isNew ? 'New blog post' : 'Edit blog post'}
+            {isNew ? t('newTitle') : t('editTitle')}
           </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Write a story or article that customers see on your storefront blog.
-          </p>
+          <p className="mt-0.5 text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
         <Link
           href={`/stores/${storeId}/blog`}
           className="text-sm font-semibold text-muted-foreground hover:text-foreground"
         >
-          ← Back to all posts
+          {t('backToAll')}
         </Link>
       </div>
 
@@ -174,18 +174,18 @@ export default function BlogPostEditorPage({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">
-              Title (English) <span className="text-destructive">*</span>
+              {t('titleEn')} <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
               value={form.title}
               onChange={e => update('title', e.target.value)}
               className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="What's new at your store..."
+              placeholder={t('titleEnPlaceholder')}
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">Title (Arabic)</label>
+            <label className="mb-1 block text-sm font-medium text-foreground">{t('titleAr')}</label>
             <input
               type="text"
               lang="ar"
@@ -200,37 +200,36 @@ export default function BlogPostEditorPage({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-foreground">
-            URL slug <span className="text-destructive">*</span>
+            {t('slug')} <span className="text-destructive">*</span>
           </label>
           <input
             type="text"
             value={form.slug}
             onChange={e => update('slug', slugify(e.target.value))}
             className="w-full rounded-lg border border-border px-4 py-2 font-mono text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            placeholder="my-first-post"
+            placeholder={t('slugPlaceholder')}
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            Lowercase letters, numbers, and dashes. Used in the public URL: /blog/
-            {form.slug || '<slug>'}
+            {t('slugHint', { slug: form.slug || '<slug>' })}
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">
-              Excerpt (English)
+              {t('excerptEn')}
             </label>
             <textarea
               value={form.excerpt}
               onChange={e => update('excerpt', e.target.value)}
               rows={3}
               className="w-full resize-none rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="One or two sentences shown on the blog list..."
+              placeholder={t('excerptEnPlaceholder')}
             />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">
-              Excerpt (Arabic)
+              {t('excerptAr')}
             </label>
             <textarea
               lang="ar"
@@ -245,14 +244,16 @@ export default function BlogPostEditorPage({
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-foreground">Cover image</label>
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            {t('coverImage')}
+          </label>
           <ImageUpload
             value={form.coverImage || undefined}
             onUpload={url => update('coverImage', url)}
             onRemove={() => update('coverImage', '')}
             folder="pages"
             storeId={storeId}
-            label="Upload cover image"
+            label={t('coverImageUpload')}
             aspectRatio="3/2"
             recommendedSizeHint={recommendedSizeText('blogCover')}
           />
@@ -261,19 +262,19 @@ export default function BlogPostEditorPage({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">
-              Content (English) <span className="text-destructive">*</span>
+              {t('contentEn')} <span className="text-destructive">*</span>
             </label>
             <textarea
               value={form.content}
               onChange={e => update('content', e.target.value)}
               rows={14}
               className="w-full rounded-lg border border-border px-4 py-2 text-base sm:text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="Write your story here. Use a blank line to start a new paragraph."
+              placeholder={t('contentEnPlaceholder')}
             />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">
-              Content (Arabic)
+              {t('contentAr')}
             </label>
             <textarea
               lang="ar"
@@ -295,10 +296,9 @@ export default function BlogPostEditorPage({
             className="h-5 w-5 cursor-pointer accent-primary"
           />
           <span className="text-sm">
-            <span className="block font-semibold text-foreground">Publish to storefront</span>
+            <span className="block font-semibold text-foreground">{t('publishLabel')}</span>
             <span className="block text-xs text-muted-foreground">
-              When checked, this post is visible at /blog/{form.slug || '<slug>'} on your store.
-              Uncheck to keep as a draft.
+              {t('publishHint', { slug: form.slug || '<slug>' })}
             </span>
           </span>
         </label>
@@ -312,14 +312,14 @@ export default function BlogPostEditorPage({
             href={`/stores/${storeId}/blog`}
             className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
           >
-            Cancel
+            {t('cancel')}
           </Link>
           <button
             type="submit"
             disabled={isSaving}
             className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
           >
-            {isSaving ? 'Saving…' : isNew ? 'Create post' : 'Save changes'}
+            {isSaving ? t('saving') : isNew ? t('createPost') : t('saveChanges')}
           </button>
         </div>
       </form>
