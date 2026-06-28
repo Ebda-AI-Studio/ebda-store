@@ -1,0 +1,12 @@
+{
+  "name": "force-admin-cf-preview",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "routes": [
+    { "pattern": "admin.force-ai.co", "custom_domain": true },
+    { "pattern": "admin.force-ai.co/*", "zone_name": "force-ai.co" }
+  ],
+  "observability": { "enabled": true }
+}

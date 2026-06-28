@@ -1,0 +1,12 @@
+{
+  "name": "force-web-cf-preview",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "routes": [
+    { "pattern": "store.force-ai.co", "custom_domain": true },
+    { "pattern": "cf.force-ai.co", "custom_domain": true },
+    { "pattern": "*/*", "zone_name": "force-ai.co" }
+  ]
+}
