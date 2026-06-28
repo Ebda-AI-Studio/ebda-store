@@ -21,7 +21,7 @@
  */
 
 // Generic alert webhook — accepts {title, body, level, source}.
-const BRIDGE_URL = 'https://store-api.forcemediakw.com/api/v1/alerts/webhooks/generic';
+const BRIDGE_URL = 'https://api.force-ai.co/api/v1/alerts/webhooks/generic';
 const TOKEN = '19b2054b6bc6e1200c06e0a4dc71cf40';
 
 // Sender-domain → source label so the Telegram message header tells you

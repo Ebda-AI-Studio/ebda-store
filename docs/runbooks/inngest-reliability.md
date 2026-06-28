@@ -115,7 +115,7 @@ retry budgets, and leave job rows stuck in `failed` state.
   idempotently resume from the next product in the batch
 
 **Railway deploy indicator:**
-`GET https://store-api.forcemediakw.com/health` returning 502/503 during deploy.
+`GET https://api.force-ai.co/health` returning 502/503 during deploy.
 
 ---
 

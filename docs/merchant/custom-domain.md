@@ -57,9 +57,9 @@ If you set up a payment provider before adding the custom domain, the success/er
 - Success URL: `https://yourstore.com/checkout/success`
 - Error URL: `https://yourstore.com/checkout/error`
 
-The webhook URL stays the same — it always points at `store-api.forcemediakw.com` regardless of your custom domain.
+The webhook URL stays the same — it always points at `api.force-ai.co` regardless of your custom domain (`store-api.forcemediakw.com` also still works during migration).
 
-في لوحة مزوّد الدفع، حدّث روابط النجاح والخطأ لتشير لنطاقك الجديد. رابط webhook لا يتغيّر (دائمًا `store-api.forcemediakw.com`).
+في لوحة مزوّد الدفع، حدّث روابط النجاح والخطأ لتشير لنطاقك الجديد. رابط webhook لا يتغيّر (دائمًا `api.force-ai.co` — والنطاق القديم `store-api.forcemediakw.com` يعمل خلال فترة التحويل).
 
 ## Verification checklist
 

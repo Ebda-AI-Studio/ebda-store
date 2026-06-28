@@ -24,7 +24,7 @@ A second super-admin (who has their own MFA working) can disable MFA on the lock
 
 ```bash
 # Step 1 — the helper super-admin logs in and gets their access token
-curl -s -X POST https://store-api.forcemediakw.com/api/v1/auth/login \
+curl -s -X POST https://api.force-ai.co/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"<helper-admin@example.com>","password":"<password>"}' \
   | jq -r '.data.accessToken'
@@ -33,7 +33,7 @@ curl -s -X POST https://store-api.forcemediakw.com/api/v1/auth/login \
 # POST /api/v1/auth/mfa/verify with their challengeToken + TOTP code
 
 # Step 3 — call the admin endpoint to disable MFA for the locked-out user
-curl -s -X POST https://store-api.forcemediakw.com/api/v1/admin/users/<userId>/mfa/disable \
+curl -s -X POST https://api.force-ai.co/api/v1/admin/users/<userId>/mfa/disable \
   -H "Authorization: Bearer <helper-admin-access-token>"
 ```
 

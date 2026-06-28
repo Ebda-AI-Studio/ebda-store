@@ -21,8 +21,10 @@ Fees are approximate per public pricing pages 2026-05; confirm with each provide
 **All four providers use the SAME webhook URL on Force AI Store:**
 
 ```
-https://store-api.forcemediakw.com/api/v1/webhooks/payment/<provider>
+https://api.force-ai.co/api/v1/webhooks/payment/<provider>
 ```
+
+(`api.force-ai.co` is the new primary API domain; `store-api.forcemediakw.com` continues to be served during migration — both work.)
 
 Where `<provider>` is one of: `tap`, `myfatoorah`, `hesabe`, `upayments`.
 
@@ -38,7 +40,7 @@ Force AI Store displays the exact URL inside each provider's panel in **Admin �
 2. Once approved, log into <https://dashboard.tap.company>
 3. Settings → **API Keys** → create a **Live Secret Key** (starts with `sk_live_`)
 4. Settings → **Webhooks** → Add new webhook:
-   - URL: `https://store-api.forcemediakw.com/api/v1/webhooks/payment/tap`
+   - URL: `https://api.force-ai.co/api/v1/webhooks/payment/tap`
    - Events: `charge.created`, `charge.updated`, `charge.captured`, `charge.failed`, `charge.refunded`
    - Save → Tap shows the webhook secret — **copy it now, shown once**
 5. In Force AI Store: **Admin → Settings → Payment Settings → Tap**:
@@ -57,7 +59,7 @@ Force AI Store displays the exact URL inside each provider's panel in **Admin �
 2. Once approved, navigate to **Developer → API Keys**
 3. Generate a **Live Token** (long string, often base64-looking)
 4. Navigate to **Notifications → Web Hooks → Add**:
-   - URL: `https://store-api.forcemediakw.com/api/v1/webhooks/payment/myfatoorah`
+   - URL: `https://api.force-ai.co/api/v1/webhooks/payment/myfatoorah`
    - Secret: click Generate → copy the secret
    - Events: tick all payment events (Paid, Failed, Refunded, etc.)
 5. In Force AI Store: **Admin → Settings → Payment Settings → MyFatoorah**:
@@ -87,7 +89,7 @@ Hesabe is contract-based — you'll receive credentials by email from your accou
    - Test Mode: OFF for live
    - **Save**
 4. Email Hesabe support to register the webhook URL on their side:
-   `https://store-api.forcemediakw.com/api/v1/webhooks/payment/hesabe`
+   `https://api.force-ai.co/api/v1/webhooks/payment/hesabe`
 
 ---
 
@@ -98,7 +100,7 @@ Hesabe is contract-based — you'll receive credentials by email from your accou
 3. **Settings → API Credentials**:
    - Copy the **Live API Key** (starts with `sk_live_`)
 4. **Settings → Webhooks**:
-   - URL: `https://store-api.forcemediakw.com/api/v1/webhooks/payment/upayments`
+   - URL: `https://api.force-ai.co/api/v1/webhooks/payment/upayments`
    - Secret: copy
 5. In Force AI Store: **Admin → Settings → Payment Settings → UPayments**:
    - Toggle: ON
@@ -172,7 +174,7 @@ If a payment link was already generated for an order, the **Copy** and **Open** 
 
 You may wonder: "if every store uses the same webhook URL, can other merchants see my payment events?"
 
-**No.** Each store has its own per-tenant webhook secret. When a payment provider sends a webhook to `store-api.forcemediakw.com/api/v1/webhooks/payment/myfatoorah`, Force AI Store:
+**No.** Each store has its own per-tenant webhook secret. When a payment provider sends a webhook to `api.force-ai.co/api/v1/webhooks/payment/myfatoorah`, Force AI Store:
 
 1. Looks up the transaction ID inside the payload
 2. Finds which store's order it belongs to (via the `Order` table)

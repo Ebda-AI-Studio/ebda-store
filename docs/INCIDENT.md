@@ -29,7 +29,7 @@ In rough order of how an incident usually surfaces:
 
 ```bash
 curl -sS -m 10 -o /dev/null -w "HTTP %{http_code} | %{time_total}s\n" \
-  https://store-api.forcemediakw.com/health
+  https://api.force-ai.co/health
 ```
 
 - HTTP 200 in <1s → API is up; problem is downstream
@@ -50,7 +50,7 @@ railway logs --lines 100 | grep -i inngest
 ```
 
 - Stuck "queued" jobs older than 5 min → Inngest sync broken (see `feedback-inngest-deploy-sync-trap.md`)
-- Recovery: `curl -X PUT https://store-api.forcemediakw.com/api/v1/inngest` to force re-sync
+- Recovery: `curl -X PUT https://api.force-ai.co/api/v1/inngest` to force re-sync
 
 **4. Is Sentry showing a new error cluster?**
 

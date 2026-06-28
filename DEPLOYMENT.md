@@ -36,7 +36,7 @@ To run the full gate manually: `bash scripts/safe-deploy.sh`
 │                      RAILWAY (~$10-20/mo)                        │
 │  ┌──────────────────────────────────────────────────────────┐    │
 │  │  Express.js API (Dockerfile, Railpack runner)             │    │
-│  │  store-api.forcemediakw.com                              │    │
+│  │  api.force-ai.co (old: store-api.forcemediakw.com)       │    │
 │  │  + Redis (railway internal :6379)                        │    │
 │  └──────────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────────┘
@@ -349,7 +349,7 @@ catches something the others can't.
 - **Dashboard**: https://uptimerobot.com
 - **Public status page**: https://stats.uptimerobot.com/23nuarbz3h — merchant-facing self-service for incident state (closes iceberg item "no public status page", 2026-05-15 audit)
 - **Active monitors**:
-  - `FWB API` → `https://store-api.forcemediakw.com/health` — HTTPS, 5-min interval, 30s timeout, alert on 2 consecutive failures
+  - `FWB API` → `https://api.force-ai.co/health` — HTTPS, 5-min interval, 30s timeout, alert on 2 consecutive failures
   - `FWB store · wadyaljuz.com` → `https://wadyaljuz.com` — same settings
   - `FWB admin` → `https://app.forcemediakw.com` — same settings (added 2026-05-15)
 - **Alert routing**: UptimeRobot mobile app push (instant on iPhone/Android, free tier, replaces Telegram which is paid-tier on UptimeRobot). The bridge to Telegram is via the in-API channel below for code-level alerts.
@@ -428,9 +428,9 @@ Sentry / Axiom / PostHog each have their own native notification channels (email
 - **Auth**: shared-secret token via querystring `?token=...` or header `x-alerts-token: ...`; gated on `ALERTS_WEBHOOK_TOKEN` env var on Railway. Token rotation = single Railway var change, no code touch.
 - **Result**: regardless of which external service raised the alarm, it lands in the same `@ForceAI1_bot` Telegram chat with the same `[P1 PLATFORM]` header format as the internal call sites.
 - **Configure per external service**:
-  - **Sentry** → Project Settings → Alerts → Create Alert Rule → Action: "Send a notification via an integration" → Webhook → URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/sentry?token=<ALERTS_WEBHOOK_TOKEN>`
-  - **Axiom** → dataset → Monitors → New monitor → Notifier: Webhook → URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/axiom?token=<ALERTS_WEBHOOK_TOKEN>`
-  - **PostHog** → Insights → Subscriptions → Webhook URL = `https://store-api.forcemediakw.com/api/v1/alerts/webhooks/posthog?token=<ALERTS_WEBHOOK_TOKEN>`
+  - **Sentry** → Project Settings → Alerts → Create Alert Rule → Action: "Send a notification via an integration" → Webhook → URL = `https://api.force-ai.co/api/v1/alerts/webhooks/sentry?token=<ALERTS_WEBHOOK_TOKEN>`
+  - **Axiom** → dataset → Monitors → New monitor → Notifier: Webhook → URL = `https://api.force-ai.co/api/v1/alerts/webhooks/axiom?token=<ALERTS_WEBHOOK_TOKEN>`
+  - **PostHog** → Insights → Subscriptions → Webhook URL = `https://api.force-ai.co/api/v1/alerts/webhooks/posthog?token=<ALERTS_WEBHOOK_TOKEN>`
 - **What this does NOT do**: it doesn't replace each service's dashboard — Sentry issues still live in Sentry, etc. It only adds Telegram as a parallel notification channel for high-signal events.
 
 ### Verifying end-to-end
@@ -442,7 +442,7 @@ curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
   -d "{\"chat_id\":\"${TELEGRAM_ALERT_CHAT_ID}\",\"text\":\"smoke test\"}"
 
 # 2. Confirm API health
-curl https://store-api.forcemediakw.com/health
+curl https://api.force-ai.co/health
 
 # 3. Trigger UptimeRobot manually: dashboard → monitor → "Test" → expect OK within 30s
 
