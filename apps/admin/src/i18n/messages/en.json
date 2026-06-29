@@ -3864,8 +3864,7 @@
       "edit": "Edit",
       "delete": "Delete",
       "deleting": "Deleting...",
-      "moveUp": "Move up",
-      "moveDown": "Move down"
+      "dragHandle": "Drag to reorder"
     },
     "productOrder": {
       "title": "Product Order",
@@ -3879,8 +3878,7 @@
       "fetchFailed": "Failed to load products",
       "empty": "No products in this category",
       "emptyDescription": "Add products to this category first, then you can set their display order here.",
-      "moveUp": "Move up",
-      "moveDown": "Move down",
+      "dragHandle": "Drag to reorder",
       "noSearch": "Reordering is disabled while a search filter is active",
       "unsavedChanges": "You have unsaved changes. Save before leaving.",
       "productCount": "{count} products",

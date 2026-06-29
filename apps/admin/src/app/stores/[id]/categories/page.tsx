@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, useToast } from '@force/ui';
 import { recommendedSizeTextForTemplate, type TemplateId } from '@force/shared';
+import { arrayMove } from '@dnd-kit/sortable';
+import { type DragEndEvent } from '@dnd-kit/core';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { SearchInput } from '../../../../components/SearchInput';
@@ -194,9 +196,9 @@ export default function StoreCategoriesPage() {
     );
   }, [categories, search]);
 
-  // Drag-free reorder via up/down controls. Persist the full order; revert +
-  // refetch on failure. Reorder is only offered when no search filter is active
-  // (so the visible index == the real index).
+  // Drag-to-reorder. Persist the new order after each drag; revert + refetch on
+  // failure. Reorder is only offered when no search filter is active (so the
+  // visible index == the real canonical index).
   const [reordering, setReordering] = useState(false);
   const persistOrder = useCallback(
     async (ordered: Category[]) => {
@@ -216,15 +218,14 @@ export default function StoreCategoriesPage() {
     },
     [storeId, showError, fetchCategories, t]
   );
-  const handleMove = useCallback(
-    (id: string, direction: 'up' | 'down') => {
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
       setCategories(prev => {
-        const idx = prev.findIndex(c => c.id === id);
-        if (idx < 0) return prev;
-        const swap = direction === 'up' ? idx - 1 : idx + 1;
-        if (swap < 0 || swap >= prev.length) return prev;
-        const next = prev.slice();
-        [next[idx], next[swap]] = [next[swap], next[idx]];
+        const oldIndex = prev.findIndex(c => c.id === active.id);
+        const newIndex = prev.findIndex(c => c.id === over.id);
+        const next = arrayMove(prev, oldIndex, newIndex);
         void persistOrder(next);
         return next;
       });
@@ -597,7 +598,7 @@ export default function StoreCategoriesPage() {
           onEdit={openEditForm}
           onDelete={setDeleteTarget}
           onAddFirst={openAddForm}
-          onMove={search.trim() ? undefined : handleMove}
+          onDragEnd={search.trim() ? undefined : handleDragEnd}
           reordering={reordering}
         />
       </div>

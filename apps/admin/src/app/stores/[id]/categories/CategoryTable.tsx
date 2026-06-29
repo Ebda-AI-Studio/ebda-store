@@ -3,6 +3,22 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useT } from '@/i18n/useT';
 
 interface Category {
@@ -26,14 +42,176 @@ interface CategoryTableProps {
   onEdit: (category: Category) => void;
   onDelete: (category: { id: string; name: string }) => void;
   onAddFirst: () => void;
-  /** Move a category one step up/down. The page persists the new order. When
-   *  omitted (or while a save is in flight), the move controls are hidden. */
-  onMove?: (id: string, direction: 'up' | 'down') => void;
+  /** Called when the user finishes a drag-reorder. The page persists the new
+   *  order. When omitted (e.g. while a search filter is active), the drag
+   *  handles are hidden. */
+  onDragEnd?: (event: DragEndEvent) => void;
+  /** When true, the drag handles are visually disabled (save in flight). */
   reordering?: boolean;
 }
 
 export type { Category };
 
+// ---------------------------------------------------------------------------
+// Grip icon
+// ---------------------------------------------------------------------------
+function GripIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 16 16" aria-hidden>
+      <circle cx="5" cy="4" r="1.2" />
+      <circle cx="11" cy="4" r="1.2" />
+      <circle cx="5" cy="8" r="1.2" />
+      <circle cx="11" cy="8" r="1.2" />
+      <circle cx="5" cy="12" r="1.2" />
+      <circle cx="11" cy="12" r="1.2" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sortable table row
+// ---------------------------------------------------------------------------
+interface SortableCategoryRowProps {
+  cat: Category;
+  isRtl: boolean;
+  deletingId: string | null;
+  storeId: string;
+  reordering: boolean;
+  showDragHandle: boolean;
+  onEdit: (cat: Category) => void;
+  onDelete: (cat: { id: string; name: string }) => void;
+  t: (key: string, values?: Record<string, string | number>) => string;
+  tOrder: (key: string) => string;
+}
+
+function SortableCategoryRow({
+  cat,
+  isRtl,
+  deletingId,
+  storeId,
+  reordering,
+  showDragHandle,
+  onEdit,
+  onDelete,
+  t,
+  tOrder,
+}: SortableCategoryRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: cat.id,
+    disabled: !showDragHandle || reordering,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+    position: isDragging ? 'relative' : undefined,
+  };
+
+  const displayName = isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || '';
+  const altName = isRtl ? cat.name : cat.nameAr;
+
+  return (
+    <tr ref={setNodeRef} style={style} className="hover:bg-muted transition-colors">
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3">
+          {/* Drag handle — only rendered when reordering is active */}
+          {showDragHandle && (
+            <span
+              {...attributes}
+              {...listeners}
+              className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              aria-label={t('dragHandle')}
+              title={t('dragHandle')}
+            >
+              <GripIcon className="h-4 w-4" />
+            </span>
+          )}
+          {cat.image ? (
+            <Image
+              src={cat.image}
+              alt={displayName}
+              width={40}
+              height={40}
+              className="h-10 w-10 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold">
+              {displayName.charAt(0)}
+            </div>
+          )}
+          <div>
+            <p className="font-medium text-foreground">{displayName}</p>
+            {altName && <p className="text-sm text-muted-foreground">{altName}</p>}
+            {cat.description && (
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{cat.description}</p>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+          {cat.slug}
+        </span>
+      </td>
+      <td className="px-6 py-4">
+        <span className="text-sm font-medium text-foreground">{cat._count?.products ?? 0}</span>
+      </td>
+      <td className="px-6 py-4 hidden md:table-cell">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+            cat.isActive
+              ? 'bg-success/10 text-success dark:bg-success/20 dark:text-success'
+              : 'bg-muted text-muted-foreground'
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${cat.isActive ? 'bg-success' : 'bg-muted-foreground'}`}
+          />
+          {cat.isActive ? t('active') : t('inactive')}
+        </span>
+      </td>
+      <td className="px-6 py-4 text-end">
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onEdit(cat)}
+            className="px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+          >
+            {t('edit')}
+          </button>
+          {(cat._count?.products ?? 0) > 1 && (
+            <Link
+              href={`/stores/${storeId}/categories/${cat.id}/order`}
+              className="px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+              title={tOrder('title')}
+            >
+              {tOrder('title')}
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              onDelete({
+                id: cat.id,
+                name: isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || cat.name,
+              })
+            }
+            disabled={deletingId === cat.id}
+            className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors disabled:opacity-50"
+          >
+            {deletingId === cat.id ? t('deleting') : t('delete')}
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CategoryTable
+// ---------------------------------------------------------------------------
 export function CategoryTable({
   categories,
   isLoading,
@@ -42,13 +220,26 @@ export function CategoryTable({
   onEdit,
   onDelete,
   onAddFirst,
-  onMove,
+  onDragEnd,
   reordering = false,
 }: CategoryTableProps) {
   const t = useT('categories.table');
   const tOrder = useT('categories.productOrder');
   const locale = useLocale();
   const isRtl = locale === 'ar';
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        // 8px movement required — lets taps and click interactions pass through
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-6">
@@ -97,7 +288,9 @@ export function CategoryTable({
     );
   }
 
-  return (
+  const showDragHandle = !!onDragEnd;
+
+  const tableBody = (
     <div className="overflow-x-auto">
       <table className="w-full" aria-label={t('label')}>
         <thead className="bg-muted border-b">
@@ -135,149 +328,35 @@ export function CategoryTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {categories.map((cat, idx) => (
-            <tr key={cat.id} className="hover:bg-muted transition-colors">
-              <td className="px-6 py-4">
-                <div className="flex items-center gap-3">
-                  {cat.image ? (
-                    <Image
-                      src={cat.image}
-                      alt={isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || ''}
-                      width={40}
-                      height={40}
-                      className="h-10 w-10 rounded-lg object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold">
-                      {(isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || '').charAt(0)}
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr}
-                    </p>
-                    {(isRtl ? cat.name : cat.nameAr) && (
-                      <p className="text-sm text-muted-foreground">
-                        {isRtl ? cat.name : cat.nameAr}
-                      </p>
-                    )}
-                    {cat.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                        {cat.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </td>
-              <td className="px-6 py-4">
-                <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                  {cat.slug}
-                </span>
-              </td>
-              <td className="px-6 py-4">
-                <span className="text-sm font-medium text-foreground">
-                  {cat._count?.products ?? 0}
-                </span>
-              </td>
-              <td className="px-6 py-4 hidden md:table-cell">
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-                    cat.isActive
-                      ? 'bg-success/10 text-success dark:bg-success/20 dark:text-success'
-                      : 'bg-muted text-muted-foreground'
-                  }`}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${cat.isActive ? 'bg-success' : 'bg-muted-foreground'}`}
-                  />
-                  {cat.isActive ? t('active') : t('inactive')}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-end">
-                <div className="flex items-center justify-end gap-2">
-                  {onMove && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onMove(cat.id, 'up')}
-                        disabled={idx === 0 || reordering}
-                        aria-label={t('moveUp')}
-                        title={t('moveUp')}
-                        className="grid h-7 w-7 place-items-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors disabled:opacity-30"
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 15l7-7 7 7"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onMove(cat.id, 'down')}
-                        disabled={idx === categories.length - 1 || reordering}
-                        aria-label={t('moveDown')}
-                        title={t('moveDown')}
-                        className="grid h-7 w-7 place-items-center rounded-lg border border-border text-foreground hover:bg-muted transition-colors disabled:opacity-30"
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => onEdit(cat)}
-                    className="px-3 py-1.5 text-xs font-medium text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-                  >
-                    {t('edit')}
-                  </button>
-                  {(cat._count?.products ?? 0) > 1 && (
-                    <Link
-                      href={`/stores/${storeId}/categories/${cat.id}/order`}
-                      className="px-3 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
-                      title={tOrder('title')}
-                    >
-                      {tOrder('title')}
-                    </Link>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onDelete({
-                        id: cat.id,
-                        name: isRtl ? cat.nameAr || cat.name : cat.name || cat.nameAr || cat.name,
-                      })
-                    }
-                    disabled={deletingId === cat.id}
-                    className="px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors disabled:opacity-50"
-                  >
-                    {deletingId === cat.id ? t('deleting') : t('delete')}
-                  </button>
-                </div>
-              </td>
-            </tr>
+          {categories.map(cat => (
+            <SortableCategoryRow
+              key={cat.id}
+              cat={cat}
+              isRtl={isRtl}
+              deletingId={deletingId}
+              storeId={storeId}
+              reordering={reordering}
+              showDragHandle={showDragHandle}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              t={t}
+              tOrder={tOrder}
+            />
           ))}
         </tbody>
       </table>
     </div>
+  );
+
+  if (!onDragEnd) {
+    return tableBody;
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+        {tableBody}
+      </SortableContext>
+    </DndContext>
   );
 }
