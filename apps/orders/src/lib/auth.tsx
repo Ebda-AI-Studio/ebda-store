@@ -29,11 +29,19 @@ export interface AuthUser {
   permissions?: string[];
 }
 
+/** Returned by login() when the account has 2FA enabled — the caller must then
+ *  collect a TOTP/backup code and call completeMfaLogin(). */
+export interface MfaChallenge {
+  mfaRequired: true;
+  challengeToken: string;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void | MfaChallenge>;
+  completeMfaLogin: (challengeToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -168,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }
 
-  async function login(email: string, password: string): Promise<void> {
+  async function login(email: string, password: string): Promise<void | MfaChallenge> {
     const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       credentials: 'include',
@@ -187,11 +195,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error?.message || 'Login failed');
     }
 
-    // This app does not handle MFA enrollment — staff enroll via the full admin.
-    // If the API returns an MFA challenge, surface a clear message rather than
-    // a half-finished flow.
+    // MFA challenge: API returns { mfaRequired: true, challengeToken } instead of
+    // tokens. Surface it to the login page so it can show the code-entry step.
+    // (Staff enroll 2FA in the full admin; here we only complete the challenge.)
     if (data.data?.mfaRequired) {
-      throw new Error('Two-factor authentication is required. Complete it in the admin app first.');
+      return { mfaRequired: true, challengeToken: data.data.challengeToken };
+    }
+
+    if (!ADMIN_ROLES.includes(data.data.user.role)) {
+      throw new Error('ADMIN_ONLY');
+    }
+
+    storeSession(data.data);
+    router.push('/orders');
+  }
+
+  async function completeMfaLogin(challengeToken: string, code: string): Promise<void> {
+    const response = await fetch(`${API_URL}/auth/mfa/verify`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeToken, code }),
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error('Server returned an invalid response. Please try again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Verification failed');
     }
 
     if (!ADMIN_ROLES.includes(data.data.user.role)) {
@@ -221,7 +256,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, isAuthenticated: !!user, login, completeMfaLogin, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

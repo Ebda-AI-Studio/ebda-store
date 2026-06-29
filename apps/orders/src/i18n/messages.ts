@@ -22,6 +22,12 @@ export interface Messages {
     failed: string;
     adminOnly: string;
     rememberMe: string;
+    mfaTitle: string;
+    mfaSubtitle: string;
+    mfaCodeLabel: string;
+    mfaVerify: string;
+    mfaCodeRequired: string;
+    back: string;
   };
   store: {
     pick: string;
@@ -209,6 +215,12 @@ export const MESSAGES: Record<Locale, Messages> = {
       failed: 'Sign in failed. Check your credentials.',
       adminOnly: 'This app is for store staff. Customer accounts cannot sign in here.',
       rememberMe: 'Remember me',
+      mfaTitle: 'Two-factor authentication',
+      mfaSubtitle: 'Enter the 6-digit code from your authenticator app (or a backup code).',
+      mfaCodeLabel: 'Authentication code',
+      mfaVerify: 'Verify',
+      mfaCodeRequired: 'Enter your authentication code.',
+      back: 'Back',
     },
     store: {
       pick: 'Store',
@@ -413,6 +425,12 @@ export const MESSAGES: Record<Locale, Messages> = {
       failed: 'فشل تسجيل الدخول. تحقّق من بياناتك.',
       adminOnly: 'هذا التطبيق لموظفي المتجر. لا يمكن لحسابات العملاء تسجيل الدخول هنا.',
       rememberMe: 'تذكّرني',
+      mfaTitle: 'المصادقة الثنائية',
+      mfaSubtitle: 'أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة (أو رمز احتياطي).',
+      mfaCodeLabel: 'رمز المصادقة',
+      mfaVerify: 'تحقّق',
+      mfaCodeRequired: 'أدخل رمز المصادقة.',
+      back: 'رجوع',
     },
     store: {
       pick: 'المتجر',

@@ -199,6 +199,19 @@ export class ResendService {
 
     const { data, error } = await ensureClient().domains.get(store.emailDomainId);
     if (error || !data) {
+      // The Resend domain no longer exists (deleted/revoked in the dashboard).
+      // Clear our dangling reference instead of throwing, so the admin badge
+      // stops showing a false 'verified', resolveSender falls back to the
+      // verified platform domain, and the merchant can re-provision cleanly.
+      // (wadyaljuz hit this: emailDomainStatus='verified' in DB but the Resend
+      // domain was gone → get 404 → previously threw → stale badge. 2026-06-29.)
+      if (error?.name === 'not_found') {
+        await prisma.store.update({
+          where: { id: storeId },
+          data: { emailDomainId: null, emailDomainStatus: null, emailDomainVerifiedAt: null },
+        });
+        return { status: 'unverified', records: [] };
+      }
       throw new Error(`Resend get-domain failed: ${error?.message ?? 'unknown'}`);
     }
 

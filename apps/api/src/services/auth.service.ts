@@ -671,6 +671,12 @@ export class AuthService {
         role: true,
         avatar: true,
         emailVerified: true,
+        // MFA status — every client reads these from /auth/me to render the
+        // 2FA toggle (admin Security page) and to gate the Orders PWA login.
+        // Omitting them made /auth/me report MFA as undefined → "disabled"
+        // everywhere, even for fully-enrolled accounts.
+        mfaEnabled: true,
+        mfaEnrolledAt: true,
         createdAt: true,
         updatedAt: true,
       },
