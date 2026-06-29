@@ -4091,6 +4091,12 @@
     }
   },
   "components": {
+    "commandPalette": {
+      "title": "لوحة الأوامر",
+      "placeholder": "ابحث في الصفحات…",
+      "empty": "لا توجد نتائج.",
+      "trigger": "بحث…"
+    },
     "notificationBell": {
       "ariaLabel": "الإشعارات",
       "title": "الإشعارات",

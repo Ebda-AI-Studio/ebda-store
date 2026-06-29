@@ -16,6 +16,7 @@ import {
 import { HubTabs } from './admin-layout/HubTabs';
 import { detectHub, type HubLabels } from './admin-layout/hubs';
 import { SidebarHeader } from './admin-layout/SidebarHeader';
+import { CommandPalette } from './CommandPalette';
 import { SidebarNav } from './admin-layout/SidebarNav';
 import { SidebarFooter } from './admin-layout/SidebarFooter';
 import { TopBar } from './admin-layout/TopBar';
@@ -49,6 +50,7 @@ export function AdminLayout({
   storeSlug,
 }: AdminLayoutProps) {
   const t = useT('components.adminLayout');
+  const tcp = useT('components.commandPalette');
   const tc = useT('common');
   const pathname = usePathname();
   const router = useRouter();
@@ -305,6 +307,30 @@ export function AdminLayout({
         isStoreAdminWithBranding={isStoreAdminWithBranding}
         userRole={user?.role as 'super_admin' | 'store_admin' | 'staff' | 'customer' | undefined}
       />
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event('force:open-search'))}
+        className="mx-3 mt-2 flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70"
+      >
+        <svg
+          className="h-4 w-4 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"
+          />
+        </svg>
+        <span className="flex-1 text-start">{tcp('trigger')}</span>
+        <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] lg:inline-block">
+          ⌘K
+        </kbd>
+      </button>
       <SidebarNav
         navItems={navItems}
         pathname={pathname}
@@ -356,6 +382,8 @@ export function AdminLayout({
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Global ⌘K command palette — renders null until opened; searches every admin page. */}
+      <CommandPalette navItems={navItems} />
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div

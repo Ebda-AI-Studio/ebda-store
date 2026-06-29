@@ -4091,6 +4091,12 @@
     }
   },
   "components": {
+    "commandPalette": {
+      "title": "Command palette",
+      "placeholder": "Search pages…",
+      "empty": "No matches.",
+      "trigger": "Search…"
+    },
     "notificationBell": {
       "ariaLabel": "Notifications",
       "title": "Notifications",
