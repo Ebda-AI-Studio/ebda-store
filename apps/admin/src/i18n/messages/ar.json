@@ -3764,6 +3764,13 @@
       "colValue": "القيمة",
       "invalidDomain": "يرجى إدخال نطاق صالح (مثل shop.example.com)",
       "updateFailed": "تعذّر تحديث النطاق",
+      "provider": {
+        "title": "مزوّد النطاق (مشرف عام)",
+        "subtitle": "المنصة التي تخدم النطاق المخصص لهذا المتجر. لا تبدّل إلا مع خطوات DNS/الشهادة في دليل التحويل إلى Cloudflare.",
+        "vercel": "Vercel",
+        "cloudflare": "Cloudflare",
+        "current": "يُخدَم حاليًا عبر {provider}."
+      },
       "emailSenderTitle": "مرسل البريد الإلكتروني",
       "emailSenderSubtitle": "أرسل تأكيدات الطلبات والإيصالات من نطاقك الخاص.",
       "sendingAs": "يُرسل باسم",

@@ -3764,6 +3764,13 @@
       "colValue": "Value",
       "invalidDomain": "Please enter a valid domain (e.g., shop.example.com)",
       "updateFailed": "Failed to update domain",
+      "provider": {
+        "title": "Domain provider (super-admin)",
+        "subtitle": "Which platform serves this store's custom domain. Switch only alongside the DNS/cert steps in the Cloudflare cutover runbook.",
+        "vercel": "Vercel",
+        "cloudflare": "Cloudflare",
+        "current": "Currently served by {provider}."
+      },
       "emailSenderTitle": "Email sender",
       "emailSenderSubtitle": "Send order confirmations and receipts under your own domain.",
       "sendingAs": "Sending as",
