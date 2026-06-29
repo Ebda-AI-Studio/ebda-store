@@ -862,7 +862,7 @@ export class InventoryService {
 
       const storeBase = store.domain
         ? `https://${store.domain}`
-        : `${process.env.WEB_URL ?? 'https://store.forcemediakw.com'}/${store.slug}`;
+        : `${process.env.WEB_URL ?? 'https://store.force-ai.co'}/${store.slug}`;
 
       // Dispatch notifications for each user — fire-and-forget per user
       for (const item of wishlistItems) {

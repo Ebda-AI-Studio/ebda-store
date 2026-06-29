@@ -260,7 +260,7 @@ export const config = {
   // Force AI WhatsApp Business Platform bridge
   // Base URL of the WBS backend. In production: https://backend.forcemediakw.com
   // Leave unset in dev — the bridge will skip sends gracefully when store.wbsEnabled=false.
-  wbsBaseUrl: process.env.WBS_BASE_URL || 'https://backend.forcemediakw.com',
+  wbsBaseUrl: process.env.WBS_BASE_URL || 'https://whatsapp-api.force-ai.co',
 } as const;
 
 // Additional production validations (core secrets already validated above)

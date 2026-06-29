@@ -826,7 +826,7 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
 
     // Compute the storefront checkout URL. Per-store custom domain may
     // be set on the Store row; for now, fall back to slug-based URL.
-    const storefrontBase = process.env.STOREFRONT_BASE_URL || 'https://store.forcemediakw.com';
+    const storefrontBase = process.env.STOREFRONT_BASE_URL || 'https://store.force-ai.co';
     const checkoutUrl = `${storefrontBase}/checkout?waToken=${encodeURIComponent(checkoutToken)}`;
 
     logger.info(

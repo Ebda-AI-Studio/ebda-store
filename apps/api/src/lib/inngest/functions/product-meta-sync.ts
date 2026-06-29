@@ -117,7 +117,7 @@ export const productMetaSync = async ({
         if (product) {
           const storeBase = store.domain
             ? `https://${store.domain}`
-            : `https://store.forcemediakw.com/${store.slug}`;
+            : `https://store.force-ai.co/${store.slug}`;
           productPayload = {
             ...product,
             link: `${storeBase}/products/${product.slug}`,

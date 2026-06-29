@@ -146,7 +146,7 @@ export const reviewRequest: InngestFunction.Any = inngest.createFunction(
 
     const base = store.domain
       ? `https://${store.domain}`
-      : `https://store.forcemediakw.com/${store.slug}`;
+      : `https://store.force-ai.co/${store.slug}`;
 
     // ── Build per-item review links ────────────────────────────────────────
     type OrderItemForReview = {

@@ -164,7 +164,7 @@ export const bulkAiLlmsTxt: InngestFunction.Any = inngest.createFunction(
 
         const storeUrl = store.domain
           ? `https://${store.domain}`
-          : `https://store.forcemediakw.com/${store.slug}`;
+          : `https://store.force-ai.co/${store.slug}`;
 
         const catList = categories
           .map(
