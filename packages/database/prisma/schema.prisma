@@ -2433,6 +2433,11 @@ model BulkAiJob {
   // [{entityId, entityName, error}, ...]. Hard-cap to 50 so the row
   // doesn't grow unbounded on a totally-failing run.
   errors       Json?
+  // Capped list of products this job actually FILLED — [{id, name}, ...]. Lets
+  // the merchant see exactly which products got AI-written content so they can
+  // validate the output (the `filled` integer alone isn't actionable). Capped
+  // (200) like `errors` so a huge sweep can't bloat the row.
+  filledProducts Json?         @map("filled_products")
   errorMessage String?         @map("error_message") // Top-level failure reason if status=failed
   startedAt    DateTime?       @map("started_at")
   completedAt  DateTime?       @map("completed_at")

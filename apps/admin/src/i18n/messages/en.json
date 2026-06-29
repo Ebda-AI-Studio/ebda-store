@@ -5238,7 +5238,9 @@
       "dismiss": "Dismiss",
       "hide": "Hide",
       "viewFailures": "View {count} failure",
-      "viewFailuresPlural": "View {count} failures"
+      "viewFailuresPlural": "View {count} failures",
+      "viewFilled": "View {count} filled product",
+      "viewFilledPlural": "View {count} filled products"
     },
     "stats": {
       "filled": "Filled",

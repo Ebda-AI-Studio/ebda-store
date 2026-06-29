@@ -63,6 +63,10 @@ interface BulkAiJobDetail extends BulkAiJob {
     field?: string;
     error: string;
   }> | null;
+  // Products this job actually filled — surfaced so the merchant can open each
+  // and validate the AI-written content. Populated by description-balance today;
+  // other fill jobs may adopt it later (null/absent = not tracked for that kind).
+  filledProducts?: Array<{ id: string; name: string }> | null;
 }
 
 /** Three jobs launched by a master sweep button, tracked as a unit. */
@@ -862,10 +866,13 @@ function ActiveJobCard({
   onClose: () => void;
   t: TFn;
 }) {
+  const params = useParams();
+  const storeId = String(params?.id ?? '');
   const pct = job.total > 0 ? Math.min(100, Math.round((job.processed / job.total) * 100)) : 0;
   const isDone =
     job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled';
   const isActive = job.status === 'running' || job.status === 'queued';
+  const filledList = job.filledProducts ?? [];
 
   const statusText = (() => {
     if (job.status === 'cancelled') return t('activeJob.statusCancelled');
@@ -932,6 +939,32 @@ function ActiveJobCard({
       </div>
 
       {job.errorMessage && <p className="mt-3 text-sm text-destructive">{job.errorMessage}</p>}
+
+      {filledList.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs font-medium text-emerald-600">
+            {filledList.length === 1
+              ? t('activeJob.viewFilled', { count: filledList.length })
+              : t('activeJob.viewFilledPlural', { count: filledList.length })}
+          </summary>
+          <ul className="mt-2 space-y-1 text-xs">
+            {filledList.map(p => (
+              <li key={p.id} className="rounded bg-white px-2 py-1.5">
+                {storeId ? (
+                  <Link
+                    href={`/stores/${storeId}/products/${p.id}`}
+                    className="font-medium text-foreground hover:text-[#fc6b02] hover:underline"
+                  >
+                    {p.name}
+                  </Link>
+                ) : (
+                  <span className="font-medium">{p.name}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {job.errors && job.errors.length > 0 && (
         <details className="mt-3">

@@ -20,11 +20,17 @@ const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 const PAGE = 25;
 const ERROR_CAP = 50;
+const FILLED_CAP = 200;
 
 interface BulkBalanceError {
   productId: string;
   productName: string;
   error: string;
+}
+
+interface FilledProduct {
+  id: string;
+  name: string;
 }
 
 export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunction(
@@ -51,6 +57,7 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
     // AI work must never run inside a DB transaction.
     return (async () => {
       const errors: BulkBalanceError[] = [];
+      const filledProducts: FilledProduct[] = [];
       let balanced = 0;
       let skipped = 0;
       let failed = 0;
@@ -83,6 +90,9 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
               const result = await balanceProductLanguages(storeId, p.id, { force: false });
               if (result.balanced) {
                 balanced++;
+                if (filledProducts.length < FILLED_CAP) {
+                  filledProducts.push({ id: p.id, name: p.name });
+                }
                 await sleep(THROTTLE_MS);
               } else {
                 skipped++;
@@ -111,6 +121,7 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
               skipped,
               failed,
               errors: errors as object,
+              filledProducts: filledProducts as object,
             },
           });
 
@@ -137,6 +148,7 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
           skipped,
           failed,
           errors: errors as object,
+          filledProducts: filledProducts as object,
           completedAt: new Date(),
         },
       });

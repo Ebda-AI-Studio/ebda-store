@@ -432,6 +432,7 @@ router.get('/bulk/:jobId', async (req: Request, res: Response, next: NextFunctio
         skipped: true,
         failed: true,
         errors: true,
+        filledProducts: true,
         errorMessage: true,
         startedAt: true,
         completedAt: true,

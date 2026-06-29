@@ -5238,7 +5238,9 @@
       "dismiss": "إغلاق",
       "hide": "إخفاء",
       "viewFailures": "عرض {count} فشل",
-      "viewFailuresPlural": "عرض {count} حالة فشل"
+      "viewFailuresPlural": "عرض {count} حالة فشل",
+      "viewFilled": "عرض {count} منتج تم تعبئته",
+      "viewFilledPlural": "عرض {count} منتجات تم تعبئتها"
     },
     "stats": {
       "filled": "مُعبَّأ",

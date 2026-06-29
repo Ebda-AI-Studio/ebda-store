@@ -1,4 +1,4 @@
-import { isAiQuotaCapError } from '../ai-quota';
+import { isPlatformQuotaCap } from '../ai-quota';
 import logger from '../logger';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -33,9 +33,14 @@ export async function callWithRetry<T>(
         (err as { status?: number; response?: { status?: number } })?.status ??
         (err as { response?: { status?: number } })?.response?.status;
       const msg = (err instanceof Error ? err.message : String(err)) ?? '';
+      // A 429 is retry-worthy UNLESS it's a deterministic platform daily/monthly
+      // cap (retrying within the window can't succeed). A Gemini-wrapped 429
+      // (AI_QUOTA_EXCEEDED) may be a per-minute RPM throttle, so we DO retry it
+      // with backoff (honouring Gemini's retryDelay) — only the bulk-loop stop
+      // check (isAiQuotaCapError) treats it as terminal, after retries exhaust.
       const transient =
         status === 503 ||
-        (status === 429 && !isAiQuotaCapError(err)) ||
+        (status === 429 && !isPlatformQuotaCap(err)) ||
         /timeout|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up/i.test(msg);
 
       if (!transient || attempt === maxAttempts) throw err;
