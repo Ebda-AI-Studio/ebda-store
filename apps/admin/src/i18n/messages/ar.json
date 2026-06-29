@@ -3943,7 +3943,9 @@
       "unsavedChanges": "لديك تغييرات غير محفوظة. احفظ قبل المغادرة.",
       "productCount": "{count} منتج",
       "sku": "رمز: {sku}",
-      "inactive": "غير نشط"
+      "inactive": "غير نشط",
+      "activeOnly": "النشطة فقط",
+      "hiddenInactive": "{count} غير نشطة مخفية (محفوظة في الترتيب)"
     }
   },
   "reviews": {

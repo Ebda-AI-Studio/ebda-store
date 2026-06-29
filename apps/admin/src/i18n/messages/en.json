@@ -3943,7 +3943,9 @@
       "unsavedChanges": "You have unsaved changes. Save before leaving.",
       "productCount": "{count} products",
       "sku": "SKU: {sku}",
-      "inactive": "Inactive"
+      "inactive": "Inactive",
+      "activeOnly": "Active only",
+      "hiddenInactive": "{count} inactive hidden (still kept in order)"
     }
   },
   "reviews": {

@@ -156,6 +156,10 @@ export default function CategoryProductOrderPage() {
 
   const [category, setCategory] = useState<CategoryMeta | null>(null);
   const [products, setProducts] = useState<ProductRow[]>([]);
+  // Hide non-active products from the reorder view by default — merchants reorder
+  // what shows on the storefront. The FULL order (incl. inactive) is always what
+  // we persist, so hiding never loses an inactive product's slot.
+  const [activeOnly, setActiveOnly] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -200,13 +204,31 @@ export default function CategoryProductOrderPage() {
     fetchProducts();
   }, [fetchProducts]);
 
+  // Products shown in the list. When activeOnly is on, inactive rows are hidden
+  // from view but stay pinned in the persisted order (see handleDragEnd).
+  const displayedProducts = activeOnly ? products.filter(p => p.status === 'active') : products;
+  const hiddenCount = products.length - displayedProducts.length;
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     setProducts(prev => {
-      const oldIndex = prev.findIndex(p => p.id === active.id);
-      const newIndex = prev.findIndex(p => p.id === over.id);
-      return arrayMove(prev, oldIndex, newIndex);
+      if (!activeOnly) {
+        const oldIndex = prev.findIndex(p => p.id === active.id);
+        const newIndex = prev.findIndex(p => p.id === over.id);
+        return arrayMove(prev, oldIndex, newIndex);
+      }
+      // Active-only view: reorder within the visible (active) subset, then
+      // rebuild the FULL order with every inactive product kept exactly where it
+      // was (its absolute slot), so hiding/reordering never drops or moves an
+      // inactive product on save.
+      const visible = prev.filter(p => p.status === 'active');
+      const oldIndex = visible.findIndex(p => p.id === active.id);
+      const newIndex = visible.findIndex(p => p.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      const reordered = arrayMove(visible, oldIndex, newIndex);
+      let ai = 0;
+      return prev.map(p => (p.status === 'active' ? reordered[ai++] : p));
     });
     setIsDirty(true);
   }
@@ -267,6 +289,25 @@ export default function CategoryProductOrderPage() {
         </div>
       )}
 
+      {!isLoading && products.length > 0 && (
+        <div className="mb-4 flex items-center gap-2">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={activeOnly}
+              onChange={e => setActiveOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            {t('activeOnly')}
+          </label>
+          {activeOnly && hiddenCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {t('hiddenInactive', { count: hiddenCount })}
+            </span>
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-3 rounded-xl border bg-card p-6 shadow-sm">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -314,9 +355,12 @@ export default function CategoryProductOrderPage() {
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext items={products.map(p => p.id)} strategy={verticalListSortingStrategy}>
+            <SortableContext
+              items={displayedProducts.map(p => p.id)}
+              strategy={verticalListSortingStrategy}
+            >
               <ul className="divide-y divide-border" role="list" aria-label={t('title')}>
-                {products.map((product, idx) => (
+                {displayedProducts.map((product, idx) => (
                   <SortableProductRow
                     key={product.id}
                     product={product}
