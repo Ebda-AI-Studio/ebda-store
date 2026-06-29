@@ -592,6 +592,8 @@
         "skuPlaceholder": "PROD-001",
         "quantity": "الكمية",
         "quantityPlaceholder": "0",
+        "lowStockThreshold": "حد المخزون المنخفض",
+        "lowStockThresholdPlaceholder": "5",
         "productStatus": "حالة المنتج",
         "category": "الفئة",
         "noCategory": "بدون فئة",

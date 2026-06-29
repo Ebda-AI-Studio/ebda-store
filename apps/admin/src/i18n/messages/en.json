@@ -592,6 +592,8 @@
         "skuPlaceholder": "PROD-001",
         "quantity": "Quantity",
         "quantityPlaceholder": "0",
+        "lowStockThreshold": "Low-Stock Threshold",
+        "lowStockThresholdPlaceholder": "5",
         "productStatus": "Product Status",
         "category": "Category",
         "noCategory": "No category",
