@@ -660,14 +660,26 @@ export class ProductService {
         }
       }
 
-      // If categories are provided, replace all existing categories
+      // If categories are provided, replace the associations — but PRESERVE the
+      // merchant's per-category drag-sort `position`. Previously this blindly
+      // deleted + recreated every ProductCategory row with the default position
+      // (0), so ANY product save that included `categories` (e.g. toggling a
+      // product out of stock) reset its position to 0 → it jumped to the front
+      // of every category listing. Re-use the saved position for links that
+      // remain; only genuinely-new category links default to 0.
       if (data.categories !== undefined) {
+        const existingLinks = await tx.productCategory.findMany({
+          where: { productId },
+          select: { categoryId: true, position: true },
+        });
+        const positionByCategory = new Map(existingLinks.map(l => [l.categoryId, l.position]));
         await tx.productCategory.deleteMany({ where: { productId } });
         if (data.categories.length > 0) {
           await tx.productCategory.createMany({
             data: data.categories.map(categoryId => ({
               productId,
               categoryId,
+              position: positionByCategory.get(categoryId) ?? 0,
             })),
           });
         }

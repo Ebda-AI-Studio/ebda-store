@@ -1294,6 +1294,24 @@ router.put(
       // never undone by a downstream error (e.g. CORS-cache bust, status fetch).
       rollbackDomainAdd = null;
 
+      // The stored llms.txt body (Store.llmsTxt) bakes ABSOLUTE URLs built from
+      // the domain at generation time, and the /llms.txt route serves it
+      // verbatim. On a real domain change those URLs go stale. Clear it so the
+      // route falls back to the live, domain-correct generator until the
+      // merchant re-runs the GEO "llms.txt" sweep for the AI-enriched version.
+      // (All other AI output — SEO/AEO meta, FAQs, citation/brand-facts — is
+      // domain-agnostic text; their URLs are computed at render time.)
+      if (domain !== oldDomain) {
+        await prisma.store
+          .update({ where: { id }, data: { llmsTxt: null } })
+          .catch(err =>
+            logger.warn(
+              { err, storeId: id },
+              '[STORE] failed to clear stale llms.txt on domain change'
+            )
+          );
+      }
+
       // Per-store Resend provisioning. Run only on actual domain change.
       // Order matters: remove the OLD Resend record BEFORE provisioning the
       // new one, otherwise provisionStoreDomain would overwrite the row's

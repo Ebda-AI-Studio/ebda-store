@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -161,6 +161,27 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       setSelectedImage(0);
     }
   }, [selectedVariant?.imageUrl]);
+
+  // Swipeable image gallery: the hero is a horizontal scroll-snap track showing
+  // one image per "page" (swipe left/right on touch, scroll on desktop). Keep the
+  // active index in sync with selectedImage so the dots + thumbnails track the
+  // swipe, and smooth-scroll to the slide when the index is set externally
+  // (thumbnail click / variant image).
+  const galleryRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = galleryRef.current;
+    if (!el) return;
+    const target = el.clientWidth * selectedImage;
+    if (Math.abs(el.scrollLeft - target) > 8) {
+      el.scrollTo({ left: target, behavior: 'smooth' });
+    }
+  }, [selectedImage]);
+  const handleGalleryScroll = () => {
+    const el = galleryRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    setSelectedImage(prev => (prev === idx ? prev : idx));
+  };
   const { success: toastSuccess, error: toastError } = useToast();
   const { addItem } = useCart();
   // Issue 1 fix (2026-05-28): destructure ctxLayout so we can merge it
@@ -418,6 +439,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const categoryName = language === 'ar' && categoryNameAr ? categoryNameAr : categoryNameEn;
   // Localized product name for breadcrumb / heading / image alt.
   const displayName = language === 'ar' && product.nameAr ? product.nameAr : product.name;
+  // Localized description — the PDP previously hard-rendered the English
+  // `description` regardless of locale, so a balanced Arabic description never
+  // showed on the AR storefront. Prefer descriptionAr on the AR site.
+  const displayDescription =
+    language === 'ar' && product.descriptionAr ? product.descriptionAr : product.description;
 
   // Derived variant/option availability
   const productVariants = product.variants ?? [];
@@ -515,16 +541,33 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               <div
                 className={`relative ${pdpAspectClass} mx-auto max-w-[280px] sm:max-w-[400px] lg:max-w-[600px] overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10`}
               >
-                {images[selectedImage]?.url ? (
-                  <Image
-                    src={images[selectedImage].url}
-                    alt={images[selectedImage].alt || displayName}
-                    width={600}
-                    height={800}
-                    className="h-full w-full object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 40vw, 32vw"
-                    priority
-                  />
+                {images.length > 0 ? (
+                  // Swipeable scroll-snap track — one image per page. Touch users
+                  // swipe left/right; desktop scrolls/drag. handleGalleryScroll
+                  // keeps selectedImage (dots + thumbnails) in sync.
+                  <div
+                    ref={galleryRef}
+                    onScroll={handleGalleryScroll}
+                    className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {images.map((img, index) => (
+                      <div
+                        key={img.id || index}
+                        className="relative h-full w-full shrink-0 snap-center"
+                      >
+                        <Image
+                          src={img.url}
+                          alt={img.alt || `${displayName} ${index + 1}`}
+                          width={600}
+                          height={800}
+                          className="h-full w-full object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 40vw, 32vw"
+                          priority={index === 0}
+                          draggable={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div className="flex h-full items-center justify-center">
                     <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full bg-primary/20">
@@ -547,7 +590,8 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                 {/* Out-of-stock label + image dim — same platform OOS system as
                     the product cards (productCardDefaults oosLabel + oosDimColor),
                     so the PDP matches the listing. orderable honors backorder:
-                    a backorder-able OOS product is still orderable so no label. */}
+                    a backorder-able OOS product is still orderable so no label.
+                    Sits OVER the swipe track so it stays put while images scroll. */}
                 <OosImageDim
                   orderable={!outOfStock || canBackorder}
                   oosDimColor={productCardDefaults?.oosDimColor}
@@ -565,6 +609,19 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   oosLabelTextColor={productCardDefaults?.oosLabelTextColor}
                   theme={store?.theme}
                 />
+                {/* Dot indicators — current image of total. */}
+                {images.length > 1 && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
+                    {images.map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 rounded-full transition-all ${
+                          i === selectedImage ? 'w-4 bg-primary' : 'w-1.5 bg-foreground/30'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
               {images.length > 1 && (
                 <div className="grid grid-cols-4 gap-4">
@@ -644,9 +701,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               </div>
               <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
 
-              {product.description && (
+              {displayDescription && (
                 <p className="mt-6 max-w-prose text-muted-foreground leading-relaxed">
-                  {product.description}
+                  {displayDescription}
                 </p>
               )}
 
