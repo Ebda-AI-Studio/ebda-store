@@ -70,16 +70,16 @@ grep '^NEXT_PUBLIC_' /tmp/web.env   # copy each into a GitHub repo Variable
 rm /tmp/web.env
 ```
 
-| Variable                       | Where it comes from                                            |
-| ------------------------------ | -------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL`          | `https://store-api.forcemediakw.com/api/v1` (workflow default) |
-| `NEXT_PUBLIC_APP_NAME`         | `Force Store` (workflow default)                               |
-| `NEXT_PUBLIC_SITE_URL`         | `https://store.forcemediakw.com` (workflow default)            |
-| `NEXT_PUBLIC_ONESIGNAL_APP_ID` | _leave empty — storefront OneSignal not configured_            |
-| `NEXT_PUBLIC_POSTHOG_HOST`     | `https://us.i.posthog.com` (workflow default)                  |
-| `NEXT_PUBLIC_POSTHOG_KEY`      | Vercel `force-web` prod (`phc_…`)                              |
-| `NEXT_PUBLIC_SENTRY_DSN_WEB`   | Vercel `force-web` prod (`https://…@…ingest.us.sentry.io/…`)   |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Vercel `force-web` prod (base64 `B…`)                          |
+| Variable                       | Where it comes from                                          |
+| ------------------------------ | ------------------------------------------------------------ |
+| `NEXT_PUBLIC_API_URL`          | `https://api.force-ai.co/api/v1` (workflow default)          |
+| `NEXT_PUBLIC_APP_NAME`         | `Force Store` (workflow default)                             |
+| `NEXT_PUBLIC_SITE_URL`         | `https://store.force-ai.co` (workflow default)               |
+| `NEXT_PUBLIC_ONESIGNAL_APP_ID` | _leave empty — storefront OneSignal not configured_          |
+| `NEXT_PUBLIC_POSTHOG_HOST`     | `https://us.i.posthog.com` (workflow default)                |
+| `NEXT_PUBLIC_POSTHOG_KEY`      | Vercel `force-web` prod (`phc_…`)                            |
+| `NEXT_PUBLIC_SENTRY_DSN_WEB`   | Vercel `force-web` prod (`https://…@…ingest.us.sentry.io/…`) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Vercel `force-web` prod (base64 `B…`)                        |
 
 > The four values marked "workflow default" are baked into `cf-deploy.yml` as
 > fallbacks, so you only strictly NEED to set the three from Vercel
