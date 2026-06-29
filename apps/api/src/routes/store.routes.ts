@@ -1083,6 +1083,16 @@ router.get(
       // and `ttl` (string, e.g. "Auto" or seconds) are preserved through
       // the merge. Without them merchants hit registrar fields they don't
       // know how to fill — caught on wadyaljuz.com 2026-05-13.
+      // Refresh Resend status live and capture the fresh status + records.
+      // The critical fix: the response MUST use the live `refreshed.status`
+      // returned from this call, NOT the pre-refresh `storeRow.emailDomainStatus`.
+      // storeRow was fetched BEFORE refreshDomainStatus writes the updated value
+      // to the DB, so returning storeRow.emailDomainStatus would return a stale
+      // snapshot and show "Verified" even after Resend has deleted/revoked the
+      // domain. (Exact failure mode: wadyaljuz had emailDomainStatus='verified' in
+      // DB but Resend had already deleted the domain; storeRow carried the stale
+      // 'verified'; refreshDomainStatus threw 404, was swallowed in catch, so the
+      // response returned the stale 'verified' badge — Fix 2 2026-06-29.)
       let resendRecords: Array<{
         type: string;
         name: string;
@@ -1090,9 +1100,18 @@ router.get(
         priority?: number;
         ttl?: string;
       }> = [];
+      let liveEmailStatus: string | null = storeRow?.emailDomainStatus ?? null;
+      let liveEmailVerifiedAt: Date | null = storeRow?.emailDomainVerifiedAt ?? null;
       if (storeRow?.emailDomainId) {
         try {
           const refreshed = await ResendService.refreshDomainStatus(id);
+          // Use the live status returned from Resend, not the stale storeRow value.
+          liveEmailStatus = refreshed.status;
+          // If Resend now says NOT verified, clear the verifiedAt so the badge
+          // won't show a stale timestamp either.
+          if (refreshed.status !== 'verified') {
+            liveEmailVerifiedAt = null;
+          }
           resendRecords = refreshed.records.map(r => ({
             type: r.type,
             name: r.name,
@@ -1103,8 +1122,11 @@ router.get(
         } catch (err) {
           logger.warn(
             { err, storeId: id },
-            'Resend status fetch failed during GET /domain — admin will still render Vercel side'
+            'Resend status fetch failed during GET /domain — falling back to stored status'
           );
+          // On failure, keep the last-known stored values (storeRow snapshot).
+          // This is a best-effort degradation: the badge may be stale when Resend
+          // is unreachable, but we do not surface a hard error on the admin page.
         }
       }
 
@@ -1136,8 +1158,8 @@ router.get(
           dnsRecords: mergedDns,
           emailSender: {
             domainId: storeRow?.emailDomainId ?? null,
-            status: storeRow?.emailDomainStatus ?? null,
-            verifiedAt: storeRow?.emailDomainVerifiedAt ?? null,
+            status: liveEmailStatus,
+            verifiedAt: liveEmailVerifiedAt,
           },
         },
       });

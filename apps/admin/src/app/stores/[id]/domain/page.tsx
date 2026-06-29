@@ -7,7 +7,6 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
 import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
-import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 
 export default function StoreDomainPage() {
@@ -15,8 +14,6 @@ export default function StoreDomainPage() {
   const storeId = params?.id as string;
   const t = useT('domain.page');
   const { store, isLoading, refetch: refetchStore } = useCurrentStore(storeId);
-  const { user } = useAuth();
-  const isSuperAdmin = user?.role === 'super_admin';
 
   // ----- Domain section state -----
   const [isEditing, setIsEditing] = useState(false);
@@ -222,7 +219,8 @@ export default function StoreDomainPage() {
     // Falls back to 'noreply' — the same column default — when unset.
     const localPart = store?.emailSenderLocalPart || 'noreply';
     const verifiedCustom = domainStatus?.emailSender?.status === 'verified' && !!store?.domain;
-    const host = verifiedCustom ? store!.domain : 'forcemediakw.com';
+    // Must match PLATFORM_EMAIL_DOMAIN in apps/api/src/services/email-sender.ts
+    const host = verifiedCustom ? store!.domain : 'force-ai.co';
     return `${name} <${localPart}@${host}>`;
   })();
 
@@ -512,24 +510,6 @@ export default function StoreDomainPage() {
             )}
           </div>
         </div>
-
-        {/* Frontend hosting provider — super-admin only. Platform now uses
-            Cloudflare-for-SaaS exclusively. Shown as informational only. */}
-        {isSuperAdmin && (
-          <div className="mt-6 rounded-lg border border-border bg-card p-6">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-foreground">{t('providerTitle')}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{t('providerSubtitle')}</p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">{t('providerCurrent')}</span>
-              <Badge variant="secondary">Cloudflare</Badge>
-            </div>
-
-            <p className="mt-3 text-xs text-muted-foreground">{t('providerHint')}</p>
-          </div>
-        )}
 
         {/* Email sender card */}
         <div className="mt-6 rounded-lg border border-border bg-card p-6">
