@@ -65,9 +65,20 @@ function deltaPercent(current: number, baseline: number): number {
   return (current - baseline) / Math.abs(baseline);
 }
 
-function classifySeverity(absdelta: number): AnomalySeverity | null {
-  if (absdelta > 0.4) return 'p0';
-  if (absdelta > 0.2) return 'warning';
+/**
+ * Direction-aware severity. Each metric only alarms in its BAD direction:
+ *   'up'   metrics (cost_spike, refund_spike)  — only a RISE is bad; a drop is
+ *                                                good news and must NEVER alarm.
+ *   'down' metrics (margin_drop, revenue_drop) — only a FALL is bad; a rise is
+ *                                                good news and must NEVER alarm.
+ * Using Math.abs(delta) previously fired p0 on the harmless direction too —
+ * e.g. refunds dropping to 0 read as a −100% "refund spike" P0 (demo store,
+ * 2026-06-24..28). A spike metric reacting to a decline is nonsensical.
+ */
+function classifySeverity(delta: number, direction: 'up' | 'down'): AnomalySeverity | null {
+  const bad = direction === 'up' ? delta : -delta; // magnitude in the bad direction
+  if (bad > 0.4) return 'p0';
+  if (bad > 0.2) return 'warning';
   return null;
 }
 
@@ -169,19 +180,41 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
   const COST_SPIKE_MIN_UNITS = 50;
   const includeCostSpike =
     costVolume7d >= COST_SPIKE_MIN_UNITS || costVolumeBaseline >= COST_SPIKE_MIN_UNITS;
-  const rawMetrics: Array<{ metric: AnomalyMetric; current: number; baseline: number }> = [
-    { metric: 'margin_drop', current: margin7d, baseline: margin28d },
+  // refund_spike has the SAME thin-data trap as cost_spike: a near-zero
+  // refunds/week baseline turns a single refund into a multi-hundred-percent
+  // "spike". Only consider it when the CURRENT week has a meaningful absolute
+  // refund count. (Direction-aware severity already stops a DROP from alarming;
+  // this floor stops a tiny RISE off a ~0 baseline from paging P0.)
+  const REFUND_SPIKE_MIN_COUNT = 3;
+  const includeRefundSpike = refunds7dCount >= REFUND_SPIKE_MIN_COUNT;
+  const rawMetrics: Array<{
+    metric: AnomalyMetric;
+    current: number;
+    baseline: number;
+    direction: 'up' | 'down';
+  }> = [
+    { metric: 'margin_drop', current: margin7d, baseline: margin28d, direction: 'down' },
     ...(includeCostSpike
       ? [
           {
             metric: 'cost_spike' as AnomalyMetric,
             current: costVolume7d,
             baseline: costVolumeBaseline,
+            direction: 'up' as const,
           },
         ]
       : []),
-    { metric: 'revenue_drop', current: revenue7d, baseline: revenueBaseline },
-    { metric: 'refund_spike', current: refunds7dCount, baseline: refundBaseline },
+    { metric: 'revenue_drop', current: revenue7d, baseline: revenueBaseline, direction: 'down' },
+    ...(includeRefundSpike
+      ? [
+          {
+            metric: 'refund_spike' as AnomalyMetric,
+            current: refunds7dCount,
+            baseline: refundBaseline,
+            direction: 'up' as const,
+          },
+        ]
+      : []),
   ];
 
   const metrics: MetricResult[] = rawMetrics.map(m => {
@@ -191,7 +224,7 @@ export async function runProfitAnomalyScan(storeId: string): Promise<ProfitAnoma
       current7d: m.current,
       baseline28d: m.baseline,
       deltaPercent: delta,
-      severity: classifySeverity(Math.abs(delta)),
+      severity: classifySeverity(delta, m.direction),
     };
   });
 
