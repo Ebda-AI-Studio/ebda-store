@@ -62,6 +62,17 @@ export function OneSignalInit() {
           serviceWorkerPath: '/OneSignalSDKWorker.js',
           allowLocalhostAsSecureOrigin: true,
         });
+        // iOS 16.4+ / Chrome web push: granting permission alone does NOT
+        // create a deliverable subscription. Explicitly request permission +
+        // opt in so the device reaches a SUBSCRIBED state — otherwise it
+        // registers as a player but stays `notification_types=none` and sends
+        // fail with "All included players are not subscribed".
+        if (!OneSignal.Notifications.permission) {
+          await OneSignal.Notifications.requestPermission();
+        }
+        if (!OneSignal.User.PushSubscription.optedIn) {
+          await OneSignal.User.PushSubscription.optIn();
+        }
       } catch (err) {
         // Never break the rest of the app over a push init failure.
         console.warn('[OneSignal] init failed', err);

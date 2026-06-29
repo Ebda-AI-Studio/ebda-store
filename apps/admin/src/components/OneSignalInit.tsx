@@ -69,6 +69,25 @@ export function OneSignalInit() {
         });
         if (cancelled) return;
 
+        // iOS 16.4+ / Chrome web push: granting notification permission alone
+        // does NOT create a deliverable subscription. Explicitly request
+        // permission + opt in so the device reaches a SUBSCRIBED state —
+        // without this it registers as a player but stays
+        // `notification_types=none` and every send fails with "All included
+        // players are not subscribed".
+        try {
+          if (!OneSignal.Notifications.permission) {
+            await OneSignal.Notifications.requestPermission();
+          }
+          if (!OneSignal.User.PushSubscription.optedIn) {
+            await OneSignal.User.PushSubscription.optIn();
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[OneSignal] opt-in failed', err);
+        }
+        if (cancelled) return;
+
         // 3. Tag the user. The backend's filter relies on `store_id` and
         // `role` matching the order's storeId / 'super_admin' respectively.
         await OneSignal.User.addTag('user_id', user.id);
