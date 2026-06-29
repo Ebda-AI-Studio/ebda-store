@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { API_URL } from '../../lib/api';
 
 /**
- * Dynamic /llms.txt — served at two levels:
+ * Dynamic /llms.txt — served at three levels:
  *
  *   store.force-ai.co/llms.txt
  *     → platform-level index: lists every active merchant with a one-liner
@@ -12,6 +12,11 @@ import { API_URL } from '../../lib/api';
  *     → middleware rewrites to /llms.txt + sets x-store-slug header.
  *       Route detects the slug, fetches that store's categories + products
  *       + contact info, renders a per-store markdown index.
+ *
+ *   wadyaljuz.com/llms.txt (a merchant's custom domain)
+ *     → middleware sets x-store-domain. Route resolves the domain to its
+ *       store and renders THAT store's per-store index (links rooted at the
+ *       custom domain), NOT the generic platform index.
  *
  * All data is fetched from the public API (no direct Prisma — the web app
  * doesn't depend on @force/database).
@@ -85,6 +90,28 @@ async function fetchStore(slug: string): Promise<PublicStore | null> {
     const res = await fetch(`${API_URL}/public/stores/${encodeURIComponent(slug)}`, {
       next: { revalidate: 600 }, // per-store store detail refreshes every 10 min
       headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data?.store ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve a custom-domain host (e.g. `wadyaljuz.com`) to its owning store via
+ * the dedicated resolve endpoint. Returns null when the host isn't a known
+ * custom domain (platform path, preview host, direct IP). This is what makes
+ * `wadyaljuz.com/llms.txt` serve Wady Aljuz's OWN index instead of the generic
+ * platform one — mirrors the host-aware resolution already used by sitemap.ts.
+ */
+async function fetchStoreByHost(host: string): Promise<PublicStore | null> {
+  if (!host) return null;
+  try {
+    const res = await fetch(`${API_URL}/public/store/resolve`, {
+      next: { revalidate: 600 },
+      headers: { 'Content-Type': 'application/json', 'x-store-domain': host },
     });
     if (!res.ok) return null;
     const json = await res.json();
@@ -262,48 +289,20 @@ platform-wide index.
 // Route handler
 // ---------------------------------------------------------------------------
 
-export async function GET() {
-  const headersList = await headers();
-  const storeSlug = headersList.get('x-store-slug');
+/**
+ * Build the per-store llms.txt Response: a merchant-provided body short-circuits
+ * the auto-build; otherwise enumerate categories + products. Shared by the
+ * platform-path (slug) and custom-domain branches so both render identically.
+ */
+async function perStoreResponse(store: PublicStore): Promise<Response> {
+  // The public store endpoint always includes id, so this should never fall
+  // back to slug — but we guard anyway.
+  const storeId: string = store.id || store.slug;
 
-  // ── Per-store mode ────────────────────────────────────────────────────────
-  if (storeSlug) {
-    const store = await fetchStore(storeSlug);
-
-    if (!store || store.status !== 'active') {
-      return new Response('Not Found', { status: 404 });
-    }
-
-    // Use the store's UUID as X-Store-ID on sub-requests (categories, products).
-    // The public store endpoint always includes id, so this should never fall
-    // back to slug — but we guard anyway.
-    const storeId: string = store.id || storeSlug;
-
-    // Merchant-provided / AI-generated body short-circuits the auto-build.
-    // Set by the bulk-ai-llms-txt sweep, or hand-edited from the admin SEO
-    // page. Empty/whitespace falls through to the auto-generated body so
-    // stores that haven't run the sweep still serve a useful response.
-    if (store.llmsTxt && store.llmsTxt.trim()) {
-      return new Response(store.llmsTxt, {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/markdown; charset=utf-8',
-          'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=86400',
-        },
-      });
-    }
-
-    const [categories, products] = await Promise.all([
-      fetchCategories(storeId),
-      fetchProducts(storeId),
-    ]);
-
-    // total count lives in meta.total from the products response, but we only
-    // have the cap-500 slice here. Use slice length as a lower bound — good
-    // enough for the index description.
-    const body = buildPerStoreBody(store, categories, products, products.length);
-
-    return new Response(body, {
+  // Merchant-provided / AI-generated body short-circuits the auto-build. Set by
+  // the bulk-ai-llms-txt sweep, or hand-edited from the admin SEO page.
+  if (store.llmsTxt && store.llmsTxt.trim()) {
+    return new Response(store.llmsTxt, {
       status: 200,
       headers: {
         'Content-Type': 'text/markdown; charset=utf-8',
@@ -312,11 +311,53 @@ export async function GET() {
     });
   }
 
-  // ── Platform mode ─────────────────────────────────────────────────────────
+  const [categories, products] = await Promise.all([
+    fetchCategories(storeId),
+    fetchProducts(storeId),
+  ]);
+  const body = buildPerStoreBody(store, categories, products, products.length);
+
+  return new Response(body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=86400',
+    },
+  });
+}
+
+export async function GET() {
+  const headersList = await headers();
+  const storeSlug = headersList.get('x-store-slug');
+  const storeDomain = headersList.get('x-store-domain');
+
+  // ── Per-store mode (platform path: store.force-ai.co/<slug>/llms.txt) ───────
+  if (storeSlug) {
+    const store = await fetchStore(storeSlug);
+    if (!store || store.status !== 'active') {
+      return new Response('Not Found', { status: 404 });
+    }
+    return perStoreResponse(store);
+  }
+
+  // ── Per-store mode (custom domain: wadyaljuz.com/llms.txt) ──────────────────
+  // The middleware sets x-store-domain (NOT x-store-slug) on custom domains, so
+  // without this branch a merchant's own domain fell through to the generic
+  // platform index. Resolve the domain → load the full store via the slug path
+  // (so contact + llmsTxt override behave identically) → serve THAT store's
+  // index. Unknown/inactive domains fall through to the platform index, not 404.
+  if (storeDomain) {
+    const resolved = await fetchStoreByHost(storeDomain);
+    const store = resolved?.slug ? ((await fetchStore(resolved.slug)) ?? resolved) : resolved;
+    if (store && (!store.status || store.status === 'active')) {
+      return perStoreResponse(store);
+    }
+  }
+
+  // ── Platform mode (store.force-ai.co/llms.txt + the Force AI landing) ───────
+  // The generic multi-tenant index — only the platform host reaches here.
   const stores = await fetchAllStores();
-
   const body = buildPlatformBody(stores);
-
   return new Response(body, {
     status: 200,
     headers: {
