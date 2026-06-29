@@ -4102,7 +4102,22 @@
       "title": "لوحة الأوامر",
       "placeholder": "ابحث في الصفحات…",
       "empty": "لا توجد نتائج.",
-      "trigger": "بحث…"
+      "trigger": "بحث…",
+      "countResults": "{count} نتيجة",
+      "navHint": "↑↓ للتنقل · ↵ للفتح",
+      "pages": {
+        "branding": "الهوية البصرية",
+        "seo": "تحسين محركات البحث",
+        "domain": "النطاق",
+        "payments": "إعدادات الدفع",
+        "shipping": "الشحن",
+        "tax": "الضرائب",
+        "pwa": "تطبيق الويب",
+        "template": "قالب التصميم",
+        "language": "اللغة",
+        "staff": "الموظفون والصلاحيات",
+        "announcement": "شريط الإعلان"
+      }
     },
     "notificationBell": {
       "ariaLabel": "الإشعارات",

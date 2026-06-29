@@ -15,6 +15,11 @@ import {
 } from './admin-layout/buildStoreAdminNav';
 import { HubTabs } from './admin-layout/HubTabs';
 import { detectHub, type HubLabels } from './admin-layout/hubs';
+import {
+  buildStorePaletteItems,
+  type PaletteItem,
+  type SettingsPaletteLabels,
+} from './admin-layout/buildPaletteItems';
 import { SidebarHeader } from './admin-layout/SidebarHeader';
 import { CommandPalette } from './CommandPalette';
 import { SidebarNav } from './admin-layout/SidebarNav';
@@ -264,6 +269,27 @@ export function AdminLayout({
     return true;
   });
 
+  // Full ⌘K palette index: every hub PLUS every page inside it (hub tabs) +
+  // Settings sub-pages. In platform (super_admin, no store) mode there are no
+  // hub tabs, so the hubs themselves are the whole index.
+  const settingsPaletteLabels: SettingsPaletteLabels = {
+    branding: tcp('pages.branding'),
+    seo: tcp('pages.seo'),
+    domain: tcp('pages.domain'),
+    payments: tcp('pages.payments'),
+    shipping: tcp('pages.shipping'),
+    tax: tcp('pages.tax'),
+    pwa: tcp('pages.pwa'),
+    template: tcp('pages.template'),
+    language: tcp('pages.language'),
+    staff: tcp('pages.staff'),
+    announcement: tcp('pages.announcement'),
+  };
+  const paletteItems: PaletteItem[] =
+    mode === 'store_admin' && navStoreId
+      ? buildStorePaletteItems(navItems, navStoreId, hubLabels, settingsPaletteLabels)
+      : navItems.map(n => ({ name: n.name, href: n.href, icon: n.icon, group: n.name }));
+
   // Hub detection — only applies to store-admin mode with a resolved storeId.
   // Detects which hub the current URL belongs to, builds the tab list, and
   // exposes the hub key so SidebarNav can highlight the correct hub item even
@@ -383,7 +409,7 @@ export function AdminLayout({
   return (
     <div className="flex min-h-screen bg-background">
       {/* Global ⌘K command palette — renders null until opened; searches every admin page. */}
-      <CommandPalette navItems={navItems} />
+      <CommandPalette items={paletteItems} />
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div

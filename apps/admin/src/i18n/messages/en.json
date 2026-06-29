@@ -4102,7 +4102,22 @@
       "title": "Command palette",
       "placeholder": "Search pages…",
       "empty": "No matches.",
-      "trigger": "Search…"
+      "trigger": "Search…",
+      "countResults": "{count} results",
+      "navHint": "↑↓ to navigate · ↵ to open",
+      "pages": {
+        "branding": "Branding",
+        "seo": "SEO",
+        "domain": "Domain",
+        "payments": "Payment settings",
+        "shipping": "Shipping",
+        "tax": "Tax",
+        "pwa": "PWA",
+        "template": "Theme template",
+        "language": "Language",
+        "staff": "Staff & roles",
+        "announcement": "Announcement bar"
+      }
     },
     "notificationBell": {
       "ariaLabel": "Notifications",

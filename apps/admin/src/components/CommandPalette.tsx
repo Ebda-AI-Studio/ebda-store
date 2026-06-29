@@ -2,25 +2,47 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { NavItem } from './admin-layout/buildStoreAdminNav';
+import type { PaletteItem } from './admin-layout/buildPaletteItems';
 import { useT } from '@/i18n/useT';
 
 /**
- * Global ⌘K / Ctrl+K command palette for the admin. Searches every admin
- * destination (the same role-aware {@link NavItem}[] the sidebar renders) so a
- * user can jump to any page from anywhere — no clicking through the sidebar.
+ * Global ⌘K / Ctrl+K command palette for the admin. Searches EVERY admin
+ * destination — the sidebar hubs PLUS every page inside them (hub tabs) and the
+ * Settings sub-pages — so a user can jump anywhere from anywhere. The item list
+ * is built (role/feature-gated) by {@link buildStorePaletteItems} in AdminLayout.
  *
  * Dependency-free (no `cmdk`) to avoid adding a package + the CF npm@10.9.2
  * lockfile regeneration step. Opens via ⌘K/Ctrl+K OR a `force:open-search`
  * window event (dispatched by the sidebar search button for mouse/touch users).
+ *
+ * Search is bilingual: `normalize()` lowercases, strips Arabic diacritics
+ * (tashkeel) and folds alef / ya / ta-marbuta variants so an Arabic query
+ * matches regardless of how the label was typed. The hub/section name is part
+ * of the haystack, so typing "stock" finds every Inventory page even when the
+ * page's own name doesn't contain the word.
  */
-export function CommandPalette({ navItems }: { navItems: NavItem[] }) {
+
+/** Lowercase + Arabic-fold so EN and AR queries both match leniently. */
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[ً-ٰٟ]/g, '') // tashkeel / dagger alef
+    .replace(/[آأإٱ]/g, 'ا') // أ إ آ ٱ → ا
+    .replace(/ى/g, 'ي') // ى → ي
+    .replace(/ة/g, 'ه') // ة → ه
+    .replace(/ـ/g, '') // tatweel
+    .trim();
+}
+
+export function CommandPalette({ items }: { items: PaletteItem[] }) {
   const router = useRouter();
   const t = useT('components.commandPalette');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   // Open via ⌘K / Ctrl+K (toggle) or a custom event from the sidebar button.
   useEffect(() => {
@@ -49,12 +71,24 @@ export function CommandPalette({ navItems }: { navItems: NavItem[] }) {
   }, [open]);
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return navItems;
-    return navItems.filter(i => i.name.toLowerCase().includes(q));
-  }, [query, navItems]);
+    const q = normalize(query);
+    if (!q) return items;
+    const terms = q.split(/\s+/).filter(Boolean);
+    // Every whitespace-separated term must appear somewhere in name+group, so
+    // "stock supplier" narrows the same way a human expects.
+    return items.filter(i => {
+      const hay = normalize(`${i.group ?? ''} ${i.name}`);
+      return terms.every(term => hay.includes(term));
+    });
+  }, [query, items]);
 
   useEffect(() => setActive(0), [query]);
+
+  // Keep the active row in view as the user arrows through.
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-idx="${active}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [active]);
 
   const go = useCallback(
     (href: string) => {
@@ -122,12 +156,12 @@ export function CommandPalette({ navItems }: { navItems: NavItem[] }) {
             ESC
           </kbd>
         </div>
-        <ul className="max-h-[60vh] overflow-y-auto p-2">
+        <ul ref={listRef} className="max-h-[60vh] overflow-y-auto p-2">
           {results.length === 0 ? (
             <li className="px-3 py-6 text-center text-sm text-muted-foreground">{t('empty')}</li>
           ) : (
             results.map((item, idx) => (
-              <li key={item.href}>
+              <li key={item.href} data-idx={idx}>
                 <button
                   type="button"
                   onClick={() => go(item.href)}
@@ -150,16 +184,25 @@ export function CommandPalette({ navItems }: { navItems: NavItem[] }) {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={1.5}
-                        d={item.icon}
+                        d={item.icon ?? 'M9 5l7 7-7 7'}
                       />
                     </svg>
                   </span>
-                  <span className="font-medium">{item.name}</span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-medium">{item.name}</span>
+                    {item.group && item.group !== item.name && (
+                      <span className="truncate text-xs text-muted-foreground">{item.group}</span>
+                    )}
+                  </span>
                 </button>
               </li>
             ))
           )}
         </ul>
+        <div className="flex items-center justify-between border-t border-border px-4 py-2 text-[10px] text-muted-foreground">
+          <span>{t('countResults', { count: results.length })}</span>
+          <span className="hidden sm:inline">{t('navHint')}</span>
+        </div>
       </div>
     </div>
   );
