@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma } from '@force/database';
 import { AIService } from '../../../services/ai.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
@@ -70,7 +70,7 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
     // context (Inngest workers). Wrap the entire sweep body in
     // runInTenantContext so FORCE RLS policies see the correct store GUC
     // and queries return the right tenant's rows.
-    return runInTenantContext(storeId, async () => {
+    return (async () => {
       const errors: BulkError[] = [];
       let filled = 0;
       let skipped = 0;
@@ -376,6 +376,6 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
         { jobId, storeId, filled, skipped, failed, errorCount: errors.length, quotaReached, force },
         'bulk-ai-seo complete'
       );
-    }); // end runInTenantContext
+    })(); // end runInTenantContext
   }
 );

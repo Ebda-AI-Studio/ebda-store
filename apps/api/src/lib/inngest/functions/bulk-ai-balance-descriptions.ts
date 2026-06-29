@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma } from '@force/database';
 import { balanceProductLanguages } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
@@ -42,7 +42,14 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
       return;
     }
 
-    return runInTenantContext(storeId, async () => {
+    // NOTE: products + bulk_ai_jobs are NOT RLS-protected and every query here
+    // scopes by storeId/jobId explicitly, so no tenant context is needed. The
+    // old `runInTenantContext` wrapper opened a single interactive transaction
+    // (30s timeout) around the WHOLE paged AI loop (Gemini calls + 2.5s
+    // throttles) → the transaction expired and the final bulkAiJob.update threw
+    // "Transaction already closed". A plain IIFE removes the long-lived tx;
+    // AI work must never run inside a DB transaction.
+    return (async () => {
       const errors: BulkBalanceError[] = [];
       let balanced = 0;
       let skipped = 0;
@@ -138,6 +145,6 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
         { jobId, storeId, balanced, skipped, failed, quotaReached },
         'bulk-ai-balance-descriptions complete'
       );
-    });
+    })();
   }
 );

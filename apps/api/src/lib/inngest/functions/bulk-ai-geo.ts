@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -93,7 +93,7 @@ export const bulkAiLlmsTxt: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    return runInTenantContext(storeId, async () => {
+    return (async () => {
       const errors: Array<{
         entityKind: string;
         entityId: string;
@@ -266,7 +266,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
         { jobId, storeId, filled, skipped, failed, quotaReached, force },
         'bulk-ai-llms-txt complete'
       );
-    }); // end runInTenantContext
+    })(); // end runInTenantContext
   }
 );
 
@@ -297,7 +297,7 @@ export const bulkAiCitationCopy: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    return runInTenantContext(storeId, async () => {
+    return (async () => {
       const errors: Array<{
         entityKind: string;
         entityId: string;
@@ -486,7 +486,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
         { jobId, storeId, filled, skipped, failed, quotaReached, force },
         'bulk-ai-citation-copy complete'
       );
-    }); // end runInTenantContext
+    })(); // end runInTenantContext
   }
 );
 
@@ -517,7 +517,7 @@ export const bulkAiBrandFacts: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    return runInTenantContext(storeId, async () => {
+    return (async () => {
       const errors: Array<{
         entityKind: string;
         entityId: string;
@@ -685,6 +685,6 @@ Populate using only the information provided above. For keyCategories, use the c
         { jobId, storeId, filled, skipped, failed, quotaReached, force },
         'bulk-ai-brand-facts complete'
       );
-    }); // end runInTenantContext
+    })(); // end runInTenantContext
   }
 );

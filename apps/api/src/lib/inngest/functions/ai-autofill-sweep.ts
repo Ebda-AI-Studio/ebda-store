@@ -12,7 +12,7 @@
  */
 
 import type { InngestFunction } from 'inngest';
-import { runInTenantContext, withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@force/database';
 import { withLeaderLock } from '../../leader-election';
 import { sweepStore } from '../../../services/ai-autofill.service';
 import { recommendationService } from '../../../services/recommendation.service';
@@ -40,11 +40,11 @@ export const aiAutofillSweep: InngestFunction.Any = inngest.createFunction(
 
       for (const s of stores) {
         try {
-          await runInTenantContext(s.id, async () => {
+          await (async () => {
             await recommendationService.recalculateFBT(s.id);
             const res = await sweepStore(s.id);
             logger.info({ storeId: s.id, ...res }, '[ai-autofill-sweep] store swept');
-          });
+          })();
         } catch (err) {
           logger.error({ err, storeId: s.id }, '[ai-autofill-sweep] store failed');
         }

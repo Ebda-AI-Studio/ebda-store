@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma } from '@force/database';
 import { AIService } from '../../../services/ai.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
@@ -52,7 +52,7 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
 
     // All DB reads/writes run inside runInTenantContext so FORCE RLS policies
     // see the correct store GUC (Inngest workers run without HTTP tenant context).
-    return runInTenantContext(storeId, async () => {
+    return (async () => {
       const errors: BulkError[] = [];
       let filled = 0;
       let skipped = 0;
@@ -406,6 +406,6 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
         { jobId, storeId, filled, skipped, failed, errorCount: errors.length, quotaReached },
         'bulk-ai-translate complete'
       );
-    }); // end runInTenantContext
+    })(); // end runInTenantContext
   }
 );

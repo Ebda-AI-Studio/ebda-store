@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { Prisma, prisma, withMoneyTx, runInTenantContext } from '@force/database';
+import { Prisma, prisma, withMoneyTx } from '@force/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../../../config';
 import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
@@ -165,7 +165,7 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
       return;
     }
 
-    return runInTenantContext(storeId, async () => {
+    return async () => {
       // Flip the job to 'running' as the very first step BEFORE any heavy
       // load. Two reasons: (a) the queue-depth watcher can distinguish
       // "Inngest never delivered the event" (status stays 'queued' for
@@ -195,7 +195,7 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
 
       try {
         // Load all active products up-front. The full list is used to:
-        //   a) set BulkAiJob.total so the progress bar is accurate
+        //   a)() set BulkAiJob.total so the progress bar is accurate
         //   b) build the candidate index we pass to Gemini
         const products = await prisma.product.findMany({
           where: { storeId, status: 'active', deletedAt: null },
@@ -509,6 +509,6 @@ Return exactly ${Math.min(
       });
 
       logger.info({ jobId, storeId, quotaReached, force }, 'bulk-ai-recommendations complete');
-    }); // end runInTenantContext
+    }; // end runInTenantContext
   }
 );

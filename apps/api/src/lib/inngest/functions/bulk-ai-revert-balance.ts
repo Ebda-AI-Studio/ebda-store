@@ -1,5 +1,5 @@
 import type { InngestFunction } from 'inngest';
-import { prisma, runInTenantContext } from '@force/database';
+import { prisma } from '@force/database';
 import { revertProductBalance } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
@@ -38,7 +38,7 @@ export const bulkAiRevertBalance: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    return runInTenantContext(storeId, async () => {
+    return (async () => {
       const errors: BulkRevertError[] = [];
       let reverted = 0;
       let skipped = 0;
@@ -131,6 +131,6 @@ export const bulkAiRevertBalance: InngestFunction.Any = inngest.createFunction(
       });
 
       logger.info({ jobId, storeId, reverted, skipped, failed }, 'bulk-ai-revert-balance complete');
-    });
+    })();
   }
 );
