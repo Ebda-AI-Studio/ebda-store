@@ -48,6 +48,11 @@ const KNOWN_SENDERS: Record<string, string> = {
   'railway.app': 'railway',
   'neon.tech': 'neon',
   'axiom.co': 'axiom',
+  // 2026-06-29: deploys moved to Cloudflare Workers Builds — add CF + GitHub
+  // so build/deploy failures land in Telegram alongside Sentry/Vercel/Railway.
+  'cloudflare.com': 'cloudflare',
+  'notify.cloudflare.com': 'cloudflare',
+  'github.com': 'github',
 };
 
 /**
@@ -77,6 +82,13 @@ const ALLOWED_LOCAL_PARTS: Record<string, string[]> = {
   railway: ['alerts', 'notifications'], // skip team@railway.app
   neon: ['alerts', 'notifications'], // skip team@neon.tech
   axiom: ['alerts', 'notifications', 'monitors'],
+  // 2026-06-29: CF Workers Builds emails come from noreply@notify.cloudflare.com
+  // and noreply@cloudflare.com. GitHub CI-failure emails come from
+  // noreply@github.com / notifications@github.com. Both use [] to match any
+  // address on their domains — each sender is single-purpose (no marketing
+  // emails share the same address pattern).
+  cloudflare: ['noreply', 'notifications', 'alerts'],
+  github: ['noreply', 'notifications'],
 };
 
 /**
