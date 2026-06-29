@@ -813,6 +813,176 @@ export class ProductService {
     return result;
   }
 
+  /**
+   * Bulk-update a set of products in a single store.
+   *
+   * Fields:
+   *   status / isFeatured / isNew / isBestSeller → updateMany (all products)
+   *   addCategoryId → upsert ProductCategory link per product (append-only)
+   *   price.set → updateMany on SIMPLE products only (variant products skipped)
+   *   price.adjustPct → read each then update (simple products only), rounded to integer fils, ≥0
+   *   inventory.set / adjust → same simple-product-only rule
+   *
+   * Returns { updated, skippedVariantProducts }.
+   */
+  static async bulkUpdate(
+    storeId: string,
+    productIds: string[],
+    fields: {
+      status?: 'draft' | 'active' | 'archived';
+      addCategoryId?: string;
+      isFeatured?: boolean;
+      isNew?: boolean;
+      isBestSeller?: boolean;
+      price?: { mode: 'set' | 'adjustPct'; value: number };
+      inventory?: { mode: 'set' | 'adjust'; value: number };
+    }
+  ): Promise<{ updated: number; skippedVariantProducts: number }> {
+    const safeIds = productIds.filter(id => typeof id === 'string' && id.length > 0);
+    if (safeIds.length === 0) return { updated: 0, skippedVariantProducts: 0 };
+
+    // Resolve ids that actually belong to this store and are not deleted.
+    const existing = await prisma.product.findMany({
+      where: { storeId, id: { in: safeIds }, deletedAt: null },
+      select: { id: true, hasVariants: true, price: true, inventory: true },
+    });
+
+    if (existing.length === 0) return { updated: 0, skippedVariantProducts: 0 };
+
+    const allIds = existing.map(p => p.id);
+    const simpleProducts = existing.filter(p => !p.hasVariants);
+    const simpleIds = simpleProducts.map(p => p.id);
+    // Only count variant products as "skipped" when a price or inventory
+    // mutation was requested — a status/flags-only edit isn't skipping anything.
+    const variantCount = existing.filter(p => p.hasVariants).length;
+    const skippedVariantProducts =
+      fields.price !== undefined || fields.inventory !== undefined ? variantCount : 0;
+
+    // --- 1. Scalar flags (all products, updateMany) ---
+    const scalarData: Record<string, unknown> = {};
+    if (fields.status !== undefined) scalarData.status = fields.status;
+    if (fields.isFeatured !== undefined) scalarData.featured = fields.isFeatured;
+    if (fields.isNew !== undefined) scalarData.isNew = fields.isNew;
+    if (fields.isBestSeller !== undefined) scalarData.isBestSeller = fields.isBestSeller;
+
+    if (Object.keys(scalarData).length > 0) {
+      await prisma.product.updateMany({
+        where: { storeId, id: { in: allIds }, deletedAt: null },
+        data: scalarData,
+      });
+    }
+
+    // --- 2. Category link (additive, per-product) ---
+    if (fields.addCategoryId) {
+      const categoryId = fields.addCategoryId;
+
+      // Guard: verify the category belongs to this store before linking.
+      // Without this check a store-A admin could supply a store-B categoryId
+      // and link their products to a foreign category.
+      const categoryExists = await prisma.category.findFirst({
+        where: { id: categoryId, storeId },
+        select: { id: true },
+      });
+      if (!categoryExists) {
+        throw new AppError(404, 'CATEGORY_NOT_FOUND', 'Category not found in this store');
+      }
+
+      // Fetch current links so we only insert missing ones.
+      const existingLinks = await prisma.productCategory.findMany({
+        where: { productId: { in: allIds }, categoryId },
+        select: { productId: true },
+      });
+      const alreadyLinked = new Set(existingLinks.map(l => l.productId));
+      const toLink = allIds.filter(id => !alreadyLinked.has(id));
+
+      if (toLink.length > 0) {
+        // Max position for this category across all products already in it.
+        const maxPos = await prisma.productCategory.aggregate({
+          where: { categoryId },
+          _max: { position: true },
+        });
+        const startPos = (maxPos._max.position ?? -1) + 1;
+
+        await prisma.productCategory.createMany({
+          data: toLink.map((productId, idx) => ({
+            productId,
+            categoryId,
+            position: startPos + idx,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    // Chunked sequential execution helper — avoids flooding the connection
+    // pool with up to 500 concurrent Prisma calls (P2024 connection starvation).
+    async function runChunked<T>(
+      items: T[],
+      chunkSize: number,
+      fn: (item: T) => Promise<unknown>
+    ): Promise<void> {
+      for (let i = 0; i < items.length; i += chunkSize) {
+        await Promise.all(items.slice(i, i + chunkSize).map(fn));
+      }
+    }
+
+    // --- 3. Price (simple products only) ---
+    if (fields.price && simpleIds.length > 0) {
+      const { mode, value } = fields.price;
+      if (mode === 'set') {
+        const fils = Math.max(0, Math.round(value));
+        await prisma.product.updateMany({
+          where: { storeId, id: { in: simpleIds }, deletedAt: null },
+          data: { price: fils },
+        });
+      } else {
+        // adjustPct: value is a percentage like -10 (10% off) or +5 (5% up).
+        // Clamp the result to [0, MAX_INT4] to prevent Postgres int4 overflow
+        // regardless of what percentage or base price is passed.
+        const MAX_INT4 = 2_147_483_647;
+        const pct = value / 100;
+        // Run in chunks of 20 to avoid pool exhaustion (up to 500 items).
+        await runChunked(simpleProducts, 20, p => {
+          const newPrice = Math.min(MAX_INT4, Math.max(0, Math.round(p.price * (1 + pct))));
+          return prisma.product.update({ where: { id: p.id }, data: { price: newPrice } });
+        });
+      }
+    }
+
+    // --- 4. Inventory (simple products only) ---
+    if (fields.inventory && simpleIds.length > 0) {
+      const { mode, value } = fields.inventory;
+      if (mode === 'set') {
+        const qty = Math.max(0, Math.round(value));
+        await prisma.product.updateMany({
+          where: { storeId, id: { in: simpleIds }, deletedAt: null },
+          data: { inventory: qty },
+        });
+      } else {
+        // adjust: add delta, floor at 0.
+        // Run in chunks of 20 to avoid pool exhaustion.
+        await runChunked(simpleProducts, 20, p => {
+          const newQty = Math.max(0, p.inventory + Math.round(value));
+          return prisma.product.update({ where: { id: p.id }, data: { inventory: newQty } });
+        });
+      }
+    }
+
+    await this.invalidateStoreProductCache(storeId);
+
+    // `updated` = products that received at least one mutation.
+    // If no price/inventory field was sent and all products have variants,
+    // the scalar/flags updateMany still touched all IDs, so allIds is correct.
+    // When the only requested field is price/inventory and ALL products have
+    // variants (simpleIds empty), updated should be 0.
+    const actuallyUpdated =
+      (fields.price !== undefined || fields.inventory !== undefined) && simpleIds.length === 0
+        ? allIds.length - variantCount // 0 when all are variant products
+        : allIds.length;
+
+    return { updated: actuallyUpdated, skippedVariantProducts };
+  }
+
   // Public methods (no store scope required)
   static async listPublic(
     storeId: string,

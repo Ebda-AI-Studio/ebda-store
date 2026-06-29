@@ -472,6 +472,66 @@
         "deletedDescription": "تم حذف {name}.",
         "deleteFailedTitle": "فشل الحذف",
         "deleteFailedDescription": "تعذّر حذف المنتج. يرجى المحاولة مرة أخرى."
+      },
+      "massEdit": {
+        "title": "تعديل جماعي لـ {count} منتج",
+        "tabFields": "الحقول",
+        "tabVariants": "المتغيرات والكمية",
+        "noChange": "بدون تغيير",
+        "enableField": "تغيير هذا الحقل",
+        "status": "الحالة",
+        "addToCategory": "إضافة إلى فئة",
+        "selectCategory": "اختر فئة...",
+        "isFeatured": "مميز",
+        "isNew": "وصل حديثاً",
+        "isBestSeller": "الأكثر مبيعاً",
+        "tristate": {
+          "noChange": "بدون تغيير",
+          "on": "تفعيل",
+          "off": "تعطيل"
+        },
+        "price": "السعر",
+        "priceMode": {
+          "set": "تحديد السعر (د.ك)",
+          "adjustPct": "تعديل بنسبة %"
+        },
+        "priceValue": "قيمة السعر",
+        "pricePct": "النسبة (مثال: -10 لخصم 10%)",
+        "inventory": "المخزون",
+        "inventoryMode": {
+          "set": "تحديد الكمية",
+          "adjust": "تعديل الكمية"
+        },
+        "inventoryValue": "الكمية",
+        "apply": "تطبيق",
+        "applying": "جارٍ التطبيق...",
+        "cancel": "إلغاء",
+        "variantProductsNote": "{count} منتج بمتغيرات في تحديدك — يمكن تعديل أسعارها ومخزونها بشكل منفصل أدناه.",
+        "simpleProductsNote": "المنتجات البسيطة ({count}) تُعدَّل من تبويب الحقول.",
+        "variantCap": "تعرض أول {cap} منتج بمتغيرات. اختر عدداً أقل لتعديل جميعها مرة واحدة.",
+        "noVariantProducts": "لا يوجد في تحديدك منتجات بمتغيرات. استخدم تبويب الحقول لتعديلها.",
+        "variantGridProduct": "المنتج",
+        "variantGridVariant": "المتغير",
+        "variantGridInventory": "المخزون",
+        "variantGridPrice": "السعر (د.ك)",
+        "variantSaving": "جارٍ الحفظ...",
+        "variantSaveAll": "حفظ تغييرات المتغيرات",
+        "toast": {
+          "successTitle": "تم التعديل الجماعي",
+          "successDescription": "تم تحديث {updated} منتج.",
+          "skippedDescription": " تم تخطي {skipped} منتج بمتغيرات للسعر/المخزون (عدِّلها من تبويب المتغيرات).",
+          "errorTitle": "فشل التعديل الجماعي",
+          "errorDescription": "تعذّر تطبيق التغييرات. يرجى المحاولة مرة أخرى.",
+          "variantSuccessTitle": "تم حفظ المتغيرات",
+          "variantSuccessDescription": "تم حفظ تغييرات المتغيرات بنجاح.",
+          "variantErrorTitle": "فشل حفظ المتغيرات",
+          "variantErrorDescription": "تعذّر حفظ بعض تغييرات المتغيرات."
+        }
+      },
+      "selectionBar": {
+        "selected": "{count} محدد",
+        "massEdit": "تعديل جماعي",
+        "clear": "إلغاء التحديد"
       }
     },
     "detail": {

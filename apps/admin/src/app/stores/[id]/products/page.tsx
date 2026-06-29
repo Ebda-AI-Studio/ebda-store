@@ -13,6 +13,7 @@ import { ProductFilters } from './_components/ProductFilters';
 import { ProductsTable } from './_components/ProductsTable';
 import { ProductsPagination } from './_components/ProductsPagination';
 import { DeleteProductModal } from './_components/DeleteProductModal';
+import { MassEditModal } from './_components/MassEditModal';
 import { ProductsLoadingSkeleton } from './_components/ProductsLoadingSkeleton';
 import type { Product, Pagination, StatusFilter } from './_components/types';
 
@@ -60,6 +61,8 @@ export default function StoreProductsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isMassEditOpen, setIsMassEditOpen] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
 
   const fetchProducts = useCallback(async () => {
@@ -126,11 +129,36 @@ export default function StoreProductsPage() {
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setPage(1);
+    setSelectedIds(new Set());
   };
 
   const handleStatusFilterChange = (status: StatusFilter) => {
     setStatusFilter(status);
     setPage(1);
+    setSelectedIds(new Set());
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = (ids: string[]) => {
+    setSelectedIds(prev => {
+      const allSelected = ids.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        ids.forEach(id => next.delete(id));
+        return next;
+      }
+      const next = new Set(prev);
+      ids.forEach(id => next.add(id));
+      return next;
+    });
   };
 
   const handleCategoryFilterChange = (categoryId: string) => {
@@ -203,17 +231,24 @@ export default function StoreProductsPage() {
           setProductToDelete(product);
           setIsDeleteModalOpen(true);
         }}
+        selectedIds={selectedIds}
+        onToggleSelect={handleToggleSelect}
+        onToggleSelectAll={handleToggleSelectAll}
       />
 
       {pagination && (
         <ProductsPagination
           pagination={pagination}
           page={page}
-          onPageChange={setPage}
+          onPageChange={next => {
+            setPage(next);
+            setSelectedIds(new Set());
+          }}
           onLimitChange={next => {
             if (limitStorageKey) window.localStorage.setItem(limitStorageKey, String(next));
             setLimit(next);
             setPage(1);
+            setSelectedIds(new Set());
           }}
         />
       )}
@@ -224,6 +259,38 @@ export default function StoreProductsPage() {
         onConfirm={handleDelete}
         product={productToDelete}
         deleting={deleting}
+      />
+
+      {/* Sticky selection action bar — shown whenever ≥1 product selected */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-xl">
+          <span className="text-sm font-medium text-foreground whitespace-nowrap">
+            {t('selectionBar.selected').replace('{count}', String(selectedIds.size))}
+          </span>
+          <button
+            onClick={() => setIsMassEditOpen(true)}
+            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            {t('selectionBar.massEdit')}
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+          >
+            {t('selectionBar.clear')}
+          </button>
+        </div>
+      )}
+
+      <MassEditModal
+        isOpen={isMassEditOpen}
+        onClose={() => setIsMassEditOpen(false)}
+        storeId={storeId}
+        selectedProducts={products.filter(p => selectedIds.has(p.id))}
+        onSuccess={() => {
+          setSelectedIds(new Set());
+          fetchProducts();
+        }}
       />
     </AdminLayout>
   );

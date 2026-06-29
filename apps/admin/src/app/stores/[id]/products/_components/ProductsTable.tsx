@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@force/ui';
@@ -11,12 +12,42 @@ import { StatusBadge } from './StatusBadge';
 import { EmptyProductsState } from './EmptyProductsState';
 import type { Product } from './types';
 
+function IndeterminateCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+  ariaLabel,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: () => void;
+  ariaLabel: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      className="rounded border-border accent-primary cursor-pointer"
+      aria-label={ariaLabel}
+    />
+  );
+}
+
 interface ProductsTableProps {
   storeId: string;
   products: Product[];
   loading: boolean;
   hasActiveFilters: boolean;
   onRequestDelete: (product: Product) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: (ids: string[]) => void;
 }
 
 export function ProductsTable({
@@ -25,6 +56,9 @@ export function ProductsTable({
   loading,
   hasActiveFilters,
   onRequestDelete,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
 }: ProductsTableProps) {
   const t = useT('products.list');
   // Localize the product name + image alt to the active admin locale.
@@ -83,7 +117,26 @@ export function ProductsTable({
     );
   }
 
+  const allPageIds = products.map(p => p.id);
+  const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedIds.has(id));
+  const someSelected = allPageIds.some(id => selectedIds.has(id));
+
   const columns: DataTableColumn<Product>[] = [
+    {
+      header: '',
+      className: 'w-10',
+      // Custom header checkbox is injected via the table override below.
+      cell: product => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(product.id)}
+          onChange={() => onToggleSelect(product.id)}
+          onClick={e => e.stopPropagation()}
+          className="rounded border-border accent-primary cursor-pointer"
+          aria-label={`Select ${product.name}`}
+        />
+      ),
+    },
     {
       header: t('table.product'),
       primaryOnMobile: true,
@@ -208,5 +261,19 @@ export function ProductsTable({
     },
   ];
 
-  return <DataTable<Product> columns={columns} rows={products} rowKey={p => p.id} />;
+  return (
+    <div className="relative">
+      {/* Inject the select-all checkbox into the first column header using a
+          sibling overlay so we don't have to change DataTable's internals. */}
+      <div className="hidden md:flex absolute top-0 start-0 h-11 w-10 items-center justify-center z-10 pointer-events-auto">
+        <IndeterminateCheckbox
+          checked={allSelected}
+          indeterminate={!allSelected && someSelected}
+          onChange={() => onToggleSelectAll(allPageIds)}
+          ariaLabel="Select all on this page"
+        />
+      </div>
+      <DataTable<Product> columns={columns} rows={products} rowKey={p => p.id} />
+    </div>
+  );
 }

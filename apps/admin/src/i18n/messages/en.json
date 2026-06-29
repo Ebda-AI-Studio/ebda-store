@@ -472,6 +472,66 @@
         "deletedDescription": "{name} has been deleted.",
         "deleteFailedTitle": "Delete failed",
         "deleteFailedDescription": "Failed to delete the product. Please try again."
+      },
+      "massEdit": {
+        "title": "Mass Edit {count} Products",
+        "tabFields": "Fields",
+        "tabVariants": "Variants & Quantity",
+        "noChange": "No change",
+        "enableField": "Change this field",
+        "status": "Status",
+        "addToCategory": "Add to category",
+        "selectCategory": "Select category...",
+        "isFeatured": "Featured",
+        "isNew": "New arrival",
+        "isBestSeller": "Best seller",
+        "tristate": {
+          "noChange": "No change",
+          "on": "Enable",
+          "off": "Disable"
+        },
+        "price": "Price",
+        "priceMode": {
+          "set": "Set price (KWD)",
+          "adjustPct": "Adjust by %"
+        },
+        "priceValue": "Price value",
+        "pricePct": "Percentage (e.g. -10 for 10% off)",
+        "inventory": "Inventory",
+        "inventoryMode": {
+          "set": "Set quantity",
+          "adjust": "Adjust quantity"
+        },
+        "inventoryValue": "Quantity",
+        "apply": "Apply",
+        "applying": "Applying...",
+        "cancel": "Cancel",
+        "variantProductsNote": "{count} variant products in your selection — their price and inventory are edited per variant below.",
+        "simpleProductsNote": "Simple products ({count}) are edited using the Fields tab.",
+        "variantCap": "Showing the first {cap} products with variants. Select fewer products to edit all variant products at once.",
+        "noVariantProducts": "None of the selected products have variants. Use the Fields tab to edit them.",
+        "variantGridProduct": "Product",
+        "variantGridVariant": "Variant",
+        "variantGridInventory": "Inventory",
+        "variantGridPrice": "Price (KWD)",
+        "variantSaving": "Saving...",
+        "variantSaveAll": "Save variant changes",
+        "toast": {
+          "successTitle": "Mass edit applied",
+          "successDescription": "Updated {updated} products.",
+          "skippedDescription": " {skipped} variant products skipped for price/inventory (edit via Variants tab).",
+          "errorTitle": "Mass edit failed",
+          "errorDescription": "Failed to apply changes. Please try again.",
+          "variantSuccessTitle": "Variants saved",
+          "variantSuccessDescription": "Variant changes saved successfully.",
+          "variantErrorTitle": "Variant save failed",
+          "variantErrorDescription": "Some variant changes failed to save."
+        }
+      },
+      "selectionBar": {
+        "selected": "{count} selected",
+        "massEdit": "Mass edit",
+        "clear": "Clear selection"
       }
     },
     "detail": {

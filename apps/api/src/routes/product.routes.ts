@@ -627,6 +627,77 @@ router.post(
   }
 );
 
+// POST /stores/:storeId/products/bulk-update
+//
+// Mass-edit a set of products in a single store.
+// Body: { productIds, fields: { status?, addCategoryId?, isFeatured?, isNew?,
+//         isBestSeller?, price?:{mode,value}, inventory?:{mode,value} } }
+//
+// Price and inventory mutations only touch SIMPLE products (products without
+// variants store stock on variants — mutating the parent is wrong).
+// Returns { updated, skippedVariantProducts }.
+const bulkUpdateSchema = z.object({
+  productIds: z.array(z.string().uuid()).min(1).max(500),
+  fields: z
+    .object({
+      status: z.enum(['draft', 'active', 'archived']).optional(),
+      addCategoryId: z.string().uuid().optional(),
+      isFeatured: z.boolean().optional(),
+      isNew: z.boolean().optional(),
+      isBestSeller: z.boolean().optional(),
+      price: z
+        .object({
+          mode: z.enum(['set', 'adjustPct']),
+          // For 'set': fils (integer, ≥0, ≤ Postgres int4 max ~2.1B)
+          // For 'adjustPct': percent in range -99..+10000 (avoids int4 overflow
+          //   from an unbounded multiplier against large fils values)
+          value: z
+            .number()
+            .min(-99, 'adjustPct must be ≥ -99 (up to 99% off)')
+            .max(2_147_483_647, 'price value too large'),
+        })
+        .optional(),
+      inventory: z
+        .object({
+          mode: z.enum(['set', 'adjust']),
+          // Clamp to int4 range; negative set values are clamped to 0 by the service.
+          value: z.number().int().min(-2_147_483_647).max(2_147_483_647),
+        })
+        .optional(),
+    })
+    .refine(d => Object.keys(d).length > 0, { message: 'fields must have at least one key' }),
+});
+
+router.post(
+  '/bulk-update',
+  authenticate,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { productIds, fields } = bulkUpdateSchema.parse(req.body);
+
+      const result = await ProductService.bulkUpdate(storeId, productIds, fields);
+
+      await auditLog({
+        action: 'product.bulk_update',
+        userId: req.user!.userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        details: { productCount: productIds.length, fields: Object.keys(fields).join(', ') },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // POST /stores/:storeId/products - Create product
 router.post(
   '/',
