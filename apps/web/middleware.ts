@@ -113,6 +113,21 @@ function extractStoreSlug(pathname: string): { slug: string; rewrittenPath: stri
 
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
+
+  // www → apex canonical 301 for CUSTOM store domains only. Platform www hosts
+  // (www.forcemediakw.com / www.force-ai.co) are real platform hosts and are
+  // skipped via isPlatformDomain. The www custom hostname is enrolled in
+  // Cloudflare-for-SaaS (CloudflareDomainService.addDomain) so TLS terminates
+  // before we reach here; we then send visitors to the single canonical apex.
+  const bareHost = hostname.split(':')[0].toLowerCase();
+  if (bareHost.startsWith('www.') && !isPlatformDomain(hostname)) {
+    const apexUrl = new URL(
+      request.nextUrl.pathname + request.nextUrl.search,
+      `https://${bareHost.replace(/^www\./, '')}`
+    );
+    return NextResponse.redirect(apexUrl, 301);
+  }
+
   const storeIdentifier = getStoreIdentifier(hostname);
 
   // 2026-05-21: Preview-unsaved draft cookie propagation. When the admin

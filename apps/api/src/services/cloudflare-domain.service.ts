@@ -35,17 +35,14 @@ export class CloudflareDomainService {
     return `${CF_API_BASE}/zones/${config.cfZoneId}/custom_hostnames`;
   }
 
-  static async addDomain(domain: string): Promise<CfCustomHostname | null> {
-    if (!this.isConfigured()) {
-      logger.warn({ domain }, 'Cloudflare-for-SaaS not configured, skipping custom hostname add');
-      return null;
-    }
+  /** Enroll ONE hostname as a Cloudflare-for-SaaS custom hostname. */
+  private static async addHostname(hostname: string): Promise<CfCustomHostname | null> {
     try {
       const res = await fetch(this.base(), {
         method: 'POST',
         headers: this.headers(),
         body: JSON.stringify({
-          hostname: domain,
+          hostname,
           ssl: { method: 'http', type: 'dv', settings: { min_tls_version: '1.2' } },
         }),
       });
@@ -56,17 +53,38 @@ export class CloudflareDomainService {
       };
       if (!res.ok || !json.success) {
         logger.error(
-          { domain, status: res.status, errors: json.errors },
+          { hostname, status: res.status, errors: json.errors },
           'CF custom hostname add failed'
         );
         return null;
       }
-      logger.info({ domain, id: json.result?.id }, 'CF custom hostname created');
+      logger.info({ hostname, id: json.result?.id }, 'CF custom hostname created');
       return json.result ?? null;
     } catch (error) {
-      logger.error({ err: error, domain }, 'CF custom hostname add threw');
+      logger.error({ err: error, hostname }, 'CF custom hostname add threw');
       return null;
     }
+  }
+
+  static async addDomain(domain: string): Promise<CfCustomHostname | null> {
+    if (!this.isConfigured()) {
+      logger.warn({ domain }, 'Cloudflare-for-SaaS not configured, skipping custom hostname add');
+      return null;
+    }
+    const apex = await this.addHostname(domain);
+    // Also enroll the www subdomain so www.<domain> gets its own cert and routes
+    // to the storefront worker (the web middleware then 301s www→apex). This is
+    // what makes the admin's "www handled automatically" promise true. Best-effort:
+    // a www failure must never block the apex the merchant actually saved, and we
+    // skip it when the saved value is already a www host (stores save the apex).
+    if (apex && !domain.startsWith('www.')) {
+      const www = `www.${domain}`;
+      const wwwResult = await this.addHostname(www);
+      if (!wwwResult) {
+        logger.warn({ domain, www }, 'CF www custom hostname enroll failed (apex succeeded)');
+      }
+    }
+    return apex;
   }
 
   private static async findByHostname(domain: string): Promise<CfCustomHostname | null> {
@@ -97,17 +115,28 @@ export class CloudflareDomainService {
     }
   }
 
+  /** Delete ONE custom hostname by name. Returns true if gone (or never existed). */
+  private static async removeHostname(hostname: string): Promise<boolean> {
+    const ch = await this.findByHostname(hostname);
+    if (!ch) return true; // already gone
+    const res = await fetch(`${this.base()}/${ch.id}`, {
+      method: 'DELETE',
+      headers: this.headers(),
+    });
+    const json = (await res.json()) as { success: boolean };
+    return res.ok && json.success;
+  }
+
   static async removeDomain(domain: string): Promise<boolean> {
     if (!this.isConfigured()) return false;
     try {
-      const ch = await this.findByHostname(domain);
-      if (!ch) return true; // already gone
-      const res = await fetch(`${this.base()}/${ch.id}`, {
-        method: 'DELETE',
-        headers: this.headers(),
-      });
-      const json = (await res.json()) as { success: boolean };
-      return res.ok && json.success;
+      const ok = await this.removeHostname(domain);
+      // Best-effort: also remove the paired www hostname enrolled by addDomain,
+      // so a domain removal doesn't leave an orphaned www custom hostname behind.
+      if (!domain.startsWith('www.')) {
+        await this.removeHostname(`www.${domain}`).catch(() => false);
+      }
+      return ok;
     } catch (error) {
       logger.error({ err: error, domain }, 'CF custom hostname delete threw');
       return false;
