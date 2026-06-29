@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useAuth } from '../../../../lib/auth';
@@ -21,8 +21,18 @@ export default function StoreProductsPage() {
   const { isAuthenticated } = useAuth();
   const storeId = params.id as string;
   const t = useT('products.list');
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const { store } = useCurrentStore(isAuthenticated ? storeId : null);
+
+  // Filter/search/page state is mirrored into the URL query string so that
+  // navigating into a product and hitting Back restores the exact same view
+  // (search term, category, status, page) instead of resetting to the top.
+  const initialStatus = ((): StatusFilter => {
+    const s = searchParams.get('status');
+    return s === 'active' || s === 'draft' || s === 'archived' || s === 'all' ? s : 'active';
+  })();
 
   // Per-page preference is persisted per store so the user's choice survives
   // navigation. Falls back to 25 when nothing is stored.
@@ -39,9 +49,14 @@ export default function StoreProductsPage() {
   const [limit, setLimit] = useState(initialLimit);
   const [loading, setLoading] = useState(true);
   // `search` holds the already-debounced term — SearchInput owns the debounce.
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState(searchParams.get('q') ?? '');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
+  const [categoryFilter, setCategoryFilter] = useState<string>(searchParams.get('category') ?? '');
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [page, setPage] = useState(() => {
+    const p = parseInt(searchParams.get('page') ?? '1', 10);
+    return Number.isFinite(p) && p > 0 ? p : 1;
+  });
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -57,6 +72,7 @@ export default function StoreProductsPage() {
         limit: String(limit),
       });
       if (statusFilter !== 'all') queryParams.append('status', statusFilter);
+      if (categoryFilter) queryParams.append('category', categoryFilter);
       if (search) queryParams.append('search', search);
 
       // API returns `{ products, meta }`; we used to read `data.pagination`,
@@ -77,7 +93,27 @@ export default function StoreProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, storeId, page, limit, statusFilter, search]);
+  }, [isAuthenticated, storeId, page, limit, statusFilter, categoryFilter, search]);
+
+  // Load the category list once (for the category filter dropdown).
+  useEffect(() => {
+    if (!isAuthenticated || !storeId) return;
+    apiGet<{ categories: { id: string; name: string }[] }>(`/api/v1/stores/${storeId}/categories`)
+      .then(({ data }) => setCategories(data?.categories ?? []))
+      .catch(() => setCategories([]));
+  }, [isAuthenticated, storeId]);
+
+  // Mirror the current filter state into the URL (replace, no history spam) so
+  // Back from a product restores the same search + category + status + page.
+  useEffect(() => {
+    const qp = new URLSearchParams();
+    if (search) qp.set('q', search);
+    if (statusFilter !== 'active') qp.set('status', statusFilter);
+    if (categoryFilter) qp.set('category', categoryFilter);
+    if (page > 1) qp.set('page', String(page));
+    const qs = qp.toString();
+    router.replace(`/stores/${storeId}/products${qs ? `?${qs}` : ''}`, { scroll: false });
+  }, [router, storeId, search, statusFilter, categoryFilter, page]);
 
   // Fetch products whenever any of the list-query inputs change. fetchProducts
   // is memoized on [isAuthenticated, storeId, page, statusFilter, debouncedSearch]
@@ -96,6 +132,16 @@ export default function StoreProductsPage() {
     setStatusFilter(status);
     setPage(1);
   };
+
+  const handleCategoryFilterChange = (categoryId: string) => {
+    setCategoryFilter(categoryId);
+    setPage(1);
+  };
+
+  const categoryOptions = useMemo(
+    () => categories.map(c => ({ value: c.id, label: c.name })),
+    [categories]
+  );
 
   const handleDelete = async () => {
     if (!productToDelete || !isAuthenticated) return;
@@ -130,7 +176,7 @@ export default function StoreProductsPage() {
   }
 
   const storeName = store?.name ?? t('fallbackStore');
-  const hasActiveFilters = Boolean(search) || statusFilter !== 'all';
+  const hasActiveFilters = Boolean(search) || statusFilter !== 'all' || Boolean(categoryFilter);
 
   return (
     <AdminLayout
@@ -143,6 +189,9 @@ export default function StoreProductsPage() {
         onSearchChange={handleSearchChange}
         statusFilter={statusFilter}
         onStatusFilterChange={handleStatusFilterChange}
+        categoryFilter={categoryFilter}
+        categoryOptions={categoryOptions}
+        onCategoryFilterChange={handleCategoryFilterChange}
       />
 
       <ProductsTable

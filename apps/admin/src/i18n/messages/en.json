@@ -419,7 +419,9 @@
         "all": "All",
         "active": "Active",
         "draft": "Draft",
-        "archived": "Archived"
+        "archived": "Archived",
+        "allCategories": "All categories",
+        "categoryAriaLabel": "Filter products by category"
       },
       "status": {
         "active": "Active",

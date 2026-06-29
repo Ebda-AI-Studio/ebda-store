@@ -419,7 +419,9 @@
         "all": "الكل",
         "active": "نشط",
         "draft": "مسودة",
-        "archived": "مؤرشف"
+        "archived": "مؤرشف",
+        "allCategories": "كل الفئات",
+        "categoryAriaLabel": "تصفية المنتجات حسب الفئة"
       },
       "status": {
         "active": "نشط",

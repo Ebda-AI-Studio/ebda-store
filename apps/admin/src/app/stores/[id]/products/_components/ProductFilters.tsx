@@ -11,6 +11,9 @@ interface ProductFiltersProps {
   onSearchChange: (value: string) => void;
   statusFilter: StatusFilter;
   onStatusFilterChange: (status: StatusFilter) => void;
+  categoryFilter: string;
+  categoryOptions: { value: string; label: string }[];
+  onCategoryFilterChange: (categoryId: string) => void;
 }
 
 const STATUS_VALUES: StatusFilter[] = ['all', 'active', 'draft', 'archived'];
@@ -20,6 +23,9 @@ export function ProductFilters({
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
+  categoryFilter,
+  categoryOptions,
+  onCategoryFilterChange,
 }: ProductFiltersProps) {
   const t = useT('products.list.filters');
 
@@ -29,13 +35,28 @@ export function ProductFilters({
 
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {/* Shared debounced search — same component the Inventory page uses. */}
         <SearchInput
           value={search}
           onSearch={onSearchChange}
           placeholder={t('searchPlaceholder')}
         />
+        {categoryOptions.length > 0 && (
+          <select
+            value={categoryFilter}
+            onChange={e => onCategoryFilterChange(e.target.value)}
+            aria-label={t('categoryAriaLabel')}
+            className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+          >
+            <option value="">{t('allCategories')}</option>
+            {categoryOptions.map(c => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <StatusFilterPills
