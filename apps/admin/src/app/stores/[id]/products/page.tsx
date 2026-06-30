@@ -61,7 +61,13 @@ export default function StoreProductsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Selection persists ACROSS searches/filters/pages so the merchant can build a
+  // set from several different searches. We keep the full Product object (not just
+  // the id) so a product selected under one search stays editable after the list
+  // re-filters away from it — `selectedProducts` (from the map) feeds the mass
+  // editor directly, not `products.filter(...)` which only sees the current page.
+  const [selectedMap, setSelectedMap] = useState<Map<string, Product>>(new Map());
+  const selectedIds = useMemo(() => new Set(selectedMap.keys()), [selectedMap]);
   const [isMassEditOpen, setIsMassEditOpen] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -126,40 +132,49 @@ export default function StoreProductsPage() {
     fetchProducts();
   }, [isAuthenticated, fetchProducts]);
 
+  // NOTE: filter/search/page changes do NOT clear the selection — it accumulates
+  // across searches by design. Selection clears only on the explicit "Clear"
+  // button or after a successful mass edit.
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setPage(1);
-    setSelectedIds(new Set());
   };
 
   const handleStatusFilterChange = (status: StatusFilter) => {
     setStatusFilter(status);
     setPage(1);
-    setSelectedIds(new Set());
   };
 
   const handleToggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+    setSelectedMap(prev => {
+      const next = new Map(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        const p = products.find(x => x.id === id);
+        if (p) next.set(id, p);
+      }
       return next;
     });
   };
 
   const handleToggleSelectAll = (ids: string[]) => {
-    setSelectedIds(prev => {
-      const allSelected = ids.every(id => prev.has(id));
+    setSelectedMap(prev => {
+      const allSelected = ids.length > 0 && ids.every(id => prev.has(id));
+      const next = new Map(prev);
       if (allSelected) {
-        const next = new Set(prev);
         ids.forEach(id => next.delete(id));
-        return next;
+      } else {
+        ids.forEach(id => {
+          const p = products.find(x => x.id === id);
+          if (p) next.set(id, p);
+        });
       }
-      const next = new Set(prev);
-      ids.forEach(id => next.add(id));
       return next;
     });
   };
+
+  const clearSelection = () => setSelectedMap(new Map());
 
   const handleCategoryFilterChange = (categoryId: string) => {
     setCategoryFilter(categoryId);
@@ -242,13 +257,11 @@ export default function StoreProductsPage() {
           page={page}
           onPageChange={next => {
             setPage(next);
-            setSelectedIds(new Set());
           }}
           onLimitChange={next => {
             if (limitStorageKey) window.localStorage.setItem(limitStorageKey, String(next));
             setLimit(next);
             setPage(1);
-            setSelectedIds(new Set());
           }}
         />
       )}
@@ -262,10 +275,10 @@ export default function StoreProductsPage() {
       />
 
       {/* Sticky selection action bar — shown whenever ≥1 product selected */}
-      {selectedIds.size > 0 && (
+      {selectedMap.size > 0 && (
         <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-xl">
           <span className="text-sm font-medium text-foreground whitespace-nowrap">
-            {t('selectionBar.selected').replace('{count}', String(selectedIds.size))}
+            {t('selectionBar.selected').replace('{count}', String(selectedMap.size))}
           </span>
           <button
             onClick={() => setIsMassEditOpen(true)}
@@ -274,7 +287,7 @@ export default function StoreProductsPage() {
             {t('selectionBar.massEdit')}
           </button>
           <button
-            onClick={() => setSelectedIds(new Set())}
+            onClick={clearSelection}
             className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
           >
             {t('selectionBar.clear')}
@@ -286,9 +299,9 @@ export default function StoreProductsPage() {
         isOpen={isMassEditOpen}
         onClose={() => setIsMassEditOpen(false)}
         storeId={storeId}
-        selectedProducts={products.filter(p => selectedIds.has(p.id))}
+        selectedProducts={Array.from(selectedMap.values())}
         onSuccess={() => {
-          setSelectedIds(new Set());
+          clearSelection();
           fetchProducts();
         }}
       />
