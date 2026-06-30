@@ -74,10 +74,11 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
     const q = normalize(query);
     if (!q) return items;
     const terms = q.split(/\s+/).filter(Boolean);
-    // Every whitespace-separated term must appear somewhere in name+group, so
-    // "stock supplier" narrows the same way a human expects.
+    // Every whitespace-separated term must appear somewhere in name + section +
+    // keywords, so "stock supplier" narrows like a human expects AND a concept
+    // word ("logo" / "شعار") finds the page that contains it (e.g. Branding).
     return items.filter(i => {
-      const hay = normalize(`${i.group ?? ''} ${i.name}`);
+      const hay = normalize(`${i.group ?? ''} ${i.name} ${i.keywords ?? ''}`);
       return terms.every(term => hay.includes(term));
     });
   }, [query, items]);
@@ -149,7 +150,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder={t('placeholder')}
-            className="h-12 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            className="h-12 w-full bg-transparent text-sm text-foreground outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground"
             aria-label={t('placeholder')}
           />
           <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">

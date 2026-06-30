@@ -12,6 +12,68 @@ export interface PaletteItem {
   href: string;
   group?: string;
   icon?: string;
+  /** Bilingual synonyms/related terms folded into the search haystack so a
+   *  concept word (e.g. "logo" / "شعار") finds the page even when the page's
+   *  own name doesn't contain it. */
+  keywords?: string;
+}
+
+// Concept synonyms per page, EN + AR, keyed by the LAST path segment of the
+// href. Lets the palette match by what a page CONTAINS, not just its title —
+// e.g. "logo"/"شعار" → Branding, "knet"/"كي نت" → Payment settings. Matching is
+// Arabic-folded in the palette, so unvowelled/variant Arabic still hits.
+const PAGE_KEYWORDS: Record<string, string> = {
+  branding:
+    'logo brand colors color palette favicon theme appearance look font شعار لوجو علامة هوية ألوان الوان لون مظهر شكل خط أيقونة',
+  seo: 'seo search engine meta title description google keywords sitemap سيو محركات البحث جوجل وصف كلمات مفتاحية عنوان',
+  domain: 'domain url web address custom domain dns website link نطاق دومين رابط عنوان موقع ويب',
+  'payment-settings':
+    'payment gateway checkout tap myfatoorah knet hesabe upayments card cod دفع بوابة كي نت ماي فاتورة بطاقة الدفع عند الاستلام',
+  shipping: 'delivery rates zones courier areas governorate شحن توصيل مناطق محافظة أسعار شركة شحن',
+  tax: 'vat taxes ضريبة ضرائب القيمة المضافة',
+  pwa: 'app install mobile icon manifest progressive تطبيق جوال أيقونة تثبيت',
+  template: 'theme design layout template skin قالب تصميم تخطيط مظهر',
+  language: 'translation arabic english locale rtl لغة ترجمة عربي انجليزي اتجاه',
+  staff: 'team members roles permissions users access موظفين فريق صلاحيات أدوار مستخدمين وصول',
+  announcement: 'banner bar top message strip إعلان شريط رسالة علوي',
+  'page-builder':
+    'design layout sections hero homepage builder تصميم تخطيط أقسام الصفحة الرئيسية بانر منشئ',
+  products: 'catalog items inventory skus goods منتجات سلع بضائع كتالوج',
+  categories: 'collections groups فئات تصنيفات مجموعات أقسام',
+  content: 'pages static about contact صفحات محتوى من نحن اتصل',
+  blog: 'posts articles news مدونة مقالات أخبار',
+  'floating-widget': 'chat button float whatsapp زر عائم دردشة',
+  navigation: 'menu links nav header قائمة تنقل روابط',
+  orders: 'sales purchases checkout invoices طلبات مبيعات فواتير',
+  customers: 'clients buyers crm contacts عملاء زبائن جهات اتصال',
+  reviews: 'ratings feedback stars مراجعات تقييمات نجوم',
+  returns: 'refunds exchanges rma إرجاع استرجاع استبدال',
+  coupons: 'discounts promo codes vouchers كوبونات خصومات أكواد قسائم',
+  loyalty: 'points rewards tiers نقاط مكافآت ولاء',
+  inventory: 'stock quantity warehouse مخزون كمية مستودع جرد',
+  warehouses: 'locations stores depot مستودعات مخازن مواقع',
+  suppliers: 'vendors purchasing موردين بائعين شراء',
+  'purchase-orders': 'po buying restock أوامر شراء توريد',
+  backorders: 'preorder out of stock طلب مسبق نفد المخزون',
+  reorder: 'reorder point low stock نقطة إعادة الطلب',
+  accounts: 'chart of accounts ledger دليل الحسابات دفتر',
+  journal: 'entries bookkeeping قيود يومية محاسبة',
+  expenses: 'costs spending bills مصروفات نفقات فواتير',
+  reports: 'financial statements pnl تقارير قوائم مالية أرباح',
+  analytics: 'reports stats metrics insights traffic تحليلات تقارير إحصائيات زيارات',
+  'ai-tools': 'ai gemini translate seo bulk autofill ذكاء اصطناعي ترجمة تعبئة تلقائية',
+  notifications: 'push alerts onesignal إشعارات تنبيهات',
+  newsletter: 'email campaign broadcast نشرة بريدية حملة بريد',
+  'abandoned-carts': 'cart recovery abandoned سلة متروكة استرداد',
+  'marketing-pixels': 'facebook tiktok snapchat google ads tracking بكسل تتبع إعلانات',
+  affiliates: 'referral partners commission تسويق بالعمولة شركاء إحالة',
+  whatsapp: 'wa chat messaging catalog واتساب رسائل دردشة',
+};
+
+/** Pull the keyword string for a page from its href's final path segment. */
+export function keywordsForHref(href: string): string | undefined {
+  const seg = href.split('/').filter(Boolean).pop() ?? '';
+  return PAGE_KEYWORDS[seg];
 }
 
 /** Labels for the Settings sub-pages (no hub tab bar, so not in hubs.ts). */
@@ -46,7 +108,13 @@ export function buildStorePaletteItems(
 
   // 1. The visible hubs themselves (Dashboard, Catalog, Sales, …).
   for (const n of navItems) {
-    items.push({ name: n.name, href: n.href, icon: n.icon, group: n.name });
+    items.push({
+      name: n.name,
+      href: n.href,
+      icon: n.icon,
+      group: n.name,
+      keywords: keywordsForHref(n.href),
+    });
   }
 
   // hubKey → display name, from the already-gated nav items.
@@ -58,7 +126,7 @@ export function buildStorePaletteItems(
     const group = hubNameByKey.get(hub.key);
     if (!group) continue;
     for (const tab of hub.buildTabs(storeId, hubLabels)) {
-      items.push({ name: tab.label, href: tab.href, group });
+      items.push({ name: tab.label, href: tab.href, group, keywords: keywordsForHref(tab.href) });
     }
   }
 
@@ -79,7 +147,8 @@ export function buildStorePaletteItems(
       [settings.language, `/stores/${storeId}/language`],
       [settings.staff, `/stores/${storeId}/staff`],
     ];
-    for (const [name, href] of pages) items.push({ name, href, group: settingsGroup });
+    for (const [name, href] of pages)
+      items.push({ name, href, group: settingsGroup, keywords: keywordsForHref(href) });
   }
 
   // Dedupe by href (a page could appear as both a hub landing + a tab).
