@@ -19,7 +19,7 @@
  * direct-compare RLS policies.
  */
 
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass, Prisma } from '@force/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 
@@ -73,28 +73,48 @@ const DEADSTOCK_VALUE_FILS_THRESHOLD = 50_000; // 500 KWD in fils (1 KWD = 1000 
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the number of days since the last paid OrderItem for this product in
- * this store. Returns 9999 if the product has never been sold.
+ * Returns a map of productId -> last paid-sale date for the given product ids in
+ * one store, computed in a SINGLE grouped query. Products with no paid sale are
+ * absent from the map (callers treat absence as "never sold" = 9999 days).
  *
- * Accepts `tx` so it can participate in the caller's bypass transaction
- * (required for Inngest jobs where no tenant GUC is set).
+ * This replaces the old per-product query that ran inside the scan transaction:
+ * N sequential `$queryRaw` calls serialized in one interactive tx blew the 30s
+ * timeout on large catalogues (the same defect that hit low-stock-scan). One
+ * grouped query is a single round-trip regardless of catalogue size.
+ *
+ * Accepts `tx` so it participates in the caller's bypass transaction (required
+ * for Inngest jobs where no tenant GUC is set).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function daysSinceLastSale(productId: string, storeId: string, tx: any): Promise<number> {
-  const lastItem = await tx.$queryRaw<{ last_sale: Date | null }[]>`
-    SELECT MAX(o.created_at) AS last_sale
+async function lastSaleByProduct(
+  productIds: string[],
+  storeId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any
+): Promise<Map<string, Date>> {
+  const map = new Map<string, Date>();
+  if (productIds.length === 0) return map;
+
+  const rows = await tx.$queryRaw<{ product_id: string; last_sale: Date | null }[]>`
+    SELECT oi.product_id, MAX(o.created_at) AS last_sale
     FROM public.order_items oi
     JOIN public.orders o ON o.id = oi.order_id
-    WHERE oi.product_id = ${productId}
-      AND o.store_id = ${storeId}
+    WHERE o.store_id = ${storeId}
       AND o.payment_status = 'paid'
+      AND oi.product_id IN (${Prisma.join(productIds)})
+    GROUP BY oi.product_id
   `;
 
-  const lastSaleAt = lastItem[0]?.last_sale;
-  if (!lastSaleAt) return 9999;
+  for (const row of rows) {
+    if (row.last_sale) map.set(row.product_id, new Date(row.last_sale));
+  }
+  return map;
+}
 
-  const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.floor((Date.now() - new Date(lastSaleAt).getTime()) / msPerDay);
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function daysSince(lastSaleAt: Date | undefined): number {
+  if (!lastSaleAt) return 9999;
+  return Math.floor((Date.now() - lastSaleAt.getTime()) / MS_PER_DAY);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,12 +193,20 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
     });
 
     // -------------------------------------------------------------------------
-    // Steps 3–4: Compute metrics and collect candidates
+    // Steps 3–4: Compute metrics and collect candidates.
+    // Last-sale dates come from ONE grouped query (not N per-product queries),
+    // so this stays a constant number of round-trips inside the short tx.
     // -------------------------------------------------------------------------
+    const lastSales = await lastSaleByProduct(
+      products.map((p: { id: string }) => p.id),
+      storeId,
+      tx
+    );
+
     const collected: DeadstockCandidate[] = [];
 
     for (const product of products) {
-      const days = await daysSinceLastSale(product.id, storeId, tx);
+      const days = daysSince(lastSales.get(product.id));
       const stockValueFils = Math.round((product.inventory ?? 0) * (product.costPrice ?? 0));
 
       if (days < DEADSTOCK_DAYS_THRESHOLD) continue;

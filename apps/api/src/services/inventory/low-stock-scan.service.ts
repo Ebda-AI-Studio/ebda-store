@@ -22,7 +22,7 @@
  * This is consistent with the owner being the admin managing the store.
  */
 
-import { prisma, withRlsBypass } from '@force/database';
+import { withRlsBypass } from '@force/database';
 import { redis } from '../redis.service';
 import logger from '../../lib/logger';
 import type { LowStockAlertItem } from '../email-templates/low-stock-alert';
@@ -65,20 +65,16 @@ function sentinelKey(storeId: string, productId: string): string {
 }
 
 /**
- * Returns true when the sentinel already exists (product was already alerted
- * and has NOT restocked above the threshold yet).
- *
- * Falls back to `false` (send the alert) when Redis is unavailable — better
- * to over-alert than to silently miss a low-stock condition.
+ * Single-key sentinel read. The scan itself uses the batched `readSentinels`
+ * below, but this stays exported as a verification API for tests and any
+ * future per-product caller. Falls back to `false` (over-alert) when Redis is
+ * unavailable — better than silently missing a low-stock condition.
  */
 export async function isSentinelSet(storeId: string, productId: string): Promise<boolean> {
   try {
-    // redis.exists() wraps under `cache:` prefix — use the raw client to
-    // avoid the `cache:` namespace collision with the general cache layer.
     const client = redis.getClient();
     if (!client) return false;
-    const key = sentinelKey(storeId, productId);
-    return (await client.exists(key)) === 1;
+    return (await client.exists(sentinelKey(storeId, productId))) === 1;
   } catch (err) {
     logger.warn({ err, storeId, productId }, 'low-stock-scan: sentinel read failed, proceeding');
     return false;
@@ -86,7 +82,9 @@ export async function isSentinelSet(storeId: string, productId: string): Promise
 }
 
 /**
- * Sets the dedup sentinel for (storeId, productId) with a 30-day backstop TTL.
+ * Single-key sentinel write — sets the dedup sentinel for (storeId, productId)
+ * with the 30-day backstop TTL. The scan uses the batched `writeSentinels`; this
+ * stays exported for tests and restock-event callers.
  */
 export async function setSentinel(storeId: string, productId: string): Promise<void> {
   try {
@@ -99,8 +97,9 @@ export async function setSentinel(storeId: string, productId: string): Promise<v
 }
 
 /**
- * Clears the dedup sentinel for (storeId, productId) — called when a product
- * is back ABOVE its threshold so the next drop triggers a fresh alert.
+ * Single-key sentinel clear — clears the dedup sentinel for (storeId, productId)
+ * so the next drop re-alerts. The scan uses the batched `writeSentinels`; this
+ * stays exported for tests and restock-event callers.
  */
 export async function clearSentinel(storeId: string, productId: string): Promise<void> {
   try {
@@ -118,13 +117,17 @@ export async function clearSentinel(storeId: string, productId: string): Promise
 
 export async function runLowStockScan(storeId: string): Promise<LowStockScanResult> {
   // -------------------------------------------------------------------------
-  // Run inside withRlsBypass so Inngest jobs (no tenant GUC) can read the
-  // products table without being filtered to 0 rows by FORCE RLS policies.
+  // Step 1: DB reads ONLY inside withRlsBypass.
+  //
+  // withRlsBypass opens an *interactive* Postgres transaction (no tenant GUC,
+  // so an Inngest cron can read past FORCE RLS). It is critical that NOTHING
+  // slow runs inside it: the per-product Redis sentinel round-trips used to
+  // live in here, and on a large catalogue N sequential Redis calls serialized
+  // inside the transaction blew the 30s interactive-tx timeout
+  // ("Transaction already closed ... 39532 ms passed"). Keep this block to the
+  // two reads and get out fast — all sentinel I/O happens AFTER, off the tx.
   // -------------------------------------------------------------------------
-  return withRlsBypass(async tx => {
-    // -----------------------------------------------------------------------
-    // Step 1: Load the store owner email (the notification recipient)
-    // -----------------------------------------------------------------------
+  const data = await withRlsBypass(async tx => {
     const store = await tx.store.findUnique({
       where: { id: storeId },
       select: {
@@ -137,17 +140,11 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
       },
     });
 
-    if (!store) {
-      logger.warn({ storeId }, 'low-stock-scan: store not found, aborting');
-      return { alertedProducts: [], clearedCount: 0, skippedCount: 0, recipientEmail: null };
-    }
+    if (!store) return null;
 
-    const recipientEmail = store.owner?.email ?? null;
-
-    // -----------------------------------------------------------------------
-    // Step 2: Load active, trackInventory products with inventory > 0
-    //         We load all of them so we can also clear sentinels for restocks.
-    // -----------------------------------------------------------------------
+    // Load active, trackInventory products. We load all of them (not just the
+    // low ones) so we can also clear sentinels for products now back above
+    // threshold or exhausted.
     const products = await tx.product.findMany({
       where: {
         storeId,
@@ -167,74 +164,127 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
       },
     });
 
-    // -----------------------------------------------------------------------
-    // Step 3: Classify each product and manage sentinels
-    // -----------------------------------------------------------------------
-    const alertedProducts: LowStockAlertItem[] = [];
-    let clearedCount = 0;
-    let skippedCount = 0;
-
-    for (const product of products) {
-      const threshold = product.lowStockThreshold ?? 5;
-      const isLow = product.inventory > 0 && product.inventory <= threshold;
-
-      if (!isLow) {
-        // Product is either back above threshold OR out-of-stock (inventory === 0).
-        // Clear the sentinel so the next drop re-alerts, but only if a sentinel
-        // actually exists — avoid a Redis write on every healthy product scan.
-        const wasAlerted = await isSentinelSet(storeId, product.id);
-        if (wasAlerted) {
-          await clearSentinel(storeId, product.id);
-          clearedCount++;
-          logger.debug(
-            { storeId, productId: product.id, inventory: product.inventory, threshold },
-            'low-stock-scan: cleared sentinel — product restocked or exhausted'
-          );
-        }
-        continue;
-      }
-
-      // Product is in low-stock range (0 < inventory <= threshold).
-      const alreadyAlerted = await isSentinelSet(storeId, product.id);
-      if (alreadyAlerted) {
-        skippedCount++;
-        logger.debug(
-          { storeId, productId: product.id, inventory: product.inventory },
-          'low-stock-scan: sentinel already set, skipping'
-        );
-        continue;
-      }
-
-      // New low-stock hit — include in digest.
-      alertedProducts.push({
-        productId: product.id,
-        name: product.name,
-        nameAr: product.nameAr,
-        inventory: product.inventory,
-        lowStockThreshold: threshold,
-      });
-    }
-
-    // -----------------------------------------------------------------------
-    // Step 4: Set sentinels for all newly-alerted products AFTER building the
-    //         digest so a failure mid-loop doesn't produce partial sentinels
-    //         for products that weren't included in the digest.
-    // -----------------------------------------------------------------------
-    for (const item of alertedProducts) {
-      await setSentinel(storeId, item.productId);
-    }
-
-    logger.info(
-      {
-        storeId,
-        alerted: alertedProducts.length,
-        cleared: clearedCount,
-        skipped: skippedCount,
-        hasRecipient: !!recipientEmail,
-      },
-      'low-stock-scan completed'
-    );
-
-    return { alertedProducts, clearedCount, skippedCount, recipientEmail };
+    return { store, products };
   });
+
+  if (!data) {
+    logger.warn({ storeId }, 'low-stock-scan: store not found, aborting');
+    return { alertedProducts: [], clearedCount: 0, skippedCount: 0, recipientEmail: null };
+  }
+
+  const { store, products } = data;
+  const recipientEmail = store.owner?.email ?? null;
+
+  // -------------------------------------------------------------------------
+  // Step 2: Classify + manage sentinels OUTSIDE the transaction.
+  //
+  // Batch the Redis reads/writes with pipelines so the whole scan is ~3 round-
+  // trips regardless of catalogue size (was 3N sequential round-trips). When
+  // Redis is unavailable we treat every sentinel as unset (over-alert rather
+  // than silently miss a low-stock condition) — same fallback as before.
+  // -------------------------------------------------------------------------
+  const sentinelExists = await readSentinels(
+    storeId,
+    products.map(p => p.id)
+  );
+
+  const alertedProducts: LowStockAlertItem[] = [];
+  const toClear: string[] = [];
+  let clearedCount = 0;
+  let skippedCount = 0;
+
+  for (const product of products) {
+    const threshold = product.lowStockThreshold ?? 5;
+    const isLow = product.inventory > 0 && product.inventory <= threshold;
+    const alerted = sentinelExists.get(product.id) === true;
+
+    if (!isLow) {
+      // Back above threshold OR out-of-stock (inventory === 0). Clear the
+      // sentinel so the next drop re-alerts, but only if one actually exists.
+      if (alerted) {
+        toClear.push(product.id);
+        clearedCount++;
+      }
+      continue;
+    }
+
+    // Product is in low-stock range (0 < inventory <= threshold).
+    if (alerted) {
+      skippedCount++;
+      continue;
+    }
+
+    // New low-stock hit — include in digest.
+    alertedProducts.push({
+      productId: product.id,
+      name: product.name,
+      nameAr: product.nameAr,
+      inventory: product.inventory,
+      lowStockThreshold: threshold,
+    });
+  }
+
+  // Set sentinels for newly-alerted products AFTER building the digest, and
+  // clear restocked ones — both batched into a single pipeline.
+  await writeSentinels(
+    storeId,
+    alertedProducts.map(p => p.productId),
+    toClear
+  );
+
+  logger.info(
+    {
+      storeId,
+      alerted: alertedProducts.length,
+      cleared: clearedCount,
+      skipped: skippedCount,
+      hasRecipient: !!recipientEmail,
+    },
+    'low-stock-scan completed'
+  );
+
+  return { alertedProducts, clearedCount, skippedCount, recipientEmail };
+}
+
+/**
+ * Batch-reads sentinel existence for a list of product ids in ONE Redis
+ * pipeline. Returns a map of productId -> exists. On any Redis error (or no
+ * client) returns an empty map, which callers read as "not set" (over-alert).
+ */
+async function readSentinels(storeId: string, productIds: string[]): Promise<Map<string, boolean>> {
+  const result = new Map<string, boolean>();
+  if (productIds.length === 0) return result;
+  try {
+    const client = redis.getClient();
+    if (!client) return result;
+    const pipeline = client.pipeline();
+    for (const id of productIds) pipeline.exists(sentinelKey(storeId, id));
+    const replies = await pipeline.exec();
+    if (!replies) return result;
+    productIds.forEach((id, i) => {
+      const [err, val] = replies[i] ?? [];
+      if (!err) result.set(id, val === 1);
+    });
+  } catch (err) {
+    logger.warn({ err, storeId }, 'low-stock-scan: batch sentinel read failed, proceeding');
+  }
+  return result;
+}
+
+/**
+ * Batch-writes sentinel state in ONE Redis pipeline: SETEX for newly-alerted
+ * products (30-day backstop TTL) and DEL for restocked/exhausted ones.
+ */
+async function writeSentinels(storeId: string, toSet: string[], toClear: string[]): Promise<void> {
+  if (toSet.length === 0 && toClear.length === 0) return;
+  try {
+    const client = redis.getClient();
+    if (!client) return;
+    const pipeline = client.pipeline();
+    for (const id of toSet) pipeline.setex(sentinelKey(storeId, id), SENTINEL_TTL_SECONDS, '1');
+    for (const id of toClear) pipeline.del(sentinelKey(storeId, id));
+    await pipeline.exec();
+  } catch (err) {
+    logger.warn({ err, storeId }, 'low-stock-scan: batch sentinel write failed');
+  }
 }

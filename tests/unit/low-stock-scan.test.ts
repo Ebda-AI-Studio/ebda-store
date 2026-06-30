@@ -18,11 +18,48 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // vi.hoisted() runs BEFORE vi.mock() factories — use it to create shared
 // mutable objects that the factories and test bodies both need to reference.
 const { mockRedisClient, mockTx } = vi.hoisted(() => {
+  // The scan reads/writes sentinels in batched pipelines. The pipeline mock
+  // records queued ops and, on exec(), delegates to the same exists/setex/del
+  // mocks the single-key helper tests use — so per-product `mockResolvedValueOnce`
+  // chains and `toHaveBeenCalledWith` assertions keep working unchanged.
   const mockRedisClient = {
     exists: vi.fn().mockResolvedValue(0),
     setex: vi.fn().mockResolvedValue('OK'),
     del: vi.fn().mockResolvedValue(1),
+    pipeline: vi.fn(),
   };
+  mockRedisClient.pipeline.mockImplementation(() => {
+    const ops: Array<['exists' | 'setex' | 'del', unknown[]]> = [];
+    const p = {
+      exists: (key: string) => {
+        ops.push(['exists', [key]]);
+        return p;
+      },
+      setex: (...args: unknown[]) => {
+        ops.push(['setex', args]);
+        return p;
+      },
+      del: (key: string) => {
+        ops.push(['del', [key]]);
+        return p;
+      },
+      exec: async () => {
+        const res: Array<[Error | null, unknown]> = [];
+        for (const [op, args] of ops) {
+          if (op === 'exists') res.push([null, await mockRedisClient.exists(args[0])]);
+          else if (op === 'setex') {
+            await mockRedisClient.setex(...(args as [string, number, string]));
+            res.push([null, 'OK']);
+          } else {
+            await mockRedisClient.del(args[0]);
+            res.push([null, 1]);
+          }
+        }
+        return res;
+      },
+    };
+    return p;
+  });
 
   const mockTx = {
     store: { findUnique: vi.fn() },
