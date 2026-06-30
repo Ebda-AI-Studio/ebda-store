@@ -15,7 +15,7 @@ import {
   pageDensityStyle,
 } from '../../../templates/shared/section-typography';
 import { api, type Product, type ProductVariant } from '@/lib/api';
-import { getProductPricing } from '@/lib/product-pricing';
+import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
 import { useCart } from '../../../contexts/CartContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../../../contexts/StoreContext';
 import { useFeatures } from '../../../contexts/FeatureContext';
@@ -454,6 +454,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // Variant-aware pricing
   const pricing = getProductPricing(product, selectedVariant, 'detail');
   const { displayPrice, displayCompare, minVariantPrice, maxVariantPrice } = pricing;
+  // BUG 1 fix: variant-resolved badge text (KWD or pct).
+  const discountBadgeText = getDiscountBadgeText(
+    product,
+    language === 'ar',
+    displayPrice,
+    displayCompare
+  );
 
   // Derived inventory (variant-aware)
   const effectiveInventory = selectedVariant ? selectedVariant.inventory : product.inventory;
@@ -663,14 +670,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             <div className="md:col-span-7">
               <div className="mb-4 flex items-center gap-2">
                 {categoryName && <Badge variant="secondary">{categoryName}</Badge>}
-                {/* Discount badge only when there is a CONCRETE compare-at to
-                  compare against. For products with variants we wait for
-                  the customer to pick one before flagging a discount. */}
-                {displayCompare && displayCompare > displayPrice && (
-                  <Badge variant="destructive">
-                    {Math.round((1 - displayPrice / displayCompare) * 100)}% OFF
-                  </Badge>
-                )}
+                {/* Discount badge — BUG 1 fix: helper text (KWD or pct).
+                    Waits for variant selection on variant products
+                    (displayCompare is null until a variant is picked). */}
+                {discountBadgeText && <Badge variant="destructive">{discountBadgeText}</Badge>}
                 {product.status === 'draft' && (
                   <Badge variant="outline">{t('Draft', 'مسودة')}</Badge>
                 )}
@@ -764,6 +767,15 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     </span>
                   )}
                 </div>
+                {/* BUG 2 fix: discount badge stacked directly below the OOS
+                    indicator row when product is out of stock (and not
+                    backorderable). This surfaces the saving alongside the
+                    stock state rather than only in the title area. */}
+                {outOfStock && !canBackorder && discountBadgeText && (
+                  <div>
+                    <Badge variant="destructive">{discountBadgeText}</Badge>
+                  </div>
+                )}
 
                 <div className="flex gap-4">
                   <Button

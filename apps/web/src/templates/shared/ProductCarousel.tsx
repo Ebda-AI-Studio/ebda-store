@@ -27,6 +27,7 @@ import { getProductCardTextSizes, resolveColor } from '@force/shared';
 import { cn } from '@force/ui';
 import type { ProductCarouselProps } from '../types';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
+import { getDiscountBadgeText } from '../../lib/product-pricing';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -309,7 +310,8 @@ export function ProductCarousel({
               const name = isRtl ? (product.nameAr ?? product.name) : product.name;
               const href = `${urlPrefix}/products/${product.slug}`;
               const img = product.images?.[0]?.url;
-              const onSale = product.compareAtPrice && product.compareAtPrice > product.price;
+              const onSale = !!(product.compareAtPrice && product.compareAtPrice > product.price);
+              const discountBadgeText = getDiscountBadgeText(product, isRtl ?? false);
               // Dual-CTA + OOS state for the carousel cards (platform-level
               // 2026-05-16). Products with variants can't add inline because
               // the carousel can't pick a variant — they get a "View" link
@@ -435,13 +437,17 @@ export function ProductCarousel({
                             </svg>
                           </div>
                         )}
-                        {onSale && (
-                          <span className="absolute end-3 top-3 rounded-full bg-foreground/85 px-2.5 py-1 text-xs font-semibold tracking-wide text-background shadow-[0_6px_16px_-6px_hsl(var(--foreground)/0.35)]">
-                            -
-                            {Math.round(
-                              (1 - product.price / (product.compareAtPrice ?? product.price)) * 100
+                        {/* BUG 1 fix: use helper for KWD/pct text.
+                            BUG 2 fix: show when OOS too; stack under ribbon
+                            (ribbon is 88×88 at top-0 start-0; below = top-[92px]). */}
+                        {onSale && discountBadgeText && (
+                          <span
+                            className={cn(
+                              'absolute z-10 rounded-full bg-foreground/85 px-2.5 py-1 text-xs font-semibold tracking-wide text-background shadow-[0_6px_16px_-6px_hsl(var(--foreground)/0.35)]',
+                              inStock ? 'end-3 top-3' : 'start-3 top-[92px]'
                             )}
-                            %
+                          >
+                            {discountBadgeText}
                           </span>
                         )}
                         {/* Bucket E3 (2026-05-17): quick-add (+) circle button

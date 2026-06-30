@@ -28,6 +28,71 @@ interface VariantLike {
   compareAtPrice?: number | null;
 }
 
+/**
+ * Minimal product shape required by getDiscountBadgeText.
+ * Callers pass a product (or a product-like subset) that includes
+ * discountType + discountValue so the helper can distinguish KWD-fixed
+ * from percentage discounts.
+ */
+interface DiscountProductLike {
+  price: number;
+  compareAtPrice?: number | null;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number | null;
+}
+
+/**
+ * Return the badge text for a sale badge, or null when no sale applies.
+ *
+ * Two forms:
+ *   - Fixed-KWD discount (`discountType === 'fixed'`):
+ *       EN: "Save KWD 2.000"   AR: "وفّر ٢٫٠٠٠ د.ك"
+ *   - Percentage / legacy (anything else with compareAtPrice):
+ *       EN: "-17%"             AR: "-17%"  (unchanged from prior behaviour)
+ *
+ * Pass `displayPrice` / `displayCompare` to override the product's own
+ * price/compareAtPrice — callers on the PDP and variant cards supply the
+ * resolved variant-level values so the badge stays accurate after a
+ * variant is selected.
+ *
+ * @param product    - Product row (needs price, compareAtPrice, discountType, discountValue).
+ * @param isRtl      - Whether the storefront is in RTL/Arabic mode.
+ * @param displayPrice   - Optional override (variant-resolved price, in fils).
+ * @param displayCompare - Optional override (variant-resolved compareAtPrice, in fils).
+ */
+export function getDiscountBadgeText(
+  product: DiscountProductLike,
+  isRtl: boolean,
+  displayPrice?: number,
+  displayCompare?: number | null
+): string | null {
+  const effectivePrice = displayPrice ?? product.price;
+  const effectiveCompare = displayCompare !== undefined ? displayCompare : product.compareAtPrice;
+
+  // No sale at all.
+  if (!effectiveCompare || effectiveCompare <= effectivePrice) return null;
+
+  if (product.discountType === 'fixed' && product.discountValue && product.discountValue > 0) {
+    // Saving = difference in fils, rendered as KWD (3 decimal places).
+    const savingFils = effectiveCompare - effectivePrice;
+    const savingKwd = (savingFils / 1000).toFixed(3);
+
+    if (isRtl) {
+      // Arabic numeral formatting via Intl + Arabic "وفّر" prefix.
+      const formatted = new Intl.NumberFormat('ar-KW', {
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
+      }).format(savingFils / 1000);
+      return `وفّر ${formatted} د.ك`;
+    }
+    return `Save KWD ${savingKwd}`;
+  }
+
+  // Percentage / legacy path — same inline text the templates previously computed.
+  const pct = Math.round((1 - effectivePrice / effectiveCompare) * 100);
+  return `-${pct}%`;
+}
+
 interface ProductLike {
   price: number;
   compareAtPrice?: number | null;

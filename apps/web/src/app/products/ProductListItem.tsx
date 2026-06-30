@@ -5,7 +5,7 @@ import Image from 'next/image';
 import type { Product } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { formatPrice } from '@/lib/format';
-import { getProductPricing } from '@/lib/product-pricing';
+import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
 import { cn, CartIcon } from '@force/ui';
@@ -44,6 +44,8 @@ export function ProductListItem({
   // multi-variant products render "From <min>" instead of the parent's
   // (often stale) standalone price.
   const pricing = getProductPricing(product, undefined, 'card');
+  // BUG 1 fix: use helper for correct KWD/pct badge text.
+  const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: orderable = truly in-stock OR backorder allowed. Derived from
   // inventory because ProductListItem uses a richer inventory check (undefined
   // means variant-managed stock → treat as orderable). OOS + backorder = orderable.
@@ -93,14 +95,17 @@ export function ProductListItem({
     >
       {/* Image */}
       <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10">
-        {/* Sale badge fires on EITHER a parent-level discount (no variants)
-            OR a variant-level discount (so a multi-size product still
-            shows the badge if any size is on sale). The parent's stale
-            compareAtPrice is filtered out by getProductPricing for
-            variant products. */}
-        {(pricing.displayCompare || pricing.hasVariantDiscount) && (
-          <span className="absolute left-2 top-2 rounded-full bg-destructive px-2 py-0.5 text-xs font-bold uppercase text-white">
-            {t('Sale', 'تخفيض')}
+        {/* Sale badge — BUG 1 fix: show KWD or pct text via helper.
+            BUG 2 fix: no inStock gate. */}
+        {(pricing.displayCompare || pricing.hasVariantDiscount) && discountBadgeText && (
+          <span
+            className={cn(
+              'absolute z-10 rounded-full bg-destructive px-2 py-0.5 text-xs font-bold uppercase text-white',
+              // BUG 2: when OOS, drop the badge below the OOS ribbon (88px) so they stack.
+              orderable ? 'start-2 top-2' : 'start-3 top-[92px]'
+            )}
+          >
+            {discountBadgeText}
           </span>
         )}
         {/* Task 3 B4: OOS badge on list view — sits inside the image container. */}

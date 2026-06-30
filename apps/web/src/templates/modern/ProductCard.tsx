@@ -19,7 +19,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
-import { calculateDiscount } from '../shared/display-helpers';
+import { getDiscountBadgeText } from '../../lib/product-pricing';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
@@ -92,7 +92,8 @@ function ModernProductCard({
   // Item 10 — image normalization.
   const normalizeImages = store.theme?.normalizeProductImages === true;
 
-  const discount = calculateDiscount(product.price, product.compareAtPrice);
+  // BUG 1 fix: use helper so fixed-KWD discounts show "Save KWD X.XXX" instead of pct.
+  const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Localized name for alt text + display. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.
   const displayName = isRtl && product.nameAr ? product.nameAr : product.name;
@@ -242,13 +243,24 @@ function ModernProductCard({
 
           {/* Badges — sale + new only. Out-of-stock now uses the shared
               prominent red ribbon (OutOfStockRibbon below) to match the
-              pecannbee/alkahraman target across every theme. */}
-          <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
-            {discount > 0 && (
-              <ProductBadge variant="sale" discount={discount} isRtl={isRtl} size="sm" />
-            )}
-            {product.isNew && <ProductBadge variant="new" isRtl={isRtl} size="sm" />}
-          </ProductBadgeGroup>
+              pecannbee/alkahraman target across every theme.
+              BUG 1 fix: pass helper text via label so fixed-KWD shows correctly.
+              BUG 2 fix: no inStock gate — badge shows when OOS too; when OOS
+              move to start-3/top-[92px] below the 88×88 ribbon. */}
+          {orderable ? (
+            <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
+              {discountBadgeText && (
+                <ProductBadge variant="sale" label={discountBadgeText} isRtl={isRtl} size="sm" />
+              )}
+              {product.isNew && <ProductBadge variant="new" isRtl={isRtl} size="sm" />}
+            </ProductBadgeGroup>
+          ) : (
+            discountBadgeText && (
+              <span className="absolute top-[92px] start-3 z-10 rounded-full bg-foreground/90 px-2.5 py-1 text-xs font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
+                {discountBadgeText}
+              </span>
+            )
+          )}
 
           {/* Platform-level OOS ribbon (top-start, red, bold) — same visual
               treatment Ahmad shipped on PecannbeeProductCard, now in every

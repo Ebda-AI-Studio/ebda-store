@@ -23,7 +23,7 @@ import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
-import { getProductPricing } from '../../lib/product-pricing';
+import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
 import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
 
 /**
@@ -107,6 +107,8 @@ function ElegantProductCard({
   // ignored. See lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
+  // BUG 1 fix: helper text for correct KWD/pct badge.
+  const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
   const orderable = product.inStock !== false || product.acceptsBackorder === true;
 
@@ -274,27 +276,37 @@ function ElegantProductCard({
             </div>
           )}
 
-          {/* Badges */}
-          <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
-            {product.isNew && (
-              <ProductBadge
-                variant="new"
-                isRtl={isRtl}
-                size="sm"
-                className="text-[9px] tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal"
-                label={isRtl ? 'جديد' : 'New'}
-              />
-            )}
-            {hasSale && (
-              <ProductBadge
-                variant="sale"
-                isRtl={isRtl}
-                size="sm"
-                className="text-[9px] tracking-[0.2em] uppercase rounded-none font-normal"
-                label={isRtl ? 'تخفيض' : 'Sale'}
-              />
-            )}
-          </ProductBadgeGroup>
+          {/* Badges — BUG 1 fix: use helper text so fixed-KWD shows correctly.
+              BUG 2 fix: no inStock gate; when OOS stack below the 88×88 ribbon. */}
+          {orderable ? (
+            <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
+              {product.isNew && (
+                <ProductBadge
+                  variant="new"
+                  isRtl={isRtl}
+                  size="sm"
+                  className="text-[9px] tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal"
+                  label={isRtl ? 'جديد' : 'New'}
+                />
+              )}
+              {hasSale && discountBadgeText && (
+                <ProductBadge
+                  variant="sale"
+                  isRtl={isRtl}
+                  size="sm"
+                  className="text-[9px] tracking-[0.2em] uppercase rounded-none font-normal"
+                  label={discountBadgeText}
+                />
+              )}
+            </ProductBadgeGroup>
+          ) : (
+            hasSale &&
+            discountBadgeText && (
+              <span className="absolute top-[92px] start-3 z-10 rounded-full bg-foreground/90 px-2.5 py-1 text-xs font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
+                {discountBadgeText}
+              </span>
+            )
+          )}
 
           {/* Quick Add — always visible on touch; slides up on hover for pointer devices.
               Task 3 B2: thread CTA customization props. */}

@@ -23,7 +23,7 @@ import {
   ctaShapeClass,
   ctaSizeClass,
 } from './card-size';
-import { getProductPricing } from '../../lib/product-pricing';
+import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
 import { productCardPropsEqual } from './product-card-memo';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
@@ -129,9 +129,8 @@ function PecannbeeProductCardImpl({
   // allowed are still orderable — CTA stays pressable, no OOS label shown.
   const orderable = inStock || product.acceptsBackorder === true;
   const onSale = !!(product.compareAtPrice && product.compareAtPrice > product.price);
-  const discountPct = onSale
-    ? Math.round((1 - product.price / (product.compareAtPrice ?? product.price)) * 100)
-    : 0;
+  // BUG 1 fix: use getDiscountBadgeText so fixed-KWD discounts render correctly.
+  const discountBadgeText = getDiscountBadgeText(product, isRtl);
 
   const name = isRtl && product.nameAr ? product.nameAr : product.name;
   const href = `${urlPrefix}/products/${product.slug}`;
@@ -340,10 +339,19 @@ function PecannbeeProductCardImpl({
           {/* Bucket C5: brand pill — hidden when OOS ribbon or NEW
               badge already occupies the top-START corner. */}
           <BrandPill hidden={!inStock || showNewBadge} />
-          {/* Sale chip top-END when in stock */}
-          {inStock && onSale && (
-            <span className="absolute top-3 end-3 z-10 rounded-full bg-foreground/90 px-2.5 py-1 text-xs font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
-              -{discountPct}%
+          {/* Sale chip — always shown when on sale (BUG 1 + BUG 2 fix).
+              When in stock: top-END corner (standard Pecannbee position).
+              When OOS: stacked below the OutOfStockRibbon on the START side
+              (ribbon is 88×88 absolute top-0 start-0; badge sits at top-[92px]
+              start-3 so it reads as directly underneath the ribbon). */}
+          {onSale && discountBadgeText && (
+            <span
+              className={cn(
+                'absolute z-10 rounded-full bg-foreground/90 px-2.5 py-1 text-xs font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]',
+                inStock ? 'top-3 end-3' : 'top-[92px] start-3'
+              )}
+            >
+              {discountBadgeText}
             </span>
           )}
         </div>

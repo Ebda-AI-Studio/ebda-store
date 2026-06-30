@@ -20,7 +20,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
-import { calculateDiscount } from '../shared/display-helpers';
+import { getDiscountBadgeText } from '../../lib/product-pricing';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
@@ -89,7 +89,8 @@ function BoldProductCard({
   // Item 10 — normalize images.
   const normalizeImages = store.theme?.normalizeProductImages === true;
 
-  const discount = calculateDiscount(product.price, product.compareAtPrice);
+  // BUG 1 fix: use helper for correct KWD/pct badge text.
+  const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
   const orderable = product.inStock !== false || product.acceptsBackorder === true;
 
@@ -225,27 +226,35 @@ function BoldProductCard({
             theme={store.theme}
           />
 
-          {/* Badges */}
-          <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
-            {discount > 0 && (
-              <ProductBadge
-                variant="sale"
-                discount={discount}
-                isRtl={isRtl}
-                size="md"
-                className="font-black px-3 py-1.5 rounded-none"
-              />
-            )}
-            {product.isNew && (
-              <ProductBadge
-                variant="new"
-                isRtl={isRtl}
-                size="md"
-                className="font-black px-3 py-1.5 rounded-none"
-                label={isRtl ? 'جديد!' : 'NEW!'}
-              />
-            )}
-          </ProductBadgeGroup>
+          {/* Badges — BUG 1 fix: helper text. BUG 2 fix: show when OOS; stack below ribbon. */}
+          {orderable ? (
+            <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
+              {discountBadgeText && (
+                <ProductBadge
+                  variant="sale"
+                  label={discountBadgeText}
+                  isRtl={isRtl}
+                  size="md"
+                  className="font-black px-3 py-1.5 rounded-none"
+                />
+              )}
+              {product.isNew && (
+                <ProductBadge
+                  variant="new"
+                  isRtl={isRtl}
+                  size="md"
+                  className="font-black px-3 py-1.5 rounded-none"
+                  label={isRtl ? 'جديد!' : 'NEW!'}
+                />
+              )}
+            </ProductBadgeGroup>
+          ) : (
+            discountBadgeText && (
+              <span className="absolute top-[92px] start-3 z-10 rounded-none bg-red-500 px-3 py-1.5 text-xs font-black tracking-wider text-white">
+                {discountBadgeText}
+              </span>
+            )
+          )}
 
           {/* Quick Add — always visible on touch (mobile/tablet); slides up on hover for pointer devices.
             Touch devices can't trigger :hover, so the button stayed unreachable on phones. */}

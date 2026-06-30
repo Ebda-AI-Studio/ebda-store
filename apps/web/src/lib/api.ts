@@ -101,6 +101,10 @@ interface Product {
   descriptionAr?: string;
   price: number;
   compareAtPrice?: number;
+  /** Discount type set by the merchant — 'percentage' | 'fixed'. null = no explicit discount. */
+  discountType?: 'percentage' | 'fixed' | null;
+  /** Discount value: basis points (bps) for percentage; fils for fixed. null when unset. */
+  discountValue?: number | null;
   sku?: string;
   inventory?: number;
   /** Server-computed: inventory <= 0 && allowBackorder. Keeps Add-to-Cart

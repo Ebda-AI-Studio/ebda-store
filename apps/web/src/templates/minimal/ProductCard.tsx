@@ -22,7 +22,7 @@ import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions'
 import { Price } from '@force/ui';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
-import { getProductPricing } from '../../lib/product-pricing';
+import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
 import {
   OosImageDim,
   OutOfStockRibbon,
@@ -97,6 +97,8 @@ function MinimalProductCard({
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
+  // BUG 1 fix: use helper for correct KWD/pct text.
+  const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
   const orderable = product.inStock !== false || product.acceptsBackorder === true;
   const handleAddToCart = async (productId: string) => {
@@ -334,10 +336,11 @@ function MinimalProductCard({
               />
             )}
             {/* Discount indicator — minimal pack stays chrome-free, so use a
-              short uppercase 'sale' label inline rather than a badge box. */}
-            {priceVisible && hasSale && (
+              short label inline. BUG 1 fix: show helper text (KWD or pct).
+              BUG 2 fix: shown even when OOS (no inStock gate). */}
+            {priceVisible && hasSale && discountBadgeText && (
               <p className="text-[10px] tracking-[0.25em] uppercase text-foreground/80">
-                {isRtl ? 'تخفيض' : 'Sale'}
+                {discountBadgeText}
               </p>
             )}
             {priceVisible && (

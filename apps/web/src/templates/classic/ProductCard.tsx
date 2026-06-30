@@ -23,7 +23,7 @@ import { Price, ProductBadge, cn } from '@force/ui';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
-import { getProductPricing } from '../../lib/product-pricing';
+import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
 import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
 
 /**
@@ -95,6 +95,8 @@ function ClassicProductCard({
   // Variant-aware pricing — see lib/product-pricing.ts.
   const pricing = getProductPricing(product, undefined, 'card');
   const hasSale = !!pricing.displayCompare || pricing.hasVariantDiscount;
+  // BUG 1 fix: use helper for correct KWD/pct badge text.
+  const discountBadgeText = getDiscountBadgeText(product, isRtl);
   // Task 13: backorder-aware orderable signal. OOS + backorder allowed → orderable.
   const orderable = product.inStock !== false || product.acceptsBackorder === true;
 
@@ -231,20 +233,29 @@ function ClassicProductCard({
             />
           </div>
 
-          {/* Badges — top corner. Sale badge wins over "new" when both apply
-            because shoppers care about price more than recency. */}
-          {hasSale ? (
-            <ProductBadge
-              variant="sale"
-              isRtl={isRtl}
-              size="sm"
-              absolute
-              position={isRtl ? 'top-right' : 'top-left'}
-              className="font-serif tracking-widest uppercase bg-destructive text-destructive-foreground rounded-none text-[10px]"
-              label={isRtl ? 'تخفيض' : 'Sale'}
-            />
+          {/* Badges — top corner. Sale badge wins over "new" when both apply.
+              BUG 1 fix: label comes from helper (KWD or pct).
+              BUG 2 fix: when OOS, stack below the 88×88 ribbon (start-3 top-[92px]). */}
+          {hasSale && discountBadgeText ? (
+            orderable ? (
+              <ProductBadge
+                variant="sale"
+                isRtl={isRtl}
+                size="sm"
+                absolute
+                position={isRtl ? 'top-right' : 'top-left'}
+                className="font-serif tracking-widest uppercase bg-destructive text-destructive-foreground rounded-none text-[10px]"
+                label={discountBadgeText}
+              />
+            ) : (
+              <span className="absolute top-[92px] start-3 z-10 rounded-full bg-destructive px-2.5 py-1 text-xs font-semibold font-serif tracking-widest uppercase text-white shadow-[0_8px_20px_-8px_hsl(var(--destructive)/0.35)]">
+                {discountBadgeText}
+              </span>
+            )
           ) : (
-            product.isNew && (
+            !hasSale &&
+            product.isNew &&
+            orderable && (
               <ProductBadge
                 variant="new"
                 isRtl={isRtl}
