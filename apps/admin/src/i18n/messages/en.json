@@ -475,6 +475,7 @@
       },
       "massEdit": {
         "title": "Mass Edit {count} Products",
+        "simpleOnly": "(simple products only)",
         "tabFields": "Fields",
         "tabVariants": "Variants & Quantity",
         "noChange": "No change",

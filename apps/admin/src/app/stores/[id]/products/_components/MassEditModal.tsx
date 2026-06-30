@@ -422,7 +422,7 @@ export function MassEditModal({
                 className="rounded border-border"
               />
               {t('massEdit.price')}
-              <span className="text-xs text-muted-foreground">(simple products only)</span>
+              <span className="text-xs text-muted-foreground">{t('massEdit.simpleOnly')}</span>
             </label>
             {changePrice && (
               <div className="space-y-2 ms-6">
@@ -458,7 +458,7 @@ export function MassEditModal({
                 className="rounded border-border"
               />
               {t('massEdit.inventory')}
-              <span className="text-xs text-muted-foreground">(simple products only)</span>
+              <span className="text-xs text-muted-foreground">{t('massEdit.simpleOnly')}</span>
             </label>
             {changeInventory && (
               <div className="space-y-2 ms-6">

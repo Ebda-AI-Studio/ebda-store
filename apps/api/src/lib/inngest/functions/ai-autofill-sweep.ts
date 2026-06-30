@@ -35,12 +35,13 @@ export const aiAutofillSweep: InngestFunction.Any = inngest.createFunction(
     triggers: [{ cron: '0 0 * * *' }],
   },
   async () => {
-    // 6h lock TTL: a crash-safety ceiling that comfortably covers a full
-    // throttled sweep yet clears well before the next daily tick — so a crashed
-    // run can't wedge the sweep for days. The lock is released on normal
-    // completion (Lua del in withLeaderLock's finally), so the TTL only matters
-    // on a hard crash. (Was 3d to match the old 3-day cadence.)
-    await withLeaderLock('ai-autofill-sweep', 6 * 60 * 60 * 1000, async () => {
+    // 12h lock TTL: a crash-safety ceiling that comfortably covers even a very
+    // large throttled sweep (2.5s/product → 12h ≈ 17k products) yet still clears
+    // before the next daily tick — so a crashed run can't wedge the sweep for
+    // days, and a slow legit run can't have its lock expire mid-sweep and trigger
+    // a parallel double-run. The lock is released on normal completion (Lua del in
+    // withLeaderLock's finally), so the TTL only matters on a hard crash.
+    await withLeaderLock('ai-autofill-sweep', 12 * 60 * 60 * 1000, async () => {
       // Active stores only — don't burn the shared Gemini quota sweeping
       // suspended / inactive / churned stores.
       const stores = await withRlsBypass(tx =>

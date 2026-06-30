@@ -475,6 +475,7 @@
       },
       "massEdit": {
         "title": "تعديل جماعي لـ {count} منتج",
+        "simpleOnly": "(المنتجات البسيطة فقط)",
         "tabFields": "الحقول",
         "tabVariants": "المتغيرات والكمية",
         "noChange": "بدون تغيير",

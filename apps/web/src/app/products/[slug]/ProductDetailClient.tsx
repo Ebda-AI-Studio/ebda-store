@@ -154,12 +154,12 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // Selected variant from VariantSelector (null = no variant chosen or invalid combo)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
-  // When the selected variant changes to one with its own imageUrl, jump the
-  // gallery to index 0 so the variant image is the active hero immediately.
+  // Reset the gallery to the first image whenever the variant image changes —
+  // INCLUDING when a variant is deselected (imageUrl → undefined). That also
+  // prevents a stale selectedImage from pointing past the end after the `images`
+  // array shrinks back (which would scroll the track into empty space).
   useEffect(() => {
-    if (selectedVariant?.imageUrl) {
-      setSelectedImage(0);
-    }
+    setSelectedImage(0);
   }, [selectedVariant?.imageUrl]);
 
   // Swipeable image gallery: the hero is a horizontal scroll-snap track showing
@@ -548,6 +548,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   <div
                     ref={galleryRef}
                     onScroll={handleGalleryScroll}
+                    // dir="ltr" even on the Arabic (RTL) storefront: the gallery
+                    // is a sequence of images (not text), so left-to-right order is
+                    // correct, AND it keeps scrollLeft positive (0→max) in every
+                    // browser. Without it, RTL makes scrollLeft go negative in
+                    // Chrome/Firefox, so the index math + scroll-to break and the
+                    // gallery desyncs / scrolls into empty space for AR shoppers.
+                    dir="ltr"
                     className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
                     {images.map((img, index) => (

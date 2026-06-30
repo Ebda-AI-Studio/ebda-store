@@ -970,15 +970,19 @@ export class ProductService {
 
     await this.invalidateStoreProductCache(storeId);
 
-    // `updated` = products that received at least one mutation.
-    // If no price/inventory field was sent and all products have variants,
-    // the scalar/flags updateMany still touched all IDs, so allIds is correct.
-    // When the only requested field is price/inventory and ALL products have
-    // variants (simpleIds empty), updated should be 0.
-    const actuallyUpdated =
-      (fields.price !== undefined || fields.inventory !== undefined) && simpleIds.length === 0
-        ? allIds.length - variantCount // 0 when all are variant products
-        : allIds.length;
+    // `updated` = products that received at least one mutation. Any scalar / flag
+    // / category field runs an updateMany over ALL matched ids (variant products
+    // included), so when one of those is present the count is allIds.length. Only
+    // when the request is price/inventory-ONLY do we report the simple-product
+    // count (variant products are skipped for price/inventory). The previous
+    // formula wrongly returned 0 for e.g. {status, price} on all-variant products.
+    const hasScalarOrCategoryField =
+      fields.status !== undefined ||
+      fields.isFeatured !== undefined ||
+      fields.isNew !== undefined ||
+      fields.isBestSeller !== undefined ||
+      fields.addCategoryId !== undefined;
+    const actuallyUpdated = hasScalarOrCategoryField ? allIds.length : simpleIds.length;
 
     return { updated: actuallyUpdated, skippedVariantProducts };
   }

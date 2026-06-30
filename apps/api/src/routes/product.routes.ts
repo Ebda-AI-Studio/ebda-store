@@ -656,6 +656,13 @@ const bulkUpdateSchema = z.object({
             .min(-99, 'adjustPct must be ≥ -99 (up to 99% off)')
             .max(2_147_483_647, 'price value too large'),
         })
+        // `set` is an absolute fils price → must be a non-negative integer.
+        // Without this, `{ mode:'set', value:-50 }` passes the shared min(-99)
+        // and the service silently clamps it to 0, zeroing every product's price.
+        .refine(p => p.mode !== 'set' || (Number.isInteger(p.value) && p.value >= 0), {
+          message: 'set price must be a non-negative integer (fils)',
+          path: ['value'],
+        })
         .optional(),
       inventory: z
         .object({
