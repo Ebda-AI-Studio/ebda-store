@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import type { ProductVariant, ProductOption } from '@/lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
+import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 
 interface VariantSelectorProps {
   variants: ProductVariant[];
@@ -88,15 +89,20 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
   return (
     <div className="mt-6 space-y-5">
       {options.map(option => {
-        // Localise the axis label (الحجم vs Size). Falls back to English
-        // when the merchant didn't enter Arabic.
-        const axisLabel = isRtl && option.nameAr ? option.nameAr : option.name;
+        // Localise the axis label (الحجم vs Size). Merchant Arabic wins; else
+        // the option-name map (Size→الحجم …); else English.
+        const axisLabel = localizeOptionName(
+          option.name,
+          option.nameAr,
+          isRtl,
+          option.values.map(v => v.value)
+        );
         // Display label for the currently-selected value.
         const selectedValue = selected[option.name];
         const selectedDisplay = selectedValue
           ? (() => {
               const found = option.values.find(v => v.value === selectedValue);
-              return isRtl && found?.valueAr ? found.valueAr : selectedValue;
+              return localizeOptionValue(selectedValue, found?.valueAr, isRtl);
             })()
           : null;
         return (
@@ -112,9 +118,9 @@ export function VariantSelector({ variants, options, onVariantSelect }: VariantS
                 const isSelected = selected[option.name] === value;
                 const available = isValueAvailable(option.name, value);
                 const thumbnail = getThumbnailForValue(option.name, value);
-                // Pill text: Arabic when isRtl AND the merchant supplied
-                // a translation, otherwise the canonical English value.
-                const pillLabel = isRtl && valueAr ? valueAr : value;
+                // Pill text: merchant Arabic wins; else unit tokens are
+                // localised ("185 Gram" → "185 جرام"); else English.
+                const pillLabel = localizeOptionValue(value, valueAr, isRtl);
                 return (
                   <button
                     key={value}

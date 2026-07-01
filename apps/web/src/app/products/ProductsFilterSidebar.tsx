@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Category, PaginationMeta, ProductFacet } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 
 interface SortOption {
   value: string;
@@ -347,7 +348,12 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
       {facets.length > 0 &&
         facets.map(facet => {
           const selectedValues = optionFilters[facet.name] ?? [];
-          const facetLabel = language === 'ar' && facet.nameAr ? facet.nameAr : facet.name;
+          const facetLabel = localizeOptionName(
+            facet.name,
+            facet.nameAr,
+            language === 'ar',
+            facet.values.map(v => v.value)
+          );
           return (
             <div key={facet.name}>
               <h3 className="mb-3 text-lg font-medium text-[hsl(var(--primary-foreground))]">
@@ -356,7 +362,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
               <div className="space-y-2">
                 {facet.values.map(v => {
                   const isChecked = selectedValues.includes(v.value);
-                  const valueLabel = language === 'ar' && v.valueAr ? v.valueAr : v.value;
+                  const valueLabel = localizeOptionValue(v.value, v.valueAr, language === 'ar');
                   const checkboxId = `facet-${facet.name}-${v.value}-${mobile ? 'm' : 'd'}`;
                   return (
                     <label
