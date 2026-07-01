@@ -36,7 +36,7 @@ import {
 import { ProductListItem } from './ProductListItem';
 import { ProductsFilterSidebar } from './ProductsFilterSidebar';
 import { ProductsPagination } from './ProductsPagination';
-import { recordLastListing } from '@/lib/last-listing';
+import { recordLastListing, consumeFocusProduct } from '@/lib/last-listing';
 
 /**
  * How many products the user can choose to load per PLP page. Capped at 96
@@ -293,6 +293,39 @@ export default function ProductsClient({
       storePrefix && path.startsWith(storePrefix) ? path.slice(storePrefix.length) : path;
     recordLastListing(store?.id, relative || '/products');
   }, [store?.id, store?.slug]);
+
+  // Focus-scroll: when the shopper returns from cart via "Continue Shopping",
+  // scroll their previously-added product into view and briefly highlight it.
+  // consumeFocusProduct reads + clears the sessionStorage key atomically so
+  // the highlight fires only once. We wait until loading is done and products
+  // are rendered before attempting the scroll (the DOM node must exist).
+  useEffect(() => {
+    if (isLoading || products.length === 0) return;
+
+    const focusId = consumeFocusProduct(store?.id);
+    if (!focusId) return;
+
+    // rAF gives React one frame to flush the card DOM nodes before we query
+    // them. Even if the product isn't on this page the effect fails gracefully
+    // (no node → no scroll, no error).
+    const rafId = requestAnimationFrame(() => {
+      const el = document.getElementById(`product-${focusId}`);
+      if (!el) return;
+
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // Temporary highlight ring: add a CSS class, then remove it after
+      // the animation completes. Uses a Tailwind-compatible ring so it
+      // respects the store's --primary token. RTL-safe (ring has no dir dependency).
+      el.classList.add('focus-product-ring');
+      setTimeout(() => {
+        el.classList.remove('focus-product-ring');
+      }, 2000);
+    });
+
+    return () => cancelAnimationFrame(rafId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, products, store?.id]);
 
   // Track previous filter values to detect filter changes vs. page changes.
   // perPage is treated as a filter so increasing it snaps the user back to
@@ -751,54 +784,59 @@ export default function ProductsClient({
                   dir={language === 'ar' ? 'rtl' : 'ltr'}
                 >
                   {products.map((p, i) => (
-                    <PecannbeeProductCard
-                      key={p.id}
-                      // First row(s) are above the fold — eager-load + preload
-                      // their images to improve LCP (audit). Rest stay lazy.
-                      priority={i < 6}
-                      // productCardDefaults override the "md" fallback when set.
-                      // Per-section overrides don't apply on PLP; only the global
-                      // defaults slot applies here (Sprint 4, 2026-05-18).
-                      cardSize={productCardDefaults?.cardSize ?? 'md'}
-                      cardAspect={productCardDefaults?.cardAspect}
-                      cardShape={productCardDefaults?.cardShape}
-                      showCardFrame={productCardDefaults?.showCardFrame}
-                      cardFrameStyle={productCardDefaults?.cardFrameStyle}
-                      cardFrameWidth={productCardDefaults?.cardFrameWidth}
-                      cardFrameSize={productCardDefaults?.cardFrameSize}
-                      cardFrameColor={productCardDefaults?.cardFrameColor}
-                      showLabel={productCardDefaults?.showLabel}
-                      showHover={productCardDefaults?.showHover}
-                      cardImageAspect={productCardDefaults?.cardImageAspect}
-                      cardImageRadius={productCardDefaults?.cardImageRadius}
-                      showCardName={productCardDefaults?.showCardName}
-                      showCardPrice={
-                        store.theme?.showPriceOnCards === false
-                          ? false
-                          : productCardDefaults?.showCardPrice
-                      }
-                      productNameZone={plpProductNameZone}
-                      productPriceZone={plpProductPriceZone}
-                      productCtaZone={plpProductCtaZone}
-                      product={toTemplateProduct(p)}
-                      isRtl={language === 'ar'}
-                      currency={store.currency}
-                      pack={templateId}
-                      onAddToCart={async productId => {
-                        const found = products.find(x => x.id === productId);
-                        if (found)
-                          addItem({
-                            id: found.id,
-                            name: found.name,
-                            nameAr: found.nameAr ?? undefined,
-                            price: found.price,
-                            slug: found.slug,
-                            image: found.images?.[0]?.url,
-                            category: found.categories?.[0]?.category?.name,
-                          });
-                      }}
-                      urlPrefix={storeUrl('')}
-                    />
+                    // id="product-{id}" anchors the focus-scroll that fires
+                    // when the shopper returns from cart via "Continue Shopping"
+                    // after adding this product on the PDP.
+                    <div key={p.id} id={`product-${p.id}`}>
+                      <PecannbeeProductCard
+                        key={p.id}
+                        // First row(s) are above the fold — eager-load + preload
+                        // their images to improve LCP (audit). Rest stay lazy.
+                        priority={i < 6}
+                        // productCardDefaults override the "md" fallback when set.
+                        // Per-section overrides don't apply on PLP; only the global
+                        // defaults slot applies here (Sprint 4, 2026-05-18).
+                        cardSize={productCardDefaults?.cardSize ?? 'md'}
+                        cardAspect={productCardDefaults?.cardAspect}
+                        cardShape={productCardDefaults?.cardShape}
+                        showCardFrame={productCardDefaults?.showCardFrame}
+                        cardFrameStyle={productCardDefaults?.cardFrameStyle}
+                        cardFrameWidth={productCardDefaults?.cardFrameWidth}
+                        cardFrameSize={productCardDefaults?.cardFrameSize}
+                        cardFrameColor={productCardDefaults?.cardFrameColor}
+                        showLabel={productCardDefaults?.showLabel}
+                        showHover={productCardDefaults?.showHover}
+                        cardImageAspect={productCardDefaults?.cardImageAspect}
+                        cardImageRadius={productCardDefaults?.cardImageRadius}
+                        showCardName={productCardDefaults?.showCardName}
+                        showCardPrice={
+                          store.theme?.showPriceOnCards === false
+                            ? false
+                            : productCardDefaults?.showCardPrice
+                        }
+                        productNameZone={plpProductNameZone}
+                        productPriceZone={plpProductPriceZone}
+                        productCtaZone={plpProductCtaZone}
+                        product={toTemplateProduct(p)}
+                        isRtl={language === 'ar'}
+                        currency={store.currency}
+                        pack={templateId}
+                        onAddToCart={async productId => {
+                          const found = products.find(x => x.id === productId);
+                          if (found)
+                            addItem({
+                              id: found.id,
+                              name: found.name,
+                              nameAr: found.nameAr ?? undefined,
+                              price: found.price,
+                              slug: found.slug,
+                              image: found.images?.[0]?.url,
+                              category: found.categories?.[0]?.category?.name,
+                            });
+                        }}
+                        urlPrefix={storeUrl('')}
+                      />
+                    </div>
                   ))}
                 </div>
               )}

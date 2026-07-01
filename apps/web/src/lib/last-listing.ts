@@ -13,6 +13,10 @@
 
 const LAST_LISTING_KEY_PREFIX = 'force-store-last-listing';
 
+/** sessionStorage key that holds the product id the shopper most recently added
+ *  to cart from a PDP, so the PLP can scroll+highlight that card on return. */
+const FOCUS_PRODUCT_KEY_PREFIX = 'cart:lastFocusProductId';
+
 /**
  * Returns the per-store sessionStorage key for the last-listing URL.
  * Falls back to a generic key when storeId is unknown (e.g. demo context).
@@ -54,6 +58,57 @@ export function getLastListing(storeId: string | undefined): string | null {
   if (typeof window === 'undefined') return null;
   try {
     return sessionStorage.getItem(lastListingKeyFor(storeId));
+  } catch {
+    return null;
+  }
+}
+
+/** Per-store sessionStorage key for the cart-focus product id. */
+function focusProductKeyFor(storeId: string | undefined): string {
+  return storeId && storeId !== 'demo'
+    ? `${FOCUS_PRODUCT_KEY_PREFIX}:${storeId}`
+    : FOCUS_PRODUCT_KEY_PREFIX;
+}
+
+/**
+ * Record the product id the shopper just added to cart from a PDP.
+ * Also accepts an optional store-relative listing path (e.g.
+ * `/products?category=chocolate`) so the PDP can update the last-listing
+ * pointer even though ProductsClient doesn't re-mount on the same visit.
+ *
+ * Called from ProductDetailClient.handleAddToCart immediately after addItem().
+ */
+export function recordFocusProduct(
+  storeId: string | undefined,
+  productId: string,
+  listingPath?: string
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(focusProductKeyFor(storeId), productId);
+    // If the caller also supplies the back-listing path, keep it in sync so
+    // "Continue Shopping" lands on the right category even when the shopper
+    // navigated directly to the PDP via a share-link (never visited the PLP).
+    if (listingPath) {
+      sessionStorage.setItem(lastListingKeyFor(storeId), listingPath);
+    }
+  } catch {
+    // sessionStorage blocked — fail silently, focus feature degrades gracefully.
+  }
+}
+
+/**
+ * Read and CLEAR the pending focus product id.
+ * Returns the product id or `null` when none was set.
+ * Clearing on read ensures the highlight only fires once per add-to-cart action.
+ */
+export function consumeFocusProduct(storeId: string | undefined): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const key = focusProductKeyFor(storeId);
+    const id = sessionStorage.getItem(key);
+    if (id) sessionStorage.removeItem(key);
+    return id;
   } catch {
     return null;
   }

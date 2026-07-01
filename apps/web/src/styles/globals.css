@@ -995,3 +995,29 @@ html {
     max-width: var(--logo-mw-d, 210px);
   }
 }
+
+/* Focus-product highlight: added transiently by ProductsClient when the
+   shopper returns from cart via "Continue Shopping" after adding a product
+   from the PDP. The class is applied to the wrapper div, then removed after
+   2 s. Uses the store's --primary token so it matches the brand. */
+.focus-product-ring {
+  border-radius: 0.75rem; /* matches card's rounded-xl */
+  outline: 3px solid hsl(var(--primary));
+  outline-offset: 2px;
+  animation: focus-product-pulse 2s ease-out forwards;
+}
+
+@keyframes focus-product-pulse {
+  0% {
+    outline-color: hsl(var(--primary));
+    outline-width: 3px;
+  }
+  60% {
+    outline-color: hsl(var(--primary) / 0.6);
+    outline-width: 3px;
+  }
+  100% {
+    outline-color: hsl(var(--primary) / 0);
+    outline-width: 3px;
+  }
+}

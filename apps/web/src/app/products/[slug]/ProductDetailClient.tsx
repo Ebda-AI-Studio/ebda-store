@@ -22,6 +22,7 @@ import { useFeatures } from '../../../contexts/FeatureContext';
 import { ShopChrome } from '../../../components';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
+import { recordFocusProduct, getLastListing } from '@/lib/last-listing';
 import { VariantSelector } from '../../../components/VariantSelector';
 import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
 import { toTemplateProduct } from '../../../templates/adapters';
@@ -116,11 +117,6 @@ function ProductSkeleton() {
     <div className="grid gap-8 lg:grid-cols-2 animate-pulse">
       <div className="space-y-4">
         <div className="aspect-square rounded-2xl bg-muted" />
-        <div className="grid grid-cols-3 gap-4">
-          {[0, 1, 2].map(i => (
-            <div key={i} className="aspect-square rounded-lg bg-muted" />
-          ))}
-        </div>
       </div>
       <div className="space-y-4">
         <div className="h-6 w-24 rounded bg-muted" />
@@ -387,6 +383,16 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     setIsAdding(false);
     // Add-to-cart toast is fired centrally by CartContext.addItem so we
     // don't double-toast on the PDP. Same elsewhere — see Group E.
+
+    // Record the focus target so "Continue Shopping" lands the shopper
+    // ON this product's card in the PLP and highlights it briefly.
+    // Derive the back-listing path: prefer the already-stored last-listing
+    // (set when shopper came from the PLP), or fall back to the primary
+    // category URL so the button always has something sensible to navigate to.
+    const existingListing = getLastListing(store?.id);
+    const categorySlug = product.categories?.[0]?.category?.slug;
+    const fallbackListing = categorySlug ? `/products?category=${categorySlug}` : '/products';
+    recordFocusProduct(store?.id, product.id, existingListing ?? fallbackListing);
   };
 
   if (isLoading) {
@@ -637,33 +643,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                   </div>
                 )}
               </div>
-              {images.length > 1 && (
-                <div className="grid grid-cols-4 gap-4">
-                  {images.map((img, index) => (
-                    <button
-                      key={img.id || index}
-                      type="button"
-                      onClick={() => setSelectedImage(index)}
-                      aria-label={`Select image ${index + 1} of ${images.length}`}
-                      aria-pressed={selectedImage === index}
-                      className={`aspect-square overflow-hidden rounded-lg transition ${
-                        selectedImage === index
-                          ? 'ring-2 ring-primary'
-                          : 'hover:ring-2 hover:ring-border'
-                      }`}
-                    >
-                      <Image
-                        src={img.url}
-                        alt={img.alt || `${displayName} ${index + 1}`}
-                        width={200}
-                        height={200}
-                        className="h-full w-full object-cover"
-                        sizes="25vw"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Thumbnail strip removed — swipe track + dot indicators replace it. */}
             </div>
 
             {/* Product Info */}
