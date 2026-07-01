@@ -3,6 +3,7 @@ import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { featureService } from '../../../services/feature.service';
+import { OneSignalService } from '../../../services/onesignal.service';
 
 /**
  * Payment-gateway abandonment sweep — runs every 30 min (Enterprise only).
@@ -20,10 +21,19 @@ import { featureService } from '../../../services/feature.service';
  * cart abandoners (never reached checkout) and from stuck-payment orders
  * (which may still convert — the merchant is just waiting).
  *
- * The sweep ONLY stamps paymentGatewayAbandonedAt. It does NOT cancel the
- * order, send a notification, or change paymentStatus — the merchant uses
- * the retargeting UI to decide what to do. The auto-cancel-unpaid cron still
- * handles actual cancellation after AUTO_CANCEL_UNPAID_DAYS (default 2 days).
+ * The sweep stamps paymentGatewayAbandonedAt AND fires a one-time "Checkout
+ * abandoned" recovery push to the store admins + super_admins (deep-linking to
+ * the Payment Abandonments retargeting page). It does NOT cancel the order or
+ * change paymentStatus — the merchant decides via the retargeting UI. The
+ * `paymentGatewayAbandonedAt` stamp dedupes the alert to exactly once per order
+ * (the stamp-guard updateMany only alerts when it actually flips the column).
+ * The auto-cancel-unpaid cron still handles cancellation after
+ * AUTO_CANCEL_UNPAID_DAYS (default 2 days).
+ *
+ * Overlap note: `order-stuck-payment-sweep` also alerts on unpaid online orders
+ * ("Payment pending — follow up", always-on, 60 min default). This alert is the
+ * Enterprise recovery/retargeting angle (30 min default), so an Enterprise store
+ * with both may get two escalating pings per order — intentional.
  *
  * Capped at 500 orders/run (oldest first); the next tick picks up the rest.
  * Each stamp is wrapped in its own step.run so a single failure doesn't abort
@@ -40,6 +50,9 @@ interface AbandonCandidate {
   id: string;
   storeId: string;
   orderNumber: string;
+  total: number;
+  currency: string;
+  store: { name: string } | null;
   payments: { provider: string | null }[];
 }
 
@@ -78,6 +91,9 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
             id: true,
             storeId: true,
             orderNumber: true,
+            total: true,
+            currency: true,
+            store: { select: { name: true } },
             payments: {
               where: { paymentUrl: { not: null } },
               select: { provider: true },
@@ -129,7 +145,7 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
     await Promise.allSettled(
       eligible.map((order: AbandonCandidate) =>
         step.run(`stamp-${order.id}`, async () => {
-          await runInTenantContext(order.storeId, () =>
+          const res = await runInTenantContext(order.storeId, () =>
             prisma.order.updateMany({
               where: {
                 id: order.id,
@@ -142,11 +158,35 @@ export const paymentAbandonmentSweep: InngestFunction.Any = inngest.createFuncti
               data: { paymentGatewayAbandonedAt: now },
             })
           );
+          // count === 0 → the guard didn't match (already stamped or paid in the
+          // race window). Skip both the counter and the alert so we never
+          // double-notify. This is what makes the push exactly-once per order.
+          if (res.count === 0) return;
+
           stamped += 1;
           logger.info(
             { orderId: order.id, storeId: order.storeId, orderNumber: order.orderNumber },
             '[payment-abandonment-sweep] stamped'
           );
+
+          // Fire the recovery push (best-effort — the method swallows its own
+          // errors, but wrap anyway so nothing can abort the sweep).
+          try {
+            await OneSignalService.notifyAdminsOfAbandonedCheckout({
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              storeId: order.storeId,
+              storeName: order.store?.name ?? order.storeId,
+              customerName: '',
+              total: order.total ?? 0,
+              currency: order.currency ?? 'KWD',
+            });
+          } catch (err) {
+            logger.error(
+              { err, orderId: order.id },
+              '[payment-abandonment-sweep] abandoned-checkout push failed'
+            );
+          }
         })
       )
     );

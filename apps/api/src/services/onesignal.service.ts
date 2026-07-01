@@ -597,6 +597,106 @@ export class OneSignalService {
   }
 
   /**
+   * Push a "checkout abandoned" recovery alert to the store's admins +
+   * super_admins. Fired from the payment-abandonment sweep the instant an order
+   * is stamped as a high-intent gateway abandoner (the customer reached the
+   * online payment page but never paid). The Enterprise `payment_abandonment`
+   * feature is checked by the sweep before this is called, and the sweep's
+   * `paymentGatewayAbandonedAt` stamp dedupes it to exactly once per order.
+   *
+   * Distinct from `notifyAdminsOfStuckPayment` (the always-on "Payment pending —
+   * follow up" nudge): this is the recovery/retargeting angle and deep-links to
+   * the Payment Abandonments page (where the merchant re-sends the link / calls
+   * the customer), not the order detail. Fire-and-forget — never throws to the
+   * caller so a push glitch can't abort the sweep.
+   */
+  static async notifyAdminsOfAbandonedCheckout(input: NotifyOrderInput): Promise<void> {
+    if (!isAdminConfigured()) {
+      logger.warn(
+        {
+          hasAppId: !!config.onesignalAdminAppId,
+          hasRestKey: !!config.onesignalAdminRestApiKey,
+        },
+        'Admin OneSignal not configured — skipping abandoned-checkout notification'
+      );
+      return;
+    }
+
+    // Deep-link to the retargeting UI (Payment Abandonments), not the order
+    // detail — this alert is about recovering the sale, not viewing the order.
+    const url = `${config.adminUrl}/stores/${input.storeId}/payment-abandonments`;
+    const dataPayload = {
+      type: 'order.checkout_abandoned',
+      orderId: input.orderId,
+      storeId: input.storeId,
+      storeName: input.storeName,
+    };
+    const sharedFields = {
+      app_id: config.onesignalAdminAppId,
+      url,
+      web_buttons: [{ id: 'recover-sale', text: 'Recover sale', url }],
+      data: dataPayload,
+    };
+
+    const moneyText = formatMoney(input.total, input.currency);
+
+    const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
+      this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
+      this.getAdminPlayerIds({ role: 'super_admin' }),
+    ]);
+
+    const storeAdminBody = {
+      ...sharedFields,
+      headings: { en: 'Checkout abandoned', ar: 'دفعة مهجورة — استرجع العميل' },
+      contents: {
+        en: `Order ${input.orderNumber} reached payment but wasn't completed — recover the sale`,
+        ar: `الطلب ${input.orderNumber} وصل لصفحة الدفع ولم يكتمل — استرجع العملية`,
+      },
+      ...(storeAdminPlayerIds.length > 0
+        ? { include_player_ids: storeAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
+    };
+
+    const superAdminBody = {
+      ...sharedFields,
+      headings: { en: 'Checkout abandoned', ar: 'دفعة مهجورة — استرجع العميل' },
+      contents: {
+        en: `${input.storeName} — Order ${input.orderNumber} (${moneyText}) reached payment but wasn't completed`,
+        ar: `${input.storeName} — الطلب ${input.orderNumber} (${moneyText}) وصل لصفحة الدفع ولم يكتمل`,
+      },
+      ...(superAdminPlayerIds.length > 0
+        ? { include_player_ids: superAdminPlayerIds }
+        : { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'super_admin' }] }),
+    };
+
+    const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Key ${config.onesignalAdminRestApiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
+        const responseText = await res.text().catch(() => '');
+        if (!res.ok) {
+          logger.error(
+            { status: res.status, body: responseText, audience },
+            'OneSignal abandoned-checkout push failed'
+          );
+          return;
+        }
+        logger.info({ audience }, 'OneSignal abandoned-checkout push sent');
+      } catch (err) {
+        logger.error({ err, audience }, 'OneSignal abandoned-checkout push threw');
+      }
+    };
+
+    await Promise.all([send(storeAdminBody, 'store_admin'), send(superAdminBody, 'super_admin')]);
+  }
+
+  /**
    * Push a payment-failure notification to admins of the store + super_admins.
    * Fired from PaymentService.handleWebhook on status: failed / expired /
    * cancelled. Customer is NOT notified — they see the failure inline at the
