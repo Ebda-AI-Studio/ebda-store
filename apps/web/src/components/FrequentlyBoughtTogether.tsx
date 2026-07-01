@@ -16,6 +16,8 @@ interface RecommendedProduct {
   slug: string;
   price: number;
   compareAtPrice?: number;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number | null;
   images: Array<{ id: string; url: string; alt?: string }>;
   /** Variants of this product (added 2026-05-16 to gate Add-all-to-cart
    *  for variant-parent products). Empty / missing = simple SKU. */
@@ -196,6 +198,8 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
               slug: p.slug,
               price: p.price,
               compareAtPrice: p.compareAtPrice,
+              discountType: p.discountType ?? undefined,
+              discountValue: p.discountValue ?? undefined,
               images: p.images,
               inStock: true,
               variants: p.variants,

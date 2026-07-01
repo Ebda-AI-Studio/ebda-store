@@ -19,6 +19,8 @@ interface WishlistItem {
     slug: string;
     price: number;
     compareAtPrice?: number;
+    discountType?: 'percentage' | 'fixed' | null;
+    discountValue?: number | null;
     images: string[];
     status: string;
   };
@@ -240,6 +242,8 @@ export default function WishlistClient() {
     slug: item.product.slug,
     price: item.product.price,
     compareAtPrice: item.product.compareAtPrice,
+    discountType: item.product.discountType ?? undefined,
+    discountValue: item.product.discountValue ?? undefined,
     images: item.product.images.map((url, i) => ({ id: `${item.id}-${i}`, url })),
     inStock: item.product.status === 'active',
   }));

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button, Modal, useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
 import type { Product } from './types';
 
@@ -92,6 +93,7 @@ export function MassEditModal({
   onSuccess,
 }: MassEditModalProps) {
   const t = useT('products.list');
+  const locale = useLocale();
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [activeTab, setActiveTab] = useState<'fields' | 'variants'>('fields');
@@ -187,7 +189,9 @@ export function MassEditModal({
         for (const prod of results) {
           for (const v of prod.variants) {
             edits[v.id] = {
-              inventory: String(v.inventory),
+              // Clamp display to 0: existing negative values (from pre-fix
+              // backorder decrements) should not confuse the merchant.
+              inventory: String(Math.max(0, v.inventory)),
               price: filsToKwd(v.price),
             };
           }
@@ -388,7 +392,7 @@ export function MassEditModal({
                 <option value="">{t('massEdit.selectCategory')}</option>
                 {categories.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {locale === 'ar' && c.nameAr ? c.nameAr : c.name}
                   </option>
                 ))}
               </select>

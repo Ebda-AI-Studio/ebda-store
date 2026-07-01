@@ -82,14 +82,17 @@ export async function decrementVariantInventory(
   return { ok: false, previousStock: inv, newStock: inv };
 }
 
-/** Unconditional variant decrement (may go negative) — backorder path. */
+/** Unconditional variant decrement (backorder path) — floored at 0 so variant
+ *  inventory never stores a negative value. The order is still accepted (the
+ *  acceptsBackorder flag gates that), but the column stays non-negative so the
+ *  admin inventory grid never shows "-2" or similar. */
 export async function forceDecrementVariantInventory(
   tx: Prisma.TransactionClient,
   variantId: string,
   qty: number
 ): Promise<DecrementResult> {
   const [row] = await tx.$queryRaw<Array<{ inventory: number }>>`
-    UPDATE public.product_variants SET inventory = inventory - ${qty}
+    UPDATE public.product_variants SET inventory = GREATEST(0, inventory - ${qty})
     WHERE id = ${variantId}
     RETURNING inventory
   `;

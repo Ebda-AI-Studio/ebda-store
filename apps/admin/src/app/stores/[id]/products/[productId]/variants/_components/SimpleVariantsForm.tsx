@@ -73,7 +73,7 @@ function rowFromVariant(variant: Variant, primaryOptionId: string | null, multiA
     priceKwd: filsToKwd(variant.price),
     compareAtKwd: filsToKwd(variant.compareAtPrice),
     costKwd: filsToKwd(variant.costPrice),
-    inventory: String(variant.inventory ?? 0),
+    inventory: String(Math.max(0, variant.inventory ?? 0)),
     imageUrl: variant.imageUrl ?? '',
   };
 }

@@ -12,6 +12,7 @@ import {
   formatPrice,
 } from '@force/shared';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
 
 type DiscountTypeUI = 'none' | 'percentage' | 'fixed';
 import Link from 'next/link';
@@ -55,6 +56,7 @@ interface Product {
 interface Category {
   id: string;
   name: string;
+  nameAr?: string;
 }
 
 export default function EditProductPage() {
@@ -67,6 +69,7 @@ export default function EditProductPage() {
   const tSections = useT('products.edit.sections');
   const tFields = useT('products.edit.fields');
   const tStatusOptions = useT('products.edit.statusOptions');
+  const locale = useLocale();
 
   const [product, setProduct] = useState<Product | null>(null);
   // Local mirror of the product's AI-provenance map. Kept in state so the
@@ -426,7 +429,10 @@ export default function EditProductPage() {
 
   const categoryOptions = [
     { value: '', label: tFields('noCategory') },
-    ...categories.map(c => ({ value: c.id, label: c.name })),
+    ...categories.map(c => ({
+      value: c.id,
+      label: locale === 'ar' && c.nameAr ? c.nameAr : c.name,
+    })),
   ];
 
   if (loading) {

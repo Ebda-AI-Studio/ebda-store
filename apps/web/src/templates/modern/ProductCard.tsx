@@ -256,7 +256,7 @@ function ModernProductCard({
             </ProductBadgeGroup>
           ) : (
             discountBadgeText && (
-              <span className="absolute top-[92px] start-3 z-10 rounded-full bg-foreground/90 px-2.5 py-1 text-xs font-semibold tracking-wide text-background shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.35)]">
+              <span className="absolute top-[92px] start-3 z-10 rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]">
                 {discountBadgeText}
               </span>
             )

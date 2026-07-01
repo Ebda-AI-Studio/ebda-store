@@ -14,6 +14,8 @@ interface RecommendedProduct {
   slug: string;
   price: number;
   compareAtPrice?: number;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number | null;
   images: Array<{ id: string; url: string; alt?: string }>;
 }
 
@@ -118,6 +120,8 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
           slug: p.slug,
           price: p.price,
           compareAtPrice: p.compareAtPrice,
+          discountType: p.discountType ?? undefined,
+          discountValue: p.discountValue ?? undefined,
           images: p.images,
           inStock: true,
         }))}

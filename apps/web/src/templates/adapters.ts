@@ -17,6 +17,10 @@ export function toTemplateProduct(p: Product): TemplateProduct {
     slug: p.slug,
     price: p.price,
     compareAtPrice: p.compareAtPrice ?? undefined,
+    // Bug A fix: pass discountType + discountValue through so getDiscountBadgeText
+    // can render "Save KWD X.XXX" instead of "-Y%" for fixed-amount discounts.
+    discountType: p.discountType ?? undefined,
+    discountValue: p.discountValue ?? undefined,
     images: (p.images || []).map(img => ({
       id: img.id || p.id,
       url: img.url,

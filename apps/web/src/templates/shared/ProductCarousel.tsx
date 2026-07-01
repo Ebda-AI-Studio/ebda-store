@@ -443,7 +443,7 @@ export function ProductCarousel({
                         {onSale && discountBadgeText && (
                           <span
                             className={cn(
-                              'absolute z-10 rounded-full bg-foreground/85 px-2.5 py-1 text-xs font-semibold tracking-wide text-background shadow-[0_6px_16px_-6px_hsl(var(--foreground)/0.35)]',
+                              'absolute z-10 rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
                               inStock ? 'end-3 top-3' : 'start-3 top-[92px]'
                             )}
                           >

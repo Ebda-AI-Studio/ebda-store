@@ -8,6 +8,7 @@ import { useAuth } from '../../../../lib/auth';
 import { apiGet, apiDelete } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
 import { useT } from '@/i18n/useT';
+import { useLocale } from 'next-intl';
 import { ProductsToolbar } from './_components/ProductsToolbar';
 import { ProductFilters } from './_components/ProductFilters';
 import { ProductsTable } from './_components/ProductsTable';
@@ -22,6 +23,7 @@ export default function StoreProductsPage() {
   const { isAuthenticated } = useAuth();
   const storeId = params.id as string;
   const t = useT('products.list');
+  const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -53,7 +55,7 @@ export default function StoreProductsPage() {
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
   const [categoryFilter, setCategoryFilter] = useState<string>(searchParams.get('category') ?? '');
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; nameAr?: string }[]>([]);
   const [page, setPage] = useState(() => {
     const p = parseInt(searchParams.get('page') ?? '1', 10);
     return Number.isFinite(p) && p > 0 ? p : 1;
@@ -107,7 +109,9 @@ export default function StoreProductsPage() {
   // Load the category list once (for the category filter dropdown).
   useEffect(() => {
     if (!isAuthenticated || !storeId) return;
-    apiGet<{ categories: { id: string; name: string }[] }>(`/api/v1/stores/${storeId}/categories`)
+    apiGet<{ categories: { id: string; name: string; nameAr?: string }[] }>(
+      `/api/v1/stores/${storeId}/categories`
+    )
       .then(({ data }) => setCategories(data?.categories ?? []))
       .catch(() => setCategories([]));
   }, [isAuthenticated, storeId]);
@@ -182,8 +186,12 @@ export default function StoreProductsPage() {
   };
 
   const categoryOptions = useMemo(
-    () => categories.map(c => ({ value: c.id, label: c.name })),
-    [categories]
+    () =>
+      categories.map(c => ({
+        value: c.id,
+        label: locale === 'ar' && c.nameAr ? c.nameAr : c.name,
+      })),
+    [categories, locale]
   );
 
   const handleDelete = async () => {

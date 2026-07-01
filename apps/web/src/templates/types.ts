@@ -32,6 +32,12 @@ export interface TemplateProduct {
   slug: string;
   price: number;
   compareAtPrice?: number;
+  /** Discount type set by the merchant — 'percentage' | 'fixed'. Passed through
+   *  from the API Product so getDiscountBadgeText can show KWD-saving text for
+   *  fixed discounts instead of always showing a percentage badge. */
+  discountType?: 'percentage' | 'fixed' | null;
+  /** Discount value: basis points for percentage; fils for fixed. */
+  discountValue?: number | null;
   images: Array<{ id: string; url: string; alt?: string }>;
   rating?: number;
   reviewCount?: number;

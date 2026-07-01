@@ -339,7 +339,7 @@ function MinimalProductCard({
               short label inline. BUG 1 fix: show helper text (KWD or pct).
               BUG 2 fix: shown even when OOS (no inStock gate). */}
             {priceVisible && hasSale && discountBadgeText && (
-              <p className="text-[10px] tracking-[0.25em] uppercase text-foreground/80">
+              <p className="text-[10px] tracking-[0.25em] uppercase text-red-600 font-semibold">
                 {discountBadgeText}
               </p>
             )}

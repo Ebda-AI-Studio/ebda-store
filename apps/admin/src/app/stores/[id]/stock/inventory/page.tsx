@@ -490,7 +490,7 @@ export default function StockInventoryPage() {
                             type="button"
                             onClick={() =>
                               router.push(
-                                `/stores/${storeId}/stock/adjustments/new?productId=${p.id}&newQty=${p.inventory}`
+                                `/stores/${storeId}/stock/adjustments/new?productId=${p.id}&newQty=${p.hasVariants ? (p.totalInventory ?? 0) : p.inventory}`
                               )
                             }
                             className="text-primary text-xs underline underline-offset-2 hover:opacity-80"
