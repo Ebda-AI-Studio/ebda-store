@@ -1,4 +1,5 @@
 import { prisma, Prisma, ProductStatus, withMoneyTx } from '@force/database';
+import { csvField } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 
 interface ProductImportRow {
@@ -283,16 +284,16 @@ export class BulkService {
 
       const baseRow = [
         product.id,
-        this.escapeCSV(product.name),
-        this.escapeCSV(product.nameAr || ''),
+        csvField(product.name),
+        csvField(product.nameAr || ''),
         product.slug,
-        this.escapeCSV(product.description || ''),
-        this.escapeCSV(product.descriptionAr || ''),
+        csvField(product.description || ''),
+        csvField(product.descriptionAr || ''),
         product.price,
         product.compareAtPrice || '',
         product.costPrice || '',
-        product.sku || '',
-        product.barcode || '',
+        csvField(product.sku || ''),
+        csvField(product.barcode || ''),
         product.inventory,
         product.lowStockThreshold,
         product.trackInventory,
@@ -300,13 +301,13 @@ export class BulkService {
         product.status,
         product.featured,
         product.isNew,
-        this.escapeCSV(categories),
-        this.escapeCSV(tags),
-        this.escapeCSV(images),
-        this.escapeCSV(product.metaTitle || ''),
-        this.escapeCSV(product.metaTitleAr || ''),
-        this.escapeCSV(product.metaDescription || ''),
-        this.escapeCSV(product.metaDescriptionAr || ''),
+        csvField(categories),
+        csvField(tags),
+        csvField(images),
+        csvField(product.metaTitle || ''),
+        csvField(product.metaTitleAr || ''),
+        csvField(product.metaDescription || ''),
+        csvField(product.metaDescriptionAr || ''),
         ...blanks(7), // parentSku + option{1,2,3}Name/Value — empty on base rows
       ].join(',');
 
@@ -319,8 +320,8 @@ export class BulkService {
         const optionCols: string[] = [];
         for (let i = 0; i < 3; i++) {
           optionCols.push(
-            opts[i] ? this.escapeCSV(opts[i].option.name) : '',
-            opts[i] ? this.escapeCSV(opts[i].value) : ''
+            opts[i] ? csvField(opts[i].option.name) : '',
+            opts[i] ? csvField(opts[i].value) : ''
           );
         }
         return [
@@ -329,8 +330,8 @@ export class BulkService {
           variant.price ?? '',
           variant.compareAtPrice ?? '',
           variant.costPrice ?? '',
-          variant.sku || '',
-          variant.barcode || '',
+          csvField(variant.sku || ''),
+          csvField(variant.barcode || ''),
           variant.inventory,
           '', // lowStockThreshold
           product.trackInventory,
@@ -340,9 +341,9 @@ export class BulkService {
           '', // isNew
           '', // categories (inherited)
           '', // tags
-          this.escapeCSV(variant.imageUrl || ''),
+          csvField(variant.imageUrl || ''),
           ...blanks(4), // meta fields (inherited)
-          product.sku || '', // parentSku
+          csvField(product.sku || ''), // parentSku
           ...optionCols, // option1Name/Value, option2..., option3...
         ].join(',');
       });
@@ -1055,13 +1056,8 @@ export class BulkService {
   }
 
   // Helper methods
-
-  private static escapeCSV(value: string): string {
-    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-      return `"${value.replace(/"/g, '""')}"`;
-    }
-    return value;
-  }
+  // CSV field escaping (formula-injection safe) uses the shared `csvField` from
+  // @force/shared — single canonical implementation across every exporter.
 
   /**
    * Split raw CSV text into records, honoring quoted fields that may span

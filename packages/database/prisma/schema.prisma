@@ -79,6 +79,7 @@ model User {
   abandonedCarts           AbandonedCart[]         @relation("AbandonedCartCustomer")
   triggeredPaymentEvents   PaymentEvent[]
   triggeredAffiliateEvents AffiliateEvent[]        @relation("AffiliateEventTriggeredBy")
+  triggeredOrderEvents     OrderEvent[]            @relation("OrderEventActor")
   staffMemberships         StoreStaff[]            @relation("StaffUser")
 
   // Composite unique (storeId, email) — one customer account per email per
@@ -419,6 +420,7 @@ model Store {
   productDailyViews        ProductDailyView[]
   whatsAppTemplates        WhatsAppTemplate[]
   paymentEvents            PaymentEvent[]
+  orderEvents              OrderEvent[]
   webhookEvents            WebhookEvent[]
   bankStatements           BankStatement[]
   bankTransactions         BankTransaction[]
@@ -1148,6 +1150,7 @@ model Order {
   loyaltyTransactions LoyaltyTransaction[]
   shipment            Shipment?
   affiliateReferrals  AffiliateReferral[]
+  events              OrderEvent[]
 
   @@index([storeId])
   @@index([customerId])
@@ -1163,6 +1166,37 @@ model Order {
   // Added 20260622130000.
   @@index([storeId, paymentGatewayAbandonedAt])
   @@map("orders")
+}
+
+/// Append-only audit trail for Order.status changes. Rows are written once and
+/// never updated — the immutable trail the in-place Order.status mutation lacks.
+/// Mirrors the PaymentEvent / AffiliateEvent pattern (TEXT ids via
+/// @default(uuid()), denormalized store_id for store-scoped RLS + admin
+/// queries without joining back through orders).
+model OrderEvent {
+  id         String   @id @default(uuid())
+  /// Denormalized so we can scope by store (RLS + admin queries) without
+  /// joining orders.
+  storeId    String   @map("store_id")
+  orderId    String   @map("order_id")
+  /// Prior status. Null only if an event is ever written for an order with no
+  /// prior status (not expected today — every transition has a from-status).
+  fromStatus String?  @map("from_status")
+  toStatus   String   @map("to_status")
+  /// User who triggered the change (admin action). Null for system/cron
+  /// transitions (e.g. auto-cancel-unpaid) where no user is in scope.
+  actorId    String?  @map("actor_id")
+  /// Free-form details preserved without column bloat. Always non-null.
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  actor User? @relation("OrderEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([storeId])
+  @@map("order_events")
 }
 
 enum OrderPaymentStatus {
@@ -2416,33 +2450,33 @@ enum BulkImportStatus {
 // AI buttons apply: never overwrite a filled field, never call the
 // model for an entity that's already complete.
 model BulkAiJob {
-  id           String          @id @default(uuid())
-  storeId      String          @map("store_id")
-  userId       String?         @map("user_id")
-  kind         BulkAiJobKind
-  status       BulkAiJobStatus @default(queued)
+  id             String          @id @default(uuid())
+  storeId        String          @map("store_id")
+  userId         String?         @map("user_id")
+  kind           BulkAiJobKind
+  status         BulkAiJobStatus @default(queued)
   // Direction is meaningful only for translate jobs. `to_ar` = fill
   // empty Arabic from English source. `to_en` = the reverse.
-  direction    String?         @db.Text
-  total        Int             @default(0)
-  processed    Int             @default(0)
-  filled       Int             @default(0)
-  skipped      Int             @default(0)
-  failed       Int             @default(0)
+  direction      String?         @db.Text
+  total          Int             @default(0)
+  processed      Int             @default(0)
+  filled         Int             @default(0)
+  skipped        Int             @default(0)
+  failed         Int             @default(0)
   // Capped list of recent failures for surfacing to the merchant —
   // [{entityId, entityName, error}, ...]. Hard-cap to 50 so the row
   // doesn't grow unbounded on a totally-failing run.
-  errors       Json?
+  errors         Json?
   // Capped list of products this job actually FILLED — [{id, name}, ...]. Lets
   // the merchant see exactly which products got AI-written content so they can
   // validate the output (the `filled` integer alone isn't actionable). Capped
   // (200) like `errors` so a huge sweep can't bloat the row.
-  filledProducts Json?         @map("filled_products")
-  errorMessage String?         @map("error_message") // Top-level failure reason if status=failed
-  startedAt    DateTime?       @map("started_at")
-  completedAt  DateTime?       @map("completed_at")
-  createdAt    DateTime        @default(now()) @map("created_at")
-  updatedAt    DateTime        @updatedAt @map("updated_at")
+  filledProducts Json?           @map("filled_products")
+  errorMessage   String?         @map("error_message") // Top-level failure reason if status=failed
+  startedAt      DateTime?       @map("started_at")
+  completedAt    DateTime?       @map("completed_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

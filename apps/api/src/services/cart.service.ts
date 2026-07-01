@@ -187,6 +187,13 @@ export class CartService {
             // the SAME product (each writing its OWN cart row) conflicted purely
             // because they read the same product.inventory row under Serializable.
             isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+            // Money-safe tx defaults (mirrors withMoneyTx): Prisma's 2s maxWait
+            // fires P2028 on the Neon pooler under checkout burst → 500. Bump to
+            // the withMoneyTx values so a brief lock wait retries instead of
+            // aborting. (withMoneyTx itself can't carry isolationLevel, so we
+            // set its maxWait/timeout inline and keep Read Committed.)
+            maxWait: 10000,
+            timeout: 30000,
           }
         ),
       { label: 'cart.addItem', extraRetryCodes: ['P2002'] }
@@ -297,7 +304,12 @@ export class CartService {
               }
             }
           },
-          { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+            // Money-safe tx defaults (mirrors withMoneyTx) — see addItem above.
+            maxWait: 10000,
+            timeout: 30000,
+          }
         ),
       { label: 'cart.addItems', extraRetryCodes: ['P2002'] }
     );

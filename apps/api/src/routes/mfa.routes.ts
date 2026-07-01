@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth';
 import { authLimiter } from '../middleware/security';
@@ -13,6 +14,21 @@ import { redis } from '../services/redis.service';
 
 const router = Router();
 
+// TOTP codes are always 6 digits (see MfaService.verifyCode).
+const codeSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/),
+});
+// /verify accepts a 6-digit TOTP OR a backup code (10 lowercase-hex chars,
+// see MfaService.generateBackupCodes) — loosen to a length range so the
+// backup-code flow is never rejected at the edge.
+const verifyBodySchema = z.object({
+  challengeToken: z.string().min(1).max(4096),
+  code: z.string().trim().min(6).max(20),
+});
+
 /**
  * POST /auth/mfa/enroll/begin
  *
@@ -26,7 +42,14 @@ const router = Router();
  */
 router.post('/enroll/begin', authenticate, async (req, res, next) => {
   try {
-    const { code } = req.body as { code?: string };
+    // `code` is optional here (only required to re-enroll when MFA is already
+    // enabled). Validate its shape only when supplied so first-time enrollment
+    // (no code) still works.
+    const parsed = z.object({ code: codeSchema.shape.code.optional() }).safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
+    }
+    const { code } = parsed.data;
     const existing = await prisma.user.findUnique({
       where: { id: req.user!.userId },
       select: { mfaEnabled: true, mfaSecret: true },
@@ -65,7 +88,11 @@ router.post('/enroll/begin', authenticate, async (req, res, next) => {
  */
 router.post('/enroll/verify', authenticate, authLimiter, async (req, res, next) => {
   try {
-    const { code } = req.body;
+    const parsed = codeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
+    }
+    const { code } = parsed.data;
     const u = await prisma.user.findUnique({
       where: { id: req.user!.userId },
       select: { mfaSecret: true },
@@ -107,7 +134,11 @@ const MFA_CHALLENGE_TTL_SECONDS = 5 * 60;
 
 router.post('/verify', authLimiter, async (req, res, next) => {
   try {
-    const { challengeToken, code } = req.body;
+    const parsed = verifyBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA request');
+    }
+    const { challengeToken, code } = parsed.data;
     let payload: any;
     try {
       // Challenge tokens are signed with audience:'force-mfa-challenge' —
@@ -200,7 +231,11 @@ router.post('/verify', authLimiter, async (req, res, next) => {
  */
 router.post('/disable', authenticate, authLimiter, async (req, res, next) => {
   try {
-    const { code } = req.body;
+    const parsed = codeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid 2FA code');
+    }
+    const { code } = parsed.data;
     const u = await prisma.user.findUnique({
       where: { id: req.user!.userId },
       select: { mfaSecret: true },

@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
+import { csvField } from '@force/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
@@ -98,20 +99,13 @@ router.get(
         },
       });
 
-      const escapeCsv = (v: string | null | undefined): string => {
-        if (v == null) return '';
-        const needsQuote = /[",\n\r]/.test(v);
-        const escaped = v.replace(/"/g, '""');
-        return needsQuote ? `"${escaped}"` : escaped;
-      };
-
       const header = 'email,language,source,active,subscribed_at\n';
       const body = rows
         .map(r =>
           [
-            escapeCsv(r.email),
-            escapeCsv(r.language),
-            escapeCsv(r.source),
+            csvField(r.email),
+            csvField(r.language),
+            csvField(r.source),
             r.isActive ? 'true' : 'false',
             r.subscribedAt.toISOString(),
           ].join(',')

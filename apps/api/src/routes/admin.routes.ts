@@ -20,6 +20,7 @@ import {
   OrderStatus,
   OrderPaymentStatus,
 } from '@force/database';
+import { csvField } from '@force/shared';
 
 const router = Router();
 
@@ -1275,18 +1276,8 @@ router.get(
 
 const EXPORT_CHUNK_SIZE = 250;
 
-/**
- * Escape a single CSV field value (RFC 4180).
- */
-function csvField(value: string | number | null | undefined | Date): string {
-  if (value == null) return '';
-  let s = value instanceof Date ? value.toISOString() : String(value);
-  // Neutralize spreadsheet formula triggers (CSV formula injection): a cell
-  // beginning with = + - @ or a control char can execute when opened in Excel/Sheets.
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
+// CSV field escaping (formula-injection safe) is the shared `csvField` from
+// @force/shared — single canonical implementation across every exporter.
 
 /**
  * GET /admin/export/orders

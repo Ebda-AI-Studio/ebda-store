@@ -12,6 +12,7 @@
  */
 import ExcelJS from 'exceljs';
 import type { Response } from 'express';
+import { neutralizeFormula } from '@force/shared';
 
 export interface XlsxColumn {
   header: string;
@@ -45,7 +46,18 @@ export async function streamXlsxResponse(res: Response, opts: StreamXlsxOpts): P
     style: col.numFmt ? { numFmt: col.numFmt } : undefined,
   }));
 
-  ws.addRows(opts.rows);
+  // Formula-injection guard: neutralise any string cell that would evaluate as a
+  // spreadsheet formula when the .xlsx is opened in Excel / Google Sheets. Covers
+  // EVERY XLSX export (orders, customers, finance…) in one place. Non-string
+  // values (numbers, dates) pass through untouched.
+  const safeRows = opts.rows.map(row => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) {
+      out[k] = typeof v === 'string' ? neutralizeFormula(v) : v;
+    }
+    return out;
+  });
+  ws.addRows(safeRows);
 
   // Bold + light-grey header row
   const headerRow = ws.getRow(1);

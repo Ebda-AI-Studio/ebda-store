@@ -837,6 +837,28 @@ export class OrderService {
     });
     const orderLocale = (updatedOrder.locale ?? undefined) as 'en' | 'ar' | undefined;
 
+    // Append-only status audit trail. `order.status` was read (via getById)
+    // BEFORE the update above, so it is the true prior status. Best-effort:
+    // mirrors recordPaymentEvent — a failed audit write must never block the
+    // status change (the Order row is the source of truth; this is the aid).
+    // actorId is null here: updateStatus has no acting-user id in scope.
+    try {
+      await prisma.orderEvent.create({
+        data: {
+          storeId,
+          orderId,
+          fromStatus: order.status,
+          toStatus: status,
+          actorId: null,
+        },
+      });
+    } catch (err) {
+      logger.error(
+        { err, orderId, storeId, fromStatus: order.status, toStatus: status },
+        '[ORDER-EVENT] failed to record status change'
+      );
+    }
+
     // Refund / cancellation side-effects: inventory restore + coupon
     // decrement + affiliate-commission reversal + the order/refunded fanout
     // (which sends the merchant the "Refund issued" push + the customer the
