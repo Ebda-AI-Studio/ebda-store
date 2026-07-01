@@ -141,11 +141,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const localizedDescription = pickMetaDescription(store, preferAr ? 'ar' : 'en');
   const localizedStoreName = preferAr && store.nameAr ? store.nameAr : store.name;
 
+  // Default OG/meta description when the merchant set no SEO description and no
+  // store description. Kept generic + truthful — do NOT bake a shipping promise
+  // ("free delivery over 20 KWD") into the platform default: that claim isn't
+  // true for every store and surfaced on stores that never offered it.
   const description =
     localizedDescription ||
     (preferAr
-      ? `تسوق أونلاين من ${localizedStoreName}. توصيل مجاني للطلبات فوق 20 د.ك.`
-      : `Shop online at ${localizedStoreName}. Free delivery on orders over 20 KWD.`);
+      ? `تسوق أونلاين من ${localizedStoreName} في الكويت.`
+      : `Shop ${localizedStoreName} online in Kuwait.`);
 
   const titleDefault =
     localizedTitle ||
@@ -202,7 +206,11 @@ export async function generateMetadata(): Promise<Metadata> {
   // a screenshot of the page chrome.
   const iconsBlock: NonNullable<Metadata['icons']> | undefined = (() => {
     const icons: NonNullable<Metadata['icons']> = {};
-    if (store.favicon) icons.icon = store.favicon;
+    // Favicon: the merchant's custom favicon, else fall back to the store's own
+    // logo so browser tabs + link-preview (WhatsApp) show the STORE's brand —
+    // not the platform's default Force AI icon when no favicon was uploaded.
+    const faviconSrc = store.favicon || store.logo || undefined;
+    if (faviconSrc) icons.icon = faviconSrc;
     if (pwaActive && pwaTouchIcon) icons.apple = pwaTouchIcon;
     return icons.icon || icons.apple ? icons : undefined;
   })();
