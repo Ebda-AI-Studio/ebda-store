@@ -218,6 +218,22 @@ export function middleware(request: NextRequest) {
     requestHeaders.set('x-store-domain', storeIdentifier);
     requestHeaders.set('x-store-identifier', storeIdentifier);
 
+    // Custom-domain /favicon.ico → dynamic per-store favicon (falls back to
+    // the neutral platform default when the store has none). This branch is
+    // ONLY reachable when storeIdentifier is truthy, i.e. NEVER on a platform
+    // host (store.force-ai.co etc — getStoreIdentifier returns null there),
+    // so the shared-domain /favicon.ico keeps serving the static
+    // /public/favicon.ico exactly as before this change. The `sf=1` marker is
+    // set by the route handler's own fallback redirect so this doesn't loop.
+    if (request.nextUrl.pathname === '/favicon.ico' && !request.nextUrl.searchParams.has('sf')) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/api/store-favicon';
+      const response = NextResponse.rewrite(url, {
+        request: { headers: requestHeaders },
+      });
+      return draftCookie(response);
+    }
+
     // Create response with modified headers
     const response = NextResponse.next({
       request: { headers: requestHeaders },
@@ -297,10 +313,23 @@ export const config = {
      * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * - manifest.webmanifest / sw.js
      * - public folder
-     * - api routes (handled separately)
+     * - api routes (handled separately, EXCEPT /api/store-favicon which the
+     *   favicon.ico rewrite below targets — matcher excludes `api/` broadly,
+     *   but the rewrite target itself never re-enters this matcher since
+     *   `/api/store-favicon` is excluded by the `api/` pattern, which is what
+     *   we want: middleware runs once on `/favicon.ico`, not again on the
+     *   rewritten destination)
+     *
+     * favicon.ico is intentionally NOT excluded here (removed 2026-07-02) so
+     * custom-domain stores can get a per-store favicon (see the
+     * `x-store-domain` branch above). This does NOT change platform-domain
+     * (store.force-ai.co etc) behavior: getStoreIdentifier() returns null for
+     * platform hosts, so those requests fall through this middleware to
+     * NextResponse.next() with no rewrite, and Next serves the static
+     * /public/favicon.ico exactly as before.
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest|sw\\.js|api/|public/).*)',
+    '/((?!_next/static|_next/image|manifest\\.webmanifest|sw\\.js|api/|public/).*)',
   ],
 };

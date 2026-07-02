@@ -804,7 +804,7 @@ export default function StoreSeoPage() {
                   className="flex-1 px-3 py-2 text-sm focus:outline-none"
                 />
                 <span className="bg-muted px-3 py-2 text-sm text-muted-foreground">
-                  @forcemediakw.com
+                  @force-ai.co
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{t('senderPrefixHint')}</p>
