@@ -638,6 +638,12 @@ describe('OrderService', () => {
               findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
             },
+            // refund_effects_applied marker (money F2 rework) — applyRefundEffects
+            // reads tx.orderEvent.findFirst; this bleeding mock must provide it.
+            orderEvent: {
+              findFirst: vi.fn().mockResolvedValue(null),
+              create: vi.fn().mockResolvedValue({}),
+            },
             $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50, track_inventory: true }]),
           } as any);
         }
