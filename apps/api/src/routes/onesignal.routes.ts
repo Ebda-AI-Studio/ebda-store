@@ -11,6 +11,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import {
   OneSignalService,
   OneSignalNotConfiguredError,
@@ -145,6 +146,12 @@ const adminStoreMiddleware = [
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // Marketing push broadcast is a Professional-tier feature. Without this gate
+  // the admin blast path (OneSignalService.broadcastToStore) sends real push
+  // to every storefront subscriber on ANY plan — a billing leak. Matches the
+  // customer subscribe route's requireFeature('push_notifications').
+  // super_admin bypasses inside requireFeature.
+  requireFeature('push_notifications'),
 ];
 
 /**

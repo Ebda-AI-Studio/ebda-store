@@ -443,6 +443,11 @@ router.get(
 // POST /public/:storeId/affiliates/apply
 router.post(
   '/:storeId/affiliates/apply',
+  // affiliate is an Enterprise-only feature. Without this gate the public
+  // signup accepted applications for ANY-tier store (affiliateService.getConfig
+  // defaults publicSignupEnabled:true) — a billing leak. requireFeature reads
+  // :storeId from params; public route has no req.user so no super_admin bypass.
+  requireFeature('affiliate'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = applySchema.parse(req.body);

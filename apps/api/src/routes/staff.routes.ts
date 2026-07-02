@@ -16,6 +16,7 @@ import bcrypt from 'bcryptjs';
 import { prisma, withRlsBypass, UserRole } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { AppError } from '../middleware/error-handler';
 import { auditLog } from '../middleware/security';
 
@@ -36,6 +37,7 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('staff_accounts'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -84,6 +86,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('staff_accounts'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;
@@ -188,6 +191,7 @@ router.delete(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('staff_accounts'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, userId } = req.params;

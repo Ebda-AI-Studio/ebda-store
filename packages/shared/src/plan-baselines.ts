@@ -55,6 +55,14 @@ const STARTER_CORE: FeatureKey[] = [
   // flag is intentionally NOT in any baseline — new code paths read
   // `inventory.basic` and friends.
   'inventory.basic',
+  // Staff accounts: core operational need, universal by default (managed-agency
+  // pattern, like `whatsapp`). Previously in NO baseline yet fully implemented +
+  // ungated → available to every plan anyway but declared-disabled (dead flag).
+  // Declaring it here makes the registry/baseline/enforcement agree; staff.routes
+  // now calls requireFeature('staff_accounts'), so a super-admin can still
+  // restrict a specific client via a StoreFeature override. To sell staff seats
+  // as a paid tier later, move this into the appropriate ADDITIONS array.
+  'staff_accounts',
 ];
 
 const PROFESSIONAL_ADDITIONS: FeatureKey[] = [

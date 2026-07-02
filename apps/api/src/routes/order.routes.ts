@@ -3,6 +3,7 @@ import { z } from 'zod';
 import ExcelJS from 'exceljs';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { requirePermission } from '../middleware/rbac';
@@ -531,6 +532,11 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
+  // accounting.invoicing is a Professional-tier addon (Kuwait-compliant tax
+  // invoice + PDF). Previously ungated at every layer — every plan incl. free
+  // could generate it. Gate the merchant-facing generation; the customer-facing
+  // public receipt route is intentionally left open (don't 403 a paying buyer).
+  requireFeature('accounting.invoicing'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, orderId } = req.params;
@@ -556,6 +562,7 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
+  requireFeature('accounting.invoicing'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
