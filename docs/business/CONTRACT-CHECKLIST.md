@@ -12,6 +12,7 @@
   - affiliate / sms / floating_widget are **Enterprise**.
   - accounting basic/expenses/invoicing = **Professional**; advanced accounting (tax_reports, multi_currency, profit_anomaly, bank_reconcile) = **Enterprise**.
   - inventory.basic = **Starter**; stock_alerts + backorder = **Professional**; multi_warehouse/barcode/purchase_orders/bulk_adjustments = **Enterprise**.
+  - **`whatsapp` admin access is baseline-included on every plan** (Starter/Professional/Enterprise, even `free`) — never quote it as a paid add-on or plan-gated feature. Only the live-ordering **activation service** (WABA setup, Meta catalog review) is billable; per-client restriction is by super-admin exception, not by plan tier.
 - [ ] **No self-serve / free-trial language.** Force AI Store is managed-agency, one-time **yearly** fee, no monthly subscription. (`free` is a grace state, not a sold tier.)
 - [ ] **New features represented** if the quote enumerates capabilities: product discount engine, accounting module (CoA + journals + P&L), reorder/dead-stock AI, page-builder consolidation.
 - [ ] **WhatsApp product** describes the **native Meta catalog** bot flow (browse catalog → select → quantity → checkout link). The old "send an image per category" flow was removed — must not appear.

@@ -132,16 +132,24 @@ Also included in every tier at no extra charge:
 | `inventory.multi_warehouse`, `inventory.barcode`, `inventory.purchase_orders`, `inventory.bulk_adjustments`     | "Full warehouse management — barcode scanning (receive/pick/cycle-count), multi-location stock, PO workflow"                        | Included in Enterprise                                  |
 | `accounting.tax_reports`, `accounting.multi_currency`, `accounting.profit_anomaly`, `accounting.bank_reconcile` | "Advanced accounting: VAT/tax reports (XLSX), multi-currency FX + KWD conversion, profit anomaly AI, bank reconciliation (CSV/OFX)" | Included in Enterprise                                  |
 
-> **`whatsapp` is a separate add-on at any plan tier.** It requires an active Force AI WhatsApp
-> Business Platform account. Price: Setup 150-300 KWD + Monthly 10-25 KWD. Bot intelligence (NLU,
-> voice, photo matching, returning-customer personalization) is included in the WhatsApp add-on at
-> no extra charge — the platform absorbs the AI cost.
+> **`whatsapp` admin access is baseline-included on every plan (Starter, Professional, Enterprise —
+> even the `free` grace state).** Per `packages/shared/src/plan-baselines.ts`, `whatsapp` is in
+> `STARTER_CORE`, so the `/whatsapp` admin section is available to every client by default
+> (managed-agency default: Ahmad onboards every client and WhatsApp is a core offering). A
+> super-admin can restrict a specific client by exception (a `StoreFeature` `whatsapp` override
+> with `enabled=false`), but it is never sold as a plan upgrade.
 
-> **`whatsapp` can be added to any Starter, Professional, or Enterprise client.** It is not
-> baseline-included in any plan; it always requires a per-store activation step.
+> **What you still charge for is the activation SERVICE, not the feature gate.** Turning on live
+> WhatsApp ordering requires an active Force AI WhatsApp Business Platform account + a
+> Meta-approved WABA connected to the store — real setup work (Meta review, catalog provisioning,
+> phone-number linking) worth quoting: Setup 150-300 KWD + Monthly 10-25 KWD. Bot intelligence
+> (NLU, voice, photo matching, returning-customer personalization) is included in that activation
+> at no extra charge — the platform absorbs the AI cost.
 
-These are the **upgrade levers** during a proposal conversation. A merchant on Professional wanting
-WhatsApp + Affiliate (Enterprise) adds ~250-500 KWD setup + ~15-35 KWD/month to the base.
+These are the **upgrade levers** during a proposal conversation (WhatsApp activation is a service
+add-on available at any tier; Affiliate requires Enterprise). A merchant on Professional wanting
+WhatsApp activation + Affiliate (Enterprise) adds ~250-500 KWD setup + ~15-35 KWD/month to the
+base.
 
 #### Band 3 — White-glove services (your time, billed at agency rates)
 
@@ -287,7 +295,9 @@ Before sending a proposal:
 - [ ] Confirm payment provider (Tap / MyFatoorah / Hesabe / UPayments) — set up account if they
       don't have one
 - [ ] Confirm custom domain availability (or provision a Force AI Store subdomain)
-- [ ] Identify which Band 2 add-ons they want (Loyalty / Affiliate / WhatsApp / etc.)
+- [ ] Identify which Band 2 add-ons they want (Loyalty / Affiliate / etc.) and whether they need
+      WhatsApp activation (baseline-included admin access at any tier — the activation service,
+      not the feature, is what's billable)
 - [ ] Identify any Band 3 white-glove services they need (catalog import, photoshoot, branding)
 - [ ] Identify any Band 4 custom dev — if yes, fixed-scope contract addendum
 - [ ] Setup fee = ABOVE your time cost + reasonable margin
@@ -308,9 +318,10 @@ Before sending a proposal:
    upgrade-marketing gate will show an on-brand upsell page to merchants who try to access a
    feature above their plan.
 3. **Layer overrides only for hybrid deals** — only flip `StoreFeature` rows for features OUTSIDE
-   the chosen plan's baseline (e.g. a starter client who paid for the `whatsapp_bot` add-on). Plan
-   changes never touch override rows, so upgrading or downgrading the store doesn't lose
-   merchant-paid extras.
+   the chosen plan's baseline (e.g. a starter client who paid for the `loyalty` add-on). `whatsapp`
+   is already baseline on every plan — only flip its override to restrict a specific client by
+   exception, never to "add" it. Plan changes never touch override rows, so upgrading or
+   downgrading the store doesn't lose merchant-paid extras.
 4. **Configure payment provider** — set up Tap/MyFatoorah/Hesabe/UPayments credentials per the
    client's account
 5. **Provision Meta Commerce catalog** — if the client paid for the WhatsApp Native Catalog Bot,

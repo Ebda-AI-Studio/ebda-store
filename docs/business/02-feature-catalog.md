@@ -487,9 +487,9 @@ A sticky button that sits on every page of your storefront. It collapses to a si
 
 > 📸 Screenshot: Floating widget expanded on a storefront page showing WhatsApp and Instagram buttons
 
-### WhatsApp Notifications — إشعارات واتساب (add-on, any plan)
+### WhatsApp Notifications — إشعارات واتساب (baseline, all plans — activation required)
 
-The full WhatsApp integration described in Section 9 is an add-on available at any plan tier. It requires an active Force AI WhatsApp Business Platform account and a connected Meta-approved WABA. The bot intelligence features (natural language ordering, voice, photo matching, returning-customer personalization) are included in the WhatsApp add-on at no extra charge — they run on the free Google Gemini tier.
+WhatsApp admin access is baseline-included on every plan tier (Starter, Professional, Enterprise, even the `free` grace state) — it is not sold as a plan upgrade. What requires a separate activation step is turning on live WhatsApp ordering: an active Force AI WhatsApp Business Platform account and a connected Meta-approved WABA. The bot intelligence features (natural language ordering, voice, photo matching, returning-customer personalization) are included in that activation at no extra charge — they run on the free Google Gemini tier.
 
 ---
 

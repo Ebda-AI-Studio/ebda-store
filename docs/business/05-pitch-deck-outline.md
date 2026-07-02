@@ -182,15 +182,15 @@ Visual: Kuwait market funnel → SMB segment → Force AI Store's wedge.
 
 **Moving to Force AI Store costs nothing meaningful. Moving away costs real work.**
 
-| Switching cost                       | Moving TO Force AI Store        | Moving FROM Force AI Store                                |
-| ------------------------------------ | ------------------------------- | --------------------------------------------------------- |
-| Bilingual content already translated | 0 (we import existing content)  | High (other platforms need re-translation or a paid app)  |
-| KNET integration                     | 0 (we configure for them)       | Medium (third-party plugin setup + testing)               |
-| Custom domain                        | 0 (we provision via Vercel API) | 0                                                         |
-| Product data export                  | 0 (CSV / Excel export)          | 0                                                         |
-| Storefront design                    | Low (5 themes to pick from)     | 0                                                         |
-| WhatsApp DM ordering bot             | 0 (included in WhatsApp add-on) | High (no equivalent exists on other Gulf platforms)       |
-| AI translation + SEO fill            | 0 (included, all content kept)  | High (manual re-work or paid app on destination platform) |
+| Switching cost                       | Moving TO Force AI Store                                     | Moving FROM Force AI Store                                |
+| ------------------------------------ | ------------------------------------------------------------ | --------------------------------------------------------- |
+| Bilingual content already translated | 0 (we import existing content)                               | High (other platforms need re-translation or a paid app)  |
+| KNET integration                     | 0 (we configure for them)                                    | Medium (third-party plugin setup + testing)               |
+| Custom domain                        | 0 (we provision via Vercel API)                              | 0                                                         |
+| Product data export                  | 0 (CSV / Excel export)                                       | 0                                                         |
+| Storefront design                    | Low (5 themes to pick from)                                  | 0                                                         |
+| WhatsApp DM ordering bot             | 0 (baseline-included; live ordering needs a WABA activation) | High (no equivalent exists on other Gulf platforms)       |
+| AI translation + SEO fill            | 0 (included, all content kept)                               | High (manual re-work or paid app on destination platform) |
 
 **The asymmetry:** moving TO Force AI Store costs nothing and unlocks features. Moving FROM Force AI
 Store means losing AI-powered features and re-configuring integrations built for Kuwait.

@@ -145,7 +145,8 @@ self-serve subscription with a public price list. Pricing depends on:
 
 - How many products you have (catalog size affects onboarding cost)
 - Whether you need bilingual translation (EN/AR — usually yes for Kuwait)
-- Which add-on features you want (Loyalty / Affiliate / WhatsApp orders / Push / etc.)
+- Which add-on features you want (Loyalty / Affiliate / Push / etc.) — WhatsApp admin access is
+  baseline-included on every plan; live WhatsApp ordering is a separate activation service
 - Whether Force Media also handles branding / photography / marketing for you
 - Your sales volume expectations (drives feature recommendations)
 

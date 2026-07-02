@@ -4222,8 +4222,8 @@ function SortableSectionRow({
 /**
  * Manual product picker — used by ExtraCarouselCard when productSource ===
  * 'manual'. Search input + result dropdown + selected-pills row with
- * up/down reorder + remove buttons. Calls the admin product search endpoint
- * /api/v1/admin/stores/:storeId/products?search=... + the `ids` param to
+ * up/down reorder + remove buttons. Calls the store-scoped product list
+ * endpoint /api/v1/stores/:storeId/products?search=... + the `ids` param to
  * hydrate names for already-selected products on mount.
  */
 interface ProductSummary {
@@ -4289,7 +4289,7 @@ function ManualProductPicker({
         const res = await apiGet<{
           products?: ProductSummary[];
           data?: { products?: ProductSummary[] };
-        }>(`/api/v1/admin/stores/${storeId}/products?ids=${missing.join(',')}&limit=50`);
+        }>(`/api/v1/stores/${storeId}/products?ids=${missing.join(',')}&limit=50`);
         const list =
           res.data?.products ?? (res.data as { products?: ProductSummary[] })?.products ?? [];
         const next: Record<string, ProductSummary> = { ...selectedDetails };
@@ -4319,7 +4319,7 @@ function ManualProductPicker({
         const res = await apiGet<{
           products?: ProductSummary[];
           data?: { products?: ProductSummary[] };
-        }>(`/api/v1/admin/stores/${storeId}/products?search=${encodeURIComponent(q)}&limit=10`);
+        }>(`/api/v1/stores/${storeId}/products?search=${encodeURIComponent(q)}&limit=10`);
         const list =
           res.data?.products ?? (res.data as { products?: ProductSummary[] })?.products ?? [];
         // Cache search-result details so a later "remove + re-add" doesn't
