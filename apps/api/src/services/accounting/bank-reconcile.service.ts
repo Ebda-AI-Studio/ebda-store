@@ -200,19 +200,49 @@ function buildBankTxCreateData(
 // ─── Auto-match ───────────────────────────────────────────────────────────────
 
 /**
+ * Bounded chunk size for the auto-match loop below. Mirrors the
+ * `SCAN_CHUNK_SIZE` pattern in `reorder-scan.service.ts` — each chunk runs
+ * inside its OWN short `withRlsBypass` transaction so a large statement
+ * (500+ rows) can never blow the 30s interactive-tx timeout regardless of
+ * total row count.
+ */
+const MATCH_CHUNK_SIZE = 50;
+
+/**
  * Run (or re-run) automatic matching for all unmatched transactions
  * in a statement.
  *
  * Each call:
  * - Resets any previous auto_matched rows to unmatched (for idempotent re-run)
  * - Finds the best single JournalEntry candidate per bank tx
- * - Updates match_status + matched_journal_entry_id atomically
+ * - Updates match_status + matched_journal_entry_id atomically per row
+ *
+ * Execution shape (fixed 2026-07-02 — same defect class as the low-stock-scan
+ * / reorder-scan 30s interactive-tx timeout, P1 2026-06-27/30): the original
+ * version held the ENTIRE per-bank-tx-row loop inside one `withRlsBypass`
+ * transaction, and re-fetched the full store-wide "already matched" entry
+ * list from scratch on EVERY iteration (redundant — that baseline never
+ * changes during a pass; only the in-memory `claimedEntries` set does). On a
+ * 500+ row statement, up to 3 sequential Prisma calls per row inside one
+ * open transaction blew the 30s cap ("Transaction already closed").
+ *
+ * Fix: fetch the already-matched baseline ONCE (not per row), then chunk the
+ * per-row candidate-lookup + write loop into bounded `MATCH_CHUNK_SIZE`
+ * batches, each its own short `withRlsBypass` transaction, so no single
+ * transaction's duration scales with the statement's row count. The
+ * candidate-matching logic and per-row confidence math are unchanged.
  */
 export async function runAutoMatch(
   statementId: string,
   storeId: string
 ): Promise<{ matched: number; unmatched: number; ambiguous: number }> {
-  return withRlsBypass(async tx => {
+  // -------------------------------------------------------------------------
+  // Step 1: short tx — reset prior auto-matches + fetch the rows to match +
+  // fetch the "already matched" baseline ONCE (was re-fetched every loop
+  // iteration before; that baseline is invariant for the duration of this
+  // pass — only `claimedEntries`, tracked in memory below, changes).
+  // -------------------------------------------------------------------------
+  const { bankTxs, alreadyMatchedIds } = await withRlsBypass(async tx => {
     // Reset prior auto_matches so re-runs are idempotent
     await tx.bankTransaction.updateMany({
       where: { statementId, storeId, matchStatus: 'auto_matched' },
@@ -230,85 +260,102 @@ export async function runAutoMatch(
       },
     });
 
-    // Track which journal entries have been claimed in this pass
-    // to prevent one ledger entry matching two bank rows.
-    const claimedEntries = new Set<string>();
+    // Already-matched journal entry ids for this store — fetched ONCE here
+    // rather than re-fetched on every bank-tx-row iteration.
+    const alreadyMatched = await tx.bankTransaction.findMany({
+      where: {
+        storeId,
+        matchStatus: { in: ['auto_matched', 'manual_matched'] },
+        matchedJournalEntryId: { not: null },
+      },
+      select: { matchedJournalEntryId: true },
+    });
+    const alreadyMatchedIds = alreadyMatched.map(r => r.matchedJournalEntryId!).filter(Boolean);
 
-    let matched = 0;
-    let unmatched = 0;
-    let ambiguous = 0;
+    return { bankTxs, alreadyMatchedIds };
+  });
 
-    for (const btx of bankTxs) {
-      const from = new Date(btx.date.getTime() - DATE_TOLERANCE_MS);
-      const to = new Date(btx.date.getTime() + DATE_TOLERANCE_MS);
-      const minFils = btx.amountFils - AMOUNT_TOLERANCE_FILS;
-      const maxFils = btx.amountFils + AMOUNT_TOLERANCE_FILS;
+  // Track which journal entries have been claimed in this pass (across ALL
+  // chunks) to prevent one ledger entry matching two bank rows.
+  const claimedEntries = new Set<string>();
 
-      // Find all already-matched journal entry ids for this store so we exclude them
-      const alreadyMatched = await tx.bankTransaction.findMany({
-        where: {
-          storeId,
-          matchStatus: { in: ['auto_matched', 'manual_matched'] },
-          matchedJournalEntryId: { not: null },
-        },
-        select: { matchedJournalEntryId: true },
-      });
-      const alreadyMatchedIds = [
-        ...alreadyMatched.map(r => r.matchedJournalEntryId!).filter(Boolean),
-        ...Array.from(claimedEntries),
-      ];
+  let matched = 0;
+  let unmatched = 0;
+  let ambiguous = 0;
 
-      // Find candidate journal entries
-      const candidates = await tx.journalLine.findMany({
-        where: {
-          account: { storeId },
-          ...(btx.direction === 'debit'
-            ? { debit: { gte: minFils, lte: maxFils } }
-            : { credit: { gte: minFils, lte: maxFils } }),
-          entry: {
-            storeId,
-            status: 'posted',
-            postedAt: { gte: from, lte: to },
-            id: alreadyMatchedIds.length > 0 ? { notIn: alreadyMatchedIds } : undefined,
+  // -------------------------------------------------------------------------
+  // Step 2: match + write in BOUNDED chunks, each its own short RLS-bypass
+  // tx. Per-row logic (candidate lookup + conditional update) is identical to
+  // before — only the transaction boundary changed.
+  // -------------------------------------------------------------------------
+  for (let chunkStart = 0; chunkStart < bankTxs.length; chunkStart += MATCH_CHUNK_SIZE) {
+    const chunk = bankTxs.slice(chunkStart, chunkStart + MATCH_CHUNK_SIZE);
+
+    await withRlsBypass(async tx => {
+      for (const btx of chunk) {
+        const from = new Date(btx.date.getTime() - DATE_TOLERANCE_MS);
+        const to = new Date(btx.date.getTime() + DATE_TOLERANCE_MS);
+        const minFils = btx.amountFils - AMOUNT_TOLERANCE_FILS;
+        const maxFils = btx.amountFils + AMOUNT_TOLERANCE_FILS;
+
+        const excludedIds = [...alreadyMatchedIds, ...Array.from(claimedEntries)];
+
+        // Find candidate journal entries
+        const candidates = await tx.journalLine.findMany({
+          where: {
+            account: { storeId },
+            ...(btx.direction === 'debit'
+              ? { debit: { gte: minFils, lte: maxFils } }
+              : { credit: { gte: minFils, lte: maxFils } }),
+            entry: {
+              storeId,
+              status: 'posted',
+              postedAt: { gte: from, lte: to },
+              id: excludedIds.length > 0 ? { notIn: excludedIds } : undefined,
+            },
           },
-        },
-        select: {
-          entryId: true,
-          debit: true,
-          credit: true,
-        },
-        distinct: ['entryId'],
-      });
+          select: {
+            entryId: true,
+            debit: true,
+            credit: true,
+          },
+          distinct: ['entryId'],
+        });
 
-      if (candidates.length === 0) {
-        unmatched++;
-        continue;
+        if (candidates.length === 0) {
+          unmatched++;
+          continue;
+        }
+
+        if (candidates.length > 1) {
+          ambiguous++;
+          continue;
+        }
+
+        // Exactly one candidate — auto match
+        const candidate = candidates[0];
+        const exactAmt = btx.direction === 'debit' ? candidate.debit : candidate.credit;
+        const confidence = computeConfidence(btx.amountFils, exactAmt);
+
+        await tx.bankTransaction.update({
+          where: { id: btx.id },
+          data: {
+            matchStatus: 'auto_matched',
+            matchedJournalEntryId: candidate.entryId,
+            confidence,
+          },
+        });
+
+        claimedEntries.add(candidate.entryId);
+        matched++;
       }
+    });
+  }
 
-      if (candidates.length > 1) {
-        ambiguous++;
-        continue;
-      }
-
-      // Exactly one candidate — auto match
-      const candidate = candidates[0];
-      const exactAmt = btx.direction === 'debit' ? candidate.debit : candidate.credit;
-      const confidence = computeConfidence(btx.amountFils, exactAmt);
-
-      await tx.bankTransaction.update({
-        where: { id: btx.id },
-        data: {
-          matchStatus: 'auto_matched',
-          matchedJournalEntryId: candidate.entryId,
-          confidence,
-        },
-      });
-
-      claimedEntries.add(candidate.entryId);
-      matched++;
-    }
-
-    // Update statement status
+  // -------------------------------------------------------------------------
+  // Step 3: recompute + persist statement status in its own short tx.
+  // -------------------------------------------------------------------------
+  await withRlsBypass(async tx => {
     const totalTx = await tx.bankTransaction.count({ where: { statementId, storeId } });
     const matchedTotal = await tx.bankTransaction.count({
       where: {
@@ -325,9 +372,9 @@ export async function runAutoMatch(
       where: { id: statementId },
       data: { status: newStatus },
     });
-
-    return { matched, unmatched, ambiguous };
   });
+
+  return { matched, unmatched, ambiguous };
 }
 
 /** Confidence 0–100: 100 = exact fils match, lower as difference grows. */

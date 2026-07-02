@@ -4,14 +4,44 @@ import { prisma, Prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
+import { writeLimiter } from '../middleware/security';
+import { getCached, invalidateCached } from '../lib/public-cache';
 
 const router = Router({ mergeParams: true });
 
-// staff can read customer records (needed for order context lookups)
+/**
+ * Cache TTL for the aggregated-customers snapshot. Must stay >= the
+ * project-wide 120s Redis TTL floor (ESLint `cacheTtlSelectors` rule) — a
+ * shorter TTL would hammer Neon compute on every cache miss. 300s balances
+ * freshness (a new order shows up in the customers list within 5 min) against
+ * the cost of re-scanning up to `MAX_ORDERS_SCANNED` orders on every request.
+ */
+const CUSTOMERS_CACHE_TTL_SECONDS = 300;
+
+function customersCacheKey(storeId: string): string {
+  return `customers-agg:${storeId}`;
+}
+
+/**
+ * Invalidate the cached aggregation for a store. Exported so order-mutation
+ * paths (status changes, payment updates, cancellations) can bust the cache
+ * instead of waiting out the TTL. Currently unused elsewhere in this repo —
+ * safe no-op call sites can adopt it as those flows are touched.
+ */
+export async function invalidateCustomersCache(storeId: string): Promise<void> {
+  await invalidateCached(customersCacheKey(storeId));
+}
+
+// staff can read customer records (needed for order context lookups).
+// writeLimiter caps the heavy aggregation endpoints (full order-table scan
+// per call, esp. export.xlsx) the same way other heavy admin routes are
+// limited — see writeLimiter usage in ai.routes.ts / bulk.routes.ts /
+// order.routes.ts.
 const adminMiddleware = [
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
+  writeLimiter,
 ];
 
 interface AggregatedCustomer {
@@ -87,6 +117,18 @@ function formatShippingAddress(addr: ShippingAddressShape | null): string {
 const MAX_ORDERS_SCANNED = 20000;
 
 /**
+ * Hard cap on the number of orders returned for a SINGLE customer's profile
+ * (`GET /customers/:customerKey`). Matches the `take: 100` convention used
+ * elsewhere in the API as an "unbounded growth" guard (e.g.
+ * `product.service.ts`, `stock-adjustment.service.ts`). Unlike
+ * `MAX_ORDERS_SCANNED` above (which bounds a store-wide scan), this bounds a
+ * single customer's order history — 100 orders for one customer covers the
+ * overwhelming majority of cases; a truncated result carries `truncated: true`
+ * so the UI can surface a notice, same pattern as the aggregation endpoints.
+ */
+const MAX_CUSTOMER_ORDERS = 100;
+
+/**
  * Aggregate customers from order history. Now includes:
  * - guest orders (no User row) keyed by shipping email/phone
  * - cancelled / unpaid orders (no status filter — Ahmad 2026-05-16:
@@ -126,7 +168,7 @@ interface OrderWithItems {
   }>;
 }
 
-async function aggregateCustomers(storeId: string): Promise<{
+async function aggregateCustomersUncached(storeId: string): Promise<{
   customers: AggregatedCustomer[];
   truncated: boolean;
   ordersScanned: number;
@@ -282,6 +324,46 @@ async function aggregateCustomers(storeId: string): Promise<{
 
   const customers = Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
   return { customers, truncated, ordersScanned: orders.length, orders: orders as OrderWithItems[] };
+}
+
+/**
+ * Cached wrapper around `aggregateCustomersUncached`. Called on EVERY
+ * `GET /customers` and `/customers/export.xlsx` request — without a cache
+ * this re-scans up to `MAX_ORDERS_SCANNED` orders (with items + payments +
+ * customer) on every page load, unlike the public product-list path which
+ * already caches via `lib/public-cache.ts`. Keyed per store (both endpoints
+ * call this with no other filter params, so a single key per store is
+ * correct — search/pagination are applied AFTER aggregation, in memory).
+ *
+ * TTL floor: the ESLint `cacheTtlSelectors` rule blocks `getCached()` calls
+ * under 120s (see `CACHE_TTL_FLOOR` in `apps/api/eslint.config.mjs`) —
+ * `CUSTOMERS_CACHE_TTL_SECONDS` (300s) respects that floor.
+ */
+async function aggregateCustomers(storeId: string): Promise<{
+  customers: AggregatedCustomer[];
+  truncated: boolean;
+  ordersScanned: number;
+  orders: OrderWithItems[];
+}> {
+  const result = await getCached(customersCacheKey(storeId), CUSTOMERS_CACHE_TTL_SECONDS, () =>
+    aggregateCustomersUncached(storeId)
+  );
+
+  // getCached() round-trips through JSON.stringify/parse when served from
+  // Redis, which turns Date fields into ISO strings. Re-hydrate them
+  // unconditionally (cheap, and a no-op on values that are already real Date
+  // instances on a cache miss) so every caller — especially the .xlsx export,
+  // which needs real Date objects for ExcelJS's `numFmt` date formatting —
+  // sees identical types whether this was a cache hit or a fresh computation.
+  for (const c of result.customers) {
+    c.lastOrderDate = new Date(c.lastOrderDate);
+    c.firstOrderDate = new Date(c.firstOrderDate);
+  }
+  for (const o of result.orders) {
+    o.createdAt = new Date(o.createdAt);
+  }
+
+  return result;
 }
 
 /**
@@ -874,7 +956,12 @@ router.get(
         orConditions.unshift({ customerId: decodedKey });
       }
 
-      const orders = await prisma.order.findMany({
+      // Fetch one extra row (like `aggregateCustomers`' MAX_ORDERS_SCANNED
+      // pattern above) to detect truncation without a separate count query.
+      // Unlike the siblings, this query previously had NO `take` at all — a
+      // customer with an unusually large order history could load its full
+      // set of orders (each with items + payments) on every profile view.
+      const fetchedOrders = await prisma.order.findMany({
         where: {
           storeId,
           deletedAt: null,
@@ -913,16 +1000,21 @@ router.get(
           },
         },
         orderBy: { createdAt: 'desc' },
+        take: MAX_CUSTOMER_ORDERS + 1,
       });
 
-      if (orders.length === 0) {
+      if (fetchedOrders.length === 0) {
         throw new AppError(404, 'NOT_FOUND', 'Customer not found');
       }
 
-      // Aggregate stats from the full order list. The first order
-      // (newest) wins for current-snapshot fields (latest address,
-      // phone, etc.). Mirror the listing-page logic exactly so the
-      // detail view's totals match what the merchant saw in the list.
+      const truncated = fetchedOrders.length > MAX_CUSTOMER_ORDERS;
+      const orders = truncated ? fetchedOrders.slice(0, MAX_CUSTOMER_ORDERS) : fetchedOrders;
+
+      // Aggregate stats from the order list (capped at MAX_CUSTOMER_ORDERS —
+      // see `truncated` above). The first order (newest) wins for
+      // current-snapshot fields (latest address, phone, etc.). Mirror the
+      // listing-page logic exactly so the detail view's totals match what
+      // the merchant saw in the list.
       const newest = orders[0];
       const oldest = orders[orders.length - 1];
       const newestShipping = (newest.shippingAddress ?? null) as ShippingAddressShape | null;
@@ -987,7 +1079,7 @@ router.get(
 
       res.json({
         success: true,
-        data: { customer, orders },
+        data: { customer, orders, truncated },
       });
     } catch (error) {
       next(error);
