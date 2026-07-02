@@ -19,7 +19,7 @@ import { ShippingService } from './shipping.service';
 import { LoyaltyService, computeRedemption } from './loyalty.service';
 import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
-import { hasCapturedPayment } from './order-refund-gating';
+import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
 
 interface CreateOrderData {
@@ -877,12 +877,20 @@ export class OrderService {
     const hadCapturedPayment = hasCapturedPayment(order);
     if (status === 'cancelled' || status === 'refunded') {
       // ALWAYS reverse stock/coupons/loyalty on a cancel/refund (the order
-      // reserved them) — but only fire the refund notification ("Refund
-      // issued" push + customer refund email) when the order was actually
-      // paid. This is the fix for cancelling an UNPAID order wrongly pushing
-      // "Refund issued".
+      // reserved them — and they're guarded once-per-order by the durable
+      // marker inside applyRefundEffects, so repeat calls are safe) — but
+      // only fire the refund notification ("Refund issued" push + customer
+      // refund email) when this is a GENUINE new refund via
+      // `shouldApplyRefundEffects` (paid AND not already refunded).
+      // `refunded` is terminal in `validTransitions` above, so the
+      // not-already-refunded arm can't be reached from updateStatus today;
+      // it's kept as a defensive belt-and-suspenders guard (and matters for
+      // any future caller / a refunded→X transition) so a bookkeeping
+      // re-touch of an already-refunded order can never double-notify.
+      // `order` here is the PRE-transition snapshot fetched via getById
+      // above, so `order.status` is the true prior status.
       await this.applyRefundEffects(storeId, orderId, {
-        fireRefundNotification: hadCapturedPayment,
+        fireRefundNotification: shouldApplyRefundEffects(status, order),
       });
     }
 
@@ -1102,9 +1110,30 @@ export class OrderService {
    * every refund path (gateway-initiated, return-driven, manual admin)
    * applies the same effects.
    *
-   * Idempotent: each step uses conditional updates / status filters so
-   * calling twice (e.g. partial refund then full refund) doesn't double
-   * the inventory restore or commission decrement.
+   * Idempotency model (F2 rework — the original single `return_stock`-row
+   * guard both suppressed notifications for a genuinely separate second
+   * return AND missed the restoreInventory:false / no-tracked-inventory
+   * case entirely, letting coupon usageCount over-decrement per call):
+   *
+   *   - Inventory restore is guarded by the pre-existing `return_stock`
+   *     InventoryHistory marker (per-order, unchanged) — still the correct
+   *     signal for "have we physically put this order's stock back".
+   *   - The coupon usageCount decrement is guarded SEPARATELY by a durable
+   *     `refund_effects_applied` OrderEvent marker, written unconditionally
+   *     at the end of the locked section regardless of restoreInventory /
+   *     track_inventory, so it also covers orders with no tracked inventory
+   *     and per-line calls (accounting/backorder.service.ts cancelBackorder
+   *     calls this once per BackorderLine with restoreInventory:false).
+   *   - The `order/refunded` notification fanout is driven ENTIRELY by the
+   *     caller's `fireRefundNotification` option — never gated on either
+   *     marker. A second, genuinely separate return on the same order
+   *     (Return #2 after Return #1) still notifies; a caller that knows the
+   *     order was already refunded (via `shouldApplyRefundEffects`) opts out.
+   *   - Affiliate + loyalty reversals are already idempotent (tagged rows)
+   *     — they run on every call, unconditionally.
+   *
+   * Both markers are read/written inside the SAME `FOR UPDATE`-locked
+   * transaction as before, so genuinely concurrent calls still serialize.
    */
   static async applyRefundEffects(
     storeId: string,
@@ -1123,47 +1152,103 @@ export class OrderService {
     });
     if (!order) return;
 
-    if (restoreInventory) {
-      await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-        for (const item of order.items) {
-          const [lockedProduct] = await tx.$queryRaw<
-            Array<{ id: string; inventory: number; track_inventory: boolean }>
-          >`
-            SELECT id, inventory, track_inventory FROM public.products
-            WHERE id = ${item.productId}
-            FOR UPDATE
-          `;
-          if (!lockedProduct?.track_inventory) continue;
-          const prevStock = lockedProduct.inventory;
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { inventory: { increment: item.quantity } },
-          });
-          if (item.variantId) {
-            await tx.productVariant.update({
-              where: { id: item.variantId },
+    const { alreadyRestoredInventory, alreadyAppliedEffects } = await withMoneyTx(
+      prisma,
+      async (tx: Prisma.TransactionClient) => {
+        await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
+
+        // Marker 1 (unchanged): "inventory already physically restored for
+        // this order". Only meaningful when restoreInventory is true.
+        const stockMarker = await tx.inventoryHistory.findFirst({
+          where: { reference: orderId, type: 'return_stock', storeId },
+          select: { id: true },
+        });
+        const alreadyRestoredInventory = !!stockMarker;
+
+        // Marker 2 (new): "the once-per-order reversible effects (today:
+        // coupon usageCount decrement) already ran for this order" —
+        // written regardless of restoreInventory/track_inventory, unlike
+        // marker 1, so it also covers the backorder-cancel /
+        // no-tracked-inventory cases marker 1 could never see.
+        const effectsMarker = await tx.orderEvent.findFirst({
+          where: { storeId, orderId, toStatus: 'refund_effects_applied' },
+          select: { id: true },
+        });
+        const alreadyAppliedEffects = !!effectsMarker;
+
+        if (restoreInventory && !alreadyRestoredInventory) {
+          for (const item of order.items) {
+            const [lockedProduct] = await tx.$queryRaw<
+              Array<{ id: string; inventory: number; track_inventory: boolean }>
+            >`
+              SELECT id, inventory, track_inventory FROM public.products
+              WHERE id = ${item.productId}
+              FOR UPDATE
+            `;
+            if (!lockedProduct?.track_inventory) continue;
+            const prevStock = lockedProduct.inventory;
+            await tx.product.update({
+              where: { id: item.productId },
               data: { inventory: { increment: item.quantity } },
             });
+            if (item.variantId) {
+              await tx.productVariant.update({
+                where: { id: item.variantId },
+                data: { inventory: { increment: item.quantity } },
+              });
+            }
+            await tx.inventoryHistory.create({
+              data: {
+                productId: item.productId,
+                storeId,
+                type: 'return_stock',
+                quantity: item.quantity,
+                previousStock: prevStock,
+                newStock: prevStock + item.quantity,
+                reason: 'Order refunded',
+                reference: orderId,
+              },
+            });
           }
-          await tx.inventoryHistory.create({
+        }
+
+        if (!alreadyAppliedEffects) {
+          await tx.orderEvent.create({
             data: {
-              productId: item.productId,
               storeId,
-              type: 'return_stock',
-              quantity: item.quantity,
-              previousStock: prevStock,
-              newStock: prevStock + item.quantity,
-              reason: 'Order refunded',
-              reference: orderId,
+              orderId,
+              fromStatus: null,
+              toStatus: 'refund_effects_applied',
+              actorId: null,
+              metadata: {},
             },
           });
         }
-      });
+
+        return { alreadyRestoredInventory, alreadyAppliedEffects };
+      }
+    );
+
+    if (alreadyRestoredInventory) {
+      logger.info(
+        { orderId, storeId },
+        '[OrderService] inventory already restored for this order — skipping duplicate restore'
+      );
+    }
+    if (alreadyAppliedEffects) {
+      logger.info(
+        { orderId, storeId },
+        '[OrderService] refund effects already applied for this order — skipping duplicate coupon reversal'
+      );
     }
 
-    if (order.couponCode) {
+    if (!alreadyAppliedEffects && order.couponCode) {
       // Decrement back to zero floor — concurrent refunds shouldn't push
-      // usageCount negative.
+      // usageCount negative. Guarded to once-per-order by
+      // `alreadyAppliedEffects` (NOT `alreadyRestoredInventory` — a
+      // restoreInventory:false call, e.g. a backorder-line cancel, or an
+      // order with no tracked inventory, must still decrement the coupon
+      // exactly once, never once per call/line).
       await prisma.coupon.updateMany({
         where: { storeId, code: order.couponCode, usageCount: { gt: 0 } },
         data: { usageCount: { decrement: 1 } },

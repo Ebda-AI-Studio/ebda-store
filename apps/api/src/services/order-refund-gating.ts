@@ -21,6 +21,15 @@ export interface CapturedPaymentInput {
   paymentStatus?: string | null;
   /** Payment rows attached to the order (status checked for 'completed'). */
   payments?: Array<{ status?: string | null }> | null;
+  /**
+   * Order's status BEFORE the transition being evaluated. Used to detect a
+   * refunded→cancelled bookkeeping close-out (the order was already
+   * refunded; this move doesn't refund it a second time) so the caller
+   * doesn't fire a second "Refund issued" notification. Optional — callers
+   * that don't care about this distinction (e.g. existing tests) can omit
+   * it and get the old paymentStatus-only behavior.
+   */
+  status?: string | null;
 }
 
 /**
@@ -35,10 +44,21 @@ export function hasCapturedPayment(order: CapturedPaymentInput): boolean {
 }
 
 /**
- * Whether `updateStatus` should run the refund reversal + "Refund issued"
- * effects for a given target status. Only cancel/refund transitions trigger
- * refund effects, and only when the order actually captured money.
+ * Whether `updateStatus` should fire the "Refund issued" notification
+ * (customer refund email + merchant push) for a given target status. Only
+ * cancel/refund transitions trigger it, only when the order actually
+ * captured money, and NEVER for a refunded→cancelled bookkeeping close-out
+ * (the order was already refunded — a second notification would be a false
+ * "you got refunded again"). The reversible effects themselves
+ * (inventory restore + coupon decrement) still run unconditionally on every
+ * cancel/refund call — they're guarded separately, once-per-order, by the
+ * durable marker inside `OrderService.applyRefundEffects`.
  */
 export function shouldApplyRefundEffects(status: string, order: CapturedPaymentInput): boolean {
-  return (status === 'cancelled' || status === 'refunded') && hasCapturedPayment(order);
+  const wasAlreadyRefunded = order.status === 'refunded';
+  return (
+    (status === 'cancelled' || status === 'refunded') &&
+    hasCapturedPayment(order) &&
+    !wasAlreadyRefunded
+  );
 }

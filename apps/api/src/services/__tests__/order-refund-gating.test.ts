@@ -57,4 +57,29 @@ describe('shouldApplyRefundEffects — the cancel/refund side-effects gate', () 
       expect(shouldApplyRefundEffects(status, paidOrder)).toBe(false);
     }
   });
+
+  // F2 rework (2026-07-02): a refunded→cancelled bookkeeping close-out must
+  // NOT fire a second "Refund issued" notification — the customer was
+  // already told when the order first became refunded.
+  describe('refunded→cancelled bookkeeping close-out (wasAlreadyRefunded)', () => {
+    it('cancelling an order that is ALREADY refunded does NOT re-apply refund effects', () => {
+      const alreadyRefundedOrder = { paymentStatus: 'paid', status: 'refunded' };
+      expect(shouldApplyRefundEffects('cancelled', alreadyRefundedOrder)).toBe(false);
+    });
+
+    it('cancelling a paid order that was NOT already refunded still applies refund effects', () => {
+      const paidNotYetRefunded = { paymentStatus: 'paid', status: 'delivered' };
+      expect(shouldApplyRefundEffects('cancelled', paidNotYetRefunded)).toBe(true);
+    });
+
+    it('refunding a paid order for the first time (status not yet refunded) applies refund effects', () => {
+      const firstRefund = { paymentStatus: 'paid', status: 'delivered' };
+      expect(shouldApplyRefundEffects('refunded', firstRefund)).toBe(true);
+    });
+
+    it('omitting `status` entirely preserves the old paymentStatus-only behavior (backward compatible)', () => {
+      const paidOrderNoStatus = { paymentStatus: 'paid' };
+      expect(shouldApplyRefundEffects('cancelled', paidOrderNoStatus)).toBe(true);
+    });
+  });
 });

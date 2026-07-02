@@ -40,6 +40,18 @@ vi.mock('@force/database', () => ({
       findMany: vi.fn().mockResolvedValue([]),
     },
     inventoryHistory: {
+      // findFirst is the return_stock idempotency marker (return null =
+      // "not yet restored" so the restore proceeds).
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({}),
+    },
+    // orderEvent backs both the status-audit-trail write in updateStatus
+    // AND the `refund_effects_applied` once-per-order marker inside
+    // applyRefundEffects (F2 rework). Default findFirst → null ("not yet
+    // applied") so the coupon decrement proceeds; tests that exercise the
+    // idempotency guard override this per-call.
+    orderEvent: {
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
     },
     coupon: {
@@ -85,6 +97,15 @@ vi.mock('@api/services/cart.service', () => ({
   },
 }));
 
+// Spy on the `order/refunded` fanout (the "Refund issued" merchant push +
+// customer refund email trigger) so the F2 idempotency tests can assert
+// exactly how many times it fired without a real Inngest client.
+vi.mock('@api/lib/inngest/client', () => ({
+  inngest: {
+    send: vi.fn().mockResolvedValue({ ids: [] }),
+  },
+}));
+
 // The order service checks the inventory.backorder feature flag before
 // creating BackorderLine rows. Default to enabled so existing tests that
 // don't care about this flag still pass unmodified.
@@ -97,6 +118,7 @@ vi.mock('@api/services/feature.service', () => ({
 }));
 
 import { CartService } from '@api/services/cart.service';
+import { inngest } from '@api/lib/inngest/client';
 
 describe('OrderService', () => {
   const mockStoreId = 'store-123';
@@ -307,6 +329,19 @@ describe('OrderService', () => {
               deleteMany: vi.fn().mockResolvedValue({}),
             },
             inventoryHistory: {
+              // return_stock idempotency marker: null = not yet restored.
+              findFirst: vi.fn().mockResolvedValue(null),
+              create: vi.fn().mockResolvedValue({}),
+            },
+            // refund_effects_applied marker (F2 rework) — this tx mock is
+            // reused by other describe blocks whose own beforeEach doesn't
+            // reset `$transaction` (vi.clearAllMocks() clears call history,
+            // not a previously assigned mockImplementation), so it must
+            // carry orderEvent too or a later applyRefundEffects call
+            // (e.g. from an updateStatus cancel/refund test) throws on
+            // `tx.orderEvent` being undefined.
+            orderEvent: {
+              findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
             },
             $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
@@ -373,6 +408,7 @@ describe('OrderService', () => {
             },
             cartItem: { deleteMany: vi.fn() },
             inventoryHistory: { create: vi.fn() },
+            orderEvent: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
             $queryRaw: vi.fn().mockResolvedValue([]),
           } as any);
         }
@@ -651,6 +687,127 @@ describe('OrderService', () => {
           })
         );
       });
+    });
+  });
+
+  describe('applyRefundEffects — F2 idempotency rework', () => {
+    // Fresh stateful markers per test — a single shared `tx` object whose
+    // inventoryHistory/orderEvent mocks persist state across multiple
+    // applyRefundEffects invocations within ONE test, so cross-call
+    // idempotency can actually be exercised (mirrors the real durable
+    // markers living in the DB across calls).
+    function makeStatefulTx() {
+      let stockMarker: { id: string } | null = null;
+      let effectsMarker: { id: string } | null = null;
+      return {
+        $queryRaw: vi
+          .fn()
+          .mockResolvedValue([{ id: 'prod-123', inventory: 50, track_inventory: true }]),
+        product: { update: vi.fn().mockResolvedValue({}) },
+        productVariant: { update: vi.fn().mockResolvedValue({}) },
+        inventoryHistory: {
+          findFirst: vi.fn(async () => stockMarker),
+          create: vi.fn(async () => {
+            stockMarker = { id: 'ih-1' };
+            return stockMarker;
+          }),
+        },
+        orderEvent: {
+          findFirst: vi.fn(async () => effectsMarker),
+          create: vi.fn(async () => {
+            effectsMarker = { id: 'oe-1' };
+            return effectsMarker;
+          }),
+        },
+      };
+    }
+
+    beforeEach(() => {
+      vi.mocked(prisma.order.update).mockResolvedValue(mockOrder as any);
+    });
+
+    it('(a) delivered→refunded via updateStatus: inventory restored once, coupon decremented once, notification fired once', async () => {
+      const tx = makeStatefulTx();
+      vi.mocked(prisma.$transaction).mockImplementation((fn: any) => fn(tx));
+
+      // A GENUINE new refund of a paid, coupon-bearing order. `refunded` is
+      // terminal (validTransitions), so the previously-considered
+      // refunded→cancelled second hop can't happen through updateStatus —
+      // this asserts the single-pass wiring: exactly one inventory restore,
+      // one coupon decrement, one `order/refunded` notification.
+      vi.mocked(prisma.order.findFirst).mockResolvedValue({
+        ...mockOrder,
+        status: 'delivered',
+        paymentStatus: 'paid',
+        couponCode: 'SAVE10',
+      } as any);
+      vi.mocked(prisma.order.update).mockResolvedValue({
+        ...mockOrder,
+        status: 'refunded',
+      } as any);
+
+      await OrderService.updateStatus(mockStoreId, 'order-123', 'refunded');
+
+      expect(tx.inventoryHistory.create).toHaveBeenCalledTimes(1);
+      expect(prisma.coupon.updateMany).toHaveBeenCalledTimes(1);
+      expect(inngest.send).toHaveBeenCalledTimes(1);
+      expect(inngest.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'order/refunded',
+          data: expect.objectContaining({ orderId: 'order-123' }),
+        })
+      );
+    });
+
+    it('(b) two separate returns on the same order: each fires the notification, but coupon decrements only once', async () => {
+      const tx = makeStatefulTx();
+      vi.mocked(prisma.$transaction).mockImplementation((fn: any) => fn(tx));
+      vi.mocked(prisma.order.findFirst).mockResolvedValue({
+        ...mockOrder,
+        status: 'delivered',
+        couponCode: 'SAVE10',
+      } as any);
+
+      // Simulates ReturnService.complete() calling applyRefundEffects
+      // directly (default options), once per completed return, twice for
+      // two SEPARATE Return requests on the same order.
+      await OrderService.applyRefundEffects(mockStoreId, 'order-123');
+      await OrderService.applyRefundEffects(mockStoreId, 'order-123');
+
+      // Inventory restore is order-level coarse (pre-existing, unchanged) —
+      // once is correct/acceptable even for two returns.
+      expect(tx.inventoryHistory.create).toHaveBeenCalledTimes(1);
+      // Coupon must decrement only once for the order, not once per return.
+      expect(prisma.coupon.updateMany).toHaveBeenCalledTimes(1);
+      // BOTH returns are genuinely separate refund events — each notifies.
+      expect(inngest.send).toHaveBeenCalledTimes(2);
+    });
+
+    it('(c) restoreInventory:false calls (backorder-line cancels) decrement the coupon at most once per order, never once per line', async () => {
+      const tx = makeStatefulTx();
+      vi.mocked(prisma.$transaction).mockImplementation((fn: any) => fn(tx));
+      vi.mocked(prisma.order.findFirst).mockResolvedValue({
+        ...mockOrder,
+        status: 'delivered',
+        couponCode: 'SAVE10',
+      } as any);
+
+      // Simulates accounting/backorder.service.ts cancelBackorder calling
+      // applyRefundEffects once per BackorderLine, 3 lines on the same
+      // order, all with restoreInventory:false (inventory was never
+      // reserved for a backordered item).
+      await OrderService.applyRefundEffects(mockStoreId, 'order-123', { restoreInventory: false });
+      await OrderService.applyRefundEffects(mockStoreId, 'order-123', { restoreInventory: false });
+      await OrderService.applyRefundEffects(mockStoreId, 'order-123', { restoreInventory: false });
+
+      // Never restores inventory (restoreInventory:false on every call).
+      expect(tx.inventoryHistory.create).not.toHaveBeenCalled();
+      // Coupon decremented exactly once despite 3 calls — the OLD guard
+      // (return_stock-marker-only) never wrote ANY marker on a
+      // restoreInventory:false call, so it would have decremented the
+      // coupon on EVERY line. The new `refund_effects_applied` marker
+      // fixes this.
+      expect(prisma.coupon.updateMany).toHaveBeenCalledTimes(1);
     });
   });
 

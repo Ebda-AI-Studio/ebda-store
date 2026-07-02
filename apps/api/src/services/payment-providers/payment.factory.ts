@@ -638,18 +638,51 @@ export class PaymentService {
       throw new AppError(404, 'NOT_FOUND', 'Payment not found');
     }
 
-    if (payment.status !== 'completed') {
-      throw new AppError(400, 'INVALID_STATE', 'Payment is not completed');
+    // Atomically CLAIM the payment before touching the provider. A plain
+    // `status === 'completed'` read-check is a TOCTOU race: two concurrent
+    // refund requests (admin double-click, client retry, two staff on one
+    // order) both read 'completed', both pass, and both call provider.refund()
+    // — a double refund at the gateway with no undo API = real money lost.
+    // We flip 'completed' -> the terminal refund status in one atomic
+    // updateMany; only the request whose update matches (count === 1) proceeds.
+    // (PaymentStatus is a Prisma enum with no transient 'refunding' value, so
+    // we claim with the final status and revert to 'completed' if the provider
+    // call throws — avoids an enum migration.)
+    const isFullRefund = !request.amount || request.amount >= payment.amount;
+    const claimedStatus = isFullRefund ? 'refunded' : 'partially_refunded';
+    const claim = await prisma.payment.updateMany({
+      where: { id: payment.id, status: 'completed' },
+      data: { status: claimedStatus },
+    });
+    if (claim.count === 0) {
+      throw new AppError(
+        400,
+        'INVALID_STATE',
+        'Payment is not completed or a refund is already in progress'
+      );
     }
 
     const providerName = provider || (payment.provider as PaymentProvider);
     const effectiveStoreId = storeId || payment.order?.storeId;
-    const response = await (
-      await factory.getProvider(providerName, effectiveStoreId)
-    ).refund(request);
-
-    // Update payment record
-    const isFullRefund = !request.amount || request.amount >= payment.amount;
+    let response: RefundResponse;
+    try {
+      response = await (await factory.getProvider(providerName, effectiveStoreId)).refund(request);
+    } catch (providerError) {
+      // The provider refund did NOT execute (no money moved) — release the
+      // claim back to 'completed' so the admin can legitimately retry.
+      await prisma.payment
+        .updateMany({
+          where: { id: payment.id, status: claimedStatus },
+          data: { status: 'completed' },
+        })
+        .catch(releaseError => {
+          logger.error(
+            { err: releaseError, paymentId: payment.id },
+            '[PAYMENT] failed to release refund claim after provider error — payment status may be stuck, manual reconciliation required'
+          );
+        });
+      throw providerError;
+    }
 
     // Wrap the two db writes in a transaction so payment + order rows can't
     // disagree after a partial failure (e.g. payment marked 'refunded' but
