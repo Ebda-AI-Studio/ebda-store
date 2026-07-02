@@ -343,6 +343,93 @@ jobs:
             tail -100 /tmp/api-server.log
           fi
 
+  # RLS cutover Phase 1c — THE GATE (docs/plans/2026-07-02-rls-cutover.md).
+  # Every other job above connects to Postgres as the `test` superuser, which
+  # BYPASSES row-level security entirely (like prod's current `neondb_owner`
+  # BYPASSRLS role) — so it never actually exercises the `force_app` RLS
+  # policies. This job's DATABASE_URL/DIRECT_URL authenticate as the REAL
+  # `force_app` login role instead, the closest CI gets to production's
+  # post-cutover connection. If a migration predicate is wrong or any table
+  # is still deny-all for force_app, THIS job fails — not prod.
+  test-rls-force-app:
+    name: RLS force_app Cutover Proof
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 10
+    needs: [build]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: force_test
+        ports:
+          # Dynamic host port: Docker assigns a random available port so
+          # parallel jobs on the same self-hosted runner never collide on 5432.
+          - 5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 30s
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Build database package
+        run: npm run build -w packages/database
+
+      - name: Run database migrations (as the ephemeral Postgres superuser)
+        # Migrations need DDL + role-creation privileges (CREATE ROLE, GRANT,
+        # ALTER TABLE ... ENABLE/FORCE ROW LEVEL SECURITY) so they run as the
+        # container superuser `test`. This idempotently creates the
+        # `force_app` role + its DML grants (20260404000000_add_rls_policies)
+        # and every RLS policy this PR + prior migrations add.
+        run: npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+
+      - name: Grant force_app a CI-only login password + TRUNCATE
+        # `force_app` is created LOGIN-but-no-password by the migration — prod
+        # never needs a CI test password (Phase 3 sets the real prod
+        # credential out of band, outside this repo). This step is the ONLY
+        # place a force_app password ever exists, and it only lives inside
+        # this disposable, per-job Postgres container.
+        #
+        # TRUNCATE is granted here — NOT in the migration; prod's force_app
+        # has no TRUNCATE and doesn't need it — purely so the shared
+        # tests/setup-e2e.ts global fixture reset (`TRUNCATE ... RESTART
+        # IDENTITY CASCADE`, which runs for every file under tests/integration
+        # regardless of which one vitest actually executes) doesn't 42501 now
+        # that this job's DATABASE_URL is force_app end-to-end.
+        run: |
+          cat <<'SQL' | npx prisma db execute --url "postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test" --stdin
+          ALTER ROLE force_app WITH PASSWORD 'ci-only-force-app-pw' LOGIN;
+          GRANT TRUNCATE ON ALL TABLES IN SCHEMA public TO force_app;
+          SQL
+
+      - name: Run force_app cross-tenant RLS proof
+        run: npx vitest run tests/integration/rls-force-app.test.ts --reporter=verbose
+        env:
+          # The whole point of this job: every prisma.* call in
+          # rls-force-app.test.ts authenticates as force_app, not a superuser.
+          DATABASE_URL: postgresql://force_app:ci-only-force-app-pw@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          DIRECT_URL: postgresql://force_app:ci-only-force-app-pw@localhost:${{ job.services.postgres.ports['5432'] }}/force_test
+          NODE_ENV: test
+
   test-e2e:
     name: E2E Tests
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
@@ -489,7 +576,17 @@ jobs:
     name: Notify on failure (main only)
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [lint, typecheck, security, build, test-unit, test-integration, test-e2e]
+    needs:
+      [
+        lint,
+        typecheck,
+        security,
+        build,
+        test-unit,
+        test-integration,
+        test-rls-force-app,
+        test-e2e,
+      ]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Compose + send Telegram alert
@@ -508,6 +605,7 @@ jobs:
           BUILD_RES: ${{ needs.build.result }}
           UNIT_RES: ${{ needs.test-unit.result }}
           INT_RES: ${{ needs.test-integration.result }}
+          RLS_FORCE_APP_RES: ${{ needs.test-rls-force-app.result }}
           E2E_RES: ${{ needs.test-e2e.result }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ALERT_CHAT_ID" ]; then
@@ -518,7 +616,7 @@ jobs:
           # Collect which jobs failed (vs which skipped vs passed) so Ahmad
           # can see what to look at without clicking through.
           FAILED_JOBS=""
-          for entry in "lint:$LINT_RES" "typecheck:$TYPECHECK_RES" "security:$SECURITY_RES" "build:$BUILD_RES" "unit:$UNIT_RES" "integration:$INT_RES" "e2e:$E2E_RES"; do
+          for entry in "lint:$LINT_RES" "typecheck:$TYPECHECK_RES" "security:$SECURITY_RES" "build:$BUILD_RES" "unit:$UNIT_RES" "integration:$INT_RES" "rls-force-app:$RLS_FORCE_APP_RES" "e2e:$E2E_RES"; do
             name="${entry%:*}"
             res="${entry#*:}"
             if [ "$res" = "failure" ]; then

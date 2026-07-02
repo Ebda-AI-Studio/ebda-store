@@ -168,17 +168,30 @@ export { withMoneyTx } from './with-money-tx';
  *
  * If the callback throws, the transaction rolls back automatically.
  *
+ * @param userId Optional — additionally sets `app.current_user_id` via SET
+ *   LOCAL, for the user-scoped RLS policies added in the RLS cutover Phase
+ *   1b (e.g. `addresses`, see 20260702170000_rls_close_denyall_tables).
+ *   Additive: defaults to `undefined`, in which case the GUC is left unset,
+ *   `current_user_id()` returns NULL, and the hybrid user-scoped policies
+ *   allow-contextless — IDENTICAL to today's behavior. Only callers that
+ *   explicitly pass a userId (tenant-context.ts, from `req.user?.userId`)
+ *   opt into the per-user backstop.
+ *
  * @example
  *   // In Express middleware:
  *   await runInTenantContext(storeId, async () => {
  *     // All prisma.product.findMany() etc. calls inside here
  *     // are scoped to this storeId via RLS
  *     await handler(req, res);
- *   });
+ *   }, req.user?.userId);
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function runInTenantContext<T>(storeId: string, fn: () => Promise<T>): Promise<T> {
+export async function runInTenantContext<T>(
+  storeId: string,
+  fn: () => Promise<T>,
+  userId?: string
+): Promise<T> {
   if (!UUID_RE.test(storeId)) {
     throw new Error('Invalid store ID format');
   }
@@ -187,6 +200,11 @@ export async function runInTenantContext<T>(storeId: string, fn: () => Promise<T
       await tx.$executeRawUnsafe(
         `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
       );
+      if (userId) {
+        await tx.$executeRawUnsafe(
+          `SET LOCAL app.current_user_id = '${userId.replace(/'/g, "''")}'`
+        );
+      }
       return tenantStorage.run(tx, fn);
     },
     // maxWait raised from Prisma's 2s default — admin dashboards fire 4-6
