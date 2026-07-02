@@ -28,6 +28,8 @@ vi.mock('@force/database', () => ({
     },
     product: {
       findUnique: vi.fn(),
+      // findMany backs OrderService.createAdminOrder's price-hydration lookup.
+      findMany: vi.fn().mockResolvedValue([]),
       update: vi.fn(),
     },
     productVariant: {
@@ -55,6 +57,7 @@ vi.mock('@force/database', () => ({
       create: vi.fn().mockResolvedValue({}),
     },
     coupon: {
+      findFirst: vi.fn(),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     backorderLine: {
@@ -310,14 +313,26 @@ describe('OrderService', () => {
       paymentMethod: 'cod',
     };
 
+    // Exposed so individual tests can override the per-user coupon count
+    // (`tx.order.count`) and the global reserve (`tx.coupon.updateMany`)
+    // without rebuilding the whole $transaction mock.
+    const txOrderCount = vi.fn().mockResolvedValue(0);
+    const txCouponUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+
     beforeEach(() => {
       vi.mocked(CartService.getOrCreate).mockResolvedValue(mockCartWithItems as any);
       vi.mocked(prisma.taxRate.findMany).mockResolvedValue([]);
+      txOrderCount.mockReset().mockResolvedValue(0);
+      txCouponUpdateMany.mockReset().mockResolvedValue({ count: 1 });
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
         if (typeof fn === 'function') {
           return fn({
             order: {
               create: vi.fn().mockResolvedValue(mockOrder),
+              count: txOrderCount,
+            },
+            coupon: {
+              updateMany: txCouponUpdateMany,
             },
             product: {
               update: vi.fn().mockResolvedValue({}),
@@ -450,6 +465,311 @@ describe('OrderService', () => {
       await expect(
         OrderService.create(mockStoreId, mockCustomerId, mockSessionId, createOrderData)
       ).resolves.toBeDefined();
+    });
+
+    // Money-integrity audit: `usageLimitPerUser` was collected + stored but
+    // never enforced — only the store-wide `usageLimit` was. These cover the
+    // new per-customer gate in OrderService.create.
+    describe('coupon usageLimitPerUser enforcement', () => {
+      const mockCoupon = {
+        id: 'coupon-1',
+        storeId: mockStoreId,
+        code: 'SAVE10',
+        type: 'percentage',
+        value: 10,
+        minOrderAmount: null,
+        maxDiscount: null,
+        usageLimit: null,
+        usageCount: 0,
+        usageLimitPerUser: 1,
+        isActive: true,
+        startsAt: new Date(Date.now() - 86400000),
+        expiresAt: new Date(Date.now() + 86400000),
+      };
+
+      const couponOrderData = { ...createOrderData, couponCode: 'SAVE10' };
+
+      beforeEach(() => {
+        vi.mocked(prisma.coupon.findFirst).mockResolvedValue(mockCoupon as any);
+      });
+
+      it('registered customer already at usageLimitPerUser → rejects, never creates the order', async () => {
+        txOrderCount.mockResolvedValue(1); // already used once, limit is 1
+
+        await expect(
+          OrderService.create(mockStoreId, mockCustomerId, mockSessionId, couponOrderData)
+        ).rejects.toThrow('Coupon usage limit reached');
+
+        // Counts by customerId, scoped to this coupon + non-cancelled/refunded.
+        expect(txOrderCount).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              storeId: mockStoreId,
+              couponCode: 'SAVE10',
+              customerId: mockCustomerId,
+              status: { notIn: ['cancelled', 'refunded'] },
+            }),
+          })
+        );
+        // The global reserve step must never run once the per-user gate rejects.
+        expect(txCouponUpdateMany).not.toHaveBeenCalled();
+      });
+
+      it('registered customer under usageLimitPerUser → order proceeds', async () => {
+        txOrderCount.mockResolvedValue(0);
+
+        const result = await OrderService.create(
+          mockStoreId,
+          mockCustomerId,
+          mockSessionId,
+          couponOrderData
+        );
+
+        expect(result.orderNumber).toBeDefined();
+        expect(txCouponUpdateMany).toHaveBeenCalled();
+      });
+
+      it('guest checkout identified by shipping email already at the per-user limit → rejects', async () => {
+        txOrderCount.mockResolvedValue(1);
+        const guestData = {
+          ...couponOrderData,
+          shippingAddress: { ...couponOrderData.shippingAddress, email: 'guest@test.com' },
+        };
+
+        await expect(
+          OrderService.create(mockStoreId, undefined, mockSessionId, guestData)
+        ).rejects.toThrow('Coupon usage limit reached');
+
+        expect(txOrderCount).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              storeId: mockStoreId,
+              couponCode: 'SAVE10',
+              OR: [{ shippingAddress: { path: ['email'], equals: 'guest@test.com' } }],
+            }),
+          })
+        );
+      });
+
+      it('guest checkout with NEITHER email nor phone → never blocked (identity ambiguous, fail open)', async () => {
+        // Even if txOrderCount were to return a high count, the code must
+        // never call it when there's no identifier to key on.
+        txOrderCount.mockResolvedValue(99);
+
+        const result = await OrderService.create(
+          mockStoreId,
+          undefined,
+          mockSessionId,
+          couponOrderData // shippingAddress has no email/phone
+        );
+
+        expect(result.orderNumber).toBeDefined();
+        expect(txOrderCount).not.toHaveBeenCalled();
+      });
+
+      it('coupon with no usageLimitPerUser set → skips the per-user check entirely', async () => {
+        vi.mocked(prisma.coupon.findFirst).mockResolvedValue({
+          ...mockCoupon,
+          usageLimitPerUser: null,
+        } as any);
+
+        const result = await OrderService.create(
+          mockStoreId,
+          mockCustomerId,
+          mockSessionId,
+          couponOrderData
+        );
+
+        expect(result.orderNumber).toBeDefined();
+        expect(txOrderCount).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('createAdminOrder', () => {
+    const mockAdminUserId = 'admin-user-1';
+    const mockProductForAdmin = {
+      id: 'prod-123',
+      name: 'Test Product',
+      price: 5000,
+      sku: 'TST-001',
+      status: 'active',
+      variants: [],
+    };
+    const baseAdminOrderData = {
+      shippingAddress: {
+        firstName: 'Test',
+        lastName: 'Customer',
+        address1: '123 Test St',
+        city: 'Kuwait City',
+        state: 'Capital',
+        postalCode: '12345',
+        country: 'Kuwait',
+      } as Record<string, unknown>,
+      items: [{ productId: 'prod-123', quantity: 1 }],
+      paymentMethod: 'cod' as const,
+    };
+
+    // Exposed so individual tests can override the per-user coupon count
+    // (`tx.order.count`) without rebuilding the whole $transaction mock.
+    const txOrderCount = vi.fn().mockResolvedValue(0);
+
+    beforeEach(() => {
+      vi.mocked(prisma.product.findMany).mockResolvedValue([mockProductForAdmin] as any);
+      vi.mocked(prisma.taxRate.findMany).mockResolvedValue([]);
+      txOrderCount.mockReset().mockResolvedValue(0);
+      vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+        if (typeof fn === 'function') {
+          return fn({
+            order: {
+              create: vi.fn().mockResolvedValue(mockOrder),
+              count: txOrderCount,
+            },
+            // Not used by createAdminOrder itself, but this mock
+            // implementation persists on `prisma.$transaction` after this
+            // describe block's tests run (vi.clearAllMocks() clears call
+            // history, not a previously assigned mockImplementation) and
+            // can bleed into a LATER describe block (e.g. `updateStatus`)
+            // whose own applyRefundEffects call needs these. Kept as safe
+            // no-op defaults so that bleed can't throw.
+            product: { update: vi.fn().mockResolvedValue({}) },
+            productVariant: { update: vi.fn().mockResolvedValue({}) },
+            inventoryHistory: {
+              findFirst: vi.fn().mockResolvedValue(null),
+              create: vi.fn().mockResolvedValue({}),
+            },
+            $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50, track_inventory: true }]),
+          } as any);
+        }
+        return fn;
+      });
+    });
+
+    it('creates an admin order with no coupon (per-user check never runs)', async () => {
+      const result = await OrderService.createAdminOrder(
+        mockStoreId,
+        mockAdminUserId,
+        baseAdminOrderData
+      );
+
+      expect(result.orderNumber).toBeDefined();
+      expect(txOrderCount).not.toHaveBeenCalled();
+    });
+
+    // Money-integrity audit gap (2026-07-02, #498 follow-up): createAdminOrder
+    // resolved coupons via CouponService.getByCode (store-wide usageLimit
+    // only) and never ran the per-customer usageLimitPerUser gate that
+    // OrderService.create already got. These mirror the `create` coverage
+    // above for the admin/manual-order path.
+    describe('coupon usageLimitPerUser enforcement', () => {
+      const mockCoupon = {
+        id: 'coupon-1',
+        storeId: mockStoreId,
+        code: 'SAVE10',
+        type: 'percentage',
+        value: 10,
+        minOrderAmount: null,
+        maxDiscount: null,
+        usageLimit: null,
+        usageCount: 0,
+        usageLimitPerUser: 1,
+        isActive: true,
+        startsAt: new Date(Date.now() - 86400000),
+        expiresAt: new Date(Date.now() + 86400000),
+      };
+
+      const couponAdminOrderData = { ...baseAdminOrderData, couponCode: 'SAVE10' };
+
+      beforeEach(() => {
+        vi.mocked(prisma.coupon.findFirst).mockResolvedValue(mockCoupon as any);
+      });
+
+      it('registered customer already at usageLimitPerUser → rejects, never creates the admin order', async () => {
+        txOrderCount.mockResolvedValue(1); // already used once, limit is 1
+
+        await expect(
+          OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
+            ...couponAdminOrderData,
+            customerId: mockCustomerId,
+          })
+        ).rejects.toThrow('Coupon usage limit reached');
+
+        expect(txOrderCount).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              storeId: mockStoreId,
+              couponCode: 'SAVE10',
+              customerId: mockCustomerId,
+              status: { notIn: ['cancelled', 'refunded'] },
+            }),
+          })
+        );
+      });
+
+      it('registered customer under usageLimitPerUser → admin order proceeds', async () => {
+        txOrderCount.mockResolvedValue(0);
+
+        const result = await OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
+          ...couponAdminOrderData,
+          customerId: mockCustomerId,
+        });
+
+        expect(result.orderNumber).toBeDefined();
+      });
+
+      it('guest admin order identified by shipping email already at the per-user limit → rejects', async () => {
+        txOrderCount.mockResolvedValue(1);
+
+        await expect(
+          OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
+            ...couponAdminOrderData,
+            shippingAddress: {
+              ...couponAdminOrderData.shippingAddress,
+              email: 'guest@test.com',
+            },
+          })
+        ).rejects.toThrow('Coupon usage limit reached');
+
+        expect(txOrderCount).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              storeId: mockStoreId,
+              couponCode: 'SAVE10',
+              OR: [{ shippingAddress: { path: ['email'], equals: 'guest@test.com' } }],
+            }),
+          })
+        );
+      });
+
+      it('guest admin order with NEITHER email nor phone → never blocked (identity ambiguous, fail open)', async () => {
+        // Even if txOrderCount were to return a high count, the code must
+        // never call it when there's no identifier to key on.
+        txOrderCount.mockResolvedValue(99);
+
+        const result = await OrderService.createAdminOrder(
+          mockStoreId,
+          mockAdminUserId,
+          couponAdminOrderData // no customerId, shippingAddress has no email/phone
+        );
+
+        expect(result.orderNumber).toBeDefined();
+        expect(txOrderCount).not.toHaveBeenCalled();
+      });
+
+      it('coupon with no usageLimitPerUser set → skips the per-user check entirely', async () => {
+        vi.mocked(prisma.coupon.findFirst).mockResolvedValue({
+          ...mockCoupon,
+          usageLimitPerUser: null,
+        } as any);
+
+        const result = await OrderService.createAdminOrder(mockStoreId, mockAdminUserId, {
+          ...couponAdminOrderData,
+          customerId: mockCustomerId,
+        });
+
+        expect(result.orderNumber).toBeDefined();
+        expect(txOrderCount).not.toHaveBeenCalled();
+      });
     });
   });
 

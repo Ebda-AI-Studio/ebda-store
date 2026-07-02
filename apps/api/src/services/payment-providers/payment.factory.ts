@@ -32,6 +32,13 @@ import { UPaymentsProvider } from './upayments.provider';
 // Supports both global and per-store configurations
 // ==========================================
 
+/** Money-integrity F3 (2026-07-02 audit): reconciliation tolerance (fils)
+ *  for a provider-reported paid amount vs the expected `Payment.amount`.
+ *  See the `isAmountUnderpaid` check in `handleWebhook` for the unit
+ *  verification note (both sides are fils; every provider's
+ *  parseWebhook/getPaymentStatus round-trips via `Math.round(x * 1000)`). */
+const AMOUNT_TOLERANCE_FILS = 5;
+
 interface ProviderConfig {
   provider: PaymentProvider;
   apiKey: string;
@@ -987,6 +994,99 @@ export class PaymentService {
       }
 
       return { success: true, status: newStatus, orderId: payment.orderId };
+    }
+
+    // Paid-amount reconciliation (money-integrity audit F3, 2026-07-02).
+    // A 'completed' webhook only proves the provider says the invoice is
+    // paid — never on its own that the AMOUNT paid matches `order.total`.
+    // `webhookData.amount` is already normalized to fils by every
+    // provider's `parseWebhook` (`Math.round(providerValue * 1000)` — see
+    // myfatoorah/tap/hesabe/upayments `.provider.ts`), the same unit as
+    // `payment.amount` (set from `order.total` at payment creation — see
+    // `PaymentService.createPayment`), so this is a direct same-unit
+    // comparison, not a currency-major-vs-minor mismatch. Gate on the
+    // currencies matching too, as a belt-and-braces guard against a
+    // provider reporting a foreign-currency settlement value we can't
+    // meaningfully compare. A short-fall beyond a 5-fils rounding
+    // tolerance means: partial capture, reused/mis-configured invoice, or
+    // a tampered total — none of which should ship goods. We deliberately
+    // do NOT flip payment/order status in that case; we just log +
+    // record + alert and acknowledge the webhook so the provider doesn't
+    // retry forever.
+    const isAmountUnderpaid =
+      webhookData.status === 'completed' &&
+      typeof webhookData.amount === 'number' &&
+      Number.isFinite(webhookData.amount) &&
+      webhookData.currency === payment.currency &&
+      Math.abs(payment.amount - webhookData.amount) > AMOUNT_TOLERANCE_FILS &&
+      webhookData.amount < payment.amount;
+
+    if (isAmountUnderpaid) {
+      logger.error(
+        {
+          paymentId: payment.id,
+          orderId: payment.orderId,
+          expectedFils: payment.amount,
+          paidAmountFils: webhookData.amount,
+          provider,
+        },
+        '[PAYMENT WEBHOOK] provider-reported paid amount is less than order total — holding order unpaid'
+      );
+
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        storeId: payment.order?.storeId ?? '',
+        orderId: payment.orderId,
+        eventType: 'reconciliation',
+        fromStatus: payment.status,
+        toStatus: null,
+        provider,
+        providerPayload: payload as Prisma.InputJsonValue,
+        details: {
+          reason: 'paid_amount_mismatch',
+          expectedFils: payment.amount,
+          paidAmountFils: webhookData.amount,
+          webhookEvent: webhookData.event,
+        },
+      });
+
+      void sendAlert({
+        level: 'p0',
+        scope: 'store',
+        store: {
+          id: payment.order?.storeId ?? '',
+          name: payment.order?.store?.name ?? payment.order?.storeId ?? 'unknown',
+        },
+        source: 'payment.webhook.amount_mismatch',
+        title: 'payment.webhook.amount_mismatch',
+        body: `Order ${payment.orderId}: ${provider} webhook reports paid ${webhookData.amount} fils but the order total is ${payment.amount} fils. Order was NOT marked as paid — investigate before fulfilling.`,
+        context: {
+          orderId: payment.orderId,
+          paymentId: payment.id,
+          provider,
+          expectedFils: payment.amount,
+          paidAmountFils: webhookData.amount,
+        },
+      }).catch(() => undefined);
+
+      // Preserve the raw receipt on the Payment row for audit, but do NOT
+      // touch `status` — leaving the order/payment exactly where they were
+      // (typically pending/unpaid) rather than confirming a short payment.
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          metadata: {
+            ...((payment.metadata as object) || {}),
+            webhookEvent: webhookData.event,
+            paymentMethod: webhookData.paymentMethod,
+            paidCurrency: webhookData.currency,
+            paidAmount: webhookData.amount,
+            amountMismatch: true,
+          },
+        },
+      });
+
+      return { success: true, status: webhookData.status, orderId: payment.orderId };
     }
 
     // Map status to our payment status

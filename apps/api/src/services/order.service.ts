@@ -455,6 +455,66 @@ export class OrderService {
         }
       }
 
+      // Per-customer coupon usage limit (money-integrity audit F3-adjacent
+      // gap, 2026-07-02: `usageLimitPerUser` was collected + stored but
+      // never enforced — only the store-wide `usageLimit` was). Count this
+      // customer's PRIOR orders that redeemed the same coupon and reject
+      // once they've reached the cap, mirroring the global-limit check's
+      // semantics: an order only "counts" while it hasn't been
+      // cancelled/refunded, because `applyRefundEffects`/`updateStatus`
+      // decrement `Coupon.usageCount` back on those two statuses (see
+      // order.service.ts ~1164-1171, ~733-737) — so a cancelled/refunded
+      // order shouldn't count against the per-user cap either.
+      //
+      // Identify the customer the same way the rest of the order code does
+      // (see aggregateCustomers in customers.routes.ts): registered
+      // customers by `customerId`; guests by shipping-address email/phone
+      // (JSON path match, same field names/precedent as the customer
+      // detail lookup in customers.routes.ts). A guest checkout with
+      // NEITHER an email nor a phone on the shipping address has no
+      // reliable identity to check — we deliberately do NOT block in that
+      // case (a false block on an unidentifiable guest is worse than the
+      // narrow loophole; the store-wide usageLimit still caps total abuse).
+      if (appliedCoupon && appliedCoupon.usageLimitPerUser && appliedCoupon.usageLimitPerUser > 0) {
+        const guestEmail =
+          typeof data.shippingAddress.email === 'string' && data.shippingAddress.email
+            ? data.shippingAddress.email
+            : undefined;
+        const guestPhone =
+          typeof data.shippingAddress.phone === 'string' && data.shippingAddress.phone
+            ? data.shippingAddress.phone
+            : undefined;
+
+        const identityWhere: Prisma.OrderWhereInput | null = customerId
+          ? { customerId }
+          : guestEmail || guestPhone
+            ? {
+                OR: [
+                  ...(guestEmail
+                    ? [{ shippingAddress: { path: ['email'], equals: guestEmail } }]
+                    : []),
+                  ...(guestPhone
+                    ? [{ shippingAddress: { path: ['phone'], equals: guestPhone } }]
+                    : []),
+                ],
+              }
+            : null;
+
+        if (identityWhere) {
+          const priorUsageCount = await tx.order.count({
+            where: {
+              storeId,
+              couponCode: appliedCoupon.code,
+              status: { notIn: ['cancelled', 'refunded'] },
+              ...identityWhere,
+            },
+          });
+          if (priorUsageCount >= appliedCoupon.usageLimitPerUser) {
+            throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
+          }
+        }
+      }
+
       // Atomically reserve a coupon redemption before creating the order so
       // that two concurrent checkouts can't both slip past a usage limit by
       // reading the same stale count. updateMany with a usageCount < limit
@@ -1500,30 +1560,34 @@ export class OrderService {
     // public flow.
     let couponDiscount = 0;
     let couponCode: string | undefined;
+    // Kept in outer scope (not just `couponCode`) so the per-user usage
+    // check inside the transaction below can read `usageLimitPerUser` —
+    // mirrors `appliedCoupon` in OrderService.create.
+    let appliedCoupon: Awaited<ReturnType<typeof CouponService.getByCode>> | null = null;
     if (data.couponCode) {
-      const coupon = await CouponService.getByCode(storeId, data.couponCode);
-      if (coupon.minOrderAmount && subtotal < coupon.minOrderAmount) {
+      appliedCoupon = await CouponService.getByCode(storeId, data.couponCode);
+      if (appliedCoupon.minOrderAmount && subtotal < appliedCoupon.minOrderAmount) {
         throw new AppError(
           400,
           'MIN_ORDER_NOT_MET',
-          `Minimum order amount of ${(coupon.minOrderAmount / 1000).toFixed(
+          `Minimum order amount of ${(appliedCoupon.minOrderAmount / 1000).toFixed(
             3
           )} KWD required for this coupon`
         );
       }
-      if (coupon.type === 'free_shipping') {
+      if (appliedCoupon.type === 'free_shipping') {
         shipping = 0;
       } else {
         couponDiscount = CouponService.calculateDiscount(
           {
-            type: coupon.type,
-            value: coupon.value,
-            maxDiscount: coupon.maxDiscount,
+            type: appliedCoupon.type,
+            value: appliedCoupon.value,
+            maxDiscount: appliedCoupon.maxDiscount,
           },
           subtotal
         );
       }
-      couponCode = coupon.code;
+      couponCode = appliedCoupon.code;
     }
 
     const total = Math.max(0, subtotal + tax + shipping - couponDiscount);
@@ -1534,6 +1598,61 @@ export class OrderService {
     // confirms physical availability before placing. The mark-paid
     // path elsewhere decrements as needed when payment lands.
     const order = await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+      // Per-customer coupon usage limit (same money-integrity gap as
+      // OrderService.create, 2026-07-02 audit: createAdminOrder resolved
+      // coupons via CouponService.getByCode, which only enforces the
+      // store-wide `usageLimit` — `usageLimitPerUser` was never checked on
+      // this path, so an admin/phone order could bypass a customer's cap).
+      // Identity resolution mirrors create(): registered customers by
+      // `customerId`; guests by shippingAddress email/phone. An
+      // unidentifiable guest (neither) is deliberately NOT blocked — same
+      // narrow-loophole tradeoff as create() (store-wide usageLimit still
+      // caps total abuse).
+      if (
+        couponCode &&
+        appliedCoupon &&
+        appliedCoupon.usageLimitPerUser &&
+        appliedCoupon.usageLimitPerUser > 0
+      ) {
+        const guestEmail =
+          typeof data.shippingAddress.email === 'string' && data.shippingAddress.email
+            ? (data.shippingAddress.email as string)
+            : undefined;
+        const guestPhone =
+          typeof data.shippingAddress.phone === 'string' && data.shippingAddress.phone
+            ? (data.shippingAddress.phone as string)
+            : undefined;
+
+        const identityWhere: Prisma.OrderWhereInput | null = data.customerId
+          ? { customerId: data.customerId }
+          : guestEmail || guestPhone
+            ? {
+                OR: [
+                  ...(guestEmail
+                    ? [{ shippingAddress: { path: ['email'], equals: guestEmail } }]
+                    : []),
+                  ...(guestPhone
+                    ? [{ shippingAddress: { path: ['phone'], equals: guestPhone } }]
+                    : []),
+                ],
+              }
+            : null;
+
+        if (identityWhere) {
+          const priorUsageCount = await tx.order.count({
+            where: {
+              storeId,
+              couponCode,
+              status: { notIn: ['cancelled', 'refunded'] },
+              ...identityWhere,
+            },
+          });
+          if (priorUsageCount >= appliedCoupon.usageLimitPerUser) {
+            throw new AppError(400, 'COUPON_LIMIT_REACHED', 'Coupon usage limit reached');
+          }
+        }
+      }
+
       const created = await tx.order.create({
         data: {
           orderNumber,

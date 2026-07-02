@@ -32,11 +32,21 @@ import { prisma, runInTenantContext } from '@force/database';
 import type { PaymentStatus } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import logger from '../lib/logger';
+import { sendAlert } from './alerts.service';
 import { OneSignalService } from './onesignal.service';
 import { recordPaymentEvent } from './payment-event.service';
 import type { PaymentStatusResponse } from './payment-providers/types';
 
 export type ConfirmSource = 'admin_refresh' | 'guest_verify';
+
+/** Money-integrity F3 (2026-07-02 audit): reconciliation tolerance for a
+ *  provider-reported paid amount vs the expected `Payment.amount`. Both
+ *  sides are in fils (see `PaymentService.createPayment`, which stores
+ *  `amount: request.amount === order.total`, and every provider's
+ *  `parseWebhook`/`getPaymentStatus`, which convert to fils via
+ *  `Math.round(x * 1000)`). 5 fils absorbs float/rounding noise without
+ *  masking a real underpayment. */
+const AMOUNT_TOLERANCE_FILS = 5;
 
 export interface ConfirmPaymentInput {
   /** The Payment row to reconcile (must carry a transactionId). */
@@ -45,6 +55,12 @@ export interface ConfirmPaymentInput {
     status: string;
     provider: string;
     metadata: unknown;
+    /** Expected amount in fils (mirrors order.total at payment creation) —
+     *  required for the paid-amount reconciliation gate below. */
+    amount: number;
+    /** Payment.currency (default 'KWD'). Used only to gate the amount
+     *  reconciliation to same-currency comparisons — see below. */
+    currency?: string;
   };
   /** The Order the payment belongs to. */
   order: {
@@ -101,6 +117,86 @@ export async function confirmPaymentFromProviderStatus(
     if (!statusChanged) {
       // Already paid — nothing to do. Never re-fire the fanout.
       return { paymentStatus: 'paid', providerStatus: status, statusChanged: false };
+    }
+
+    // Paid-amount reconciliation (money-integrity audit F3, 2026-07-02).
+    // The provider says the invoice is "Paid", but that alone doesn't prove
+    // the AMOUNT paid matches what we expect. `providerStatus.paidAmount`
+    // (fils) is only populated by providers that distinguish invoiced vs
+    // settled amount (currently MyFatoorah's GetPaymentStatus —
+    // `PaidCurrencyValue`); Tap/Hesabe/UPayments never set it. Only gate
+    // when it's actually present + parseable and the currencies line up —
+    // never block on missing/ambiguous data, since a false block here
+    // would hold a legitimately-paid customer's order hostage.
+    const paidAmount = providerStatus.paidAmount;
+    const sameCurrency =
+      !providerStatus.paidCurrency || !providerStatus.currency
+        ? true
+        : providerStatus.paidCurrency === providerStatus.currency;
+    if (
+      typeof paidAmount === 'number' &&
+      Number.isFinite(paidAmount) &&
+      typeof payment.amount === 'number' &&
+      sameCurrency &&
+      Math.abs(payment.amount - paidAmount) > AMOUNT_TOLERANCE_FILS &&
+      paidAmount < payment.amount
+    ) {
+      logger.error(
+        {
+          paymentId: payment.id,
+          orderId: order.id,
+          expectedFils: payment.amount,
+          paidAmountFils: paidAmount,
+          source,
+        },
+        '[PAYMENT CONFIRM] provider-reported paid amount is less than expected — holding order unpaid'
+      );
+
+      await recordPaymentEvent({
+        paymentId: payment.id,
+        storeId: order.storeId,
+        orderId: order.id,
+        eventType: 'reconciliation',
+        fromStatus: payment.status as PaymentStatus,
+        toStatus: null,
+        provider: payment.provider,
+        triggeredByUserId,
+        details: {
+          source,
+          reason: 'paid_amount_mismatch',
+          expectedFils: payment.amount,
+          paidAmountFils: paidAmount,
+          providerStatus: status,
+        },
+      });
+
+      const alertStore = await prisma.store
+        .findUnique({ where: { id: order.storeId }, select: { name: true } })
+        .catch(() => null);
+      void sendAlert({
+        level: 'p0',
+        scope: 'store',
+        store: { id: order.storeId, name: alertStore?.name ?? order.storeId },
+        source: 'payment.confirm.amount_mismatch',
+        title: 'payment.confirm.amount_mismatch',
+        body: `Order ${order.id}: ${payment.provider} reports paid ${paidAmount} fils but the order total is ${payment.amount} fils. Order was NOT marked as paid — investigate before fulfilling.`,
+        context: {
+          orderId: order.id,
+          paymentId: payment.id,
+          provider: payment.provider,
+          expectedFils: payment.amount,
+          paidAmountFils: paidAmount,
+          source,
+        },
+      }).catch(() => undefined);
+
+      // Leave the order/payment exactly as they are — do NOT transition to
+      // paid/confirmed, do NOT run the post-payment fanout.
+      return {
+        paymentStatus: order.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+        providerStatus: status,
+        statusChanged: false,
+      };
     }
 
     await prisma.$transaction([

@@ -22,6 +22,9 @@ const txn = vi.fn().mockResolvedValue([{}, {}]);
 // Returns the order detail the "Payment received" push reads; null is fine for
 // the reconciliation tests (the push is best-effort and never affects the result).
 const orderFindUnique = vi.fn().mockResolvedValue(null);
+// The amount-mismatch alert path resolves the store name for the Telegram
+// header — mock a store row so the alert-building code has something to read.
+const storeFindUnique = vi.fn().mockResolvedValue({ name: 'Test Store' });
 vi.mock('@force/database', () => ({
   prisma: {
     payment: { update: (...a: unknown[]) => paymentUpdate(...a) },
@@ -29,6 +32,7 @@ vi.mock('@force/database', () => ({
       update: (...a: unknown[]) => orderUpdate(...a),
       findUnique: (...a: unknown[]) => orderFindUnique(...a),
     },
+    store: { findUnique: (...a: unknown[]) => storeFindUnique(...a) },
     $transaction: (...a: unknown[]) => txn(...a),
   },
   // The "Payment received" merchant push wraps a lookup in runInTenantContext;
@@ -42,17 +46,31 @@ vi.mock('@api/services/payment-event.service', () => ({
   recordPaymentEvent: (...a: unknown[]) => recordEvent(...a),
 }));
 
+// Mock the alert channel — assert a P0 fires on a paid-amount mismatch
+// without hitting Telegram/config.
+const sendAlertMock = vi.fn().mockResolvedValue(undefined);
+vi.mock('@api/services/alerts.service', () => ({
+  sendAlert: (...a: unknown[]) => sendAlertMock(...a),
+}));
+
 import { confirmPaymentFromProviderStatus } from '@api/services/payment-confirm.service';
 import type { PaymentStatusResponse } from '@api/services/payment-providers/types';
 
+// `amount` mirrors `order.total` in fils (see PaymentService.createPayment) —
+// required so the paid-amount reconciliation gate has an expected value to
+// compare against.
 const basePayment = {
   id: 'pay_1',
   status: 'pending',
   provider: 'myfatoorah',
   metadata: {},
+  amount: 5000,
 };
 
-function statusResponse(status: PaymentStatusResponse['status']): PaymentStatusResponse {
+function statusResponse(
+  status: PaymentStatusResponse['status'],
+  overrides: Partial<PaymentStatusResponse> = {}
+): PaymentStatusResponse {
   return {
     success: true,
     provider: 'myfatoorah',
@@ -61,6 +79,7 @@ function statusResponse(status: PaymentStatusResponse['status']): PaymentStatusR
     status,
     amount: 5000,
     currency: 'KWD',
+    ...overrides,
   };
 }
 
@@ -192,5 +211,84 @@ describe('confirmPaymentFromProviderStatus', () => {
         details: expect.objectContaining({ source: 'guest_verify' }),
       })
     );
+  });
+
+  // Money-integrity audit F3 (2026-07-02): a 'completed' provider status
+  // alone must never be enough to confirm an order — the PAID AMOUNT must
+  // also match what we expect (payment.amount, fils).
+  describe('paid-amount reconciliation (F3)', () => {
+    it('paidAmount far below payment.amount → does NOT mark paid, alerts P0, no fanout', async () => {
+      const result = await confirmPaymentFromProviderStatus({
+        payment: basePayment, // amount: 5000 fils
+        order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
+        // Provider reports only 1000 fils paid against a 5000 fils invoice.
+        providerStatus: statusResponse('completed', { paidAmount: 1000, paidCurrency: 'KWD' }),
+        source: 'guest_verify',
+      });
+
+      expect(result).toEqual({
+        paymentStatus: 'unpaid',
+        providerStatus: 'completed',
+        statusChanged: false,
+      });
+      // Never transitions the order/payment rows.
+      expect(txn).not.toHaveBeenCalled();
+      expect(orderUpdate).not.toHaveBeenCalled();
+      expect(inngestSend).not.toHaveBeenCalled();
+      // Records the mismatch for audit + raises a P0 alert.
+      expect(recordEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'reconciliation',
+          details: expect.objectContaining({
+            reason: 'paid_amount_mismatch',
+            expectedFils: 5000,
+            paidAmountFils: 1000,
+          }),
+        })
+      );
+      expect(sendAlertMock).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 'p0', source: 'payment.confirm.amount_mismatch' })
+      );
+    });
+
+    it('paidAmount within rounding tolerance (≤5 fils short) → still marks paid', async () => {
+      const result = await confirmPaymentFromProviderStatus({
+        payment: basePayment, // amount: 5000 fils
+        order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
+        providerStatus: statusResponse('completed', { paidAmount: 4997, paidCurrency: 'KWD' }),
+        source: 'guest_verify',
+      });
+
+      expect(result.statusChanged).toBe(true);
+      expect(result.paymentStatus).toBe('paid');
+      expect(txn).toHaveBeenCalledTimes(1);
+      expect(sendAlertMock).not.toHaveBeenCalled();
+    });
+
+    it('no paidAmount reported (Tap/Hesabe/UPayments never set it) → falls back to status-only, marks paid', async () => {
+      const result = await confirmPaymentFromProviderStatus({
+        payment: basePayment,
+        order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
+        providerStatus: statusResponse('completed'), // no paidAmount override
+        source: 'guest_verify',
+      });
+
+      expect(result.statusChanged).toBe(true);
+      expect(result.paymentStatus).toBe('paid');
+      expect(sendAlertMock).not.toHaveBeenCalled();
+    });
+
+    it('paidAmount OVER expected (overpayment) → still marks paid (only underpayment blocks)', async () => {
+      const result = await confirmPaymentFromProviderStatus({
+        payment: basePayment,
+        order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: null },
+        providerStatus: statusResponse('completed', { paidAmount: 6000, paidCurrency: 'KWD' }),
+        source: 'guest_verify',
+      });
+
+      expect(result.statusChanged).toBe(true);
+      expect(result.paymentStatus).toBe('paid');
+      expect(sendAlertMock).not.toHaveBeenCalled();
+    });
   });
 });

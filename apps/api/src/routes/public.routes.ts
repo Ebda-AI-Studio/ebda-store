@@ -653,6 +653,8 @@ router.post(
               provider: true,
               transactionId: true,
               metadata: true,
+              amount: true,
+              currency: true,
             },
           },
         },
@@ -747,6 +749,8 @@ router.post(
             ...((payment.metadata as object) || {}),
             ...(body.paymentId ? { returnPaymentId: body.paymentId } : {}),
           },
+          amount: payment.amount,
+          currency: payment.currency,
         },
         order: {
           id: order.id,

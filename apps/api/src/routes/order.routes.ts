@@ -919,6 +919,8 @@ router.post(
           status: payment.status,
           provider: payment.provider,
           metadata: payment.metadata,
+          amount: payment.amount,
+          currency: payment.currency,
         },
         order: {
           id: order.id,
