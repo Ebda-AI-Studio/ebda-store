@@ -8,6 +8,7 @@ import { apiGet, apiPost, apiDelete } from '../../../../lib/api';
 import { useAuth } from '../../../../lib/auth';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/i18n/useT';
+import { useRequireFeature } from '../../../../hooks/useRequireFeature';
 
 interface StaffMember {
   membershipId: string;
@@ -21,6 +22,8 @@ interface StaffMember {
 }
 
 export default function StoreStaffPage() {
+  const { gate } = useRequireFeature('staff_accounts');
+
   const params = useParams();
   const storeId = params?.id as string;
   const router = useRouter();
@@ -132,6 +135,8 @@ export default function StoreStaffPage() {
       setRemoving(false);
     }
   }
+
+  if (gate) return gate;
 
   return (
     <AdminLayout

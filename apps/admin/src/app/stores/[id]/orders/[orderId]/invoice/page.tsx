@@ -7,8 +7,11 @@ import { useLocale } from 'next-intl';
 import { useToast } from '@force/ui';
 import { AdminLayout } from '../../../../../../components/AdminLayout';
 import { apiFetch } from '../../../../../../lib/api';
+import { useRequireFeature } from '../../../../../../hooks/useRequireFeature';
 
 export default function OrderInvoicePage() {
+  const { gate } = useRequireFeature('accounting.invoicing');
+
   const params = useParams();
   const router = useRouter();
   const storeId = params?.id as string;
@@ -72,6 +75,8 @@ export default function OrderInvoicePage() {
       toastError(t('errors.emailFailed'));
     }
   }, [storeId, orderId, t, toastError, toastSuccess]);
+
+  if (gate) return gate;
 
   return (
     <AdminLayout mode="store_admin" storeId={storeId} title={t('title')}>

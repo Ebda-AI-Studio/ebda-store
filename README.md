@@ -78,7 +78,7 @@ Major capabilities added across this session (commit SHAs for reference):
 | **Async Jobs**      | Inngest (30+ functions, cloud-hosted step functions)       |
 | **Push**            | OneSignal + Web Push (VAPID dual-stack)                    |
 | **Email**           | Resend (transactional)                                     |
-| **Error Tracking**  | Sentry (three projects: api / admin / web)                 |
+| **Error Tracking**  | Sentry (four projects: api / web / admin / orders)         |
 | **Logging**         | Pino + Axiom drain (30-day retention)                      |
 | **Analytics**       | PostHog (storefront + admin)                               |
 | **Testing**         | Vitest (497+ tests)                                        |

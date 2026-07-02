@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
+import { useRequireFeature } from '@/hooks/useRequireFeature';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -167,6 +168,8 @@ function AnomalyRow({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AnomaliesPage() {
+  const { gate } = useRequireFeature('accounting.profit_anomaly');
+
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('finance.anomalies');
@@ -219,6 +222,8 @@ export default function AnomaliesPage() {
       setItems(prev => prev.map(a => (a.id === id ? { ...a, acknowledged: true } : a)));
     }
   }
+
+  if (gate) return gate;
 
   return (
     <AdminLayout title={t('title')}>

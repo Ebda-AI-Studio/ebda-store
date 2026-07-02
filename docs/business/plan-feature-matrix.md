@@ -4,7 +4,7 @@
 > (the code that actually gates features at runtime). If this table and the code disagree, the code
 > wins — regenerate this doc.**
 >
-> **Last synced: 2026-06-19.** Multi-currency, bank reconciliation, barcode scanning, and
+> **Last synced: 2026-07-02.** Multi-currency, bank reconciliation, barcode scanning, and
 > multi-warehouse are shipped Enterprise features (not roadmap). Tax reports (XLSX export),
 > profit anomaly watch, loyalty redemption, low-stock alerts, backorders, and server-side CAPI
 > pixels are also real and confirmed against code. The 2026-06 shipping/orders/payment-lifecycle
@@ -36,6 +36,7 @@ self-serve signup and no free trial). Super-admin can override any feature per s
 | Shipping carriers (`shipping_carriers`)                     |  —   |   ✅    |      ✅      |     ✅     |
 | Bulk operations (`bulk_operations`)                         |  —   |   ✅    |      ✅      |     ✅     |
 | Abandoned cart (`abandoned_cart`)                           |  —   |   ✅    |      ✅      |     ✅     |
+| Staff accounts (`staff_accounts`)                           |  —   |   ✅    |      ✅      |     ✅     |
 | Inventory — stock alerts (`inventory.stock_alerts`)         |  —   |    —    |      ✅      |     ✅     |
 | Inventory — backorder (`inventory.backorder`)               |  —   |    —    |      ✅      |     ✅     |
 | Accounting — basic / CoA + journals (`accounting.basic`)    |  —   |    —    |      ✅      |     ✅     |
@@ -55,16 +56,17 @@ self-serve signup and no free trial). Super-admin can override any feature per s
 | Affiliate program (`affiliate`)                             |  —   |    —    |      —       |     ✅     |
 | SMS (`sms`)                                                 |  —   |    —    |      —       |     ✅     |
 | Floating widget (`floating_widget`)                         |  —   |    —    |      —       |     ✅     |
+| Payment-gateway abandonment capture (`payment_abandonment`) |  —   |    —    |      —       |     ✅     |
 
 ## Not plan-gated by baseline (add-on or always-on)
 
 - **Product discount engine** (per-product percentage/fixed discount with live preview) — part of the core product editor; available from Starter up.
 - **WhatsApp Business Platform integration** (`whatsapp`) — **universal by default (managed-agency).** As of 2026-06-09 (#94) `whatsapp` is in `STARTER_CORE` and the `free` grace baseline, so the `/whatsapp` admin pages are accessible to **every** store out of the box (Ahmad onboards each client and WhatsApp is a core offering). It is still feature-gated, but the gate **defaults open** — access is restricted only by exception, when a super-admin sets a `StoreFeature` `whatsapp` override with `enabled=false` (e.g. a limited deal). This is the managed-agency default-everything/restrict-by-exception model, not a sold per-plan tier.
-- **AI Tools** (`ai_tools`) — admin AI-bulk-sweep pages are feature-gated as of 2026-06-09; only stores with `ai_tools` feature enabled see the AI Tools hub. This prevents unbounded Gemini API usage from stores that haven't been provisioned for it.
-- **Email campaigns** (`email_campaigns`), **customer wallet** (`customer_wallet`), **staff accounts** (`staff_accounts`) — present in the registry; enable per-store via override when sold. Not in baselines as of this sync.
+- **AI Tools** — the admin AI-bulk-sweep hub (`/stores/:id/ai-tools`) is feature-gated as of 2026-06-09. There is no standalone `ai_tools` `FeatureKey`; the page gates on **`bulk_operations`** (`useRequireFeature('bulk_operations')`, Starter+ — same row already in the matrix). This prevents unbounded Gemini API usage from stores below Starter.
+- **Email campaigns** (`email_campaigns`), **customer wallet** (`customer_wallet`) — present in the registry; enable per-store via override when sold. Not in baselines as of this sync. (**`staff_accounts`** moved from this list into `STARTER_CORE` on 2026-07-02 — it's now a real matrix row above, universal by default like `whatsapp`. The `/staff` admin page now renders the `FeatureUpgradeGate` for a store without it; API-side `staff.routes` enforcement is tracked separately.)
 - The legacy parent `inventory` flag is **intentionally not in any baseline** — code reads the granular `inventory.*` sub-keys.
 - **Delivery areas & fees** (governorate → area cascade, per-area fee, bulk xlsx/csv import + xlsx export, hide-unpriced) — **core shipping, ungated.** Part of the checkout + Settings → Shipping for every plan; not a `FeatureKey`. The legacy `ShippingZone` API stays as a fallback when a store has no area rates.
-- **Orders + Orders PWA CRUD** (status, mark-paid, payment link, refund, refresh payment/refund, invoice view/email, bulk mark-paid, activity timeline, staff order permissions) — **core, ungated.** There is no `orders` feature key; order management is universal. Staff visibility is governed by the staff/role system, not a plan baseline.
+- **Orders + Orders PWA CRUD** (status, mark-paid, payment link, refund, refresh payment/refund, bulk mark-paid, activity timeline, staff order permissions) — **core, ungated.** There is no `orders` feature key; order management is universal. Staff visibility is governed by the staff/role system, not a plan baseline. Exception: the **invoice viewer** (`/orders/:orderId/invoice`) admin page gates on **`accounting.invoicing`** (Professional+, same row already in the matrix) via `FeatureUpgradeGate` — the underlying API route itself has no plan check yet.
 - **Order payment-lifecycle alerts** ("Payment received", "Payment pending — follow up" via `STUCK_PAYMENT_MINUTES`, auto-cancel-unpaid via `AUTO_CANCEL_UNPAID_DAYS`, no-false-refund-on-unpaid-cancel) — **platform-level, ungated.** Background Inngest jobs that run for every store; tuned by env, not by plan.
 - **Inventory variant stock totals + paginated inventory page + per-type adjustment explanations** — **part of `inventory.basic` (Starter+)**, the same row already in the matrix. The barcode **Scan** modes (Receive / Pick / Count) are gated by `inventory.barcode` (**Enterprise**, already in the matrix).
 - **Storefront Locations page** (Google Maps embed, Page-Builder-editable, nav + mobile "Menu" drawer link) — **core storefront, ungated.**

@@ -151,7 +151,7 @@ Railway deploys from repo root so picks up `/railway.json` first. But if Railway
 **✅ Five-channel observability stack is excellent.**
 
 1. **UptimeRobot** — three monitors (API health, wadyaljuz, admin), 5-min interval, public status page. Per-merchant monitor instructions documented.
-2. **Sentry** — three projects (api/web/admin), correct `tracesSampleRate` (0.1 prod / 1.0 admin), no-op when DSN missing.
+2. **Sentry** — three projects (api/web/admin), correct `tracesSampleRate` (0.1 prod / 1.0 admin), no-op when DSN missing. _(updated 2026-07-02: now four — PR #497 adds `orders`; this is a point-in-time audit snapshot, left otherwise as-is.)_
 3. **PostHog** — consent-gated on storefront (rule 5 compliant), always-on on admin.
 4. **Telegram alerts** — `@ForceAI1_bot`, Redis-throttled (300s TTL), scope-aware headers, graceful no-op when unconfigured. P0/P1/info severity levels.
 5. **Axiom log drain** — `@axiomhq/pino` transport, in-process (no Railway Pro dependency), 30-day retention verified, dataset `force-api-railway`.
