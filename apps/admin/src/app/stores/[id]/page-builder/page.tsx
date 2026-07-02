@@ -2846,6 +2846,74 @@ export default function StoreLayoutPage() {
                       )}
                     </div>
                   </div>
+                  {/* Discount / sale badge group — merchant-configurable
+                      corner + color for the "Save X" / "-X%" chip. Default
+                      (unset) = bottom-left corner, theme destructive/red
+                      color. Position is PHYSICAL (not RTL-mirrored) — "Bottom
+                      left" always renders bottom-left, in Arabic stores too. */}
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+                    <p className="text-sm font-semibold text-foreground">
+                      Discount / sale badge — شارة الخصم
+                    </p>
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">
+                        Badge position — موضع الشارة
+                      </label>
+                      <select
+                        value={layout.productCardDefaults?.discountBadge?.position ?? ''}
+                        onChange={e =>
+                          setLayout(prev =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  productCardDefaults: {
+                                    ...(prev.productCardDefaults ?? {}),
+                                    discountBadge: {
+                                      ...(prev.productCardDefaults?.discountBadge ?? {}),
+                                      position:
+                                        (e.target.value as
+                                          | 'top-left'
+                                          | 'top-right'
+                                          | 'bottom-left'
+                                          | 'bottom-right') || undefined,
+                                    },
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Bottom left (default) — أسفل اليسار (افتراضي)</option>
+                        <option value="top-left">Top left — أعلى اليسار</option>
+                        <option value="top-right">Top right — أعلى اليمين</option>
+                        <option value="bottom-left">Bottom left — أسفل اليسار</option>
+                        <option value="bottom-right">Bottom right — أسفل اليمين</option>
+                      </select>
+                    </div>
+                    <ColorField
+                      label="Badge color"
+                      value={layout.productCardDefaults?.discountBadge?.color}
+                      onChange={v =>
+                        setLayout(prev =>
+                          prev
+                            ? {
+                                ...prev,
+                                productCardDefaults: {
+                                  ...(prev.productCardDefaults ?? {}),
+                                  discountBadge: {
+                                    ...(prev.productCardDefaults?.discountBadge ?? {}),
+                                    color: v || undefined,
+                                  },
+                                },
+                              }
+                            : prev
+                        )
+                      }
+                      hint="Unset = platform default red/destructive color."
+                      theme={storeInfo?.theme ?? FALLBACK_THEME}
+                    />
+                  </div>
                 </div>
                 <div className="mt-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

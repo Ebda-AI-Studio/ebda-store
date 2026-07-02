@@ -25,6 +25,7 @@ import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
 import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import { getDiscountBadgeColor, getDiscountBadgePosition } from '../shared/discount-badge';
 
 /**
  * Elegant Template - Product Card
@@ -135,6 +136,13 @@ function ElegantProductCard({
   const nameCase = layout?.productCardDefaults?.productNameCase;
   // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
   const viewOnly = defaults?.ctaMode === 'viewOnly';
+  // Discount/sale badge — merchant-configurable corner + color. Unset
+  // position defaults to bottom-left (physical, not RTL-mirrored).
+  const discountBadgePositionCls = getDiscountBadgePosition(
+    defaults?.discountBadge?.position,
+    isRtl
+  );
+  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
 
   return (
     <article
@@ -276,36 +284,33 @@ function ElegantProductCard({
             </div>
           )}
 
-          {/* Badges — BUG 1 fix: use helper text so fixed-KWD shows correctly.
-              BUG 2 fix: no inStock gate; when OOS stack below the 88×88 ribbon. */}
-          {orderable ? (
+          {/* NEW badge — BUG 2 fix: no inStock gate removed from the group;
+              NEW stays top corner, only shown when orderable (unchanged). */}
+          {orderable && product.isNew && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
-              {product.isNew && (
-                <ProductBadge
-                  variant="new"
-                  isRtl={isRtl}
-                  size="sm"
-                  className="text-[9px] tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal"
-                  label={isRtl ? 'جديد' : 'New'}
-                />
-              )}
-              {hasSale && discountBadgeText && (
-                <ProductBadge
-                  variant="sale"
-                  isRtl={isRtl}
-                  size="sm"
-                  className="text-[9px] tracking-[0.2em] uppercase rounded-none font-normal"
-                  label={discountBadgeText}
-                />
-              )}
+              <ProductBadge
+                variant="new"
+                isRtl={isRtl}
+                size="sm"
+                className="text-[9px] tracking-[0.2em] uppercase rounded-none bg-foreground text-background font-normal"
+                label={isRtl ? 'جديد' : 'New'}
+              />
             </ProductBadgeGroup>
-          ) : (
-            hasSale &&
-            discountBadgeText && (
-              <span className="absolute top-[92px] start-3 z-10 rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]">
-                {discountBadgeText}
-              </span>
-            )
+          )}
+          {/* Sale badge — pulled OUT of the NEW badge group so only IT moves
+              to the merchant-configured corner (default bottom-left,
+              physical — never mirrors with RTL). BUG 1 fix: helper text.
+              BUG 2 fix: no inStock gate. */}
+          {hasSale && discountBadgeText && (
+            <span
+              className={cn(
+                'absolute z-10 rounded-full px-2.5 py-1 text-[9px] font-normal tracking-[0.2em] uppercase text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
+                discountBadgePositionCls
+              )}
+              style={{ backgroundColor: discountBadgeColor }}
+            >
+              {discountBadgeText}
+            </span>
           )}
 
           {/* Quick Add — always visible on touch; slides up on hover for pointer devices.

@@ -28,6 +28,7 @@ import { cn } from '@force/ui';
 import type { ProductCarouselProps } from '../types';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
+import { getDiscountBadgeColor, getDiscountBadgePosition } from './discount-badge';
 
 /**
  * Horizontal-scroll product strip. Card chrome + CTA pill style vary per pack:
@@ -118,6 +119,13 @@ export function ProductCarousel({
   const nameCase = cardDefaults?.productNameCase;
   // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
   const viewOnly = cardDefaults?.ctaMode === 'viewOnly';
+  // Discount/sale badge — merchant-configurable corner + color. Unset
+  // position defaults to bottom-left (physical, not RTL-mirrored).
+  const discountBadgePositionCls = getDiscountBadgePosition(
+    cardDefaults?.discountBadge?.position,
+    isRtl
+  );
+  const discountBadgeColor = getDiscountBadgeColor(cardDefaults?.discountBadge?.color, store.theme);
   // Build CTA extra classes for inline carousel CTA buttons.
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
     .filter(Boolean)
@@ -438,14 +446,18 @@ export function ProductCarousel({
                           </div>
                         )}
                         {/* BUG 1 fix: use helper for KWD/pct text.
-                            BUG 2 fix: show when OOS too; stack under ribbon
-                            (ribbon is 88×88 at top-0 start-0; below = top-[92px]). */}
+                            BUG 2 fix: show when OOS too. Corner + color are
+                            merchant-configurable via
+                            productCardDefaults.discountBadge (default
+                            bottom-left, physical — never mirrors with RTL;
+                            clears the top OOS ribbon by design). */}
                         {onSale && discountBadgeText && (
                           <span
                             className={cn(
-                              'absolute z-10 rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
-                              inStock ? 'end-3 top-3' : 'start-3 top-[92px]'
+                              'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_6px_16px_-6px_rgba(220,38,38,0.45)]',
+                              discountBadgePositionCls
                             )}
+                            style={{ backgroundColor: discountBadgeColor }}
                           >
                             {discountBadgeText}
                           </span>

@@ -579,6 +579,16 @@ const layoutSchemaInternal = z
         // listed or Zod silently strips it on every PUT (no .passthrough()).
         // Keep in sync with ProductCardDefaults in packages/shared/src/types/store-layout.ts.
         ctaMode: z.enum(['auto', 'viewOnly']).optional(),
+        // 2026-07: discount/sale badge corner + color. Must be listed or Zod
+        // silently strips it on every PUT (no .passthrough()). Keep in sync
+        // with ProductCardDefaults in packages/shared/src/types/store-layout.ts.
+        discountBadge: z
+          .object({
+            position: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right']).optional(),
+            color: colorValue,
+          })
+          .partial()
+          .optional(),
       })
       .partial()
       .optional(),
@@ -693,7 +703,6 @@ const layoutSchemaInternal = z
  * ("inferred type exceeds maximum length") — the inferred Zod type is too deep
  * for tsc to serialize on an export. The test only needs `.shape`.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const layoutSchema: z.ZodObject<Record<string, z.ZodTypeAny>> = layoutSchemaInternal;
 
 /**

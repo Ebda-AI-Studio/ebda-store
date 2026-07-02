@@ -862,6 +862,19 @@ export interface ProductCardDefaults {
    *              OOS state still applies (card still shows as disabled/dim).
    */
   ctaMode?: 'auto' | 'viewOnly';
+  /**
+   * Discount/sale badge ("Save X" / "-X%") corner + color, sibling to
+   * ctaShape/oosLabel*. Position uses PHYSICAL corners (not logical
+   * start/end) so "bottom-left" renders at the physical bottom-left in
+   * BOTH LTR and RTL storefronts — unlike oosLabelPlacement, this badge
+   * must NOT mirror with reading direction. Unset position defaults to
+   * 'bottom-left' at render time (apps/web/src/templates/shared/discount-badge.ts).
+   * Unset color defaults to the platform destructive/red token.
+   */
+  discountBadge?: {
+    position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+    color?: string; // token:* or hex; unset = theme destructive/red default
+  };
 }
 
 export interface StoreLayoutSettings {

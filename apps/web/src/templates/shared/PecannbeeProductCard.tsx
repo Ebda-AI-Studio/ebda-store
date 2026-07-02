@@ -29,6 +29,7 @@ import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
 import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
+import { getDiscountBadgeColor, getDiscountBadgePosition } from './discount-badge';
 
 interface PecannbeeProductCardProps extends ProductCardProps {
   pack?: TemplateId;
@@ -182,6 +183,13 @@ function PecannbeeProductCardImpl({
   const nameCase = defaults?.productNameCase;
   // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
   const viewOnly = defaults?.ctaMode === 'viewOnly';
+  // Discount/sale badge — merchant-configurable corner + color. Unset
+  // position defaults to bottom-left (physical, not RTL-mirrored).
+  const discountBadgePositionCls = getDiscountBadgePosition(
+    defaults?.discountBadge?.position,
+    isRtl
+  );
+  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
 
   // CTA shape + size classes (additive — '' when unset so pack styles win).
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
@@ -339,17 +347,17 @@ function PecannbeeProductCardImpl({
           {/* Bucket C5: brand pill — hidden when OOS ribbon or NEW
               badge already occupies the top-START corner. */}
           <BrandPill hidden={!inStock || showNewBadge} />
-          {/* Sale chip — always shown when on sale (BUG 1 + BUG 2 fix).
-              When in stock: top-END corner (standard Pecannbee position).
-              When OOS: stacked below the OutOfStockRibbon on the START side
-              (ribbon is 88×88 absolute top-0 start-0; badge sits at top-[92px]
-              start-3 so it reads as directly underneath the ribbon). */}
+          {/* Sale chip — always shown when on sale (BUG 1 + BUG 2 fix),
+              both stock states. Corner + color are merchant-configurable
+              via productCardDefaults.discountBadge (default bottom-left,
+              physical — never mirrors with RTL). */}
           {onSale && discountBadgeText && (
             <span
               className={cn(
-                'absolute z-10 rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
-                inStock ? 'top-3 end-3' : 'top-[92px] start-3'
+                'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
+                discountBadgePositionCls
               )}
+              style={{ backgroundColor: discountBadgeColor }}
             >
               {discountBadgeText}
             </span>

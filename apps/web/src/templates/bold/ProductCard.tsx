@@ -21,6 +21,7 @@ import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { Price, ProductBadge, ProductBadgeGroup, cn } from '@force/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
+import { getDiscountBadgeColor, getDiscountBadgePosition } from '../shared/discount-badge';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
@@ -121,6 +122,13 @@ function BoldProductCard({
   const nameCase = layout?.productCardDefaults?.productNameCase;
   // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
   const viewOnly = defaults?.ctaMode === 'viewOnly';
+  // Discount/sale badge — merchant-configurable corner + color. Unset
+  // position defaults to bottom-left (physical, not RTL-mirrored).
+  const discountBadgePositionCls = getDiscountBadgePosition(
+    defaults?.discountBadge?.position,
+    isRtl
+  );
+  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
 
   return (
     <article
@@ -226,34 +234,33 @@ function BoldProductCard({
             theme={store.theme}
           />
 
-          {/* Badges — BUG 1 fix: helper text. BUG 2 fix: show when OOS; stack below ribbon. */}
-          {orderable ? (
+          {/* NEW badge — BUG 2 fix: no inStock gate removed from the group;
+              NEW stays top corner, only shown when orderable (unchanged). */}
+          {orderable && product.isNew && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
-              {discountBadgeText && (
-                <ProductBadge
-                  variant="sale"
-                  label={discountBadgeText}
-                  isRtl={isRtl}
-                  size="md"
-                  className="font-black px-3 py-1.5 rounded-none"
-                />
-              )}
-              {product.isNew && (
-                <ProductBadge
-                  variant="new"
-                  isRtl={isRtl}
-                  size="md"
-                  className="font-black px-3 py-1.5 rounded-none"
-                  label={isRtl ? 'جديد!' : 'NEW!'}
-                />
-              )}
+              <ProductBadge
+                variant="new"
+                isRtl={isRtl}
+                size="md"
+                className="font-black px-3 py-1.5 rounded-none"
+                label={isRtl ? 'جديد!' : 'NEW!'}
+              />
             </ProductBadgeGroup>
-          ) : (
-            discountBadgeText && (
-              <span className="absolute top-[92px] start-3 z-10 rounded-none bg-red-500 px-3 py-1.5 text-xs font-black tracking-wider text-white">
-                {discountBadgeText}
-              </span>
-            )
+          )}
+          {/* Sale badge — pulled OUT of the NEW badge group so only IT moves
+              to the merchant-configured corner (default bottom-left,
+              physical — never mirrors with RTL). BUG 1 fix: helper text.
+              BUG 2 fix: no inStock gate. */}
+          {discountBadgeText && (
+            <span
+              className={cn(
+                'absolute z-10 rounded-none px-3 py-1.5 text-xs font-black tracking-wider text-white',
+                discountBadgePositionCls
+              )}
+              style={{ backgroundColor: discountBadgeColor }}
+            >
+              {discountBadgeText}
+            </span>
           )}
 
           {/* Quick Add — always visible on touch (mobile/tablet); slides up on hover for pointer devices.

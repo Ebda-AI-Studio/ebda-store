@@ -12,6 +12,10 @@ import { cn, CartIcon } from '@force/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
 import type { CtaShape, CtaSize } from '../../templates/shared/card-size';
+import {
+  getDiscountBadgeColor,
+  getDiscountBadgePosition,
+} from '../../templates/shared/discount-badge';
 
 interface ProductListItemProps {
   product: Product;
@@ -71,6 +75,13 @@ export function ProductListItem({
   const nameCase = defaults?.productNameCase;
   // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
   const viewOnly = defaults?.ctaMode === 'viewOnly';
+  // Discount/sale badge — merchant-configurable corner + color. Unset
+  // position defaults to bottom-left (physical, not RTL-mirrored).
+  const discountBadgePositionCls = getDiscountBadgePosition(
+    defaults?.discountBadge?.position,
+    isRtl
+  );
+  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
 
   // CTA shape + size extra classes.
   const ctaExtraCls = [ctaShapeClass(resolvedCtaShape), ctaSizeClass(resolvedCtaSize)]
@@ -96,14 +107,16 @@ export function ProductListItem({
       {/* Image */}
       <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 to-primary/10">
         {/* Sale badge — BUG 1 fix: show KWD or pct text via helper.
-            BUG 2 fix: no inStock gate. */}
+            BUG 2 fix: no inStock gate. Corner + color are merchant-
+            configurable via productCardDefaults.discountBadge (default
+            bottom-left, physical — never mirrors with RTL). */}
         {(pricing.displayCompare || pricing.hasVariantDiscount) && discountBadgeText && (
           <span
             className={cn(
-              'absolute z-10 rounded-full bg-destructive px-2 py-0.5 text-xs font-bold uppercase text-white',
-              // BUG 2: when OOS, drop the badge below the OOS ribbon (88px) so they stack.
-              orderable ? 'start-2 top-2' : 'start-3 top-[92px]'
+              'absolute z-10 rounded-full px-2 py-0.5 text-xs font-bold uppercase text-white',
+              discountBadgePositionCls
             )}
+            style={{ backgroundColor: discountBadgeColor }}
           >
             {discountBadgeText}
           </span>

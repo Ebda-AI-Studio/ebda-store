@@ -20,6 +20,7 @@ import { useStore } from '../../contexts/StoreContext';
 import { resolveColor, getProductCardTextSizes } from '@force/shared';
 import { Price, ProductBadge, ProductBadgeGroup, Rating, cn } from '@force/ui';
 import { getDiscountBadgeText } from '../../lib/product-pricing';
+import { getDiscountBadgeColor, getDiscountBadgePosition } from '../shared/discount-badge';
 import { PlaceholderImageIcon } from '../shared/icons';
 import { CompareButton, RemoveFromWishlistButton } from '../shared/card-actions';
 import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
@@ -137,6 +138,13 @@ function ModernProductCard({
   const nameCase = defaults?.productNameCase;
   // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
   const viewOnly = defaults?.ctaMode === 'viewOnly';
+  // Discount/sale badge — merchant-configurable corner + color. Unset
+  // position defaults to bottom-left (physical, not RTL-mirrored).
+  const discountBadgePositionCls = getDiscountBadgePosition(
+    defaults?.discountBadge?.position,
+    isRtl
+  );
+  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
 
   return (
     <article
@@ -241,25 +249,29 @@ function ModernProductCard({
             </div>
           )}
 
-          {/* Badges — sale + new only. Out-of-stock now uses the shared
-              prominent red ribbon (OutOfStockRibbon below) to match the
-              pecannbee/alkahraman target across every theme.
-              BUG 1 fix: pass helper text via label so fixed-KWD shows correctly.
-              BUG 2 fix: no inStock gate — badge shows when OOS too; when OOS
-              move to start-3/top-[92px] below the 88×88 ribbon. */}
-          {orderable ? (
+          {/* NEW badge — out-of-stock now uses the shared prominent red
+              ribbon (OutOfStockRibbon below) to match the pecannbee/
+              alkahraman target across every theme. NEW stays top corner,
+              only shown when orderable (unchanged). */}
+          {orderable && product.isNew && (
             <ProductBadgeGroup absolute position={isRtl ? 'top-right' : 'top-left'} isRtl={isRtl}>
-              {discountBadgeText && (
-                <ProductBadge variant="sale" label={discountBadgeText} isRtl={isRtl} size="sm" />
-              )}
-              {product.isNew && <ProductBadge variant="new" isRtl={isRtl} size="sm" />}
+              <ProductBadge variant="new" isRtl={isRtl} size="sm" />
             </ProductBadgeGroup>
-          ) : (
-            discountBadgeText && (
-              <span className="absolute top-[92px] start-3 z-10 rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]">
-                {discountBadgeText}
-              </span>
-            )
+          )}
+          {/* Sale badge — pulled OUT of the NEW badge group so only IT moves
+              to the merchant-configured corner (default bottom-left,
+              physical — never mirrors with RTL). BUG 1 fix: helper text.
+              BUG 2 fix: no inStock gate. */}
+          {discountBadgeText && (
+            <span
+              className={cn(
+                'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide text-white shadow-[0_8px_20px_-8px_rgba(220,38,38,0.45)]',
+                discountBadgePositionCls
+              )}
+              style={{ backgroundColor: discountBadgeColor }}
+            >
+              {discountBadgeText}
+            </span>
           )}
 
           {/* Platform-level OOS ribbon (top-start, red, bold) — same visual

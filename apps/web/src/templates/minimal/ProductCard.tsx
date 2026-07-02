@@ -29,6 +29,7 @@ import {
   ProductCardCta,
   isProductNew,
 } from '../shared/ProductCardCta';
+import { getDiscountBadgeColor } from '../shared/discount-badge';
 import { cn } from '@force/ui';
 
 /**
@@ -127,6 +128,12 @@ function MinimalProductCard({
   const nameCase = layout?.productCardDefaults?.productNameCase;
   // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
   const viewOnly = defaults?.ctaMode === 'viewOnly';
+  // Discount/sale badge — minimal's badge is inline text below the price
+  // (no corner overlay by design, "minimal pack stays chrome-free"), so
+  // only the merchant-configurable COLOR applies here; the position field
+  // is a no-op for this theme. Unset color falls back to the platform
+  // destructive/red default (matches the previous hardcoded text-red-600).
+  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
 
   return (
     <article
@@ -336,10 +343,16 @@ function MinimalProductCard({
               />
             )}
             {/* Discount indicator — minimal pack stays chrome-free, so use a
-              short label inline. BUG 1 fix: show helper text (KWD or pct).
-              BUG 2 fix: shown even when OOS (no inStock gate). */}
+              short label inline (no corner overlay; the position field of
+              productCardDefaults.discountBadge is a no-op here by design).
+              BUG 1 fix: show helper text (KWD or pct).
+              BUG 2 fix: shown even when OOS (no inStock gate). Color is
+              merchant-configurable via productCardDefaults.discountBadge.color. */}
             {priceVisible && hasSale && discountBadgeText && (
-              <p className="text-[10px] tracking-[0.25em] uppercase text-red-600 font-semibold">
+              <p
+                className="text-[10px] tracking-[0.25em] uppercase font-semibold"
+                style={{ color: discountBadgeColor }}
+              >
                 {discountBadgeText}
               </p>
             )}

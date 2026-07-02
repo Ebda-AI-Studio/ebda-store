@@ -25,6 +25,7 @@ import { TaxInclusiveLabel } from '../shared/tax-inclusive-label';
 import { productCardPropsEqual } from '../shared/product-card-memo';
 import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
 import { OosImageDim, ProductCardCta, OutOfStockRibbon } from '../shared/ProductCardCta';
+import { getDiscountBadgeColor, getDiscountBadgePosition } from '../shared/discount-badge';
 
 /**
  * Classic Template - Product Card
@@ -122,6 +123,13 @@ function ClassicProductCard({
   const nameCase = defaults?.productNameCase;
   // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
   const viewOnly = defaults?.ctaMode === 'viewOnly';
+  // Discount/sale badge — merchant-configurable corner + color. Unset
+  // position defaults to bottom-left (physical, not RTL-mirrored).
+  const discountBadgePositionCls = getDiscountBadgePosition(
+    defaults?.discountBadge?.position,
+    isRtl
+  );
+  const discountBadgeColor = getDiscountBadgeColor(defaults?.discountBadge?.color, store.theme);
 
   return (
     <article
@@ -233,25 +241,21 @@ function ClassicProductCard({
             />
           </div>
 
-          {/* Badges — top corner. Sale badge wins over "new" when both apply.
-              BUG 1 fix: label comes from helper (KWD or pct).
-              BUG 2 fix: when OOS, stack below the 88×88 ribbon (start-3 top-[92px]). */}
+          {/* Badges — top corner for "new"; sale badge wins over "new" when
+              both apply. BUG 1 fix: label comes from helper (KWD or pct).
+              BUG 2 fix: no inStock gate. Sale badge corner + color are
+              merchant-configurable via productCardDefaults.discountBadge
+              (default bottom-left, physical — never mirrors with RTL). */}
           {hasSale && discountBadgeText ? (
-            orderable ? (
-              <ProductBadge
-                variant="sale"
-                isRtl={isRtl}
-                size="sm"
-                absolute
-                position={isRtl ? 'top-right' : 'top-left'}
-                className="font-serif tracking-widest uppercase bg-destructive text-destructive-foreground rounded-none text-[10px]"
-                label={discountBadgeText}
-              />
-            ) : (
-              <span className="absolute top-[92px] start-3 z-10 rounded-full bg-destructive px-2.5 py-1 text-xs font-semibold font-serif tracking-widest uppercase text-white shadow-[0_8px_20px_-8px_hsl(var(--destructive)/0.35)]">
-                {discountBadgeText}
-              </span>
-            )
+            <span
+              className={cn(
+                'absolute z-10 rounded-full px-2.5 py-1 text-xs font-semibold font-serif tracking-widest uppercase text-white shadow-[0_8px_20px_-8px_hsl(var(--destructive)/0.35)]',
+                discountBadgePositionCls
+              )}
+              style={{ backgroundColor: discountBadgeColor }}
+            >
+              {discountBadgeText}
+            </span>
           ) : (
             !hasSale &&
             product.isNew &&
