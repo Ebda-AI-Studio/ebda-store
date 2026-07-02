@@ -158,7 +158,16 @@ job **queues** until it wakes — it doesn't fail, it just waits.
 
 ## Follow-ups
 
-- **Server-side Sentry** is inactive on the CF target for web + admin (the OpenNext
-  build moves `instrumentation.ts` aside). Client-side Sentry works via each app's
-  `instrumentation-client.ts`. Full SSR Sentry on Workers needs the
-  `@sentry/cloudflare` SDK — separate task.
+- **Server-side Sentry on the CF target — web DONE (2026-07-02), admin/orders still open.**
+  `apps/web/sentry-worker-entry.ts` wraps the OpenNext Worker's fetch handler with
+  `@sentry/cloudflare`'s `Sentry.withSentry(...)`, `apps/web/wrangler.jsonc` `main`
+  points at it, and `compatibility_date` was bumped to `2025-08-16` (Sentry's
+  Cloudflare SDK requires it for `https.request`). The `deploy-web` job passes the
+  DSN as a runtime var: `wrangler deploy --var SENTRY_DSN:<value>`, sourced from
+  the same `NEXT_PUBLIC_SENTRY_DSN_WEB` repo variable used for client Sentry —
+  omitted entirely when unset, so unconfigured/preview deploys still build. Client-side
+  Sentry works via each app's `instrumentation-client.ts` regardless. **`apps/admin`**
+  (has `instrumentation.ts` + `NEXT_PUBLIC_SENTRY_DSN_ADMIN` already) and **`apps/orders`**
+  (no Sentry wiring at all yet) still need the same worker-entry treatment — repeat the
+  `apps/web` pattern for each: custom worker entry + `main` override + compat-date bump
+  - `--var` in their `cf-deploy.yml` deploy jobs.

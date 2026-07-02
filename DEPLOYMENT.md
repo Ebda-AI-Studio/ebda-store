@@ -367,6 +367,7 @@ Four Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 - **No-op when DSN missing** (graceful in dev / preview / pre-account-creation).
 - **Source maps + releases (added 2026-07-02, audit H2)**: web/admin/orders `next.config.js` are now wrapped in `withSentryConfig`. Upload only activates when `SENTRY_AUTH_TOKEN` (+ optional `SENTRY_ORG`/`SENTRY_PROJECT`) is set — omitted everywhere today, so this is a no-op until configured on Vercel. Before this, every Sentry issue from web/admin arrived with minified/obfuscated stack traces and no release association.
 - **Sample rates**: storefront `tracesSampleRate=0.1` in prod (high traffic), admin `1.0` (low volume, every trace is signal). Session replays fire only on errors, not on healthy sessions.
+- **Cloudflare Workers target — storefront only (2026-07-02):** the standard `@sentry/nextjs` server SDK can't run on Workers (and `cf-build.sh` moves `instrumentation.ts` aside for the CF build regardless — see `docs/migration/cloudflare-preview-workers.md`). `apps/web/sentry-worker-entry.ts` wraps the OpenNext Worker's fetch handler with `@sentry/cloudflare`'s `Sentry.withSentry(...)` so SSR/RSC errors ARE captured on `store.force-ai.co` too. The DSN reaches the Worker as a runtime var `SENTRY_DSN` (`cf-deploy.yml` → `wrangler deploy --var SENTRY_DSN:<value>`, sourced from the same `NEXT_PUBLIC_SENTRY_DSN_WEB` repo variable; omitted → clean no-op). `apps/admin` and `apps/orders` do NOT have this yet — follow-up, same pattern.
 
 ### 3. PostHog — product analytics
 

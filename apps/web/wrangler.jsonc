@@ -1,7 +1,13 @@
 {
   "name": "force-web-cf-preview",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2025-03-25",
+  // Custom worker entry (NOT the raw OpenNext output) — wraps the generated
+  // fetch handler with @sentry/cloudflare so SSR/RSC errors are captured on
+  // this target. See apps/web/sentry-worker-entry.ts for the why + sources.
+  "main": "sentry-worker-entry.ts",
+  // 2025-08-16+ is REQUIRED by Sentry's Cloudflare SDK (needs `https.request`
+  // to transmit events) — bumped from 2025-03-25 specifically for this.
+  // https://docs.sentry.io/platforms/javascript/guides/cloudflare/frameworks/nextjs/
+  "compatibility_date": "2025-08-16",
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "routes": [

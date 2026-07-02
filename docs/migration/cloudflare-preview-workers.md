@@ -96,11 +96,11 @@ Error: File server/instrumentation.js does not exist
 
 This is triggered by the **mere presence** of `instrumentation.ts`, independent of its contents — so there is **no in-file code fix** (verified 2026-06-19: gating/lazy-importing the Sentry calls inside the file does not help; the trace step fails before any of that runs). It is an upstream `@opennextjs/aws` limitation, still present in the **latest** `@opennextjs/cloudflare@1.19.11`. The only reliable workaround is to build with the file absent, which `scripts/cf-build.sh` automates safely. `apps/web` + `apps/admin` both have an `instrumentation.ts`; `apps/orders` has none (builds straight).
 
-**Possible future eliminations (not needed for preview):** (a) an OpenNext release that fixes `copyTracedFiles` for instrumentation → then the file can stay; (b) move server-side Sentry to `@sentry/cloudflare` (Workers SDK) AND drop `instrumentation.ts` on the CF build — heavier, risks the live Vercel Sentry wiring, deferred to prod cutover. Tracked in `cloudflare-readiness.md` §1.
+**Possible future eliminations (not needed for preview):** (a) an OpenNext release that fixes `copyTracedFiles` for instrumentation → then the file can stay; (b) move server-side Sentry to `@sentry/cloudflare` (Workers SDK) — **done for `apps/web` 2026-07-02** via `apps/web/sentry-worker-entry.ts` (see `cloudflare-ci-deploy.md` Follow-ups). Note this did NOT eliminate the move-aside — that's still required for the unrelated `copyTracedFiles` bug above, independent of Sentry; `instrumentation.ts` still gets moved aside on every `apps/web` CF build, and SSR Sentry now runs via the worker-entry wrapper instead. `apps/admin` still needs the same worker-entry treatment (still `instrumentation.ts`-moved-aside + no CF SSR Sentry); `apps/orders` has no Sentry at all today.
 
 ## Next steps (when promoting beyond preview)
 
-1. Re-check newer `@opennextjs/cloudflare` for the `copyTracedFiles` instrumentation fix; if shipped, drop the move-aside. Otherwise `@sentry/cloudflare` across web + admin.
+1. Re-check newer `@opennextjs/cloudflare` for the `copyTracedFiles` instrumentation fix; if shipped, drop the move-aside. `@sentry/cloudflare` is live for web — repeat for admin.
 2. Commit the build tooling (devDeps + worker config) + wire a CI build job, lockfile regenerated with npm 10.8.2.
 3. Cloudflare for SaaS custom-hostname onboarding per client domain (production DNS — canary 1–2 stores first, per `cloudflare-readiness.md`).
 

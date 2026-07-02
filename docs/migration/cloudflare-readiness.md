@@ -48,6 +48,7 @@ Cloudflare Workers is **not Node** — native binaries (`sharp`) and Node-runtim
 Affects: FWB web, FWB admin, WBS frontend. The hook loads `@sentry/nextjs` + `sentry.server.config.ts` for the Node runtime; that won't run on Workers, and OpenNext can't trace the compiled `server/instrumentation.js` in the monorepo standalone.
 
 - **Fix:** use **`@sentry/cloudflare`** (Workers SDK) for the server side, or gate the Node instrumentation to only load when `NEXT_RUNTIME === 'nodejs'` AND not on Workers. One shared change.
+- **Status (2026-07-02): done for FWB web** — `apps/web/sentry-worker-entry.ts` wraps the OpenNext Worker fetch handler with `Sentry.withSentry(...)`; see `cloudflare-ci-deploy.md` Follow-ups for the exact wiring. FWB admin + WBS frontend still need the same treatment.
 
 ### 2. `opengraph-image.tsx` — `sharp` → `next/og`
 

@@ -165,7 +165,20 @@ jobs:
         run: npx wrangler r2 bucket create force-web-opennext-cache || true
       - name: Deploy worker
         working-directory: apps/web
-        run: npx wrangler deploy
+        # SSR/RSC Sentry (@sentry/cloudflare, see sentry-worker-entry.ts) reads
+        # its DSN from the Worker's runtime `env`, not build-time NEXT_PUBLIC_*
+        # inlining — `--var` sets it as a plain (non-secret; the DSN is already
+        # public in the client bundle) runtime var. Reuses the SAME repo
+        # variable as client Sentry, so no new secret to provision. Omitted
+        # entirely when unset → sentry-worker-entry.ts no-ops cleanly.
+        env:
+          SENTRY_DSN_WEB: ${{ vars.NEXT_PUBLIC_SENTRY_DSN_WEB }}
+        run: |
+          if [ -n "$SENTRY_DSN_WEB" ]; then
+            npx wrangler deploy --var "SENTRY_DSN:${SENTRY_DSN_WEB}"
+          else
+            npx wrangler deploy
+          fi
 
   deploy-admin:
     name: Deploy admin
