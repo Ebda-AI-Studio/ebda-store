@@ -250,11 +250,13 @@ jobs:
         env:
           V_ONESIGNAL_ORDERS: ${{ vars.NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID }}
           V_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+          V_SENTRY_DSN_ORDERS: ${{ vars.NEXT_PUBLIC_SENTRY_DSN_ORDERS }}
         run: |
           cat > apps/orders/.env.production.local <<EOF
           NEXT_PUBLIC_API_URL=https://api.force-ai.co
           NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID=${V_ONESIGNAL_ORDERS}
           NEXT_PUBLIC_VAPID_PUBLIC_KEY=${V_VAPID_PUBLIC_KEY}
+          NEXT_PUBLIC_SENTRY_DSN_ORDERS=${V_SENTRY_DSN_ORDERS}
           EOF
           echo "wrote apps/orders/.env.production.local"
       - name: Build for Cloudflare (OpenNext)

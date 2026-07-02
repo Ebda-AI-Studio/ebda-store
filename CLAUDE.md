@@ -449,20 +449,27 @@ Optional (feature degrades gracefully if missing):
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL (e.g., `https://api-production-c058.up.railway.app`)
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for the admin PWA (`react-onesignal` in `apps/admin`).
-- `NEXT_PUBLIC_SENTRY_DSN_ADMIN` — admin client Sentry DSN. Initialized in `apps/admin/instrumentation-client.ts` (replaced the dead `sentry.client.config.ts`, same latent bug as web — no `withSentryConfig`, fixed 2026-06-25). Server Sentry off on the CF target (instrumentation.ts moved aside).
+- `NEXT_PUBLIC_SENTRY_DSN_ADMIN` — admin client Sentry DSN. Initialized in `apps/admin/instrumentation-client.ts` (replaced the dead `sentry.client.config.ts`, same latent bug as web — no `withSentryConfig`, fixed 2026-06-25). Server Sentry off on the CF target (instrumentation.ts moved aside). **`next.config.js` is now wrapped in `withSentryConfig` (fixed 2026-07-02, audit H2)** — see the shared `SENTRY_AUTH_TOKEN` note below for source maps/releases.
 
 ### Web (Vercel)
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for storefront broadcasts (script-tag init via `OneSignalStorefrontInit.tsx`). Storefront silently no-ops when missing.
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — VAPID public key for the standards-based Web Push subscription path.
-- `NEXT_PUBLIC_SENTRY_DSN_WEB` — client-side Sentry DSN. Initialized in `apps/web/instrumentation-client.ts` (the Next 15.3+/Sentry v10 client hook). NOTE: this REPLACED the old `sentry.client.config.ts`, which never loaded because `next.config.js` isn't wrapped in `withSentryConfig` — so browser Sentry was silently dead until 2026-06-25. Server-side Sentry (`instrumentation.ts` → `sentry.server.config.ts`) works on Vercel but is OFF on the Cloudflare target (cf-build moves `instrumentation.ts` aside); restoring it there needs `@sentry/cloudflare`.
+- `NEXT_PUBLIC_SENTRY_DSN_WEB` — client-side Sentry DSN. Initialized in `apps/web/instrumentation-client.ts` (the Next 15.3+/Sentry v10 client hook). NOTE: this REPLACED the old `sentry.client.config.ts`, which never loaded because `next.config.js` isn't wrapped in `withSentryConfig` — so browser Sentry was silently dead until 2026-06-25. Server-side Sentry (`instrumentation.ts` → `sentry.server.config.ts`) works on Vercel but is OFF on the Cloudflare target (cf-build moves `instrumentation.ts` aside); restoring it there needs `@sentry/cloudflare`. **`next.config.js` is now wrapped in `withSentryConfig` (fixed 2026-07-02, audit H2)** — see the shared `SENTRY_AUTH_TOKEN` note below.
 - **Cloudflare deploy build env**: the CF Workers build (`cf-deploy.yml`) reads all `NEXT_PUBLIC_*` from GitHub repo **variables** (public, build-time inlined). Keep them synced with Vercel's `force-web` prod env. See `docs/migration/cloudflare-ci-deploy.md`.
 
 ### Orders PWA (Vercel — `force-orders`)
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL.
 - `NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID` — OneSignal app ID for the Orders PWA (`react-onesignal` init via `OneSignalInit.tsx`, origin `orders.forcemediakw.com`). The app silently no-ops (no Enable banner) when missing. Replaced the old `NEXT_PUBLIC_VAPID_PUBLIC_KEY` path (server 403 + iOS-unreliable) on 2026-06-24.
+- `NEXT_PUBLIC_SENTRY_DSN_ORDERS` — **new (2026-07-02, audit H1)**. Orders PWA client Sentry DSN. Previously the Orders PWA — the surface store staff use to run live fulfillment — shipped with zero Sentry coverage; a crash was invisible. Initialized in `apps/orders/instrumentation-client.ts` (same client-only pattern as web/admin — no server-side Sentry added here, matching the scope of this fix). Wired into `cf-deploy.yml`'s `deploy-orders` env block via GitHub repo variable of the same name (keep synced with Vercel's `force-orders` prod env). `next.config.js` wrapped in `withSentryConfig` too.
+
+**Sentry build-time config (source maps + releases, added 2026-07-02, audit H2) — shared across web/admin/orders:**
+
+- `SENTRY_AUTH_TOKEN` — enables the Sentry webpack/Turbopack plugin's source-map upload + release creation during `next build`. **Optional and safe to omit**: when unset, the plugin logs a warning and skips the upload — it does NOT fail the build. This is why local dev, CI's `npm run build` step, and the Cloudflare Workers build (`cf-deploy.yml` doesn't set it) are all unaffected; only environments where this is explicitly configured (e.g. Vercel prod) get uploaded source maps + linked releases.
+- `SENTRY_ORG` / `SENTRY_PROJECT` — Sentry org/project slugs for the upload. Optional; the plugin can often infer them from the auth token, but set explicitly for clarity.
+- Set these on Vercel (web/admin/orders prod envs) to actually get readable stack traces in Sentry. Not currently set anywhere — until they are, behavior is unchanged from before this fix (no source maps uploaded, same as always).
 
 ## Commands
 

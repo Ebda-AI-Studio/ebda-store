@@ -1,4 +1,5 @@
 const path = require('path');
+const { withSentryConfig } = require('@sentry/nextjs');
 
 // Cloudflare/OpenNext build target detection. Set OPEN_NEXT_CLOUDFLARE=1 in the
 // Cloudflare build; CF_PAGES is auto-set by Cloudflare Pages. Default (Vercel/
@@ -162,4 +163,24 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+// Wraps the config with Sentry's build-time integration so source maps upload
+// and a release is created (audit 2026-07-02 H2 — this was previously bare,
+// so every Sentry issue arrived with minified/obfuscated stack traces).
+//
+// Conservative + reversible: the Sentry bundler plugin no-ops the upload (logs
+// a warning, does NOT fail the build) whenever `authToken` is absent — see
+// @sentry/bundler-plugin-core's `!options.authToken` guard. That means local
+// dev, CI (`ci.yml`'s `npm run build` step has no SENTRY_AUTH_TOKEN), and the
+// Cloudflare Workers build (`cf-deploy.yml` doesn't set it either) all build
+// exactly as before: no source maps uploaded, no release created, zero risk of
+// a new build failure. Set SENTRY_AUTH_TOKEN (+ optionally SENTRY_ORG /
+// SENTRY_PROJECT) wherever you want uploads to actually happen (e.g. Vercel
+// prod env) to get the benefit.
+module.exports = withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  widenClientFileUpload: true,
+  telemetry: false,
+});

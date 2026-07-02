@@ -1,5 +1,6 @@
 const path = require('path');
 const createNextIntlPlugin = require('next-intl/plugin');
+const { withSentryConfig } = require('@sentry/nextjs');
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
@@ -149,4 +150,18 @@ const nextConfig = {
   },
 };
 
-module.exports = withNextIntl(nextConfig);
+// Wraps the config with Sentry's build-time integration so source maps upload
+// and a release is created (audit 2026-07-02 H2 — this was previously bare,
+// so every Sentry issue arrived with minified/obfuscated stack traces). See
+// apps/web/next.config.js for the full rationale (same pattern here) — the
+// Sentry bundler plugin no-ops the upload (warns, doesn't fail the build)
+// whenever SENTRY_AUTH_TOKEN is unset, so CI/local/Cloudflare builds are
+// unaffected unless the token is explicitly configured.
+module.exports = withSentryConfig(withNextIntl(nextConfig), {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  widenClientFileUpload: true,
+  telemetry: false,
+});

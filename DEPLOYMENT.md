@@ -219,7 +219,8 @@ Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/
 
 ### Monitoring
 
-- [ ] Set up Sentry for error tracking (SENTRY_DSN on Railway + NEXT_PUBLIC_SENTRY_DSN_ADMIN/WEB on Vercel)
+- [ ] Set up Sentry for error tracking (SENTRY_DSN on Railway + NEXT_PUBLIC_SENTRY_DSN_ADMIN/WEB/ORDERS on Vercel)
+- [ ] Set SENTRY_AUTH_TOKEN (+ SENTRY_ORG / SENTRY_PROJECT) on Vercel for web/admin/orders to get source maps + releases uploaded (optional — builds succeed without it, just with minified stack traces)
 - [ ] Enable Railway metrics alerts
 - [ ] Confirm Neon compute usage alerts are configured in the Neon dashboard
 
@@ -357,12 +358,14 @@ catches something the others can't.
 
 ### 2. Sentry — "code threw"
 
-Three Sentry projects (one per app) so issues stay isolated in the dashboard UI:
+Four Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 
 - **API** — `apps/api/src/services/sentry.service.ts` + boot init. Captures `uncaughtException`, `unhandledRejection`, Express errors. Env: `SENTRY_DSN` on Railway.
 - **Storefront** (`apps/web`) — `sentry.{client,server,edge}.config.ts` + `instrumentation.ts`. Captures SSR throws, RSC errors, client hydration errors, browser uncaught errors, route-handler errors. Env: `NEXT_PUBLIC_SENTRY_DSN_WEB` on Vercel.
 - **Admin** (`apps/admin`) — same shape. Env: `NEXT_PUBLIC_SENTRY_DSN_ADMIN` on Vercel.
+- **Orders** (`apps/orders`) — **added 2026-07-02 (audit H1)**. Client-only via `instrumentation-client.ts` (no server-side Sentry — Orders has no `instrumentation.ts`). Env: `NEXT_PUBLIC_SENTRY_DSN_ORDERS` on Vercel + as a GitHub repo variable for the `cf-deploy.yml` Cloudflare build. Previously this app had ZERO error capture — a crash in the fulfillment UI store staff use was invisible.
 - **No-op when DSN missing** (graceful in dev / preview / pre-account-creation).
+- **Source maps + releases (added 2026-07-02, audit H2)**: web/admin/orders `next.config.js` are now wrapped in `withSentryConfig`. Upload only activates when `SENTRY_AUTH_TOKEN` (+ optional `SENTRY_ORG`/`SENTRY_PROJECT`) is set — omitted everywhere today, so this is a no-op until configured on Vercel. Before this, every Sentry issue from web/admin arrived with minified/obfuscated stack traces and no release association.
 - **Sample rates**: storefront `tracesSampleRate=0.1` in prod (high traffic), admin `1.0` (low volume, every trace is signal). Session replays fire only on errors, not on healthy sessions.
 
 ### 3. PostHog — product analytics
@@ -475,17 +478,17 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 
 ### Account ownership
 
-| Service                | Account email            | Project / org                                         |
-| ---------------------- | ------------------------ | ----------------------------------------------------- |
-| Vercel                 | ahmed0montaser@gmail.com | Hobby plan, sole owner                                |
-| Railway                | ahmed0montaser@gmail.com | personal project `force-website-builder`              |
-| Neon                   | ahmed0montaser@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1) |
-| Sentry                 | (Ahmad's account)        | one org with three projects: `api`, `web`, `admin`    |
-| PostHog                | (Ahmad's account)        | EU region, single project covering web + admin        |
-| UptimeRobot            | (Ahmad's account)        | free tier, 2 monitors currently                       |
-| Axiom                  | (Ahmad's account)        | free tier (500GB/30d) — dataset `force-api-railway`   |
-| Resend                 | platform-wide            | one account; per-merchant domains added under it      |
-| @ForceAI1_bot Telegram | personal DM to Ahmad     | chat_id `1943728711`                                  |
+| Service                | Account email            | Project / org                                               |
+| ---------------------- | ------------------------ | ----------------------------------------------------------- |
+| Vercel                 | ahmed0montaser@gmail.com | Hobby plan, sole owner                                      |
+| Railway                | ahmed0montaser@gmail.com | personal project `force-website-builder`                    |
+| Neon                   | ahmed0montaser@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)       |
+| Sentry                 | (Ahmad's account)        | one org with four projects: `api`, `web`, `admin`, `orders` |
+| PostHog                | (Ahmad's account)        | EU region, single project covering web + admin              |
+| UptimeRobot            | (Ahmad's account)        | free tier, 2 monitors currently                             |
+| Axiom                  | (Ahmad's account)        | free tier (500GB/30d) — dataset `force-api-railway`         |
+| Resend                 | platform-wide            | one account; per-merchant domains added under it            |
+| @ForceAI1_bot Telegram | personal DM to Ahmad     | chat_id `1943728711`                                        |
 
 ---
 

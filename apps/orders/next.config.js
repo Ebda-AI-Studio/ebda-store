@@ -1,4 +1,5 @@
 const path = require('path');
+const { withSentryConfig } = require('@sentry/nextjs');
 
 // Cloudflare/OpenNext build target detection (mirrors apps/web). Set
 // OPEN_NEXT_CLOUDFLARE=1 in the Cloudflare build; CF_PAGES is auto-set by CF.
@@ -91,4 +92,17 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+// Wraps the config with Sentry's build-time integration so source maps upload
+// and a release is created, matching apps/web + apps/admin (audit 2026-07-02
+// H1/H2). Same conservative behavior: the Sentry bundler plugin no-ops the
+// upload (warns, doesn't fail the build) whenever SENTRY_AUTH_TOKEN is unset,
+// so CI/local/Cloudflare builds are unaffected unless the token is explicitly
+// configured. See apps/web/next.config.js for the full rationale.
+module.exports = withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  widenClientFileUpload: true,
+  telemetry: false,
+});
