@@ -1,14 +1,52 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
+import { FeatureKey } from '@force/shared';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
+import { featureService } from '../services/feature.service';
 import { notificationConfigService } from '../services/notification-config.service';
 import { pushService } from '../services/push.service';
 import logger from '../lib/logger';
 
 const router = Router();
+
+// The generic `:channel` param route can't take a single `requireFeature(key)`
+// at the middleware layer (channel isn't known until the request lands), so
+// the gate is resolved per-channel inside the handler instead. `whatsapp`
+// (and any other unlisted channel) is core / not plan-gated here — only the
+// paid channels below need a check. Mirrors requireFeature's fail-closed
+// 403 FEATURE_DISABLED shape + super_admin bypass.
+const GATED_CHANNEL_FEATURES: Partial<Record<string, FeatureKey>> = {
+  sms: 'sms',
+  push: 'push_notifications',
+};
+
+async function assertChannelFeatureEnabled(
+  req: Request,
+  res: Response,
+  storeId: string,
+  channel: string
+): Promise<boolean> {
+  const featureKey = GATED_CHANNEL_FEATURES[channel];
+  if (!featureKey) return true;
+
+  // Super-admin bypass — matches requireFeature's platform-staff exemption.
+  if ((req as any).user?.role === 'super_admin') return true;
+
+  const enabled = await featureService.isFeatureEnabled(storeId, featureKey);
+  if (!enabled) {
+    res.status(403).json({
+      success: false,
+      error: 'Feature not available',
+      code: 'FEATURE_DISABLED',
+      feature: featureKey,
+    });
+    return false;
+  }
+  return true;
+}
 
 // ==========================================
 // Validation schemas
@@ -149,6 +187,10 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, channel } = req.params;
+      // sms is Enterprise-only, push_notifications is Professional+. Without
+      // this gate a lower-tier merchant could save real third-party
+      // credentials (e.g. Unifonic) before ever paying for the channel.
+      if (!(await assertChannelFeatureEnabled(req, res, storeId, channel))) return;
       const data = upsertConfigSchema.parse(req.body);
 
       const config = await notificationConfigService.upsertConfig(storeId, channel, data);
@@ -197,6 +239,10 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, channel } = req.params;
+      // Same gate as the config save route — test-connection round-trips a
+      // live call to the third-party provider (e.g. Unifonic Account/info),
+      // which is itself a paid-feature capability.
+      if (!(await assertChannelFeatureEnabled(req, res, storeId, channel))) return;
       const result = await notificationConfigService.testConnection(storeId, channel);
 
       res.json({ success: true, data: result });

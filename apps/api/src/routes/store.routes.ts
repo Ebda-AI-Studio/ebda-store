@@ -910,6 +910,11 @@ router.put(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // floating_widget is Enterprise-only. Without this gate a non-Enterprise
+  // merchant could persist a fully-configured widget for free — it would go
+  // live instantly on plan upgrade with no further merchant action. Matches
+  // the existing marketing_pixels gate below for consistency.
+  requireFeature('floating_widget'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

@@ -23,6 +23,7 @@ import { prisma, runInTenantContext } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
 import { createPoFromSuggestion } from '../services/accounting/purchase-order.service';
 import { createClearanceCouponFromFlag } from '../services/accounting/deadstock-scan.service';
 import { inngest } from '../lib/inngest/client';
@@ -238,6 +239,11 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  // accounting.profit_anomaly is Enterprise-only. The daily-sweep Inngest job
+  // already gates the write side (accounting-profit-anomaly.ts); without this
+  // gate a downgraded/never-Enterprise store retained unrestricted read access
+  // to historical rows forever — the two layers of the same feature disagreed.
+  requireFeature('accounting.profit_anomaly'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = anomalyListSchema.safeParse(req.query);
@@ -278,6 +284,7 @@ router.post(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
+  requireFeature('accounting.profit_anomaly'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await runInTenantContext(req.params.storeId, () =>
