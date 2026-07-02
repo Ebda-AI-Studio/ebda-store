@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 import { api, API_URL } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';
-import { formatPrice } from '@/lib/format';
+import { formatPrice as formatPriceBase } from '@/lib/format';
 import {
   formatDate as formatStoreDate,
   formatDateTime as formatStoreDateTime,
@@ -90,6 +90,9 @@ export default function OrderDetailClient() {
   const storeUrl = useStoreUrl();
   const { store } = useStore();
   const { t, language } = useLanguage();
+  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
+  // (formatPriceBase defaults to Western digits when no locale is passed).
+  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
   // Safe cast: this is a standard [id] route (not catch-all [...id]), so
   // params.id is always a single string in Next.js App Router.
   const orderId = params.id as string;
@@ -130,11 +133,16 @@ export default function OrderDetailClient() {
       if (result.success && result.data) {
         setOrder(result.data.order as unknown as OrderDetail);
       } else if (result.error) {
-        setError(result.error.message || 'Failed to load order');
+        setError(result.error.message || t('Failed to load order', 'فشل تحميل الطلب'));
       }
     } catch (err) {
       console.error('Failed to fetch order:', err);
-      setError('Unable to load order details. Please check your connection.');
+      setError(
+        t(
+          'Unable to load order details. Please check your connection.',
+          'تعذر تحميل تفاصيل الطلب. يرجى التحقق من اتصالك بالإنترنت.'
+        )
+      );
     } finally {
       setIsLoading(false);
     }
@@ -942,7 +950,7 @@ export default function OrderDetailClient() {
               </h2>
               <button
                 onClick={() => setShowTrackingModal(false)}
-                aria-label="Close"
+                aria-label={t('Close', 'إغلاق')}
                 className="rounded-lg p-1 text-muted-foreground/70 hover:bg-muted hover:text-muted-foreground transition-colors"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

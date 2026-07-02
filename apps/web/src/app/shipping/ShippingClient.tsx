@@ -6,7 +6,7 @@ import { ShopChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { API_URL } from '../../lib/api';
-import { formatPrice } from '../../lib/format';
+import { formatPrice as formatPriceBase } from '../../lib/format';
 
 interface ShippingZone {
   id: string;
@@ -36,6 +36,9 @@ export default function ShippingClient() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
+  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
+  // (formatPriceBase defaults to Western digits when no locale is passed).
+  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
   const [zones, setZones] = useState<ShippingZone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);

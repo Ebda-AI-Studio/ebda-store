@@ -67,7 +67,7 @@ export const Price = forwardRef<HTMLDivElement, PriceProps>(
     const fmtPrice = (amount: number) =>
       formatPrice(amount, {
         currency,
-        locale: isRtl ? 'ar-KW' : 'en-KW',
+        locale: isRtl ? 'ar' : 'en',
       });
 
     const discount =

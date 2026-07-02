@@ -10,7 +10,7 @@ import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useCart } from '../../../contexts/CartContext';
 import { trackPurchase } from '../../../components/MarketingPixels';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { formatPrice } from '@/lib/format';
+import { formatPrice as formatPriceBase } from '@/lib/format';
 import { formatDate } from '@/lib/format-date';
 import { useLastListing } from '../../../hooks/useLastListing';
 
@@ -36,6 +36,9 @@ function SuccessContent() {
   const { store } = useStore();
   const { clearCart } = useCart();
   const { t, language } = useLanguage();
+  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
+  // (formatPriceBase defaults to Western digits when no locale is passed).
+  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
 
   const [order, setOrder] = useState<Order | null>(null);
   const [, setIsLoading] = useState(true);

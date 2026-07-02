@@ -45,18 +45,24 @@ export { isSafeUrl, sanitizeUrl } from './safe-url';
  * KWD with 3 decimal places.  Pass `{ unit: 'kwd' }` if the input is already
  * in the major currency unit.
  *
+ * `locale` defaults to `'en'` (Western digits, `en-US` `Intl` locale) so every
+ * existing call-site that doesn't pass it renders byte-identical to before.
+ * Pass `locale: 'ar'` to render with Arabic-Indic digits (`ar-KW`), matching
+ * `getDiscountBadgeText`'s Arabic-locale formatting.
+ *
  * @param amount   - The price amount (in fils by default, or KWD if `unit` is `'kwd'`).
  * @param options  - Optional overrides for unit, currency, and locale.
  */
 export function formatPrice(
   amount: number,
-  options?: { unit?: 'fils' | 'kwd'; currency?: string; locale?: string }
+  options?: { unit?: 'fils' | 'kwd'; currency?: string; locale?: 'en' | 'ar' }
 ): string {
-  const { unit = 'fils', currency = 'KWD', locale = 'en-US' } = options ?? {};
+  const { unit = 'fils', currency = 'KWD', locale = 'en' } = options ?? {};
   const decimals = currency === 'KWD' ? 3 : 2;
   const divisor = unit === 'fils' ? (currency === 'KWD' ? 1000 : 100) : 1;
+  const intlLocale = locale === 'ar' ? 'ar-KW' : 'en-US';
 
-  return new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(intlLocale, {
     style: 'currency',
     currency,
     minimumFractionDigits: decimals,

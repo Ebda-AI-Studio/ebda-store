@@ -28,17 +28,27 @@ function ResetPasswordForm() {
     setError('');
 
     if (!token) {
-      setError('Invalid or missing reset token. Please request a new password reset link.');
+      setError(
+        t(
+          'Invalid or missing reset token. Please request a new password reset link.',
+          'رمز إعادة التعيين غير صالح أو مفقود. يرجى طلب رابط جديد لإعادة تعيين كلمة المرور.'
+        )
+      );
       return;
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('Passwords do not match.', 'كلمتا المرور غير متطابقتين.'));
       return;
     }
 
     if (formData.newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setError(
+        t(
+          'Password must be at least 8 characters.',
+          'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.'
+        )
+      );
       return;
     }
 
@@ -49,12 +59,21 @@ function ResetPasswordForm() {
       const result = await api.resetPassword(token, formData.newPassword);
 
       if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to reset password');
+        throw new Error(
+          result.error?.message || t('Failed to reset password', 'فشلت إعادة تعيين كلمة المرور')
+        );
       }
 
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password. Please try again.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : t(
+              'Failed to reset password. Please try again.',
+              'فشلت إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى.'
+            )
+      );
     } finally {
       setIsLoading(false);
     }

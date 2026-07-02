@@ -6,7 +6,7 @@ import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useFeatures } from '../../contexts/FeatureContext';
-import { formatPrice } from '@/lib/format';
+import { formatPrice as formatPriceBase } from '@/lib/format';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
 
 export default function AccountDashboardClient() {
@@ -14,6 +14,9 @@ export default function AccountDashboardClient() {
   const { store } = useStore();
   const { t, language } = useLanguage();
   const { isEnabled } = useFeatures();
+  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
+  // (formatPriceBase defaults to Western digits when no locale is passed).
+  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
@@ -48,11 +51,16 @@ export default function AccountDashboardClient() {
         );
         setAddressCount(seen.size);
       } else if (result.error) {
-        setError(result.error.message || 'Failed to load orders');
+        setError(result.error.message || t('Failed to load orders', 'فشل تحميل الطلبات'));
       }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
-      setError('Unable to load orders. Please check your connection.');
+      setError(
+        t(
+          'Unable to load orders. Please check your connection.',
+          'تعذر تحميل الطلبات. يرجى التحقق من اتصالك بالإنترنت.'
+        )
+      );
     } finally {
       setIsLoading(false);
     }

@@ -40,7 +40,7 @@ const PaymentStep = dynamic(() => import('./PaymentStep'), {
     </div>
   ),
 });
-import { formatPrice } from '@/lib/format';
+import { formatPrice as formatPriceBase } from '@/lib/format';
 import type { CheckoutCartItem, Coupon, PaymentProvider } from './types';
 
 interface Cart {
@@ -129,6 +129,10 @@ export default function CheckoutClient() {
   const continueShoppingHref = useLastListing();
   const { items: cartContextItems, total: cartContextTotal, isReady: cartIsReady } = useCart();
   const { language, t } = useLanguage();
+  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
+  // (formatPriceBase defaults to Western digits when no locale is passed).
+  // Passed down to PaymentStep as the `formatPrice` prop too.
+  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

@@ -31,7 +31,7 @@ import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 import { SpecTable } from '../../../templates/shared/SpecTable';
 import { OosImageDim, OutOfStockRibbon } from '../../../templates/shared/ProductCardCta';
-import { formatPrice } from '@/lib/format';
+import { formatPrice as formatPriceBase } from '@/lib/format';
 
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
@@ -192,6 +192,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const { isLoading: templateLoading } = useTemplateComponents();
   const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
+  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
+  // (formatPriceBase defaults to Western digits when no locale is passed).
+  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
   // Prop layout wins (server-side fetch); ctx layout is the lazy-fetched fallback.
   const resolvedLayout = layout ?? ctxLayout ?? undefined;
   // Issue 2: pass productCardDefaults to all card surfaces on this page.
@@ -311,10 +314,15 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             }
           }
         } else {
-          setError(response.error?.message || 'Product not found');
+          setError(response.error?.message || t('Product not found', 'المنتج غير موجود'));
         }
       } catch {
-        setError('Unable to load product. Please check your connection.');
+        setError(
+          t(
+            'Unable to load product. Please check your connection.',
+            'تعذر تحميل المنتج. يرجى التحقق من اتصالك بالإنترنت.'
+          )
+        );
       } finally {
         setIsLoading(false);
       }

@@ -11,7 +11,7 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
-import { formatPrice } from '@/lib/format';
+import { formatPrice as formatPriceBase } from '@/lib/format';
 import { CartRecommendations } from '../../components/CartRecommendations';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import {
@@ -87,6 +87,9 @@ export default function CartClient() {
     cta: cartZoneStyle(cartCtaZone),
   };
   const { language, t } = useLanguage();
+  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
+  // (formatPriceBase defaults to Western digits when no locale is passed).
+  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
   const continuShoppingHref = useLastListing();
 
   // ── Summary-label color + bold (StoreTheme → per-store) ─────────────────
@@ -496,7 +499,7 @@ export default function CartClient() {
                               <button
                                 onClick={() => handleRemoveItem(item.id)}
                                 className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                                aria-label="Remove item"
+                                aria-label={t('Remove item', 'إزالة المنتج')}
                               >
                                 <svg
                                   className="h-5 w-5"
@@ -525,7 +528,7 @@ export default function CartClient() {
                                       ? 'cursor-not-allowed text-muted-foreground/40'
                                       : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
                                   }`}
-                                  aria-label="Decrease quantity"
+                                  aria-label={t('Decrease quantity', 'إنقاص الكمية')}
                                 >
                                   <svg
                                     className="h-4 w-4"
@@ -552,7 +555,7 @@ export default function CartClient() {
                                       ? 'cursor-not-allowed text-muted-foreground/40'
                                       : 'cursor-pointer text-muted-foreground hover:bg-muted hover:text-foreground'
                                   }`}
-                                  aria-label="Increase quantity"
+                                  aria-label={t('Increase quantity', 'زيادة الكمية')}
                                 >
                                   <svg
                                     className="h-4 w-4"

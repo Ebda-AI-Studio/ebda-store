@@ -142,10 +142,17 @@ function SearchContent() {
       if (response.success && response.data) {
         setAllProducts(response.data.products || []);
       } else {
-        setError(response.error?.message || 'Failed to search products');
+        setError(
+          response.error?.message || t('Failed to search products', 'فشل البحث عن المنتجات')
+        );
       }
     } catch {
-      setError('Unable to search. Please check your connection and try again.');
+      setError(
+        t(
+          'Unable to search. Please check your connection and try again.',
+          'تعذر البحث. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.'
+        )
+      );
     } finally {
       setIsLoading(false);
     }

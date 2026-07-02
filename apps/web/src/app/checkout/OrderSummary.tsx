@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { Button, Input } from '@force/ui';
 import type { CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
-import { formatPrice } from '@/lib/format';
+import { formatPrice as formatPriceBase } from '@/lib/format';
 import type { CheckoutCartItem, Coupon } from './types';
 
 /** Loyalty redemption control state, threaded from CheckoutClient. Present
@@ -76,6 +76,9 @@ export function OrderSummary({
   summaryColors,
 }: OrderSummaryProps) {
   const { t, isRtl } = useLanguage();
+  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
+  // (formatPriceBase defaults to Western digits when no locale is passed).
+  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: isRtl ? 'ar' : 'en' });
   const summaryLabelBold = summaryColors?.bold !== false;
   const summaryFontWeight = summaryLabelBold ? 'font-bold' : 'font-normal';
   const labelColorStyle = summaryColors?.labelColor

@@ -32,7 +32,7 @@ export function PoweredByForce() {
         href="https://force-ai.co"
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Powered by Force AI"
+        aria-label={t('Powered by Force AI', 'مدعوم من Force AI')}
         className="inline-flex items-center gap-1 align-middle hover:opacity-80 transition-opacity"
       >
         {/* "Powered by Force AI" as a text wordmark — the raw /logo.svg mark read

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Product } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
-import { formatPrice } from '@/lib/format';
+import { formatPrice as formatPriceBase } from '@/lib/format';
 import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
 import { useStore } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
@@ -37,6 +37,9 @@ export function ProductListItem({
 }: ProductListItemProps) {
   const { t, isRtl } = useLanguage();
   const { store, layout } = useStore();
+  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
+  // (formatPriceBase defaults to Western digits when no locale is passed).
+  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: isRtl ? 'ar' : 'en' });
   const priceVisible = showCardPrice !== false;
   // Localized name for alt text + heading. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.

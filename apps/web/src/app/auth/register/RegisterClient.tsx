@@ -31,14 +31,16 @@ export default function RegisterClient() {
 
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('Passwords do not match', 'كلمتا المرور غير متطابقتين'));
       setIsLoading(false);
       return;
     }
 
     // Validate password strength
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(
+        t('Password must be at least 8 characters', 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل')
+      );
       setIsLoading(false);
       return;
     }
@@ -53,7 +55,7 @@ export default function RegisterClient() {
       });
 
       if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to register');
+        throw new Error(result.error?.message || t('Failed to register', 'فشل إنشاء الحساب'));
       }
 
       // T1-4: register no longer returns tokens. The API responds the
@@ -65,7 +67,7 @@ export default function RegisterClient() {
       // here.
       router.push(storeUrl('/auth/check-email'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to register');
+      setError(err instanceof Error ? err.message : t('Failed to register', 'فشل إنشاء الحساب'));
     } finally {
       setIsLoading(false);
     }

@@ -137,7 +137,9 @@ export function HeroSlider({
             }`}
             aria-hidden={i !== activeIndex}
             aria-roledescription="slide"
-            aria-label={`Slide ${i + 1} of ${slides.length}`}
+            aria-label={
+              isRtl ? `الشريحة ${i + 1} من ${slides.length}` : `Slide ${i + 1} of ${slides.length}`
+            }
           >
             {/* Priority on slide 0 only — that's the LCP image. The rest
                 lazy-load so we don't preload 6 banners on every page view. */}
@@ -157,7 +159,7 @@ export function HeroSlider({
       <div
         className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2"
         role="tablist"
-        aria-label="Hero slides"
+        aria-label={isRtl ? 'شرائح البانر الرئيسي' : 'Hero slides'}
       >
         {slides.map((_, i) => (
           <button
@@ -165,7 +167,9 @@ export function HeroSlider({
             type="button"
             role="tab"
             aria-selected={i === activeIndex}
-            aria-label={`Slide ${i + 1} of ${slides.length}`}
+            aria-label={
+              isRtl ? `الشريحة ${i + 1} من ${slides.length}` : `Slide ${i + 1} of ${slides.length}`
+            }
             onClick={() => goTo(i)}
             className={`h-2 rounded-full transition-all ${
               i === activeIndex ? 'w-6 bg-white shadow-md' : 'w-2 bg-white/60 hover:bg-white/80'
