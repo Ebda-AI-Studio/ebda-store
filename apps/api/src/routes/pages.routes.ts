@@ -4,8 +4,18 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireStoreAccess } from '../middleware/store-access';
 import { PagesService } from '../services/pages.service';
+import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
+
+// This router is mounted at the bare '/' prefix in routes/index.ts (so
+// both its '/stores/:storeId/pages' admin CRUD paths and its
+// '/public/:storeId/pages/:slug' public paths resolve correctly), but
+// Express does NOT populate req.params.storeId at that bare mount level.
+// Every route below declares ':storeId' explicitly, so router.param sets
+// RLS tenant context correctly here regardless of which surface is hit.
+// See F2, docs/plans/2026-07-02-rls-cutover.md.
+router.param('storeId', tenantContext);
 
 // Empty strings from controlled admin inputs are coerced to null so an
 // explicit clear hits the DB column.

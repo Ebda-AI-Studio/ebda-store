@@ -9,8 +9,16 @@ import { prisma, ProductStatus } from '@force/database';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { inngest } from '../lib/inngest/client';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
+import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
+
+// Mounted at the bare '/stores' prefix in routes/index.ts, so Express does
+// NOT populate req.params.storeId at the mount level — every route below
+// declares its own '/:storeId/...' path. router.param runs AFTER Express
+// resolves :storeId for the matched route, so RLS tenant context is set
+// correctly here. See F2, docs/plans/2026-07-02-rls-cutover.md.
+router.param('storeId', tenantContext);
 
 // Scope the feature gate to the bulk subtree only — see inventory.routes.ts
 // for why the previous `router.use(requireFeature('bulk_operations'))`

@@ -77,7 +77,22 @@ router.use('/payment-settings', paymentSettingsRoutes);
 // Upload routes
 router.use('/uploads', uploadRoutes);
 
-// Admin routes (super_admin only — tenantContext activates per-route via :id param)
+// Admin routes (super_admin only).
+//
+// AUDITED (2026-07-02, F2 follow-up) and INTENTIONALLY LEFT UNFIXED here:
+// `tenantContext` at this bare '/admin' mount is a no-op (same root cause as
+// the couponRoutes block below), but admin.routes.ts reuses the SAME ':id'
+// token for THREE different entity types across its own routes —
+// '/stores/:id' (a store id), '/users/:id' (a user id), '/products/:id' (a
+// product id) — all legitimately cross-tenant super_admin surfaces (list
+// all stores/users/products/orders/customers, dashboard, audit-logs).
+// Registering `router.param('id', tenantContext)` inside admin.routes.ts
+// like the other fixed routers would be WRONG: it would try to open a
+// single-store RLS transaction using a user id or product id as the
+// "storeId" for the non-store routes, which would either no-op (falls the
+// UUID check) or — worse, post-force_app-cutover — silently scope every
+// query in that request to zero rows (current_store_id() would never match
+// any real store_id). Left unchanged; see the PR description for this ticket.
 router.use('/admin', tenantContext, adminRoutes);
 
 // OneSignal admin push subscription endpoints (any authenticated user can
@@ -85,11 +100,33 @@ router.use('/admin', tenantContext, adminRoutes);
 // each notification — see services/onesignal.service.ts).
 router.use('/admin', onesignalRoutes);
 
-// Feature management routes (super_admin: /admin/stores/:id/features, store_admin: /stores/:storeId/my-features)
+// Feature management routes (super_admin: /admin/stores/:id/features, store_admin: /stores/:storeId/my-features).
+//
+// REWORKED 2026-07-02 (F2 surgical follow-up, PR #499): a
+// `router.param('id' | 'storeId', tenantContext)` registration was briefly
+// added here (Phase 1a), then REVERTED — `featureService.getStoreFeatures`
+// → `readFromDb` calls `withRlsBypass` internally (shared with background
+// Inngest fan-out that has no tenant GUC), and `withRlsBypass` opens its
+// own `basePrisma.$transaction`. Nesting that inside the outer per-request
+// tenant tx would hold 2 DB connections per request. This router is
+// CONTEXT-LESS (bare '/admin' + '/stores' mounts, no per-route param
+// registration) — Phase 2 candidate; needs `readFromDb`'s request-handler
+// call path rewired to the ALS-aware `prisma` proxy before it's safe to wrap.
 router.use('/admin', tenantContext, featureRoutes);
 router.use('/stores', tenantContext, featureRoutes);
 
-// Store routes (tenantContext activates when :storeId or :id is present)
+// Store routes.
+//
+// REWORKED 2026-07-02 (F2 surgical follow-up, PR #499): a
+// `router.param('id', tenantContext)` registration was briefly added here
+// (Phase 1a), then REVERTED — the domain-management handlers in
+// store.routes.ts call external APIs in-request (Vercel/Cloudflare domain
+// provisioning via `resolveDomainService`, Resend domain verification via
+// `ResendService.provisionStoreDomain` / `removeStoreDomain` /
+// `verifyAndRefreshDomain`). Trapping a slow third-party call inside a 30s
+// RLS interactive transaction risks blowing the timeout. This router is
+// CONTEXT-LESS — Phase 2 candidate; the CRUD-only handlers are fine, only
+// the domain endpoints need per-route (not per-router) context wiring.
 router.use('/stores', tenantContext, storeRoutes);
 
 // Store-scoped routes — tenantContext wraps all downstream handlers in an RLS transaction
@@ -107,7 +144,28 @@ router.use('/stores/:storeId/reviews', tenantContext, reviewRoutes);
 router.use('/stores/:storeId/analytics', tenantContext, analyticsRoutes);
 router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 
-// Store-scoped routes mounted under /stores (storeId in sub-route params)
+// Store-scoped routes mounted under /stores (storeId in sub-route params).
+//
+// NOTE (fixed 2026-07-02, audit F2): `tenantContext` passed to `router.use`
+// at these BARE '/stores' mounts is a no-op — Express only populates
+// req.params for params declared in the MOUNT path, and these mounts have
+// none. For couponRoutes / shippingRoutes / taxRoutes / loyaltyRoutes /
+// pwaRoutes / bulkRoutes / variantRoutes, RLS tenant context IS set via
+// `router.param('storeId', tenantContext)` registered INSIDE each
+// sub-router file, which fires after Express resolves the param for the
+// matched route — verified fast, DB-only, no inner context/tx. The
+// `tenantContext` argument here is kept only for readability/consistency
+// with the correctly-wired `/stores/:storeId/...` mounts above. See
+// docs/plans/2026-07-02-rls-cutover.md (Phase 1a) and
+// docs/audits/2026-07-02-tenancy-rls-auth.md (F2).
+//
+// inventoryRoutes is the exception: REWORKED 2026-07-02 (surgical
+// follow-up, PR #499) — its `router.param('storeId', tenantContext)` was
+// REVERTED because `reconcileCountSession` (services/barcode-scan.service.ts)
+// calls `runInTenantContext` internally for the cycle-count reconcile path,
+// which would double-nest a second `basePrisma.$transaction` inside the
+// outer per-request tx. inventoryRoutes stays CONTEXT-LESS — Phase 2
+// candidate.
 router.use('/stores', tenantContext, couponRoutes);
 router.use('/stores', tenantContext, shippingRoutes);
 router.use('/stores', tenantContext, taxRoutes);
@@ -121,6 +179,13 @@ router.use('/stores', tenantContext, variantRoutes);
 // under /public/:storeId/pages/:slug. The shared router internally
 // declares both surfaces; mounting at the API root preserves the full
 // path prefixes (`/stores/...` + `/public/...`).
+//
+// NOTE (fixed 2026-07-02, F2): pages/blog/locations all declare an
+// explicit ':storeId' param in their OWN routes (not a slug/host lookup),
+// so they have the exact same bare-mount bug as the couponRoutes block
+// below. `tenantContext` here at the bare '/' mount is a no-op; RLS
+// context is set via `router.param('storeId', tenantContext)` registered
+// inside each of pages.routes.ts / blog.routes.ts / locations.routes.ts.
 router.use('/', tenantContext, pagesRoutes);
 
 // Blog (Bucket E1, 2026-05-17) — same dual-surface pattern as pages.
@@ -133,7 +198,11 @@ router.use('/', tenantContext, blogRoutes);
 // /public/:storeId/locations. Both 404 when locationsEnabled=false.
 router.use('/', tenantContext, locationsRoutes);
 
-// Notification routes (admin + public push)
+// Notification routes (admin + public push).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499):
+// notificationConfigService.readFromDb calls withRlsBypass internally
+// (double-nesting risk) AND testConnection calls an external SMS provider
+// API in-request — both disqualify the whole-request tx wrap.
 router.use('/stores', tenantContext, notificationRoutes);
 router.use('/public', notificationRoutes);
 
@@ -141,11 +210,20 @@ router.use('/public', notificationRoutes);
 router.use('/stores', tenantContext, abandonedCartRoutes);
 router.use('/public', abandonedCartRoutes);
 
-// Recommendation routes (admin + public)
+// Recommendation routes (admin + public).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499):
+// the admin recalculate endpoint fires `recommendationService.recalculateFBT`
+// fire-and-forget (no await) so the response can return before it finishes —
+// wrapping the request would let the outer tx commit while the detached
+// work is still running, then hit "transaction already closed".
 router.use('/stores', tenantContext, recommendationRoutes);
 router.use('/public', recommendationRoutes);
 
-// Shipping carrier routes (admin + public tracking)
+// Shipping carrier routes (admin + public tracking).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499):
+// createShipmentForOrder / cancelShipment / updateShipmentStatus /
+// testConnection all call external courier APIs (Aramex, iCarry) in-request —
+// slow third-party calls have no place inside a 30s RLS transaction.
 router.use('/stores', tenantContext, shippingCarrierRoutes);
 router.use('/public', shippingCarrierRoutes);
 
@@ -155,9 +233,15 @@ router.use('/public', affiliateRoutes);
 
 // Newsletter admin routes (list + CSV export). Public signup is in
 // public.routes.ts so visitors don't need a JWT to subscribe.
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the
+// broadcast endpoint loops `ResendService.sendBrandedEmail` in chunks of 50,
+// sequentially awaited in-request — a large subscriber list can run well
+// past 30s, which would blow the RLS transaction's timeout.
 router.use('/stores', tenantContext, newsletterRoutes);
 
-// WBS integration routes (Force AI Store ↔ WBS bridge config)
+// WBS integration routes (Force AI Store ↔ WBS bridge config).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): handlers
+// call the external WBS backend via `fetch` in-request.
 router.use('/stores', tenantContext, wbsIntegrationRoutes);
 
 // Phase 7: WhatsApp templates admin (generate / sync / status)
@@ -166,34 +250,60 @@ router.use('/stores/:id/wa-templates', tenantContext, waTemplatesRoutes);
 // Phase 7: merchant-initiated payment links via WhatsApp
 router.use('/stores/:id/payment-links', tenantContext, paymentLinksRoutes);
 
-// Finance routes (COA tree + general ledger journal)
+// Finance routes (COA tree + general ledger journal).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the
+// accounting services already call `runInTenantContext`/`withRlsBypass`
+// per-query internally — wrapping the whole request would double-nest.
 router.use('/stores', tenantContext, financeRoutes);
 
-// Smart layer routes (reorder suggestions + deadstock flags + profit anomalies)
+// Smart layer routes (reorder suggestions + deadstock flags + profit anomalies).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): same
+// reason as financeRoutes — services already self-manage tenant context
+// per-query.
 router.use('/stores', tenantContext, smartLayerRoutes);
 
-// Insights routes (cohort + funnel + rfm + dashboard — Batch 4)
+// Insights routes (cohort + funnel + rfm + dashboard — Batch 4).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499):
+// `generateInsightNarration` calls Gemini in-request — an external AI call
+// has no place inside a 30s RLS transaction.
 router.use('/stores', tenantContext, insightsRoutes);
 
-// Supplier CRUD (Batch 2 accounting)
+// Supplier CRUD (Batch 2 accounting).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): service
+// already self-manages tenant context per-query (see financeRoutes note).
 router.use('/stores', tenantContext, suppliersRoutes);
 
-// Purchase Order CRUD + receive (Batch 2 accounting)
+// Purchase Order CRUD + receive (Batch 2 accounting).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): service
+// already self-manages tenant context per-query (see financeRoutes note).
 router.use('/stores', tenantContext, purchaseOrdersRoutes);
 
-// Stock Adjustment CRUD + post (Batch 2 accounting)
+// Stock Adjustment CRUD + post (Batch 2 accounting).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): service
+// already self-manages tenant context per-query (see financeRoutes note).
 router.use('/stores', tenantContext, stockAdjustmentsRoutes);
 
-// Multi-Warehouse stock + order routing (Enterprise — inventory.multi_warehouse)
+// Multi-Warehouse stock + order routing (Enterprise — inventory.multi_warehouse).
+// KEPT: warehouse.service.ts deliberately relies on the ALS-aware `prisma`
+// proxy (not withRlsBypass/runInTenantContext) for its cross-warehouse
+// aggregate writes specifically BECAUSE it's called from within this
+// router's tenant tx — see the docstring on `syncAggregateInventory`. Safe
+// to wrap.
 router.use('/stores', tenantContext, warehouseRoutes);
 
-// Expense CRUD + approve/post/reject (Batch 2 accounting)
+// Expense CRUD + approve/post/reject (Batch 2 accounting).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): service
+// already self-manages tenant context per-query (see financeRoutes note).
 router.use('/stores', tenantContext, expensesRoutes);
 
-// Backorder list + cancel (Batch 2 accounting)
+// Backorder list + cancel (Batch 2 accounting).
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): service
+// already self-manages tenant context per-query (see financeRoutes note).
 router.use('/stores', tenantContext, backordersRoutes);
 
-// Phase 5 bot intelligence: proxy bot analytics from WBS to admin frontend
+// Phase 5 bot intelligence: proxy bot analytics from WBS to admin frontend.
+// CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): the handler
+// calls the external WBS backend via `fetch` (10s timeout) in-request.
 router.use('/stores', tenantContext, botAnalyticsRoutes);
 
 // Staff management — store owners add / remove staff members

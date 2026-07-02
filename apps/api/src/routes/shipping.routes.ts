@@ -7,8 +7,16 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { ShippingService } from '../services/shipping.service';
 import { prisma } from '@force/database';
 import { KUWAIT_GOVERNORATES } from '@force/shared';
+import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
+
+// Mounted at the bare '/stores' prefix in routes/index.ts, so Express does
+// NOT populate req.params.storeId at the mount level — every route below
+// declares its own '/:storeId/...' path. router.param runs AFTER Express
+// resolves :storeId for the matched route, so RLS tenant context is set
+// correctly here. See F2, docs/plans/2026-07-02-rls-cutover.md.
+router.param('storeId', tenantContext);
 
 // Validation schemas
 const createShippingZoneSchema = z.object({

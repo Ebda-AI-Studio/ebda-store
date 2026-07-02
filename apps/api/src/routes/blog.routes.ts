@@ -5,6 +5,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { BlogService } from '../services/blog.service';
 import { writeLimiter } from '../middleware/security';
+import { tenantContext } from '../middleware/tenant-context';
 
 /**
  * Blog routes (Bucket E1, 2026-05-17).
@@ -15,8 +16,16 @@ import { writeLimiter } from '../middleware/security';
  * Both surfaces 404 when the store has `blogEnabled=false` so a
  * merchant who hasn't opted in never accidentally exposes a stub
  * empty blog (returns 0 posts) to crawlers.
+ *
+ * This router is mounted at the bare '/' prefix in routes/index.ts, so
+ * Express does NOT populate req.params.storeId at the mount level.
+ * router.param (below) sets RLS tenant context after Express resolves
+ * :storeId for the matched route. See F2,
+ * docs/plans/2026-07-02-rls-cutover.md.
  */
 const router = Router({ mergeParams: true });
+
+router.param('storeId', tenantContext);
 
 const optionalNullableString = z.preprocess(
   v => (typeof v === 'string' && v.trim() === '' ? null : v),

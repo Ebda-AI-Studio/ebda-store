@@ -6,8 +6,14 @@
  *   → requireFeature('inventory.multi_warehouse')
  *
  * Middleware chain mirrors the existing inventory.routes.ts pattern.
- * tenantContext is applied at the router mount in routes/index.ts (via the
- * /stores/:storeId prefix) so we don't need to open our own tx.
+ *
+ * NOTE (fixed 2026-07-02, F2): this router is mounted at the BARE '/stores'
+ * prefix in routes/index.ts, NOT '/stores/:storeId' — Express only
+ * populates req.params for params declared in the mount path, so
+ * tenantContext at the mount level was a no-op here. Every route below
+ * declares its own '/:storeId/...' path, so tenant context is now set via
+ * router.param (below), which runs AFTER Express resolves :storeId for the
+ * matched route. See docs/plans/2026-07-02-rls-cutover.md.
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
@@ -16,8 +22,11 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { WarehouseService } from '../services/warehouse.service';
+import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
+
+router.param('storeId', tenantContext);
 
 // ─── Validation schemas ────────────────────────────────────────────────────────
 

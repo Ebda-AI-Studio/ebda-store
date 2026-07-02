@@ -6,12 +6,24 @@ import logger from '../lib/logger';
  * Tenant Context Middleware
  *
  * Wraps the downstream route handler in a Prisma interactive transaction
- * with `SET LOCAL app.current_store_id = '<storeId>'`. This activates
- * Row-Level Security (RLS) policies so the database enforces tenant
- * isolation — even if application code misses a WHERE filter.
+ * with `SET LOCAL app.current_store_id = '<storeId>'`. This sets the GUC
+ * that RLS policies read — but the policies themselves only ENFORCE
+ * against the non-bypass `force_app` role. Production currently connects
+ * as the `neondb_owner` BYPASSRLS role (see `apps/api/src/index.ts` boot
+ * guard), so today this is inert: it is correct-but-inert plumbing ahead
+ * of the RLS cutover (see `docs/plans/2026-07-02-rls-cutover.md`), not a
+ * live backstop. Tenant isolation today rests entirely on the application
+ * layer (`requireStoreAccess` + explicit `where: { storeId }`). Once the
+ * cutover flips `DATABASE_URL` to `force_app` and drops
+ * `ALLOW_BYPASSRLS_ROLE`, this same wiring becomes a real database-level
+ * backstop with zero code changes — that is the point of shipping it now.
  *
  * How it works:
- * 1. Extracts storeId from route params (set by Express route matching)
+ * 1. Extracts storeId from route params (set by Express route matching —
+ *    either from the mount path directly, e.g. `/stores/:storeId/products`,
+ *    or via `router.param('storeId', tenantContext)` registered inside a
+ *    sub-router whose OWN routes declare `:storeId`, for routers mounted
+ *    at a bare prefix like `/stores`)
  * 2. Opens a Prisma $transaction and runs SET LOCAL inside it
  * 3. Stores the transaction client in AsyncLocalStorage
  * 4. Calls next() — all downstream Prisma queries auto-use the transaction
@@ -21,6 +33,7 @@ import logger from '../lib/logger';
  * - Routes WITHOUT a storeId skip this middleware (no RLS filtering)
  * - If the transaction fails, the error handler returns a clean 500
  * - Existing `where: { storeId }` filters remain as defense-in-depth
+ *   (and are the ONLY isolation mechanism until the force_app cutover)
  * - Super_admin cross-tenant routes don't pass through this middleware
  * - 30-second transaction timeout prevents long-lived transactions
  */
