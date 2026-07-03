@@ -44,6 +44,7 @@
 - [x] Category suggestion — AI-suggested chips on product edit
 - [x] Review spam detection, auto-translation, summarization, owner-response drafting
 - [x] Reorder + dead-stock AI — Gemini-powered reorder recommendations and dead-stock flags in Stock hub
+- [x] Catalogue field sweeps (2026-07-03) — 5 bulk AI-tools sweeps on the AI Tools page, each smart-skipping already-filled entities: product FAQs (bilingual FAQ pairs per product), category assignment (uncategorized products only, picks from the store's own categories, never invents one), image alt-text (Gemini Vision, capped 4 images/product), product excerpts (1-2 sentence bilingual summary derived from the full description, provenance-stamped), product tags (up to 5 tags/product, reuses existing store tags case-insensitively, never deletes)
 
 ### Accounting Module (Professional plan)
 

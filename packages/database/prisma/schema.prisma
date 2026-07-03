@@ -715,6 +715,11 @@ model Product {
   // 0 = unordered (falls back to createdAt desc). Set via the reorder admin page.
   bestSellerPosition   Int           @default(0) @map("best_seller_position")
   viewCount            Int           @default(0) @map("view_count")
+  // Short 1-2 sentence blurb, distinct from the full `description`. Written
+  // by the bulk-ai-excerpt sweep (or manually) — surfaced anywhere a compact
+  // summary is useful (search results, share cards). Bilingual EN+AR.
+  excerpt              String?
+  excerptAr            String?       @map("excerpt_ar")
   metaTitle            String?       @map("meta_title")
   metaTitleAr          String?       @map("meta_title_ar")
   metaDescription      String?       @map("meta_description")
@@ -2498,6 +2503,12 @@ enum BulkAiJobKind {
   brand_facts
   description_balance
   description_revert
+  // Catalogue field sweeps (2026-07-03)
+  product_faqs
+  category_assign
+  image_alt
+  excerpt
+  product_tags
 }
 
 enum BulkAiJobStatus {

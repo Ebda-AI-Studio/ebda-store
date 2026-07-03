@@ -9,6 +9,7 @@ import { requireFeature } from '../middleware/feature-gate';
 import { prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { invalidateCachedPrefix } from '../lib/public-cache';
+import { EXCERPT_MAX_LENGTH } from '../lib/ai/product-excerpt-generator';
 
 const router = Router({ mergeParams: true });
 
@@ -24,6 +25,11 @@ const createProductSchema = z.object({
     .optional(),
   description: z.string().optional(),
   descriptionAr: z.string().optional(),
+  // Short 1-2 sentence blurb — written by the bulk-ai-excerpt sweep or
+  // manually. Nullable so the admin form can explicitly clear it (same
+  // undefined/null convention as SEO meta below).
+  excerpt: z.string().max(EXCERPT_MAX_LENGTH).optional().nullable(),
+  excerptAr: z.string().max(EXCERPT_MAX_LENGTH).optional().nullable(),
   price: z.number().int().min(0),
   // Nullable so the admin form can explicitly clear an existing value
   // (Prisma treats `undefined` as "leave alone"; we need `null` to clear).

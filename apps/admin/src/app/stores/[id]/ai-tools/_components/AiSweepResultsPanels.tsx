@@ -86,6 +86,36 @@ interface MetaAeoResult {
   }>;
 }
 
+interface CategorizeResult {
+  products: { total: number; filled: number; fillRate: number };
+  recentProducts: Array<{
+    id: string;
+    name: string;
+    categoryName: string | null;
+    updatedAt: string;
+  }>;
+}
+
+interface ImageAltResult {
+  images: { total: number; filled: number; fillRate: number };
+}
+
+interface ExcerptResult {
+  products: { total: number; filled: number; fillRate: number };
+  recentProducts: Array<{
+    id: string;
+    name: string;
+    excerpt: string | null;
+    excerptAr: string | null;
+    updatedAt: string;
+  }>;
+}
+
+interface TagsResult {
+  products: { total: number; filled: number; fillRate: number };
+  totalTags: number;
+}
+
 // ---------------------------------------------------------------------------
 // Root component
 // ---------------------------------------------------------------------------
@@ -99,23 +129,35 @@ export function AiSweepResultsPanels({ storeId }: { storeId: string }) {
   const [faqs, setFaqs] = useState<FaqResult | null>(null);
   const [howtos, setHowtos] = useState<HowtoResult | null>(null);
   const [metaAeo, setMetaAeo] = useState<MetaAeoResult | null>(null);
+  const [categorize, setCategorize] = useState<CategorizeResult | null>(null);
+  const [imageAlt, setImageAlt] = useState<ImageAltResult | null>(null);
+  const [excerpt, setExcerpt] = useState<ExcerptResult | null>(null);
+  const [tags, setTags] = useState<TagsResult | null>(null);
 
   const fetchAll = useCallback(async () => {
     if (!storeId) return;
     setLoading(true);
     const base = `/api/v1/stores/${storeId}/ai/results`;
-    const [t, s, f, h, m] = await Promise.allSettled([
+    const [t, s, f, h, m, c, ia, ex, tg] = await Promise.allSettled([
       apiGet<TranslateResult>(`${base}/translate`),
       apiGet<SeoResult>(`${base}/seo`),
       apiGet<FaqResult>(`${base}/faqs`),
       apiGet<HowtoResult>(`${base}/howtos`),
       apiGet<MetaAeoResult>(`${base}/meta-aeo`),
+      apiGet<CategorizeResult>(`${base}/categorize`),
+      apiGet<ImageAltResult>(`${base}/image-alt`),
+      apiGet<ExcerptResult>(`${base}/excerpt`),
+      apiGet<TagsResult>(`${base}/tags`),
     ]);
     if (t.status === 'fulfilled' && t.value.data) setTranslate(t.value.data);
     if (s.status === 'fulfilled' && s.value.data) setSeo(s.value.data);
     if (f.status === 'fulfilled' && f.value.data) setFaqs(f.value.data);
     if (h.status === 'fulfilled' && h.value.data) setHowtos(h.value.data);
     if (m.status === 'fulfilled' && m.value.data) setMetaAeo(m.value.data);
+    if (c.status === 'fulfilled' && c.value.data) setCategorize(c.value.data);
+    if (ia.status === 'fulfilled' && ia.value.data) setImageAlt(ia.value.data);
+    if (ex.status === 'fulfilled' && ex.value.data) setExcerpt(ex.value.data);
+    if (tg.status === 'fulfilled' && tg.value.data) setTags(tg.value.data);
     setLoading(false);
     setLastFetched(new Date());
   }, [storeId]);
@@ -198,6 +240,38 @@ export function AiSweepResultsPanels({ storeId }: { storeId: string }) {
           badge={metaAeo ? `${pct(metaAeo.products.fillRate)}% products` : undefined}
         >
           {metaAeo ? <MetaAeoPanel data={metaAeo} storeId={storeId} /> : <Loading />}
+        </CollapsiblePanel>
+
+        <CollapsiblePanel
+          title="Category assignment"
+          titleAr="تعيين الفئات"
+          badge={categorize ? `${pct(categorize.products.fillRate)}% products` : undefined}
+        >
+          {categorize ? <CategorizePanel data={categorize} storeId={storeId} /> : <Loading />}
+        </CollapsiblePanel>
+
+        <CollapsiblePanel
+          title="Image alt-text"
+          titleAr="نص بديل للصور"
+          badge={imageAlt ? `${pct(imageAlt.images.fillRate)}% images` : undefined}
+        >
+          {imageAlt ? <ImageAltPanel data={imageAlt} storeId={storeId} /> : <Loading />}
+        </CollapsiblePanel>
+
+        <CollapsiblePanel
+          title="Product excerpts"
+          titleAr="ملخصات المنتجات"
+          badge={excerpt ? `${pct(excerpt.products.fillRate)}% products` : undefined}
+        >
+          {excerpt ? <ExcerptPanel data={excerpt} storeId={storeId} /> : <Loading />}
+        </CollapsiblePanel>
+
+        <CollapsiblePanel
+          title="Product tags"
+          titleAr="وسوم المنتجات"
+          badge={tags ? `${pct(tags.products.fillRate)}% products` : undefined}
+        >
+          {tags ? <TagsPanel data={tags} storeId={storeId} /> : <Loading />}
         </CollapsiblePanel>
       </div>
     </div>
@@ -569,6 +643,142 @@ function MetaAeoPanel({ data, storeId }: { data: MetaAeoResult; storeId: string 
         className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
         Open SEO page / فتح صفحة السيو
+        <ArrowIcon />
+      </Link>
+    </div>
+  );
+}
+
+function CategorizePanel({ data, storeId }: { data: CategorizeResult; storeId: string }) {
+  return (
+    <div className="space-y-4">
+      <FillRateCard
+        label="Products categorized"
+        labelAr="منتجات مصنّفة"
+        filled={data.products.filled}
+        total={data.products.total}
+        rate={data.products.fillRate}
+      />
+
+      {data.recentProducts.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Recently categorized / المصنّفة مؤخراً
+          </p>
+          <ul className="divide-y rounded-lg border bg-card text-sm">
+            {data.recentProducts.map(p => (
+              <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="font-medium">{p.name}</span>
+                {p.categoryName && (
+                  <span className="shrink-0 text-xs text-muted-foreground">{p.categoryName}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <Link
+        href={`/stores/${storeId}/products`}
+        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+      >
+        Open Catalog → Products / فتح المنتجات
+        <ArrowIcon />
+      </Link>
+    </div>
+  );
+}
+
+function ImageAltPanel({ data, storeId }: { data: ImageAltResult; storeId: string }) {
+  return (
+    <div className="space-y-4">
+      <FillRateCard
+        label="Images with alt-text"
+        labelAr="صور بنص بديل"
+        filled={data.images.filled}
+        total={data.images.total}
+        rate={data.images.fillRate}
+      />
+
+      <Link
+        href={`/stores/${storeId}/products`}
+        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+      >
+        Open Catalog → Products / فتح المنتجات
+        <ArrowIcon />
+      </Link>
+    </div>
+  );
+}
+
+function ExcerptPanel({ data, storeId }: { data: ExcerptResult; storeId: string }) {
+  return (
+    <div className="space-y-4">
+      <FillRateCard
+        label="Products with excerpt"
+        labelAr="منتجات بملخص"
+        filled={data.products.filled}
+        total={data.products.total}
+        rate={data.products.fillRate}
+      />
+
+      {data.recentProducts.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Recently filled / المملوءة مؤخراً
+          </p>
+          <ul className="divide-y rounded-lg border bg-card text-sm">
+            {data.recentProducts.map(p => (
+              <li key={p.id} className="px-3 py-2">
+                <p className="font-medium">{p.name}</p>
+                {p.excerpt && <p className="mt-0.5 text-xs text-muted-foreground">{p.excerpt}</p>}
+                {p.excerptAr && (
+                  <p className="mt-0.5 text-xs text-muted-foreground" dir="rtl">
+                    {p.excerptAr}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <Link
+        href={`/stores/${storeId}/products`}
+        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+      >
+        Open Catalog → Products / فتح المنتجات
+        <ArrowIcon />
+      </Link>
+    </div>
+  );
+}
+
+function TagsPanel({ data, storeId }: { data: TagsResult; storeId: string }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <FillRateCard
+          label="Products tagged"
+          labelAr="منتجات موسومة"
+          filled={data.products.filled}
+          total={data.products.total}
+          rate={data.products.fillRate}
+        />
+        <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-center">
+          <div className="text-2xl font-bold text-foreground">{data.totalTags}</div>
+          <div className="mt-1 text-[11px] font-medium text-foreground">Total tags</div>
+          <div className="text-[10px] text-muted-foreground" dir="rtl">
+            إجمالي الوسوم
+          </div>
+        </div>
+      </div>
+
+      <Link
+        href={`/stores/${storeId}/products`}
+        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+      >
+        Open Catalog → Products / فتح المنتجات
         <ArrowIcon />
       </Link>
     </div>

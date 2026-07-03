@@ -99,6 +99,11 @@ interface Product {
   slug: string;
   description?: string;
   descriptionAr?: string;
+  /** Short 1-2 sentence blurb, distinct from the full `description` — written
+   *  by the bulk-ai-excerpt sweep or manually. Rendered on the PDP near the
+   *  title when present. */
+  excerpt?: string | null;
+  excerptAr?: string | null;
   price: number;
   compareAtPrice?: number;
   /** Discount type set by the merchant — 'percentage' | 'fixed'. null = no explicit discount. */

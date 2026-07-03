@@ -401,7 +401,7 @@ export function ProductCarousel({
                           <>
                             <Image
                               src={img}
-                              alt={name}
+                              alt={product.images?.[0]?.alt || name}
                               fill
                               priority={i < 4}
                               sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
@@ -419,7 +419,7 @@ export function ProductCarousel({
                             {showHover && product.images?.[1]?.url && (
                               <Image
                                 src={product.images[1].url}
-                                alt={name}
+                                alt={product.images[1].alt || name}
                                 fill
                                 sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
                                 loading="lazy"

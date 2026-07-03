@@ -458,6 +458,11 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   // showed on the AR storefront. Prefer descriptionAr on the AR site.
   const displayDescription =
     language === 'ar' && product.descriptionAr ? product.descriptionAr : product.description;
+  // Short 1-2 sentence blurb (bulk-ai-excerpt sweep or manual) — a compact
+  // summary rendered near the title, distinct from the full description
+  // below. Same locale-fallback convention as displayDescription.
+  const displayExcerpt =
+    language === 'ar' && product.excerptAr ? product.excerptAr : product.excerpt;
 
   // Derived variant/option availability
   const productVariants = product.variants ?? [];
@@ -679,6 +684,10 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               >
                 {displayName}
               </h1>
+
+              {displayExcerpt && (
+                <p className="mt-2 text-base text-muted-foreground">{displayExcerpt}</p>
+              )}
 
               {/* Price */}
               <div className="mt-4 flex items-baseline gap-3">

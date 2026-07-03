@@ -49,6 +49,10 @@ import { paymentWebhookProcess } from './payment-webhook-process';
 import { paymentWebhookStuckSweep } from './payment-webhook-stuck-sweep';
 import { bulkAiBalanceDescriptions } from './bulk-ai-balance-descriptions';
 import { bulkAiRevertBalance } from './bulk-ai-revert-balance';
+import { bulkAiCategorize } from './bulk-ai-categorize';
+import { bulkAiImageAlt } from './bulk-ai-image-alt';
+import { bulkAiExcerpt } from './bulk-ai-excerpt';
+import { bulkAiTags } from './bulk-ai-tags';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -136,4 +140,9 @@ export const inngestFunctions: InngestFunction.Any[] = [
   bulkAiBalanceDescriptions,
   // Bulk revert: restores description fields from the balance snapshot.
   bulkAiRevertBalance,
+  // Catalogue field sweeps (2026-07-03): category / image-alt / excerpt / tags.
+  bulkAiCategorize,
+  bulkAiImageAlt,
+  bulkAiExcerpt,
+  bulkAiTags,
 ];

@@ -637,6 +637,10 @@
         "descriptionPlaceholder": "Describe your product...",
         "descriptionAr": "Description (Arabic)",
         "descriptionArPlaceholder": "وصف المنتج...",
+        "excerpt": "Short excerpt",
+        "excerptPlaceholder": "A 1-2 sentence summary for search results and share cards...",
+        "excerptAr": "Short excerpt (Arabic)",
+        "excerptArPlaceholder": "ملخص من جملة أو جملتين لنتائج البحث وبطاقات المشاركة...",
         "mediaHint": "Drag and drop images here, or click to select",
         "mediaSizeHint": "Recommended 1000×1000 (square). Up to 10MB per file — we auto-compress for the storefront.",
         "price": "Price (KWD)",
@@ -5199,7 +5203,8 @@
       "aeo": "AEO — Answer Engine Optimization",
       "geo": "GEO — Generative Engine Optimization",
       "geoDescription": "Optimises your store for LLM-powered search — ChatGPT, Perplexity, Google AI Overview, Bing Copilot.",
-      "descriptionRevert": "Revert language balance"
+      "descriptionRevert": "Revert language balance",
+      "catalogueFields": "Catalogue fields"
     },
     "cards": {
       "balanceDescriptions": {
@@ -5281,6 +5286,30 @@
         "button": "Generate",
         "forceTooltip": "Overwrites existing brand facts JSON with freshly generated data."
       },
+      "categorize": {
+        "title": "Assign categories",
+        "body": "For every uncategorized product, picks the single best-matching category from your store's own category list — never invents a new one. Products that already have a category are always left alone.",
+        "button": "Run sweep",
+        "forceTooltip": "Categories are never reassigned once set — this sweep only ever fills products with zero categories."
+      },
+      "imageAlt": {
+        "title": "Generate image alt-text",
+        "body": "Uses Gemini Vision to write concise, descriptive alt-text (SEO + accessibility) for product images that don't have any yet. Checks up to 4 images per product to protect your AI quota.",
+        "button": "Run sweep",
+        "forceTooltip": "Images that already have alt-text are never overwritten — this sweep only fills images missing one."
+      },
+      "excerpt": {
+        "title": "Draft product excerpts",
+        "body": "Summarises each product's full description into a punchy 1-2 sentence excerpt, bilingual EN + AR. Skips products that already have an excerpt.",
+        "button": "Run sweep",
+        "forceTooltip": "Re-drafts excerpts the AI previously wrote. A manually-written excerpt is never overwritten."
+      },
+      "productTags": {
+        "title": "Suggest product tags",
+        "body": "Suggests up to 5 relevant tags per product from its name and description, reusing your store's existing tags wherever they fit. Skips products that already have at least one tag.",
+        "button": "Run sweep",
+        "forceTooltip": "Also tops up already-tagged products with newly-suggested tags (up to 5 total). Existing tags are never removed."
+      },
       "defaultForceTooltip": "Replaces existing content with a fresh AI generation."
     },
     "masterSweep": {
@@ -5301,7 +5330,11 @@
       "llmsTxt": "LLMs.txt",
       "citationCopy": "Citation copy",
       "brandFacts": "Brand facts",
-      "descriptionBalance": "Language balance"
+      "descriptionBalance": "Language balance",
+      "categoryAssign": "Category assignment",
+      "imageAlt": "Image alt-text",
+      "excerpt": "Product excerpts",
+      "productTags": "Product tags"
     },
     "activeJob": {
       "sweepSuffix": "sweep",

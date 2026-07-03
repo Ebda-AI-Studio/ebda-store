@@ -212,7 +212,9 @@ function MinimalProductCard({
             <>
               <Image
                 src={product.images[0].url}
-                alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                alt={
+                  product.images[0].alt || (isRtl && product.nameAr ? product.nameAr : product.name)
+                }
                 className={`w-full h-full object-cover transition-opacity duration-700 ease-out ${
                   showHover !== false && product.images[1]?.url
                     ? 'group-hover:opacity-0'
@@ -227,7 +229,10 @@ function MinimalProductCard({
               {showHover !== false && product.images[1]?.url && (
                 <Image
                   src={product.images[1].url}
-                  alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                  alt={
+                    product.images[1].alt ||
+                    (isRtl && product.nameAr ? product.nameAr : product.name)
+                  }
                   className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out"
                   style={normalizeImages ? { objectFit: 'cover' } : undefined}
                   fill

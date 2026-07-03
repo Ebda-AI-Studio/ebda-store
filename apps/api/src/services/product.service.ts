@@ -65,6 +65,42 @@ function buildProductSearchAnd(
  * Variants inherit the parent's lowStockThreshold (no per-variant threshold).
  * Variants also inherit the parent's allowBackorder flag when their own is false.
  */
+/**
+ * Fields not in `AI_AUTOFILL_FIELDS` are excluded from that engine's 3-day
+ * sweep + `/ai/reset-field` endpoint by design (same "excluded from v1"
+ * treatment documented on the AEO fields) but are still AI-writable via a
+ * standalone bulk sweep — currently `excerpt`/`excerptAr` (bulk-ai-excerpt).
+ * Track this list here so the provenance map stays accurate.
+ */
+const MANUAL_PROVENANCE_FIELDS = ['excerpt', 'excerptAr'] as const;
+
+/**
+ * Mirrors `stampHumanEdits`' per-field diff for `MANUAL_PROVENANCE_FIELDS`:
+ * a manual edit that changes the value stamps 'human' (so the admin
+ * `AiFieldBadge` stops showing "✨ AI" after the merchant rewrites an
+ * AI-drafted excerpt); clearing the field to empty removes the provenance
+ * entry entirely, matching the convention used everywhere else.
+ */
+function stampManualProvenance(
+  sources: Record<string, 'ai' | 'human'>,
+  stored: Record<string, unknown>,
+  incoming: Record<string, unknown>
+): Record<string, 'ai' | 'human'> {
+  const next = { ...sources };
+  for (const field of MANUAL_PROVENANCE_FIELDS) {
+    if (!(field in incoming)) continue;
+    const before = (stored[field] ?? '') as string;
+    const after = (incoming[field] ?? '') as string;
+    if (after === before) continue;
+    if (String(after).trim() === '') {
+      delete next[field];
+    } else {
+      next[field] = 'human';
+    }
+  }
+  return next;
+}
+
 function enrichStockFlags<
   P extends {
     inventory: number;
@@ -131,6 +167,9 @@ interface CreateProductData {
   slug?: string;
   description?: string;
   descriptionAr?: string;
+  /** Short 1-2 sentence blurb — written by the bulk-ai-excerpt sweep or manually. */
+  excerpt?: string | null;
+  excerptAr?: string | null;
   price: number;
   /** Original/RRP shown struck-through next to the sale price. `null` clears it. */
   compareAtPrice?: number | null;
@@ -508,7 +547,11 @@ export class ProductService {
     // Any AI-writable field the merchant filled in AT CREATE TIME is their own
     // — stamp it 'human' so the autofill engine never overwrites it. Fields
     // left empty get no entry and remain fillable by the engine.
-    const aiFieldSources = stampHumanEdits({}, {}, data as unknown as Record<string, unknown>);
+    const aiFieldSources = stampManualProvenance(
+      stampHumanEdits({}, {}, data as unknown as Record<string, unknown>),
+      {},
+      data as unknown as Record<string, unknown>
+    );
 
     const product = await prisma.product.create({
       data: {
@@ -519,6 +562,8 @@ export class ProductService {
         slug,
         description: data.description,
         descriptionAr: data.descriptionAr,
+        excerpt: data.excerpt ?? null,
+        excerptAr: data.excerptAr ?? null,
         price: data.price,
         compareAtPrice: data.compareAtPrice ?? null,
         costPrice: data.costPrice ?? null,
@@ -636,8 +681,12 @@ export class ProductService {
     );
     // Stamp human ownership on the fields they changed so the AI engine never
     // overwrites them.
-    const nextSources = stampHumanEdits(
-      (product.aiFieldSources as Record<string, 'ai' | 'human'>) ?? {},
+    const nextSources = stampManualProvenance(
+      stampHumanEdits(
+        (product.aiFieldSources as Record<string, 'ai' | 'human'>) ?? {},
+        product as Record<string, unknown>,
+        data as Record<string, unknown>
+      ),
       product as Record<string, unknown>,
       data as Record<string, unknown>
     );
@@ -693,6 +742,10 @@ export class ProductService {
           slug: finalSlug,
           description: data.description,
           descriptionAr: data.descriptionAr,
+          // Excerpt — null clears (bulk-sweep/manual clear), undefined leaves
+          // the existing value alone, same convention as SEO meta below.
+          ...(data.excerpt !== undefined ? { excerpt: data.excerpt } : {}),
+          ...(data.excerptAr !== undefined ? { excerptAr: data.excerptAr } : {}),
           price: data.price,
           // Pass through only when present in the patch — undefined leaves
           // the existing value, explicit null clears it. Same convention

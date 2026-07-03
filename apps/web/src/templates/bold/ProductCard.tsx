@@ -188,7 +188,9 @@ function BoldProductCard({
             <>
               <Image
                 src={product.images[0].url}
-                alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                alt={
+                  product.images[0].alt || (isRtl && product.nameAr ? product.nameAr : product.name)
+                }
                 className={cn(
                   'object-cover transition-all duration-300 ease-out',
                   isHovered && 'scale-[1.05]'
@@ -205,7 +207,10 @@ function BoldProductCard({
               {showHover !== false && product.images[1]?.url && (
                 <Image
                   src={product.images[1].url}
-                  alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                  alt={
+                    product.images[1].alt ||
+                    (isRtl && product.nameAr ? product.nameAr : product.name)
+                  }
                   className={cn(
                     'absolute inset-0 object-cover transition-all duration-300 ease-out',
                     isHovered && 'scale-[1.05]'

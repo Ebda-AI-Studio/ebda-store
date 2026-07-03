@@ -252,7 +252,9 @@ function ElegantProductCard({
             <>
               <Image
                 src={product.images[0].url}
-                alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                alt={
+                  product.images[0].alt || (isRtl && product.nameAr ? product.nameAr : product.name)
+                }
                 className={cn(
                   'object-cover transition-all duration-500',
                   isHovered ? 'brightness-95 scale-[1.02]' : 'brightness-100 scale-100'
@@ -269,7 +271,10 @@ function ElegantProductCard({
               {showHover !== false && product.images[1]?.url && (
                 <Image
                   src={product.images[1].url}
-                  alt={isRtl && product.nameAr ? product.nameAr : product.name}
+                  alt={
+                    product.images[1].alt ||
+                    (isRtl && product.nameAr ? product.nameAr : product.name)
+                  }
                   className="object-cover transition-opacity duration-500"
                   style={{ opacity: isHovered ? 1 : 0 }}
                   fill

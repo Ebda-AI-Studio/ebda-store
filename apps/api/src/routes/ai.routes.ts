@@ -541,6 +541,233 @@ router.post(
   }
 );
 
+// Catalogue-wide product-FAQ sweep — the bulk twin of /product-faqs/draft.
+// Creates a BulkAiJob and hands off to the `bulk-ai-product-faqs` Inngest
+// function (which reuses generateProductFaqs, so bulk and per-product never
+// diverge). Default smart-skips products that already have FAQs; `force`
+// re-drafts AI-owned rows only (manual edits preserved).
+router.post(
+  '/bulk/product-faqs',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const force = req.body?.force === true;
+
+      const job = await prisma.bulkAiJob.create({
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'product_faqs',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/product-faqs-requested',
+          data: { jobId: job.id, storeId, force },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the product-FAQ draft right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =====================================================================
+// Catalogue field sweeps (2026-07-03) — category assignment, image
+// alt-text, product excerpts, product tags. Each mirrors the bulk-ai
+// pattern above: creates a BulkAiJob + hands off to an Inngest function.
+// See docs/plans/2026-07-03-ai-bulk-sweeps.md.
+// =====================================================================
+
+// Uncategorized-products-only category assignment. `force` is accepted for
+// wiring consistency but is a no-op in the Inngest function (never
+// re-categorizes a product that already has one — see bulk-ai-categorize.ts).
+router.post(
+  '/bulk/categorize',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const force = req.body?.force === true;
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'category_assign' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/categorize-requested',
+          data: { jobId: job.id, storeId, force },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the category sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Gemini-Vision image alt-text sweep. `force` is accepted for wiring
+// consistency but is a no-op — an image that already has `alt` is never
+// overwritten (see bulk-ai-image-alt.ts).
+router.post(
+  '/bulk/image-alt',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const force = req.body?.force === true;
+
+      const job = await prisma.bulkAiJob.create({
+        data: { storeId, userId: req.user!.userId, kind: 'image_alt' },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/image-alt-requested',
+          data: { jobId: job.id, storeId, force },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the image alt-text sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Product-excerpt sweep. `force` re-generates ai-owned excerpts only —
+// never overwrites a human-written one (see bulk-ai-excerpt.ts).
+router.post(
+  '/bulk/excerpt',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const force = req.body?.force === true;
+
+      const job = await prisma.bulkAiJob.create({
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'excerpt',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/excerpt-requested',
+          data: { jobId: job.id, storeId, force },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the excerpt sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Product-tag sweep. `force` tops up already-tagged products with newly
+// suggested tags (never deletes an existing tag — see bulk-ai-tags.ts).
+router.post(
+  '/bulk/tags',
+  requireFeature('bulk_operations'),
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const force = req.body?.force === true;
+
+      const job = await prisma.bulkAiJob.create({
+        data: {
+          storeId,
+          userId: req.user!.userId,
+          kind: 'product_tags',
+          ...(force ? { errors: { force: true } as object } : {}),
+        },
+        select: { id: true, status: true, kind: true, createdAt: true },
+      });
+
+      try {
+        await inngest.send({
+          name: 'bulk-ai/tags-requested',
+          data: { jobId: job.id, storeId, force },
+        });
+      } catch (err) {
+        await markJobFailedIfEnqueueFailed(job.id, err);
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'AI_QUEUE_UNREACHABLE',
+            message: 'Could not enqueue the tag sweep right now. Try again in a minute.',
+          },
+        });
+        return;
+      }
+
+      res.status(202).json({ success: true, data: { job } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // =====================================================================
 // AI Usage — summary + paginated log for merchant quota visibility.
 // =====================================================================
@@ -1876,5 +2103,162 @@ router.post(
     }
   }
 );
+
+// =====================================================================
+// Catalogue field sweep results — closes the every-data-has-a-UI gap for
+// category / image-alt / excerpt / tags, mirroring /results/translate etc.
+// =====================================================================
+
+/**
+ * GET /stores/:storeId/ai/results/categorize
+ * Category-assignment fill-rate: how many active products have >=1
+ * category, plus the 5 most recently-categorized products.
+ */
+router.get('/results/categorize', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+
+    const [totalProducts, categorizedProducts, recentProducts] = await Promise.all([
+      prisma.product.count({ where: { storeId, status: 'active', deletedAt: null } }),
+      prisma.product.count({
+        where: { storeId, status: 'active', deletedAt: null, categories: { some: {} } },
+      }),
+      prisma.product.findMany({
+        where: { storeId, status: 'active', deletedAt: null, categories: { some: {} } },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          updatedAt: true,
+          categories: { take: 1, select: { category: { select: { name: true } } } },
+        },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        products: {
+          total: totalProducts,
+          filled: categorizedProducts,
+          fillRate: totalProducts === 0 ? 0 : categorizedProducts / totalProducts,
+        },
+        recentProducts: recentProducts.map(p => ({
+          id: p.id,
+          name: p.name,
+          categoryName: p.categories[0]?.category.name ?? null,
+          updatedAt: p.updatedAt,
+        })),
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /stores/:storeId/ai/results/image-alt
+ * Image alt-text fill-rate across every active product's images.
+ */
+router.get('/results/image-alt', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+
+    const [totalImages, imagesWithAlt] = await Promise.all([
+      prisma.productImage.count({
+        where: { product: { storeId, status: 'active', deletedAt: null } },
+      }),
+      prisma.productImage.count({
+        where: {
+          product: { storeId, status: 'active', deletedAt: null },
+          alt: { not: null },
+        },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        images: {
+          total: totalImages,
+          filled: imagesWithAlt,
+          fillRate: totalImages === 0 ? 0 : imagesWithAlt / totalImages,
+        },
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /stores/:storeId/ai/results/excerpt
+ * Excerpt fill-rate + 5 most-recently-filled products.
+ */
+router.get('/results/excerpt', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+
+    const [totalProducts, productsWithExcerpt, recentProducts] = await Promise.all([
+      prisma.product.count({ where: { storeId, status: 'active', deletedAt: null } }),
+      prisma.product.count({
+        where: { storeId, status: 'active', deletedAt: null, excerpt: { not: null } },
+      }),
+      prisma.product.findMany({
+        where: { storeId, status: 'active', deletedAt: null, excerpt: { not: null } },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: { id: true, name: true, excerpt: true, excerptAr: true, updatedAt: true },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        products: {
+          total: totalProducts,
+          filled: productsWithExcerpt,
+          fillRate: totalProducts === 0 ? 0 : productsWithExcerpt / totalProducts,
+        },
+        recentProducts,
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /stores/:storeId/ai/results/tags
+ * Tag fill-rate + total distinct tags in the store.
+ */
+router.get('/results/tags', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = (req.params as { storeId: string }).storeId;
+
+    const [totalProducts, taggedProducts, totalTags] = await Promise.all([
+      prisma.product.count({ where: { storeId, status: 'active', deletedAt: null } }),
+      prisma.product.count({
+        where: { storeId, status: 'active', deletedAt: null, tags: { some: {} } },
+      }),
+      prisma.tag.count({ where: { storeId } }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        products: {
+          total: totalProducts,
+          filled: taggedProducts,
+          fillRate: totalProducts === 0 ? 0 : taggedProducts / totalProducts,
+        },
+        totalTags,
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
 
 export default router;

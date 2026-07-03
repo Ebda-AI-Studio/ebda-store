@@ -41,7 +41,11 @@ interface BulkAiJob {
     | 'citation_copy'
     | 'brand_facts'
     | 'description_balance'
-    | 'description_revert';
+    | 'description_revert'
+    | 'category_assign'
+    | 'image_alt'
+    | 'excerpt'
+    | 'product_tags';
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   direction: 'to_ar' | 'to_en' | null;
   total: number;
@@ -113,6 +117,10 @@ export default function AiToolsPage() {
     | 'citation-copy'
     | 'brand-facts'
     | 'geo-all'
+    | 'categorize'
+    | 'image-alt'
+    | 'excerpt'
+    | 'tags'
     | null
   >(null);
   const [cancelling, setCancelling] = useState<string | null>(null); // jobId being cancelled
@@ -514,6 +522,55 @@ export default function AiToolsPage() {
         />
       </div>
 
+      {/* ── Catalogue field sweeps ────────────────────────────────── */}
+      <SectionHeading title={t('sections.catalogueFields')} className="mt-6" />
+      <div className="mt-3 grid gap-4 md:grid-cols-3">
+        <BulkActionCard
+          title={t('cards.categorize.title')}
+          body={t('cards.categorize.body')}
+          buttonLabel={t('cards.categorize.button')}
+          startingLabel={t('starting')}
+          loading={starting === 'categorize'}
+          disabled={anyRunning}
+          onAction={force => start('/bulk/categorize', 'categorize', {}, force)}
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.categorize.forceTooltip')}
+        />
+        <BulkActionCard
+          title={t('cards.imageAlt.title')}
+          body={t('cards.imageAlt.body')}
+          buttonLabel={t('cards.imageAlt.button')}
+          startingLabel={t('starting')}
+          loading={starting === 'image-alt'}
+          disabled={anyRunning}
+          onAction={force => start('/bulk/image-alt', 'image-alt', {}, force)}
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.imageAlt.forceTooltip')}
+        />
+        <BulkActionCard
+          title={t('cards.excerpt.title')}
+          body={t('cards.excerpt.body')}
+          buttonLabel={t('cards.excerpt.button')}
+          startingLabel={t('starting')}
+          loading={starting === 'excerpt'}
+          disabled={anyRunning}
+          onAction={force => start('/bulk/excerpt', 'excerpt', {}, force)}
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.excerpt.forceTooltip')}
+        />
+        <BulkActionCard
+          title={t('cards.productTags.title')}
+          body={t('cards.productTags.body')}
+          buttonLabel={t('cards.productTags.button')}
+          startingLabel={t('starting')}
+          loading={starting === 'tags'}
+          disabled={anyRunning}
+          onAction={force => start('/bulk/tags', 'tags', {}, force)}
+          replaceExistingLabel={t('replaceExisting')}
+          forceTooltip={t('cards.productTags.forceTooltip')}
+        />
+      </div>
+
       {/* Currently populated GEO outputs — closes the every-data-has-a-UI gap. */}
       <GeoResultsPanel storeId={storeId} refreshTrigger={jobs.length} />
 
@@ -637,6 +694,14 @@ function jobKindLabel(
       return t('jobKind.descriptionBalance');
     case 'description_revert':
       return t('jobKind.descriptionRevert');
+    case 'category_assign':
+      return t('jobKind.categoryAssign');
+    case 'image_alt':
+      return t('jobKind.imageAlt');
+    case 'excerpt':
+      return t('jobKind.excerpt');
+    case 'product_tags':
+      return t('jobKind.productTags');
     default:
       return kind;
   }

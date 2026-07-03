@@ -191,6 +191,44 @@ type BulkAiRevertBalanceEvent = EventPayload & {
   };
 };
 
+// Catalogue field sweeps (2026-07-03): category assignment, image alt-text,
+// product excerpts, product tags. See docs/plans/2026-07-03-ai-bulk-sweeps.md.
+type BulkAiCategorizeEvent = EventPayload & {
+  name: 'bulk-ai/categorize-requested';
+  data: {
+    jobId: string;
+    storeId: string;
+    force?: boolean;
+  };
+};
+
+type BulkAiImageAltEvent = EventPayload & {
+  name: 'bulk-ai/image-alt-requested';
+  data: {
+    jobId: string;
+    storeId: string;
+    force?: boolean;
+  };
+};
+
+type BulkAiExcerptEvent = EventPayload & {
+  name: 'bulk-ai/excerpt-requested';
+  data: {
+    jobId: string;
+    storeId: string;
+    force?: boolean;
+  };
+};
+
+type BulkAiTagsEvent = EventPayload & {
+  name: 'bulk-ai/tags-requested';
+  data: {
+    jobId: string;
+    storeId: string;
+    force?: boolean;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -211,7 +249,11 @@ export type AppEvent =
   | InsightsRollupRequestedEvent
   | PaymentWebhookReceivedEvent
   | BulkAiBalanceDescriptionsEvent
-  | BulkAiRevertBalanceEvent;
+  | BulkAiRevertBalanceEvent
+  | BulkAiCategorizeEvent
+  | BulkAiImageAltEvent
+  | BulkAiExcerptEvent
+  | BulkAiTagsEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

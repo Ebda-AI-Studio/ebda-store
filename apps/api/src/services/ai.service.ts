@@ -26,6 +26,7 @@ import { redis } from './redis.service';
 import { AppError } from '../middleware/error-handler';
 import { assertAiQuota } from '../lib/ai-quota';
 import logger from '../lib/logger';
+import { safeFetchImage } from '../lib/safe-fetch';
 import { sanitizeJsonControlChars } from '../lib/ai/parse-ai-json';
 
 // Gemini Vision accepts only these mime types for inline_data. Anything else
@@ -508,9 +509,11 @@ export class AIService {
     await assertAiQuota();
 
     // Fetch the logo bytes — Gemini Vision needs inline base64 data.
+    // SSRF guard: logoUrl is merchant-controlled — block private/loopback/
+    // metadata targets before fetching server-side.
     let logoFetch: Response;
     try {
-      logoFetch = await fetch(logoUrl);
+      logoFetch = await safeFetchImage(logoUrl);
     } catch {
       throw new AppError(502, 'AI_LOGO_FETCH_FAILED', 'Could not reach the logo URL.');
     }

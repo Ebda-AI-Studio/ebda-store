@@ -34,6 +34,9 @@ interface Product {
   slug: string;
   description?: string;
   descriptionAr?: string;
+  /** Short 1-2 sentence blurb — written by the bulk-ai-excerpt sweep or manually. */
+  excerpt?: string;
+  excerptAr?: string;
   price: number;
   compareAtPrice?: number | null;
   costPrice?: number | null;
@@ -93,6 +96,8 @@ export default function EditProductPage() {
     nameAr: '',
     description: '',
     descriptionAr: '',
+    excerpt: '',
+    excerptAr: '',
     /** Regular (RRP) price as KWD string. Derived from product on load via deriveDiscountInput. */
     price: '',
     // Cost-of-goods. Used for profit reporting (price - costPrice = margin)
@@ -200,6 +205,8 @@ export default function EditProductPage() {
           nameAr: p.nameAr || '',
           description: p.description || '',
           descriptionAr: p.descriptionAr || '',
+          excerpt: (p as Product & { excerpt?: string }).excerpt || '',
+          excerptAr: (p as Product & { excerptAr?: string }).excerptAr || '',
           // Show the regular (RRP) price, not the discounted price.
           price: derived.regularPrice ? (derived.regularPrice / 1000).toFixed(3) : '',
           costPrice: p.costPrice ? (p.costPrice / 1000).toFixed(3) : '',
@@ -370,6 +377,9 @@ export default function EditProductPage() {
         nameAr: formData.nameAr || undefined,
         description: formData.description || undefined,
         descriptionAr: formData.descriptionAr || undefined,
+        // null clears, undefined leaves alone — same convention as metaTitle below.
+        excerpt: formData.excerpt || null,
+        excerptAr: formData.excerptAr || null,
         price: finalPrice,
         // null clears an existing compare-at price when no discount is active.
         compareAtPrice: finalCompareAtPrice,
@@ -611,6 +621,39 @@ export default function EditProductPage() {
                     onChange={e => updateField('descriptionAr', e.target.value)}
                     placeholder={tFields('descriptionArPlaceholder')}
                     rows={4}
+                    lang="ar"
+                    dir="rtl"
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    {/* No storeId/productId here on purpose: `excerpt` is written
+                        by the standalone bulk-ai-excerpt sweep, not the
+                        AI_AUTOFILL_FIELDS autopilot list, so the reset-field
+                        endpoint doesn't support regenerating it. Omitting the
+                        ids keeps the badge display-only (the "✨ AI" chip
+                        still renders; the "Switch to AI" hand-back button,
+                        which would 400, never does). */}
+                    <AiFieldBadge field="excerpt" sources={aiSources} />
+                  </div>
+                  <Textarea
+                    label={tFields('excerpt')}
+                    value={formData.excerpt}
+                    onChange={e => updateField('excerpt', e.target.value)}
+                    placeholder={tFields('excerptPlaceholder')}
+                    rows={2}
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldBadge field="excerptAr" sources={aiSources} />
+                  </div>
+                  <Textarea
+                    label={tFields('excerptAr')}
+                    value={formData.excerptAr}
+                    onChange={e => updateField('excerptAr', e.target.value)}
+                    placeholder={tFields('excerptArPlaceholder')}
+                    rows={2}
                     lang="ar"
                     dir="rtl"
                   />
