@@ -1123,6 +1123,8 @@
             "ctaTextArPlaceholder": "تسوق الآن",
             "ctaHref": "Button link",
             "ctaHrefPlaceholder": "/products or /products?category=shoes",
+            "link": "Banner link (optional)",
+            "linkPlaceholder": "https://… or /products — leave empty for a non-clickable banner",
             "slideLabel": "Slide {index}"
           }
         },

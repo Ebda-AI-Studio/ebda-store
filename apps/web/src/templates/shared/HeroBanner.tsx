@@ -3,10 +3,12 @@
 import type React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { cn } from '@force/ui';
 import { IMAGE_STANDARDS, sanitizeUrl } from '@force/shared';
 import type { HeroBannerProps } from '../types';
 import { getPackStyles } from './pack-styles';
 import { responsiveFontSize } from './section-typography';
+import { HeroBannerLink } from './HeroBannerLink';
 
 /**
  * Single hero banner — full-bleed image, optional headline overlay + CTA.
@@ -36,6 +38,7 @@ export function HeroBanner({
   ctaText,
   ctaTextAr,
   ctaHref,
+  link,
   isRtl,
   pack,
   priority = true,
@@ -88,6 +91,12 @@ export function HeroBanner({
   //       pickReadableForeground(resolveColor(bgColor, theme) ?? '#000000') here.
   const heroColor: string = headingZone?.color ?? '#ffffff';
 
+  // Accessible label for the stretched banner-link anchor (HeroBannerLink):
+  // prefer the visible headline, then the image alt text, then a generic
+  // localized fallback so screen-reader users always get context for the
+  // "whole slide is clickable" affordance.
+  const bannerLabel = text || alt || (isRtl ? 'عرض المزيد' : 'View more');
+
   // Framed mode (Ahmad 2026-05-17 night): merchant uploaded an image
   // they want shown in FULL without crop. Sit the hero inside a
   // max-w-7xl container with horizontal padding + rounded-2xl frame +
@@ -106,67 +115,80 @@ export function HeroBanner({
     // both are classes now, so the later sm: utility wins (no inline-style override
     // trap). sm:max-h-none removes the mobile ceiling. overflow-hidden clips both.
     <section className={containerBaseClass} style={mobileAspectStyle} dir={isRtl ? 'rtl' : 'ltr'}>
-      {desktopSrc && (
-        <picture>
-          <source media="(max-width: 639px)" srcSet={mobileSrc} />
-          <Image
-            src={desktopSrc}
-            alt={alt}
-            fill
-            priority={priority}
-            loading={priority ? undefined : 'lazy'}
-            sizes="100vw"
-            // object-cover (full-bleed): backend auto-resize lands every new
-            // upload at the exact container aspect (16:9 mobile / 1920×700
-            // desktop) via sharp before R2, so cover trims zero pixels for
-            // post-auto-resize uploads. Pre-feature legacy assets may crop
-            // slightly.
-            // object-contain (framed): whole image displays inside the
-            // container, letterbox bars fill with the neutral bg above.
-            // Pick by `presentation` prop / merchant admin toggle.
-            className={imageObjectClass}
-          />
-        </picture>
-      )}
+      <HeroBannerLink link={link} label={bannerLabel}>
+        {desktopSrc && (
+          <picture>
+            <source media="(max-width: 639px)" srcSet={mobileSrc} />
+            <Image
+              src={desktopSrc}
+              alt={alt}
+              fill
+              priority={priority}
+              loading={priority ? undefined : 'lazy'}
+              sizes="100vw"
+              // object-cover (full-bleed): backend auto-resize lands every new
+              // upload at the exact container aspect (16:9 mobile / 1920×700
+              // desktop) via sharp before R2, so cover trims zero pixels for
+              // post-auto-resize uploads. Pre-feature legacy assets may crop
+              // slightly.
+              // object-contain (framed): whole image displays inside the
+              // container, letterbox bars fill with the neutral bg above.
+              // Pick by `presentation` prop / merchant admin toggle.
+              className={imageObjectClass}
+            />
+          </picture>
+        )}
 
-      {showOverlay && (
-        <div className={`absolute inset-0 flex items-center justify-center ${styles.heroOverlay}`}>
-          <div className="mx-auto max-w-3xl px-6 text-center">
-            {text && (
-              <h1
-                className={styles.heroHeadline}
-                data-zone="heroHeadline"
-                style={{
-                  fontFamily: headingZone?.fontFamily,
-                  fontSize: responsiveFontSize(headingZone?.fontSize),
-                  fontWeight: headingZone?.fontWeight,
-                  // heroColor is always defined: merchant pick OR '#ffffff' fallback.
-                  // This replaces the removed `text-white` in heroHeadline pack-styles
-                  // so every theme still gets a legible color without a hardcoded class.
-                  color: heroColor,
-                  letterSpacing: headingZone?.letterSpacing,
-                  lineHeight: headingZone?.lineHeight,
-                  textTransform: headingZone?.textTransform as React.CSSProperties['textTransform'],
-                }}
-              >
-                {text}
-              </h1>
-            )}
-            {subtitleText && (
-              <p className="mt-3 text-base sm:text-lg text-white/90 drop-shadow">{subtitleText}</p>
-            )}
-            {cta && ctaHref && (
-              <Link
-                href={sanitizeUrl(ctaHref)}
-                className={`mt-6 inline-flex items-center justify-center ${styles.heroCta}`}
-                data-cta="button"
-              >
-                {cta}
-              </Link>
-            )}
+        {showOverlay && (
+          <div
+            className={`absolute inset-0 flex items-center justify-center ${styles.heroOverlay}`}
+          >
+            <div className="mx-auto max-w-3xl px-6 text-center">
+              {text && (
+                <h1
+                  className={styles.heroHeadline}
+                  data-zone="heroHeadline"
+                  style={{
+                    fontFamily: headingZone?.fontFamily,
+                    fontSize: responsiveFontSize(headingZone?.fontSize),
+                    fontWeight: headingZone?.fontWeight,
+                    // heroColor is always defined: merchant pick OR '#ffffff' fallback.
+                    // This replaces the removed `text-white` in heroHeadline pack-styles
+                    // so every theme still gets a legible color without a hardcoded class.
+                    color: heroColor,
+                    letterSpacing: headingZone?.letterSpacing,
+                    lineHeight: headingZone?.lineHeight,
+                    textTransform:
+                      headingZone?.textTransform as React.CSSProperties['textTransform'],
+                  }}
+                >
+                  {text}
+                </h1>
+              )}
+              {subtitleText && (
+                <p className="mt-3 text-base sm:text-lg text-white/90 drop-shadow">
+                  {subtitleText}
+                </p>
+              )}
+              {cta && ctaHref && (
+                // relative z-10: sits above HeroBannerLink's `absolute inset-0
+                // z-0` stretched anchor (when `link` is set) so the CTA's own
+                // destination wins the click, per the stretched-link pattern.
+                <Link
+                  href={sanitizeUrl(ctaHref)}
+                  className={cn(
+                    'relative z-10 mt-6 inline-flex items-center justify-center',
+                    styles.heroCta
+                  )}
+                  data-cta="button"
+                >
+                  {cta}
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </HeroBannerLink>
     </section>
   );
 

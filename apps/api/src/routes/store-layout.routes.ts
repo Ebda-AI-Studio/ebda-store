@@ -27,7 +27,10 @@ const router = Router({ mergeParams: true });
 // merging with defaults. Validating the parts that absolutely must be right
 // (numeric ranges, enum values) and letting unknown extras through keeps
 // the column forward-compatible.
-const heroSlideSchema = z.object({
+// Exported (not just used internally) so `tests/unit/hero-slide-schema.test.ts`
+// can assert the `link` / `ctaHref` scheme-allowlist behavior directly,
+// mirroring how `layoutSchema` is exported below for its parity test.
+export const heroSlideSchema = z.object({
   image: z.string().url().or(z.string().min(1)),
   imageAr: z.string().optional(),
   // Mobile-specific images — without these listed in the Zod schema, the
@@ -50,6 +53,17 @@ const heroSlideSchema = z.object({
     .refine(v => v === undefined || v === '' || isSafeUrl(v), {
       message:
         'CTA link must be a relative path or use http(s)/mailto/tel — javascript: is not allowed',
+    }),
+  // Optional "banner link" (stretched-link pattern) — makes the whole slide
+  // clickable. Same scheme allowlist as ctaHref. MUST be listed here or the
+  // parse step silently strips it (the same mobile-image silent-strip trap
+  // documented above for imageMobile/imageMobileAr).
+  link: z
+    .string()
+    .optional()
+    .refine(v => v === undefined || v === '' || isSafeUrl(v), {
+      message:
+        'Banner link must be a relative path or use http(s)/mailto/tel — javascript: is not allowed',
     }),
 });
 

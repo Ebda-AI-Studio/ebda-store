@@ -5359,7 +5359,16 @@ function SlidesEditor({ slides, storeId, storeTemplate, onChange }: SlidesEditor
   const addSlide = () => {
     onChange([
       ...slides,
-      { image: '', alt: '', headline: '', headlineAr: '', ctaText: '', ctaTextAr: '', ctaHref: '' },
+      {
+        image: '',
+        alt: '',
+        headline: '',
+        headlineAr: '',
+        ctaText: '',
+        ctaTextAr: '',
+        ctaHref: '',
+        link: '',
+      },
     ]);
   };
 
@@ -5562,6 +5571,12 @@ function SlidesEditor({ slides, storeId, storeTemplate, onChange }: SlidesEditor
                   placeholder={t('ctaHrefPlaceholder')}
                   value={slide.ctaHref ?? ''}
                   onChange={v => updateSlide(index, { ctaHref: v })}
+                />
+                <TextField
+                  label={t('link')}
+                  placeholder={t('linkPlaceholder')}
+                  value={slide.link ?? ''}
+                  onChange={v => updateSlide(index, { link: v })}
                 />
               </div>
             </div>

@@ -364,6 +364,14 @@ export interface HeroBannerProps {
   ctaText?: string;
   ctaTextAr?: string;
   ctaHref?: string;
+  /**
+   * Optional "banner link" — when set, the whole banner becomes clickable
+   * (stretched-link pattern) via `HeroBannerLink`; the CTA button above
+   * keeps its own destination and wins the click. Mirrors `ctaHref`
+   * (single, non-bilingual — a URL doesn't need translation). Empty/unset
+   * = today's behavior, zero change.
+   */
+  link?: string;
   isRtl?: boolean;
   /**
    * Active template id, used by shared section components to pick per-pack

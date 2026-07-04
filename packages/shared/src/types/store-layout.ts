@@ -89,6 +89,15 @@ export interface HeroSlide {
   ctaText?: string;
   ctaTextAr?: string;
   ctaHref?: string;
+  /**
+   * Optional "banner link" — when set, the WHOLE slide becomes a clickable
+   * marketing space (stretched-link pattern) in addition to the CTA button
+   * above, which keeps its own destination and wins the click (it sits on
+   * top). Single, non-bilingual (mirrors `ctaHref`) — a URL doesn't need
+   * translation. Empty/unset = today's behavior, zero change (slide is not
+   * clickable outside the CTA button).
+   */
+  link?: string;
 }
 
 /**
