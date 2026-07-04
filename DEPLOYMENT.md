@@ -202,13 +202,13 @@ Backups: daily local `pg_dump` runs on the developer Mac at 3:30am via launchd (
 
 Add these records to your domain:
 
-| Type  | Name   | Value                    | Notes                                          |
-| ----- | ------ | ------------------------ | ----------------------------------------------- |
-| —     | store  | (Worker route)           | Cloudflare Worker `force-web-cf-preview` custom domain |
-| —     | admin  | (Worker route)           | Cloudflare Worker `force-admin-cf-preview` custom domain |
-| —     | orders | (Worker route)           | Cloudflare Worker `force-orders-cf-preview` custom domain |
-| CNAME | api    | your-app.up.railway.app | Railway API — no proxy                         |
-| CNAME | cdn    | pub-xxx.r2.dev           | Cloudflare R2 public bucket (`*.r2.dev`)       |
+| Type  | Name   | Value                   | Notes                                                     |
+| ----- | ------ | ----------------------- | --------------------------------------------------------- |
+| —     | store  | (Worker route)          | Cloudflare Worker `force-web-cf-preview` custom domain    |
+| —     | admin  | (Worker route)          | Cloudflare Worker `force-admin-cf-preview` custom domain  |
+| —     | orders | (Worker route)          | Cloudflare Worker `force-orders-cf-preview` custom domain |
+| CNAME | api    | your-app.up.railway.app | Railway API — no proxy                                    |
+| CNAME | cdn    | pub-xxx.r2.dev          | Cloudflare R2 public bucket (`*.r2.dev`)                  |
 
 Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/services/vercel-domain.service.ts` (or the Cloudflare-for-SaaS Custom Hostnames path per `Store.domainProvider` — see `docs/migration/cloudflare-cutover-runbook.md`) — merchants add their domain in the admin UI and the API provisions it automatically.
 
@@ -324,14 +324,14 @@ Estimated effort: ~4h focused session.
 
 See `docs/audits/2026-05-22-comprehensive-saas-audit.md` §6 for the authoritative per-service forecast (idle / 10k MAU / 100k MAU scenarios). Snapshot of current scale:
 
-| Service                                     | Plan       | Monthly Cost  |
-| ------------------------------------------- | ---------- | ------------- |
+| Service                                     | Plan       | Monthly Cost                                                 |
+| ------------------------------------------- | ---------- | ------------------------------------------------------------ |
 | Cloudflare Workers (admin + web + orders)   | Workers    | see linked audit doc §6 (Vercel no longer part of the stack) |
-| Railway (API + Redis)                       | Hobby      | ~$6-16        |
-| Neon Postgres                               | Launch     | $0-17 (today) |
-| Cloudflare R2                               | Free tier  | $0            |
-| Inngest, OneSignal, Sentry, R2, Gemini, etc | Free tiers | $0            |
-| **Total at current scale**                  |            | **see linked audit doc §6 for the current forecast** |
+| Railway (API + Redis)                       | Hobby      | ~$6-16                                                       |
+| Neon Postgres                               | Launch     | $0-17 (today)                                                |
+| Cloudflare R2                               | Free tier  | $0                                                           |
+| Inngest, OneSignal, Sentry, R2, Gemini, etc | Free tiers | $0                                                           |
+| **Total at current scale**                  |            | **see linked audit doc §6 for the current forecast**         |
 
 ---
 
@@ -473,27 +473,27 @@ curl https://api.force-ai.co/health
 
 Each hosting/data provider's billing dashboard fires an email to the account owner when spend or usage crosses a threshold. A runaway AI sweep, bot scrape, or cron loop can otherwise spike costs 10× silently. Verified per-provider:
 
-| Provider | Alert           | Threshold                        |
-| -------- | --------------- | -------------------------------- |
-| Railway  | Budget alert    | spend > 80% of monthly budget    |
-| Neon     | Compute credits | usage > 80% of monthly credits   |
+| Provider   | Alert                | Threshold                                                                                                                                                                                                                       |
+| ---------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Railway    | Budget alert         | spend > 80% of monthly budget                                                                                                                                                                                                   |
+| Neon       | Compute credits      | usage > 80% of monthly credits                                                                                                                                                                                                  |
 | Cloudflare | Spending/usage limit | verify a cap is configured in the Cloudflare dashboard for the Workers plan now hosting web/admin/orders (was previously tracked via Vercel's spending limit before the 2026-07 migration; needs re-verification on Cloudflare) |
 
 Renewal verification: re-check these in the per-provider dashboard quarterly — providers occasionally migrate billing UIs and silently drop alert rules.
 
 ### Account ownership
 
-| Service                | Account email            | Project / org                                               |
-| ---------------------- | ------------------------ | ----------------------------------------------------------- |
+| Service                | Account email            | Project / org                                                                                        |
+| ---------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------- |
 | Cloudflare             | ahmed0montaser@gmail.com | Workers Builds hosting `force-web`/`force-admin`/`force-orders-cf-preview` (replaced Vercel 2026-07) |
-| Railway                | ahmed0montaser@gmail.com | personal project `force-website-builder`                    |
-| Neon                   | ahmed0montaser@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)       |
-| Sentry                 | (Ahmad's account)        | one org with four projects: `api`, `web`, `admin`, `orders` |
-| PostHog                | (Ahmad's account)        | EU region, single project covering web + admin              |
-| UptimeRobot            | (Ahmad's account)        | free tier, 2 monitors currently                             |
-| Axiom                  | (Ahmad's account)        | free tier (500GB/30d) — dataset `force-api-railway`         |
-| Resend                 | platform-wide            | one account; per-merchant domains added under it            |
-| @ForceAI1_bot Telegram | personal DM to Ahmad     | chat_id `1943728711`                                        |
+| Railway                | ahmed0montaser@gmail.com | personal project `force-website-builder`                                                             |
+| Neon                   | ahmed0montaser@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                |
+| Sentry                 | (Ahmad's account)        | one org with four projects: `api`, `web`, `admin`, `orders`                                          |
+| PostHog                | (Ahmad's account)        | EU region, single project covering web + admin                                                       |
+| UptimeRobot            | (Ahmad's account)        | free tier, 2 monitors currently                                                                      |
+| Axiom                  | (Ahmad's account)        | free tier (500GB/30d) — dataset `force-api-railway`                                                  |
+| Resend                 | platform-wide            | one account; per-merchant domains added under it                                                     |
+| @ForceAI1_bot Telegram | personal DM to Ahmad     | chat_id `1943728711`                                                                                 |
 
 ---
 

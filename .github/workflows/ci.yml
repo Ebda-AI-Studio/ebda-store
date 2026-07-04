@@ -90,7 +90,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # No 'cache: npm' (removed 2026-07-05): actions/setup-node's built-in
+          # npm cache restore hits GitHub's remote Actions Cache backend, and on
+          # our self-hosted runners (mac-orbstack-fwb/-2) that restore has been
+          # intermittently stalling at 0% for 5-8+ minutes before timing out
+          # ("Failed to restore: The operation cannot be completed in timeout"),
+          # burning the whole job timeout and reporting Lint/Security Audit as a
+          # cancelled (red) required check even though eslint/npm audit never ran.
+          # Confirmed via job logs across ~40% of recent CI runs (2026-07-04/05).
+          # The self-hosted runner's own $HOME persists between jobs on the same
+          # machine, so npm's native ~/.npm package cache stays warm anyway —
+          # dropping this wrapper removes the flaky network dependency with no
+          # real cache-loss cost here.
 
       - name: Install dependencies
         run: npm ci
@@ -112,7 +123,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
+          # was intermittently stalling for minutes on our self-hosted runners
+          # and eating job timeouts (cancelled Lint/Security Audit). See the
+          # full explanation on the Lint job above (~line 93).
 
       - name: Install dependencies
         run: npm ci
@@ -155,7 +169,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
+          # was intermittently stalling for minutes on our self-hosted runners
+          # and eating job timeouts (cancelled Lint/Security Audit). See the
+          # full explanation on the Lint job above (~line 93).
 
       - name: Install dependencies
         run: npm ci
@@ -183,7 +200,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
+          # was intermittently stalling for minutes on our self-hosted runners
+          # and eating job timeouts (cancelled Lint/Security Audit). See the
+          # full explanation on the Lint job above (~line 93).
 
       - name: Install dependencies
         run: npm ci
@@ -247,7 +267,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
+          # was intermittently stalling for minutes on our self-hosted runners
+          # and eating job timeouts (cancelled Lint/Security Audit). See the
+          # full explanation on the Lint job above (~line 93).
 
       - name: Install dependencies
         run: npm ci
@@ -380,7 +403,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
+          # was intermittently stalling for minutes on our self-hosted runners
+          # and eating job timeouts (cancelled Lint/Security Audit). See the
+          # full explanation on the Lint job above (~line 93).
 
       - name: Install dependencies
         run: npm ci
@@ -469,7 +495,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
+          # was intermittently stalling for minutes on our self-hosted runners
+          # and eating job timeouts (cancelled Lint/Security Audit). See the
+          # full explanation on the Lint job above (~line 93).
 
       - name: Install dependencies
         run: npm ci
@@ -514,7 +543,11 @@ jobs:
   security:
     name: Security Audit
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 5
+    # 7 (was 5), bumped 2026-07-05 alongside removing the flaky npm-cache
+    # restore + pinning trufflehog off '@main' — small safety margin so a
+    # cold npm ci + double audit + secret scan on a busy self-hosted runner
+    # still fits comfortably now that the two known hangs are gone.
+    timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
 
@@ -522,7 +555,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          # No 'cache: npm' (removed 2026-07-05): the GH Actions cache restore
+          # was intermittently stalling for minutes on our self-hosted runners
+          # and eating job timeouts (cancelled Lint/Security Audit). See the
+          # full explanation on the Lint job above (~line 93).
 
       - name: Install dependencies
         run: npm ci
@@ -563,7 +599,19 @@ jobs:
           fi
 
       - name: Check for secrets
-        uses: trufflesecurity/trufflehog@main
+        # Pinned to a release tag (not the floating '@main' branch ref) — fixed
+        # 2026-07-05. '@main' can't be cached by the runner's action-download
+        # cache (its resolved SHA changes on every trufflehog commit), so every
+        # job re-downloaded the action tarball from codeload.github.com; on our
+        # self-hosted runners that download was intermittently hitting the
+        # actions/runner's 100s HttpClient timeout, retrying twice with backoff,
+        # and burning this job's whole 5-minute timeout before npm audit or the
+        # scan ever ran (surfaced as a cancelled/red "Security Audit" check on
+        # ~40% of recent runs — not a real vulnerability or secret finding).
+        # A pinned tag resolves to a stable SHA the runner caches after the
+        # first successful download, and is also better supply-chain hygiene
+        # than trusting an unpinned third-party branch. Bump deliberately.
+        uses: trufflesecurity/trufflehog@00155c9dc586f34d189adc83d3ac2698c2ec551f # v3.95.8
         with:
           path: ./
           extra_args: --only-verified
@@ -577,16 +625,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     needs:
-      [
-        lint,
-        typecheck,
-        security,
-        build,
-        test-unit,
-        test-integration,
-        test-rls-force-app,
-        test-e2e,
-      ]
+      [lint, typecheck, security, build, test-unit, test-integration, test-rls-force-app, test-e2e]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Compose + send Telegram alert

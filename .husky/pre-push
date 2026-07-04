@@ -34,6 +34,16 @@ npm ci --dry-run 2>&1 | grep -E "^npm error" && exit 1 || true
 echo "-> generating prisma client (needed for typecheck)..."
 npm run db:generate >/dev/null 2>&1
 
+# Build the shared workspace packages before typecheck/tests (fixed
+# 2026-07-05). apps/* consume @force/database, @force/shared, @force/ui via
+# their compiled dist output, not raw source -- skipping this made every
+# downstream typecheck AND unit-test run fail ("Cannot find module
+# '@force/database'" / "Failed to resolve entry for package '@force/shared'").
+# CI's Build job builds every workspace before typecheck/tests depend on it;
+# this only builds the 3 shared packages (not the apps) to keep the hook fast.
+echo "-> building shared packages (needed for downstream typecheck + tests)..."
+npm run build -w packages/database -w packages/shared -w packages/ui >/dev/null 2>&1
+
 npm run lint
 
 echo "-> typechecking apps..."

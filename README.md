@@ -168,15 +168,15 @@ The bot degrades gracefully: if `GEMINI_API_KEY` is unset in WBS, the bot revert
 
 ## Deployment
 
-| Service         | Platform      | URL                                  |
-| --------------- | ------------- | ------------------------------------ |
-| API             | Railway       | `api-production-c058.up.railway.app` |
-| Admin Dashboard | Cloudflare Worker (`force-admin-cf-preview`) | `admin.force-ai.co`   |
-| Storefront      | Cloudflare Worker (`force-web-cf-preview`)   | `store.force-ai.co` + per-tenant custom domains (e.g. `wadyaljuz.com`) |
-| Orders PWA      | Cloudflare Worker (`force-orders-cf-preview`) | `orders.force-ai.co` |
-| Database        | Neon          | Serverless PostgreSQL                |
-| Redis           | Railway       | Internal network                     |
-| Storage         | Cloudflare R2 | Public bucket via `*.r2.dev`         |
+| Service         | Platform                                      | URL                                                                    |
+| --------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
+| API             | Railway                                       | `api-production-c058.up.railway.app`                                   |
+| Admin Dashboard | Cloudflare Worker (`force-admin-cf-preview`)  | `admin.force-ai.co`                                                    |
+| Storefront      | Cloudflare Worker (`force-web-cf-preview`)    | `store.force-ai.co` + per-tenant custom domains (e.g. `wadyaljuz.com`) |
+| Orders PWA      | Cloudflare Worker (`force-orders-cf-preview`) | `orders.force-ai.co`                                                   |
+| Database        | Neon                                          | Serverless PostgreSQL                                                  |
+| Redis           | Railway                                       | Internal network                                                       |
+| Storage         | Cloudflare R2                                 | Public bucket via `*.r2.dev`                                           |
 
 ## Quick Start
 
