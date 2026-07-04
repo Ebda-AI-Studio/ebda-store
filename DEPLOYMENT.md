@@ -1,6 +1,8 @@
 # Force Website Builder - Production Deployment Guide
 
 > **2026-05-22 update:** prior versions of this doc described a Cloudflare Pages + Supabase topology that was never the production state. The canonical production stack is below. The old doc misled incident responders during the 2026-05-22 audit (P1-7).
+>
+> **2026-07-05 update:** `apps/web`, `apps/admin`, and `apps/orders` have since fully MIGRATED off Vercel to **Cloudflare Workers** (OpenNext, deployed via GitHub→CF Workers Builds — `force-web-cf-preview` / `force-admin-cf-preview` / `force-orders-cf-preview`, serving `store.force-ai.co` / `admin.force-ai.co` / `orders.force-ai.co`). The old Vercel projects (`force-admin`, `force-web`, `force-orders`) are decommissioned. Steps below that reference Vercel setup/rollback are kept for history where useful but no longer reflect where to actually deploy — see `docs/migration/cloudflare-ci-deploy.md` and `docs/migration/cloudflare-cutover-runbook.md` for the current procedure.
 
 ## CI gate
 
@@ -22,13 +24,16 @@ To run the full gate manually: `bash scripts/safe-deploy.sh`
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                       VERCEL Hobby (free)                        │
+│              CLOUDFLARE WORKERS (GitHub→CF Workers Builds)       │
 │  ┌──────────────────────────┐  ┌──────────────────────────┐      │
-│  │  force-admin (Next 16)   │  │  force-web (Next 16)     │      │
-│  │  app.forcemediakw.com    │  │  store.forcemediakw.com  │      │
+│  │ force-admin-cf-preview   │  │ force-web-cf-preview     │      │
+│  │  admin.force-ai.co       │  │  store.force-ai.co       │      │
 │  │                          │  │  + per-tenant domains    │      │
 │  └──────────────────────────┘  │  (wadyaljuz.com, ...)    │      │
-│                                └──────────────────────────┘      │
+│  ┌──────────────────────────┐  └──────────────────────────┘      │
+│  │ force-orders-cf-preview  │                                    │
+│  │  orders.force-ai.co      │                                    │
+│  └──────────────────────────┘                                    │
 └──────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼ HTTPS, credentials:include
@@ -132,11 +137,11 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 ---
 
-## Step 2: Vercel Setup (Web & Admin)
+## Step 2: Cloudflare Workers Setup (Web, Admin & Orders)
 
-> ⚠️ **NOTE:** Production storefront + admin run on **Vercel Hobby**, not Cloudflare Pages. Project names: `force-admin` (app.forcemediakw.com) and `force-web` (store.forcemediakw.com + per-tenant custom domains). Vercel domain provisioning is automated via `apps/api/src/services/vercel-domain.service.ts`.
+> ⚠️ **NOTE (updated 2026-07-05):** Production storefront, admin, and orders PWA run on **Cloudflare Workers** (OpenNext), NOT Vercel. Worker names: `force-admin-cf-preview` (`admin.force-ai.co`), `force-web-cf-preview` (`store.force-ai.co` + per-tenant custom domains), `force-orders-cf-preview` (`orders.force-ai.co`). The Vercel projects that previously hosted these apps are decommissioned.
 
-Both apps deploy automatically via Vercel's GitHub integration on push to `main`. No manual steps needed — connect the repo in the Vercel dashboard, set the root directory for each app (`apps/admin` and `apps/web`), and add the env vars from §1.4. Vercel provisions TLS automatically for all custom domains.
+All three apps deploy automatically via GitHub→CF Workers Builds on push to `main` touching their respective `apps/*/**` path (`.github/workflows/cf-deploy.yml`, runs on the self-hosted runner). No manual per-push steps needed — the workflow builds each app with OpenNext and runs `wrangler deploy`. Per-tenant custom domain provisioning is still handled by the API (see `apps/api/src/services/vercel-domain.service.ts` / `docs/migration/cloudflare-cutover-runbook.md` for the current provider). Setup details: `docs/migration/cloudflare-ci-deploy.md`.
 
 ---
 
@@ -197,14 +202,15 @@ Backups: daily local `pg_dump` runs on the developer Mac at 3:30am via launchd (
 
 Add these records to your domain:
 
-| Type  | Name  | Value                   | Notes                                    |
-| ----- | ----- | ----------------------- | ---------------------------------------- |
-| CNAME | store | cname.vercel-dns.com    | Vercel (storefront) — Vercel adds SSL    |
-| CNAME | app   | cname.vercel-dns.com    | Vercel (admin) — Vercel adds SSL         |
-| CNAME | api   | your-app.up.railway.app | Railway API — no proxy                   |
-| CNAME | cdn   | pub-xxx.r2.dev          | Cloudflare R2 public bucket (`*.r2.dev`) |
+| Type  | Name   | Value                    | Notes                                          |
+| ----- | ------ | ------------------------ | ----------------------------------------------- |
+| —     | store  | (Worker route)           | Cloudflare Worker `force-web-cf-preview` custom domain |
+| —     | admin  | (Worker route)           | Cloudflare Worker `force-admin-cf-preview` custom domain |
+| —     | orders | (Worker route)           | Cloudflare Worker `force-orders-cf-preview` custom domain |
+| CNAME | api    | your-app.up.railway.app | Railway API — no proxy                         |
+| CNAME | cdn    | pub-xxx.r2.dev           | Cloudflare R2 public bucket (`*.r2.dev`)       |
 
-Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/services/vercel-domain.service.ts` — merchants add their domain in the admin UI and the API calls the Vercel API automatically.
+Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/services/vercel-domain.service.ts` (or the Cloudflare-for-SaaS Custom Hostnames path per `Store.domainProvider` — see `docs/migration/cloudflare-cutover-runbook.md`) — merchants add their domain in the admin UI and the API provisions it automatically.
 
 ---
 
@@ -219,8 +225,8 @@ Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/
 
 ### Monitoring
 
-- [ ] Set up Sentry for error tracking (SENTRY_DSN on Railway + NEXT_PUBLIC_SENTRY_DSN_ADMIN/WEB/ORDERS on Vercel)
-- [ ] Set SENTRY_AUTH_TOKEN (+ SENTRY_ORG / SENTRY_PROJECT) on Vercel for web/admin/orders to get source maps + releases uploaded (optional — builds succeed without it, just with minified stack traces)
+- [ ] Set up Sentry for error tracking (SENTRY_DSN on Railway + NEXT_PUBLIC_SENTRY_DSN_ADMIN/WEB/ORDERS as CF Workers Builds env vars / GitHub repo variables)
+- [ ] Set SENTRY_AUTH_TOKEN (+ SENTRY_ORG / SENTRY_PROJECT) for web/admin/orders builds to get source maps + releases uploaded (optional — builds succeed without it, just with minified stack traces)
 - [ ] Enable Railway metrics alerts
 - [ ] Confirm Neon compute usage alerts are configured in the Neon dashboard
 
@@ -247,10 +253,10 @@ Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/
 git push origin main
 ```
 
-### Deploy Web/Admin (Vercel)
+### Deploy Web/Admin/Orders (Cloudflare Workers)
 
 ```bash
-# Vercel auto-deploys on git push via GitHub integration
+# cf-deploy.yml auto-deploys each app on git push touching apps/<app>/**
 git push origin main
 ```
 
@@ -271,11 +277,10 @@ npx prisma migrate deploy
 2. Find previous working deployment
 3. Click "Rollback"
 
-### Vercel (Web & Admin)
+### Cloudflare Workers (Web, Admin & Orders)
 
-1. Go to https://vercel.com/ahmad-sharafs-projects/force-admin/deployments (or force-web)
-2. Find previous successful deployment
-3. Click "..." → **Promote to Production**
+1. `bash scripts/rollback.sh` (git revert + push) re-triggers `cf-deploy.yml`, redeploying the reverted build to `force-web-cf-preview` / `force-admin-cf-preview` / `force-orders-cf-preview`.
+2. To roll back a single Worker without a code revert: `wrangler deployments list` (per app dir) then `wrangler rollback <deployment-id>`.
 
 See `docs/ROLLBACK.md` §A for the full fast-path procedure.
 
@@ -293,7 +298,7 @@ npx prisma migrate dev --name rollback_xxx
 
 ## Environments & staging posture
 
-**Current posture (2026-05-15, "option C" — safe-by-default Preview)**: there is no separate staging Railway service. Instead, Vercel Preview deployments for force-web + force-admin have `NEXT_PUBLIC_API_URL=http://localhost:4000` so PR previews are **non-functional by default** — they can't talk to production. A contributor who wants their preview to reach an API must override the env var on their PR explicitly. This blocks the worst-case data-integrity gap (a PR preview from a contributor writing to prod Neon) at zero cost. The CI `preview-env-isolation.yml` rule-13 gate verifies the production-vs-preview value differs and passes.
+**Current posture (2026-05-15, "option C" — safe-by-default Preview)**: there is no separate staging Railway service. Preview deployments for web/admin (whether the historical Vercel Preview flow or the Cloudflare Workers Builds preview environment) have `NEXT_PUBLIC_API_URL=http://localhost:4000` so PR previews are **non-functional by default** — they can't talk to production. A contributor who wants their preview to reach an API must override the env var on their PR explicitly. This blocks the worst-case data-integrity gap (a PR preview from a contributor writing to prod Neon) at zero cost. The CI `preview-env-isolation.yml` rule-13 gate verifies the production-vs-preview value differs and passes.
 
 **Why not a real staging Railway service yet**: at single-merchant scale (wadyaljuz only) the operational cost of maintaining a parallel Railway + Neon-branch + per-provider sandbox account chain (~4-6h setup, ~$20/mo Railway Pro OR a separate Hobby project) outweighs the marginal risk reduction. The safe-by-default Preview value gives ~80% of the protection at 5 minutes of setup.
 
@@ -309,7 +314,7 @@ When any of these fire, the path to real staging is:
 - New Railway project `fwb-staging` on Hobby plan (~$5/mo, separate from prod)
 - Neon branch `staging` from `main` + seed fixtures script at `scripts/seed-staging.mjs`
 - Custom domain `store-api-staging.forcemediakw.com` → CNAME → Railway service
-- Vercel Preview `NEXT_PUBLIC_API_URL` swap from `localhost:4000` → `https://store-api-staging.forcemediakw.com`
+- Preview environment `NEXT_PUBLIC_API_URL` swap from `localhost:4000` → `https://store-api-staging.forcemediakw.com`
 - Per-provider sandbox credentials: Tap/MyFatoorah/Hesabe/UPayments test mode, OneSignal separate "staging" app, Cloudflare R2 separate bucket `force-uploads-staging`, Sentry environment tag `staging`, Inngest separate `INNGEST_DEPLOY_ID`, Axiom dataset `force-api-railway-staging`
 - Documentation in this section updated with the URLs + dashboards
 
@@ -321,21 +326,20 @@ See `docs/audits/2026-05-22-comprehensive-saas-audit.md` §6 for the authoritati
 
 | Service                                     | Plan       | Monthly Cost  |
 | ------------------------------------------- | ---------- | ------------- |
-| Vercel (admin + web)                        | Hobby      | $0            |
+| Cloudflare Workers (admin + web + orders)   | Workers    | see linked audit doc §6 (Vercel no longer part of the stack) |
 | Railway (API + Redis)                       | Hobby      | ~$6-16        |
 | Neon Postgres                               | Launch     | $0-17 (today) |
 | Cloudflare R2                               | Free tier  | $0            |
 | Inngest, OneSignal, Sentry, R2, Gemini, etc | Free tiers | $0            |
-| **Total at current scale**                  |            | **~$6-33/mo** |
+| **Total at current scale**                  |            | **see linked audit doc §6 for the current forecast** |
 
 ---
 
 ## Support Contacts
 
-- Vercel: support@vercel.com
 - Railway: support@railway.app
 - Neon: support@neon.tech
-- Cloudflare: Enterprise support or community forums
+- Cloudflare (Workers, R2, DNS): Enterprise support or community forums
 
 ---
 
@@ -352,7 +356,7 @@ catches something the others can't.
 - **Active monitors**:
   - `FWB API` → `https://api.force-ai.co/health` — HTTPS, 5-min interval, 30s timeout, alert on 2 consecutive failures
   - `FWB store · wadyaljuz.com` → `https://wadyaljuz.com` — same settings
-  - `FWB admin` → `https://app.forcemediakw.com` — same settings (added 2026-05-15)
+  - `FWB admin` → `https://admin.force-ai.co` — same settings (added 2026-05-15; domain updated 2026-07-05 after the Cloudflare Workers migration)
 - **Alert routing**: UptimeRobot mobile app push (instant on iPhone/Android, free tier, replaces Telegram which is paid-tier on UptimeRobot). The bridge to Telegram is via the in-API channel below for code-level alerts.
 - **Adding a new merchant**: clone the existing storefront monitor, swap the URL to the merchant's domain, name it `FWB store · <slug>`. Attach the same mobile-push alert contact. Also add it to the public status page.
 
@@ -361,18 +365,18 @@ catches something the others can't.
 Four Sentry projects (one per app) so issues stay isolated in the dashboard UI:
 
 - **API** — `apps/api/src/services/sentry.service.ts` + boot init. Captures `uncaughtException`, `unhandledRejection`, Express errors. Env: `SENTRY_DSN` on Railway.
-- **Storefront** (`apps/web`) — `sentry.{client,server,edge}.config.ts` + `instrumentation.ts`. Captures SSR throws, RSC errors, client hydration errors, browser uncaught errors, route-handler errors. Env: `NEXT_PUBLIC_SENTRY_DSN_WEB` on Vercel.
-- **Admin** (`apps/admin`) — same shape. Env: `NEXT_PUBLIC_SENTRY_DSN_ADMIN` on Vercel.
-- **Orders** (`apps/orders`) — **added 2026-07-02 (audit H1)**. Client-only via `instrumentation-client.ts` (no server-side Sentry — Orders has no `instrumentation.ts`). Env: `NEXT_PUBLIC_SENTRY_DSN_ORDERS` on Vercel + as a GitHub repo variable for the `cf-deploy.yml` Cloudflare build. Previously this app had ZERO error capture — a crash in the fulfillment UI store staff use was invisible.
+- **Storefront** (`apps/web`) — `sentry.{client,server,edge}.config.ts` + `instrumentation.ts`. Captures SSR throws, RSC errors, client hydration errors, browser uncaught errors, route-handler errors. Env: `NEXT_PUBLIC_SENTRY_DSN_WEB` as a GitHub repo variable, consumed by the Cloudflare Workers build (`cf-deploy.yml`).
+- **Admin** (`apps/admin`) — same shape. Env: `NEXT_PUBLIC_SENTRY_DSN_ADMIN` as a GitHub repo variable, consumed by `cf-deploy.yml`.
+- **Orders** (`apps/orders`) — **added 2026-07-02 (audit H1)**. Client-only via `instrumentation-client.ts` (no server-side Sentry — Orders has no `instrumentation.ts`). Env: `NEXT_PUBLIC_SENTRY_DSN_ORDERS` as a GitHub repo variable for the `cf-deploy.yml` Cloudflare build. Previously this app had ZERO error capture — a crash in the fulfillment UI store staff use was invisible.
 - **No-op when DSN missing** (graceful in dev / preview / pre-account-creation).
-- **Source maps + releases (added 2026-07-02, audit H2)**: web/admin/orders `next.config.js` are now wrapped in `withSentryConfig`. Upload only activates when `SENTRY_AUTH_TOKEN` (+ optional `SENTRY_ORG`/`SENTRY_PROJECT`) is set — omitted everywhere today, so this is a no-op until configured on Vercel. Before this, every Sentry issue from web/admin arrived with minified/obfuscated stack traces and no release association.
+- **Source maps + releases (added 2026-07-02, audit H2)**: web/admin/orders `next.config.js` are now wrapped in `withSentryConfig`. Upload only activates when `SENTRY_AUTH_TOKEN` (+ optional `SENTRY_ORG`/`SENTRY_PROJECT`) is set — omitted everywhere today, so this is a no-op until configured in the CF Workers Builds env. Before this, every Sentry issue from web/admin arrived with minified/obfuscated stack traces and no release association.
 - **Sample rates**: storefront `tracesSampleRate=0.1` in prod (high traffic), admin `1.0` (low volume, every trace is signal). Session replays fire only on errors, not on healthy sessions.
 - **Cloudflare Workers target — storefront only (2026-07-02):** the standard `@sentry/nextjs` server SDK can't run on Workers (and `cf-build.sh` moves `instrumentation.ts` aside for the CF build regardless — see `docs/migration/cloudflare-preview-workers.md`). `apps/web/sentry-worker-entry.ts` wraps the OpenNext Worker's fetch handler with `@sentry/cloudflare`'s `Sentry.withSentry(...)` so SSR/RSC errors ARE captured on `store.force-ai.co` too. The DSN reaches the Worker as a runtime var `SENTRY_DSN` (`cf-deploy.yml` → `wrangler deploy --var SENTRY_DSN:<value>`, sourced from the same `NEXT_PUBLIC_SENTRY_DSN_WEB` repo variable; omitted → clean no-op). `apps/admin` and `apps/orders` do NOT have this yet — follow-up, same pattern.
 
 ### 3. PostHog — product analytics
 
 - **Apps wired**: `apps/web` (storefront) + `apps/admin`. SDK: `posthog-js` v1.373.4.
-- **Env**: `NEXT_PUBLIC_POSTHOG_KEY` on Vercel (both projects). Optional `NEXT_PUBLIC_POSTHOG_HOST` (defaults to `https://eu.i.posthog.com`).
+- **Env**: `NEXT_PUBLIC_POSTHOG_KEY` as a GitHub repo variable (both apps), consumed by the Cloudflare Workers build. Optional `NEXT_PUBLIC_POSTHOG_HOST` (defaults to `https://eu.i.posthog.com`).
 - **Consent gating**:
   - Storefront: gated on the marketing cookie consent (`consent.marketing === true`). Same gate as Meta / GA / TikTok pixels. Init fires only after the visitor accepts marketing cookies.
   - Admin: always-on (operator-only tool, no public visitors, no GDPR consent surface).
@@ -473,7 +477,7 @@ Each hosting/data provider's billing dashboard fires an email to the account own
 | -------- | --------------- | -------------------------------- |
 | Railway  | Budget alert    | spend > 80% of monthly budget    |
 | Neon     | Compute credits | usage > 80% of monthly credits   |
-| Vercel   | Spending limit  | hard cap configured in dashboard |
+| Cloudflare | Spending/usage limit | verify a cap is configured in the Cloudflare dashboard for the Workers plan now hosting web/admin/orders (was previously tracked via Vercel's spending limit before the 2026-07 migration; needs re-verification on Cloudflare) |
 
 Renewal verification: re-check these in the per-provider dashboard quarterly — providers occasionally migrate billing UIs and silently drop alert rules.
 
@@ -481,7 +485,7 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 
 | Service                | Account email            | Project / org                                               |
 | ---------------------- | ------------------------ | ----------------------------------------------------------- |
-| Vercel                 | ahmed0montaser@gmail.com | Hobby plan, sole owner                                      |
+| Cloudflare             | ahmed0montaser@gmail.com | Workers Builds hosting `force-web`/`force-admin`/`force-orders-cf-preview` (replaced Vercel 2026-07) |
 | Railway                | ahmed0montaser@gmail.com | personal project `force-website-builder`                    |
 | Neon                   | ahmed0montaser@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)       |
 | Sentry                 | (Ahmad's account)        | one org with four projects: `api`, `web`, `admin`, `orders` |

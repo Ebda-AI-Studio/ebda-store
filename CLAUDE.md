@@ -124,8 +124,9 @@ When Ahmad reports a bug or asks for a feature, the fix MUST land in a place whe
 ```
 apps/
   api/          → Express.js API (Railway) - port from PORT env var
-  admin/        → Next.js admin dashboard (Vercel)
-  web/          → Next.js storefront (Vercel)
+  admin/        → Next.js admin dashboard (Cloudflare Worker `force-admin-cf-preview`, admin.force-ai.co)
+  web/          → Next.js storefront (Cloudflare Worker `force-web-cf-preview`, store.force-ai.co)
+  orders/       → Next.js order-tracking (Cloudflare Worker `force-orders-cf-preview`, orders.force-ai.co)
 packages/
   database/     → Prisma ORM + schema (@force/database)
   shared/       → Shared types, utils, constants (@force/shared)
@@ -135,10 +136,10 @@ packages/
 ### Deployment
 
 - **API**: Railway (Railpack build, NOT Dockerfile) at `api-production-c058.up.railway.app`
-- **Admin**: Vercel project `force-admin` → custom domain `app.forcemediakw.com`. **ALSO auto-deploys to Cloudflare Workers** at `admin.force-ai.co` via `cf-deploy.yml` (push to main touching `apps/admin/**`). Vercel stays live until a deliberate cutover.
-- **Orders PWA**: Vercel project `force-orders` → `orders.forcemediakw.com`. **ALSO auto-deploys to Cloudflare Workers** at `orders.force-ai.co` via `cf-deploy.yml` (push to main touching `apps/orders/**`). Vercel stays live until cutover.
-- **Web**: Vercel project `force-web` → custom domain `wadyaljuz.com` (per-tenant; future tenants attach their own custom domains). **ALSO auto-deploys to Cloudflare Workers** (OpenNext) via `.github/workflows/cf-deploy.yml` on every push to `main` touching `apps/web/**` — runs on the self-hosted runner (zero GH minutes), serves `store.force-ai.co` + every merchant Custom Hostname via the SaaS `*/*` fallback. wadyaljuz.com is LIVE on Cloudflare. Setup: `docs/migration/cloudflare-ci-deploy.md`.
-- _Stale Vercel projects to ignore:_ `force-web-sigma` (no prod deploy), `force-web-sigma-seven.vercel.app` (DEPLOYMENT_NOT_FOUND ghost). Both pre-date the 2026-05-17 rename to the canonical `force-web` / `force-admin` projects. Safe to delete via Vercel dashboard.
+- **Admin**: Cloudflare Worker `force-admin-cf-preview` → `admin.force-ai.co` (via GitHub→CF Workers Builds, OpenNext).
+- **Orders PWA**: Cloudflare Worker `force-orders-cf-preview` → `orders.force-ai.co` (via GitHub→CF Workers Builds, OpenNext).
+- **Web**: Cloudflare Worker `force-web-cf-preview` → `store.force-ai.co` + per-tenant custom domains (e.g. wadyaljuz.com) via the SaaS `*/*` fallback (via GitHub→CF Workers Builds, OpenNext). Setup: `docs/migration/cloudflare-ci-deploy.md`.
+- _Note:_ the apps are now fully migrated to Cloudflare Workers (`force-web`/`force-admin`/`force-orders-cf-preview`); the old Vercel projects (`force-admin`, `force-orders`, `force-web`, plus stale ghosts `force-web-sigma`) are decommissioned.
 - **Database**: Neon PostgreSQL (serverless) — local .env has stale Supabase URL, production uses Neon
 - **Redis**: Railway internal (`redis.railway.internal:6379`)
 - **Storage**: Cloudflare R2 (public bucket `*.r2.dev`, NOT `*.r2.cloudflarestorage.com`)
@@ -154,7 +155,7 @@ packages/
 
 The API and frontends are on **different domains**. This has major implications:
 
-1. **HTTP-only cookies set by the API are scoped to the API domain** — Next.js middleware on Vercel CANNOT read them
+1. **HTTP-only cookies set by the API are scoped to the API domain** — Next.js middleware on Cloudflare Workers CANNOT read them
 2. **Server-side route protection via middleware is NOT possible** with the current setup
 3. **All auth protection is client-side** via `AuthProvider` in each frontend app
 4. **Do NOT add cookie-based auth checks in Next.js middleware** — they will cause redirect loops
@@ -445,32 +446,32 @@ Optional (feature degrades gracefully if missing):
 - `AUTO_CANCEL_UNPAID_DAYS` (default 2, matches MyFatoorah's 2-day payment-link validity) — how old a `pending` / `unpaid` order must be before the daily Inngest cron (`order-auto-cancel-unpaid`, 03:00 UTC) auto-cancels it via `OrderService.updateStatus(...,'cancelled')`. Never refunds (the order was never paid — refund effects are gated on a captured payment); the customer still gets the standard `order_cancelled` notification.
 - `R2_ORPHAN_SWEEP_APPLY` (default unset / report-only) — controls the weekly Inngest cron `r2-orphan-sweep` (Sunday 04:00 UTC). When **unset or any value other than `"true"`**, the sweep only **reports** orphans (count, size, sample keys) via structured logger + Telegram alert — it never deletes. Set to the literal string `"true"` to enable batch deletion of confirmed orphans (DeleteObjects ≤1000/request). Review at least one report run before enabling. Objects younger than 24 h are always skipped regardless of this flag.
 
-### Admin (Vercel)
+### Admin (Cloudflare Worker `force-admin-cf-preview`)
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL (e.g., `https://api-production-c058.up.railway.app`)
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for the admin PWA (`react-onesignal` in `apps/admin`).
 - `NEXT_PUBLIC_SENTRY_DSN_ADMIN` — admin client Sentry DSN. Initialized in `apps/admin/instrumentation-client.ts` (replaced the dead `sentry.client.config.ts`, same latent bug as web — no `withSentryConfig`, fixed 2026-06-25). Server Sentry off on the CF target (instrumentation.ts moved aside). **`next.config.js` is now wrapped in `withSentryConfig` (fixed 2026-07-02, audit H2)** — see the shared `SENTRY_AUTH_TOKEN` note below for source maps/releases. **NOT yet given the `@sentry/cloudflare` worker-entry treatment** that `apps/web` got 2026-07-02 (see the Web section below); tracked as a follow-up, same pattern.
 
-### Web (Vercel)
+### Web (Cloudflare Worker `force-web-cf-preview`)
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for storefront broadcasts (script-tag init via `OneSignalStorefrontInit.tsx`). Storefront silently no-ops when missing.
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — VAPID public key for the standards-based Web Push subscription path.
-- `NEXT_PUBLIC_SENTRY_DSN_WEB` — client-side Sentry DSN. Initialized in `apps/web/instrumentation-client.ts` (the Next 15.3+/Sentry v10 client hook). NOTE: this REPLACED the old `sentry.client.config.ts`, which never loaded because `next.config.js` isn't wrapped in `withSentryConfig` — so browser Sentry was silently dead until 2026-06-25. Server-side Sentry (`instrumentation.ts` → `sentry.server.config.ts`) works on Vercel but is OFF on the Cloudflare target (cf-build moves `instrumentation.ts` aside); restoring it there needs `@sentry/cloudflare`. **`next.config.js` is now wrapped in `withSentryConfig` (fixed 2026-07-02, audit H2)** — see the shared `SENTRY_AUTH_TOKEN` note below.
+- `NEXT_PUBLIC_SENTRY_DSN_WEB` — client-side Sentry DSN. Initialized in `apps/web/instrumentation-client.ts` (the Next 15.3+/Sentry v10 client hook). NOTE: this REPLACED the old `sentry.client.config.ts`, which never loaded because `next.config.js` isn't wrapped in `withSentryConfig` — so browser Sentry was silently dead until 2026-06-25. Server-side Sentry (`instrumentation.ts` → `sentry.server.config.ts`) is OFF on the Cloudflare target (cf-build moves `instrumentation.ts` aside, since the app is fully migrated off Vercel where this path used to work); restoring it there needs `@sentry/cloudflare`. **`next.config.js` is now wrapped in `withSentryConfig` (fixed 2026-07-02, audit H2)** — see the shared `SENTRY_AUTH_TOKEN` note below.
 - **Cloudflare SSR/RSC Sentry (web only, added 2026-07-02):** `apps/web/sentry-worker-entry.ts` wraps the OpenNext-generated Worker fetch handler with `@sentry/cloudflare`'s `Sentry.withSentry(...)` so SSR/RSC errors ARE captured on the CF target (the standard `@sentry/nextjs` server SDK still can't run there). `apps/web/wrangler.jsonc` `main` now points at this custom entry instead of the raw `.open-next/worker.js`, and `compatibility_date` was bumped to `2025-08-16` (Sentry's Cloudflare SDK requires it for `https.request`). The DSN reaches the Worker as a runtime var named **`SENTRY_DSN`** (distinct from the build-time `NEXT_PUBLIC_SENTRY_DSN_WEB`) — `cf-deploy.yml`'s "Deploy worker" step passes it via `wrangler deploy --var SENTRY_DSN:<value>`, reusing the SAME `NEXT_PUBLIC_SENTRY_DSN_WEB` GitHub repo variable (the DSN isn't a secret — it's already public in the client bundle), and omits the flag entirely when unset so preview/unconfigured deploys still build and serve cleanly. **`apps/admin` and `apps/orders` do NOT have this wiring yet** — same pattern needs repeating there as a follow-up (admin has `instrumentation.ts` + `NEXT_PUBLIC_SENTRY_DSN_ADMIN` already; orders has no Sentry at all today).
-- **Cloudflare deploy build env**: the CF Workers build (`cf-deploy.yml`) reads all `NEXT_PUBLIC_*` from GitHub repo **variables** (public, build-time inlined). Keep them synced with Vercel's `force-web` prod env. See `docs/migration/cloudflare-ci-deploy.md`.
+- **Cloudflare deploy build env**: the CF Workers build (`cf-deploy.yml`) reads all `NEXT_PUBLIC_*` from GitHub repo **variables** (public, build-time inlined) — these GitHub repo variables are now the canonical source (the old Vercel `force-web` prod env is decommissioned). See `docs/migration/cloudflare-ci-deploy.md`.
 
-### Orders PWA (Vercel — `force-orders`)
+### Orders PWA (Cloudflare Worker `force-orders-cf-preview`)
 
 - `NEXT_PUBLIC_API_URL` — Railway API URL.
 - `NEXT_PUBLIC_ONESIGNAL_ORDERS_APP_ID` — OneSignal app ID for the Orders PWA (`react-onesignal` init via `OneSignalInit.tsx`, origin `orders.forcemediakw.com`). The app silently no-ops (no Enable banner) when missing. Replaced the old `NEXT_PUBLIC_VAPID_PUBLIC_KEY` path (server 403 + iOS-unreliable) on 2026-06-24.
-- `NEXT_PUBLIC_SENTRY_DSN_ORDERS` — **new (2026-07-02, audit H1)**. Orders PWA client Sentry DSN. Previously the Orders PWA — the surface store staff use to run live fulfillment — shipped with zero Sentry coverage; a crash was invisible. Initialized in `apps/orders/instrumentation-client.ts` (same client-only pattern as web/admin — no server-side Sentry added here, matching the scope of this fix). Wired into `cf-deploy.yml`'s `deploy-orders` env block via GitHub repo variable of the same name (keep synced with Vercel's `force-orders` prod env). `next.config.js` wrapped in `withSentryConfig` too.
+- `NEXT_PUBLIC_SENTRY_DSN_ORDERS` — **new (2026-07-02, audit H1)**. Orders PWA client Sentry DSN. Previously the Orders PWA — the surface store staff use to run live fulfillment — shipped with zero Sentry coverage; a crash was invisible. Initialized in `apps/orders/instrumentation-client.ts` (same client-only pattern as web/admin — no server-side Sentry added here, matching the scope of this fix). Wired into `cf-deploy.yml`'s `deploy-orders` env block via GitHub repo variable of the same name (the GitHub repo variable is now canonical — the old Vercel `force-orders` prod env is decommissioned). `next.config.js` wrapped in `withSentryConfig` too.
 
 **Sentry build-time config (source maps + releases, added 2026-07-02, audit H2) — shared across web/admin/orders:**
 
-- `SENTRY_AUTH_TOKEN` — enables the Sentry webpack/Turbopack plugin's source-map upload + release creation during `next build`. **Optional and safe to omit**: when unset, the plugin logs a warning and skips the upload — it does NOT fail the build. This is why local dev, CI's `npm run build` step, and the Cloudflare Workers build (`cf-deploy.yml` doesn't set it) are all unaffected; only environments where this is explicitly configured (e.g. Vercel prod) get uploaded source maps + linked releases.
+- `SENTRY_AUTH_TOKEN` — enables the Sentry webpack/Turbopack plugin's source-map upload + release creation during `next build`. **Optional and safe to omit**: when unset, the plugin logs a warning and skips the upload — it does NOT fail the build. This is why local dev, CI's `npm run build` step, and the Cloudflare Workers build (`cf-deploy.yml` doesn't set it) are all unaffected; only environments where this is explicitly configured (e.g. as a CF Workers Builds env var) get uploaded source maps + linked releases.
 - `SENTRY_ORG` / `SENTRY_PROJECT` — Sentry org/project slugs for the upload. Optional; the plugin can often infer them from the auth token, but set explicitly for clarity.
-- Set these on Vercel (web/admin/orders prod envs) to actually get readable stack traces in Sentry. Not currently set anywhere — until they are, behavior is unchanged from before this fix (no source maps uploaded, same as always).
+- Set these in the CF Workers Builds env (web/admin/orders) to actually get readable stack traces in Sentry. Not currently set anywhere — until they are, behavior is unchanged from before this fix (no source maps uploaded, same as always).
 
 ## Commands
 
@@ -504,7 +505,7 @@ CI (`.github/workflows/ci.yml`) runs lint → typecheck → build → unit tests
 
 This project follows the standing rollback discipline (see global `~/.claude/CLAUDE.md` + `~/.claude/projects/-Users-ahmadsharaf/memory/feedback-rollback-recipe.md`).
 
-- **Code rollback (all 3 deploys at once):** `bash scripts/rollback.sh` — git revert + push triggers Vercel admin (`apps/admin`) + Vercel storefront (`apps/web`) + Railway API. Lock-step matters — `apps/admin` and `apps/web` share API contracts via `@force/shared`. Don't promote one Vercel app without the other.
+- **Code rollback (all 3 deploys at once):** `bash scripts/rollback.sh` — git revert + push triggers the Cloudflare Worker admin (`apps/admin` → `force-admin-cf-preview`) + Cloudflare Worker storefront (`apps/web` → `force-web-cf-preview`) + Railway API. Lock-step matters — `apps/admin` and `apps/web` share API contracts via `@force/shared`. Don't promote one Worker app without the other.
 - **Per-commit Neon snapshots: RETIRED (2026-06-08, cost).** `neon-snapshot.yml` is disabled and the stale `prod-<sha>` branches pruned (the auto-prune had let them pile up + drive extra-branch/compute charges). DR is now an **automated daily local pg_dump**: launchd `com.forceai.neon-backup` (3:30am, runs on next wake) → `~/.claude/scripts/backup-all-neon.sh` → `~/Desktop/projects/_backups/<project>/` (keeps 30). It pulls the real direct URL from Neon via `neonctl --role-name neondb_owner` and **requires `pg_dump` ≥ PG17** (`brew install postgresql@17`; pg_dump 14 fails silently on a PG17 server). Weekly `com.forceai.mac-maintenance` handles storage hygiene + a Telegram low-disk alert.
 - **Local pg_dump:** `bash scripts/backup-db.sh` writes to `~/Desktop/projects/_backups/force-website-builder/`. Reads `DATABASE_URL` from `apps/api/.env`.
 - **Migration rollback:** see `docs/ROLLBACK.md`. RLS policy state must be re-verified after restore (the `runInTenantContext` AsyncLocalStorage pattern depends on policy shape). Hand-written migrations live at `packages/database/prisma/migrations/<TS>_<name>/migration.sql` and apply on next API boot — by the time you notice a schema bug, it's already live.

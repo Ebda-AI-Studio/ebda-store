@@ -89,8 +89,9 @@ Major capabilities added across this session (commit SHAs for reference):
 force-website-builder/
 ├── apps/
 │   ├── api/            # Express.js API server (Railway)
-│   ├── admin/          # Admin dashboard (Vercel)
-│   └── web/            # Customer storefront (Vercel)
+│   ├── admin/          # Admin dashboard (Cloudflare Worker `force-admin-cf-preview`)
+│   ├── web/            # Customer storefront (Cloudflare Worker `force-web-cf-preview`)
+│   └── orders/         # Order-tracking PWA (Cloudflare Worker `force-orders-cf-preview`)
 ├── packages/
 │   ├── database/       # Prisma schema & client (@force/database)
 │   ├── shared/         # Types, Zod schemas, constants (@force/shared)
@@ -170,8 +171,9 @@ The bot degrades gracefully: if `GEMINI_API_KEY` is unset in WBS, the bot revert
 | Service         | Platform      | URL                                  |
 | --------------- | ------------- | ------------------------------------ |
 | API             | Railway       | `api-production-c058.up.railway.app` |
-| Admin Dashboard | Vercel        | `app.forcemediakw.com`               |
-| Storefront      | Vercel        | `wadyaljuz.com` (flagship tenant)    |
+| Admin Dashboard | Cloudflare Worker (`force-admin-cf-preview`) | `admin.force-ai.co`   |
+| Storefront      | Cloudflare Worker (`force-web-cf-preview`)   | `store.force-ai.co` + per-tenant custom domains (e.g. `wadyaljuz.com`) |
+| Orders PWA      | Cloudflare Worker (`force-orders-cf-preview`) | `orders.force-ai.co` |
 | Database        | Neon          | Serverless PostgreSQL                |
 | Redis           | Railway       | Internal network                     |
 | Storage         | Cloudflare R2 | Public bucket via `*.r2.dev`         |
@@ -237,7 +239,7 @@ After init, `npx neonctl@latest projects list`, `npx neonctl@latest branches cre
 
 **Note on AI keys:** `GOOGLE_GENERATIVE_AI_KEY` is for Force AI Store's own catalog AI features. The WhatsApp bot AI (`GEMINI_API_KEY`) lives in the WBS Railway service — not here. See Bot Intelligence section above for details.
 
-**Admin & Storefront (Vercel):**
+**Admin & Storefront (Cloudflare Workers, via GitHub→CF Workers Builds):**
 
 | Variable                       | Description                           |
 | ------------------------------ | ------------------------------------- |
