@@ -334,7 +334,16 @@ jobs:
         # so the regression tests for the MyFatoorah empty-email P0 + the Sentry
         # 4xx-gate were dead weight. They run HERE (not the unit job) because the
         # shared test setup connects to Postgres + Redis, which only this job has.
-        run: npx vitest run tests/integration apps/api/src --reporter=verbose
+        #
+        # --exclude rls-force-app.test.ts: this job's DATABASE_URL authenticates
+        # as the `test` superuser (BYPASSRLS), so every cross-tenant assertion in
+        # that file is a guaranteed false failure here — the file is designed to
+        # run ONLY under the dedicated `test-rls-force-app` job below, whose
+        # DATABASE_URL is a real `force_app` login and actually enforces RLS.
+        # Introduced in #501 without this exclusion, which is why this job was
+        # red on main from 2026-07-02 onward despite RLS force_app coverage
+        # passing in its own job the whole time.
+        run: npx vitest run tests/integration apps/api/src --exclude tests/integration/rls-force-app.test.ts --reporter=verbose
         env:
           # Integration tests run against the ephemeral postgres SERVICE CONTAINER
           # (localhost below), never a Neon branch. The old TEST_DATABASE_URL path
