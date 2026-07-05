@@ -7,6 +7,11 @@ import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { parseAiJson } from '../../ai/parse-ai-json';
+import { rethrowAsAppError } from '../../ai/gemini-errors';
+import { recordUsage } from '../../../services/ai.service';
+import { AppError } from '../../../middleware/error-handler';
+
+const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
 /**
  * Catalogue-wide AI product recommendations sweep.
@@ -388,6 +393,14 @@ Return exactly ${Math.min(
             const result = await callWithRetry(
               () => model.generateContent(prompt),
               `recommendations:${product.id}`
+            ).catch((err: unknown) => rethrowAsAppError(err, 'AI recommendations sweep failed'));
+            const usage = result.response.usageMetadata;
+            await recordUsage(
+              storeId,
+              'recommendations',
+              usage?.promptTokenCount ?? 0,
+              usage?.candidatesTokenCount ?? 0,
+              false
             );
             const raw = result.response.text();
             let parsed: LlmRec[];
@@ -452,7 +465,7 @@ Return exactly ${Math.min(
               );
               throw err;
             }
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
             if (errors.length < ERROR_CAP) {
               errors.push({
                 entityKind: 'product',
@@ -488,7 +501,7 @@ Return exactly ${Math.min(
             entityKind: 'store',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
         }
       }

@@ -14,6 +14,8 @@
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseAiJson } from './parse-ai-json';
+import { rethrowAsAppError } from './gemini-errors';
+import { recordUsage } from '../../services/ai.service';
 
 export interface CategoryOption {
   id: string;
@@ -22,6 +24,8 @@ export interface CategoryOption {
 }
 
 export interface SuggestProductCategoryInput {
+  /** storeId for AI quota-usage attribution (AiUsage row). */
+  storeId: string;
   storeName: string;
   product: {
     name: string;
@@ -73,7 +77,22 @@ export async function suggestProductCategory(
   const model = genai.getGenerativeModel({ model: modelName });
 
   const prompt = buildCategorizePrompt(input);
-  const result = await model.generateContent(prompt);
+  let result;
+  try {
+    result = await model.generateContent(prompt);
+  } catch (err) {
+    rethrowAsAppError(err, 'AI category suggestion failed');
+  }
+
+  const usage = result.response.usageMetadata;
+  await recordUsage(
+    input.storeId,
+    'categorize',
+    usage?.promptTokenCount ?? 0,
+    usage?.candidatesTokenCount ?? 0,
+    false
+  );
+
   const raw = result.response.text();
 
   const parsed = parseAiJson<{ matches?: SuggestedCategoryMatch[] }>(raw);

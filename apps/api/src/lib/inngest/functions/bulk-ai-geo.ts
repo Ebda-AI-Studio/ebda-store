@@ -7,6 +7,11 @@ import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
+import { rethrowAsAppError } from '../../ai/gemini-errors';
+import { recordUsage } from '../../../services/ai.service';
+import { AppError } from '../../../middleware/error-handler';
+
+const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
 /**
  * GEO (Generative Engine Optimization) bulk sweeps — generates content
@@ -206,6 +211,14 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
           const result = await callWithRetry(
             () => model.generateContent(prompt),
             `llms-txt:${storeId}`
+          ).catch((err: unknown) => rethrowAsAppError(err, 'AI llms.txt sweep failed'));
+          const usage = result.response.usageMetadata;
+          await recordUsage(
+            storeId,
+            'geo',
+            usage?.promptTokenCount ?? 0,
+            usage?.candidatesTokenCount ?? 0,
+            false
           );
           const text = result.response.text().trim();
 
@@ -221,7 +234,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
           await sleep(THROTTLE_MS);
         } catch (err) {
           if (isAiQuotaCapError(err)) throw err;
-          const msg = err instanceof Error ? err.message : 'Gemini call failed';
+          const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
           logger.error({ err, storeId, jobId }, 'bulk-ai-llms-txt: Gemini error');
           if (errors.length < ERROR_CAP)
             errors.push({
@@ -240,7 +253,7 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
             entityKind: 'store',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
       }
 
@@ -411,6 +424,14 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
               const result = await callWithRetry(
                 () => model.generateContent(prompt),
                 `citation-copy:product:${p.id}`
+              ).catch((err: unknown) => rethrowAsAppError(err, 'AI citation-copy sweep failed'));
+              const usage = result.response.usageMetadata;
+              await recordUsage(
+                storeId,
+                'geo',
+                usage?.promptTokenCount ?? 0,
+                usage?.candidatesTokenCount ?? 0,
+                false
               );
               const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
               const parsed = JSON.parse(raw) as { en: string; ar: string };
@@ -430,7 +451,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
               await sleep(THROTTLE_MS);
             } catch (err) {
               if (isAiQuotaCapError(err)) throw err;
-              const msg = err instanceof Error ? err.message : 'Gemini call failed';
+              const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
               if (errors.length < ERROR_CAP)
                 errors.push({
                   entityKind: 'product',
@@ -460,7 +481,7 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
             entityKind: 'store',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
       }
 
@@ -624,6 +645,14 @@ Populate using only the information provided above. For keyCategories, use the c
           const result = await callWithRetry(
             () => model.generateContent(prompt),
             `brand-facts:${storeId}`
+          ).catch((err: unknown) => rethrowAsAppError(err, 'AI brand-facts sweep failed'));
+          const usage = result.response.usageMetadata;
+          await recordUsage(
+            storeId,
+            'geo',
+            usage?.promptTokenCount ?? 0,
+            usage?.candidatesTokenCount ?? 0,
+            false
           );
           const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
           const parsed = JSON.parse(raw);
@@ -640,7 +669,7 @@ Populate using only the information provided above. For keyCategories, use the c
           await sleep(THROTTLE_MS);
         } catch (err) {
           if (isAiQuotaCapError(err)) throw err;
-          const msg = err instanceof Error ? err.message : 'Gemini call failed';
+          const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
           logger.error({ err, storeId, jobId }, 'bulk-ai-brand-facts: Gemini error');
           if (errors.length < ERROR_CAP)
             errors.push({
@@ -659,7 +688,7 @@ Populate using only the information provided above. For keyCategories, use the c
             entityKind: 'store',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
       }
 

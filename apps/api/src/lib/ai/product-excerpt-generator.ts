@@ -9,10 +9,14 @@
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseAiJson } from './parse-ai-json';
+import { rethrowAsAppError } from './gemini-errors';
+import { recordUsage } from '../../services/ai.service';
 
 export const EXCERPT_MAX_LENGTH = 300;
 
 export interface GenerateProductExcerptInput {
+  /** storeId for AI quota-usage attribution (AiUsage row). */
+  storeId: string;
   storeName: string;
   product: {
     name: string;
@@ -58,7 +62,22 @@ export async function generateProductExcerpt(
   const model = genai.getGenerativeModel({ model: modelName });
 
   const prompt = buildExcerptPrompt(input);
-  const result = await model.generateContent(prompt);
+  let result;
+  try {
+    result = await model.generateContent(prompt);
+  } catch (err) {
+    rethrowAsAppError(err, 'AI excerpt generation failed');
+  }
+
+  const usage = result.response.usageMetadata;
+  await recordUsage(
+    input.storeId,
+    'excerpt',
+    usage?.promptTokenCount ?? 0,
+    usage?.candidatesTokenCount ?? 0,
+    false
+  );
+
   const raw = result.response.text();
 
   const parsed = parseAiJson<Partial<GeneratedProductExcerpt>>(raw);

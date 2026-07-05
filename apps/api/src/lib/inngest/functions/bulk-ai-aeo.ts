@@ -7,6 +7,11 @@ import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
+import { rethrowAsAppError } from '../../ai/gemini-errors';
+import { recordUsage } from '../../../services/ai.service';
+import { AppError } from '../../../middleware/error-handler';
+
+const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
 /**
  * AEO (Answer Engine Optimisation) bulk sweeps — drafts FAQ items,
@@ -380,6 +385,14 @@ No other text, no markdown code fences — pure JSON only.`;
           const result = await callWithRetry(
             () => model.generateContent(prompt),
             `faq-aeo:${storeId}`
+          ).catch((err: unknown) => rethrowAsAppError(err, 'AI FAQ AEO sweep failed'));
+          const usage = result.response.usageMetadata;
+          await recordUsage(
+            storeId,
+            'aeo',
+            usage?.promptTokenCount ?? 0,
+            usage?.candidatesTokenCount ?? 0,
+            false
           );
           const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
           const parsed = JSON.parse(raw);
@@ -387,7 +400,7 @@ No other text, no markdown code fences — pure JSON only.`;
           drafted = parsed.slice(0, count);
         } catch (err) {
           if (isAiQuotaCapError(err)) throw err;
-          const msg = err instanceof Error ? err.message : 'Gemini call failed';
+          const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
           logger.error({ err, storeId, jobId }, 'bulk-ai-faq-aeo: Gemini error');
           if (errors.length < ERROR_CAP)
             errors.push({
@@ -435,7 +448,7 @@ No other text, no markdown code fences — pure JSON only.`;
                 entityKind: 'faq',
                 entityId: storeId,
                 entityName: f.question.slice(0, 80),
-                error: err instanceof Error ? err.message : 'persist failed',
+                error: err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE,
               });
             }
             failed++;
@@ -449,7 +462,7 @@ No other text, no markdown code fences — pure JSON only.`;
             entityKind: 'store',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
         }
       }
@@ -638,6 +651,14 @@ No markdown, no code fences — pure JSON only.`;
           const result = await callWithRetry(
             () => model.generateContent(prompt),
             `howto-aeo:${storeId}`
+          ).catch((err: unknown) => rethrowAsAppError(err, 'AI HowTo AEO sweep failed'));
+          const usage = result.response.usageMetadata;
+          await recordUsage(
+            storeId,
+            'aeo',
+            usage?.promptTokenCount ?? 0,
+            usage?.candidatesTokenCount ?? 0,
+            false
           );
           const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
           const parsed = JSON.parse(raw);
@@ -645,7 +666,7 @@ No markdown, no code fences — pure JSON only.`;
           drafted = parsed.slice(0, count);
         } catch (err) {
           if (isAiQuotaCapError(err)) throw err;
-          const msg = err instanceof Error ? err.message : 'Gemini call failed';
+          const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
           logger.error({ err, storeId, jobId }, 'bulk-ai-howto-aeo: Gemini error');
           if (errors.length < ERROR_CAP)
             errors.push({
@@ -697,7 +718,7 @@ No markdown, no code fences — pure JSON only.`;
                 entityKind: 'howto',
                 entityId: storeId,
                 entityName: h.title.slice(0, 80),
-                error: err instanceof Error ? err.message : 'persist failed',
+                error: err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE,
               });
             }
             failed++;
@@ -711,7 +732,7 @@ No markdown, no code fences — pure JSON only.`;
             entityKind: 'store',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
         }
       }
@@ -875,6 +896,14 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
             const result = await callWithRetry(
               () => model.generateContent(prompt),
               `meta-aeo:store:${storeId}`
+            ).catch((err: unknown) => rethrowAsAppError(err, 'AI store meta AEO sweep failed'));
+            const usage = result.response.usageMetadata;
+            await recordUsage(
+              storeId,
+              'aeo',
+              usage?.promptTokenCount ?? 0,
+              usage?.candidatesTokenCount ?? 0,
+              false
             );
             const raw = stripFences(result.response.text());
             const parsed = JSON.parse(raw) as { en: string; ar: string };
@@ -895,7 +924,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
             await sleep(THROTTLE_MS);
           } catch (err) {
             if (isAiQuotaCapError(err)) throw err;
-            const msg = err instanceof Error ? err.message : 'Gemini call failed';
+            const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
             logger.error({ err, storeId, jobId }, 'bulk-ai-meta-aeo: store meta error');
             if (errors.length < ERROR_CAP)
               errors.push({
@@ -980,6 +1009,14 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
               const result = await callWithRetry(
                 () => model.generateContent(prompt),
                 `meta-aeo:product:${p.id}`
+              ).catch((err: unknown) => rethrowAsAppError(err, 'AI product meta AEO sweep failed'));
+              const usage = result.response.usageMetadata;
+              await recordUsage(
+                storeId,
+                'aeo',
+                usage?.promptTokenCount ?? 0,
+                usage?.candidatesTokenCount ?? 0,
+                false
               );
               const raw = stripFences(result.response.text());
               const parsed = JSON.parse(raw) as { en: string; ar: string };
@@ -1000,7 +1037,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
               await sleep(THROTTLE_MS);
             } catch (err) {
               if (isAiQuotaCapError(err)) throw err;
-              const msg = err instanceof Error ? err.message : 'Gemini call failed';
+              const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
               if (errors.length < ERROR_CAP)
                 errors.push({
                   entityKind: 'product',
@@ -1069,6 +1106,16 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
               const result = await callWithRetry(
                 () => model.generateContent(prompt),
                 `meta-aeo:category:${c.id}`
+              ).catch((err: unknown) =>
+                rethrowAsAppError(err, 'AI category meta AEO sweep failed')
+              );
+              const usage = result.response.usageMetadata;
+              await recordUsage(
+                storeId,
+                'aeo',
+                usage?.promptTokenCount ?? 0,
+                usage?.candidatesTokenCount ?? 0,
+                false
               );
               const raw = stripFences(result.response.text());
               const parsed = JSON.parse(raw) as { en: string; ar: string };
@@ -1089,7 +1136,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
               await sleep(THROTTLE_MS);
             } catch (err) {
               if (isAiQuotaCapError(err)) throw err;
-              const msg = err instanceof Error ? err.message : 'Gemini call failed';
+              const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
               if (errors.length < ERROR_CAP)
                 errors.push({
                   entityKind: 'category',
@@ -1119,7 +1166,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
             entityKind: 'store',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
         }
       }

@@ -295,7 +295,7 @@ const bulkTranslateSchema = z.object({
 // so the merchant sees an actionable error instead of a stuck "queued"
 // row that lingers forever.
 async function markJobFailedIfEnqueueFailed(jobId: string, err: unknown): Promise<void> {
-  const message = err instanceof Error ? err.message : 'Failed to enqueue job';
+  const message = err instanceof AppError ? err.message : 'Failed to enqueue job';
   try {
     await prisma.bulkAiJob.update({
       where: { id: jobId },
@@ -504,6 +504,7 @@ router.post(
       try {
         faqs = await generateProductFaqs(
           {
+            storeId,
             storeName: store?.name ?? storeId,
             product: {
               name: product.name,
@@ -515,24 +516,18 @@ router.post(
           apiKey,
           process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest'
         );
-      } catch {
+      } catch (err) {
+        // generateProductFaqs already converts Gemini/SDK errors (e.g. a 429
+        // quota) into a well-classified AppError with a merchant-safe message
+        // — let those through unchanged. Only a genuine JSON-parse failure
+        // (thrown as a plain Error) becomes AI_PARSE_ERROR.
+        if (err instanceof AppError) throw err;
         throw new AppError(502, 'AI_PARSE_ERROR', 'AI returned unexpected format');
       }
 
-      // Record AI usage for quota tracking (non-blocking).
-      prisma.aiUsage
-        .create({
-          data: {
-            storeId,
-            feature: 'product_faq_draft',
-            inputTokens: 0,
-            outputTokens: 0,
-            cachedHit: false,
-          },
-        })
-        .catch(() => {
-          /* intentionally swallowed */
-        });
+      // AI usage is now recorded inside generateProductFaqs() itself (feature
+      // 'product-faqs') — recording it again here would double-count this
+      // single request against the daily/monthly quota cap.
 
       res.json({ success: true, data: { faqs } });
     } catch (error) {

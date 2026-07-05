@@ -6,6 +6,7 @@ import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { generateProductFaqs } from '../../ai/product-faq-generator';
+import { AppError } from '../../../middleware/error-handler';
 
 /**
  * Catalogue-wide product-FAQ sweep.
@@ -152,6 +153,7 @@ export const bulkAiProductFaqs: InngestFunction.Any = inngest.createFunction(
               () =>
                 generateProductFaqs(
                   {
+                    storeId,
                     storeName: store?.name ?? storeId,
                     product: {
                       name: product.name,
@@ -213,7 +215,10 @@ export const bulkAiProductFaqs: InngestFunction.Any = inngest.createFunction(
                 entityKind: 'product',
                 entityId: product.id,
                 entityName: product.name,
-                error: err instanceof Error ? err.message : String(err),
+                error:
+                  err instanceof AppError
+                    ? err.message
+                    : 'AI request failed — please try again shortly.',
               });
             }
             failed++;
@@ -239,7 +244,7 @@ export const bulkAiProductFaqs: InngestFunction.Any = inngest.createFunction(
             entityKind: 'product',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
         }
       }

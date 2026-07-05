@@ -6,6 +6,7 @@ import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { suggestProductTags, MAX_TAGS_PER_PRODUCT } from '../../ai/product-tag-suggester';
+import { AppError } from '../../../middleware/error-handler';
 
 /**
  * Catalogue-wide product-tag sweep.
@@ -151,6 +152,7 @@ export const bulkAiTags: InngestFunction.Any = inngest.createFunction(
               () =>
                 suggestProductTags(
                   {
+                    storeId,
                     storeName: store?.name ?? storeId,
                     product: { name: product.name, description: product.description },
                     existingTagNames,
@@ -198,7 +200,10 @@ export const bulkAiTags: InngestFunction.Any = inngest.createFunction(
                 entityKind: 'product',
                 entityId: product.id,
                 entityName: product.name,
-                error: err instanceof Error ? err.message : String(err),
+                error:
+                  err instanceof AppError
+                    ? err.message
+                    : 'AI request failed — please try again shortly.',
               });
             }
             failed++;
@@ -222,7 +227,7 @@ export const bulkAiTags: InngestFunction.Any = inngest.createFunction(
             entityKind: 'product',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
         }
       }

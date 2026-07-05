@@ -16,6 +16,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import { safeFetchImage } from '../safe-fetch';
+import { rethrowAsAppError } from './gemini-errors';
+import { recordUsage } from '../../services/ai.service';
 
 export const ALT_TEXT_MAX_LENGTH = 160;
 
@@ -41,6 +43,8 @@ async function rasterizeForGemini(
 }
 
 export interface GenerateProductAltTextInput {
+  /** storeId for AI quota-usage attribution (AiUsage row). */
+  storeId: string;
   imageUrl: string;
   product: {
     name: string;
@@ -94,7 +98,22 @@ Rules:
   const genai = new GoogleGenerativeAI(apiKey);
   const model = genai.getGenerativeModel({ model: modelName });
 
-  const result = await model.generateContent([{ inlineData: { mimeType, data: base64 } }, prompt]);
+  let result;
+  try {
+    result = await model.generateContent([{ inlineData: { mimeType, data: base64 } }, prompt]);
+  } catch (err) {
+    rethrowAsAppError(err, 'AI alt-text generation failed');
+  }
+
+  const usage = result.response.usageMetadata;
+  await recordUsage(
+    input.storeId,
+    'image-alt',
+    usage?.promptTokenCount ?? 0,
+    usage?.candidatesTokenCount ?? 0,
+    false
+  );
+
   const raw = result.response.text().trim();
   const alt = raw.replace(/^["']|["']$/g, '').trim();
 

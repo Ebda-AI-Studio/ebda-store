@@ -3,6 +3,7 @@ import { prisma } from '@force/database';
 import { config } from '../../config';
 import logger from '../logger';
 import { assertAiQuota } from '../ai-quota';
+import { rethrowAsAppError } from './gemini-errors';
 
 async function throttle() {
   const ms = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
@@ -72,7 +73,12 @@ ${review.body}`;
   await assertAiQuota();
   await throttle();
 
-  const result = await getModel().generateContent(prompt);
+  let result;
+  try {
+    result = await getModel().generateContent(prompt);
+  } catch (err) {
+    rethrowAsAppError(err, 'AI review translation failed');
+  }
   const parsed = JSON.parse(stripFences(result.response.text())) as { translated: string };
 
   await prisma.review.update({
@@ -124,7 +130,12 @@ body: ${review.body}`;
   await assertAiQuota();
   await throttle();
 
-  const result = await getModel().generateContent(prompt);
+  let result;
+  try {
+    result = await getModel().generateContent(prompt);
+  } catch (err) {
+    rethrowAsAppError(err, 'AI review spam detection failed');
+  }
   const parsed = JSON.parse(stripFences(result.response.text())) as {
     spamScore: number;
     reasons: string[];
@@ -175,7 +186,12 @@ ${reviewsText}`;
   await assertAiQuota();
   await throttle();
 
-  const result = await getModel().generateContent(prompt);
+  let result;
+  try {
+    result = await getModel().generateContent(prompt);
+  } catch (err) {
+    rethrowAsAppError(err, 'AI review summarization failed');
+  }
   const parsed = JSON.parse(stripFences(result.response.text())) as Omit<
     ReviewSummary,
     'reviewCount'
@@ -230,7 +246,12 @@ Review:
   await assertAiQuota();
   await throttle();
 
-  const result = await getModel().generateContent(prompt);
+  let result;
+  try {
+    result = await getModel().generateContent(prompt);
+  } catch (err) {
+    rethrowAsAppError(err, 'AI owner response draft failed');
+  }
   const parsed = JSON.parse(stripFences(result.response.text())) as OwnerResponseDraft;
 
   logger.info({ reviewId }, '[REVIEW-TOOLS] draftOwnerResponse: done');

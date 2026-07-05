@@ -28,6 +28,7 @@ import { assertAiQuota } from '../lib/ai-quota';
 import logger from '../lib/logger';
 import { safeFetchImage } from '../lib/safe-fetch';
 import { sanitizeJsonControlChars } from '../lib/ai/parse-ai-json';
+import { rethrowAsAppError } from '../lib/ai/gemini-errors';
 
 // Gemini Vision accepts only these mime types for inline_data. Anything else
 // (image/svg+xml, image/gif, image/tiff, image/x-icon) gets a 400. We
@@ -53,7 +54,18 @@ async function rasterizeForGemini(
   return { data: png.toString('base64'), mimeType: 'image/png' };
 }
 
-type Feature = 'translate' | 'seo' | 'categorize' | 'section';
+type Feature =
+  | 'translate'
+  | 'seo'
+  | 'categorize'
+  | 'section'
+  | 'product-faqs'
+  | 'aeo'
+  | 'geo'
+  | 'recommendations'
+  | 'tags'
+  | 'image-alt'
+  | 'excerpt';
 type Lang = 'en' | 'ar';
 
 export type TranslationKind =
@@ -140,7 +152,7 @@ function cacheKey(feature: Feature, payload: unknown): string {
   return `ai:${feature}:${hash}`;
 }
 
-async function recordUsage(
+export async function recordUsage(
   storeId: string,
   feature: Feature,
   inputTokens: number,
@@ -155,38 +167,6 @@ async function recordUsage(
     // Never fail the user-facing request because we couldn't log usage.
     logger.warn({ err, storeId, feature }, 'Failed to record AI usage');
   }
-}
-
-/**
- * Translate Google Generative AI SDK errors into AppError so the
- * Express error handler can return a useful HTTP status + message
- * to the merchant instead of a generic 500.
- */
-function rethrowAsAppError(err: unknown, fallback: string): never {
-  const e = err as { status?: number; message?: string };
-  if (e?.status === 429) {
-    throw new AppError(
-      429,
-      'AI_QUOTA_EXCEEDED',
-      'AI quota reached for this minute or day. Try again shortly, or contact support to raise the limit.'
-    );
-  }
-  if (e?.status === 401 || e?.status === 403) {
-    throw new AppError(
-      503,
-      'AI_NOT_CONFIGURED',
-      'AI features are misconfigured on this server (auth failed). Contact support.'
-    );
-  }
-  if (e?.status === 400) {
-    throw new AppError(
-      502,
-      'AI_BAD_REQUEST',
-      e.message?.slice(0, 240) || 'AI rejected the request shape.'
-    );
-  }
-  logger.error({ err }, fallback);
-  throw new AppError(502, 'AI_UPSTREAM_ERROR', fallback);
 }
 
 /**

@@ -52,9 +52,15 @@ export function isAiQuotaCapError(err: unknown): boolean {
 // bulk sweep blowing through it for the rest of the day. Only counts
 // non-cached calls — cache hits never touch Gemini.
 //
-// Defaults are conservative for Google's free tier: 1k requests/day,
-// 20k/month. Operator can raise via AI_DAILY_REQUEST_CAP /
-// AI_MONTHLY_REQUEST_CAP after enabling billing.
+// Gemini's real free-tier ceiling is ~500 requests/day per project/model.
+// The default daily cap is kept safely UNDER that (450) so our own
+// friendly AppError trips before Google's raw 429 does — a single named
+// constant so it's trivially raised (or disabled) once billing is
+// enabled or a local-AI-primary/Gemini-fallback setup lands. Override
+// via AI_DAILY_REQUEST_CAP / AI_MONTHLY_REQUEST_CAP env vars.
+const DEFAULT_DAILY_REQUEST_CAP = 450;
+const DEFAULT_MONTHLY_REQUEST_CAP = 20000;
+
 export async function assertAiQuota(): Promise<void> {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
@@ -71,8 +77,14 @@ export async function assertAiQuota(): Promise<void> {
     }),
   ]);
 
-  const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '1000', 10);
-  const monthlyCap = parseInt(process.env.AI_MONTHLY_REQUEST_CAP ?? '20000', 10);
+  const dailyCap = parseInt(
+    process.env.AI_DAILY_REQUEST_CAP ?? String(DEFAULT_DAILY_REQUEST_CAP),
+    10
+  );
+  const monthlyCap = parseInt(
+    process.env.AI_MONTHLY_REQUEST_CAP ?? String(DEFAULT_MONTHLY_REQUEST_CAP),
+    10
+  );
 
   if (today >= dailyCap) {
     throw new AppError(

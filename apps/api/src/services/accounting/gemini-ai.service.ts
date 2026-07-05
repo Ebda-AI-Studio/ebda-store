@@ -18,7 +18,8 @@
  *     even when responseMimeType is set.
  *   - Vision: accepts optional imageBase64 + imageMimeType; parts order is prompt first
  *     so the text instruction anchors the model before the image data.
- *   - Error classification mirrors rethrowAsAppError in ai.service.ts.
+ *   - Error classification uses the shared rethrowAsAppError from lib/ai/gemini-errors.ts
+ *     (2026-07-05 — was a duplicated local copy).
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -26,6 +27,7 @@ import { prisma } from '@force/database';
 import { assertAiQuota } from '../../lib/ai-quota';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
+import { rethrowAsAppError } from '../../lib/ai/gemini-errors';
 
 // ---------------------------------------------------------------------------
 // Client singleton
@@ -57,34 +59,6 @@ function stripJsonFences(text: string): string {
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/```$/, '')
     .trim();
-}
-
-/** Map SDK errors → AppError so Express errorHandler produces useful HTTP status. */
-function rethrowAsAppError(err: unknown, fallback: string): never {
-  const e = err as { status?: number; message?: string };
-  if (e?.status === 429) {
-    throw new AppError(
-      429,
-      'AI_QUOTA_EXCEEDED',
-      'AI quota reached for this minute or day. Try again shortly.'
-    );
-  }
-  if (e?.status === 401 || e?.status === 403) {
-    throw new AppError(
-      503,
-      'AI_NOT_CONFIGURED',
-      'AI auth failed — check GOOGLE_GENERATIVE_AI_KEY.'
-    );
-  }
-  if (e?.status === 400) {
-    throw new AppError(
-      502,
-      'AI_BAD_REQUEST',
-      e.message?.slice(0, 240) ?? 'AI rejected the request shape.'
-    );
-  }
-  logger.error({ err }, fallback);
-  throw new AppError(502, 'AI_UPSTREAM_ERROR', fallback);
 }
 
 /** Record token usage in AiUsage. Never throws — a logging failure must not surface to callers. */

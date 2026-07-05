@@ -8,10 +8,14 @@
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseAiJson } from './parse-ai-json';
+import { rethrowAsAppError } from './gemini-errors';
+import { recordUsage } from '../../services/ai.service';
 
 export const MAX_TAGS_PER_PRODUCT = 5;
 
 export interface SuggestProductTagsInput {
+  /** storeId for AI quota-usage attribution (AiUsage row). */
+  storeId: string;
   storeName: string;
   product: {
     name: string;
@@ -57,7 +61,22 @@ export async function suggestProductTags(
   const model = genai.getGenerativeModel({ model: modelName });
 
   const prompt = buildTagsPrompt(input);
-  const result = await model.generateContent(prompt);
+  let result;
+  try {
+    result = await model.generateContent(prompt);
+  } catch (err) {
+    rethrowAsAppError(err, 'AI tag suggestion failed');
+  }
+
+  const usage = result.response.usageMetadata;
+  await recordUsage(
+    input.storeId,
+    'tags',
+    usage?.promptTokenCount ?? 0,
+    usage?.candidatesTokenCount ?? 0,
+    false
+  );
+
   const raw = result.response.text();
 
   const parsed = parseAiJson<{ tags?: unknown }>(raw);

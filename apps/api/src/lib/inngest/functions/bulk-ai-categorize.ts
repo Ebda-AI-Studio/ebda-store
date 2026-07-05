@@ -6,6 +6,7 @@ import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { suggestProductCategory } from '../../ai/product-category-suggester';
+import { AppError } from '../../../middleware/error-handler';
 
 /**
  * Catalogue-wide category-assignment sweep — uncategorized products only.
@@ -137,6 +138,7 @@ export const bulkAiCategorize: InngestFunction.Any = inngest.createFunction(
                 () =>
                   suggestProductCategory(
                     {
+                      storeId,
                       storeName: store?.name ?? storeId,
                       product: { name: product.name, description: product.description },
                       existingCategories,
@@ -169,7 +171,10 @@ export const bulkAiCategorize: InngestFunction.Any = inngest.createFunction(
                   entityKind: 'product',
                   entityId: product.id,
                   entityName: product.name,
-                  error: err instanceof Error ? err.message : String(err),
+                  error:
+                    err instanceof AppError
+                      ? err.message
+                      : 'AI request failed — please try again shortly.',
                 });
               }
               failed++;
@@ -194,7 +199,7 @@ export const bulkAiCategorize: InngestFunction.Any = inngest.createFunction(
             entityKind: 'product',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
         }
       }

@@ -13,6 +13,8 @@
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseAiJson } from './parse-ai-json';
+import { rethrowAsAppError } from './gemini-errors';
+import { recordUsage } from '../../services/ai.service';
 
 export interface GeneratedProductFaq {
   question: string;
@@ -22,6 +24,8 @@ export interface GeneratedProductFaq {
 }
 
 export interface GenerateProductFaqsInput {
+  /** storeId for AI quota-usage attribution (AiUsage row). */
+  storeId: string;
   /** Store display name for prompt context (falls back to storeId upstream). */
   storeName: string;
   product: {
@@ -63,9 +67,11 @@ Return ONLY valid JSON — no markdown, no explanation:
 /**
  * Generate bilingual FAQ pairs for a single product via Gemini.
  *
- * Throws on a missing API key (caller maps to 503 AI_NOT_CONFIGURED in the
- * sync route, or records a per-product error in the sweep) and on an
- * unparseable model response (502 AI_PARSE_ERROR / per-product error).
+ * Gemini/SDK errors are converted to a clean AppError via rethrowAsAppError
+ * (2026-07-05) so raw provider error text never reaches a merchant-facing
+ * surface. Successful calls record AiUsage (feature 'product-faqs') so
+ * assertAiQuota() actually sees this sweep's traffic. Also throws on an
+ * unparseable model response (per-product error upstream).
  *
  * `apiKey` and `modelName` are injected so the caller decides config
  * resolution — the sync route reads process.env directly, the Inngest fn
@@ -80,7 +86,22 @@ export async function generateProductFaqs(
   const model = genai.getGenerativeModel({ model: modelName });
 
   const prompt = buildProductFaqPrompt(input);
-  const result = await model.generateContent(prompt);
+  let result;
+  try {
+    result = await model.generateContent(prompt);
+  } catch (err) {
+    rethrowAsAppError(err, 'AI product FAQ generation failed');
+  }
+
+  const usage = result.response.usageMetadata;
+  await recordUsage(
+    input.storeId,
+    'product-faqs',
+    usage?.promptTokenCount ?? 0,
+    usage?.candidatesTokenCount ?? 0,
+    false
+  );
+
   const raw = result.response.text();
 
   // parseAiJson strips code fences + trailing prose (outermost-JSON-span

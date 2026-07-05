@@ -6,6 +6,7 @@ import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { generateProductAltText } from '../../ai/product-alt-text-generator';
+import { AppError } from '../../../middleware/error-handler';
 
 /**
  * Catalogue-wide image alt-text sweep (Gemini Vision).
@@ -141,6 +142,7 @@ export const bulkAiImageAlt: InngestFunction.Any = inngest.createFunction(
                 () =>
                   generateProductAltText(
                     {
+                      storeId,
                       imageUrl: image.url,
                       product: { name: product.name, nameAr: product.nameAr },
                     },
@@ -166,7 +168,10 @@ export const bulkAiImageAlt: InngestFunction.Any = inngest.createFunction(
                   entityKind: 'product',
                   entityId: product.id,
                   entityName: product.name,
-                  error: err instanceof Error ? err.message : String(err),
+                  error:
+                    err instanceof AppError
+                      ? err.message
+                      : 'AI request failed — please try again shortly.',
                 });
               }
               productFailed++;
@@ -196,7 +201,7 @@ export const bulkAiImageAlt: InngestFunction.Any = inngest.createFunction(
             entityKind: 'product',
             entityId: storeId,
             entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
+            error: err instanceof AppError ? err.message : 'AI quota cap reached',
           });
         }
       }
