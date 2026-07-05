@@ -13,10 +13,18 @@ import { inngest } from '../client';
  * `running` forever with no failure marker. The admin sees "importing..."
  * indefinitely and can't cancel without DB intervention.
  *
- * This scheduled function runs every 15 minutes and flips any `running`
+ * This scheduled function runs every 4 hours and flips any `running`
  * job whose `startedAt` is older than 1 hour to `failed`. 1 hour is a
  * generous ceiling — even a 50k-row import completes well inside that
  * on the current Railway instance. Anything older is orphaned.
+ *
+ * Cadence: every-4h, not every-15-min (changed 2026-07-05). The 15-min cron
+ * woke the Neon compute ~33% of every idle hour, defeating autosuspend
+ * (min_cu 0.25 / suspend 300s) — a real always-on compute cost. Every 4h
+ * cuts idle-wake to ~2% while keeping orphan cleanup responsive: a crashed
+ * import is marked failed within ~5h. Orphans are rare (only on crash/
+ * redeploy mid-import), and during active use the DB is warm from real
+ * traffic anyway.
  *
  * Surfaced by the 2026-05-22 SaaS audit (P1-5). Alternative considered:
  * raising bulk-import-products `retries` to 2. Rejected — would violate
@@ -27,7 +35,7 @@ export const bulkImportOrphanCleanup: InngestFunction.Any = inngest.createFuncti
     id: 'bulk-import-orphan-cleanup',
     name: 'Mark orphaned bulk-import jobs as failed',
     retries: 1,
-    triggers: [{ cron: '*/15 * * * *' }],
+    triggers: [{ cron: '0 */4 * * *' }],
   },
   async () => {
     const orphanCutoff = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
