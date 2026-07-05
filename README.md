@@ -109,7 +109,7 @@ force-website-builder/
 - **Multi-tenancy** — Row-Level Security (RLS) via AsyncLocalStorage + Prisma Proxy, automatic tenant scoping on all queries
 - **Feature Toggle Engine** — 22 parent features + 14 inventory/accounting sub-features across 4 plan tiers (free / starter / professional / enterprise), with Redis-cached lookups; see `packages/shared/src/features.ts` (FEATURE_KEYS_ARRAY) and `packages/shared/src/plan-baselines.ts`
 - **Plan Tier System** — four tiers (free / starter / professional / enterprise) with layered feature baselines; upgrade-marketing gate shows on-brand upsell page for plan-gated features; see `packages/shared/src/plan-baselines.ts`
-- **Custom Domains** — Store owners add custom domains via admin UI; auto-registered on Vercel with SSL
+- **Custom Domains** — Store owners add custom domains via admin UI; auto-registered via Cloudflare-for-SaaS Custom Hostnames with SSL
 - **Role-Based Access** — Super Admin (platform-wide), Store Admin (single store), Customer (storefront)
 
 ### Commerce
@@ -233,8 +233,8 @@ After init, `npx neonctl@latest projects list`, `npx neonctl@latest branches cre
 | `VAPID_PUBLIC_KEY`         | Web Push public key                                            |
 | `VAPID_PRIVATE_KEY`        | Web Push private key                                           |
 | `VAPID_SUBJECT`            | Web Push contact (e.g. `mailto:...`)                           |
-| `VERCEL_API_TOKEN`         | For custom domain registration                                 |
-| `VERCEL_PROJECT_ID`        | Storefront project ID                                          |
+| `CF_API_TOKEN`             | Cloudflare-for-SaaS custom domain registration (live path)     |
+| `CF_ZONE_ID`               | Cloudflare zone for custom hostnames                           |
 | `GOOGLE_GENERATIVE_AI_KEY` | Gemini Flash Lite — translation, SEO, AEO, category suggestion |
 
 **Note on AI keys:** `GOOGLE_GENERATIVE_AI_KEY` is for Force AI Store's own catalog AI features. The WhatsApp bot AI (`GEMINI_API_KEY`) lives in the WBS Railway service — not here. See Bot Intelligence section above for details.

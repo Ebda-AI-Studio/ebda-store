@@ -483,17 +483,17 @@ Renewal verification: re-check these in the per-provider dashboard quarterly —
 
 ### Account ownership
 
-| Service                | Account email            | Project / org                                                                                        |
-| ---------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| Cloudflare             | ahmed0montaser@gmail.com | Workers Builds hosting `force-web`/`force-admin`/`force-orders-cf-preview` (replaced Vercel 2026-07) |
-| Railway                | ahmed0montaser@gmail.com | personal project `force-website-builder`                                                             |
-| Neon                   | ahmed0montaser@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                |
-| Sentry                 | (Ahmad's account)        | one org with four projects: `api`, `web`, `admin`, `orders`                                          |
-| PostHog                | (Ahmad's account)        | EU region, single project covering web + admin                                                       |
-| UptimeRobot            | (Ahmad's account)        | free tier, 2 monitors currently                                                                      |
-| Axiom                  | (Ahmad's account)        | free tier (500GB/30d) — dataset `force-api-railway`                                                  |
-| Resend                 | platform-wide            | one account; per-merchant domains added under it                                                     |
-| @ForceAI1_bot Telegram | personal DM to Ahmad     | chat_id `1943728711`                                                                                 |
+| Service                | Account email          | Project / org                                                                                        |
+| ---------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| Cloudflare             | forceai.0ps1@gmail.com | Workers Builds hosting `force-web`/`force-admin`/`force-orders-cf-preview` (replaced Vercel 2026-07) |
+| Railway                | forceai.0ps1@gmail.com | project `force-website-builder`                                                                      |
+| Neon                   | forceai.0ps1@gmail.com | project `ep-falling-meadow-a1uq2yil` (ap-southeast-1)                                                |
+| Sentry                 | forceai.0ps1@gmail.com | one org with four projects: `api`, `web`, `admin`, `orders`                                          |
+| PostHog                | forceai.0ps1@gmail.com | EU region, single project covering web + admin                                                       |
+| UptimeRobot            | forceai.0ps1@gmail.com | free tier, 2 monitors currently                                                                      |
+| Axiom                  | (Ahmad's account)      | free tier (500GB/30d) — dataset `force-api-railway`                                                  |
+| Resend                 | platform-wide          | one account; per-merchant domains added under it                                                     |
+| @ForceAI1_bot Telegram | personal DM to Ahmad   | chat_id `1943728711`                                                                                 |
 
 ---
 

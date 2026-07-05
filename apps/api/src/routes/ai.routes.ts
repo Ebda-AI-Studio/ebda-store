@@ -779,7 +779,7 @@ router.get('/usage/summary', async (req: Request, res: Response, next: NextFunct
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
 
-    const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '1000', 10);
+    const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '450', 10);
     const monthlyCap = parseInt(process.env.AI_MONTHLY_REQUEST_CAP ?? '20000', 10);
 
     const [todayCount, monthCount, last30] = await Promise.all([

@@ -213,7 +213,7 @@ export const config = {
 
   // Frontend custom-domain provider. 'vercel' (default, live) or 'cloudflare'
   // (Cloudflare-for-SaaS). Per-store `Store.domainProvider` overrides this.
-  domainProvider: (process.env.DOMAIN_PROVIDER as 'vercel' | 'cloudflare') || 'vercel',
+  domainProvider: (process.env.DOMAIN_PROVIDER as 'vercel' | 'cloudflare') || 'cloudflare',
   // Cloudflare-for-SaaS Custom Hostnames. Unset → CloudflareDomainService
   // reports not-configured and the resolver no-ops the CF path (like Vercel today).
   cfApiToken: process.env.CF_API_TOKEN || '',

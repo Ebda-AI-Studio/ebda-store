@@ -157,9 +157,9 @@ At current idle state (fewer than 100 merchants, under 10k MAU), FWB's infrastru
 
 #### 6.9 Google Gemini (gemini-2.5-flash-lite)
 
-**Free (2026):** 15 RPM, 1,000 RPD, 250K TPM. **Paid:** $0.10/1M input + $0.40/1M output.
+**Free (2026):** 15 RPM, ~500 RPD (the real 429 ceiling we hit in prod on `gemini-flash-lite`; Google nominally publishes higher), 250K TPM. **Paid:** $0.10/1M input + $0.40/1M output.
 
-**FWB usage per call:** ~250 input + 200 output = 450 tokens avg. Daily cap of 1,000 calls × 450 tokens = 450K tokens/day = **$0.105/day = $3.15/mo** at max.
+**FWB usage per call:** ~250 input + 200 output = 450 tokens avg. Daily cap of 450 calls × 450 tokens ≈ 200K tokens/day — comfortably under the **$0.105/day / $3.15/mo** ceiling implied by the older 1,000-call cap.
 
 | Scenario                           | Gemini cost |
 | ---------------------------------- | ----------- |
@@ -167,7 +167,7 @@ At current idle state (fewer than 100 merchants, under 10k MAU), FWB's infrastru
 | 10k MAU (500 calls/day)            | ~$1.50/mo   |
 | 100k MAU (20K calls/day paid tier) | ~$63/mo     |
 
-**Free tier is only 1,000 RPD.** `AI_DAILY_REQUEST_CAP=1000` intentionally hits this. Single merchant bulk-sweeping 1,000 products consumes entire platform's daily quota. At 100k MAU with many simultaneous sweeps, paid tier mandatory.
+**The free-tier daily ceiling for `gemini-flash-lite` is ~500 RPD** (the real 429 we hit in prod, not Google's higher published number). `AI_DAILY_REQUEST_CAP=450` is set safely UNDER that so our friendly quota error trips before Google's raw 429. A single merchant bulk-sweeping ~450 products consumes the entire platform's daily allowance. At 100k MAU with many simultaneous sweeps, paid tier mandatory.
 
 #### 6.10 Payment Providers (Per-Transaction)
 

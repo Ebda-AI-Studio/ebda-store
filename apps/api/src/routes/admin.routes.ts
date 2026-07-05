@@ -1127,7 +1127,7 @@ router.get(
   requireRole('super_admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '1000', 10);
+      const dailyCap = parseInt(process.env.AI_DAILY_REQUEST_CAP ?? '450', 10);
       const monthlyCap = parseInt(process.env.AI_MONTHLY_REQUEST_CAP ?? '20000', 10);
 
       const now = new Date();

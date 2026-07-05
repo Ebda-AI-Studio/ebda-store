@@ -46,7 +46,7 @@ export function resolveDomainService(
   store: { domainProvider?: string | null } | null | undefined
 ): DomainProvider {
   const perStore = normalize(store?.domainProvider);
-  const chosen = perStore ?? normalize(config.domainProvider) ?? 'vercel';
+  const chosen = perStore ?? normalize(config.domainProvider) ?? 'cloudflare';
   return PROVIDERS[chosen];
 }
 

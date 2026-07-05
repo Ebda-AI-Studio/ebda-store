@@ -80,7 +80,7 @@ Super-admin nav adds: Stores management, Users, Audit Logs.
 | Review summarization                               | Per-product button                                   | Live   |
 | Owner response drafting                            | Per-review button                                    | Live   |
 
-**Quota architecture:** `AI_DAILY_REQUEST_CAP=1000` + `AI_MONTHLY_REQUEST_CAP=20000` global gates. Per-store daily token budget. 7-day Redis cache on responses. `AiUsage` table audits every call.
+**Quota architecture:** `AI_DAILY_REQUEST_CAP=450` + `AI_MONTHLY_REQUEST_CAP=20000` global gates. Per-store daily token budget. 7-day Redis cache on responses. `AiUsage` table audits every call.
 
 **Deterministic smart software (no LLM):** WCAG auto-contrast, token-aware color resolution, SmartPaletteModal generator, FBT (90-day SQL window), abandoned cart detection, XLSX import with Arabic header normalization, bilingual search.
 

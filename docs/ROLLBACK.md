@@ -1,26 +1,34 @@
 # Production rollback — Force Website Builder
 
-This monorepo deploys to **3 platforms simultaneously**: Vercel admin (`app.forcemediakw.com`) + Vercel storefront (`store.forcemediakw.com` + per-tenant custom domains) + Railway API. Plus **Neon Postgres** (83 models, RLS via AsyncLocalStorage) and **Cloudflare R2** for assets.
+This monorepo deploys **web / admin / orders to Cloudflare Workers** (GitHub Actions `.github/workflows/cf-deploy.yml` → OpenNext build → `wrangler deploy`, workers `force-web-cf-preview` / `force-admin-cf-preview` / `force-orders-cf-preview`) + the **API to Railway** (git auto-deploy from `main`). Plus **Neon Postgres** (83 models, RLS via AsyncLocalStorage) and **Cloudflare R2** for assets.
 
 ## Three rollback paths
 
-### A. Vercel-only fast-path per app (~30 seconds each)
+### A. Per-worker fast-path — instant, no code change
 
-Use when one Vercel app is broken but the other apps + API + DB are fine.
+Use when one Worker (or the API) is broken but the others + DB are fine. There is **NO one-click dashboard "Promote to Production"** like Vercel had — you roll back with the CLI.
 
-For admin:
+Cloudflare Worker (admin / web / orders), from the app dir (e.g. `apps/web`):
 
-1. https://vercel.com/ahmad-sharafs-projects/force-admin/deployments
-2. Three-dot menu on the previous successful prod deployment → **Promote to Production**
+```bash
+# roll back to the immediately-previous version (fastest — instant, no rebuild)
+npx wrangler rollback
 
-For storefront:
+# or pin a specific earlier version by id
+npx wrangler versions list          # find the good version id
+npx wrangler versions deploy <version-id>@100
+```
 
-1. https://vercel.com/ahmad-sharafs-projects/force-web/deployments
-2. Same flow.
+Railway API fast-path:
 
-⚠️ The admin and storefront often need to be in lock-step (shared API contracts via `@force/shared`). Promoting one without the other can break SSR fetches. Prefer path B unless you're sure.
+```bash
+railway rollback                    # roll the API service back to the previous deployment
+# or: Railway dashboard → api service → Deployments → redeploy a prior good deploy
+```
 
-### B. Git revert + push (~2–3 minutes, all platforms)
+⚠️ The admin and storefront often need to be in lock-step (shared API contracts via `@force/shared`). Rolling one Worker back without the other can break SSR fetches. If in doubt, prefer path B (revert the code so all surfaces rebuild from the same commit).
+
+### B. Git revert + push (~2–5 minutes, all platforms)
 
 Default. `scripts/rollback.sh` does this:
 
@@ -37,9 +45,8 @@ git push
 
 Effect:
 
-- Vercel admin rebuilds (~2 min)
-- Vercel storefront rebuilds (~2 min)
-- Railway API rebuilds (~2–3 min)
+- `cf-deploy.yml` re-runs on the push and `wrangler deploy`s the reverted web / admin / orders Workers (~3–5 min, only the apps whose paths changed)
+- Railway API auto-redeploys from `main` (~2–3 min)
 - Inngest functions auto-redeploy on next API boot
 - OneSignal apps unchanged (no rebuild)
 
