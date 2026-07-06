@@ -50,9 +50,24 @@ Effect:
 - Inngest functions auto-redeploy on next API boot
 - OneSignal apps unchanged (no rebuild)
 
-### C. Migration rollback (local pg_dump restore)
+### C. Data rollback (PITR first, dump restore as fallback)
 
-> **DR policy (2026-06-08):** Per-commit Neon snapshot branches (`neon-snapshot.yml`) are **retired** — they were accumulating branch cost without auto-pruning. DR is now daily local `pg_dump` runs on the developer Mac (launchd `com.forceai.neon-backup`, 3:30am daily, 30-day retention at `~/Desktop/projects/_backups/force-website-builder/`). The `neon-snapshot.yml` workflow is disabled.
+> **Full DR runbook: [`docs/DB-BACKUP-RESTORE.md`](./DB-BACKUP-RESTORE.md)** — decision table,
+> the 4-layer strategy, exact restore commands, and the quarterly drill log. The summary below
+> is the migration-specific slice.
+>
+> **Fastest path is Neon PITR (near-zero data loss), NOT the dump.** For a bad migration or
+> data corruption inside the last **7 days**, branch production to a timestamp just before it
+> and cut over — no data-since-backup loss, production untouched while you verify:
+>
+> ```bash
+> ORG=org-lingering-river-25973882; PID=crimson-king-40424588   # fwb-eu
+> TS=$(date -u -v-15M +%Y-%m-%dT%H:%M:%SZ)
+> neonctl branches create --project-id "$PID" --org-id "$ORG" --name recover --parent main --timestamp "$TS"
+> # verify, then promote `recover` to primary in the Neon console (or repoint DATABASE_URL). See DB-BACKUP-RESTORE.md.
+> ```
+
+> **DR policy (2026-06-08):** Per-commit Neon snapshot branches (`neon-snapshot.yml`) are **retired** — they were accumulating branch cost without auto-pruning. The dump layer is a daily local `pg_dump` on the developer Mac (launchd `com.forceai.neon-backup`, 3:30am daily, 30-day retention at `~/Desktop/projects/_backups/force-website-builder/`) + a daily encrypted copy to R2. The `neon-snapshot.yml` workflow is disabled. Neon PITR (7-day window, raised 2026-07-06) is the primary recovery mechanism.
 
 FWB uses **hand-written migrations** at `packages/database/prisma/migrations/<TS>_<name>/migration.sql`. Since commit `decd870` (2026-05-12), migrations apply automatically via Railway's `preDeployCommand` on every deploy — see "Migration auto-apply check" below. So by the time you notice an issue, the migration is already live.
 
@@ -94,19 +109,27 @@ ls -lt ~/Desktop/projects/_backups/force-website-builder/
 
 #### Restore from local pg_dump
 
+The dumps are **plain gzip'd SQL** (`.sql.gz`) without `--clean`, so reset the target branch's
+schema first, then `psql` the dump in a single transaction. (Full walkthrough +
+decrypt-from-R2 variant in [`docs/DB-BACKUP-RESTORE.md`](./DB-BACKUP-RESTORE.md).)
+
 ```bash
-# 1. Create a restore-target Neon branch from production (so production is untouched during restore)
-npx neonctl@latest branches create --name restore-candidate --parent production
+ORG=org-lingering-river-25973882; PID=crimson-king-40424588   # fwb-eu
+export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 
-# 2. Get the direct connection string for the restore branch
-npx neonctl@latest cs restore-candidate --role-name neondb_owner
+# 1. Create a restore-target branch off production (branch name is `main`, not `production`)
+neonctl branches create --project-id "$PID" --org-id "$ORG" --name restore-candidate --parent main
+URL=$(neonctl connection-string restore-candidate --project-id "$PID" --org-id "$ORG" \
+        --role-name neondb_owner --database-name neondb)
 
-# 3. Restore the dump (pg_restore for custom format, psql for plain SQL)
-pg_restore -d "<restore-branch-direct-url>" \
-  ~/Desktop/projects/_backups/force-website-builder/<chosen-dump>.dump
+# 2. Reset schema on the isolated branch, then restore
+psql "$URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+zcat < ~/Desktop/projects/_backups/force-website-builder/<chosen>.sql.gz \
+  | psql "$URL" --single-transaction -v ON_ERROR_STOP=1
 
-# 4. Verify the restore branch looks correct, then swap production to it in the Neon console
-#    Neon console → Branches → production → Reset from branch → restore-candidate
+# 3. Re-apply RLS (dump restore does NOT preserve runtime policy wiring), verify, then
+#    promote restore-candidate to primary in the Neon console (Branches → main → Restore from branch)
+npm run db:rls
 ```
 
 ⚠️ **Restore is destructive to writes since the backup:** orders placed, products edited, store settings changed, R2 uploads referenced from new schema rows — all lost on restore. For FWB this means **per-tenant data loss across multiple stores**. Coordinate with the Force team before doing this.
