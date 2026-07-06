@@ -4,17 +4,23 @@ import { revertProductBalance } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 
 /**
  * Bulk revert: restores every product's description fields to the snapshot
  * captured before the last balance operation. Products that were never
  * balanced (no `aiBalanceBackup`) are silently skipped.
  *
- * Concurrency capped at 1 per store. No AI calls in the inner loop so no
- * throttle needed, but we keep a small sleep to avoid hammering the DB.
+ * Concurrency capped at 1 per store. No AI calls in the inner loop.
+ *
+ * PR2 — crash-resumable batching. The product id list is loaded ONCE inside
+ * `step.run('load-items', ...)`, then split into `BULK_AI_BATCH_SIZE`-sized
+ * batches, each processed inside its own `step.run(\`batch-${i}\`, ...)`. A
+ * crash mid-sweep resumes at the first unfinished batch. `revertProductBalance`
+ * is naturally idempotent (a product with no backup, or already reverted,
+ * just reports `reverted: false`), so a retried batch never double-reverts.
  */
 
-const PAGE = 50;
 const ERROR_CAP = 50;
 
 interface BulkRevertError {
@@ -23,7 +29,24 @@ interface BulkRevertError {
   error: string;
 }
 
-export const bulkAiRevertBalance: InngestFunction.Any = inngest.createFunction(
+interface RevertBatchResult {
+  processed: number;
+  reverted: number;
+  skipped: number;
+  failed: number;
+  errors: BulkRevertError[];
+  quotaReached: boolean;
+  cancelled: boolean;
+}
+
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type for object literals mixing a plain string[] with
+// a richer array-of-objects sibling (the annotation widens the contextual
+// type fed into `createFunction`'s generics, and Jsonify then collapses the
+// string[] to `unknown[]`). Assigning to the annotated export on a separate
+// line avoids feeding the annotation back into inference.
+const bulkAiRevertBalanceFn = inngest.createFunction(
   {
     id: 'bulk-ai-revert-balance',
     name: 'Bulk: revert EN/AR description balance across catalogue',
@@ -39,81 +62,142 @@ export const bulkAiRevertBalance: InngestFunction.Any = inngest.createFunction(
     }
 
     return (async () => {
+      await step.run('mark-running', () =>
+        prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'running', startedAt: new Date() },
+        })
+      );
+
+      // We list ALL products; revertProductBalance skips those without a
+      // backup — this gives an upper bound for the progress bar.
+      const productIds = await step.run('load-items', async () => {
+        const products = await prisma.product.findMany({
+          where: { storeId, deletedAt: null },
+          select: { id: true },
+        });
+        await prisma.bulkAiJob.update({ where: { id: jobId }, data: { total: products.length } });
+        return products.map(p => p.id);
+      });
+
+      const batches = chunk(productIds, BULK_AI_BATCH_SIZE);
+
       const errors: BulkRevertError[] = [];
+      let processed = 0;
       let reverted = 0;
       let skipped = 0;
       let failed = 0;
-      let processed = 0;
 
-      try {
-        // Mark running + count products that have a non-empty backup
-        await step.run('mark-running', async () => {
-          // We count ALL products; revertProductBalance will skip those
-          // without a backup — this gives an upper bound for the progress bar.
-          const total = await prisma.product.count({ where: { storeId, deletedAt: null } });
-          await prisma.bulkAiJob.update({
+      for (let i = 0; i < batches.length; i++) {
+        const batchIds = batches[i];
+
+        const result: RevertBatchResult = await step.run(`batch-${i}`, async () => {
+          const currentJob = await prisma.bulkAiJob.findUnique({
             where: { id: jobId },
-            data: { status: 'running', startedAt: new Date(), total },
+            select: { status: true },
           });
-        });
+          if (currentJob?.status === 'cancelled') {
+            return {
+              processed: 0,
+              reverted: 0,
+              skipped: 0,
+              failed: 0,
+              errors: [],
+              quotaReached: false,
+              cancelled: true,
+            };
+          }
 
-        let cursor: string | null = null;
-        while (true) {
-          const products: Array<{ id: string; name: string }> = await prisma.product.findMany({
-            where: { storeId, deletedAt: null },
-            orderBy: { id: 'asc' },
-            take: PAGE,
-            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+          const items = await prisma.product.findMany({
+            where: { id: { in: batchIds } },
             select: { id: true, name: true },
           });
-          if (products.length === 0) break;
+          const byId = new Map(items.map(p => [p.id, p]));
 
-          for (const p of products) {
+          let bProcessed = 0;
+          let bReverted = 0;
+          let bSkipped = 0;
+          let bFailed = 0;
+          let bQuotaReached = false;
+          const bErrors: BulkRevertError[] = [];
+
+          for (const id of batchIds) {
+            const p = byId.get(id);
+            if (!p) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
+
             try {
-              const result = await revertProductBalance(storeId, p.id);
-              if (result.reverted) {
-                reverted++;
+              const revertResult = await revertProductBalance(storeId, p.id);
+              if (revertResult.reverted) {
+                bReverted++;
               } else {
-                skipped++;
+                bSkipped++;
               }
             } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              if (errors.length < ERROR_CAP) {
-                errors.push({
+              // quota errors shouldn't appear here (no AI calls), but handle
+              // for safety, same as the original — abort gracefully rather
+              // than let the error escape the step uncaught.
+              if (isAiQuotaCapError(err)) {
+                bQuotaReached = true;
+                break;
+              }
+              if (bErrors.length < ERROR_CAP) {
+                bErrors.push({
                   productId: p.id,
                   productName: p.name,
                   error: err instanceof Error ? err.message : 'unknown',
                 });
               }
-              failed++;
+              bFailed++;
             }
-            processed++;
+            bProcessed++;
           }
 
-          cursor = products[products.length - 1].id;
+          return {
+            processed: bProcessed,
+            reverted: bReverted,
+            skipped: bSkipped,
+            failed: bFailed,
+            errors: bErrors,
+            quotaReached: bQuotaReached,
+            cancelled: false,
+          };
+        });
 
-          await prisma.bulkAiJob.update({
-            where: { id: jobId },
-            data: {
-              processed,
-              filled: reverted,
-              skipped,
-              failed,
-              errors: errors as object,
-            },
-          });
-
-          if (products.length < PAGE) break;
+        processed += result.processed;
+        reverted += result.reverted;
+        skipped += result.skipped;
+        failed += result.failed;
+        for (const e of result.errors) {
+          if (errors.length < ERROR_CAP) errors.push(e);
         }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        // quota errors shouldn't appear here (no AI calls), but handle for safety
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            productId: storeId,
-            productName: 'sweep',
-            error: err instanceof Error ? err.message : 'unexpected error',
-          });
+
+        await step.run(`progress-${i}`, () =>
+          prisma.bulkAiJob.update({
+            where: { id: jobId },
+            data: { processed, filled: reverted, skipped, failed, errors: errors as object },
+          })
+        );
+
+        if (result.cancelled) {
+          logger.info(
+            { jobId, storeId, processed, reverted, skipped, failed },
+            'bulk-ai-revert-balance: cancelled by merchant'
+          );
+          break;
+        }
+        if (result.quotaReached) {
+          if (errors.length < ERROR_CAP) {
+            errors.push({
+              productId: storeId,
+              productName: 'sweep',
+              error: 'AI quota cap reached',
+            });
+          }
+          break;
         }
       }
 
@@ -134,3 +218,4 @@ export const bulkAiRevertBalance: InngestFunction.Any = inngest.createFunction(
     })();
   }
 );
+export const bulkAiRevertBalance: InngestFunction.Any = bulkAiRevertBalanceFn;

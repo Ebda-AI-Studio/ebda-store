@@ -56,7 +56,10 @@ vi.mock('@force/database', () => ({
 // The Inngest function file imports `inngest` from '../client' to register
 // itself via createFunction — stub createFunction to just capture + expose
 // the handler so the test can invoke it directly without a running Inngest.
-let capturedHandler: (args: { event: { data: unknown } }) => Promise<void>;
+let capturedHandler: (args: {
+  event: { data: unknown };
+  step: { run: (id: string, fn: () => unknown) => Promise<unknown> };
+}) => Promise<void>;
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
   inngest: {
     createFunction: (_cfg: unknown, handler: typeof capturedHandler) => {
@@ -89,7 +92,8 @@ beforeEach(async () => {
 });
 
 async function runSweep(data: { jobId: string; storeId: string; force?: boolean }) {
-  await capturedHandler({ event: { data } });
+  const step = { run: (_id: string, fn: () => unknown) => Promise.resolve(fn()) };
+  await capturedHandler({ event: { data }, step });
 }
 
 describe('bulk-ai-excerpt sweep', () => {

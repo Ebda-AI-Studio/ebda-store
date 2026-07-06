@@ -10,6 +10,7 @@ import { parseAiJson } from '../../ai/parse-ai-json';
 import { rethrowAsAppError } from '../../ai/gemini-errors';
 import { recordUsage } from '../../../services/ai.service';
 import { AppError } from '../../../middleware/error-handler';
+import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -33,9 +34,16 @@ const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.'
  *     every product. Each per-product transaction deletes the prior
  *     recs then inserts the freshly-generated ones, so re-running with
  *     force fully replaces stale picks.
- *   - Cooperative cancellation: the per-product loop polls
- *     `bulk_ai_jobs.status` every 5 items and exits cleanly if a
- *     merchant clicks Cancel.
+ *   - Cooperative cancellation: checked at batch boundaries.
+ *
+ * PR2 — crash-resumable batching. The candidate product list (id + name +
+ * category) is loaded ONCE inside `step.run('load-items', ...)`, split into
+ * `BULK_AI_BATCH_SIZE`-sized batches, each processed inside its own
+ * `step.run(\`batch-${i}\`, ...)`. A crash mid-sweep resumes at the first
+ * unfinished batch. Each product re-reads whether it already has AI recs
+ * fresh at batch-processing time (idempotency re-check) — the catalogue
+ * index + FBT co-purchase map are rebuilt fresh per batch too (cheap reads,
+ * always current).
  *
  * Mirrors the pattern of bulk-ai-seo / bulk-ai-translate / bulk-ai-aeo:
  *   - concurrency key on storeId (one sweep per store at a time)
@@ -43,7 +51,6 @@ const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.'
  *   - throttle at AI_BULK_THROTTLE_MS (default 2500ms — ~24 RPM)
  *   - quota check before each call via assertAiQuota
  *   - error cap at 50 so no single run bloats the BulkAiJob row
- *   - quota errors re-thrown cleanly (not silenced)
  */
 
 const ERROR_CAP = 50;
@@ -95,10 +102,6 @@ async function computeCoPurchasePairs(
 ): Promise<Map<string, Array<{ productId: string; coOrders: number }>>> {
   const since = new Date(Date.now() - FBT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  // a.product_id < b.product_id makes each unordered pair appear once;
-  // we expand to both directions in JS below so either product can be the
-  // source. COUNT(DISTINCT o.id) so multiple lines of the same product in
-  // one order don't inflate the pair count.
   const rows = await prisma.$queryRaw<Array<{ a_id: string; b_id: string; co_orders: bigint }>>(
     Prisma.sql`
       SELECT a.product_id AS a_id,
@@ -127,12 +130,9 @@ async function computeCoPurchasePairs(
   };
   for (const r of rows) {
     const n = Number(r.co_orders);
-    // Expand to both directions so each product sees its co-bought set.
     push(r.a_id, r.b_id, n);
     push(r.b_id, r.a_id, n);
   }
-  // Keep only the strongest pairs per product (already globally sorted, so
-  // re-sort each bucket then trim).
   for (const [src, list] of map) {
     list.sort((x, y) => y.coOrders - x.coOrders);
     map.set(src, list.slice(0, FBT_PAIRS_PER_PRODUCT));
@@ -146,7 +146,31 @@ interface LlmRec {
   reason?: string;
 }
 
-export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction(
+interface RecError {
+  entityKind: string;
+  entityId: string;
+  entityName: string;
+  error: string;
+}
+
+interface RecBatchResult {
+  processed: number;
+  filled: number;
+  skipped: number;
+  failed: number;
+  errors: RecError[];
+  quotaReached: boolean;
+  cancelled: boolean;
+}
+
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type for object literals mixing a plain string[] with
+// a richer array-of-objects sibling (the annotation widens the contextual
+// type fed into `createFunction`'s generics, and Jsonify then collapses the
+// string[] to `unknown[]`). Assigning to the annotated export on a separate
+// line avoids feeding the annotation back into inference.
+const bulkAiRecommendationsFn = inngest.createFunction(
   {
     id: 'bulk-ai-recommendations',
     name: 'Bulk: generate AI product recommendations across catalogue',
@@ -170,7 +194,7 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
       return;
     }
 
-    return async () => {
+    return (async () => {
       // Flip the job to 'running' as the very first step BEFORE any heavy
       // load. Two reasons: (a) the queue-depth watcher can distinguish
       // "Inngest never delivered the event" (status stays 'queued' for
@@ -183,189 +207,162 @@ export const bulkAiRecommendations: InngestFunction.Any = inngest.createFunction
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
-          data: { status: 'running', startedAt: new Date() },
+          data: { status: 'running', startedAt: new Date(), force },
         })
       );
 
-      const errors: Array<{
-        entityKind: string;
-        entityId: string;
-        entityName: string;
-        error: string;
-      }> = [];
-      let filled = 0;
-      let skipped = 0;
-      let failed = 0;
-      let quotaReached = false;
-
-      try {
-        // Load all active products up-front. The full list is used to:
-        //   a)() set BulkAiJob.total so the progress bar is accurate
-        //   b) build the candidate index we pass to Gemini
+      // Stable snapshot of the candidate catalogue index — used both to
+      // build batches and as the Gemini candidate list. Loaded ONCE so
+      // batch boundaries never shift across retries.
+      const catalogIndex = await step.run('load-items', async () => {
         const products = await prisma.product.findMany({
           where: { storeId, status: 'active', deletedAt: null },
           select: {
             id: true,
             name: true,
-            description: true,
-            // Use the ProductCategory join table to get category names.
-            // A product may belong to multiple categories; we use the first
-            // for the catalog index summary passed to Gemini.
-            categories: {
-              include: { category: { select: { name: true } } },
-              take: 1,
-            },
+            categories: { include: { category: { select: { name: true } } }, take: 1 },
           },
         });
 
-        await prisma.bulkAiJob.update({
-          where: { id: jobId },
-          data: { total: products.length },
-        });
+        await prisma.bulkAiJob.update({ where: { id: jobId }, data: { total: products.length } });
 
-        if (products.length < 2) {
-          // Nothing useful to recommend from a 0- or 1-product catalogue.
-          await prisma.bulkAiJob.update({
-            where: { id: jobId },
-            data: {
-              status: 'completed',
-              completedAt: new Date(),
-              processed: products.length,
-              filled: 0,
-              skipped: products.length,
-              failed: 0,
-            },
-          });
-          logger.info({ jobId, storeId }, 'bulk-ai-recommendations: catalog too small, skipped');
-          return;
-        }
-
-        // Pre-build a compact catalog index. Passed as JSON context so Gemini
-        // can pick valid IDs. We cap at CANDIDATE_SLICE per call to keep
-        // prompt sizes reasonable and reduce hallucinated IDs.
-        const catalogIndex = products.map(p => ({
+        return products.map(p => ({
           id: p.id,
           name: p.name,
-          // A product may sit in multiple categories; take the first for the
-          // summary label we pass to Gemini.
           category: p.categories[0]?.category.name ?? null,
         }));
+      });
 
-        // Smart-skip — pre-fetch the set of product IDs that already have AI
-        // recommendations in this store. Re-running the sweep should be
-        // incremental: products with existing recs are left alone (saves
-        // Gemini quota + preserves prior recs verbatim). Products without
-        // any recs get processed. A merchant who wants to fully regenerate
-        // can clear ai_recommendation rows for the store and re-run.
-        const existingRecRows = await prisma.aiRecommendation.findMany({
-          where: { storeId },
-          select: { sourceProductId: true },
-          distinct: ['sourceProductId'],
-        });
-        const productsWithRecs = new Set(existingRecRows.map(r => r.sourceProductId));
-
-        // Frequently-bought-together signal from real order history. Passed
-        // into each product's prompt so Gemini prioritises genuine
-        // complements (products actually bought together) over merely-similar
-        // catalogue items. Empty map for stores with no order history → the
-        // prompt falls back to catalogue-only reasoning.
-        const nameById = new Map(catalogIndex.map(c => [c.id, c.name] as const));
-        let coPurchase: Map<string, Array<{ productId: string; coOrders: number }>>;
-        try {
-          coPurchase = await computeCoPurchasePairs(storeId);
-        } catch (err) {
-          // FBT is an enhancement, not a hard dependency — never fail the
-          // sweep because the co-purchase query had a problem.
-          logger.warn(
-            { jobId, storeId, err: err instanceof Error ? err.message : String(err) },
-            'bulk-ai-recommendations: co-purchase signal unavailable, falling back to catalogue-only'
-          );
-          coPurchase = new Map();
-        }
-
-        logger.info(
-          {
-            jobId,
-            storeId,
-            totalProducts: products.length,
-            alreadyHaveRecs: productsWithRecs.size,
-            toProcess: products.length - productsWithRecs.size,
-            productsWithCoPurchaseSignal: coPurchase.size,
+      if (catalogIndex.length < 2) {
+        // Nothing useful to recommend from a 0- or 1-product catalogue.
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: {
+            status: 'completed',
+            completedAt: new Date(),
+            processed: catalogIndex.length,
+            filled: 0,
+            skipped: catalogIndex.length,
+            failed: 0,
           },
-          'bulk-ai-recommendations: pre-sweep state'
-        );
-
-        const genAI = getGenAI();
-        const model = genAI.getGenerativeModel({
-          model: MODEL,
-          generationConfig: { responseMimeType: 'application/json' },
         });
+        logger.info({ jobId, storeId }, 'bulk-ai-recommendations: catalog too small, skipped');
+        return;
+      }
 
-        let processed = 0;
+      const nameById = new Map(catalogIndex.map(c => [c.id, c.name] as const));
+      const batches = chunk(
+        catalogIndex.map(c => c.id),
+        BULK_AI_BATCH_SIZE
+      );
 
-        for (const product of products) {
-          // Cooperative cancellation — check every 5 items whether the
-          // merchant clicked Cancel. If so, break out cleanly.
-          if (processed % 5 === 0 && processed > 0) {
-            const currentJob = await prisma.bulkAiJob.findUnique({
-              where: { id: jobId },
-              select: { status: true },
-            });
-            if (currentJob?.status === 'cancelled') {
-              logger.info(
-                { jobId, storeId, processed, filled, skipped, failed },
-                'bulk-ai-recommendations: cancelled by merchant'
-              );
-              break;
-            }
+      const errors: RecError[] = [];
+      let processed = 0;
+      let filled = 0;
+      let skipped = 0;
+      let failed = 0;
+      let quotaReached = false;
+
+      for (let i = 0; i < batches.length; i++) {
+        const batchIds = batches[i];
+
+        const result: RecBatchResult = await step.run(`batch-${i}`, async () => {
+          const currentJob = await prisma.bulkAiJob.findUnique({
+            where: { id: jobId },
+            select: { status: true },
+          });
+          if (currentJob?.status === 'cancelled') {
+            return {
+              processed: 0,
+              filled: 0,
+              skipped: 0,
+              failed: 0,
+              errors: [],
+              quotaReached: false,
+              cancelled: true,
+            };
           }
 
-          // Skip products that already have AI recs from a prior sweep.
-          // When force=true, bypass the skip so every product gets fresh recs.
-          // Counts toward `skipped` in the job summary, NOT `failed`, so
-          // re-runs report cleanly: e.g. "230 skipped, 1 filled" when the
-          // merchant fixes the one product that failed last time.
-          if (!force && productsWithRecs.has(product.id)) {
-            skipped++;
-            processed++;
-            if (processed % 25 === 0 || processed === products.length) {
-              await prisma.bulkAiJob.update({
-                where: { id: jobId },
-                data: { processed, filled, skipped, failed, errors: errors as object },
-              });
-            }
-            continue;
-          }
+          const genAI = getGenAI();
+          const model = genAI.getGenerativeModel({
+            model: MODEL,
+            generationConfig: { responseMimeType: 'application/json' },
+          });
 
+          // Smart-skip set + FBT signal rebuilt fresh per batch — cheap
+          // reads, and always reflect what earlier batches just wrote.
+          const existingRecRows = await prisma.aiRecommendation.findMany({
+            where: { storeId },
+            select: { sourceProductId: true },
+            distinct: ['sourceProductId'],
+          });
+          const productsWithRecs = new Set(existingRecRows.map(r => r.sourceProductId));
+
+          let coPurchase: Map<string, Array<{ productId: string; coOrders: number }>>;
           try {
-            await assertAiQuota();
+            coPurchase = await computeCoPurchasePairs(storeId);
+          } catch (err) {
+            logger.warn(
+              { jobId, storeId, err: err instanceof Error ? err.message : String(err) },
+              'bulk-ai-recommendations: co-purchase signal unavailable, falling back to catalogue-only'
+            );
+            coPurchase = new Map();
+          }
 
-            const desc = (product.description ?? '').slice(0, 300);
-            const candidates = catalogIndex
-              .filter(c => c.id !== product.id)
-              .slice(0, CANDIDATE_SLICE);
+          let bProcessed = 0;
+          let bFilled = 0;
+          let bSkipped = 0;
+          let bFailed = 0;
+          let bQuotaReached = false;
+          const bErrors: RecError[] = [];
 
-            const productCategory = product.categories[0]?.category.name ?? null;
+          for (const productId of batchIds) {
+            const name = nameById.get(productId);
+            if (!name) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
 
-            // Frequently-bought-together signal — the products customers have
-            // ACTUALLY ordered alongside this one, ranked by co-order count.
-            // This is the strongest available complement signal; the prompt
-            // instructs Gemini to prioritise it.
-            const fbt = (coPurchase.get(product.id) ?? [])
-              .filter(p => nameById.has(p.productId))
-              .map(p => ({
-                productId: p.productId,
-                name: nameById.get(p.productId)!,
-                coOrders: p.coOrders,
-              }));
-            const fbtBlock =
-              fbt.length > 0
-                ? `\nFrequently bought together (REAL co-purchase data — customers ordered these in the SAME order as the source product; higher coOrders = stronger signal). Prioritise these when they fit as complements:\n${JSON.stringify(
-                    fbt
-                  )}\n`
-                : '';
+            // Fresh re-fetch — the idempotency re-check.
+            const product = await prisma.product.findUnique({
+              where: { id: productId },
+              select: { id: true, name: true, description: true },
+            });
+            if (!product) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
 
-            const prompt = `You recommend complementary products for an e-commerce store. Pick the ${RECS_PER_PRODUCT} catalog products that are most likely to be bought TOGETHER with the source product (genuine cross-sells / bundles / accessories — NOT substitutes or near-duplicates).
+            if (!force && productsWithRecs.has(productId)) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
+
+            try {
+              await assertAiQuota();
+
+              const desc = (product.description ?? '').slice(0, 300);
+              const candidates = catalogIndex
+                .filter(c => c.id !== productId)
+                .slice(0, CANDIDATE_SLICE);
+              const productCategory = catalogIndex.find(c => c.id === productId)?.category ?? null;
+
+              const fbt = (coPurchase.get(productId) ?? [])
+                .filter(p => nameById.has(p.productId))
+                .map(p => ({
+                  productId: p.productId,
+                  name: nameById.get(p.productId)!,
+                  coOrders: p.coOrders,
+                }));
+              const fbtBlock =
+                fbt.length > 0
+                  ? `\nFrequently bought together (REAL co-purchase data — customers ordered these in the SAME order as the source product; higher coOrders = stronger signal). Prioritise these when they fit as complements:\n${JSON.stringify(fbt)}\n`
+                  : '';
+
+              const prompt = `You recommend complementary products for an e-commerce store. Pick the ${RECS_PER_PRODUCT} catalog products that are most likely to be bought TOGETHER with the source product (genuine cross-sells / bundles / accessories — NOT substitutes or near-duplicates).
 
 Ranking priority:
 1. Products in the "Frequently bought together" list below — these are real co-purchases and should rank highest when they make sense as complements.
@@ -385,124 +382,132 @@ ${JSON.stringify(candidates)}
 
 Output schema: [{"productId":"<id from candidate list>","score":0.0,"reason":"<one sentence — mention if it's frequently bought together>"}]
 
-Return exactly ${Math.min(
-              RECS_PER_PRODUCT,
-              candidates.length
-            )} items sorted by descending score (strongest complement first).`;
+Return exactly ${Math.min(RECS_PER_PRODUCT, candidates.length)} items sorted by descending score (strongest complement first).`;
 
-            const result = await callWithRetry(
-              () => model.generateContent(prompt),
-              `recommendations:${product.id}`
-            ).catch((err: unknown) => rethrowAsAppError(err, 'AI recommendations sweep failed'));
-            const usage = result.response.usageMetadata;
-            await recordUsage(
-              storeId,
-              'recommendations',
-              usage?.promptTokenCount ?? 0,
-              usage?.candidatesTokenCount ?? 0,
-              false
-            );
-            const raw = result.response.text();
-            let parsed: LlmRec[];
-
-            try {
-              // parseAiJson applies the outermost-JSON-span slice (strips any
-              // leading/trailing prose Gemini adds) + control-char sanitising
-              // before JSON.parse. See feedback-gemini-json-response-extra-text.
-              parsed = parseAiJson<LlmRec[]>(raw);
-            } catch {
-              throw new Error('LLM returned unparseable JSON');
-            }
-
-            if (!Array.isArray(parsed)) {
-              throw new Error('LLM response is not a JSON array');
-            }
-
-            // Validate picks — Gemini occasionally hallucinates IDs that
-            // don't exist in the catalog. Filter those out silently.
-            const validIdSet = new Set(catalogIndex.map(c => c.id));
-            const validRecs = parsed
-              .filter(
-                (r): r is LlmRec =>
-                  r !== null &&
-                  typeof r === 'object' &&
-                  typeof r.productId === 'string' &&
-                  validIdSet.has(r.productId) &&
-                  r.productId !== product.id
-              )
-              .slice(0, RECS_PER_PRODUCT);
-
-            if (validRecs.length === 0) {
-              // No valid picks — count as skipped (not an error).
-              skipped++;
-            } else {
-              // Fully replace prior AI recs for this source product so
-              // re-sweeping the catalogue produces a clean result.
-              await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-                await tx.aiRecommendation.deleteMany({
-                  where: { storeId, sourceProductId: product.id },
-                });
-                await tx.aiRecommendation.createMany({
-                  data: validRecs.map(r => ({
-                    storeId,
-                    sourceProductId: product.id,
-                    targetProductId: r.productId,
-                    score: typeof r.score === 'number' ? Math.max(0, Math.min(1, r.score)) : 0.5,
-                    reason: typeof r.reason === 'string' ? r.reason.slice(0, 500) : null,
-                  })),
-                  skipDuplicates: true,
-                });
-              });
-              filled++;
-            }
-          } catch (err) {
-            if (isAiQuotaCapError(err)) {
-              // Quota errors propagate up so the Inngest retry mechanism
-              // can surface them cleanly; do not silently swallow them.
-              logger.warn(
-                { storeId, jobId },
-                'bulk-ai-recommendations: quota cap hit, aborting sweep'
+              const genResult = await callWithRetry(
+                () => model.generateContent(prompt),
+                `recommendations:${product.id}`
+              ).catch((err: unknown) => rethrowAsAppError(err, 'AI recommendations sweep failed'));
+              const usage = genResult.response.usageMetadata;
+              await recordUsage(
+                storeId,
+                'recommendations',
+                usage?.promptTokenCount ?? 0,
+                usage?.candidatesTokenCount ?? 0,
+                false
               );
-              throw err;
+              const raw = genResult.response.text();
+              let parsed: LlmRec[];
+
+              try {
+                parsed = parseAiJson<LlmRec[]>(raw);
+              } catch {
+                throw new Error('LLM returned unparseable JSON');
+              }
+
+              if (!Array.isArray(parsed)) {
+                throw new Error('LLM response is not a JSON array');
+              }
+
+              const validIdSet = new Set(catalogIndex.map(c => c.id));
+              const validRecs = parsed
+                .filter(
+                  (r): r is LlmRec =>
+                    r !== null &&
+                    typeof r === 'object' &&
+                    typeof r.productId === 'string' &&
+                    validIdSet.has(r.productId) &&
+                    r.productId !== product.id
+                )
+                .slice(0, RECS_PER_PRODUCT);
+
+              if (validRecs.length === 0) {
+                bSkipped++;
+              } else {
+                await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+                  await tx.aiRecommendation.deleteMany({
+                    where: { storeId, sourceProductId: product.id },
+                  });
+                  await tx.aiRecommendation.createMany({
+                    data: validRecs.map(r => ({
+                      storeId,
+                      sourceProductId: product.id,
+                      targetProductId: r.productId,
+                      score: typeof r.score === 'number' ? Math.max(0, Math.min(1, r.score)) : 0.5,
+                      reason: typeof r.reason === 'string' ? r.reason.slice(0, 500) : null,
+                    })),
+                    skipDuplicates: true,
+                  });
+                });
+                bFilled++;
+              }
+            } catch (err) {
+              if (isAiQuotaCapError(err)) {
+                logger.warn(
+                  { storeId, jobId },
+                  'bulk-ai-recommendations: quota cap hit, aborting sweep'
+                );
+                bQuotaReached = true;
+                break;
+              }
+              const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
+              if (bErrors.length < ERROR_CAP)
+                bErrors.push({
+                  entityKind: 'product',
+                  entityId: product.id,
+                  entityName: product.name,
+                  error: msg,
+                });
+              bFailed++;
             }
-            const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
-            if (errors.length < ERROR_CAP) {
-              errors.push({
-                entityKind: 'product',
-                entityId: product.id,
-                entityName: product.name,
-                error: msg,
-              });
-            }
-            failed++;
+
+            bProcessed++;
+            await sleep(THROTTLE_MS);
           }
 
-          processed++;
+          return {
+            processed: bProcessed,
+            filled: bFilled,
+            skipped: bSkipped,
+            failed: bFailed,
+            errors: bErrors,
+            quotaReached: bQuotaReached,
+            cancelled: false,
+          };
+        });
 
-          // Throttle to stay under the free-tier ~30 RPM. Only sleep after a
-          // real model call — the quota-gate early-return above never reaches
-          // this line, so the sleep is always paired with a Gemini call.
-          await sleep(THROTTLE_MS);
-
-          // Persist incremental progress so the admin polling UI sees live
-          // updates rather than a single jump at completion.
-          if (processed % 10 === 0 || processed === products.length) {
-            await prisma.bulkAiJob.update({
-              where: { id: jobId },
-              data: { processed, filled, skipped, failed, errors: errors as object },
-            });
-          }
+        processed += result.processed;
+        filled += result.filled;
+        skipped += result.skipped;
+        failed += result.failed;
+        for (const e of result.errors) {
+          if (errors.length < ERROR_CAP) errors.push(e);
         }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        quotaReached = true;
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            entityKind: 'store',
-            entityId: storeId,
-            entityName: 'sweep',
-            error: err instanceof AppError ? err.message : 'AI quota cap reached',
-          });
+
+        await step.run(`progress-${i}`, () =>
+          prisma.bulkAiJob.update({
+            where: { id: jobId },
+            data: { processed, filled, skipped, failed, errors: errors as object },
+          })
+        );
+
+        if (result.cancelled) {
+          logger.info(
+            { jobId, storeId, processed, filled, skipped, failed },
+            'bulk-ai-recommendations: cancelled by merchant'
+          );
+          break;
+        }
+        if (result.quotaReached) {
+          quotaReached = true;
+          if (errors.length < ERROR_CAP)
+            errors.push({
+              entityKind: 'store',
+              entityId: storeId,
+              entityName: 'sweep',
+              error: 'AI quota cap reached',
+            });
+          break;
         }
       }
 
@@ -516,12 +521,25 @@ Return exactly ${Math.min(
         where: { id: jobId },
         data: {
           status: finalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          completedAt: new Date(),
+          processed,
+          filled,
+          skipped,
+          failed,
           errors: errors as object,
+          completedAt: new Date(),
         },
       });
 
-      logger.info({ jobId, storeId, quotaReached, force }, 'bulk-ai-recommendations complete');
-    }; // end runInTenantContext
+      logger.info(
+        { jobId, storeId, filled, skipped, failed, quotaReached, force },
+        'bulk-ai-recommendations complete'
+      );
+    })(); // end runInTenantContext — FIXED (2026-07): this used to be
+    // `return async () => {...};` with NO invocation — a genuine bug that
+    // meant the entire sweep body above never ran (Inngest received an
+    // uninvoked function reference as the handler's resolved value). The
+    // `(...)()` IIFE at the end actually executes it, matching every other
+    // bulk-ai-* function in this directory.
   }
 );
+export const bulkAiRecommendations: InngestFunction.Any = bulkAiRecommendationsFn;

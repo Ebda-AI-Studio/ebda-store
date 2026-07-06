@@ -5,6 +5,7 @@ import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 
 /**
  * Catalogue-wide translation sweep. Walks every product + category
@@ -13,9 +14,18 @@ import { inngest } from '../client';
  * the missing translation.
  *
  * Concurrency capped at 1 per store so a merchant can't run two
- * sweeps that race on the same field. Per-step retries are off
- * because a partial run is recoverable (re-running just translates
- * what's still missing — the smart-skip handles idempotency).
+ * sweeps that race on the same field.
+ *
+ * PR2 — crash-resumable batching. The store + every category + every
+ * product are loaded ONCE inside `step.run('load-items', ...)` as a single
+ * stable work-item list (`{kind, id}`), then split into
+ * `BULK_AI_BATCH_SIZE`-sized batches, each processed inside its own
+ * `step.run(\`batch-${i}\`, ...)`. A crash mid-sweep resumes at the first
+ * unfinished batch. Each entity's name/description pair is re-read fresh at
+ * batch-processing time (not the load-items snapshot) so a retried batch
+ * never re-translates a field a prior attempt already filled — this is
+ * exactly the existing `shouldFill` smart-skip, just re-evaluated per batch
+ * instead of once per whole sweep.
  */
 const ERROR_CAP = 50;
 
@@ -35,7 +45,26 @@ interface BulkError {
   error: string;
 }
 
-export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
+interface BatchResult {
+  processed: number;
+  filled: number;
+  skipped: number;
+  failed: number;
+  errors: BulkError[];
+  quotaReached: boolean;
+  cancelled: boolean;
+}
+
+type WorkItem = { kind: 'store' | 'category' | 'product'; id: string };
+
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type when the returned object mixes a plain string[]
+// with a richer array-of-objects sibling (the annotation widens the
+// contextual type fed into `createFunction`'s generics, and Jsonify then
+// collapses the string[] to `unknown[]`). Assigning to the annotated export
+// on a separate line avoids feeding the annotation back into inference.
+const bulkAiTranslateFn = inngest.createFunction(
   {
     id: 'bulk-ai-translate',
     name: 'Bulk: translate missing EN/AR across catalogue',
@@ -50,152 +79,386 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    // All DB reads/writes run inside runInTenantContext so FORCE RLS policies
-    // see the correct store GUC (Inngest workers run without HTTP tenant context).
+    // Direction `to_ar` = fill empty AR from EN; `to_en` = fill empty EN from AR.
+    const fillTo: 'ar' | 'en' = direction === 'to_en' ? 'en' : 'ar';
+
+    function shouldFill(en: string | null | undefined, ar: string | null | undefined): boolean {
+      const enFilled = !!en?.trim();
+      const arFilled = !!ar?.trim();
+      if (enFilled === arFilled) return false; // both filled or both empty
+      return fillTo === 'ar' ? enFilled && !arFilled : arFilled && !enFilled;
+    }
+
+    function sourceText(en: string | null | undefined, ar: string | null | undefined): string {
+      return fillTo === 'ar' ? (en ?? '') : (ar ?? '');
+    }
+
     return (async () => {
+      await step.run('mark-running', () =>
+        prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'running', startedAt: new Date() },
+        })
+      );
+
+      const items: WorkItem[] = await step.run('load-items', async () => {
+        const products = await prisma.product.findMany({
+          where: { storeId, deletedAt: null },
+          select: { id: true },
+        });
+        const cats = await prisma.category.findMany({
+          where: { storeId },
+          select: { id: true },
+        });
+        const store = await prisma.store.findUnique({
+          where: { id: storeId },
+          select: { id: true },
+        });
+
+        const work: WorkItem[] = [
+          ...products.map(p => ({ kind: 'product' as const, id: p.id })),
+          ...cats.map(c => ({ kind: 'category' as const, id: c.id })),
+          ...(store ? [{ kind: 'store' as const, id: storeId }] : []),
+        ];
+
+        // Each entity has 2 fields (name + description); upper bound only.
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { total: work.length * 2 },
+        });
+
+        return work;
+      });
+
+      const batches = chunk(items, BULK_AI_BATCH_SIZE);
+
       const errors: BulkError[] = [];
+      let processed = 0;
       let filled = 0;
       let skipped = 0;
       let failed = 0;
-      let processed = 0;
       let quotaReached = false;
 
-      // Direction `to_ar` = fill empty AR from EN; `to_en` = fill empty EN from AR.
-      const fillTo: 'ar' | 'en' = direction === 'to_en' ? 'en' : 'ar';
+      for (let i = 0; i < batches.length; i++) {
+        const batchItems = batches[i];
 
-      function shouldFill(en: string | null | undefined, ar: string | null | undefined): boolean {
-        const enFilled = !!en?.trim();
-        const arFilled = !!ar?.trim();
-        if (enFilled === arFilled) return false; // both filled or both empty
-        return fillTo === 'ar' ? enFilled && !arFilled : arFilled && !enFilled;
-      }
-
-      function sourceText(en: string | null | undefined, ar: string | null | undefined): string {
-        return fillTo === 'ar' ? (en ?? '') : (ar ?? '');
-      }
-
-      async function recordError(err: BulkError) {
-        if (errors.length < ERROR_CAP) errors.push(err);
-        failed++;
-      }
-
-      try {
-        // Mark running and count rows to estimate total work
-        await step.run('mark-running', async () => {
-          const [productCount, categoryCount] = await Promise.all([
-            prisma.product.count({ where: { storeId, deletedAt: null } }),
-            prisma.category.count({ where: { storeId } }),
-          ]);
-          await prisma.bulkAiJob.update({
+        const result: BatchResult = await step.run(`batch-${i}`, async () => {
+          const currentJob = await prisma.bulkAiJob.findUnique({
             where: { id: jobId },
-            data: {
-              status: 'running',
-              startedAt: new Date(),
-              // Each entity has 2 fields (name + description); upper bound only.
-              total: (productCount + categoryCount) * 2 + 2,
-            },
+            select: { status: true },
           });
-        });
+          if (currentJob?.status === 'cancelled') {
+            return {
+              processed: 0,
+              filled: 0,
+              skipped: 0,
+              failed: 0,
+              errors: [],
+              quotaReached: false,
+              cancelled: true,
+            };
+          }
 
-        // Process products in pages of 25 to bound memory and Gemini RPS
-        const PAGE = 25;
-        let cursor: string | null = null;
-        while (true) {
-          const products: Array<{
-            id: string;
-            name: string;
-            nameAr: string | null;
-            description: string | null;
-            descriptionAr: string | null;
-          }> = await prisma.product.findMany({
-            where: { storeId, deletedAt: null },
-            orderBy: { id: 'asc' },
-            take: PAGE,
-            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-            select: {
-              id: true,
-              name: true,
-              nameAr: true,
-              description: true,
-              descriptionAr: true,
-            },
-          });
-          if (products.length === 0) break;
+          let bProcessed = 0;
+          let bFilled = 0;
+          let bSkipped = 0;
+          let bFailed = 0;
+          let bQuotaReached = false;
+          const bErrors: BulkError[] = [];
 
-          for (const p of products) {
+          async function recordError(err: BulkError) {
+            if (bErrors.length < ERROR_CAP) bErrors.push(err);
+            bFailed++;
+          }
+
+          entityLoop: for (const item of batchItems) {
+            // Fresh per-item read — the idempotency re-check (shouldFill is
+            // re-evaluated against current DB state, not the load-items
+            // snapshot).
+            if (item.kind === 'product') {
+              const p = await prisma.product.findUnique({
+                where: { id: item.id },
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                  description: true,
+                  descriptionAr: true,
+                },
+              });
+              if (!p) {
+                bProcessed += 2;
+                bSkipped += 2;
+                continue;
+              }
+              const updates: Record<string, string> = {};
+
+              if (shouldFill(p.name, p.nameAr)) {
+                try {
+                  const r = await callWithRetry(
+                    () =>
+                      AIService.translate({
+                        storeId,
+                        text: sourceText(p.name, p.nameAr),
+                        from: fillTo === 'ar' ? 'en' : 'ar',
+                        to: fillTo,
+                        kind: 'product-name',
+                      }),
+                    `translate:product:${p.id}:name`
+                  );
+                  updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
+                  bFilled++;
+                  await sleep(THROTTLE_MS);
+                } catch (err) {
+                  if (isAiQuotaCapError(err)) {
+                    bQuotaReached = true;
+                    break entityLoop;
+                  }
+                  await recordError({
+                    entityKind: 'product',
+                    entityId: p.id,
+                    entityName: p.name,
+                    field: 'name',
+                    error: err instanceof Error ? err.message : 'unknown',
+                  });
+                }
+              } else {
+                bSkipped++;
+              }
+              bProcessed++;
+
+              if (shouldFill(p.description, p.descriptionAr)) {
+                try {
+                  const r = await callWithRetry(
+                    () =>
+                      AIService.translate({
+                        storeId,
+                        text: sourceText(p.description, p.descriptionAr),
+                        from: fillTo === 'ar' ? 'en' : 'ar',
+                        to: fillTo,
+                        kind: 'product-description',
+                      }),
+                    `translate:product:${p.id}:description`
+                  );
+                  updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
+                  bFilled++;
+                  await sleep(THROTTLE_MS);
+                } catch (err) {
+                  if (isAiQuotaCapError(err)) {
+                    bQuotaReached = true;
+                    break entityLoop;
+                  }
+                  await recordError({
+                    entityKind: 'product',
+                    entityId: p.id,
+                    entityName: p.name,
+                    field: 'description',
+                    error: err instanceof Error ? err.message : 'unknown',
+                  });
+                }
+              } else {
+                bSkipped++;
+              }
+              bProcessed++;
+
+              if (Object.keys(updates).length > 0) {
+                try {
+                  await prisma.product.update({ where: { id: p.id }, data: updates });
+                } catch (err) {
+                  await recordError({
+                    entityKind: 'product',
+                    entityId: p.id,
+                    entityName: p.name,
+                    field: 'persist',
+                    error: err instanceof Error ? err.message : 'persist failed',
+                  });
+                }
+              }
+              continue;
+            }
+
+            if (item.kind === 'category') {
+              const c = await prisma.category.findUnique({
+                where: { id: item.id },
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                  description: true,
+                  descriptionAr: true,
+                },
+              });
+              if (!c) {
+                bProcessed += 2;
+                bSkipped += 2;
+                continue;
+              }
+              const updates: Record<string, string> = {};
+
+              if (shouldFill(c.name, c.nameAr)) {
+                try {
+                  const r = await callWithRetry(
+                    () =>
+                      AIService.translate({
+                        storeId,
+                        text: sourceText(c.name, c.nameAr),
+                        from: fillTo === 'ar' ? 'en' : 'ar',
+                        to: fillTo,
+                        kind: 'category-name',
+                      }),
+                    `translate:category:${c.id}:name`
+                  );
+                  updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
+                  bFilled++;
+                  await sleep(THROTTLE_MS);
+                } catch (err) {
+                  if (isAiQuotaCapError(err)) {
+                    bQuotaReached = true;
+                    break entityLoop;
+                  }
+                  await recordError({
+                    entityKind: 'category',
+                    entityId: c.id,
+                    entityName: c.name,
+                    field: 'name',
+                    error: err instanceof Error ? err.message : 'unknown',
+                  });
+                }
+              } else bSkipped++;
+              bProcessed++;
+
+              if (shouldFill(c.description, c.descriptionAr)) {
+                try {
+                  const r = await callWithRetry(
+                    () =>
+                      AIService.translate({
+                        storeId,
+                        text: sourceText(c.description, c.descriptionAr),
+                        from: fillTo === 'ar' ? 'en' : 'ar',
+                        to: fillTo,
+                        kind: 'category-description',
+                      }),
+                    `translate:category:${c.id}:description`
+                  );
+                  updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
+                  bFilled++;
+                  await sleep(THROTTLE_MS);
+                } catch (err) {
+                  if (isAiQuotaCapError(err)) {
+                    bQuotaReached = true;
+                    break entityLoop;
+                  }
+                  await recordError({
+                    entityKind: 'category',
+                    entityId: c.id,
+                    entityName: c.name,
+                    field: 'description',
+                    error: err instanceof Error ? err.message : 'unknown',
+                  });
+                }
+              } else bSkipped++;
+              bProcessed++;
+
+              if (Object.keys(updates).length > 0) {
+                try {
+                  await prisma.category.update({ where: { id: c.id }, data: updates });
+                } catch (err) {
+                  await recordError({
+                    entityKind: 'category',
+                    entityId: c.id,
+                    entityName: c.name,
+                    field: 'persist',
+                    error: err instanceof Error ? err.message : 'persist failed',
+                  });
+                }
+              }
+              continue;
+            }
+
+            // item.kind === 'store'
+            const store = await prisma.store.findUnique({
+              where: { id: item.id },
+              select: { name: true, nameAr: true, description: true, descriptionAr: true },
+            });
+            if (!store) {
+              bProcessed += 2;
+              bSkipped += 2;
+              continue;
+            }
             const updates: Record<string, string> = {};
 
-            if (shouldFill(p.name, p.nameAr)) {
+            if (shouldFill(store.name, store.nameAr)) {
               try {
                 const r = await callWithRetry(
                   () =>
                     AIService.translate({
                       storeId,
-                      text: sourceText(p.name, p.nameAr),
+                      text: sourceText(store.name, store.nameAr),
                       from: fillTo === 'ar' ? 'en' : 'ar',
                       to: fillTo,
-                      kind: 'product-name',
+                      kind: 'store-name',
                     }),
-                  `translate:product:${p.id}:name`
+                  `translate:store:${storeId}:name`
                 );
                 updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
-                filled++;
+                bFilled++;
                 await sleep(THROTTLE_MS);
               } catch (err) {
-                if (isAiQuotaCapError(err)) throw err;
+                if (isAiQuotaCapError(err)) {
+                  bQuotaReached = true;
+                  break entityLoop;
+                }
                 await recordError({
-                  entityKind: 'product',
-                  entityId: p.id,
-                  entityName: p.name,
+                  entityKind: 'store',
+                  entityId: storeId,
+                  entityName: store.name,
                   field: 'name',
                   error: err instanceof Error ? err.message : 'unknown',
                 });
               }
-            } else {
-              skipped++;
-            }
-            processed++;
+            } else bSkipped++;
+            bProcessed++;
 
-            if (shouldFill(p.description, p.descriptionAr)) {
+            if (shouldFill(store.description, store.descriptionAr)) {
               try {
                 const r = await callWithRetry(
                   () =>
                     AIService.translate({
                       storeId,
-                      text: sourceText(p.description, p.descriptionAr),
+                      text: sourceText(store.description, store.descriptionAr),
                       from: fillTo === 'ar' ? 'en' : 'ar',
                       to: fillTo,
-                      kind: 'product-description',
+                      kind: 'store-description',
                     }),
-                  `translate:product:${p.id}:description`
+                  `translate:store:${storeId}:description`
                 );
                 updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
-                filled++;
+                bFilled++;
                 await sleep(THROTTLE_MS);
               } catch (err) {
-                if (isAiQuotaCapError(err)) throw err;
+                if (isAiQuotaCapError(err)) {
+                  bQuotaReached = true;
+                  break entityLoop;
+                }
                 await recordError({
-                  entityKind: 'product',
-                  entityId: p.id,
-                  entityName: p.name,
+                  entityKind: 'store',
+                  entityId: storeId,
+                  entityName: store.name,
                   field: 'description',
                   error: err instanceof Error ? err.message : 'unknown',
                 });
               }
-            } else {
-              skipped++;
-            }
-            processed++;
+            } else bSkipped++;
+            bProcessed++;
 
             if (Object.keys(updates).length > 0) {
               try {
-                await prisma.product.update({ where: { id: p.id }, data: updates });
+                await prisma.store.update({ where: { id: storeId }, data: updates });
               } catch (err) {
-                if (isAiQuotaCapError(err)) throw err;
                 await recordError({
-                  entityKind: 'product',
-                  entityId: p.id,
-                  entityName: p.name,
+                  entityKind: 'store',
+                  entityId: storeId,
+                  entityName: store.name,
                   field: 'persist',
                   error: err instanceof Error ? err.message : 'persist failed',
                 });
@@ -203,189 +466,51 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
             }
           }
 
-          cursor = products[products.length - 1].id;
+          return {
+            processed: bProcessed,
+            filled: bFilled,
+            skipped: bSkipped,
+            failed: bFailed,
+            errors: bErrors,
+            quotaReached: bQuotaReached,
+            cancelled: false,
+          };
+        });
 
-          // Persist progress at the end of each page
-          await prisma.bulkAiJob.update({
+        processed += result.processed;
+        filled += result.filled;
+        skipped += result.skipped;
+        failed += result.failed;
+        for (const e of result.errors) {
+          if (errors.length < ERROR_CAP) errors.push(e);
+        }
+
+        await step.run(`progress-${i}`, () =>
+          prisma.bulkAiJob.update({
             where: { id: jobId },
             data: { processed, filled, skipped, failed, errors: errors as object },
-          });
+          })
+        );
 
-          if (products.length < PAGE) break;
+        if (result.cancelled) {
+          logger.info(
+            { jobId, storeId, processed, filled, skipped, failed },
+            'bulk-ai-translate: cancelled by merchant'
+          );
+          break;
         }
-
-        // Categories
-        const cats = await prisma.category.findMany({
-          where: { storeId },
-          select: { id: true, name: true, nameAr: true, description: true, descriptionAr: true },
-        });
-        for (const c of cats) {
-          const updates: Record<string, string> = {};
-          if (shouldFill(c.name, c.nameAr)) {
-            try {
-              const r = await callWithRetry(
-                () =>
-                  AIService.translate({
-                    storeId,
-                    text: sourceText(c.name, c.nameAr),
-                    from: fillTo === 'ar' ? 'en' : 'ar',
-                    to: fillTo,
-                    kind: 'category-name',
-                  }),
-                `translate:category:${c.id}:name`
-              );
-              updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
-              filled++;
-              await sleep(THROTTLE_MS);
-            } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              await recordError({
-                entityKind: 'category',
-                entityId: c.id,
-                entityName: c.name,
-                field: 'name',
-                error: err instanceof Error ? err.message : 'unknown',
-              });
-            }
-          } else skipped++;
-          processed++;
-
-          if (shouldFill(c.description, c.descriptionAr)) {
-            try {
-              const r = await callWithRetry(
-                () =>
-                  AIService.translate({
-                    storeId,
-                    text: sourceText(c.description, c.descriptionAr),
-                    from: fillTo === 'ar' ? 'en' : 'ar',
-                    to: fillTo,
-                    kind: 'category-description',
-                  }),
-                `translate:category:${c.id}:description`
-              );
-              updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
-              filled++;
-              await sleep(THROTTLE_MS);
-            } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              await recordError({
-                entityKind: 'category',
-                entityId: c.id,
-                entityName: c.name,
-                field: 'description',
-                error: err instanceof Error ? err.message : 'unknown',
-              });
-            }
-          } else skipped++;
-          processed++;
-
-          if (Object.keys(updates).length > 0) {
-            try {
-              await prisma.category.update({ where: { id: c.id }, data: updates });
-            } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              await recordError({
-                entityKind: 'category',
-                entityId: c.id,
-                entityName: c.name,
-                field: 'persist',
-                error: err instanceof Error ? err.message : 'persist failed',
-              });
-            }
+        if (result.quotaReached) {
+          quotaReached = true;
+          if (errors.length < ERROR_CAP) {
+            errors.push({
+              entityKind: 'store',
+              entityId: storeId,
+              entityName: 'sweep',
+              field: 'sweep-aborted',
+              error: 'AI quota cap reached',
+            });
           }
-        }
-
-        // Store row (name + description)
-        const store = await prisma.store.findUnique({
-          where: { id: storeId },
-          select: { name: true, nameAr: true, description: true, descriptionAr: true },
-        });
-        if (store) {
-          const updates: Record<string, string> = {};
-          if (shouldFill(store.name, store.nameAr)) {
-            try {
-              const r = await callWithRetry(
-                () =>
-                  AIService.translate({
-                    storeId,
-                    text: sourceText(store.name, store.nameAr),
-                    from: fillTo === 'ar' ? 'en' : 'ar',
-                    to: fillTo,
-                    kind: 'store-name',
-                  }),
-                `translate:store:${storeId}:name`
-              );
-              updates[fillTo === 'ar' ? 'nameAr' : 'name'] = r.translation;
-              filled++;
-              await sleep(THROTTLE_MS);
-            } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              await recordError({
-                entityKind: 'store',
-                entityId: storeId,
-                entityName: store.name,
-                field: 'name',
-                error: err instanceof Error ? err.message : 'unknown',
-              });
-            }
-          } else skipped++;
-          processed++;
-
-          if (shouldFill(store.description, store.descriptionAr)) {
-            try {
-              const r = await callWithRetry(
-                () =>
-                  AIService.translate({
-                    storeId,
-                    text: sourceText(store.description, store.descriptionAr),
-                    from: fillTo === 'ar' ? 'en' : 'ar',
-                    to: fillTo,
-                    kind: 'store-description',
-                  }),
-                `translate:store:${storeId}:description`
-              );
-              updates[fillTo === 'ar' ? 'descriptionAr' : 'description'] = r.translation;
-              filled++;
-              await sleep(THROTTLE_MS);
-            } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              await recordError({
-                entityKind: 'store',
-                entityId: storeId,
-                entityName: store.name,
-                field: 'description',
-                error: err instanceof Error ? err.message : 'unknown',
-              });
-            }
-          } else skipped++;
-          processed++;
-
-          if (Object.keys(updates).length > 0) {
-            try {
-              await prisma.store.update({ where: { id: storeId }, data: updates });
-            } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              await recordError({
-                entityKind: 'store',
-                entityId: storeId,
-                entityName: store.name,
-                field: 'persist',
-                error: err instanceof Error ? err.message : 'persist failed',
-              });
-            }
-          }
-        }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        quotaReached = true;
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            entityKind: 'store',
-            entityId: storeId,
-            entityName: 'sweep',
-            field: 'sweep-aborted',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
-          });
+          break;
         }
       }
 
@@ -409,3 +534,4 @@ export const bulkAiTranslate: InngestFunction.Any = inngest.createFunction(
     })(); // end runInTenantContext
   }
 );
+export const bulkAiTranslate: InngestFunction.Any = bulkAiTranslateFn;

@@ -7,6 +7,7 @@ import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { generateProductFaqs } from '../../ai/product-faq-generator';
 import { AppError } from '../../../middleware/error-handler';
+import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 
 /**
  * Catalogue-wide product-FAQ sweep.
@@ -22,7 +23,18 @@ import { AppError } from '../../../middleware/error-handler';
  *   - `force: true`: process every product. Deletes that product's prior
  *     AI-DRAFTED FAQs (manuallyEdited rows are preserved) then inserts the
  *     freshly-generated ones.
- *   - Cooperative cancellation: polls bulk_ai_jobs.status every 5 items.
+ *   - Cooperative cancellation: polls bulk_ai_jobs.status once per batch.
+ *
+ * PR2 — crash-resumable batching. The product id list is loaded ONCE inside
+ * `step.run('load-items', ...)` (stable set + order across retries), then
+ * split into `BULK_AI_BATCH_SIZE`-sized batches, each processed inside its
+ * own `step.run(\`batch-${i}\`, ...)`. Inngest memoizes completed steps, so
+ * a crash mid-sweep (deploy window / worker restart) resumes at the first
+ * unfinished batch instead of restarting from item 0. Each item re-checks
+ * its own "needs work" predicate fresh (from the batch's own DB read, not
+ * the load-items snapshot) so a batch step that gets retried after a
+ * partial failure never re-spends a Gemini call on a product it already
+ * finished.
  *
  * Follows the canonical bulk-AI patterns:
  *   - concurrency key on storeId (one sweep per store at a time)
@@ -30,7 +42,7 @@ import { AppError } from '../../../middleware/error-handler';
  *   - throttle at AI_BULK_THROTTLE_MS (default 2500ms — ~24 RPM)
  *   - assertAiQuota before each Gemini call (respects AI_DAILY_REQUEST_CAP)
  *   - error cap at 50 so no single run bloats the BulkAiJob row
- *   - quota errors re-thrown cleanly (not silenced)
+ *   - quota errors abort the sweep cleanly (not silenced)
  */
 
 const ERROR_CAP = 50;
@@ -48,7 +60,24 @@ interface BulkError {
   error: string;
 }
 
-export const bulkAiProductFaqs: InngestFunction.Any = inngest.createFunction(
+interface BatchResult {
+  processed: number;
+  filled: number;
+  skipped: number;
+  failed: number;
+  errors: BulkError[];
+  quotaReached: boolean;
+  cancelled: boolean;
+}
+
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type when the returned object mixes a plain string[]
+// with a richer array-of-objects sibling (the annotation widens the
+// contextual type fed into `createFunction`'s generics, and Jsonify then
+// collapses the string[] to `unknown[]`). Assigning to the annotated export
+// on a separate line avoids feeding the annotation back into inference.
+const bulkAiProductFaqsFn = inngest.createFunction(
   {
     id: 'bulk-ai-product-faqs',
     name: 'Bulk: draft product FAQs across catalogue',
@@ -76,176 +105,233 @@ export const bulkAiProductFaqs: InngestFunction.Any = inngest.createFunction(
       await step.run('mark-running', () =>
         prisma.bulkAiJob.update({
           where: { id: jobId },
-          data: { status: 'running', startedAt: new Date() },
+          data: { status: 'running', startedAt: new Date(), force },
         })
       );
 
-      const errors: BulkError[] = [];
-      let filled = 0;
-      let skipped = 0;
-      let failed = 0;
-      let processed = 0;
-      let quotaReached = false;
+      const apiKey = config.googleAiKey;
+      if (!apiKey) {
+        throw new Error('AI_NOT_CONFIGURED: GOOGLE_GENERATIVE_AI_KEY missing');
+      }
 
-      try {
-        const apiKey = config.googleAiKey;
-        if (!apiKey) {
-          throw new Error('AI_NOT_CONFIGURED: GOOGLE_GENERATIVE_AI_KEY missing');
-        }
-
+      // Stable snapshot of the candidate set + order — batch boundaries never
+      // shift across retries even if products are added/removed mid-sweep.
+      const { storeName, productIds } = await step.run('load-items', async () => {
         const store = await prisma.store.findUnique({
           where: { id: storeId },
           select: { name: true },
         });
-
         const products = await prisma.product.findMany({
           where: { storeId, status: 'active', deletedAt: null },
-          select: {
-            id: true,
-            name: true,
-            nameAr: true,
-            description: true,
-            _count: { select: { faqs: true } },
-          },
+          select: { id: true },
         });
-
         await prisma.bulkAiJob.update({
           where: { id: jobId },
           data: { total: products.length },
         });
+        return { storeName: store?.name ?? storeId, productIds: products.map(p => p.id) };
+      });
 
-        for (const product of products) {
-          // Cooperative cancellation — check every 5 items.
-          if (processed % 5 === 0 && processed > 0) {
-            const currentJob = await prisma.bulkAiJob.findUnique({
-              where: { id: jobId },
-              select: { status: true },
-            });
-            if (currentJob?.status === 'cancelled') {
-              logger.info(
-                { jobId, storeId, processed, filled, skipped, failed },
-                'bulk-ai-product-faqs: cancelled by merchant'
-              );
-              break;
-            }
-          }
+      const batches = chunk(productIds, BULK_AI_BATCH_SIZE);
 
-          // Smart-skip: products that already have FAQs are left alone unless
-          // force is set. Counts as skipped (not failed) so re-runs report
-          // cleanly.
-          if (!force && product._count.faqs > 0) {
-            skipped++;
-            processed++;
-            if (processed % 25 === 0 || processed === products.length) {
-              await prisma.bulkAiJob.update({
-                where: { id: jobId },
-                data: { processed, filled, skipped, failed, errors: errors as object },
-              });
-            }
-            continue;
-          }
+      const errors: BulkError[] = [];
+      let processed = 0;
+      let filled = 0;
+      let skipped = 0;
+      let failed = 0;
+      let quotaReached = false;
 
-          try {
-            await assertAiQuota();
+      for (let i = 0; i < batches.length; i++) {
+        const batchIds = batches[i];
 
-            // Shared core — identical to the per-product "Draft with AI" path.
-            const faqs = await callWithRetry(
-              () =>
-                generateProductFaqs(
-                  {
-                    storeId,
-                    storeName: store?.name ?? storeId,
-                    product: {
-                      name: product.name,
-                      nameAr: product.nameAr,
-                      description: product.description,
-                    },
-                    count: FAQS_PER_PRODUCT,
-                  },
-                  apiKey,
-                  MODEL
-                ),
-              `product-faqs:${product.id}`
-            );
-
-            // Keep only well-formed rows (question + answer present).
-            const validFaqs = faqs.filter(
-              f =>
-                f &&
-                typeof f.question === 'string' &&
-                f.question.trim() &&
-                typeof f.answer === 'string' &&
-                f.answer.trim()
-            );
-
-            if (validFaqs.length === 0) {
-              skipped++;
-            } else {
-              await prisma.$transaction(async tx => {
-                // On force, replace only AI-drafted rows — never clobber
-                // merchant-edited FAQs.
-                if (force) {
-                  await tx.productFaq.deleteMany({
-                    where: { productId: product.id, aiDrafted: true, manuallyEdited: false },
-                  });
-                }
-                await tx.productFaq.createMany({
-                  data: validFaqs.map(f => ({
-                    productId: product.id,
-                    question: f.question.slice(0, 500),
-                    questionAr: f.questionAr?.slice(0, 500) ?? null,
-                    answer: f.answer.slice(0, 2000),
-                    answerAr: f.answerAr?.slice(0, 2000) ?? null,
-                    aiDrafted: true,
-                  })),
-                });
-              });
-              filled++;
-            }
-          } catch (err) {
-            if (isAiQuotaCapError(err)) {
-              logger.warn(
-                { storeId, jobId },
-                'bulk-ai-product-faqs: quota cap hit, aborting sweep'
-              );
-              throw err;
-            }
-            if (errors.length < ERROR_CAP) {
-              errors.push({
-                entityKind: 'product',
-                entityId: product.id,
-                entityName: product.name,
-                error:
-                  err instanceof AppError
-                    ? err.message
-                    : 'AI request failed — please try again shortly.',
-              });
-            }
-            failed++;
-          }
-
-          processed++;
-
-          // Throttle to stay under the free-tier RPM — only after a real call.
-          await sleep(THROTTLE_MS);
-
-          if (processed % 10 === 0 || processed === products.length) {
-            await prisma.bulkAiJob.update({
-              where: { id: jobId },
-              data: { processed, filled, skipped, failed, errors: errors as object },
-            });
-          }
-        }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        quotaReached = true;
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            entityKind: 'product',
-            entityId: storeId,
-            entityName: 'sweep',
-            error: err instanceof AppError ? err.message : 'AI quota cap reached',
+        const result: BatchResult = await step.run(`batch-${i}`, async () => {
+          const currentJob = await prisma.bulkAiJob.findUnique({
+            where: { id: jobId },
+            select: { status: true },
           });
+          if (currentJob?.status === 'cancelled') {
+            return {
+              processed: 0,
+              filled: 0,
+              skipped: 0,
+              failed: 0,
+              errors: [],
+              quotaReached: false,
+              cancelled: true,
+            };
+          }
+
+          // Fresh per-batch read — this IS the per-item idempotency re-check:
+          // a batch step retried after a partial failure sees the real
+          // current `_count.faqs`, so products it already wrote on the prior
+          // attempt are skipped instead of re-spending a Gemini call.
+          const items = await prisma.product.findMany({
+            where: { id: { in: batchIds } },
+            select: {
+              id: true,
+              name: true,
+              nameAr: true,
+              description: true,
+              _count: { select: { faqs: true } },
+            },
+          });
+          const byId = new Map(items.map(p => [p.id, p]));
+
+          let bProcessed = 0;
+          let bFilled = 0;
+          let bSkipped = 0;
+          let bFailed = 0;
+          let bQuotaReached = false;
+          const bErrors: BulkError[] = [];
+
+          for (const id of batchIds) {
+            const product = byId.get(id);
+            // Deleted between load-items and this batch running — nothing to do.
+            if (!product) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
+
+            // Smart-skip: products that already have FAQs are left alone
+            // unless force is set. Counts as skipped (not failed) so
+            // re-runs report cleanly.
+            if (!force && product._count.faqs > 0) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
+
+            try {
+              await assertAiQuota();
+
+              // Shared core — identical to the per-product "Draft with AI" path.
+              const faqs = await callWithRetry(
+                () =>
+                  generateProductFaqs(
+                    {
+                      storeId,
+                      storeName,
+                      product: {
+                        name: product.name,
+                        nameAr: product.nameAr,
+                        description: product.description,
+                      },
+                      count: FAQS_PER_PRODUCT,
+                    },
+                    apiKey,
+                    MODEL
+                  ),
+                `product-faqs:${product.id}`
+              );
+
+              // Keep only well-formed rows (question + answer present).
+              const validFaqs = faqs.filter(
+                f =>
+                  f &&
+                  typeof f.question === 'string' &&
+                  f.question.trim() &&
+                  typeof f.answer === 'string' &&
+                  f.answer.trim()
+              );
+
+              if (validFaqs.length === 0) {
+                bSkipped++;
+              } else {
+                await prisma.$transaction(async tx => {
+                  // On force, replace only AI-drafted rows — never clobber
+                  // merchant-edited FAQs.
+                  if (force) {
+                    await tx.productFaq.deleteMany({
+                      where: { productId: product.id, aiDrafted: true, manuallyEdited: false },
+                    });
+                  }
+                  await tx.productFaq.createMany({
+                    data: validFaqs.map(f => ({
+                      productId: product.id,
+                      question: f.question.slice(0, 500),
+                      questionAr: f.questionAr?.slice(0, 500) ?? null,
+                      answer: f.answer.slice(0, 2000),
+                      answerAr: f.answerAr?.slice(0, 2000) ?? null,
+                      aiDrafted: true,
+                    })),
+                  });
+                });
+                bFilled++;
+              }
+            } catch (err) {
+              if (isAiQuotaCapError(err)) {
+                logger.warn(
+                  { storeId, jobId },
+                  'bulk-ai-product-faqs: quota cap hit, aborting sweep'
+                );
+                bQuotaReached = true;
+                break; // do not count this item — matches pre-batch abort semantics
+              }
+              if (bErrors.length < ERROR_CAP) {
+                bErrors.push({
+                  entityKind: 'product',
+                  entityId: product.id,
+                  entityName: product.name,
+                  error:
+                    err instanceof AppError
+                      ? err.message
+                      : 'AI request failed — please try again shortly.',
+                });
+              }
+              bFailed++;
+            }
+
+            bProcessed++;
+
+            // Throttle to stay under the free-tier RPM — only after a real call.
+            await sleep(THROTTLE_MS);
+          }
+
+          return {
+            processed: bProcessed,
+            filled: bFilled,
+            skipped: bSkipped,
+            failed: bFailed,
+            errors: bErrors,
+            quotaReached: bQuotaReached,
+            cancelled: false,
+          };
+        });
+
+        processed += result.processed;
+        filled += result.filled;
+        skipped += result.skipped;
+        failed += result.failed;
+        for (const e of result.errors) {
+          if (errors.length < ERROR_CAP) errors.push(e);
+        }
+
+        await step.run(`progress-${i}`, () =>
+          prisma.bulkAiJob.update({
+            where: { id: jobId },
+            data: { processed, filled, skipped, failed, errors: errors as object },
+          })
+        );
+
+        if (result.cancelled) {
+          logger.info(
+            { jobId, storeId, processed, filled, skipped, failed },
+            'bulk-ai-product-faqs: cancelled by merchant'
+          );
+          break;
+        }
+        if (result.quotaReached) {
+          quotaReached = true;
+          if (errors.length < ERROR_CAP) {
+            errors.push({
+              entityKind: 'product',
+              entityId: storeId,
+              entityName: 'sweep',
+              error: 'AI quota cap reached',
+            });
+          }
+          break;
         }
       }
 
@@ -273,3 +359,4 @@ export const bulkAiProductFaqs: InngestFunction.Any = inngest.createFunction(
     })(); // end runInTenantContext
   }
 );
+export const bulkAiProductFaqs: InngestFunction.Any = bulkAiProductFaqsFn;

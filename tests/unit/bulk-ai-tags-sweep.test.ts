@@ -59,7 +59,10 @@ vi.mock('@force/database', () => ({
   },
 }));
 
-let capturedHandler: (args: { event: { data: unknown } }) => Promise<void>;
+let capturedHandler: (args: {
+  event: { data: unknown };
+  step: { run: (id: string, fn: () => unknown) => Promise<unknown> };
+}) => Promise<void>;
 vi.mock('../../apps/api/src/lib/inngest/client', () => ({
   inngest: {
     createFunction: (_cfg: unknown, handler: typeof capturedHandler) => {
@@ -91,7 +94,8 @@ beforeEach(async () => {
 });
 
 async function runSweep(data: { jobId: string; storeId: string; force?: boolean }) {
-  await capturedHandler({ event: { data } });
+  const step = { run: (_id: string, fn: () => unknown) => Promise.resolve(fn()) };
+  await capturedHandler({ event: { data }, step });
 }
 
 describe('bulk-ai-tags sweep', () => {

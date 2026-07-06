@@ -3,6 +3,7 @@ import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { sendAlert } from '../../../services/alerts.service';
+import { assertAiQuota, isAiQuotaCapError } from '../../ai-quota';
 
 /**
  * Every-15-min watcher that surfaces stuck background jobs as P1
@@ -25,8 +26,56 @@ import { sendAlert } from '../../../services/alerts.service';
  * Throttle is handled by sendAlert's Redis-keyed dedup
  * (sha1(level+title+source), 5-min TTL) so consecutive cron ticks
  * for the same stuck job collapse to one Telegram message.
+ *
+ * PR2 (2026-07) — the bulk-ai-* sweeps are now crash-checkpointed at the
+ * batch level (`step.run('batch-N', ...)` per BULK_AI_BATCH_SIZE items —
+ * see `../batch-utils.ts`), so a stuck-running job almost always has real
+ * completed batches Inngest will skip on replay. Auto-reap now RE-ENQUEUES
+ * the original event (same jobId) so the sweep resumes from the first
+ * unfinished batch, instead of permanently failing a job that could finish
+ * cleanly with a resend. Gated on same-day AI quota (don't re-hammer an
+ * exhausted quota) and a per-job max-resume count (`BulkAiJob.autoResumeCount`,
+ * capped at MAX_AUTO_RESUMES) so a job that keeps crashing at the same batch
+ * can't loop forever — once either guard trips, falls back to the original
+ * mark-failed + P1-alert path.
  */
-export const queueDepthWatch: InngestFunction.Any = inngest.createFunction(
+
+// How many times a single stuck job may be auto-resumed before we give up
+// and fall back to marking it failed. Keeps a job that crashes at the same
+// batch every time from looping forever.
+const MAX_AUTO_RESUMES = 3;
+
+// Maps BulkAiJob.kind -> the Inngest event name its sweep function listens
+// on (see apps/api/src/routes/ai.routes.ts for the original `inngest.send`
+// call sites this mirrors). Kinds not listed here (none currently) would
+// fall through to the mark-failed path since there's nowhere to resend to.
+const RESUME_EVENT_BY_KIND: Record<string, string> = {
+  translate: 'bulk-ai/translate-requested',
+  seo: 'bulk-ai/seo-requested',
+  product_faqs: 'bulk-ai/product-faqs-requested',
+  category_assign: 'bulk-ai/categorize-requested',
+  image_alt: 'bulk-ai/image-alt-requested',
+  excerpt: 'bulk-ai/excerpt-requested',
+  product_tags: 'bulk-ai/tags-requested',
+  faq_aeo: 'bulk-ai/faq-aeo-requested',
+  howto_aeo: 'bulk-ai/howto-aeo-requested',
+  meta_aeo: 'bulk-ai/meta-aeo-requested',
+  recommendations: 'bulk-ai/recommendations-requested',
+  llms_txt: 'bulk-ai/llms-txt-requested',
+  citation_copy: 'bulk-ai/citation-copy-requested',
+  brand_facts: 'bulk-ai/brand-facts-requested',
+  description_balance: 'bulk-ai/balance-descriptions.requested',
+  description_revert: 'bulk-ai/revert-balance.requested',
+};
+
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type for object literals mixing a plain string[] with
+// a richer array-of-objects sibling (the annotation widens the contextual
+// type fed into `createFunction`'s generics, and Jsonify then collapses the
+// string[] to `unknown[]`). Assigning to the annotated export on a separate
+// line avoids feeding the annotation back into inference.
+const queueDepthWatchFn = inngest.createFunction(
   {
     id: 'queue-depth-watch',
     name: 'Queue-depth watcher (stuck BulkAiJob rows → Telegram)',
@@ -63,6 +112,9 @@ export const queueDepthWatch: InngestFunction.Any = inngest.createFunction(
             processed: true,
             total: true,
             startedAt: true,
+            force: true,
+            direction: true,
+            autoResumeCount: true,
             store: { select: { name: true, slug: true } },
           },
           take: 20,
@@ -90,22 +142,103 @@ export const queueDepthWatch: InngestFunction.Any = inngest.createFunction(
       });
     }
 
+    let autoResumed = 0;
+    let autoReaped = 0;
+
     for (const job of stuckRunning) {
       const ageMin = Math.floor((now - (job.startedAt?.getTime() ?? now)) / 60_000);
       const progress = job.total > 0 ? `${job.processed}/${job.total}` : 'unknown';
-      // Auto-reap: a stuck-running row > 60min almost always means the
-      // worker died mid-execution (Railway redeploy window, Inngest
-      // disconnect, an exception that escaped the try/catch).
-      // Marking failed here clears the dashboard confusion + lets the
-      // merchant retry from the UI without needing manual SQL.
+
+      const resumeEvent = RESUME_EVENT_BY_KIND[job.kind];
+      const guardTripped = job.autoResumeCount >= MAX_AUTO_RESUMES;
+
+      let quotaExhausted = false;
+      if (resumeEvent && !guardTripped) {
+        try {
+          await assertAiQuota();
+        } catch (err) {
+          if (isAiQuotaCapError(err)) quotaExhausted = true;
+          else throw err;
+        }
+      }
+
+      if (resumeEvent && !guardTripped && !quotaExhausted) {
+        // Crash-resumable path: the sweep is batch-checkpointed (PR2), so
+        // re-sending its original event lets Inngest replay memoized
+        // batches and continue from the first unfinished one. Flip the row
+        // back to 'queued' immediately so this same tick's stuck-running
+        // scan (and the next one) doesn't re-flag it while it's just
+        // waiting to be picked up again.
+        try {
+          await withRlsBypass(tx =>
+            tx.bulkAiJob.update({
+              where: { id: job.id },
+              data: { status: 'queued', autoResumeCount: { increment: 1 } },
+            })
+          );
+          await inngest.send({
+            name: resumeEvent,
+            data: {
+              jobId: job.id,
+              storeId: job.storeId,
+              force: job.force,
+              ...(job.kind === 'translate' ? { direction: job.direction } : {}),
+            },
+          });
+          autoResumed++;
+          logger.info(
+            {
+              jobId: job.id,
+              storeId: job.storeId,
+              kind: job.kind,
+              ageMin,
+              progress,
+              resumeCount: job.autoResumeCount + 1,
+            },
+            'queue-depth-watch: auto-resumed stuck-running job'
+          );
+          await sendAlert({
+            level: 'info',
+            scope: 'store',
+            store: { id: job.storeId, name: job.store?.name ?? job.storeId, slug: job.store?.slug },
+            source: 'inngest.queue-depth',
+            title: `bulk-ai-job auto-resumed after ${ageMin}m stuck running (${job.kind}, ${progress})`,
+            body: `Job ${job.id} for store "${job.store?.name ?? job.storeId}" was running ${ageMin} min at progress ${progress} without updates — re-enqueued (attempt ${job.autoResumeCount + 1}/${MAX_AUTO_RESUMES}). It will resume from the first unfinished batch.`,
+            context: {
+              jobId: job.id,
+              kind: job.kind,
+              ageMinutes: ageMin,
+              type: 'stuck_running_auto_resumed',
+            },
+          });
+          continue;
+        } catch (err) {
+          logger.error(
+            { jobId: job.id, err: (err as Error).message },
+            'queue-depth-watch: auto-resume failed, falling back to mark-failed'
+          );
+          // fall through to the mark-failed path below
+        }
+      }
+
+      // Fallback: no resume mapping for this kind, the resume-count guard
+      // tripped, quota is exhausted, or the re-enqueue attempt itself
+      // failed. Mark failed + alert exactly as before PR2.
+      autoReaped++;
+      const reason = !resumeEvent
+        ? 'no resume mapping for this job kind'
+        : guardTripped
+          ? `auto-resume cap reached (${MAX_AUTO_RESUMES})`
+          : quotaExhausted
+            ? 'AI quota exhausted for today'
+            : 're-enqueue attempt failed';
       try {
-        // Auto-reap write also needs bypass — same reason as the reads above.
         await withRlsBypass(tx =>
           tx.bulkAiJob.update({
             where: { id: job.id },
             data: {
               status: 'failed',
-              errorMessage: `auto-reaped by queue-depth-watch: stuck running ${ageMin}m at progress ${progress}. likely cause: worker died mid-execution (deploy window / crash / inngest disconnect). retry from UI.`,
+              errorMessage: `auto-reaped by queue-depth-watch: stuck running ${ageMin}m at progress ${progress} (${reason}). likely cause: worker died mid-execution (deploy window / crash / inngest disconnect). retry from UI.`,
               completedAt: new Date(),
             },
           })
@@ -122,21 +255,34 @@ export const queueDepthWatch: InngestFunction.Any = inngest.createFunction(
         store: { id: job.storeId, name: job.store?.name ?? job.storeId, slug: job.store?.slug },
         source: 'inngest.queue-depth',
         title: `bulk-ai-job auto-reaped after ${ageMin}m stuck running (${job.kind}, ${progress})`,
-        body: `Job ${job.id} for store "${job.store?.name ?? job.storeId}" was running ${ageMin} min at progress ${progress} without updates — auto-marked failed. Common cause: a Railway redeploy window killed the Inngest invocation. Merchant can retry from the UI; partial progress is lost.`,
+        body: `Job ${job.id} for store "${job.store?.name ?? job.storeId}" was running ${ageMin} min at progress ${progress} without updates — auto-marked failed (${reason}). Merchant can retry from the UI; partial progress up to the last completed batch is lost.`,
         context: {
           jobId: job.id,
           kind: job.kind,
           ageMinutes: ageMin,
           type: 'stuck_running_auto_reaped',
+          reason,
         },
       });
     }
 
     logger.warn(
-      { stuckQueued: stuckQueued.length, stuckRunning: stuckRunning.length },
+      {
+        stuckQueued: stuckQueued.length,
+        stuckRunning: stuckRunning.length,
+        autoResumed,
+        autoReaped,
+      },
       'queue-depth-watch: stuck jobs detected, alerts dispatched'
     );
 
-    return { ok: true, stuckQueued: stuckQueued.length, stuckRunning: stuckRunning.length };
+    return {
+      ok: true,
+      stuckQueued: stuckQueued.length,
+      stuckRunning: stuckRunning.length,
+      autoResumed,
+      autoReaped,
+    };
   }
 );
+export const queueDepthWatch: InngestFunction.Any = queueDepthWatchFn;

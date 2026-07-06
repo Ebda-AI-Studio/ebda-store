@@ -2478,6 +2478,16 @@ model BulkAiJob {
   // (200) like `errors` so a huge sweep can't bloat the row.
   filledProducts Json?           @map("filled_products")
   errorMessage   String?         @map("error_message") // Top-level failure reason if status=failed
+  // Durable copy of the event's `force` flag — persisted by the Inngest
+  // function itself (mark-running / load-items step) so it survives the
+  // per-batch `errors` column overwrites and stays readable by the
+  // queue-depth-watch reaper when it needs to re-enqueue a stuck job.
+  force          Boolean         @default(false)
+  // How many times queue-depth-watch has auto-resumed (re-enqueued) this
+  // job after finding it stuck `running`. Capped by MAX_AUTO_RESUMES so a
+  // job that keeps crashing at the same batch can't loop forever — once
+  // the cap is hit the reaper falls back to marking it failed + alerting.
+  autoResumeCount Int            @default(0) @map("auto_resume_count")
   startedAt      DateTime?       @map("started_at")
   completedAt    DateTime?       @map("completed_at")
   createdAt      DateTime        @default(now()) @map("created_at")

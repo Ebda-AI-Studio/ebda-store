@@ -9,6 +9,18 @@
  *
  * Leader-locked via Redis so only one Railway replica runs the job per tick.
  * retries: 1 — a full catalogue sweep is expensive; let failures surface fast.
+ *
+ * PR2 — crash-resumable batching. The active-store id list is loaded ONCE
+ * inside `step.run('load-stores', ...)` (stable set + order across
+ * retries), then split into `BULK_AI_BATCH_SIZE`-sized batches, each
+ * processed inside its own `step.run(\`batch-${i}\`, ...)`. A crash mid-sweep
+ * resumes at the first unfinished batch of stores instead of restarting the
+ * whole platform sweep from store 0 — each store's per-store try/catch is
+ * unchanged, and `sweepStore`/`recalculateFBT` are already idempotent
+ * (force:false short-circuits already-balanced pairs; the refresh gate only
+ * re-touches products idle > STALE_TTL_DAYS), so re-running a batch that
+ * partially succeeded before a crash costs at most a few cheap no-op reads
+ * per already-swept store.
  */
 
 import type { InngestFunction } from 'inngest';
@@ -18,8 +30,16 @@ import { sweepStore } from '../../../services/ai-autofill.service';
 import { recommendationService } from '../../../services/recommendation.service';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 
-export const aiAutofillSweep: InngestFunction.Any = inngest.createFunction(
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type for object literals mixing a plain string[] with
+// a richer array-of-objects sibling (the annotation widens the contextual
+// type fed into `createFunction`'s generics, and Jsonify then collapses the
+// string[] to `unknown[]`). Assigning to the annotated export on a separate
+// line avoids feeding the annotation back into inference.
+const aiAutofillSweepFn = inngest.createFunction(
   {
     id: 'ai-autofill-sweep',
     name: 'AI-first: daily catalogue autofill sweep',
@@ -34,7 +54,7 @@ export const aiAutofillSweep: InngestFunction.Any = inngest.createFunction(
     // products idle > STALE_TTL_DAYS, so a caught-up catalogue makes no Gemini calls.
     triggers: [{ cron: '0 0 * * *' }],
   },
-  async () => {
+  async ({ step }) => {
     // 12h lock TTL: a crash-safety ceiling that comfortably covers even a very
     // large throttled sweep (2.5s/product → 12h ≈ 17k products) yet still clears
     // before the next daily tick — so a crashed run can't wedge the sweep for
@@ -43,25 +63,36 @@ export const aiAutofillSweep: InngestFunction.Any = inngest.createFunction(
     // withLeaderLock's finally), so the TTL only matters on a hard crash.
     await withLeaderLock('ai-autofill-sweep', 12 * 60 * 60 * 1000, async () => {
       // Active stores only — don't burn the shared Gemini quota sweeping
-      // suspended / inactive / churned stores.
-      const stores = await withRlsBypass(tx =>
-        tx.store.findMany({
-          where: { deletedAt: null, status: 'active' },
-          select: { id: true },
-        })
-      );
+      // suspended / inactive / churned stores. Loaded ONCE so batch
+      // boundaries are stable across retries.
+      const storeIds = await step.run('load-stores', async () => {
+        const stores = await withRlsBypass(tx =>
+          tx.store.findMany({
+            where: { deletedAt: null, status: 'active' },
+            select: { id: true },
+          })
+        );
+        return stores.map(s => s.id);
+      });
 
-      for (const s of stores) {
-        try {
-          await (async () => {
-            await recommendationService.recalculateFBT(s.id);
-            const res = await sweepStore(s.id);
-            logger.info({ storeId: s.id, ...res }, '[ai-autofill-sweep] store swept');
-          })();
-        } catch (err) {
-          logger.error({ err, storeId: s.id }, '[ai-autofill-sweep] store failed');
-        }
+      const batches = chunk(storeIds, BULK_AI_BATCH_SIZE);
+
+      for (let i = 0; i < batches.length; i++) {
+        const batchIds = batches[i];
+
+        await step.run(`batch-${i}`, async () => {
+          for (const storeId of batchIds) {
+            try {
+              await recommendationService.recalculateFBT(storeId);
+              const res = await sweepStore(storeId);
+              logger.info({ storeId, ...res }, '[ai-autofill-sweep] store swept');
+            } catch (err) {
+              logger.error({ err, storeId }, '[ai-autofill-sweep] store failed');
+            }
+          }
+        });
       }
     }).catch(err => logger.error({ err }, '[ai-autofill-sweep] leader lock error'));
   }
 );
+export const aiAutofillSweep: InngestFunction.Any = aiAutofillSweepFn;

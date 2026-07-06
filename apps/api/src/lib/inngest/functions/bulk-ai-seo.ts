@@ -5,6 +5,7 @@ import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
+import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 
 /**
  * Catalogue-wide SEO sweep. Fills missing SEO meta on the store row,
@@ -12,6 +13,15 @@ import { inngest } from '../client';
  * have all four meta fields filled (we never overwrite existing
  * SEO on a bulk run — merchants can do per-entity overwrite from
  * the entity's own form if they want a regenerate).
+ *
+ * PR2 — crash-resumable batching. The store + every category + every
+ * product are loaded ONCE inside `step.run('load-items', ...)` as a single
+ * stable work-item list (`{kind, id}`, set + order fixed across retries),
+ * then split into `BULK_AI_BATCH_SIZE`-sized batches, each processed inside
+ * its own `step.run(\`batch-${i}\`, ...)`. A crash mid-sweep resumes at the
+ * first unfinished batch. Each item's current SEO fields are re-read fresh
+ * at batch-processing time (not the load-items snapshot) so a retried batch
+ * never re-spends a Gemini call on an entity already filled.
  */
 const ERROR_CAP = 50;
 
@@ -29,6 +39,18 @@ interface BulkError {
   error: string;
 }
 
+interface BatchResult {
+  processed: number;
+  filled: number;
+  skipped: number;
+  failed: number;
+  errors: BulkError[];
+  quotaReached: boolean;
+  cancelled: boolean;
+}
+
+type WorkItem = { kind: 'store' | 'category' | 'product'; id: string };
+
 function needsSeo(entity: {
   metaTitle?: string | null;
   metaTitleAr?: string | null;
@@ -43,7 +65,14 @@ function needsSeo(entity: {
   );
 }
 
-export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type when the returned object mixes a plain string[]
+// with a richer array-of-objects sibling (the annotation widens the
+// contextual type fed into `createFunction`'s generics, and Jsonify then
+// collapses the string[] to `unknown[]`). Assigning to the annotated export
+// on a separate line avoids feeding the annotation back into inference.
+const bulkAiSeoFn = inngest.createFunction(
   {
     id: 'bulk-ai-seo',
     name: 'Bulk: generate missing SEO meta across catalogue',
@@ -66,229 +95,255 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    // All DB reads/writes inside this function run without an HTTP tenant
-    // context (Inngest workers). Wrap the entire sweep body in
-    // runInTenantContext so FORCE RLS policies see the correct store GUC
-    // and queries return the right tenant's rows.
     return (async () => {
+      await step.run('mark-running', () =>
+        prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'running', startedAt: new Date(), force },
+        })
+      );
+
+      const items: WorkItem[] = await step.run('load-items', async () => {
+        const store = await prisma.store.findUnique({
+          where: { id: storeId },
+          select: { id: true },
+        });
+        if (!store) return [];
+
+        const cats = await prisma.category.findMany({
+          where: { storeId, deletedAt: null },
+          select: { id: true },
+        });
+        const products = await prisma.product.findMany({
+          where: { storeId, deletedAt: null },
+          select: { id: true },
+        });
+
+        const work: WorkItem[] = [
+          { kind: 'store', id: storeId },
+          ...cats.map(c => ({ kind: 'category' as const, id: c.id })),
+          ...products.map(p => ({ kind: 'product' as const, id: p.id })),
+        ];
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { total: work.length },
+        });
+
+        return work;
+      });
+
       const errors: BulkError[] = [];
+      let processed = 0;
       let filled = 0;
       let skipped = 0;
       let failed = 0;
-      let processed = 0;
       let quotaReached = false;
 
-      async function recordError(err: BulkError) {
-        if (errors.length < ERROR_CAP) errors.push(err);
-        failed++;
+      if (items.length === 0) {
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        });
+        return;
       }
 
-      try {
-        const store = await prisma.store.findUnique({
-          where: { id: storeId },
-          select: {
-            name: true,
-            nameAr: true,
-            description: true,
-            descriptionAr: true,
-            metaTitle: true,
-            metaTitleAr: true,
-            metaDescription: true,
-            metaDescriptionAr: true,
-          },
-        });
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { name: true, nameAr: true },
+      });
+      const storeName = store?.name ?? storeId;
+      const storeNameAr = store?.nameAr ?? null;
 
-        // Total = store row + every category + every product.
-        await step.run('mark-running', async () => {
-          const [productCount, categoryCount] = await Promise.all([
-            prisma.product.count({ where: { storeId, deletedAt: null } }),
-            prisma.category.count({ where: { storeId, deletedAt: null } }),
-          ]);
-          await prisma.bulkAiJob.update({
+      const batches = chunk(items, BULK_AI_BATCH_SIZE);
+
+      for (let i = 0; i < batches.length; i++) {
+        const batchItems = batches[i];
+
+        const result: BatchResult = await step.run(`batch-${i}`, async () => {
+          const currentJob = await prisma.bulkAiJob.findUnique({
             where: { id: jobId },
-            data: {
-              status: 'running',
-              startedAt: new Date(),
-              total: productCount + categoryCount + 1,
-            },
+            select: { status: true },
           });
-        });
-
-        if (!store) {
-          await prisma.bulkAiJob.update({
-            where: { id: jobId },
-            data: {
-              status: 'failed',
-              errorMessage: 'Store not found',
-              completedAt: new Date(),
-            },
-          });
-          return;
-        }
-
-        // Store-level SEO
-        if (force || needsSeo(store)) {
-          try {
-            const r = await callWithRetry(
-              () =>
-                AIService.suggestSeo({
-                  storeId,
-                  kind: 'store',
-                  storeName: store.name,
-                  storeNameAr: store.nameAr,
-                  entityName: store.name,
-                  entityNameAr: store.nameAr,
-                  entityDescription: store.description,
-                  entityDescriptionAr: store.descriptionAr,
-                }),
-              `seo:store:${storeId}`
-            );
-            await prisma.store.update({
-              where: { id: storeId },
-              data: {
-                metaTitle: store.metaTitle?.trim() || r.suggestion.title,
-                metaTitleAr: store.metaTitleAr?.trim() || r.suggestion.titleAr,
-                metaDescription: store.metaDescription?.trim() || r.suggestion.description,
-                metaDescriptionAr: store.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
-              },
-            });
-            filled++;
-            await sleep(THROTTLE_MS);
-          } catch (err) {
-            if (isAiQuotaCapError(err)) throw err;
-            await recordError({
-              entityKind: 'store',
-              entityId: storeId,
-              entityName: store.name,
-              error: err instanceof Error ? err.message : 'unknown',
-            });
+          if (currentJob?.status === 'cancelled') {
+            return {
+              processed: 0,
+              filled: 0,
+              skipped: 0,
+              failed: 0,
+              errors: [],
+              quotaReached: false,
+              cancelled: true,
+            };
           }
-        } else {
-          skipped++;
-        }
-        processed++;
 
-        await prisma.bulkAiJob.update({
-          where: { id: jobId },
-          data: { processed, filled, skipped, failed },
-        });
+          let bProcessed = 0;
+          let bFilled = 0;
+          let bSkipped = 0;
+          let bFailed = 0;
+          let bQuotaReached = false;
+          const bErrors: BulkError[] = [];
 
-        // Categories
-        const cats = await prisma.category.findMany({
-          where: { storeId, deletedAt: null },
-          select: {
-            id: true,
-            name: true,
-            nameAr: true,
-            description: true,
-            descriptionAr: true,
-            metaTitle: true,
-            metaTitleAr: true,
-            metaDescription: true,
-            metaDescriptionAr: true,
-          },
-        });
-        for (const c of cats) {
-          if (!force && !needsSeo(c)) {
-            skipped++;
-          } else {
-            try {
-              const r = await callWithRetry(
-                () =>
-                  AIService.suggestSeo({
-                    storeId,
-                    kind: 'category',
-                    storeName: store.name,
-                    storeNameAr: store.nameAr,
-                    entityName: c.name,
-                    entityNameAr: c.nameAr,
-                    entityDescription: c.description,
-                    entityDescriptionAr: c.descriptionAr,
-                  }),
-                `seo:category:${c.id}`
-              );
-              await prisma.category.update({
-                where: { id: c.id },
-                data: {
-                  metaTitle: c.metaTitle?.trim() || r.suggestion.title,
-                  metaTitleAr: c.metaTitleAr?.trim() || r.suggestion.titleAr,
-                  metaDescription: c.metaDescription?.trim() || r.suggestion.description,
-                  metaDescriptionAr: c.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
+          for (const item of batchItems) {
+            // Fresh per-item read — the idempotency re-check. Whichever
+            // entity kind, we re-derive its current SEO-completeness right
+            // before deciding whether to call Gemini.
+            if (item.kind === 'store') {
+              const s = await prisma.store.findUnique({
+                where: { id: item.id },
+                select: {
+                  name: true,
+                  nameAr: true,
+                  description: true,
+                  descriptionAr: true,
+                  metaTitle: true,
+                  metaTitleAr: true,
+                  metaDescription: true,
+                  metaDescriptionAr: true,
                 },
               });
-              filled++;
-              await sleep(THROTTLE_MS);
-            } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              await recordError({
-                entityKind: 'category',
-                entityId: c.id,
-                entityName: c.name,
-                error: err instanceof Error ? err.message : 'unknown',
-              });
-            }
-          }
-          processed++;
-        }
-
-        await prisma.bulkAiJob.update({
-          where: { id: jobId },
-          data: { processed, filled, skipped, failed, errors: errors as object },
-        });
-
-        // Products — page through to bound memory
-        const PAGE = 25;
-        let cursor: string | null = null;
-        while (true) {
-          const products: Array<{
-            id: string;
-            name: string;
-            nameAr: string | null;
-            description: string | null;
-            descriptionAr: string | null;
-            metaTitle: string | null;
-            metaTitleAr: string | null;
-            metaDescription: string | null;
-            metaDescriptionAr: string | null;
-            categories: Array<{ category: { name: string } }>;
-          }> = await prisma.product.findMany({
-            where: { storeId, deletedAt: null },
-            orderBy: { id: 'asc' },
-            take: PAGE,
-            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-            select: {
-              id: true,
-              name: true,
-              nameAr: true,
-              description: true,
-              descriptionAr: true,
-              metaTitle: true,
-              metaTitleAr: true,
-              metaDescription: true,
-              metaDescriptionAr: true,
-              categories: { include: { category: { select: { name: true } } } },
-            },
-          });
-          if (products.length === 0) break;
-
-          for (const p of products) {
-            // Cooperative cancellation — check every 5 products.
-            if (processed % 5 === 0 && processed > 0) {
-              const currentJob = await prisma.bulkAiJob.findUnique({
-                where: { id: jobId },
-                select: { status: true },
-              });
-              if (currentJob?.status === 'cancelled') {
-                logger.info(
-                  { jobId, storeId, processed, filled, skipped, failed },
-                  'bulk-ai-seo: cancelled by merchant'
-                );
-                break;
+              if (!s) {
+                bSkipped++;
+                bProcessed++;
+                continue;
               }
+              if (!force && !needsSeo(s)) {
+                bSkipped++;
+              } else {
+                try {
+                  const r = await callWithRetry(
+                    () =>
+                      AIService.suggestSeo({
+                        storeId,
+                        kind: 'store',
+                        storeName: s.name,
+                        storeNameAr: s.nameAr,
+                        entityName: s.name,
+                        entityNameAr: s.nameAr,
+                        entityDescription: s.description,
+                        entityDescriptionAr: s.descriptionAr,
+                      }),
+                    `seo:store:${storeId}`
+                  );
+                  await prisma.store.update({
+                    where: { id: storeId },
+                    data: {
+                      metaTitle: s.metaTitle?.trim() || r.suggestion.title,
+                      metaTitleAr: s.metaTitleAr?.trim() || r.suggestion.titleAr,
+                      metaDescription: s.metaDescription?.trim() || r.suggestion.description,
+                      metaDescriptionAr: s.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
+                    },
+                  });
+                  bFilled++;
+                  await sleep(THROTTLE_MS);
+                } catch (err) {
+                  if (isAiQuotaCapError(err)) {
+                    bQuotaReached = true;
+                    break;
+                  }
+                  bErrors.push({
+                    entityKind: 'store',
+                    entityId: storeId,
+                    entityName: s.name,
+                    error: err instanceof Error ? err.message : 'unknown',
+                  });
+                  bFailed++;
+                }
+              }
+              bProcessed++;
+              continue;
             }
 
+            if (item.kind === 'category') {
+              const c = await prisma.category.findUnique({
+                where: { id: item.id },
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                  description: true,
+                  descriptionAr: true,
+                  metaTitle: true,
+                  metaTitleAr: true,
+                  metaDescription: true,
+                  metaDescriptionAr: true,
+                },
+              });
+              if (!c) {
+                bSkipped++;
+                bProcessed++;
+                continue;
+              }
+              if (!force && !needsSeo(c)) {
+                bSkipped++;
+              } else {
+                try {
+                  const r = await callWithRetry(
+                    () =>
+                      AIService.suggestSeo({
+                        storeId,
+                        kind: 'category',
+                        storeName,
+                        storeNameAr,
+                        entityName: c.name,
+                        entityNameAr: c.nameAr,
+                        entityDescription: c.description,
+                        entityDescriptionAr: c.descriptionAr,
+                      }),
+                    `seo:category:${c.id}`
+                  );
+                  await prisma.category.update({
+                    where: { id: c.id },
+                    data: {
+                      metaTitle: c.metaTitle?.trim() || r.suggestion.title,
+                      metaTitleAr: c.metaTitleAr?.trim() || r.suggestion.titleAr,
+                      metaDescription: c.metaDescription?.trim() || r.suggestion.description,
+                      metaDescriptionAr: c.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
+                    },
+                  });
+                  bFilled++;
+                  await sleep(THROTTLE_MS);
+                } catch (err) {
+                  if (isAiQuotaCapError(err)) {
+                    bQuotaReached = true;
+                    break;
+                  }
+                  bErrors.push({
+                    entityKind: 'category',
+                    entityId: c.id,
+                    entityName: c.name,
+                    error: err instanceof Error ? err.message : 'unknown',
+                  });
+                  bFailed++;
+                }
+              }
+              bProcessed++;
+              continue;
+            }
+
+            // item.kind === 'product'
+            const p = await prisma.product.findUnique({
+              where: { id: item.id },
+              select: {
+                id: true,
+                name: true,
+                nameAr: true,
+                description: true,
+                descriptionAr: true,
+                metaTitle: true,
+                metaTitleAr: true,
+                metaDescription: true,
+                metaDescriptionAr: true,
+                categories: { include: { category: { select: { name: true } } } },
+              },
+            });
+            if (!p) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
             if (!force && !needsSeo(p)) {
-              skipped++;
+              bSkipped++;
             } else {
               try {
                 const r = await callWithRetry(
@@ -296,8 +351,8 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
                     AIService.suggestSeo({
                       storeId,
                       kind: 'product',
-                      storeName: store.name,
-                      storeNameAr: store.nameAr,
+                      storeName,
+                      storeNameAr,
                       entityName: p.name,
                       entityNameAr: p.nameAr,
                       entityDescription: p.description,
@@ -315,46 +370,74 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
                     metaDescriptionAr: p.metaDescriptionAr?.trim() || r.suggestion.descriptionAr,
                   },
                 });
-                filled++;
+                bFilled++;
                 // Throttle to stay under the free-tier 15 RPM. Only sleep
                 // after a real call — skipped entities pass through fast.
                 await sleep(THROTTLE_MS);
               } catch (err) {
-                if (isAiQuotaCapError(err)) throw err;
-                await recordError({
+                if (isAiQuotaCapError(err)) {
+                  bQuotaReached = true;
+                  break;
+                }
+                bErrors.push({
                   entityKind: 'product',
                   entityId: p.id,
                   entityName: p.name,
                   error: err instanceof Error ? err.message : 'unknown',
                 });
+                bFailed++;
               }
             }
-            processed++;
+            bProcessed++;
           }
 
-          cursor = products[products.length - 1].id;
+          return {
+            processed: bProcessed,
+            filled: bFilled,
+            skipped: bSkipped,
+            failed: bFailed,
+            errors: bErrors,
+            quotaReached: bQuotaReached,
+            cancelled: false,
+          };
+        });
 
-          await prisma.bulkAiJob.update({
+        processed += result.processed;
+        filled += result.filled;
+        skipped += result.skipped;
+        failed += result.failed;
+        for (const e of result.errors) {
+          if (errors.length < ERROR_CAP) errors.push(e);
+        }
+
+        await step.run(`progress-${i}`, () =>
+          prisma.bulkAiJob.update({
             where: { id: jobId },
             data: { processed, filled, skipped, failed, errors: errors as object },
-          });
+          })
+        );
 
-          if (products.length < PAGE) break;
+        if (result.cancelled) {
+          logger.info(
+            { jobId, storeId, processed, filled, skipped, failed },
+            'bulk-ai-seo: cancelled by merchant'
+          );
+          break;
         }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        quotaReached = true;
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            entityKind: 'store',
-            entityId: storeId,
-            entityName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
-          });
+        if (result.quotaReached) {
+          quotaReached = true;
+          if (errors.length < ERROR_CAP) {
+            errors.push({
+              entityKind: 'store',
+              entityId: storeId,
+              entityName: 'sweep',
+              error: 'AI quota cap reached',
+            });
+          }
+          break;
         }
       }
 
-      // Only mark completed if the merchant didn't cancel.
       const finalRow = await prisma.bulkAiJob.findUnique({
         where: { id: jobId },
         select: { status: true },
@@ -379,3 +462,4 @@ export const bulkAiSeo: InngestFunction.Any = inngest.createFunction(
     })(); // end runInTenantContext
   }
 );
+export const bulkAiSeo: InngestFunction.Any = bulkAiSeoFn;

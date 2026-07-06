@@ -7,6 +7,7 @@ import { callWithRetry } from '../ai-retry';
 import { inngest } from '../client';
 import { generateProductAltText } from '../../ai/product-alt-text-generator';
 import { AppError } from '../../../middleware/error-handler';
+import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 
 /**
  * Catalogue-wide image alt-text sweep (Gemini Vision).
@@ -29,6 +30,14 @@ import { AppError } from '../../../middleware/error-handler';
  * sweep's BulkAiJob shape): a product counts `filled` if at least one of
  * its images got a fresh alt, `skipped` if none needed one, `failed` if
  * every attempted image failed.
+ *
+ * PR2 — crash-resumable batching. The product id list is loaded ONCE inside
+ * `step.run('load-items', ...)`, then split into `BULK_AI_BATCH_SIZE`-sized
+ * batches, each processed inside its own `step.run(\`batch-${i}\`, ...)`. A
+ * crash mid-sweep resumes at the first unfinished batch. Each product's
+ * images are re-read fresh at batch-processing time (not the load-items
+ * snapshot) so a retried batch never re-spends a Vision call on an image
+ * already alt-filled by a prior attempt.
  */
 
 const ERROR_CAP = 50;
@@ -45,7 +54,24 @@ interface BulkError {
   error: string;
 }
 
-export const bulkAiImageAlt: InngestFunction.Any = inngest.createFunction(
+interface BatchResult {
+  processed: number;
+  filled: number;
+  skipped: number;
+  failed: number;
+  errors: BulkError[];
+  quotaReached: boolean;
+  cancelled: boolean;
+}
+
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type when the returned object mixes a plain string[]
+// with a richer array-of-objects sibling (the annotation widens the
+// contextual type fed into `createFunction`'s generics, and Jsonify then
+// collapses the string[] to `unknown[]`). Assigning to the annotated export
+// on a separate line avoids feeding the annotation back into inference.
+const bulkAiImageAltFn = inngest.createFunction(
   {
     id: 'bulk-ai-image-alt',
     name: 'Bulk: generate image alt-text across catalogue',
@@ -53,7 +79,7 @@ export const bulkAiImageAlt: InngestFunction.Any = inngest.createFunction(
     retries: 2,
     triggers: [{ event: 'bulk-ai/image-alt-requested' }],
   },
-  async ({ event }) => {
+  async ({ event, step }) => {
     const { jobId, storeId } = event.data as {
       jobId: string;
       storeId: string;
@@ -66,143 +92,208 @@ export const bulkAiImageAlt: InngestFunction.Any = inngest.createFunction(
     }
 
     return (async () => {
-      await prisma.bulkAiJob.update({
-        where: { id: jobId },
-        data: { status: 'running', startedAt: new Date() },
-      });
+      await step.run('mark-running', () =>
+        prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'running', startedAt: new Date() },
+        })
+      );
 
-      const errors: BulkError[] = [];
-      let filled = 0;
-      let skipped = 0;
-      let failed = 0;
-      let processed = 0;
-      let quotaReached = false;
+      const apiKey = config.googleAiKey;
+      if (!apiKey) {
+        throw new Error('AI_NOT_CONFIGURED: GOOGLE_GENERATIVE_AI_KEY missing');
+      }
 
-      try {
-        const apiKey = config.googleAiKey;
-        if (!apiKey) {
-          throw new Error('AI_NOT_CONFIGURED: GOOGLE_GENERATIVE_AI_KEY missing');
-        }
-
+      const productIds = await step.run('load-items', async () => {
         const products = await prisma.product.findMany({
           where: { storeId, status: 'active', deletedAt: null },
-          select: {
-            id: true,
-            name: true,
-            nameAr: true,
-            images: {
-              orderBy: { position: 'asc' },
-              take: IMAGES_PER_PRODUCT_CAP,
-              select: { id: true, url: true, alt: true },
-            },
-          },
+          select: { id: true },
         });
-
         await prisma.bulkAiJob.update({
           where: { id: jobId },
           data: { total: products.length },
         });
+        return products.map(p => p.id);
+      });
 
-        for (const product of products) {
-          if (processed % 5 === 0 && processed > 0) {
-            const currentJob = await prisma.bulkAiJob.findUnique({
-              where: { id: jobId },
-              select: { status: true },
-            });
-            if (currentJob?.status === 'cancelled') {
-              logger.info(
-                { jobId, storeId, processed, filled, skipped, failed },
-                'bulk-ai-image-alt: cancelled by merchant'
-              );
-              break;
-            }
-          }
+      const batches = chunk(productIds, BULK_AI_BATCH_SIZE);
 
-          const missingAlt = product.images.filter(img => !img.alt?.trim());
-          if (missingAlt.length === 0) {
-            skipped++;
-            processed++;
-            if (processed % 10 === 0 || processed === products.length) {
-              await prisma.bulkAiJob.update({
-                where: { id: jobId },
-                data: { processed, filled, skipped, failed, errors: errors as object },
-              });
-            }
-            continue;
-          }
+      const errors: BulkError[] = [];
+      let processed = 0;
+      let filled = 0;
+      let skipped = 0;
+      let failed = 0;
+      let quotaReached = false;
 
-          let productFilled = 0;
-          let productFailed = 0;
+      for (let i = 0; i < batches.length; i++) {
+        const batchIds = batches[i];
 
-          for (const image of missingAlt) {
-            try {
-              await assertAiQuota();
-
-              const alt = await callWithRetry(
-                () =>
-                  generateProductAltText(
-                    {
-                      storeId,
-                      imageUrl: image.url,
-                      product: { name: product.name, nameAr: product.nameAr },
-                    },
-                    apiKey,
-                    MODEL
-                  ),
-                `image-alt:${image.id}`
-              );
-
-              await prisma.productImage.update({
-                where: { id: image.id },
-                data: { alt },
-              });
-              productFilled++;
-            } catch (err) {
-              if (isAiQuotaCapError(err)) {
-                logger.warn({ storeId, jobId }, 'bulk-ai-image-alt: quota cap hit, aborting sweep');
-                processed++;
-                throw err;
-              }
-              if (errors.length < ERROR_CAP) {
-                errors.push({
-                  entityKind: 'product',
-                  entityId: product.id,
-                  entityName: product.name,
-                  error:
-                    err instanceof AppError
-                      ? err.message
-                      : 'AI request failed — please try again shortly.',
-                });
-              }
-              productFailed++;
-            }
-
-            await sleep(THROTTLE_MS);
-          }
-
-          if (productFilled > 0) filled++;
-          else if (productFailed > 0) failed++;
-          else skipped++;
-
-          processed++;
-
-          if (processed % 10 === 0 || processed === products.length) {
-            await prisma.bulkAiJob.update({
-              where: { id: jobId },
-              data: { processed, filled, skipped, failed, errors: errors as object },
-            });
-          }
-        }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        quotaReached = true;
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            entityKind: 'product',
-            entityId: storeId,
-            entityName: 'sweep',
-            error: err instanceof AppError ? err.message : 'AI quota cap reached',
+        const result: BatchResult = await step.run(`batch-${i}`, async () => {
+          const currentJob = await prisma.bulkAiJob.findUnique({
+            where: { id: jobId },
+            select: { status: true },
           });
+          if (currentJob?.status === 'cancelled') {
+            return {
+              processed: 0,
+              filled: 0,
+              skipped: 0,
+              failed: 0,
+              errors: [],
+              quotaReached: false,
+              cancelled: true,
+            };
+          }
+
+          // Fresh per-batch read of each product's images — the idempotency
+          // re-check. Images already alt-filled by a prior partial attempt
+          // (this batch retried, or the per-product endpoint) drop out of
+          // `missingAlt` naturally.
+          const items = await prisma.product.findMany({
+            where: { id: { in: batchIds } },
+            select: {
+              id: true,
+              name: true,
+              nameAr: true,
+              images: {
+                orderBy: { position: 'asc' },
+                take: IMAGES_PER_PRODUCT_CAP,
+                select: { id: true, url: true, alt: true },
+              },
+            },
+          });
+          const byId = new Map(items.map(p => [p.id, p]));
+
+          let bProcessed = 0;
+          let bFilled = 0;
+          let bSkipped = 0;
+          let bFailed = 0;
+          let bQuotaReached = false;
+          const bErrors: BulkError[] = [];
+
+          outer: for (const id of batchIds) {
+            const product = byId.get(id);
+            if (!product) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
+
+            const missingAlt = product.images.filter(img => !img.alt?.trim());
+            if (missingAlt.length === 0) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
+
+            let productFilled = 0;
+            let productFailed = 0;
+
+            for (const image of missingAlt) {
+              try {
+                await assertAiQuota();
+
+                const alt = await callWithRetry(
+                  () =>
+                    generateProductAltText(
+                      {
+                        storeId,
+                        imageUrl: image.url,
+                        product: { name: product.name, nameAr: product.nameAr },
+                      },
+                      apiKey,
+                      MODEL
+                    ),
+                  `image-alt:${image.id}`
+                );
+
+                await prisma.productImage.update({
+                  where: { id: image.id },
+                  data: { alt },
+                });
+                productFilled++;
+              } catch (err) {
+                if (isAiQuotaCapError(err)) {
+                  logger.warn(
+                    { storeId, jobId },
+                    'bulk-ai-image-alt: quota cap hit, aborting sweep'
+                  );
+                  bQuotaReached = true;
+                  // Tally whatever this product accomplished before the abort,
+                  // matching the pre-batch semantics of not counting the
+                  // in-flight image, then stop the whole batch.
+                  if (productFilled > 0) bFilled++;
+                  else if (productFailed > 0) bFailed++;
+                  break outer;
+                }
+                if (bErrors.length < ERROR_CAP) {
+                  bErrors.push({
+                    entityKind: 'product',
+                    entityId: product.id,
+                    entityName: product.name,
+                    error:
+                      err instanceof AppError
+                        ? err.message
+                        : 'AI request failed — please try again shortly.',
+                  });
+                }
+                productFailed++;
+              }
+
+              await sleep(THROTTLE_MS);
+            }
+
+            if (productFilled > 0) bFilled++;
+            else if (productFailed > 0) bFailed++;
+            else bSkipped++;
+
+            bProcessed++;
+          }
+
+          return {
+            processed: bProcessed,
+            filled: bFilled,
+            skipped: bSkipped,
+            failed: bFailed,
+            errors: bErrors,
+            quotaReached: bQuotaReached,
+            cancelled: false,
+          };
+        });
+
+        processed += result.processed;
+        filled += result.filled;
+        skipped += result.skipped;
+        failed += result.failed;
+        for (const e of result.errors) {
+          if (errors.length < ERROR_CAP) errors.push(e);
+        }
+
+        await step.run(`progress-${i}`, () =>
+          prisma.bulkAiJob.update({
+            where: { id: jobId },
+            data: { processed, filled, skipped, failed, errors: errors as object },
+          })
+        );
+
+        if (result.cancelled) {
+          logger.info(
+            { jobId, storeId, processed, filled, skipped, failed },
+            'bulk-ai-image-alt: cancelled by merchant'
+          );
+          break;
+        }
+        if (result.quotaReached) {
+          quotaReached = true;
+          if (errors.length < ERROR_CAP) {
+            errors.push({
+              entityKind: 'product',
+              entityId: storeId,
+              entityName: 'sweep',
+              error: 'AI quota cap reached',
+            });
+          }
+          break;
         }
       }
 
@@ -230,3 +321,4 @@ export const bulkAiImageAlt: InngestFunction.Any = inngest.createFunction(
     })();
   }
 );
+export const bulkAiImageAlt: InngestFunction.Any = bulkAiImageAltFn;

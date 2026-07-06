@@ -10,6 +10,7 @@ import { sanitizeJsonControlChars } from '../../ai/parse-ai-json';
 import { rethrowAsAppError } from '../../ai/gemini-errors';
 import { recordUsage } from '../../../services/ai.service';
 import { AppError } from '../../../middleware/error-handler';
+import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -22,8 +23,8 @@ const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.'
  * Three Inngest functions registered here:
  *   bulk-ai-faq-aeo      — draft up to 8 store-level FAQ items
  *   bulk-ai-howto-aeo    — draft up to 3 HowTo guides
- *   bulk-ai-meta-aeo     — rewrite store + product meta descriptions
- *                          in conversational direct-answer style
+ *   bulk-ai-meta-aeo     — rewrite store + product + category meta
+ *                          descriptions in conversational direct-answer style
  *
  * All three follow the same patterns as bulk-ai-seo and
  * bulk-ai-translate:
@@ -32,6 +33,19 @@ const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.'
  *   - Cap error list at 50 so no single run bloats the row unboundedly
  *   - Mark BulkAiJob completed regardless — quotaReached is surfaced
  *     via the error list so the merchant sees actionable feedback
+ *
+ * PR2 — crash-resumable steps. `bulk-ai-faq-aeo` / `bulk-ai-howto-aeo` each
+ * make a SINGLE Gemini call for the whole store (count is small, 3-8 items)
+ * — there's nothing to batch, so the whole fetch+generate+persist body is
+ * wrapped in one `step.run('generate-and-persist', ...)`: if the function
+ * crashes AFTER that step completes (e.g. during the final job-completion
+ * write), a retry skips straight past it instead of re-spending the Gemini
+ * call. `bulk-ai-meta-aeo` DOES loop over every product + category, so it
+ * gets full batching: `step.run('load-items', ...)` loads a stable
+ * `{kind, id}` work-item list, split into `BULK_AI_BATCH_SIZE`-sized
+ * batches, each processed inside its own `step.run(\`batch-${i}\`, ...)` —
+ * a crash mid-sweep resumes at the first unfinished batch, and each item's
+ * current AEO field is re-read fresh at batch time (idempotency re-check).
  */
 
 // -----------------------------------------------------------------------
@@ -103,7 +117,9 @@ function stripFences(text: string): string {
  *
  * The whole operation is a no-op when the link is already correctly
  * configured (enabled + present), so re-running the sweep doesn't
- * re-toggle anything. Safe to call on every sweep completion.
+ * re-toggle anything. Safe to call on every sweep completion (including
+ * a memoized-step retry — it's a plain idempotent read+conditional-write,
+ * not a Gemini call).
  */
 async function ensureFooterSupportLinkEnabled(
   storeId: string,
@@ -134,9 +150,6 @@ async function ensureFooterSupportLinkEnabled(
     let mutated = false;
 
     if (existingIdx >= 0) {
-      // Patch in place: enable the entry, and backfill nameAr if missing
-      // (older stores have entries without it — without nameAr the AR
-      // storefront falls back to the English label).
       const current = support[existingIdx];
       const needsEnable = current?.enabled !== true;
       const needsNameAr = !current?.nameAr;
@@ -170,9 +183,6 @@ async function ensureFooterSupportLinkEnabled(
       'bulk-ai-aeo: enabled footer support link after content sweep'
     );
   } catch (err) {
-    // Never block the sweep result on a settings update — log + move on.
-    // The sweep itself succeeded; the worst case here is the link stays
-    // hidden until the merchant toggles it manually.
     logger.warn(
       { err, storeId, href },
       'bulk-ai-aeo: failed to auto-enable footer link (sweep still succeeded)'
@@ -205,11 +215,25 @@ export interface DraftedHowTo {
   stepsAr: HowToStep[];
 }
 
+interface AeoErr {
+  entityKind: string;
+  entityId: string;
+  entityName: string;
+  error: string;
+}
+
 // -----------------------------------------------------------------------
 // bulk-ai-faq-aeo — draft store-level FAQ items
 // -----------------------------------------------------------------------
 
-export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type for object literals mixing a plain string[] with
+// a richer array-of-objects sibling (the annotation widens the contextual
+// type fed into `createFunction`'s generics, and Jsonify then collapses the
+// string[] to `unknown[]`). Assigning to the annotated export on a separate
+// line avoids feeding the annotation back into inference.
+const bulkAiFaqAeoFn = inngest.createFunction(
   {
     id: 'bulk-ai-faq-aeo',
     name: 'Bulk: draft AEO FAQ items for a store',
@@ -217,7 +241,7 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
     retries: 2,
     triggers: [{ event: 'bulk-ai/faq-aeo-requested' }],
   },
-  async ({ event }) => {
+  async ({ event, step }) => {
     const {
       jobId,
       storeId,
@@ -234,25 +258,50 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
       return;
     }
 
-    // Wrap entire sweep in runInTenantContext — Inngest workers run without
-    // HTTP tenant context, so FORCE RLS would return 0 rows on every query.
     return (async () => {
-      const errors: Array<{
-        entityKind: string;
-        entityId: string;
-        entityName: string;
-        error: string;
-      }> = [];
-      let filled = 0;
-      let skipped = 0;
-      let failed = 0;
-      let quotaReached = false;
-
-      try {
-        await prisma.bulkAiJob.update({
+      await step.run('mark-running', () =>
+        prisma.bulkAiJob.update({
           where: { id: jobId },
-          data: { status: 'running', startedAt: new Date(), total: count },
-        });
+          data: { status: 'running', startedAt: new Date(), total: count, force },
+        })
+      );
+
+      const result = await runFaqAeoStep();
+      async function runFaqAeoStep(): Promise<{
+        notFound: boolean;
+        filled: number;
+        skipped: number;
+        failed: number;
+        errors: AeoErr[];
+        quotaReached?: boolean;
+      }> {
+        try {
+          return await step.run('generate-and-persist', () => generateAndPersistFaqs());
+        } catch (err) {
+          if (!isAiQuotaCapError(err)) throw err;
+          return {
+            notFound: false,
+            filled: 0,
+            skipped: 0,
+            failed: 0,
+            errors: [
+              {
+                entityKind: 'store',
+                entityId: storeId,
+                entityName: 'sweep',
+                error: err instanceof AppError ? err.message : 'AI quota cap reached',
+              },
+            ],
+            quotaReached: true,
+          };
+        }
+      }
+
+      async function generateAndPersistFaqs() {
+        const errors: AeoErr[] = [];
+        let filled = 0;
+        let skipped = 0;
+        let failed = 0;
 
         const [store, sampleCats, sampleProds, paymentConfigs] = await Promise.all([
           prisma.store.findUnique({
@@ -276,14 +325,9 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
         ]);
 
         if (!store) {
-          await prisma.bulkAiJob.update({
-            where: { id: jobId },
-            data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
-          });
-          return;
+          return { notFound: true, filled, skipped, failed, errors };
         }
 
-        // Fetch existing FAQs so we can smart-skip duplicates / locked entries.
         const existingFaqs = await prisma.storeFaq.findMany({
           where: { storeId },
           select: { question: true, manuallyEdited: true, orderIndex: true },
@@ -291,9 +335,8 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
         const lockedQuestions = new Set(
           existingFaqs.filter(f => f.manuallyEdited).map(f => f.question.trim().toLowerCase())
         );
-        const maxOrder = existingFaqs.reduce((m, f) => Math.max(m, f.orderIndex), -1);
+        let maxOrder = existingFaqs.reduce((m, f) => Math.max(m, f.orderIndex), -1);
 
-        // Build prompt
         const catNames = sampleCats.map(c => c.name).join(', ') || 'none';
         const prodNames =
           sampleProds
@@ -301,19 +344,6 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
             .join(', ')
             .slice(0, 500) || 'none';
 
-        // Resolve the customer-facing payment methods this store actually
-        // supports. The previous hardcoded "(KNET, Tap, MyFatoorah, cash on
-        // delivery)" mixed customer methods with gateway company names and
-        // produced answers like "We accept payment through Tap and
-        // MyFatoorah" — meaningless to a shopper, since Tap / MyFatoorah
-        // are the back-end processors, not what they tap on the checkout
-        // page. Customers want method names: KNET, Visa, Mastercard, Apple
-        // Pay, Cash on Delivery.
-        //
-        // PROVIDER_METHODS holds the per-gateway default method set for
-        // Kuwait. Falls back to this when `paymentConfig.supportedMethods`
-        // is empty (most stores leave it unset and rely on the gateway's
-        // default).
         const PROVIDER_METHODS: Record<string, string[]> = {
           tap: ['KNET', 'Visa', 'Mastercard', 'Apple Pay'],
           myfatoorah: ['KNET', 'Visa', 'Mastercard', 'Apple Pay'],
@@ -330,14 +360,10 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
         const paymentMethodsList =
           methodSet.size > 0 ? Array.from(methodSet).join(', ') : 'cash on delivery';
 
-        // When force=true, delete existing AI-drafted FAQs so we regenerate
-        // them cleanly. Manually-edited entries are always preserved.
         if (force) {
           await prisma.storeFaq.deleteMany({
             where: { storeId, manuallyEdited: false },
           });
-          // Re-fetch locked questions after deletion so the loop below
-          // doesn't conflict with any stale state.
           const reloadedFaqs = await prisma.storeFaq.findMany({
             where: { storeId },
             select: { question: true, manuallyEdited: true, orderIndex: true },
@@ -346,6 +372,7 @@ export const bulkAiFaqAeo: InngestFunction.Any = inngest.createFunction(
           for (const f of reloadedFaqs) {
             if (f.manuallyEdited) lockedQuestions.add(f.question.trim().toLowerCase());
           }
+          maxOrder = reloadedFaqs.reduce((m, f) => Math.max(m, f.orderIndex), -1);
           logger.info({ jobId, storeId }, 'bulk-ai-faq-aeo: cleared non-manual FAQs (force=true)');
         }
 
@@ -382,11 +409,11 @@ No other text, no markdown code fences — pure JSON only.`;
 
         let drafted: DraftedFaq[] = [];
         try {
-          const result = await callWithRetry(
+          const genResult = await callWithRetry(
             () => model.generateContent(prompt),
             `faq-aeo:${storeId}`
           ).catch((err: unknown) => rethrowAsAppError(err, 'AI FAQ AEO sweep failed'));
-          const usage = result.response.usageMetadata;
+          const usage = genResult.response.usageMetadata;
           await recordUsage(
             storeId,
             'aeo',
@@ -394,7 +421,7 @@ No other text, no markdown code fences — pure JSON only.`;
             usage?.candidatesTokenCount ?? 0,
             false
           );
-          const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
+          const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
           const parsed = JSON.parse(raw);
           if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
           drafted = parsed.slice(0, count);
@@ -414,15 +441,12 @@ No other text, no markdown code fences — pure JSON only.`;
 
         await sleep(THROTTLE_MS);
 
-        // Persist drafted FAQs (smart-skip locked questions)
         let orderCursor = maxOrder;
         for (const f of drafted) {
-          // Validate required fields — Gemini occasionally drops a field
           if (!f.question?.trim() || !f.answer?.trim()) {
             skipped++;
             continue;
           }
-          // Smart-skip: never overwrite a manually-edited entry
           if (lockedQuestions.has(f.question.trim().toLowerCase())) {
             skipped++;
             continue;
@@ -454,20 +478,20 @@ No other text, no markdown code fences — pure JSON only.`;
             failed++;
           }
         }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        quotaReached = true;
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            entityKind: 'store',
-            entityId: storeId,
-            entityName: 'sweep',
-            error: err instanceof AppError ? err.message : 'AI quota cap reached',
-          });
-        }
+
+        return { notFound: false, filled, skipped, failed, errors };
       }
 
-      // Only mark completed if the merchant didn't cancel.
+      if (result.notFound) {
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        });
+        return;
+      }
+
+      const quotaReached = 'quotaReached' in result && result.quotaReached === true;
+
       const faqFinalRow = await prisma.bulkAiJob.findUnique({
         where: { id: jobId },
         select: { status: true },
@@ -476,35 +500,47 @@ No other text, no markdown code fences — pure JSON only.`;
         where: { id: jobId },
         data: {
           status: faqFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed: filled + skipped + failed,
-          filled,
-          skipped,
-          failed,
-          errors: errors as object,
+          processed: result.filled + result.skipped + result.failed,
+          filled: result.filled,
+          skipped: result.skipped,
+          failed: result.failed,
+          errors: result.errors as object,
           completedAt: new Date(),
         },
       });
 
-      // Surface the new content: enable /faq in the footer support column.
-      // Only fires when this sweep actually wrote a row — re-running on an
-      // already-populated store is a no-op via the smart-skip path.
-      if (filled > 0) {
+      if (result.filled > 0) {
         await ensureFooterSupportLinkEnabled(storeId, '/faq', 'FAQ', 'الأسئلة الشائعة');
       }
 
       logger.info(
-        { jobId, storeId, filled, skipped, failed, quotaReached },
+        {
+          jobId,
+          storeId,
+          filled: result.filled,
+          skipped: result.skipped,
+          failed: result.failed,
+          quotaReached,
+        },
         'bulk-ai-faq-aeo complete'
       );
     })(); // end runInTenantContext
   }
 );
+export const bulkAiFaqAeo: InngestFunction.Any = bulkAiFaqAeoFn;
 
 // -----------------------------------------------------------------------
 // bulk-ai-howto-aeo — draft HowTo guides
 // -----------------------------------------------------------------------
 
-export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type for object literals mixing a plain string[] with
+// a richer array-of-objects sibling (the annotation widens the contextual
+// type fed into `createFunction`'s generics, and Jsonify then collapses the
+// string[] to `unknown[]`). Assigning to the annotated export on a separate
+// line avoids feeding the annotation back into inference.
+const bulkAiHowtoAeoFn = inngest.createFunction(
   {
     id: 'bulk-ai-howto-aeo',
     name: 'Bulk: draft AEO HowTo guides for a store',
@@ -512,7 +548,7 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
     retries: 2,
     triggers: [{ event: 'bulk-ai/howto-aeo-requested' }],
   },
-  async ({ event }) => {
+  async ({ event, step }) => {
     const {
       jobId,
       storeId,
@@ -530,22 +566,49 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
     }
 
     return (async () => {
-      const errors: Array<{
-        entityKind: string;
-        entityId: string;
-        entityName: string;
-        error: string;
-      }> = [];
-      let filled = 0;
-      let skipped = 0;
-      let failed = 0;
-      let quotaReached = false;
-
-      try {
-        await prisma.bulkAiJob.update({
+      await step.run('mark-running', () =>
+        prisma.bulkAiJob.update({
           where: { id: jobId },
-          data: { status: 'running', startedAt: new Date(), total: count },
-        });
+          data: { status: 'running', startedAt: new Date(), total: count, force },
+        })
+      );
+
+      const result = await runHowtoAeoStep();
+      async function runHowtoAeoStep(): Promise<{
+        notFound: boolean;
+        filled: number;
+        skipped: number;
+        failed: number;
+        errors: AeoErr[];
+        quotaReached?: boolean;
+      }> {
+        try {
+          return await step.run('generate-and-persist', () => generateAndPersistHowtos());
+        } catch (err) {
+          if (!isAiQuotaCapError(err)) throw err;
+          return {
+            notFound: false,
+            filled: 0,
+            skipped: 0,
+            failed: 0,
+            errors: [
+              {
+                entityKind: 'store',
+                entityId: storeId,
+                entityName: 'sweep',
+                error: err instanceof AppError ? err.message : 'AI quota cap reached',
+              },
+            ],
+            quotaReached: true,
+          };
+        }
+      }
+
+      async function generateAndPersistHowtos() {
+        const errors: AeoErr[] = [];
+        let filled = 0;
+        let skipped = 0;
+        let failed = 0;
 
         const [store, sampleCats, sampleProds] = await Promise.all([
           prisma.store.findUnique({
@@ -565,15 +628,9 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
         ]);
 
         if (!store) {
-          await prisma.bulkAiJob.update({
-            where: { id: jobId },
-            data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
-          });
-          return;
+          return { notFound: true, filled, skipped, failed, errors };
         }
 
-        // Smart-skip: don't re-draft a HowTo with the same title as an existing
-        // manually-edited one.
         const existingHowtos = await prisma.storeHowto.findMany({
           where: { storeId },
           select: { title: true, manuallyEdited: true, orderIndex: true },
@@ -581,15 +638,12 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
         const lockedTitles = new Set(
           existingHowtos.filter(h => h.manuallyEdited).map(h => h.title.trim().toLowerCase())
         );
-        const maxOrder = existingHowtos.reduce((m, h) => Math.max(m, h.orderIndex), -1);
+        let maxOrder = existingHowtos.reduce((m, h) => Math.max(m, h.orderIndex), -1);
 
-        // When force=true, delete existing AI-drafted HowTos so we regenerate
-        // them cleanly. Manually-edited entries are always preserved.
         if (force) {
           await prisma.storeHowto.deleteMany({
             where: { storeId, manuallyEdited: false },
           });
-          // Re-fetch locked titles after deletion.
           const reloadedHowtos = await prisma.storeHowto.findMany({
             where: { storeId },
             select: { title: true, manuallyEdited: true, orderIndex: true },
@@ -598,6 +652,7 @@ export const bulkAiHowtoAeo: InngestFunction.Any = inngest.createFunction(
           for (const h of reloadedHowtos) {
             if (h.manuallyEdited) lockedTitles.add(h.title.trim().toLowerCase());
           }
+          maxOrder = reloadedHowtos.reduce((m, h) => Math.max(m, h.orderIndex), -1);
           logger.info(
             { jobId, storeId },
             'bulk-ai-howto-aeo: cleared non-manual HowTos (force=true)'
@@ -648,11 +703,11 @@ No markdown, no code fences — pure JSON only.`;
 
         let drafted: DraftedHowTo[] = [];
         try {
-          const result = await callWithRetry(
+          const genResult = await callWithRetry(
             () => model.generateContent(prompt),
             `howto-aeo:${storeId}`
           ).catch((err: unknown) => rethrowAsAppError(err, 'AI HowTo AEO sweep failed'));
-          const usage = result.response.usageMetadata;
+          const usage = genResult.response.usageMetadata;
           await recordUsage(
             storeId,
             'aeo',
@@ -660,7 +715,7 @@ No markdown, no code fences — pure JSON only.`;
             usage?.candidatesTokenCount ?? 0,
             false
           );
-          const raw = sanitizeJsonControlChars(stripFences(result.response.text()));
+          const raw = sanitizeJsonControlChars(stripFences(genResult.response.text()));
           const parsed = JSON.parse(raw);
           if (!Array.isArray(parsed)) throw new Error('Gemini returned non-array');
           drafted = parsed.slice(0, count);
@@ -724,20 +779,20 @@ No markdown, no code fences — pure JSON only.`;
             failed++;
           }
         }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        quotaReached = true;
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            entityKind: 'store',
-            entityId: storeId,
-            entityName: 'sweep',
-            error: err instanceof AppError ? err.message : 'AI quota cap reached',
-          });
-        }
+
+        return { notFound: false, filled, skipped, failed, errors };
       }
 
-      // Only mark completed if the merchant didn't cancel.
+      if (result.notFound) {
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        });
+        return;
+      }
+
+      const quotaReached = 'quotaReached' in result && result.quotaReached === true;
+
       const howtoFinalRow = await prisma.bulkAiJob.findUnique({
         where: { id: jobId },
         select: { status: true },
@@ -746,20 +801,16 @@ No markdown, no code fences — pure JSON only.`;
         where: { id: jobId },
         data: {
           status: howtoFinalRow?.status === 'cancelled' ? 'cancelled' : 'completed',
-          processed: filled + skipped + failed,
-          filled,
-          skipped,
-          failed,
-          errors: errors as object,
+          processed: result.filled + result.skipped + result.failed,
+          filled: result.filled,
+          skipped: result.skipped,
+          failed: result.failed,
+          errors: result.errors as object,
           completedAt: new Date(),
         },
       });
 
-      // Surface the new content: ensure /how-to-guides is in the footer
-      // support column AND enabled. For pre-2026-05-13 stores the entry
-      // doesn't exist at all — the helper appends it. For newer stores
-      // it just flips the existing entry's enabled flag.
-      if (filled > 0) {
+      if (result.filled > 0) {
         await ensureFooterSupportLinkEnabled(
           storeId,
           '/how-to-guides',
@@ -769,40 +820,54 @@ No markdown, no code fences — pure JSON only.`;
       }
 
       logger.info(
-        { jobId, storeId, filled, skipped, failed, quotaReached },
+        {
+          jobId,
+          storeId,
+          filled: result.filled,
+          skipped: result.skipped,
+          failed: result.failed,
+          quotaReached,
+        },
         'bulk-ai-howto-aeo complete'
       );
     })(); // end runInTenantContext
   }
 );
+export const bulkAiHowtoAeo: InngestFunction.Any = bulkAiHowtoAeoFn;
 
 // -----------------------------------------------------------------------
 // bulk-ai-meta-aeo — rewrite meta descriptions in conversational style
 // -----------------------------------------------------------------------
 
+type MetaWorkItem = { kind: 'store' | 'category' | 'product'; id: string };
+
+interface MetaBatchResult {
+  processed: number;
+  filled: number;
+  skipped: number;
+  failed: number;
+  errors: AeoErr[];
+  quotaReached: boolean;
+  cancelled: boolean;
+}
+
 /**
- * Rewrites metaDescription (store + products) to answer "What is X?"
- * style questions that answer engines like Perplexity or Google AI
- * Overview surface. Preserves the metaTitle and fills empty
- * metaDescriptionAr when the English rewrite was applied.
+ * Rewrites metaDescriptionAeo (store + products + categories) to answer
+ * "What is X?" style questions that answer engines like Perplexity or
+ * Google AI Overview surface.
  *
- * Smart-skip rule:
- *   - Skip any product / store row where metaDescription starts with a
- *     value that looks like a manual edit. We detect this by checking
- *     whether the row's AiUsage history shows feature='meta_aeo' AND
- *     the meta fields have changed since. Instead of that complexity
- *     we simply re-run only rows where metaDescription is empty
- *     (missing entirely) OR where it was previously AI-drafted
- *     (no manual_meta flag exists yet — we use the presence of a
- *     non-empty metaDescription that doesn't look conversational as
- *     a signal to skip rather than stomp).
- *
- * Conservative default: only fill EMPTY metaDescription fields so
- * we never stomp on a merchant who has written a custom one. A
- * merchant who wants AEO rewrites on pre-existing meta can delete
- * and re-run, or use the per-entity SEO form.
+ * Conservative default: only fill EMPTY metaDescriptionAeo fields so we
+ * never stomp on a merchant who has written a custom one. `force` bypasses
+ * the skip.
  */
-export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type for object literals mixing a plain string[] with
+// a richer array-of-objects sibling (the annotation widens the contextual
+// type fed into `createFunction`'s generics, and Jsonify then collapses the
+// string[] to `unknown[]`). Assigning to the annotated export on a separate
+// line avoids feeding the annotation back into inference.
+const bulkAiMetaAeoFn = inngest.createFunction(
   {
     id: 'bulk-ai-meta-aeo',
     name: 'Bulk: rewrite meta descriptions in conversational AEO style',
@@ -810,7 +875,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
     retries: 2,
     triggers: [{ event: 'bulk-ai/meta-aeo-requested' }],
   },
-  async ({ event }) => {
+  async ({ event, step }) => {
     const {
       jobId,
       storeId,
@@ -826,290 +891,275 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
     }
 
     return (async () => {
-      const errors: Array<{
-        entityKind: string;
-        entityId: string;
-        entityName: string;
-        error: string;
-      }> = [];
+      await step.run('mark-running', () =>
+        prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'running', startedAt: new Date(), force },
+        })
+      );
+
+      const items: MetaWorkItem[] = await step.run('load-items', async () => {
+        const store = await prisma.store.findUnique({
+          where: { id: storeId },
+          select: { id: true },
+        });
+        if (!store) return [];
+
+        const products = await prisma.product.findMany({
+          where: { storeId, deletedAt: null },
+          select: { id: true },
+        });
+        const cats = await prisma.category.findMany({
+          where: { storeId, deletedAt: null },
+          select: { id: true },
+        });
+
+        const work: MetaWorkItem[] = [
+          { kind: 'store', id: storeId },
+          ...products.map(p => ({ kind: 'product' as const, id: p.id })),
+          ...cats.map(c => ({ kind: 'category' as const, id: c.id })),
+        ];
+
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { total: work.length },
+        });
+
+        return work;
+      });
+
+      if (items.length === 0) {
+        await prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+        });
+        return;
+      }
+
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { name: true },
+      });
+      const storeName = store?.name ?? storeId;
+
+      const batches = chunk(items, BULK_AI_BATCH_SIZE);
+
+      const errors: AeoErr[] = [];
+      let processed = 0;
       let filled = 0;
       let skipped = 0;
       let failed = 0;
-      let processed = 0;
       let quotaReached = false;
 
-      try {
-        // Count to set total for progress bar — we now write to the AEO
-        // columns specifically, so the "needs work" predicate is
-        // `metaDescriptionAeo is null`, not `metaDescription is null`.
-        const [productCount, categoryCount] = await Promise.all([
-          prisma.product.count({ where: { storeId, deletedAt: null, metaDescriptionAeo: null } }),
-          prisma.category.count({ where: { storeId, deletedAt: null, metaDescriptionAeo: null } }),
-        ]);
+      for (let i = 0; i < batches.length; i++) {
+        const batchItems = batches[i];
 
-        await prisma.bulkAiJob.update({
-          where: { id: jobId },
-          data: {
-            status: 'running',
-            startedAt: new Date(),
-            total: productCount + categoryCount + 1, // +1 for the store row
-          },
-        });
-
-        const store = await prisma.store.findUnique({
-          where: { id: storeId },
-          select: {
-            name: true,
-            nameAr: true,
-            description: true,
-            metaDescriptionAeo: true,
-            metaDescriptionAeoAr: true,
-          },
-        });
-
-        if (!store) {
-          await prisma.bulkAiJob.update({
+        const result: MetaBatchResult = await step.run(`batch-${i}`, async () => {
+          const currentJob = await prisma.bulkAiJob.findUnique({
             where: { id: jobId },
-            data: { status: 'failed', errorMessage: 'Store not found', completedAt: new Date() },
+            select: { status: true },
           });
-          return;
-        }
+          if (currentJob?.status === 'cancelled') {
+            return {
+              processed: 0,
+              filled: 0,
+              skipped: 0,
+              failed: 0,
+              errors: [],
+              quotaReached: false,
+              cancelled: true,
+            };
+          }
 
-        const genAI = getGenAI();
+          const genAI = getGenAI();
+          const model = genAI.getGenerativeModel({
+            model: MODEL,
+            generationConfig: { responseMimeType: 'application/json' },
+          });
 
-        // ---- Store-level meta ----
-        // Writes to metaDescriptionAeo / metaDescriptionAeoAr (NOT the SEO
-        // columns). Skip only if the dedicated AEO field is already
-        // populated — so running the SEO sweep first no longer locks AEO
-        // out of every row. Merchant clears the AEO column from admin if
-        // they want a re-run.  When force=true, bypass the skip entirely.
-        if (force || !store.metaDescriptionAeo?.trim()) {
-          try {
-            await assertAiQuota();
+          let bProcessed = 0;
+          let bFilled = 0;
+          let bSkipped = 0;
+          let bFailed = 0;
+          let bQuotaReached = false;
+          const bErrors: AeoErr[] = [];
 
-            const model = genAI.getGenerativeModel({
-              model: MODEL,
-              generationConfig: { responseMimeType: 'application/json' },
-            });
-
-            const prompt = buildMetaPrompt('store', store.name, store.description ?? '');
-            const result = await callWithRetry(
-              () => model.generateContent(prompt),
-              `meta-aeo:store:${storeId}`
-            ).catch((err: unknown) => rethrowAsAppError(err, 'AI store meta AEO sweep failed'));
-            const usage = result.response.usageMetadata;
-            await recordUsage(
-              storeId,
-              'aeo',
-              usage?.promptTokenCount ?? 0,
-              usage?.candidatesTokenCount ?? 0,
-              false
-            );
-            const raw = stripFences(result.response.text());
-            const parsed = JSON.parse(raw) as { en: string; ar: string };
-
-            if (typeof parsed.en === 'string' && parsed.en.trim()) {
-              await prisma.store.update({
-                where: { id: storeId },
-                data: {
-                  metaDescriptionAeo: parsed.en.trim().slice(0, 160),
-                  metaDescriptionAeoAr:
-                    parsed.ar?.trim().slice(0, 160) || store.metaDescriptionAeoAr || null,
+          for (const item of batchItems) {
+            if (item.kind === 'store') {
+              const s = await prisma.store.findUnique({
+                where: { id: item.id },
+                select: {
+                  name: true,
+                  description: true,
+                  metaDescriptionAeo: true,
+                  metaDescriptionAeoAr: true,
                 },
               });
-              filled++;
-            } else {
-              skipped++;
-            }
-            await sleep(THROTTLE_MS);
-          } catch (err) {
-            if (isAiQuotaCapError(err)) throw err;
-            const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
-            logger.error({ err, storeId, jobId }, 'bulk-ai-meta-aeo: store meta error');
-            if (errors.length < ERROR_CAP)
-              errors.push({
-                entityKind: 'store',
-                entityId: storeId,
-                entityName: store.name,
-                error: msg,
-              });
-            failed++;
-          }
-        } else {
-          skipped++;
-        }
-        processed++;
-
-        await prisma.bulkAiJob.update({
-          where: { id: jobId },
-          data: { processed, filled, skipped, failed },
-        });
-
-        // ---- Products — page through ----
-        const PAGE = 25;
-        let cursor: string | null = null;
-        while (true) {
-          const products: Array<{
-            id: string;
-            name: string;
-            nameAr: string | null;
-            description: string | null;
-            metaDescriptionAeo: string | null;
-            metaDescriptionAeoAr: string | null;
-          }> = await prisma.product.findMany({
-            where: { storeId, deletedAt: null },
-            orderBy: { id: 'asc' },
-            take: PAGE,
-            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-            select: {
-              id: true,
-              name: true,
-              nameAr: true,
-              description: true,
-              metaDescriptionAeo: true,
-              metaDescriptionAeoAr: true,
-            },
-          });
-          if (products.length === 0) break;
-
-          for (const p of products) {
-            // Cooperative cancellation — check every 5 products.
-            if (processed % 5 === 0 && processed > 0) {
-              const currentJob = await prisma.bulkAiJob.findUnique({
-                where: { id: jobId },
-                select: { status: true },
-              });
-              if (currentJob?.status === 'cancelled') {
-                logger.info(
-                  { jobId, storeId, processed, filled, skipped, failed },
-                  'bulk-ai-meta-aeo: cancelled by merchant'
+              if (!s) {
+                bSkipped++;
+                bProcessed++;
+                continue;
+              }
+              if (!force && s.metaDescriptionAeo?.trim()) {
+                bSkipped++;
+                bProcessed++;
+                continue;
+              }
+              try {
+                await assertAiQuota();
+                const prompt = buildMetaPrompt('store', s.name, s.description ?? '');
+                const genResult = await callWithRetry(
+                  () => model.generateContent(prompt),
+                  `meta-aeo:store:${storeId}`
+                ).catch((err: unknown) => rethrowAsAppError(err, 'AI store meta AEO sweep failed'));
+                const usage = genResult.response.usageMetadata;
+                await recordUsage(
+                  storeId,
+                  'aeo',
+                  usage?.promptTokenCount ?? 0,
+                  usage?.candidatesTokenCount ?? 0,
+                  false
                 );
-                break;
+                const raw = stripFences(genResult.response.text());
+                const parsed = JSON.parse(raw) as { en: string; ar: string };
+                if (typeof parsed.en === 'string' && parsed.en.trim()) {
+                  await prisma.store.update({
+                    where: { id: storeId },
+                    data: {
+                      metaDescriptionAeo: parsed.en.trim().slice(0, 160),
+                      metaDescriptionAeoAr:
+                        parsed.ar?.trim().slice(0, 160) || s.metaDescriptionAeoAr || null,
+                    },
+                  });
+                  bFilled++;
+                } else {
+                  bSkipped++;
+                }
+                await sleep(THROTTLE_MS);
+              } catch (err) {
+                if (isAiQuotaCapError(err)) {
+                  bQuotaReached = true;
+                  break;
+                }
+                const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
+                logger.error({ err, storeId, jobId }, 'bulk-ai-meta-aeo: store meta error');
+                if (bErrors.length < ERROR_CAP)
+                  bErrors.push({
+                    entityKind: 'store',
+                    entityId: storeId,
+                    entityName: s.name,
+                    error: msg,
+                  });
+                bFailed++;
               }
-            }
-
-            // Smart-skip: only fill if AEO column is empty. SEO content
-            // in metaDescription is irrelevant — AEO is a separate field.
-            // When force=true, process even if already populated.
-            if (!force && p.metaDescriptionAeo?.trim()) {
-              skipped++;
-              processed++;
+              bProcessed++;
               continue;
             }
 
-            try {
-              await assertAiQuota();
-
-              const model = genAI.getGenerativeModel({
-                model: MODEL,
-                generationConfig: { responseMimeType: 'application/json' },
+            if (item.kind === 'product') {
+              const p = await prisma.product.findUnique({
+                where: { id: item.id },
+                select: {
+                  id: true,
+                  name: true,
+                  description: true,
+                  metaDescriptionAeo: true,
+                  metaDescriptionAeoAr: true,
+                },
               });
-
-              const prompt = buildMetaPrompt('product', p.name, p.description ?? '', store.name);
-              const result = await callWithRetry(
-                () => model.generateContent(prompt),
-                `meta-aeo:product:${p.id}`
-              ).catch((err: unknown) => rethrowAsAppError(err, 'AI product meta AEO sweep failed'));
-              const usage = result.response.usageMetadata;
-              await recordUsage(
-                storeId,
-                'aeo',
-                usage?.promptTokenCount ?? 0,
-                usage?.candidatesTokenCount ?? 0,
-                false
-              );
-              const raw = stripFences(result.response.text());
-              const parsed = JSON.parse(raw) as { en: string; ar: string };
-
-              if (typeof parsed.en === 'string' && parsed.en.trim()) {
-                await prisma.product.update({
-                  where: { id: p.id },
-                  data: {
-                    metaDescriptionAeo: parsed.en.trim().slice(0, 160),
-                    metaDescriptionAeoAr:
-                      parsed.ar?.trim().slice(0, 160) || p.metaDescriptionAeoAr || null,
-                  },
-                });
-                filled++;
-              } else {
-                skipped++;
+              if (!p) {
+                bSkipped++;
+                bProcessed++;
+                continue;
               }
-              await sleep(THROTTLE_MS);
-            } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
-              if (errors.length < ERROR_CAP)
-                errors.push({
-                  entityKind: 'product',
-                  entityId: p.id,
-                  entityName: p.name,
-                  error: msg,
-                });
-              failed++;
+              if (!force && p.metaDescriptionAeo?.trim()) {
+                bSkipped++;
+                bProcessed++;
+                continue;
+              }
+              try {
+                await assertAiQuota();
+                const prompt = buildMetaPrompt('product', p.name, p.description ?? '', storeName);
+                const genResult = await callWithRetry(
+                  () => model.generateContent(prompt),
+                  `meta-aeo:product:${p.id}`
+                ).catch((err: unknown) =>
+                  rethrowAsAppError(err, 'AI product meta AEO sweep failed')
+                );
+                const usage = genResult.response.usageMetadata;
+                await recordUsage(
+                  storeId,
+                  'aeo',
+                  usage?.promptTokenCount ?? 0,
+                  usage?.candidatesTokenCount ?? 0,
+                  false
+                );
+                const raw = stripFences(genResult.response.text());
+                const parsed = JSON.parse(raw) as { en: string; ar: string };
+                if (typeof parsed.en === 'string' && parsed.en.trim()) {
+                  await prisma.product.update({
+                    where: { id: p.id },
+                    data: {
+                      metaDescriptionAeo: parsed.en.trim().slice(0, 160),
+                      metaDescriptionAeoAr:
+                        parsed.ar?.trim().slice(0, 160) || p.metaDescriptionAeoAr || null,
+                    },
+                  });
+                  bFilled++;
+                } else {
+                  bSkipped++;
+                }
+                await sleep(THROTTLE_MS);
+              } catch (err) {
+                if (isAiQuotaCapError(err)) {
+                  bQuotaReached = true;
+                  break;
+                }
+                const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
+                if (bErrors.length < ERROR_CAP)
+                  bErrors.push({
+                    entityKind: 'product',
+                    entityId: p.id,
+                    entityName: p.name,
+                    error: msg,
+                  });
+                bFailed++;
+              }
+              bProcessed++;
+              continue;
             }
-            processed++;
-          }
 
-          cursor = products[products.length - 1].id;
-
-          await prisma.bulkAiJob.update({
-            where: { id: jobId },
-            data: { processed, filled, skipped, failed, errors: errors as object },
-          });
-
-          if (products.length < PAGE) break;
-        }
-
-        // ---- Categories — page through with same pattern as products ----
-        let catCursor: string | null = null;
-        while (true) {
-          const cats: Array<{
-            id: string;
-            name: string;
-            nameAr: string | null;
-            description: string | null;
-            metaDescriptionAeo: string | null;
-            metaDescriptionAeoAr: string | null;
-          }> = await prisma.category.findMany({
-            where: { storeId, deletedAt: null },
-            orderBy: { id: 'asc' },
-            take: PAGE,
-            ...(catCursor ? { skip: 1, cursor: { id: catCursor } } : {}),
-            select: {
-              id: true,
-              name: true,
-              nameAr: true,
-              description: true,
-              metaDescriptionAeo: true,
-              metaDescriptionAeoAr: true,
-            },
-          });
-          if (cats.length === 0) break;
-
-          for (const c of cats) {
-            // When force=true, process even if already populated.
+            // item.kind === 'category'
+            const c = await prisma.category.findUnique({
+              where: { id: item.id },
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                metaDescriptionAeo: true,
+                metaDescriptionAeoAr: true,
+              },
+            });
+            if (!c) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
             if (!force && c.metaDescriptionAeo?.trim()) {
-              skipped++;
-              processed++;
+              bSkipped++;
+              bProcessed++;
               continue;
             }
-
             try {
               await assertAiQuota();
-
-              const model = genAI.getGenerativeModel({
-                model: MODEL,
-                generationConfig: { responseMimeType: 'application/json' },
-              });
-
-              const prompt = buildMetaPrompt('category', c.name, c.description ?? '', store.name);
-              const result = await callWithRetry(
+              const prompt = buildMetaPrompt('category', c.name, c.description ?? '', storeName);
+              const genResult = await callWithRetry(
                 () => model.generateContent(prompt),
                 `meta-aeo:category:${c.id}`
               ).catch((err: unknown) =>
                 rethrowAsAppError(err, 'AI category meta AEO sweep failed')
               );
-              const usage = result.response.usageMetadata;
+              const usage = genResult.response.usageMetadata;
               await recordUsage(
                 storeId,
                 'aeo',
@@ -1117,9 +1167,8 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
                 usage?.candidatesTokenCount ?? 0,
                 false
               );
-              const raw = stripFences(result.response.text());
+              const raw = stripFences(genResult.response.text());
               const parsed = JSON.parse(raw) as { en: string; ar: string };
-
               if (typeof parsed.en === 'string' && parsed.en.trim()) {
                 await prisma.category.update({
                   where: { id: c.id },
@@ -1129,49 +1178,75 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
                       parsed.ar?.trim().slice(0, 160) || c.metaDescriptionAeoAr || null,
                   },
                 });
-                filled++;
+                bFilled++;
               } else {
-                skipped++;
+                bSkipped++;
               }
               await sleep(THROTTLE_MS);
             } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
+              if (isAiQuotaCapError(err)) {
+                bQuotaReached = true;
+                break;
+              }
               const msg = err instanceof AppError ? err.message : AI_UNAVAILABLE_MESSAGE;
-              if (errors.length < ERROR_CAP)
-                errors.push({
+              if (bErrors.length < ERROR_CAP)
+                bErrors.push({
                   entityKind: 'category',
                   entityId: c.id,
                   entityName: c.name,
                   error: msg,
                 });
-              failed++;
+              bFailed++;
             }
-            processed++;
+            bProcessed++;
           }
 
-          catCursor = cats[cats.length - 1].id;
+          return {
+            processed: bProcessed,
+            filled: bFilled,
+            skipped: bSkipped,
+            failed: bFailed,
+            errors: bErrors,
+            quotaReached: bQuotaReached,
+            cancelled: false,
+          };
+        });
 
-          await prisma.bulkAiJob.update({
+        processed += result.processed;
+        filled += result.filled;
+        skipped += result.skipped;
+        failed += result.failed;
+        for (const e of result.errors) {
+          if (errors.length < ERROR_CAP) errors.push(e);
+        }
+
+        await step.run(`progress-${i}`, () =>
+          prisma.bulkAiJob.update({
             where: { id: jobId },
             data: { processed, filled, skipped, failed, errors: errors as object },
-          });
+          })
+        );
 
-          if (cats.length < PAGE) break;
+        if (result.cancelled) {
+          logger.info(
+            { jobId, storeId, processed, filled, skipped, failed },
+            'bulk-ai-meta-aeo: cancelled by merchant'
+          );
+          break;
         }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        quotaReached = true;
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            entityKind: 'store',
-            entityId: storeId,
-            entityName: 'sweep',
-            error: err instanceof AppError ? err.message : 'AI quota cap reached',
-          });
+        if (result.quotaReached) {
+          quotaReached = true;
+          if (errors.length < ERROR_CAP)
+            errors.push({
+              entityKind: 'store',
+              entityId: storeId,
+              entityName: 'sweep',
+              error: 'AI quota cap reached',
+            });
+          break;
         }
       }
 
-      // Only mark completed if the merchant didn't cancel.
       const metaFinalRow = await prisma.bulkAiJob.findUnique({
         where: { id: jobId },
         select: { status: true },
@@ -1196,6 +1271,7 @@ export const bulkAiMetaAeo: InngestFunction.Any = inngest.createFunction(
     })(); // end runInTenantContext
   }
 );
+export const bulkAiMetaAeo: InngestFunction.Any = bulkAiMetaAeoFn;
 
 // -----------------------------------------------------------------------
 // Prompt builder for conversational meta descriptions

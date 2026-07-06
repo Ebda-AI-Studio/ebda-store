@@ -4,6 +4,7 @@ import { balanceProductLanguages } from '../../../services/ai-autofill.service';
 import { isAiQuotaCapError } from '../../ai-quota';
 import logger from '../../logger';
 import { inngest } from '../client';
+import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
 
 /**
  * Bulk description-language balancer. Walks every active product for the
@@ -14,11 +15,18 @@ import { inngest } from '../client';
  *
  * Concurrency capped at 1 per store (matching the translate bulk pattern).
  * 2.5s throttle between calls to stay within Gemini free-tier RPM.
+ *
+ * PR2 — crash-resumable batching. The product id list is loaded ONCE inside
+ * `step.run('load-items', ...)`, then split into `BULK_AI_BATCH_SIZE`-sized
+ * batches, each processed inside its own `step.run(\`batch-${i}\`, ...)`. A
+ * crash mid-sweep resumes at the first unfinished batch. `force: false` is
+ * always passed to `balanceProductLanguages`, which itself short-circuits an
+ * already-balanced pair — so a retried batch is naturally idempotent with no
+ * extra re-check needed here.
  */
 
 const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-const PAGE = 25;
 const ERROR_CAP = 50;
 const FILLED_CAP = 200;
 
@@ -33,7 +41,25 @@ interface FilledProduct {
   name: string;
 }
 
-export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunction(
+interface BalanceBatchResult {
+  processed: number;
+  balanced: number;
+  skipped: number;
+  failed: number;
+  errors: BulkBalanceError[];
+  filledProducts: FilledProduct[];
+  quotaReached: boolean;
+  cancelled: boolean;
+}
+
+// NOTE: inferred WITHOUT the `InngestFunction.Any` contextual type on this
+// `const` — annotating that directly here breaks TS's inference of
+// `step.run`'s return type for object literals mixing a plain string[] with
+// a richer array-of-objects sibling (the annotation widens the contextual
+// type fed into `createFunction`'s generics, and Jsonify then collapses the
+// string[] to `unknown[]`). Assigning to the annotated export on a separate
+// line avoids feeding the annotation back into inference.
+const bulkAiBalanceDescriptionsFn = inngest.createFunction(
   {
     id: 'bulk-ai-balance-descriptions',
     name: 'Bulk: balance EN/AR descriptions across catalogue',
@@ -49,71 +75,135 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
     }
 
     // NOTE: products + bulk_ai_jobs are NOT RLS-protected and every query here
-    // scopes by storeId/jobId explicitly, so no tenant context is needed. The
-    // old `runInTenantContext` wrapper opened a single interactive transaction
-    // (30s timeout) around the WHOLE paged AI loop (Gemini calls + 2.5s
-    // throttles) → the transaction expired and the final bulkAiJob.update threw
-    // "Transaction already closed". A plain IIFE removes the long-lived tx;
-    // AI work must never run inside a DB transaction.
+    // scopes by storeId/jobId explicitly, so no tenant context is needed. AI
+    // work must never run inside a long-lived DB transaction — a plain IIFE
+    // (no runInTenantContext wrapper) avoids that trap.
     return (async () => {
+      await step.run('mark-running', () =>
+        prisma.bulkAiJob.update({
+          where: { id: jobId },
+          data: { status: 'running', startedAt: new Date() },
+        })
+      );
+
+      const productIds = await step.run('load-items', async () => {
+        const products = await prisma.product.findMany({
+          where: { storeId, deletedAt: null },
+          select: { id: true },
+        });
+        await prisma.bulkAiJob.update({ where: { id: jobId }, data: { total: products.length } });
+        return products.map(p => p.id);
+      });
+
+      const batches = chunk(productIds, BULK_AI_BATCH_SIZE);
+
       const errors: BulkBalanceError[] = [];
       const filledProducts: FilledProduct[] = [];
+      let processed = 0;
       let balanced = 0;
       let skipped = 0;
       let failed = 0;
-      let processed = 0;
       let quotaReached = false;
 
-      try {
-        // Mark running and set total
-        await step.run('mark-running', async () => {
-          const total = await prisma.product.count({ where: { storeId, deletedAt: null } });
-          await prisma.bulkAiJob.update({
-            where: { id: jobId },
-            data: { status: 'running', startedAt: new Date(), total },
-          });
-        });
+      for (let i = 0; i < batches.length; i++) {
+        const batchIds = batches[i];
 
-        let cursor: string | null = null;
-        while (true) {
-          const products: Array<{ id: string; name: string }> = await prisma.product.findMany({
-            where: { storeId, deletedAt: null },
-            orderBy: { id: 'asc' },
-            take: PAGE,
-            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        const result: BalanceBatchResult = await step.run(`batch-${i}`, async () => {
+          const currentJob = await prisma.bulkAiJob.findUnique({
+            where: { id: jobId },
+            select: { status: true },
+          });
+          if (currentJob?.status === 'cancelled') {
+            return {
+              processed: 0,
+              balanced: 0,
+              skipped: 0,
+              failed: 0,
+              errors: [],
+              filledProducts: [],
+              quotaReached: false,
+              cancelled: true,
+            };
+          }
+
+          const items = await prisma.product.findMany({
+            where: { id: { in: batchIds } },
             select: { id: true, name: true },
           });
-          if (products.length === 0) break;
+          const byId = new Map(items.map(p => [p.id, p]));
 
-          for (const p of products) {
+          let bProcessed = 0;
+          let bBalanced = 0;
+          let bSkipped = 0;
+          let bFailed = 0;
+          let bQuotaReached = false;
+          const bErrors: BulkBalanceError[] = [];
+          const bFilledProducts: FilledProduct[] = [];
+
+          for (const id of batchIds) {
+            const p = byId.get(id);
+            if (!p) {
+              bSkipped++;
+              bProcessed++;
+              continue;
+            }
+
             try {
-              const result = await balanceProductLanguages(storeId, p.id, { force: false });
-              if (result.balanced) {
-                balanced++;
-                if (filledProducts.length < FILLED_CAP) {
-                  filledProducts.push({ id: p.id, name: p.name });
+              // force:false — balanceProductLanguages itself short-circuits an
+              // already-balanced pair, making this naturally idempotent across
+              // a retried batch.
+              const balanceResult = await balanceProductLanguages(storeId, p.id, { force: false });
+              if (balanceResult.balanced) {
+                bBalanced++;
+                if (bFilledProducts.length < FILLED_CAP) {
+                  bFilledProducts.push({ id: p.id, name: p.name });
                 }
                 await sleep(THROTTLE_MS);
               } else {
-                skipped++;
+                bSkipped++;
               }
             } catch (err) {
-              if (isAiQuotaCapError(err)) throw err;
-              if (errors.length < ERROR_CAP) {
-                errors.push({
+              if (isAiQuotaCapError(err)) {
+                bQuotaReached = true;
+                break;
+              }
+              if (bErrors.length < ERROR_CAP) {
+                bErrors.push({
                   productId: p.id,
                   productName: p.name,
                   error: err instanceof Error ? err.message : 'unknown',
                 });
               }
-              failed++;
+              bFailed++;
             }
-            processed++;
+            bProcessed++;
           }
 
-          cursor = products[products.length - 1].id;
+          return {
+            processed: bProcessed,
+            balanced: bBalanced,
+            skipped: bSkipped,
+            failed: bFailed,
+            errors: bErrors,
+            filledProducts: bFilledProducts,
+            quotaReached: bQuotaReached,
+            cancelled: false,
+          };
+        });
 
-          await prisma.bulkAiJob.update({
+        processed += result.processed;
+        balanced += result.balanced;
+        skipped += result.skipped;
+        failed += result.failed;
+        for (const e of result.errors) {
+          if (errors.length < ERROR_CAP) errors.push(e);
+        }
+        for (const fp of result.filledProducts) {
+          if (filledProducts.length < FILLED_CAP) filledProducts.push(fp);
+        }
+
+        await step.run(`progress-${i}`, () =>
+          prisma.bulkAiJob.update({
             where: { id: jobId },
             data: {
               processed,
@@ -123,19 +213,26 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
               errors: errors as object,
               filledProducts: filledProducts as object,
             },
-          });
+          })
+        );
 
-          if (products.length < PAGE) break;
+        if (result.cancelled) {
+          logger.info(
+            { jobId, storeId, processed, balanced, skipped, failed },
+            'bulk-ai-balance-descriptions: cancelled by merchant'
+          );
+          break;
         }
-      } catch (err) {
-        if (!isAiQuotaCapError(err)) throw err;
-        quotaReached = true;
-        if (errors.length < ERROR_CAP) {
-          errors.push({
-            productId: storeId,
-            productName: 'sweep',
-            error: err instanceof Error ? err.message : 'AI quota cap reached',
-          });
+        if (result.quotaReached) {
+          quotaReached = true;
+          if (errors.length < ERROR_CAP) {
+            errors.push({
+              productId: storeId,
+              productName: 'sweep',
+              error: 'AI quota cap reached',
+            });
+          }
+          break;
         }
       }
 
@@ -160,3 +257,4 @@ export const bulkAiBalanceDescriptions: InngestFunction.Any = inngest.createFunc
     })();
   }
 );
+export const bulkAiBalanceDescriptions: InngestFunction.Any = bulkAiBalanceDescriptionsFn;
