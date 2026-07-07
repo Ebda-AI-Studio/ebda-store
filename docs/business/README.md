@@ -59,7 +59,7 @@ Read everything in order 1 → 6. Also pair with:
 
 - `docs/audits/2026-05-22-comprehensive-saas-audit.md` (technical audit)
 - `CLAUDE.md` (strategic positioning + 13 production-readiness rules)
-- `docs/ROLLBACK.md` + `DEPLOYMENT.md` (operations)
+- `docs/ROLLBACK.md` + `docs/DEPLOYMENT.md` (operations)
 
 ---
 
@@ -96,7 +96,7 @@ If you came from the business side and want to peek under the hood:
 - [`docs/audits/2026-05-22-comprehensive-saas-audit.md`](../audits/2026-05-22-comprehensive-saas-audit.md) — full SaaS due-diligence audit (security, performance, infrastructure, costs, SWOT, risk register)
 - [`docs/audits/_slices/`](../audits/_slices/) — 6 per-domain audit deep-dives
 - [`CLAUDE.md`](../../CLAUDE.md) — strategic positioning + 13 production-readiness rules (the internal compass)
-- [`DEPLOYMENT.md`](../../DEPLOYMENT.md) — production topology
+- [`docs/DEPLOYMENT.md`](../DEPLOYMENT.md) — production topology
 - [`docs/ROLLBACK.md`](../ROLLBACK.md) — incident response
 
 ---

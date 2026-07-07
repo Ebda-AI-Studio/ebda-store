@@ -157,7 +157,7 @@ git push origin staging
 ## 8. Related runbooks
 
 - [ROLLBACK.md](../ROLLBACK.md) — code + DB rollback procedures
-- [DEPLOYMENT.md](../../DEPLOYMENT.md) — env vars, secrets, infra inventory
+- [DEPLOYMENT.md](../DEPLOYMENT.md) — env vars, secrets, infra inventory
 
 ## 9. Open items (Ahmad to decide)
 

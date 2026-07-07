@@ -85,7 +85,7 @@ await step.run('reap-stuck-running', async () => {
 ```
 
 **Alert routing:** a Telegram P1 fires on any auto-reap event. See
-`apps/api/src/services/alerts.service.ts` and DEPLOYMENT.md §4 for bot config.
+`apps/api/src/services/alerts.service.ts` and docs/DEPLOYMENT.md §4 for bot config.
 
 **When you see the alert:**
 
@@ -214,7 +214,7 @@ and bypasses the retry loop — no double-counting.
 
 ## Related
 
-- **Stuck job alert**: Telegram `@ForceAI1_bot` P1 level — see DEPLOYMENT.md §4
+- **Stuck job alert**: Telegram `@ForceAI1_bot` P1 level — see docs/DEPLOYMENT.md §4
 - **Inngest dashboard**: https://app.inngest.com — function execution history + retry audit
 - **Auto-reaper source**: `apps/api/src/lib/inngest/functions/queue-depth-watch.ts`
 - **mark-running-first source**: `apps/api/src/lib/inngest/functions/bulk-ai-recommendations.ts`
