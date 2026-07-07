@@ -206,16 +206,9 @@ export const config = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramAlertChatId: process.env.TELEGRAM_ALERT_CHAT_ID || '',
 
-  // Vercel (for custom domain provisioning)
-  vercelApiToken: process.env.VERCEL_API_TOKEN || '',
-  vercelProjectId: process.env.VERCEL_PROJECT_ID || '',
-  vercelTeamId: process.env.VERCEL_TEAM_ID || '',
-
-  // Frontend custom-domain provider. 'vercel' (default, live) or 'cloudflare'
-  // (Cloudflare-for-SaaS). Per-store `Store.domainProvider` overrides this.
-  domainProvider: (process.env.DOMAIN_PROVIDER as 'vercel' | 'cloudflare') || 'cloudflare',
-  // Cloudflare-for-SaaS Custom Hostnames. Unset → CloudflareDomainService
-  // reports not-configured and the resolver no-ops the CF path (like Vercel today).
+  // Cloudflare-for-SaaS Custom Hostnames — the only custom-domain provider
+  // (Vercel cancelled 2026-07, removed). Unset → CloudflareDomainService
+  // reports not-configured and the resolver no-ops the domain-provisioning path.
   cfApiToken: process.env.CF_API_TOKEN || '',
   cfZoneId: process.env.CF_ZONE_ID || '',
   // The CNAME target a merchant points their hostname at (a hostname in our CF

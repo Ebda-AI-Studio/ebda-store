@@ -171,8 +171,8 @@ model Store {
   nameAr                String?     @map("name_ar")
   slug                  String      @unique
   domain                String?     @unique
-  // Frontend hosting provider for this store's custom domain: 'vercel' (default,
-  // null) or 'cloudflare' (Cloudflare-for-SaaS). null = use the DOMAIN_PROVIDER env.
+  // Legacy frontend-hosting-provider column. Cloudflare-for-SaaS is the only
+  // provider now (Vercel cancelled 2026-07) — kept as-is, no migration needed.
   domainProvider        String?     @map("domain_provider")
   // Resend email-sender state (platform-managed under a single Resend account)
   emailSenderLocalPart  String      @default("noreply") @map("email_sender_local_part")

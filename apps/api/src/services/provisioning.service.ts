@@ -17,8 +17,9 @@ export interface ProvisionStoreInput {
   storeName: string;
   storeSlug?: string;
   domain?: string;
-  // Frontend hosting provider for the custom domain. Omitted/null → DOMAIN_PROVIDER env default.
-  domainProvider?: 'vercel' | 'cloudflare';
+  // Frontend hosting provider for the custom domain. Cloudflare-for-SaaS is the
+  // only provider (Vercel cancelled 2026-07); kept optional for signature compat.
+  domainProvider?: 'cloudflare';
   plan?: 'free' | 'starter' | 'professional' | 'enterprise';
 
   // Owner details
@@ -218,7 +219,7 @@ export class ProvisioningService {
       domainAdded = false;
 
       // Per-store Resend provisioning for the newly-created store. Best-effort:
-      // failures don't roll back the provisioning — storefront works on Vercel;
+      // failures don't roll back the provisioning — the storefront still works;
       // email just falls back to platform sender until merchant adds DNS.
       if (domain) {
         try {

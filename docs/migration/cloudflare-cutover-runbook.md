@@ -1,14 +1,14 @@
 # Cloudflare cutover runbook — per-tenant frontend migration (Vercel → Cloudflare-for-SaaS)
 
-**Status:** code-ready, env-gated. The provisioning path, the dual provider switch
-(`DOMAIN_PROVIDER` env + per-store `Store.domainProvider`), and the tooling below all
-ship in the repo. **Live activation needs the Cloudflare credentials set (below).**
+> **Status (updated 2026-07-07): CUTOVER COMPLETE, Vercel decommissioned.** The Vercel
+> account is cancelled and `VercelDomainService` / the `vercel` `DOMAIN_PROVIDER` branch /
+> the admin Domain page's provider switcher have been deleted from the codebase (verified
+> zero stores had `Store.domainProvider='vercel'` in prod before removal). Cloudflare-for-SaaS
+> is now the sole custom-domain provider — `resolveDomainService()` always returns
+> `CloudflareDomainService`. Sections below describing the dual-provider switch (§0.3, §4,
+> §5) are kept for migration history but no longer reflect live behavior.
 
-**Invariant — Vercel is never broken by this.** Every store with `domainProvider = NULL`
-(the default for all existing stores) resolves to `VercelDomainService`, unchanged.
-`CloudflareDomainService` no-ops (logs + returns null) until `CF_*` are set. The
-OpenNext/Cloudflare build files stay git-ignored, so Vercel/CI never import
-`@opennextjs/cloudflare`. Cutover is **opt-in, one store at a time, reversible**.
+`CloudflareDomainService` no-ops (logs + returns null) until `CF_*` are set.
 
 ---
 
@@ -23,8 +23,8 @@ OpenNext/Cloudflare build files stay git-ignored, so Vercel/CI never import
    `Zone:Zone:Read`. This is `CF_API_TOKEN`. Grab the zone id → `CF_ZONE_ID`.
 3. **Set the API env (Railway):**
    - `CF_API_TOKEN`, `CF_ZONE_ID`, `CF_FALLBACK_ORIGIN`
-   - Leave `DOMAIN_PROVIDER` **unset** (= `vercel`) so nothing flips globally; you
-     cut over per store. (Set it to `cloudflare` only once every store is migrated.)
+   - (`DOMAIN_PROVIDER` no longer exists as a config key — Cloudflare-for-SaaS is
+     the only provider, cutover-complete 2026-07-07.)
 4. **Deploy the storefront Worker** (already proven on preview workers, #315/#318):
    ```bash
    bash scripts/cf-setup-local.sh web        # clone the git-ignored CF build files + devDeps
@@ -73,28 +73,27 @@ on Cloudflare — this migration is frontend-only.
 
 ---
 
-## 4. Rollback (per store, reversible)
+## 4. Rollback (per store) — HISTORICAL, Vercel target no longer available
 
 ```bash
 CF_API_TOKEN=… CF_ZONE_ID=… DATABASE_URL=… \
 bash scripts/cf-migrate-store.sh <slug> --rollback
 ```
 
-Deletes the CF custom hostname and sets `domain_provider='vercel'`. The merchant
-points the CNAME/A record back to Vercel (`cname.vercel-dns.com` for a subdomain, or
-`A @ → 76.76.21.21` for an apex). If the Vercel domain alias was never removed, the
-storefront is live again as soon as DNS propagates.
+Deletes the CF custom hostname and clears `domain_provider` (falls back to the
+platform default, also Cloudflare). Vercel is cancelled, so this no longer reverts
+to a working alternate host — it only removes the CF custom hostname. There is
+currently no second custom-domain provider to fail over to.
 
 ---
 
-## 5. Super-admin UI switch (no DNS move)
+## 5. Super-admin UI switch — REMOVED (2026-07-07)
 
-The admin **Domain** page shows a super-admin-only **Frontend hosting** card with a
-Vercel ⇄ Cloudflare toggle (`PATCH /stores/:id/domain-provider`, audit-logged). Use
-it to flip the provider the API provisions/queries for a store WITHOUT running the
-script — handy when the CF hostname already exists and you only need to change which
-provider the status page reads. It does **not** move DNS or create/delete the CF
-hostname; the script does that.
+The admin **Domain** page previously showed a super-admin-only **Frontend hosting**
+card with a Vercel ⇄ Cloudflare toggle (`PATCH /stores/:id/domain-provider`,
+audit-logged). Both the UI card and the API endpoint were deleted once Vercel was
+cancelled and confirmed to have zero stores still on it — there is only one provider
+left to switch to/from, so the control had nothing left to do.
 
 ---
 

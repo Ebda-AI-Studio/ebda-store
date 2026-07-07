@@ -141,7 +141,7 @@ SMTP_FROM_EMAIL=noreply@yourdomain.com
 
 > ⚠️ **NOTE (updated 2026-07-05):** Production storefront, admin, and orders PWA run on **Cloudflare Workers** (OpenNext), NOT Vercel. Worker names: `force-admin-cf-preview` (`admin.force-ai.co`), `force-web-cf-preview` (`store.force-ai.co` + per-tenant custom domains), `force-orders-cf-preview` (`orders.force-ai.co`). The Vercel projects that previously hosted these apps are decommissioned.
 
-All three apps deploy automatically via GitHub→CF Workers Builds on push to `main` touching their respective `apps/*/**` path (`.github/workflows/cf-deploy.yml`, runs on the self-hosted runner). No manual per-push steps needed — the workflow builds each app with OpenNext and runs `wrangler deploy`. Per-tenant custom domain provisioning is still handled by the API (see `apps/api/src/services/vercel-domain.service.ts` / `docs/migration/cloudflare-cutover-runbook.md` for the current provider). Setup details: `docs/migration/cloudflare-ci-deploy.md`.
+All three apps deploy automatically via GitHub→CF Workers Builds on push to `main` touching their respective `apps/*/**` path (`.github/workflows/cf-deploy.yml`, runs on the self-hosted runner). No manual per-push steps needed — the workflow builds each app with OpenNext and runs `wrangler deploy`. Per-tenant custom domain provisioning is handled by the API via Cloudflare-for-SaaS (see `apps/api/src/services/cloudflare-domain.service.ts` / `docs/migration/cloudflare-cutover-runbook.md`). Setup details: `docs/migration/cloudflare-ci-deploy.md`.
 
 ---
 
@@ -210,7 +210,7 @@ Add these records to your domain:
 | CNAME | api    | your-app.up.railway.app | Railway API — no proxy                                    |
 | CNAME | cdn    | pub-xxx.r2.dev          | Cloudflare R2 public bucket (`*.r2.dev`)                  |
 
-Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/services/vercel-domain.service.ts` (or the Cloudflare-for-SaaS Custom Hostnames path per `Store.domainProvider` — see `docs/migration/cloudflare-cutover-runbook.md`) — merchants add their domain in the admin UI and the API provisions it automatically.
+Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/services/cloudflare-domain.service.ts` (Cloudflare-for-SaaS Custom Hostnames — see `docs/migration/cloudflare-cutover-runbook.md`) — merchants add their domain in the admin UI and the API provisions it automatically.
 
 ---
 

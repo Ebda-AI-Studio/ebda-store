@@ -15,8 +15,8 @@ export interface Store {
   nameAr?: string;
   slug: string;
   domain?: string;
-  // Frontend hosting provider for the custom domain: 'vercel' (default/null) or
-  // 'cloudflare'. Super-admin-only switch on the /domain page (canary cutover).
+  // Legacy frontend-hosting-provider column. Cloudflare-for-SaaS is the only
+  // provider now (Vercel cancelled 2026-07); no UI reads/writes this anymore.
   domainProvider?: string | null;
   logo?: string;
   logoAr?: string;

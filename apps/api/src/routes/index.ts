@@ -120,7 +120,7 @@ router.use('/stores', tenantContext, featureRoutes);
 // REWORKED 2026-07-02 (F2 surgical follow-up, PR #499): a
 // `router.param('id', tenantContext)` registration was briefly added here
 // (Phase 1a), then REVERTED — the domain-management handlers in
-// store.routes.ts call external APIs in-request (Vercel/Cloudflare domain
+// store.routes.ts call external APIs in-request (Cloudflare-for-SaaS domain
 // provisioning via `resolveDomainService`, Resend domain verification via
 // `ResendService.provisionStoreDomain` / `removeStoreDomain` /
 // `verifyAndRefreshDomain`). Trapping a slow third-party call inside a 30s

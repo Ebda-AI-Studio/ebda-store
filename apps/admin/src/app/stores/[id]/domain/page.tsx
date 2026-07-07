@@ -5,25 +5,15 @@ import { useParams } from 'next/navigation';
 import { Button, Badge, Input, Label } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { Alert } from '../../../../components/Alert';
-import { apiGet, apiPost, apiPut, apiPatch } from '../../../../lib/api';
+import { apiGet, apiPost, apiPut } from '../../../../lib/api';
 import { useCurrentStore } from '../../../../hooks/useCurrentStore';
-import { useAuth } from '../../../../lib/auth';
 import { useT } from '@/i18n/useT';
 
 export default function StoreDomainPage() {
   const params = useParams();
   const storeId = params?.id as string;
   const t = useT('domain.page');
-  const { user } = useAuth();
-  const isSuperAdmin = user?.role === 'super_admin';
   const { store, isLoading, refetch: refetchStore } = useCurrentStore(storeId);
-
-  // Super-admin: which provider serves this store's custom domain (Vercel vs
-  // Cloudflare-for-SaaS). Flips the per-store override via PATCH; the resolver
-  // falls back to DOMAIN_PROVIDER then 'vercel' when unset.
-  const [isSwitchingProvider, setIsSwitchingProvider] = useState(false);
-  const [providerError, setProviderError] = useState('');
-  const currentProvider = store?.domainProvider === 'cloudflare' ? 'cloudflare' : 'vercel';
 
   // ----- Domain section state -----
   const [isEditing, setIsEditing] = useState(false);
@@ -200,26 +190,6 @@ export default function StoreDomainPage() {
     }
   }
 
-  async function handleSwitchProvider(next: 'vercel' | 'cloudflare') {
-    if (next === currentProvider) return;
-    setIsSwitchingProvider(true);
-    setProviderError('');
-    try {
-      const { error: apiError } = await apiPatch(`/api/v1/stores/${storeId}/domain-provider`, {
-        provider: next,
-      });
-      if (apiError) {
-        setProviderError(apiError.message || t('updateFailed'));
-        return;
-      }
-      await refetchStore();
-    } catch {
-      setProviderError(t('updateFailed'));
-    } finally {
-      setIsSwitchingProvider(false);
-    }
-  }
-
   if (isLoading) {
     return (
       <AdminLayout title={t('title')} subtitle={t('subtitle')} mode="store_admin" storeId={storeId}>
@@ -329,19 +299,17 @@ export default function StoreDomainPage() {
               </div>
             ) : domain ? (
               (() => {
-                // Three states based on Vercel's domain API:
+                // Three states based on the Cloudflare-for-SaaS custom hostname API:
                 //   verified=false              → "pending" — DNS records not added yet
-                //   verified=true, misconfig=t  → "dns-not-pointing" — Vercel owns the
-                //                                  cert/config but the live A/CNAME
+                //   verified=true, misconfig=t  → "dns-not-pointing" — Cloudflare owns
+                //                                  the cert/config but the live CNAME
                 //                                  resolves elsewhere (registrar parking
-                //                                  page, old AWS pointer, etc.). The
-                //                                  Vercel UI calls this "configured by
-                //                                  another A record". Without this state
-                //                                  the admin would show a green "live at
-                //                                  https://X" message while customers
-                //                                  visiting X actually land on the
-                //                                  registrar parking page — what bit us
-                //                                  on wadyaljuz.com 2026-05-13.
+                //                                  page, old A record, etc.). Without
+                //                                  this state the admin would show a
+                //                                  green "live at https://X" message
+                //                                  while customers visiting X actually
+                //                                  land on the registrar parking page —
+                //                                  what bit us on wadyaljuz.com 2026-05-13.
                 //   verified=true, misconfig=f  → "live" — true end-to-end pointing at us
                 const isVerified = domainStatus?.verified === true;
                 const isMisconfigured = domainStatus?.misconfigured === true;
@@ -452,51 +420,30 @@ export default function StoreDomainPage() {
                                     {record.ttl ?? '1 Hour'}
                                   </td>
                                 </tr>
-                              )) ||
-                                // Fallback when the API returned no records (e.g.
-                                // Vercel unreachable). Apex domains get the simple
-                                // single A record — most registrars allow it
-                                // without lockouts. The www variant is auto-attached
-                                // at the Vercel project level, so the merchant
-                                // never needs to set a CNAME on `www` (which
-                                // GoDaddy and similar registrars often lock).
-                                (domain.split('.').filter(Boolean).length === 2 ? (
-                                  <tr>
-                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
-                                      A
-                                    </td>
-                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
-                                      @
-                                    </td>
-                                    <td className="px-3 py-2 font-mono text-xs align-top break-all">
-                                      76.76.21.21
-                                    </td>
-                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
-                                      —
-                                    </td>
-                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
-                                      1 Hour
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  <tr>
-                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
-                                      CNAME
-                                    </td>
-                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
-                                      {domain}
-                                    </td>
-                                    <td className="px-3 py-2 font-mono text-xs align-top break-all">
-                                      cf.force-ai.co
-                                    </td>
-                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
-                                      —
-                                    </td>
-                                    <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
-                                      1 Hour
-                                    </td>
-                                  </tr>
-                                ))}
+                              )) || (
+                                // Fallback when the API returned no records (e.g. the
+                                // provider is unreachable). Cloudflare-for-SaaS uses a
+                                // single CNAME regardless of apex or subdomain — both
+                                // the domain and its www variant are enrolled as custom
+                                // hostnames pointing at the same fallback origin.
+                                <tr>
+                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
+                                    CNAME
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap">
+                                    {domain}
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-xs align-top break-all">
+                                    cf.force-ai.co
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
+                                    —
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-xs align-top whitespace-nowrap text-muted-foreground">
+                                    1 Hour
+                                  </td>
+                                </tr>
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -519,14 +466,13 @@ export default function StoreDomainPage() {
                     )}
 
                     {/* www auto-attach feedback — the platform's
-                        VercelDomainService.addDomain() attaches the www
-                        variant alongside the apex automatically (commit
-                        0e2ba67). without surfacing that here, merchants
-                        worry / try to set up www themselves at the
-                        registrar even though it just works. only show
-                        on apex domains (2-part: example.com), not on
-                        subdomain attachments where there's no implicit
-                        www variant. */}
+                        CloudflareDomainService.addDomain() attaches the www
+                        variant alongside the apex automatically. without
+                        surfacing that here, merchants worry / try to set up
+                        www themselves at the registrar even though it just
+                        works. only show on apex domains (2-part:
+                        example.com), not on subdomain attachments where
+                        there's no implicit www variant. */}
                     {domain.split('.').filter(Boolean).length === 2 && (
                       <Alert variant="info" title={t('wwwAutoAttachedTitle')}>
                         <p className="mt-1 text-sm">{t('wwwAutoAttachedMessage', { domain })}</p>
@@ -618,38 +564,6 @@ export default function StoreDomainPage() {
             )}
           </div>
         </div>
-
-        {/* Super-admin: which provider serves this store's custom domain.
-            Flips Store.domainProvider; DNS/cert work is done out-of-band per the
-            Cloudflare cutover runbook. Vercel is the default when unset. */}
-        {isSuperAdmin && (
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-foreground">{t('provider.title')}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{t('provider.subtitle')}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {(['vercel', 'cloudflare'] as const).map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => handleSwitchProvider(p)}
-                  disabled={isSwitchingProvider}
-                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-                    currentProvider === p
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-foreground hover:bg-muted/70'
-                  }`}
-                >
-                  {t(`provider.${p}`)}
-                  {currentProvider === p && <span className="ms-2 text-xs">✓</span>}
-                </button>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              {t('provider.current', { provider: t(`provider.${currentProvider}`) })}
-            </p>
-            {providerError && <p className="mt-2 text-sm text-destructive">{providerError}</p>}
-          </div>
-        )}
       </div>
     </AdminLayout>
   );

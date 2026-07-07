@@ -24,18 +24,19 @@ The admin will show you two DNS records to add. Keep this page open.
 
 ## Step 2 — Add the DNS records at your registrar
 
-Force AI Store uses Vercel for SSL provisioning, so the records vary slightly per setup. The admin will show you the exact ones, but they look like:
+Force AI Store uses Cloudflare-for-SaaS for SSL provisioning — one CNAME record for your domain (the same record works for an apex domain or a subdomain). The admin will show you the exact value, but it looks like:
 
-| Type    | Name               | Value                  | TTL  |
-| ------- | ------------------ | ---------------------- | ---- |
-| `A`     | `@` (or apex/root) | `76.76.21.21`          | 3600 |
-| `CNAME` | `www`              | `cname.vercel-dns.com` | 3600 |
+| Type    | Name                    | Value            | TTL  |
+| ------- | ----------------------- | ---------------- | ---- |
+| `CNAME` | `@` (or your subdomain) | `cf.force-ai.co` | 3600 |
+
+The `www` variant is enrolled automatically alongside your domain — you don't need a separate record for it.
 
 **At your registrar (e.g. GoDaddy / Namecheap / Cloudflare):**
 
 1. Find the DNS management panel (often labeled "DNS Records", "DNS Settings", or "Manage DNS")
 2. Delete any existing `A` record on `@` if present (it's usually the registrar's default parking page)
-3. Add both rows from the table above
+3. Add the CNAME record from the table above
 4. **If you use Cloudflare**: set the proxy status to **DNS-only** (gray cloud), NOT Proxied (orange cloud). Force AI Store needs to verify the domain directly.
 
 أضف السجلات عند جهة تسجيل النطاق (GoDaddy / Namecheap / Cloudflare). لو تستخدم Cloudflare، أبقِ الـ proxy على "DNS only" (سحابة رمادية).
@@ -72,12 +73,12 @@ The webhook URL stays the same — it always points at `api.force-ai.co` regardl
 ## Common issues — مشاكل شائعة
 
 **"DNS hasn't propagated yet"**
-DNS changes can take up to 24h to propagate globally, though Cloudflare-hosted DNS usually resolves in <5 min. Use <https://dnschecker.org/?type=A&domain=yourstore.com> to see if the record is visible from different regions. Wait an hour and click Verify again.
+DNS changes can take up to 24h to propagate globally, though Cloudflare-hosted DNS usually resolves in <5 min. Use <https://dnschecker.org/?type=CNAME&domain=yourstore.com> to see if the record is visible from different regions. Wait an hour and click Verify again.
 
 **"Certificate is still pending"**
 Let's Encrypt issuance usually completes in 1-5 minutes after DNS verification. If it's been > 30 minutes, contact support — there may be a CAA record on your domain blocking Let's Encrypt.
 
-**"Site loads but shows a Vercel error page"**
+**"Site loads but shows an error page"**
 Your DNS resolved correctly but the domain isn't yet linked to your Force AI Store account internally. Wait 2-3 minutes after clicking Verify; if still broken contact support.
 
 **"Cloudflare orange-cloud breaks SSL"**

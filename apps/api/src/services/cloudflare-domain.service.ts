@@ -16,8 +16,8 @@ interface CfCustomHostname {
 }
 
 /**
- * Cloudflare-for-SaaS custom-domain provider (Custom Hostnames API).
- * Mirrors VercelDomainService's surface so resolveDomainService() can swap them.
+ * Cloudflare-for-SaaS custom-domain provider (Custom Hostnames API). The sole
+ * `DomainProvider` implementation (Vercel was cancelled 2026-07 and removed).
  * Inactive (no-ops, logs) until CF_API_TOKEN / CF_ZONE_ID / CF_FALLBACK_ORIGIN are set.
  */
 export class CloudflareDomainService {

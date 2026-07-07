@@ -643,60 +643,6 @@ router.patch(
   }
 );
 
-// PATCH /stores/:id/domain-provider - Flip a store's frontend host between
-// Vercel and Cloudflare-for-SaaS (canary cutover). super_admin only. This only
-// changes which provider the API provisions/queries for THIS store's custom
-// domain — it does NOT move DNS (the merchant/operator does that out-of-band
-// via scripts/cf-migrate-store.sh + the runbook).
-router.patch(
-  '/:id/domain-provider',
-  authenticate,
-  requireMfaEnrolled,
-  authorize('super_admin'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const provider = (req.body as { provider?: string }).provider;
-      if (provider !== 'vercel' && provider !== 'cloudflare') {
-        throw new AppError(
-          400,
-          'INVALID_DOMAIN_PROVIDER',
-          'provider must be "vercel" or "cloudflare"'
-        );
-      }
-
-      const store = await prisma.store.update({
-        where: { id: req.params.id },
-        data: { domainProvider: provider },
-        select: { id: true, domainProvider: true },
-      });
-
-      await prisma.auditLog
-        .create({
-          data: {
-            action: 'store.domain_provider_change',
-            userId: req.user!.userId,
-            storeId: req.params.id,
-            resourceType: 'store',
-            resourceId: req.params.id,
-            details: { newProvider: provider },
-            ipAddress: req.ip ?? null,
-            userAgent: req.headers['user-agent'] ?? null,
-          },
-        })
-        .catch(err => {
-          logger.warn(
-            { err, storeId: req.params.id },
-            '[store.domain-provider] audit log write failed'
-          );
-        });
-
-      res.json({ success: true, data: { domainProvider: store.domainProvider } });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
 // PUT /stores/:id/template - Update store template
 router.put(
   '/:id/template',
@@ -1057,7 +1003,7 @@ router.get(
         },
       });
 
-      // No custom domain at all — neither Vercel nor Resend state is meaningful.
+      // No custom domain at all — neither the provider nor Resend state is meaningful.
       if (!store.domain) {
         res.json({
           success: true,
@@ -1075,9 +1021,9 @@ router.get(
         return;
       }
 
-      // Resolve the frontend host provider for THIS store (per-store override →
-      // DOMAIN_PROVIDER env → vercel). The returned DomainStatus shape is
-      // identical across providers, so the rest of the handler is unchanged.
+      // Resolve the frontend host provider for THIS store (Cloudflare-for-SaaS
+      // is the only provider; `resolveDomainService` still takes the store's
+      // row for signature compat with legacy callers).
       const domainSvc = resolveDomainService({ domainProvider: storeRow?.domainProvider });
       const providerStatus = await domainSvc.getDomain(store.domain);
 
@@ -1138,17 +1084,11 @@ router.get(
       // Merge provider + Resend DNS records into one panel. The admin renders
       // this list under a neutral 'DNS records to add at your registrar'
       // heading so merchants never see provider names. The fallback when the
-      // provider API is unreachable is provider-aware: Cloudflare-for-SaaS is a
-      // single CNAME to the zone target; Vercel mirrors the apex-vs-subdomain
-      // split (an apex like `wadyaljuz.com` gets `A @ → 76.76.21.21`, a
-      // subdomain keeps the CNAME). www handling is automatic on the Vercel side.
-      const isApexFallback = store.domain.split('.').filter(Boolean).length === 2;
-      const providerFallbackRecords =
-        domainSvc.providerName === 'cloudflare'
-          ? [{ type: 'CNAME', name: store.domain, value: config.cfFallbackOrigin }]
-          : isApexFallback
-            ? [{ type: 'A', name: '@', value: '76.76.21.21' }]
-            : [{ type: 'CNAME', name: store.domain, value: 'cname.vercel-dns.com' }];
+      // provider API is unreachable is a single CNAME to the Cloudflare-for-SaaS
+      // zone target (www handling is automatic on the Cloudflare side).
+      const providerFallbackRecords = [
+        { type: 'CNAME', name: store.domain, value: config.cfFallbackOrigin },
+      ];
       const providerRecords = providerStatus?.dnsRecords ?? providerFallbackRecords;
       const mergedDns = [...providerRecords, ...resendRecords];
 
@@ -1210,16 +1150,15 @@ router.put(
       });
       const previousEmailDomainId = previousEmailRow?.emailDomainId ?? null;
 
-      // Resolve the frontend host provider for this store (per-store override →
-      // DOMAIN_PROVIDER env → vercel). All attach/remove/status calls below go
-      // through it so a Cloudflare-flipped store provisions on Cloudflare.
+      // Resolve the frontend host provider for this store (Cloudflare-for-SaaS
+      // is the only provider). All attach/remove/status calls below go through it.
       const domainSvc = resolveDomainService({ domainProvider: previousEmailRow?.domainProvider });
 
-      // Add new domain to Vercel FIRST (before touching the old one). If we
-      // removed the old domain first and then add-new failed, the storefront
+      // Add new domain to the provider FIRST (before touching the old one). If
+      // we removed the old domain first and then add-new failed, the storefront
       // on the old domain would go dark AND the new domain wouldn't work —
       // a customer-visible outage. With this ordering, the old domain keeps
-      // serving traffic until everything else (Vercel add + DB update)
+      // serving traffic until everything else (provider add + DB update)
       // succeeds; old-domain removal moves to AFTER the DB commit below.
       if (domain && domain !== oldDomain) {
         // Check platform configuration first — domain feature is unusable
@@ -1346,12 +1285,12 @@ router.put(
         }
       }
 
-      // Remove old domain from Vercel AFTER the DB commit. Doing this before
-      // (and especially before adding the new domain) created a window where
-      // an addDomain failure left BOTH domains broken — old removed, new not
-      // added. Now: new domain is live, DB points at it, then we tear down
+      // Remove old domain from the provider AFTER the DB commit. Doing this
+      // before (and especially before adding the new domain) created a window
+      // where an addDomain failure left BOTH domains broken — old removed, new
+      // not added. Now: new domain is live, DB points at it, then we tear down
       // the old one. Fire-and-forget — if the carrier-side removal fails we
-      // log it; the worst case is a stranded domain alias on Vercel (no
+      // log it; the worst case is a stranded domain alias on the provider (no
       // customer impact, just manual cleanup).
       if (oldDomain && oldDomain !== domain) {
         const domainToRemove = oldDomain;
@@ -1376,8 +1315,7 @@ router.put(
       if (domain) {
         domainStatus = await domainSvc.getDomain(domain);
       }
-      const fallbackDnsValue =
-        domainSvc.providerName === 'cloudflare' ? config.cfFallbackOrigin : 'cname.vercel-dns.com';
+      const fallbackDnsValue = config.cfFallbackOrigin;
 
       res.json({
         success: true,

@@ -1,5 +1,3 @@
-import { config } from '../config';
-import { VercelDomainService } from './vercel-domain.service';
 import { CloudflareDomainService } from './cloudflare-domain.service';
 
 /** Canonical DNS row a merchant must create. */
@@ -17,9 +15,13 @@ export interface DomainStatus {
   dnsRecords: DomainDnsRecord[];
 }
 
-/** The contract both VercelDomainService and CloudflareDomainService satisfy. */
+/**
+ * The contract a custom-domain provider satisfies. Cloudflare-for-SaaS is the
+ * only implementation (Vercel was cancelled 2026-07 and the VercelDomainService
+ * branch removed here).
+ */
 export interface DomainProvider {
-  readonly providerName: 'vercel' | 'cloudflare';
+  readonly providerName: 'cloudflare';
   isConfigured(): boolean;
   /** Attach a custom domain. Returns true-ish on success, null when not configured. */
   addDomain(domain: string): Promise<unknown | null>;
@@ -29,29 +31,20 @@ export interface DomainProvider {
   getDomain(domain: string): Promise<DomainStatus | null>;
 }
 
-const PROVIDERS: Record<'vercel' | 'cloudflare', DomainProvider> = {
-  vercel: VercelDomainService,
-  cloudflare: CloudflareDomainService,
-};
-
-function normalize(p: string | null | undefined): 'vercel' | 'cloudflare' | null {
-  return p === 'cloudflare' ? 'cloudflare' : p === 'vercel' ? 'vercel' : null;
-}
-
 /**
- * Pick the provider for a store: per-store override → env default → 'vercel'.
- * `store` may be null (platform-level / no store context) → env default.
+ * Cloudflare-for-SaaS is the sole custom-domain provider. `store` is still
+ * accepted for signature compat with callers that pass per-store context
+ * (`Store.domainProvider` is still read by them), but there is nothing left
+ * to select between.
  */
 export function resolveDomainService(
-  store: { domainProvider?: string | null } | null | undefined
+  _store?: { domainProvider?: string | null } | null
 ): DomainProvider {
-  const perStore = normalize(store?.domainProvider);
-  const chosen = perStore ?? normalize(config.domainProvider) ?? 'cloudflare';
-  return PROVIDERS[chosen];
+  return CloudflareDomainService;
 }
 
 export function getDomainProviderName(
   store: { domainProvider?: string | null } | null | undefined
-): 'vercel' | 'cloudflare' {
+): 'cloudflare' {
   return resolveDomainService(store).providerName;
 }

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Cut ONE store's frontend from Vercel to Cloudflare-for-SaaS.
-#   1) creates the CF custom hostname, 2) flips Store.domainProvider='cloudflare',
+# Provision Cloudflare-for-SaaS custom-domain hosting for ONE store.
+#   1) creates the CF custom hostname, 2) sets Store.domainProvider='cloudflare',
 #   3) prints the CNAME the merchant must set. DNS itself is changed by the merchant/you.
-# Reversible: re-run with --rollback to set the provider back to 'vercel' + delete the
-# CF custom hostname.
+# --rollback deletes the CF custom hostname and clears Store.domainProvider (falls
+# back to the platform default, also Cloudflare — Vercel was cancelled 2026-07 and
+# is no longer an available rollback target).
 #
 # Usage:
 #   CF_API_TOKEN=... CF_ZONE_ID=... CF_FALLBACK_ORIGIN=cf.forcemediakw.com \
@@ -30,8 +31,9 @@ if [ "$MODE" = "--rollback" ]; then
     curl -s -X DELETE -H "Authorization: Bearer $CF_API_TOKEN" "$CF/$ID" >/dev/null &&
       echo "deleted CF hostname $ID"
   fi
-  db -c "UPDATE stores SET domain_provider='vercel' WHERE slug='$SLUG';" >/dev/null
-  echo "↩︎  $SLUG ($DOMAIN) reverted to vercel"
+  db -c "UPDATE stores SET domain_provider=NULL WHERE slug='$SLUG';" >/dev/null
+  echo "↩︎  $SLUG ($DOMAIN): CF custom hostname removed, domain_provider cleared."
+  echo "   DNS still points at Cloudflare — repoint the merchant's CNAME elsewhere if needed."
   exit 0
 fi
 
