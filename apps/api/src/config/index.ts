@@ -251,7 +251,7 @@ export const config = {
   aramexWebhookSecret: process.env.ARAMEX_WEBHOOK_SECRET || '',
 
   // Force AI WhatsApp Business Platform bridge
-  // Base URL of the WBS backend. In production: https://backend.forcemediakw.com
+  // Base URL of the WBS backend. In production: https://whatsapp-api.force-ai.co
   // Leave unset in dev — the bridge will skip sends gracefully when store.wbsEnabled=false.
   wbsBaseUrl: process.env.WBS_BASE_URL || 'https://whatsapp-api.force-ai.co',
 } as const;
