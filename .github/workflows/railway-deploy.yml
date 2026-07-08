@@ -1,0 +1,103 @@
+name: Deploy API (Railway)
+
+# Deploys the Express API to Railway from GitHub Actions instead of Railway's own
+# GitHub App auto-deploy. Why: the dashboard Git integration is OAuth-wired and NOT
+# version-controlled — it silently broke on the 2026-07 org migration (like the CF
+# Workers Builds integration did). An Actions deploy IS the pipeline-as-code: it
+# survives org moves (just needs the secret), is reviewable, and is the clean place
+# to gate + verify. Mirrors cf-deploy.yml (the frontends already deploy this way).
+#
+# SAFE TO MERGE BEFORE CUTOVER: the deploy is guarded on the RAILWAY_TOKEN secret —
+# with it unset this workflow no-ops (warning only), so merging changes nothing until
+# you actively cut over. See docs/migration/railway-actions-deploy.md for the 2-step
+# activation (add token + disable Railway auto-deploy so they don't double-fire).
+#
+# Migrations still run via railway.json `preDeployCommand` (prisma migrate deploy)
+# on Railway BEFORE the new replica is promoted — unchanged by this.
+#
+# REQUIRED to activate:
+#   secret   RAILWAY_TOKEN     — a Railway PROJECT token (Project → Settings → Tokens),
+#                                scoped to the `production` environment.
+#   variable RAILWAY_SERVICE   — the exact service name to deploy (default below).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'railway.json'
+      - 'Dockerfile.api'
+      - '.github/workflows/railway-deploy.yml'
+  workflow_dispatch:
+
+# Never cancel a mid-flight production API deploy.
+concurrency:
+  group: railway-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy API to Railway
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - name: Guard — require RAILWAY_TOKEN (safe no-op until cutover)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::warning::RAILWAY_TOKEN not set — skipping deploy. To activate: add the RAILWAY_TOKEN secret AND disable Railway's GitHub auto-deploy (see docs/migration/railway-actions-deploy.md)."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Checkout
+        if: env.SKIP != '1'
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        if: env.SKIP != '1'
+        run: npm install -g @railway/cli@4
+
+      - name: Deploy (railway up)
+        if: env.SKIP != '1'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        # --ci streams build/deploy logs then exits with the deploy's status, so a
+        # failed build/deploy fails this step. railway.json's preDeployCommand runs
+        # the Prisma migration on Railway before the new replica is promoted.
+        run: |
+          railway up --ci \
+            --service "${{ vars.RAILWAY_SERVICE || 'api' }}" \
+            --environment "${{ vars.RAILWAY_ENVIRONMENT || 'production' }}"
+
+      - name: Verify /health (post-deploy)
+        if: env.SKIP != '1'
+        run: |
+          url="${{ vars.RAILWAY_HEALTH_URL || 'https://api.force-ai.co/health' }}"
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "$url" || echo 000)
+            if [ "$code" = "200" ]; then echo "API healthy ($url → 200)"; exit 0; fi
+            echo "attempt $i: $url → $code, retrying…"; sleep 10
+          done
+          echo "::error::API $url did not return 200 within 5 min after deploy"; exit 1
+
+  notify-failure:
+    name: Notify on failure
+    needs: deploy
+    if: failure() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Telegram alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+        run: |
+          [ -z "$TELEGRAM_BOT_TOKEN" ] && exit 0
+          curl -sS -m 15 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" \
+            -d text="🚨 Railway API deploy FAILED on main (${GITHUB_SHA:0:7}). Check the run + consider rollback." >/dev/null || true

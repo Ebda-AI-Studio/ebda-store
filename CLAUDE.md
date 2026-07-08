@@ -135,7 +135,7 @@ packages/
 
 ### Deployment
 
-- **API**: Railway (Railpack build, NOT Dockerfile) at `api-production-c058.up.railway.app`
+- **API**: Railway (Railpack build, NOT Dockerfile) at `api-production-c058.up.railway.app`. Deploy is moving from Railway's GitHub App auto-deploy → **GitHub Actions** (`.github/workflows/railway-deploy.yml`, `railway up`), matching the frontends' `cf-deploy.yml` model (migration-proof, reviewable, `/health`-verified). The workflow is a **safe no-op until the `RAILWAY_TOKEN` secret is set + Railway auto-deploy is disabled** — cutover steps in `docs/migration/railway-actions-deploy.md`.
 - **Admin**: Cloudflare Worker `force-admin-cf-preview` → `admin.force-ai.co` (via GitHub→CF Workers Builds, OpenNext).
 - **Orders PWA**: Cloudflare Worker `force-orders-cf-preview` → `orders.force-ai.co` (via GitHub→CF Workers Builds, OpenNext).
 - **Web**: Cloudflare Worker `force-web-cf-preview` → `store.force-ai.co` + per-tenant custom domains (e.g. wadyaljuz.com) via the SaaS `*/*` fallback (via GitHub→CF Workers Builds, OpenNext). Setup: `docs/migration/cloudflare-ci-deploy.md`.
