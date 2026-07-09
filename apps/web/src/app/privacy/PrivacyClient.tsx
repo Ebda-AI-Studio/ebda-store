@@ -173,7 +173,69 @@ function PrivacyFallback() {
 
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground">
-              {t('6. Your Rights', '6. حقوقك')}
+              {t('6. Third-Party Services We Use', '6. خدمات الجهات الخارجية التي نستخدمها')}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'We rely on trusted third-party providers to operate this store. Each processes only the data needed for its function, under its own privacy policy:',
+                'نعتمد على مزودي خدمات موثوقين من جهات خارجية لتشغيل هذا المتجر. يعالج كل منهم البيانات اللازمة لأداء وظيفته فقط، وفقاً لسياسة الخصوصية الخاصة به:'
+              )}
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>
+                {t(
+                  'Payment gateways (such as MyFatoorah, Tap, Hesabe, or UPayments) — to process your payments securely. We never store your full card details.',
+                  'بوابات الدفع (مثل ماي فاتورة، تاب، هيسبة، أو يو بايمنتس) — لمعالجة مدفوعاتك بأمان. لا نقوم مطلقاً بتخزين تفاصيل بطاقتك كاملة.'
+                )}
+              </li>
+              <li>
+                {t(
+                  'PostHog (product analytics, hosted in the European Union) — anonymous usage analytics to improve the store. Your IP address is not collected.',
+                  'PostHog (تحليلات المنتج، مستضافة في الاتحاد الأوروبي) — تحليلات استخدام مجهولة الهوية لتحسين المتجر. لا يتم جمع عنوان IP الخاص بك.'
+                )}
+              </li>
+              <li>
+                {t(
+                  'Sentry (error monitoring) — to detect and fix technical problems. It does not receive your account profile.',
+                  'Sentry (مراقبة الأخطاء) — لاكتشاف المشكلات التقنية وإصلاحها. لا يستقبل ملف حسابك الشخصي.'
+                )}
+              </li>
+              <li>
+                {t(
+                  'OneSignal (push notifications) — to send order and promotional notifications, only if you opt in.',
+                  'OneSignal (الإشعارات الفورية) — لإرسال إشعارات الطلبات والعروض الترويجية، فقط إذا اخترت ذلك.'
+                )}
+              </li>
+              <li>
+                {t(
+                  'Resend (email delivery) — to send transactional emails such as order confirmations and password resets.',
+                  'Resend (تسليم البريد الإلكتروني) — لإرسال رسائل البريد الإلكتروني المعاملاتية مثل تأكيدات الطلبات وإعادة تعيين كلمة المرور.'
+                )}
+              </li>
+              <li>
+                {t(
+                  'Cloudflare and Neon (hosting & infrastructure) — to host the store, deliver content securely, and store your account and order data.',
+                  'Cloudflare و Neon (الاستضافة والبنية التحتية) — لاستضافة المتجر وتسليم المحتوى بأمان وتخزين بيانات حسابك وطلباتك.'
+                )}
+              </li>
+            </ul>
+            <p className="mt-3 text-muted-foreground">
+              {t(
+                'International transfers: some providers (for example, PostHog) process data on servers in the European Union. We choose providers with strong, recognized data-protection standards.',
+                'عمليات النقل الدولية: يعالج بعض المزودين (مثل PostHog) البيانات على خوادم في الاتحاد الأوروبي. نختار مزودين يلتزمون بمعايير قوية ومعترف بها لحماية البيانات.'
+              )}
+            </p>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'Data retention: we keep your information for as long as your account is active or as needed to provide our services and meet legal obligations (such as Kuwait commercial and tax record-keeping requirements).',
+                'الاحتفاظ بالبيانات: نحتفظ بمعلوماتك طالما ظل حسابك نشطاً أو حسب الحاجة لتقديم خدماتنا والوفاء بالالتزامات القانونية (مثل متطلبات حفظ السجلات التجارية والضريبية في الكويت).'
+              )}
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('7. Your Rights', '7. حقوقك')}
             </h2>
             <p className="mt-2 text-muted-foreground">
               {t('You have the right to:', 'لديك الحق في:')}
@@ -193,7 +255,7 @@ function PrivacyFallback() {
 
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground">
-              {t('7. Contact Us', '7. تواصل معنا')}
+              {t('8. Contact Us', '8. تواصل معنا')}
             </h2>
             <p className="mt-2 text-muted-foreground">
               {t(

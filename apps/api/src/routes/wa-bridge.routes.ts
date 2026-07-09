@@ -821,7 +821,10 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
       paymentMethod,
     };
     const checkoutToken = jwt.sign(tokenPayload, config.jwtSecret, {
+      algorithm: 'HS256',
       expiresIn: CHECKOUT_TOKEN_TTL_SECONDS,
+      issuer: 'force-api',
+      audience: 'force-wa-cart',
     });
 
     // Compute the storefront checkout URL. Per-store custom domain may
@@ -888,7 +891,11 @@ router.post('/cart/redeem', async (req: Request, res: Response) => {
     }
     const { token } = parse.data;
 
-    const payload = jwt.verify(token, config.jwtSecret) as Record<string, unknown>;
+    const payload = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: 'force-api',
+      audience: 'force-wa-cart',
+    }) as Record<string, unknown>;
     if (payload.sub !== 'wa-cart') {
       res.status(400).json({ success: false, error: 'WRONG_TOKEN_TYPE' });
       return;

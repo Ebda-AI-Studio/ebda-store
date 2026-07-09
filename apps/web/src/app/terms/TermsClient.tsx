@@ -234,6 +234,12 @@ function TermsFallback() {
                 `إلى أقصى حد يسمح به القانون، لن يكون ${brandName} مسؤولاً عن أي أضرار غير مباشرة أو عرضية أو خاصة أو تبعية ناتجة عن استخدامك لخدماتنا.`
               )}
             </p>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'The service and all products are provided "as is" and "as available" without warranties of any kind, whether express or implied, except those that cannot be excluded under applicable law.',
+                'يتم تقديم الخدمة وجميع المنتجات "كما هي" و"حسب توفرها" دون أي ضمانات من أي نوع، سواء كانت صريحة أو ضمنية، باستثناء ما لا يمكن استبعاده بموجب القانون المعمول به.'
+              )}
+            </p>
           </section>
 
           <section className="mb-8">
@@ -250,7 +256,19 @@ function TermsFallback() {
 
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground">
-              {t('11. Contact Information', '11. معلومات الاتصال')}
+              {t('11. Governing Law & Jurisdiction', '11. القانون الحاكم والاختصاص القضائي')}
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              {t(
+                'These Terms are governed by and construed in accordance with the laws of the State of Kuwait. Any dispute arising out of or relating to these Terms or your use of the service shall be subject to the exclusive jurisdiction of the competent courts of Kuwait.',
+                'تخضع هذه الشروط وتُفسَّر وفقاً لقوانين دولة الكويت. يخضع أي نزاع ينشأ عن هذه الشروط أو يتعلق بها أو باستخدامك للخدمة للاختصاص القضائي الحصري للمحاكم المختصة في دولة الكويت.'
+              )}
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-foreground">
+              {t('12. Contact Information', '12. معلومات الاتصال')}
             </h2>
             <p className="mt-2 text-muted-foreground">
               {t(

@@ -21,6 +21,26 @@ import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
+
+/**
+ * Bust the storefront product caches (list / detail / suggest — all carry
+ * price & inventory) after an order changes stock. Best-effort and always
+ * called AFTER the surrounding transaction commits, never inside it (the
+ * order paths deliberately avoid network I/O within the Prisma tx). Without
+ * this, a checkout that sells the last unit still shows "in stock" on the
+ * PLP/PDP for up to the cache TTL. A cache error must never fail the order.
+ */
+async function bustProductCaches(storeId: string): Promise<void> {
+  try {
+    await invalidateStoreProductCaches(storeId);
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : 'unknown', storeId },
+      '[OrderService] product cache invalidation after inventory change failed'
+    );
+  }
+}
 
 interface CreateOrderData {
   shippingAddress: {
@@ -729,6 +749,10 @@ export class OrderService {
       }
     }
 
+    // Checkout decremented inventory inside the tx above (now committed) — bust
+    // the storefront product caches so a sold-out item stops showing "in stock".
+    await bustProductCaches(storeId);
+
     return order;
   }
 
@@ -840,6 +864,10 @@ export class OrderService {
       { orderId, storeId },
       'Order rolled back after payment-create failure (inventory + cart restored)'
     );
+
+    // Inventory was restored in the tx above — bust product caches so stock
+    // reappears as available on the storefront.
+    await bustProductCaches(storeId);
   }
 
   static async updateStatus(
@@ -1371,6 +1399,12 @@ export class OrderService {
       },
       data: { cancelledAt: new Date(), cancelledReason: 'Order refunded' },
     });
+
+    // Only bust caches when this pass actually restored inventory (skip the
+    // idempotent re-entry where a prior refund already restored it).
+    if (!alreadyRestoredInventory) {
+      await bustProductCaches(storeId);
+    }
   }
 
   static async getCustomerOrders(

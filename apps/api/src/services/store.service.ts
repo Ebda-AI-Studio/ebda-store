@@ -27,7 +27,7 @@ async function bustStoreCaches(
   await invalidateCached(`public:store:${storeId}`);
   if (slug) await invalidateCached(`public:store:${slug}`);
   await invalidateCached(`public:categories:${storeId}`);
-  invalidateCachedPrefix(`public:products:${storeId}:`);
+  await invalidateCachedPrefix(`public:products:${storeId}:`);
   // Purge the storefront's Next data cache too (fire-and-forget, no-op if the
   // STOREFRONT_REVALIDATE_URL / REVALIDATE_SECRET env pair isn't configured) so
   // a merchant's edit shows on the live storefront within ~a second.

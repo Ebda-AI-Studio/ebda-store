@@ -2,7 +2,7 @@ import { prisma, Prisma, ProductStatus, OrderStatus, withMoneyTx } from '@force/
 import { AppError } from '../middleware/error-handler';
 import { slugify, AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import { redis } from './redis.service';
-import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
+import { invalidateCached, invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { inngest } from '../lib/inngest/client';
@@ -502,15 +502,13 @@ export class ProductService {
   }
 
   /**
-   * Invalidate Redis caches related to a store's products and categories.
+   * Invalidate caches related to a store's products and categories.
    * Best-effort: failures are logged but do not throw.
    *
-   * The Redis side of `public:products:<storeId>:...` keys we let expire
-   * naturally on their 30s TTL — pattern delete would require SCAN and
-   * the staleness window is small. The in-memory mirror IS swept here
-   * via prefix delete because it has no per-key TTL when Redis is
-   * unavailable (a sale-price update in admin used to stay invisible
-   * until the API process restarted).
+   * Both cache layers are cleared: `invalidateStoreProductCaches` sweeps the
+   * product list / detail / suggest keys from Redis (SCAN+UNLINK) AND the
+   * in-memory fallback, so a price/stock correction is visible on every
+   * replica immediately rather than lingering on other pods until the TTL.
    */
   private static async invalidateStoreProductCache(storeId: string): Promise<void> {
     try {
@@ -522,13 +520,10 @@ export class ProductService {
         '[PRODUCT] Redis cache invalidation failed'
       );
     }
-    // Synchronous in-memory clear so the failover cache doesn't
-    // outlive the Redis row.
-    invalidateCachedPrefix(`public:products:${storeId}:`);
-    invalidateCachedPrefix(`public:suggest:${storeId}:`);
-    // Invalidate per-product detail cache entries (keyed by storeId prefix).
-    // Redis keys expire naturally on their TTL; in-memory entries are swept here.
-    invalidateCachedPrefix(`public:product:${storeId}:`);
+    // Clear product list / detail / suggest caches (both Redis + in-memory).
+    // Shared with OrderService's checkout-driven inventory paths so the key
+    // definition lives in exactly one place.
+    await invalidateStoreProductCaches(storeId);
     await invalidateCached(`public:categories:${storeId}`);
   }
 

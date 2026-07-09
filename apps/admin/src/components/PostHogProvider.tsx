@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 // posthog-js is lazy-loaded (kept out of the first-load bundle); this holds the
 // instance once loaded so captureEvent() can use it (no-op until then).
@@ -50,6 +51,21 @@ export function PostHogProvider({ children }: Props) {
         respect_dnt: true,
         persistence: 'localStorage+cookie',
       });
+      // Session-replay is off, so link PostHog ↔ Sentry by distinct_id: a Sentry
+      // error carries the id to look up that operator's PostHog events without
+      // recording their screen. Best-effort.
+      try {
+        const distinctId = posthog.get_distinct_id?.();
+        if (distinctId) {
+          Sentry.setTag('posthog_distinct_id', distinctId);
+          Sentry.setContext('posthog', {
+            distinct_id: distinctId,
+            session_id: posthog.get_session_id?.(),
+          });
+        }
+      } catch {
+        // Sentry not initialised (DSN unset) — ignore.
+      }
     });
     return () => {
       cancelled = true;

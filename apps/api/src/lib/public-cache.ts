@@ -23,6 +23,15 @@ import { BoundedMap } from './bounded-map';
  */
 const memoryCache = new BoundedMap<string, { data: unknown; expiresAt: number }>(1000);
 
+/**
+ * In-process single-flight registry. When both cache layers miss, concurrent
+ * requests for the SAME key share one in-flight `fetchFn()` instead of each
+ * hammering the DB — collapsing a per-pod thundering herd at every TTL boundary
+ * (e.g. a hot category page) down to one query + N cache hits. Cross-pod, the
+ * herd is at most (pod count), not (request count).
+ */
+const inFlight = new Map<string, Promise<unknown>>();
+
 export async function getCached<T>(
   key: string,
   ttlSeconds: number,
@@ -42,17 +51,29 @@ export async function getCached<T>(
     return memEntry.data as T;
   }
 
-  const data = await fetchFn();
+  // Miss on both layers: single-flight the fetch so concurrent callers for this
+  // key don't each run fetchFn(). A late waiter that arrives after the fetch
+  // resolved will re-read the now-warm cache on its next call.
+  const existing = inFlight.get(key) as Promise<T> | undefined;
+  if (existing) return existing;
 
+  const pending = (async () => {
+    const data = await fetchFn();
+    try {
+      await redis.set(key, JSON.stringify(data), ttlSeconds);
+    } catch {
+      // Redis unavailable, memory cache below is the fallback.
+    }
+    memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
+    return data;
+  })();
+
+  inFlight.set(key, pending);
   try {
-    await redis.set(key, JSON.stringify(data), ttlSeconds);
-  } catch {
-    // Redis unavailable, memory cache below is the fallback.
+    return await pending;
+  } finally {
+    inFlight.delete(key);
   }
-
-  memoryCache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
-
-  return data;
 }
 
 /**
@@ -72,14 +93,36 @@ export async function invalidateCached(key: string): Promise<void> {
 }
 
 /**
- * Bulk invalidator. Drops every in-memory key starting with `prefix`.
- * Redis pattern delete would require SCAN; instead we let Redis entries
- * naturally expire on their TTL — acceptable for product list caches
- * keyed by varying query suffixes (page/limit/sort), which the user
- * already accepts a small staleness window on.
+ * Bulk invalidator. Drops every entry starting with `prefix` from BOTH the
+ * in-memory fallback AND Redis (via a non-blocking SCAN+UNLINK). Previously
+ * this only swept the in-memory layer and let Redis expire on TTL, which meant
+ * a price/stock correction stayed live on OTHER API replicas (and the same pod
+ * after a restart) for up to the TTL — the Redis copy outlived the bust. Now
+ * both layers clear immediately. Best-effort on the Redis side: an outage is
+ * swallowed and the in-memory sweep still runs.
  */
-export function invalidateCachedPrefix(prefix: string): void {
+export async function invalidateCachedPrefix(prefix: string): Promise<void> {
   for (const key of memoryCache.keys()) {
     if (key.startsWith(prefix)) memoryCache.delete(key);
   }
+  try {
+    await redis.deleteByPattern(prefix);
+  } catch {
+    // Redis unavailable — in-memory sweep above already ran.
+  }
+}
+
+/**
+ * Bust every public product-facing cache for a store (both layers).
+ * The product LIST, per-product DETAIL, and search SUGGEST caches all carry
+ * `price` and `inventory`/`inStock`, so ANY write that changes a product's
+ * price or stock MUST call this — admin edits (via `ProductService`) AND
+ * checkout-driven inventory decrement/restore (via `OrderService`). Kept here
+ * in the shared lib so both services reuse one key definition without a
+ * circular import.
+ */
+export async function invalidateStoreProductCaches(storeId: string): Promise<void> {
+  await invalidateCachedPrefix(`public:products:${storeId}:`);
+  await invalidateCachedPrefix(`public:product:${storeId}:`);
+  await invalidateCachedPrefix(`public:suggest:${storeId}:`);
 }

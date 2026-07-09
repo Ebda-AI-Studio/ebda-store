@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react';
 import posthog from 'posthog-js';
+import * as Sentry from '@sentry/nextjs';
 import { useConsent } from '../contexts/ConsentContext';
 
 /**
@@ -64,6 +65,21 @@ export function PostHogProvider({ children }: Props) {
       // survive Safari ITP 7-day cap; localStorage backs it up.
       persistence: 'localStorage+cookie',
     });
+    // Session-replay is deliberately off (see above), so link PostHog ↔ Sentry
+    // by distinct_id: a Sentry error then carries the id to look up that
+    // visitor's PostHog event stream, without recording their screen.
+    try {
+      const distinctId = posthog.get_distinct_id?.();
+      if (distinctId) {
+        Sentry.setTag('posthog_distinct_id', distinctId);
+        Sentry.setContext('posthog', {
+          distinct_id: distinctId,
+          session_id: posthog.get_session_id?.(),
+        });
+      }
+    } catch {
+      // Sentry not initialised (DSN unset) — ignore.
+    }
   }, [apiKey, apiHost, marketingConsentGranted]);
 
   return <>{children}</>;

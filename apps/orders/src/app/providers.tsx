@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { StoreProvider } from '@/contexts/StoreContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ToastProvider } from '@/contexts/ToastContext';
+import { PostHogProvider } from '@/components/PostHogProvider';
 import { registerServiceWorker } from '@/pwa/register-sw';
 
 // OneSignalInit is a render-null leaf that only runs post-auth — keep the heavy
@@ -39,9 +40,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <LanguageProvider>
       <ToastProvider>
-        <AuthProvider>
-          <AuthedProviders>{children}</AuthedProviders>
-        </AuthProvider>
+        <PostHogProvider>
+          <AuthProvider>
+            <AuthedProviders>{children}</AuthedProviders>
+          </AuthProvider>
+        </PostHogProvider>
       </ToastProvider>
     </LanguageProvider>
   );

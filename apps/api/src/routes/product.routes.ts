@@ -403,7 +403,7 @@ router.put(
 
       // Bust the public product cache so the storefront immediately reflects
       // the new order on next request.
-      invalidateCachedPrefix(`public:products:${storeId}:`);
+      await invalidateCachedPrefix(`public:products:${storeId}:`);
 
       res.json({ success: true });
     } catch (error) {
@@ -487,7 +487,7 @@ router.put(
 
       // Bust the public product cache so the storefront immediately reflects
       // the new order on next request.
-      invalidateCachedPrefix(`public:products:${storeId}:`);
+      await invalidateCachedPrefix(`public:products:${storeId}:`);
 
       res.json({ success: true });
     } catch (error) {

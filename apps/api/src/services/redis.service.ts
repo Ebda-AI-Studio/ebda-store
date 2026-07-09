@@ -174,6 +174,30 @@ class RedisService {
     return (await this.getConnectedClient().exists(`cache:${key}`)) === 1;
   }
 
+  /**
+   * Delete every cache entry whose logical key starts with `prefix`
+   * (Redis key `cache:${prefix}*`). Uses a non-blocking SCAN cursor + UNLINK
+   * so busting a store's product cache never stalls the event loop or blocks
+   * other clients (unlike `KEYS`). Best-effort: a Redis outage returns 0 and
+   * the caller's in-memory sweep still runs. Returns the number of keys removed.
+   */
+  async deleteByPattern(prefix: string): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    const client = this.getConnectedClient();
+    const match = `cache:${prefix}*`;
+    let cursor = '0';
+    let removed = 0;
+    do {
+      const [next, keys] = await client.scan(cursor, 'MATCH', match, 'COUNT', 200);
+      cursor = next;
+      if (keys.length > 0) {
+        await client.unlink(...keys);
+        removed += keys.length;
+      }
+    } while (cursor !== '0');
+    return removed;
+  }
+
   // ==========================================
   // Rate Limiting
   // ==========================================
