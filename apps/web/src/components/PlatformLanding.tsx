@@ -255,9 +255,9 @@ const AUDIENCES: Array<{ titleEn: string; titleAr: string; bodyEn: string; bodyA
     titleEn: 'Selling to businesses',
     titleAr: 'تبيع للشركات',
     bodyEn:
-      'Wholesale, distributors, restocking. Set different prices per customer, hide the catalogue behind a login, take big orders without phone calls.',
+      'Wholesale, distributors, restocking. Take large orders online with invoicing and built-in accounting, and let buyers reorder over WhatsApp instead of by phone.',
     bodyAr:
-      'بيع بالجملة، موزعين، إعادة توريد. ضع أسعاراً مختلفة لكل عميل، أخفِ الكتالوج خلف تسجيل دخول، استقبل طلبات كبيرة بدون مكالمات هاتفية.',
+      'بيع بالجملة، موزعين، إعادة توريد. استقبل الطلبات الكبيرة عبر الإنترنت مع الفوترة والمحاسبة المدمجة، ودع عملاءك يعيدون الطلب عبر واتساب بدلاً من الهاتف.',
   },
   {
     titleEn: 'Running more than one brand',
