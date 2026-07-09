@@ -47,6 +47,7 @@ import { r2OrphanSweep } from './r2-orphan-sweep';
 import { paymentAbandonmentSweep } from './payment-abandonment-sweep';
 import { paymentWebhookProcess } from './payment-webhook-process';
 import { paymentWebhookStuckSweep } from './payment-webhook-stuck-sweep';
+import { orderCreatedStuckSweep } from './order-created-stuck-sweep';
 import { bulkAiBalanceDescriptions } from './bulk-ai-balance-descriptions';
 import { bulkAiRevertBalance } from './bulk-ai-revert-balance';
 import { bulkAiCategorize } from './bulk-ai-categorize';
@@ -135,6 +136,9 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // Safety net: re-sends undelivered payment webhook inbox rows + P0-alerts
   // wedged ones (the inngest.send-ok-but-never-delivered gap). 5-min cron.
   paymentWebhookStuckSweep,
+  // Safety net: re-sends order/created for PAID orders whose fanout never ran
+  // (the order/created enqueue is fire-and-forget with no fallback). 5-min cron.
+  orderCreatedStuckSweep,
   // AI description-language balancer: translates the richer EN/AR description
   // into the thinner language across the whole catalogue. Revert backup included.
   bulkAiBalanceDescriptions,

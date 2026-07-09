@@ -439,6 +439,15 @@ Optional (feature degrades gracefully if missing):
   `PaymentService.handleWebhook` mutation runs in the `payment-webhook-process` Inngest fn
   OFF the shared API pool, so a webhook storm can't starve auth (P2024). `inngest.send`
   failure falls back to inline processing so no webhook is lost.
+- `STUCK_ORDER_NOTIFY_MINUTES` (default 10) — order-created fanout safety net (Builder Reality
+  Audit Lens E, E2-1): the sibling of `STUCK_WEBHOOK_MINUTES` for the `order/created` enqueue,
+  which is fire-and-forget with no inline fallback. The 5-min Inngest cron
+  `order-created-stuck-sweep` finds orders that are **paid** (`paymentStatus='paid'`) but whose
+  fanout never claimed them (`orderCreatedNotifiedAt IS NULL`) past this window and RE-SENDS
+  `order/created` (recovering the confirmation email + admin push + WhatsApp + CAPI + accounting
+  journal). Keyed on `paid` specifically so it can never re-notify a still-unpaid online order.
+  Idempotent via the fanout's atomic `order_created_notified_at` claim. Orders still unnotified
+  past 3× the window fire a P1 alert (re-send isn't landing → investigate Inngest delivery).
 - `STUCK_PAYMENT_MINUTES` (default 60) — order-payment lifecycle: how long an ONLINE order may sit `status=pending` / `paymentStatus=unpaid` before the 15-min stuck-payment Inngest sweep (`order-stuck-payment-sweep`) pushes the merchant a "Payment pending — follow up" alert (deduped once per order via `Order.stuckPaymentAlertedAt`). COD orders never trigger it (no online Payment row).
 - `PAYMENT_ABANDON_MINUTES` (default 30) — abandoned-checkout recovery: how long an ONLINE order may sit `status=pending` / `paymentStatus=unpaid` (with a generated gateway `paymentUrl`) before the 30-min Inngest sweep (`payment-abandonment-sweep`, **Enterprise `payment_abandonment` feature only**) stamps `Order.paymentGatewayAbandonedAt` AND pushes the store admins + super_admins a one-time "Checkout abandoned" recovery alert (via `OneSignalService.notifyAdminsOfAbandonedCheckout`, deep-linking to `/stores/:id/payment-abandonments`). The stamp dedupes the alert to exactly once per order. COD orders never match (no online Payment row). Overlaps intentionally with `STUCK_PAYMENT_MINUTES` (an Enterprise store with both enabled gets the recovery ping at 30 min and the "Payment pending — follow up" nudge at 60 min).
 - `AUTO_CANCEL_UNPAID_DAYS` (default 2, matches MyFatoorah's 2-day payment-link validity) — how old a `pending` / `unpaid` order must be before the daily Inngest cron (`order-auto-cancel-unpaid`, 03:00 UTC) auto-cancels it via `OrderService.updateStatus(...,'cancelled')`. Never refunds (the order was never paid — refund effects are gated on a captured payment); the customer still gets the standard `order_cancelled` notification.

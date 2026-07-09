@@ -1,0 +1,141 @@
+import type { InngestFunction } from 'inngest';
+import { withRlsBypass } from '@force/database';
+import logger from '../../logger';
+import { inngest } from '../client';
+import { sendAlert } from '../../../services/alerts.service';
+
+/**
+ * Stuck order-created sweep — scheduled safety net (every 5 min).
+ *
+ * The mirror of `payment-webhook-stuck-sweep` for the `order/created` fanout.
+ * The `order/created` enqueue (4 call sites: COD create, admin mark-paid single
+ * + bulk, and the online-payment webhook) is fire-and-forget: if `inngest.send`
+ * fails to enqueue (Inngest outage / misconfig / Railway↔Inngest blip) the four
+ * downstream functions — customer email, admin push, WhatsApp notify, CAPI, and
+ * the accounting journal — NEVER run for that order, with no `function.failed`
+ * to dead-letter (the consumer never started) and no provider retry. A PAID
+ * order silently ends up with no confirmation email and, worse, no books entry.
+ *
+ * This sweep finds orders that are genuinely PAID (`paymentStatus = 'paid'`) but
+ * whose fanout never claimed them (`orderCreatedNotifiedAt IS NULL`) past the
+ * staleness window, and re-sends `order/created` once per tick. Keyed on
+ * `paymentStatus='paid'` specifically so it can NEVER re-notify a still-unpaid
+ * online order (the ghost-notification trap the create path guards against) —
+ * an unpaid/pending order legitimately has no fanout yet and is excluded.
+ *
+ * Idempotency-safe: the fanout's first step atomically CLAIMs
+ * `order_created_notified_at` (`order-created.ts`), so a re-sent event for an
+ * order whose fanout is merely slow/in-flight matches 0 rows on the claim and
+ * skips — no double email/push. COD orders (which are `unpaid` until delivery)
+ * are intentionally out of scope here; their send-failure is lower-impact
+ * (no books/paid-order reconciliation) and covered by the enqueue-site log.
+ */
+interface StuckOrder {
+  id: string;
+  storeId: string;
+  locale: string | null;
+  createdAt: Date;
+}
+
+const STUCK_ORDER_NOTIFY_MINUTES = Number(process.env.STUCK_ORDER_NOTIFY_MINUTES) || 10;
+const SWEEP_TAKE = 200;
+
+/** Minimal shape of the Inngest `step` this handler uses (kept for unit tests). */
+interface SweepStep {
+  run<T>(id: string, fn: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * Extracted handler (testable in isolation — mirrors the order-whatsapp-notify
+ * pattern). The `createFunction` wrapper below just forwards `step`.
+ */
+export async function handleOrderCreatedStuckSweep(
+  step: SweepStep
+): Promise<{ swept: number; resent: number; alerted: number }> {
+  const cutoff = new Date(Date.now() - STUCK_ORDER_NOTIFY_MINUTES * 60_000);
+
+  // Cross-tenant read — Inngest crons run outside tenant-context middleware.
+  const stuck: StuckOrder[] = await step.run('find-stuck', async () =>
+    withRlsBypass(tx =>
+      tx.order.findMany({
+        where: {
+          paymentStatus: 'paid',
+          orderCreatedNotifiedAt: null,
+          status: { not: 'cancelled' },
+          createdAt: { lt: cutoff },
+        },
+        select: { id: true, storeId: true, locale: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+        take: SWEEP_TAKE,
+      })
+    )
+  );
+
+  if (stuck.length === 0) return { swept: 0, resent: 0, alerted: 0 };
+
+  let resent = 0;
+  await step.run('resend-order-created', async () => {
+    for (const o of stuck) {
+      try {
+        await inngest.send({
+          name: 'order/created',
+          data: {
+            orderId: o.id,
+            storeId: o.storeId,
+            // Recovery re-send: these are all paid (online) orders. The fanout
+            // only uses paymentMethod for the admin-push display string.
+            paymentMethod: 'online',
+            locale: o.locale ?? undefined,
+          },
+        });
+        resent += 1;
+      } catch (err) {
+        logger.error({ err, orderId: o.id }, '[order-created-stuck-sweep] re-send failed');
+      }
+    }
+  });
+  logger.warn(
+    { count: stuck.length, resent },
+    '[order-created-stuck-sweep] re-sent order/created for paid-but-unnotified orders'
+  );
+
+  // Orders still unnotified past 3× the window mean the re-send itself isn't
+  // landing (persistent Inngest delivery problem) — page an operator.
+  const veryStaleCutoff = Date.now() - 3 * STUCK_ORDER_NOTIFY_MINUTES * 60_000;
+  const veryStale = stuck.filter(o => o.createdAt.getTime() < veryStaleCutoff);
+  if (veryStale.length > 0) {
+    await step.run('alert-very-stale', async () => {
+      await sendAlert({
+        level: 'p1',
+        scope: 'platform',
+        source: 'order.created.stuck',
+        title: `order/created fanout stuck for ${veryStale.length} paid order(s)`,
+        body:
+          `${veryStale.length} PAID order(s) still have no order/created fanout after ` +
+          `> ${3 * STUCK_ORDER_NOTIFY_MINUTES}m — no confirmation email, admin push, ` +
+          `WhatsApp notify, CAPI, or accounting journal entry. Re-send isn't landing; ` +
+          `investigate Inngest delivery.`,
+        context: {
+          ids: veryStale.slice(0, 20).map(o => o.id),
+          oldestCreatedAt: veryStale[0]?.createdAt?.toISOString(),
+        },
+      }).catch(() => undefined);
+    });
+    logger.error(
+      { count: veryStale.length },
+      '[order-created-stuck-sweep] very-stale paid orders — P1 alerted'
+    );
+  }
+
+  return { swept: stuck.length, resent, alerted: veryStale.length };
+}
+
+export const orderCreatedStuckSweep: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'order-created-stuck-sweep',
+    name: 'Order created — sweep paid-but-unnotified orders',
+    retries: 1,
+    triggers: [{ cron: '*/5 * * * *' }], // every 5 minutes
+  },
+  async ({ step }) => handleOrderCreatedStuckSweep(step)
+);

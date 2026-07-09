@@ -183,7 +183,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       );
     }
 
-    await Promise.allSettled([
+    const results = await Promise.allSettled([
       step.run('send-customer-confirmation', () =>
         skipEmail
           ? Promise.resolve()
@@ -232,12 +232,24 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           locale: emailLocale,
         })
       ),
-    ]).then(results => {
-      results.forEach(r => {
-        if (r.status === 'rejected') {
-          logger.error({ err: r.reason }, 'order/created step failed');
-        }
-      });
-    });
+    ]);
+
+    // Re-throw if ANY step ultimately failed (after Inngest's per-step retries).
+    // Without this, Promise.allSettled swallowed every rejection and the run
+    // always completed as "success" — so `inngest/function.failed` never fired
+    // and alerts-failure-watch could never dead-letter this fanout, even when
+    // every customer/admin notification was lost. Sibling consumers of the same
+    // order/created event (order-whatsapp-notify, accounting-post-order-journal)
+    // already throw + escalate; this brings the notification fanout up to parity.
+    // Idempotent on retry: each side-effect is its own memoized step.run, so a
+    // retry re-runs only the failed steps.
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    if (rejected.length > 0) {
+      rejected.forEach(r => logger.error({ err: r.reason }, 'order/created step failed'));
+      throw new AggregateError(
+        rejected.map(r => r.reason),
+        `order-created-fanout: ${rejected.length}/${results.length} side-effect step(s) failed`
+      );
+    }
   }
 );

@@ -972,12 +972,14 @@ export class PaymentService {
           { paymentId: payment.id, orderId: payment.orderId },
           '[PAYMENT WEBHOOK] out-of-band refund detected — running applyRefundEffects fresh'
         );
-        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId).catch(err =>
-          logger.error(
-            { err, orderId: payment.orderId },
-            '[PAYMENT WEBHOOK] applyRefundEffects failed for out-of-band refund'
-          )
-        );
+        // Let a genuine failure propagate. This runs inside the retriable
+        // `payment-webhook-process` Inngest step, so throwing gives 3 retries +
+        // the alerts-failure-watch P0 dead-letter for a money-adjacent reversal
+        // (inventory/coupon/loyalty restore + refund email). Swallowing it here
+        // marked the WebhookEvent 'processed' as if the reversal succeeded.
+        // Safe to retry: applyRefundEffects is idempotent (per-order
+        // alreadyRestoredInventory / alreadyAppliedEffects guards).
+        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId);
         // Also flip the order's paymentStatus since OrderService.updateStatus
         // is not the trigger here.
         await prisma.order
@@ -1219,12 +1221,24 @@ export class PaymentService {
         currency: order.currency,
         paymentMethod: payment.provider,
         reason: webhookData.status,
-      }).catch(err =>
+      }).catch(err => {
         logger.error(
           { err, orderId: order.id },
           '[PAYMENT WEBHOOK] Payment-failure notification failed'
-        )
-      );
+        );
+        // Pure notification (not money): don't re-throw — retrying the webhook
+        // step would risk a duplicate push. But don't leave it silent either:
+        // surface a throttled info-level alert so a lost failed-payment signal
+        // is at least visible to an operator.
+        void sendAlert({
+          level: 'info',
+          scope: 'platform',
+          source: 'payment.webhook.failure_notify_failed',
+          title: 'payment-failure admin push failed',
+          body: `Could not notify store admins of a failed/expired/cancelled payment for order ${order.orderNumber}.`,
+          context: { orderId: order.id, storeId: order.storeId },
+        }).catch(() => undefined);
+      });
     }
 
     return { success: true, status: webhookData.status, orderId: payment.orderId };
