@@ -58,6 +58,15 @@ jobs:
         if: env.SKIP != '1'
         uses: actions/checkout@v4
 
+      # The self-hosted runner has no node/npm on PATH — setup-node provides it
+      # (on ubuntu-latest it's a no-op-ish re-pin). Without this: "npm: command
+      # not found" (exit 127) on the CLI install.
+      - name: Setup Node
+        if: env.SKIP != '1'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Install Railway CLI
         if: env.SKIP != '1'
         run: npm install -g @railway/cli@4
