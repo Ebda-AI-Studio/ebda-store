@@ -479,7 +479,7 @@ npm run dev:api          # Start API dev server
 npm run dev:admin        # Start admin dev server (port 3001)
 npm run dev:web          # Start web dev server (port 3000)
 npm run build            # Build all workspaces
-npm run typecheck        # tsc --noEmit across the repo
+npm run typecheck        # tsc --noEmit per workspace (matches CI's per-app jobs)
 npm run lint             # Lint all workspaces
 npm run lint:fix         # Lint + autofix
 npm run format           # Prettier write
