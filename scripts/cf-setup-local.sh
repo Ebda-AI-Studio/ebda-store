@@ -52,6 +52,19 @@ for app in "${APPS[@]}"; do
     orders) ROUTES_JSON=$'  "routes": [\n    { "pattern": "orders.force-ai.co", "custom_domain": true },\n    { "pattern": "orders.force-ai.co/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
     *)      ROUTES_JSON='' ;;
   esac
+  # apps/web deploys a CUSTOM Worker entry (sentry-worker-entry.ts) that wraps the
+  # OpenNext handler with @sentry/cloudflare (SSR error capture) AND reverse-proxies
+  # the force-ai.co / www company apex to Cloudflare Pages. Other apps deploy the raw
+  # OpenNext worker. Keep this in sync with the committed apps/web/wrangler.jsonc —
+  # this generator OVERWRITES that file, so `main` MUST be set here too (else the
+  # custom entry is silently dropped and Sentry SSR + the apex proxy never deploy).
+  if [ "$app" = "web" ]; then
+    MAIN_ENTRY="sentry-worker-entry.ts"
+    COMPAT_DATE="2025-08-16"   # >= required by @sentry/cloudflare (https.request)
+  else
+    MAIN_ENTRY=".open-next/worker.js"
+    COMPAT_DATE="2025-03-25"
+  fi
   # OpenNext cache config (2026-06-27). DEFAULT = empty config = current
   # behaviour, ZERO risk. When OPENNEXT_CACHE=true (a repo variable threaded by
   # cf-deploy.yml) AND this is the storefront (web), emit the R2 incremental
@@ -84,8 +97,8 @@ EOF
     cat > "$dir/wrangler.jsonc" <<EOF
 {
   "name": "force-$app-cf-preview",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2025-03-25",
+  "main": "${MAIN_ENTRY}",
+  "compatibility_date": "${COMPAT_DATE}",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "force-$app-cf-preview" }],
@@ -106,8 +119,8 @@ EOF
     cat > "$dir/wrangler.jsonc" <<EOF
 {
   "name": "force-$app-cf-preview",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2025-03-25",
+  "main": "${MAIN_ENTRY}",
+  "compatibility_date": "${COMPAT_DATE}",
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
 ${ROUTES_JSON}  "observability": { "enabled": true }
