@@ -14,6 +14,31 @@ import ExcelJS from 'exceljs';
 import type { Response } from 'express';
 import { neutralizeFormula } from '@force/shared';
 
+/**
+ * Formula-injection guard, cell/row level — for routes that build an ExcelJS
+ * workbook by hand (multiple sheets, array-form rows) and so can't route through
+ * `streamXlsxResponse`. Neutralise every string that would evaluate as a
+ * spreadsheet formula when the .xlsx is opened in Excel / Google Sheets; leave
+ * numbers, dates, and other non-strings untouched. Wrap EVERY `sheet.addRow(...)`
+ * whose payload contains user-controlled text (names, notes, addresses, product
+ * names) in the matching helper.
+ */
+export function neutralizeCell(v: unknown): unknown {
+  return typeof v === 'string' ? neutralizeFormula(v) : v;
+}
+
+/** Neutralise every string in an object-form `addRow` payload. */
+export function neutralizeRowObject(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) out[k] = neutralizeCell(v);
+  return out;
+}
+
+/** Neutralise every string in an array-form `addRow` payload. */
+export function neutralizeRowArray(row: unknown[]): unknown[] {
+  return row.map(neutralizeCell);
+}
+
 export interface XlsxColumn {
   header: string;
   key: string;
@@ -50,13 +75,7 @@ export async function streamXlsxResponse(res: Response, opts: StreamXlsxOpts): P
   // spreadsheet formula when the .xlsx is opened in Excel / Google Sheets. Covers
   // EVERY XLSX export (orders, customers, finance…) in one place. Non-string
   // values (numbers, dates) pass through untouched.
-  const safeRows = opts.rows.map(row => {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(row)) {
-      out[k] = typeof v === 'string' ? neutralizeFormula(v) : v;
-    }
-    return out;
-  });
+  const safeRows = opts.rows.map(neutralizeRowObject);
   ws.addRows(safeRows);
 
   // Bold + light-grey header row

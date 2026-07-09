@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import ExcelJS from 'exceljs';
+import { neutralizeRowObject, neutralizeRowArray } from '../lib/exports/xlsx';
 import { prisma, Prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -432,38 +433,40 @@ router.get(
       };
 
       for (const c of customers) {
-        sheet.addRow({
-          storeName: store.name,
-          firstName: c.firstName,
-          lastName: c.lastName,
-          email: c.email,
-          phone: c.phone,
-          isGuest: c.isGuest ? 'Yes' : 'No',
-          address: c.address,
-          address1: c.address1,
-          address2: c.address2,
-          area: c.area,
-          city: c.city,
-          country: c.country,
-          postalCode: c.postalCode,
-          totalOrders: c.totalOrders,
-          paidCount: c.paidCount,
-          pendingCount: c.pendingCount,
-          cancelledCount: c.cancelledCount,
-          failedCount: c.failedCount,
-          // Convert fils → KWD with 3 decimals so the cell is numeric and
-          // sortable in Excel rather than a formatted string.
-          totalSpent: Number((c.totalSpent / 1000).toFixed(3)),
-          avgOrderValue: Number((c.avgOrderValue / 1000).toFixed(3)),
-          lastOrderNumber: c.lastOrderNumber,
-          lastOrderTotal: Number((c.lastOrderTotal / 1000).toFixed(3)),
-          lastOrderStatus: c.lastOrderStatus,
-          lastOrderPaymentStatus: c.lastOrderPaymentStatus,
-          lastOrderDate: c.lastOrderDate,
-          firstOrderDate: c.firstOrderDate,
-          statuses: c.statuses,
-          paymentMethods: c.paymentMethods,
-        });
+        sheet.addRow(
+          neutralizeRowObject({
+            storeName: store.name,
+            firstName: c.firstName,
+            lastName: c.lastName,
+            email: c.email,
+            phone: c.phone,
+            isGuest: c.isGuest ? 'Yes' : 'No',
+            address: c.address,
+            address1: c.address1,
+            address2: c.address2,
+            area: c.area,
+            city: c.city,
+            country: c.country,
+            postalCode: c.postalCode,
+            totalOrders: c.totalOrders,
+            paidCount: c.paidCount,
+            pendingCount: c.pendingCount,
+            cancelledCount: c.cancelledCount,
+            failedCount: c.failedCount,
+            // Convert fils → KWD with 3 decimals so the cell is numeric and
+            // sortable in Excel rather than a formatted string.
+            totalSpent: Number((c.totalSpent / 1000).toFixed(3)),
+            avgOrderValue: Number((c.avgOrderValue / 1000).toFixed(3)),
+            lastOrderNumber: c.lastOrderNumber,
+            lastOrderTotal: Number((c.lastOrderTotal / 1000).toFixed(3)),
+            lastOrderStatus: c.lastOrderStatus,
+            lastOrderPaymentStatus: c.lastOrderPaymentStatus,
+            lastOrderDate: c.lastOrderDate,
+            firstOrderDate: c.firstOrderDate,
+            statuses: c.statuses,
+            paymentMethods: c.paymentMethods,
+          })
+        );
       }
 
       // When the order scan hit the cap, append a visible notice row so the
@@ -540,29 +543,31 @@ router.get(
         const payMethod = order.payments?.[0]?.method ?? '';
 
         for (const item of order.items) {
-          purchasesSheet.addRow({
-            storeName: store.name,
-            customer: customerName,
-            email,
-            phone,
-            orderNumber: order.orderNumber,
-            orderDate: order.createdAt,
-            orderStatus: order.status ?? '',
-            paymentStatus: order.paymentStatus ?? '',
-            payProvider,
-            payMethod,
-            product: item.productName,
-            sku: item.sku ?? '',
-            variant: item.variantName ?? '',
-            qty: item.quantity,
-            unitPrice: Number((item.price / 1000).toFixed(3)),
-            lineTotal: Number((item.total / 1000).toFixed(3)),
-            area,
-            city,
-            country,
-            block,
-            street,
-          });
+          purchasesSheet.addRow(
+            neutralizeRowObject({
+              storeName: store.name,
+              customer: customerName,
+              email,
+              phone,
+              orderNumber: order.orderNumber,
+              orderDate: order.createdAt,
+              orderStatus: order.status ?? '',
+              paymentStatus: order.paymentStatus ?? '',
+              payProvider,
+              payMethod,
+              product: item.productName,
+              sku: item.sku ?? '',
+              variant: item.variantName ?? '',
+              qty: item.quantity,
+              unitPrice: Number((item.price / 1000).toFixed(3)),
+              lineTotal: Number((item.total / 1000).toFixed(3)),
+              area,
+              city,
+              country,
+              block,
+              street,
+            })
+          );
         }
       }
 
@@ -660,7 +665,9 @@ router.get(
         fgColor: { argb: 'FFF1F5F9' },
       };
       for (const p of topProducts) {
-        summarySheet.addRow([p.product, p.qty, Number((p.revenue / 1000).toFixed(3))]);
+        summarySheet.addRow(
+          neutralizeRowArray([p.product, p.qty, Number((p.revenue / 1000).toFixed(3))])
+        );
       }
 
       summarySheet.addRow([]); // blank row between sections
@@ -684,13 +691,15 @@ router.get(
         fgColor: { argb: 'FFF1F5F9' },
       };
       for (const r of customerSpendRows) {
-        summarySheet.addRow([
-          r.name || r.email,
-          r.email,
-          r.orders,
-          r.items,
-          Number((r.spend / 1000).toFixed(3)),
-        ]);
+        summarySheet.addRow(
+          neutralizeRowArray([
+            r.name || r.email,
+            r.email,
+            r.orders,
+            r.items,
+            Number((r.spend / 1000).toFixed(3)),
+          ])
+        );
       }
 
       // Column widths for readability.

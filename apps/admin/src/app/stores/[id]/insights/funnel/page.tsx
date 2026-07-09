@@ -90,7 +90,7 @@ export default function InsightsFunnelPage() {
 
   const steps = totals
     ? [
-        { label: t('views'), value: totals.productViews || 0, note: t('viewsNote') },
+        { label: t('views'), value: totals.productViews || 0 },
         { label: t('carts'), value: totals.cartsCreated },
         { label: t('checkouts'), value: totals.checkoutsStarted },
         { label: t('completed'), value: totals.ordersCompleted },
@@ -144,14 +144,7 @@ export default function InsightsFunnelPage() {
                   return (
                     <div key={step.label}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium">
-                          {step.label}
-                          {step.note && (
-                            <span className="ms-2 text-xs text-muted-foreground">
-                              ({step.note})
-                            </span>
-                          )}
-                        </span>
+                        <span className="text-sm font-medium">{step.label}</span>
                         <div className="flex items-center gap-3">
                           {prevValue !== null && (
                             <span className="text-xs text-red-500">

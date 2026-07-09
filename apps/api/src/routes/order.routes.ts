@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
+import { neutralizeRowObject } from '../lib/exports/xlsx';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -210,49 +211,53 @@ router.get(
         const payment = order.payments?.[0];
 
         // Orders sheet row
-        ordersSheet.addRow({
-          storeName,
-          orderNumber: order.orderNumber,
-          orderDate: order.createdAt,
-          customer: customerName,
-          email,
-          phone,
-          status: order.status ?? '',
-          paymentStatus: order.paymentStatus ?? '',
-          payProvider: payment?.provider ?? '',
-          payMethod: payment?.method ?? '',
-          itemCount: order.items?.length ?? 0,
-          subtotal: Number((order.subtotal / 1000).toFixed(3)),
-          discount: Number(((order.discount + order.couponDiscount) / 1000).toFixed(3)),
-          coupon: order.couponCode ?? '',
-          shipping: Number((order.shipping / 1000).toFixed(3)),
-          tax: Number((order.tax / 1000).toFixed(3)),
-          total: Number((order.total / 1000).toFixed(3)),
-          area: addr?.area ?? addr?.state ?? '',
-          city: addr?.city ?? '',
-          country: addr?.country ?? '',
-          block: addr?.block ?? '',
-          street: addr?.street ?? '',
-          customerNotes: order.customerNotes ?? '',
-        });
-
-        // Line Items sheet — one row per item
-        for (const item of order.items ?? []) {
-          itemsSheet.addRow({
+        ordersSheet.addRow(
+          neutralizeRowObject({
             storeName,
             orderNumber: order.orderNumber,
             orderDate: order.createdAt,
             customer: customerName,
             email,
+            phone,
             status: order.status ?? '',
             paymentStatus: order.paymentStatus ?? '',
-            product: item.productName,
-            sku: item.sku ?? '',
-            variant: item.variantName ?? '',
-            qty: item.quantity,
-            unitPrice: Number((item.price / 1000).toFixed(3)),
-            lineTotal: Number((item.total / 1000).toFixed(3)),
-          });
+            payProvider: payment?.provider ?? '',
+            payMethod: payment?.method ?? '',
+            itemCount: order.items?.length ?? 0,
+            subtotal: Number((order.subtotal / 1000).toFixed(3)),
+            discount: Number(((order.discount + order.couponDiscount) / 1000).toFixed(3)),
+            coupon: order.couponCode ?? '',
+            shipping: Number((order.shipping / 1000).toFixed(3)),
+            tax: Number((order.tax / 1000).toFixed(3)),
+            total: Number((order.total / 1000).toFixed(3)),
+            area: addr?.area ?? addr?.state ?? '',
+            city: addr?.city ?? '',
+            country: addr?.country ?? '',
+            block: addr?.block ?? '',
+            street: addr?.street ?? '',
+            customerNotes: order.customerNotes ?? '',
+          })
+        );
+
+        // Line Items sheet — one row per item
+        for (const item of order.items ?? []) {
+          itemsSheet.addRow(
+            neutralizeRowObject({
+              storeName,
+              orderNumber: order.orderNumber,
+              orderDate: order.createdAt,
+              customer: customerName,
+              email,
+              status: order.status ?? '',
+              paymentStatus: order.paymentStatus ?? '',
+              product: item.productName,
+              sku: item.sku ?? '',
+              variant: item.variantName ?? '',
+              qty: item.quantity,
+              unitPrice: Number((item.price / 1000).toFixed(3)),
+              lineTotal: Number((item.total / 1000).toFixed(3)),
+            })
+          );
         }
       }
 

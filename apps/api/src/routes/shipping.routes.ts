@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
+import { neutralizeRowObject } from '../lib/exports/xlsx';
 import multer from 'multer';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
@@ -140,16 +141,18 @@ router.get(
 
       if (rates.length > 0) {
         for (const r of rates) {
-          sheet.addRow({
-            governorate: r.governorate,
-            governorateAr: r.governorateAr,
-            area: r.area,
-            areaAr: r.areaAr,
-            deliveryFee: filsToKwd(r.deliveryFee),
-            freeShippingThreshold:
-              r.freeShippingThreshold != null ? filsToKwd(r.freeShippingThreshold) : '',
-            isActive: r.isActive ? 'Yes' : 'No',
-          });
+          sheet.addRow(
+            neutralizeRowObject({
+              governorate: r.governorate,
+              governorateAr: r.governorateAr,
+              area: r.area,
+              areaAr: r.areaAr,
+              deliveryFee: filsToKwd(r.deliveryFee),
+              freeShippingThreshold:
+                r.freeShippingThreshold != null ? filsToKwd(r.freeShippingThreshold) : '',
+              isActive: r.isActive ? 'Yes' : 'No',
+            })
+          );
         }
       } else {
         // Template: every canonical area, empty fee / blank Active so the

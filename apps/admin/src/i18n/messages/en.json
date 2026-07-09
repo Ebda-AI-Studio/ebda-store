@@ -5102,8 +5102,7 @@
       "completed": "Orders Completed",
       "abandoned": "Abandoned",
       "revenue": "Revenue (KWD)",
-      "dropoff": "Drop-off",
-      "viewsNote": "Per-session view tracking pending storefront SDK."
+      "dropoff": "Drop-off"
     },
     "segments": {
       "title": "Customer Segments (RFM)",
