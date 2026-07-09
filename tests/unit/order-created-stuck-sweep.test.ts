@@ -59,7 +59,11 @@ describe('order-created-stuck-sweep', () => {
     expect(where.paymentStatus).toBe('paid');
     expect(where.orderCreatedNotifiedAt).toBeNull();
     expect(where.status).toEqual({ not: 'cancelled' });
+    // Bounded window: older than the notify grace (lt) AND within the recency
+    // floor (gt) — the P0 fix so the historical back-catalog is never swept.
     expect(where.createdAt.lt).toBeInstanceOf(Date);
+    expect(where.createdAt.gt).toBeInstanceOf(Date);
+    expect(where.createdAt.gt.getTime()).toBeLessThan(where.createdAt.lt.getTime());
   });
 
   it('re-sends order/created for each stuck paid order (no alert when only mildly stale)', async () => {

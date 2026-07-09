@@ -38,6 +38,14 @@ interface StuckOrder {
 }
 
 const STUCK_ORDER_NOTIFY_MINUTES = Number(process.env.STUCK_ORDER_NOTIFY_MINUTES) || 10;
+// RECENCY FLOOR (P0 fix, 2026-07-09): the sweep must ONLY recover recently-stuck
+// orders, never the historical back-catalog. Without a lower bound, the first
+// run swept EVERY paid order whose `orderCreatedNotifiedAt` was NULL — which
+// includes all orders predating the claim mechanism — and re-fired order/created
+// (confirmation email + admin push + WhatsApp + CAPI + accounting journal) for
+// the entire order history across every store. A genuinely-stuck order is caught
+// within minutes; 12h is a generous ceiling that safely excludes old orders.
+const STUCK_ORDER_MAX_AGE_MINUTES = Number(process.env.STUCK_ORDER_MAX_AGE_MINUTES) || 720;
 const SWEEP_TAKE = 200;
 
 /** Minimal shape of the Inngest `step` this handler uses (kept for unit tests). */
@@ -53,6 +61,7 @@ export async function handleOrderCreatedStuckSweep(
   step: SweepStep
 ): Promise<{ swept: number; resent: number; alerted: number }> {
   const cutoff = new Date(Date.now() - STUCK_ORDER_NOTIFY_MINUTES * 60_000);
+  const floorCutoff = new Date(Date.now() - STUCK_ORDER_MAX_AGE_MINUTES * 60_000);
 
   // Cross-tenant read — Inngest crons run outside tenant-context middleware.
   const stuck: StuckOrder[] = await step.run('find-stuck', async () =>
@@ -62,7 +71,9 @@ export async function handleOrderCreatedStuckSweep(
           paymentStatus: 'paid',
           orderCreatedNotifiedAt: null,
           status: { not: 'cancelled' },
-          createdAt: { lt: cutoff },
+          // Window: older than the notify grace period, but NOT older than the
+          // recency floor — so the historical back-catalog is never re-notified.
+          createdAt: { lt: cutoff, gt: floorCutoff },
         },
         select: { id: true, storeId: true, locale: true, createdAt: true },
         orderBy: { createdAt: 'asc' },
