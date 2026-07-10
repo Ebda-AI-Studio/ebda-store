@@ -290,7 +290,7 @@ FWB is an e-commerce platform for one-time product purchases. No subscription bi
 
 #### Vendor 1: Railway (API hosting)
 
-**Risk**: High lock-in — `Dockerfile` + `railway.json` are Railway-specific; Railpack build system; Railway internal Redis URL. Migration cost to Fly.io/Render: ~4 hours (rewrite Dockerfile to standard, swap Redis URL, update DNS). Low-cost mitigation: standard Express app is portable. The Railpack-vs-Dockerfile confusion (`feedback-railway-build-failure-invisible.md`) has been stabilized.
+**Risk**: High lock-in — `Dockerfile.api` + `railway.json` are Railway-specific; Railway internal Redis URL. Migration cost to Fly.io/Render: ~4 hours (rewrite Dockerfile to standard, swap Redis URL, update DNS). Low-cost mitigation: standard Express app is portable. _(2026-07-10 correction — historical plan doc, left otherwise as-is: this originally said "Railpack build system," but the build has always been (or has since been confirmed as) Dockerfile-based per `railway.json`'s `builder: DOCKERFILE`. Confirm the live Railway dashboard setting if deploy behaviour is ever in question.)_
 
 #### Vendor 2: Neon Postgres
 

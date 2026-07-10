@@ -18,6 +18,8 @@ This project runs two complementary gates:
 
 To run the full gate manually: `bash scripts/safe-deploy.sh`
 
+**AI-output eval harness** (branch `feat/ai-output-eval-harness`, not yet merged to `main` as of this writing — currently in CI): `apps/api/src/lib/ai/eval/` adds a QA layer across all 21 distinct AI generator output types (product FAQs/excerpts/alt-text/category+tag suggestions, translation, SEO meta, section copy, description balancing, AEO/GEO content, product recommendations, review tools). Deterministic checks (`tests/unit/ai-eval-*.test.ts` — schema validity, bilingual field presence, length bounds, script correctness, near-duplication, numeric-spec-invention guard) run on every push as part of the normal unit-test job. A separate model-as-judge layer (`.github/workflows/ai-eval-nightly.yml`, real Gemini calls scoring grounding/relevance/duplication/tone) runs nightly at 2:30am UTC (or on-demand via `workflow_dispatch`) — deliberately kept off the per-push gate since it costs Gemini quota and is non-deterministic. Internal QA tooling, not merchant-facing.
+
 ---
 
 ## Architecture Overview
@@ -40,7 +42,7 @@ To run the full gate manually: `bash scripts/safe-deploy.sh`
 ┌──────────────────────────────────────────────────────────────────┐
 │                      RAILWAY (~$10-20/mo)                        │
 │  ┌──────────────────────────────────────────────────────────┐    │
-│  │  Express.js API (Dockerfile, Railpack runner)             │    │
+│  │  Express.js API (Dockerfile.api, builder=DOCKERFILE)       │    │
 │  │  api.force-ai.co (old: store-api.forcemediakw.com)       │    │
 │  │  + Redis (railway internal :6379)                        │    │
 │  └──────────────────────────────────────────────────────────┘    │
@@ -62,6 +64,8 @@ Estimated Monthly Cost (current scale): ~$26/mo
 ---
 
 ## Step 1: Railway Setup (API Server)
+
+> **Note:** this is the original manual dashboard walkthrough for a from-scratch Railway project. The actual production build/start config is defined by the root `railway.json` (`builder: DOCKERFILE`, `dockerfilePath: Dockerfile.api`, `startCommand: node apps/api/dist/index.js`) — Railway reads that file automatically once linked, so most of the "1.3 Configure Service" table below is superseded by `railway.json` rather than the dashboard fields. Kept for onboarding a fresh Railway project from zero.
 
 ### 1.1 Create Railway Account
 
