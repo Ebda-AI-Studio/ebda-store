@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
@@ -82,7 +82,6 @@ const templates: Template[] = [
 
 export default function StoreTemplatePage() {
   const params = useParams();
-  const router = useRouter();
   const storeId = params?.id as string;
   const t = useT('template.page');
   const toast = useToast();
@@ -134,8 +133,12 @@ export default function StoreTemplatePage() {
         return;
       }
 
+      // Stay on the template page after saving — consistent with every other
+      // settings page (success toast, no navigation). Reflect the saved template
+      // locally so the "Current" badge + the disabled-when-unchanged Save button
+      // update without a reload / kicking the merchant out of the page.
+      setStore(prev => (prev ? { ...prev, template: selectedTemplate } : prev));
       toast.success(t('saveSuccess'), t('saveSuccessBody'));
-      router.push(`/stores/${storeId}`);
     } catch (err) {
       console.error('Failed to update template:', err);
       toast.error(t('saveError'), t('saveErrorBody'));
