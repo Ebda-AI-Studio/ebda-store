@@ -240,8 +240,12 @@ export function OutOfStockRibbon({
 
   if (hasBadgeConfig) {
     // Configurable badge pill path.
+    // 2026-07-10: default EN fallback shortened 'Out of stock' → 'Sold Out'
+    // (matches the shorter copy already used on the elegant CTA label) —
+    // narrower text keeps the compact pill from growing as wide as the
+    // wishlist heart-collision guard below needs to reserve.
     const labelText =
-      (isRtl ? oosLabelTextAr : oosLabelTextEn) ?? (isRtl ? 'نفدت الكمية' : 'Out of stock');
+      (isRtl ? oosLabelTextAr : oosLabelTextEn) ?? (isRtl ? 'نفدت الكمية' : 'Sold Out');
     const placementCls = oosPlacementClass(oosLabelPlacement);
     const shapeCls = labelShapeClass(oosLabelShape);
     // Defaults match the admin ColorField inheritFromToken hints (muted bg /
@@ -256,9 +260,23 @@ export function OutOfStockRibbon({
         ? resolveColor(oosLabelTextColor, theme)
         : 'hsl(var(--foreground))';
 
+    // Wishlist-heart collision guard (2026-07-10, pecannbee live bug): the
+    // heart button is a fixed 40px circle inset ~12px from a TOP corner on
+    // every card that has one (PecannbeeProductCard / elegant / modern). On
+    // compact cards (110-200px wide) a wide EN badge placed in the corner
+    // OPPOSITE the heart can still physically reach into the heart's
+    // footprint and get clipped behind it — confirmed live: 'OUT OF STOCK'
+    // (~100px) overlapped the heart by ~12px while the shorter Arabic
+    // equivalent (~68px) cleared it by ~20px. Reserve the heart's footprint
+    // on any top-row placement so the pill can never grow into it; truncate
+    // as a last resort for a merchant's very long custom text. Bottom
+    // placements skip the guard — the heart never lives there.
+    const isTopPlacement = !oosLabelPlacement || oosLabelPlacement.startsWith('top');
+    const collisionGuardCls = isTopPlacement ? 'max-w-[calc(100%-3.5rem)] truncate' : '';
+
     return (
       <span
-        className={`pointer-events-none absolute z-10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm ${placementCls} ${shapeCls} ${className}`}
+        className={`pointer-events-none absolute z-10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-normal shadow-sm ${collisionGuardCls} ${placementCls} ${shapeCls} ${className}`}
         style={{ backgroundColor: bgColor, color: textColor }}
         aria-hidden
       >

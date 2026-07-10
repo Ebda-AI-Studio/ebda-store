@@ -850,7 +850,7 @@ export interface ProductCardDefaults {
   ctaTextColor?: string; // token:* or hex; unset = contrast-guarded default
   /** Out-of-stock label badge: shape/size/placement/color, independent of CTA. */
   oosLabel?: boolean; // show the OOS label badge (default true = current ribbon)
-  oosLabelTextEn?: string; // default "Out of stock"
+  oosLabelTextEn?: string; // default "Sold Out"
   oosLabelTextAr?: string; // default "نفدت الكمية"
   oosLabelShape?: 'rounded' | 'pill' | 'square' | 'soft';
   oosLabelPlacement?: 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end';
