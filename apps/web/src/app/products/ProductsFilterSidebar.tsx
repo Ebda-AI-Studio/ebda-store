@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Category, PaginationMeta, ProductFacet } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useNumerals } from '../../hooks/useNumerals';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 
 interface SortOption {
@@ -122,6 +123,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
     fgTriplet,
   } = props;
   const { t } = useLanguage();
+  const { localize } = useNumerals();
 
   // Override --primary / --primary-foreground LOCALLY on the sidebar root when
   // the merchant set custom filter colors. Every inner element already paints
@@ -211,9 +213,10 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
                 <>
                   {t('Showing', 'عرض')}{' '}
                   <span className="font-medium text-[hsl(var(--primary-foreground))]">
-                    {resultCount}
+                    {localize(resultCount)}
                   </span>{' '}
-                  {meta ? t(`of ${meta.total}`, `من ${meta.total}`) : ''} {t('products', 'منتجات')}
+                  {meta ? t(`of ${meta.total}`, `من ${localize(meta.total)}`) : ''}{' '}
+                  {t('products', 'منتجات')}
                 </>
               )}
             </p>
@@ -291,10 +294,10 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs lg:text-sm text-[hsl(var(--primary-foreground)/0.8)]">
                 <span>
-                  {priceMin.toFixed(3)} {t('KWD', 'د.ك')}
+                  {localize(priceMin.toFixed(3))} {t('KWD', 'د.ك')}
                 </span>
                 <span>
-                  {priceMax.toFixed(3)} {t('KWD', 'د.ك')}
+                  {localize(priceMax.toFixed(3))} {t('KWD', 'د.ك')}
                 </span>
               </div>
               <div className="relative h-1.5 rounded-full bg-[hsl(var(--primary-foreground)/0.25)]">

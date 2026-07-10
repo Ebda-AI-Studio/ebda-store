@@ -1653,6 +1653,10 @@
         "title": "Show quick-add (+) on product carousels",
         "hint": "Customers can add a product to cart with one tap directly from the homepage carousels — no need to open the product page first. When on, the bottom \"Add to cart\" button on each carousel card is hidden (the + replaces it)."
       },
+      "arabicNumerals": {
+        "title": "Arabic numerals (٠١٢٣)",
+        "hint": "Show Eastern Arabic-Indic digits on the Arabic storefront. Off = Western digits (0-9) everywhere."
+      },
       "logoSize": {
         "title": "Logo size",
         "hint": "How big your logo appears in the header. Auto fits each logo to its shape. S / M / L are three fixed sizes (Small is the most compact, Large matches the full default) — picking any of them changes the logo immediately. Affects only this store.",

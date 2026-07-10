@@ -145,11 +145,11 @@ export default function ProductsClient({
   // How many products to load per page. The user can pick from a small
   // allow-list (12 / 24 / 48 / 96); we persist their choice to localStorage
   // so it survives reloads but never trust it blindly — anything outside the
-  // allow-list falls back to 12 (Pecannbee default).
+  // allow-list falls back to 96 (default: show all items).
   const [perPage, setPerPage] = useState<number>(() => {
-    if (typeof window === 'undefined') return 12;
+    if (typeof window === 'undefined') return 96;
     const stored = Number(window.localStorage.getItem('plp-per-page'));
-    return PER_PAGE_OPTIONS.includes(stored) ? stored : 12;
+    return PER_PAGE_OPTIONS.includes(stored) ? stored : 96;
   });
 
   // Price range in MAJOR units (KD). 0–100 KD covers most KW grocery / spice

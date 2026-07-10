@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useNumerals } from '../../hooks/useNumerals';
 
 /**
  * Classic template — cart list as a clean, table-style grid. Square
@@ -20,8 +21,9 @@ export default function ClassicCartTable({
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${(price / 1000).toFixed(3)} ${currency}`;
+  const format = (price: number) => `${localize((price / 1000).toFixed(3))} ${currency}`;
 
   return (
     <div
@@ -96,7 +98,7 @@ export default function ClassicCartTable({
                     −
                   </button>
                   <span className="w-10 text-center text-sm font-medium" style={typography?.cta}>
-                    {item.quantity}
+                    {localize(item.quantity)}
                   </span>
                   <button
                     type="button"

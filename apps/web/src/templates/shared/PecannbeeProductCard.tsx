@@ -10,6 +10,7 @@ import { getProductCardTextSizes, resolveColor } from '@force/shared';
 import { cn, CartIcon } from '@force/ui';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useStore } from '../../contexts/StoreContext';
+import { useNumerals } from '../../hooks/useNumerals';
 import { getPackStyles } from './pack-styles';
 import {
   cardFrameClass,
@@ -92,6 +93,7 @@ function PecannbeeProductCardImpl({
 }: PecannbeeProductCardProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const { store, layout } = useStore();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const styles = getPackStyles(pack);
   const textSizes = getProductCardTextSizes(cardSize);
@@ -434,12 +436,12 @@ function PecannbeeProductCardImpl({
                     }}
                   >
                     {pricing.mode === 'fromMin' ? `${isRtl ? 'من ' : 'From '}` : ''}
-                    {(pricing.displayPrice / 1000).toFixed(3)} {currency}
+                    {localize((pricing.displayPrice / 1000).toFixed(3))} {currency}
                   </span>
                 </span>
                 {pricing.displayCompare && (
                   <span className="text-sm text-muted-foreground line-through">
-                    {(pricing.displayCompare / 1000).toFixed(3)}
+                    {localize((pricing.displayCompare / 1000).toFixed(3))}
                   </span>
                 )}
               </div>

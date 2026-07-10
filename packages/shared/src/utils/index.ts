@@ -70,6 +70,24 @@ export function formatPrice(
   }).format(amount / divisor);
 }
 
+/** ASCII digit → Eastern Arabic-Indic digit lookup ('0'..'9' → '٠'..'٩'). */
+const ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+/**
+ * Convert ASCII digits (0-9) in a string or number to Eastern Arabic-Indic
+ * digits (٠١٢٣٤٥٦٧٨٩). Every non-digit character (separators like `.`, `,`,
+ * `/`, `-`, `:`, spaces, currency words, letters) is left untouched — only
+ * the `0`-`9` characters are swapped.
+ *
+ * Used to localize numeric displays (prices, counts, quantities) on the
+ * Arabic storefront when a store opts into `StoreTheme.arabicNumerals`.
+ * Never apply this to identifiers (order numbers, SKUs, phone numbers,
+ * tracking numbers) — those must always stay Western digits.
+ */
+export function toArabicDigits(input: string | number): string {
+  return String(input).replace(/[0-9]/g, digit => ARABIC_DIGITS[Number(digit)]);
+}
+
 /**
  * Generate URL-friendly slug from string
  */

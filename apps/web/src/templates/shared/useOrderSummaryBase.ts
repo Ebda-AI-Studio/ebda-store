@@ -10,6 +10,7 @@
  */
 
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useNumerals } from '../../hooks/useNumerals';
 import type { OrderSummaryProps } from '../types';
 
 export interface OrderSummaryBaseResult {
@@ -42,11 +43,12 @@ export function useOrderSummaryBase({
   'currency' | 'ctaLabel' | 'ctaLabelAr' | 'summaryColors' | 'isRtl'
 >): OrderSummaryBaseResult {
   const { isRtl: ctxIsRtl } = useLanguage();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
 
   return {
     isRtl,
-    fmt: (p: number) => `${(p / 1000).toFixed(3)} ${currency}`,
+    fmt: (p: number) => `${localize((p / 1000).toFixed(3))} ${currency}`,
     ctaText: isRtl ? (ctaLabelAr ?? ctaLabel) : (ctaLabel ?? ctaLabelAr),
     summaryLabelBold: summaryColors?.bold !== false,
     labelColorStyle: summaryColors?.labelColor ? { color: summaryColors.labelColor } : undefined,

@@ -2,6 +2,7 @@
 
 import type { PaginationMeta } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useNumerals } from '../../hooks/useNumerals';
 
 interface ProductsPaginationProps {
   meta: PaginationMeta;
@@ -11,6 +12,7 @@ interface ProductsPaginationProps {
 
 export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginationProps) {
   const { language } = useLanguage();
+  const { localize } = useNumerals();
   const t = (en: string, ar: string) => (language === 'ar' ? ar : en);
 
   if (meta.totalPages <= 1) return null;
@@ -37,7 +39,7 @@ export function ProductsPagination({ meta, page, onPageChange }: ProductsPaginat
                   page === p ? 'bg-primary text-white' : 'border border-border hover:bg-muted'
                 }`}
               >
-                {p}
+                {localize(p)}
               </button>
             </span>
           );

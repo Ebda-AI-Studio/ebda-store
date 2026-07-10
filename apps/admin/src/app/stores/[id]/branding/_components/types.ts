@@ -100,6 +100,11 @@ export interface StoreTheme {
    * uppercase via [data-ui-uppercase='true'] .ui-caps-toggle in globals.css.
    */
   uppercaseStyle?: boolean;
+  /**
+   * Opt-in Eastern Arabic-Indic digits (٠١٢٣) on the Arabic storefront.
+   * Default false = Western digits (0-9) everywhere in both languages.
+   */
+  arabicNumerals?: boolean;
 }
 
 export interface StoreBranding {

@@ -331,6 +331,28 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         </label>
       </div>
 
+      {/* ── Arabic numerals ──────────────────────────────────────────────── */}
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{t('arabicNumerals.title')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('arabicNumerals.hint')}</p>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={branding.theme.arabicNumerals === true}
+            onChange={e =>
+              onChange({
+                ...branding,
+                theme: { ...branding.theme, arabicNumerals: e.target.checked },
+              })
+            }
+            className="h-4 w-4 cursor-pointer accent-primary"
+          />
+          <span className="text-xs text-foreground">{t('arabicNumerals.title')}</span>
+        </label>
+      </div>
+
       {/* ── Footer logo ───────────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>

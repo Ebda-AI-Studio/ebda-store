@@ -77,7 +77,7 @@ async function fetchInitialData(
   // (isNew=true), so a category landed showing only a handful of products.
   const productsQuery = new URLSearchParams({
     page: '1',
-    limit: '12',
+    limit: '96',
   });
   if (filters.category) productsQuery.set('category', filters.category);
 

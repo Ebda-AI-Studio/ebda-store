@@ -38,7 +38,10 @@ export default function ShippingClient() {
   const { language, t } = useLanguage();
   // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
   // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
+  const formatPrice = (amount: number) =>
+    formatPriceBase(amount, {
+      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
+    });
   const [zones, setZones] = useState<ShippingZone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);

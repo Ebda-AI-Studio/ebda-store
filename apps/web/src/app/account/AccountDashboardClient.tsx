@@ -16,7 +16,10 @@ export default function AccountDashboardClient() {
   const { isEnabled } = useFeatures();
   // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
   // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
+  const formatPrice = (amount: number) =>
+    formatPriceBase(amount, {
+      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
+    });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);

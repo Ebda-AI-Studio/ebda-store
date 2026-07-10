@@ -15,7 +15,10 @@ export default function OrdersClient() {
   const { t, language } = useLanguage();
   // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
   // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
+  const formatPrice = (amount: number) =>
+    formatPriceBase(amount, {
+      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
+    });
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

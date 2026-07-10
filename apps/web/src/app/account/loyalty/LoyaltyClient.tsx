@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useNumerals } from '../../../hooks/useNumerals';
 import { useFeatures } from '../../../contexts/FeatureContext';
 import { api, API_URL } from '../../../lib/api';
 import { formatDate as formatStoreDate } from '../../../lib/format-date';
@@ -33,6 +34,7 @@ async function authFetch(url: string) {
 export default function LoyaltyClient() {
   const { store } = useStore();
   const { t, language } = useLanguage();
+  const { localize } = useNumerals();
   const { isEnabled } = useFeatures();
   const { success: toastSuccess, error: toastError } = useToast();
   const storeId = store.id;
@@ -435,7 +437,7 @@ export default function LoyaltyClient() {
                   )}
                 </p>
                 <p className="mt-1 text-5xl font-bold text-primary">
-                  {loyaltyPoints.points.toLocaleString()}
+                  {localize(loyaltyPoints.points.toLocaleString())}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {t('points', '\u0646\u0642\u0627\u0637')}
@@ -548,7 +550,7 @@ export default function LoyaltyClient() {
                         }`}
                       >
                         {isPositive ? '+' : ''}
-                        {txn.points.toLocaleString()}
+                        {localize(txn.points.toLocaleString())}
                       </td>
                     </tr>
                   );

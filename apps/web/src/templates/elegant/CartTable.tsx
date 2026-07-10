@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useNumerals } from '../../hooks/useNumerals';
 
 /**
  * Elegant template — cart rendered with thin hairline dividers, generous
@@ -20,8 +21,9 @@ export default function ElegantCartTable({
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${(price / 1000).toFixed(3)} ${currency}`;
+  const format = (price: number) => `${localize((price / 1000).toFixed(3))} ${currency}`;
 
   return (
     <div className="divide-y divide-border/50" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -91,7 +93,7 @@ export default function ElegantCartTable({
                     className="min-w-[2ch] text-center font-light tracking-wide"
                     style={typography?.cta}
                   >
-                    {item.quantity}
+                    {localize(item.quantity)}
                   </span>
                   <button
                     type="button"

@@ -11,6 +11,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNumerals } from '../hooks/useNumerals';
 import { api, type SearchSuggestion } from '../lib/api';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -50,6 +51,7 @@ function cacheSet(key: string, value: SearchSuggestion[]) {
 export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps) {
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
+  const { localize } = useNumerals();
   const isAr = language === 'ar';
 
   const [suggestions, setSuggestions] = useState<SearchSuggestion[] | null>(null);
@@ -233,7 +235,7 @@ export function SearchAutocomplete({ query, onSelect }: SearchAutocompleteProps)
             const isActive = activeIndex === idx;
             const displayName = isAr && product.nameAr ? product.nameAr : product.name;
             // Prices stored in fils — divide by 1000 for KWD.
-            const priceKwd = (product.price / 1000).toFixed(3);
+            const priceKwd = localize((product.price / 1000).toFixed(3));
 
             return (
               <Link

@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useNumerals } from '../../hooks/useNumerals';
 
 /**
  * Minimal template — cart rendered with ultra-spare typography-first
@@ -20,8 +21,9 @@ export default function MinimalCartTable({
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
-  const format = (price: number) => `${(price / 1000).toFixed(3)} ${currency}`;
+  const format = (price: number) => `${localize((price / 1000).toFixed(3))} ${currency}`;
 
   return (
     <div className="space-y-10" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -81,7 +83,7 @@ export default function MinimalCartTable({
                     className="min-w-[1.5ch] text-center text-foreground"
                     style={typography?.cta}
                   >
-                    {item.quantity}
+                    {localize(item.quantity)}
                   </span>
                   <button
                     type="button"

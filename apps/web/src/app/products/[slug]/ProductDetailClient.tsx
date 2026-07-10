@@ -25,6 +25,7 @@ import { trackViewContent, trackAddToCart } from '../../../components/MarketingP
 import { recordFocusProduct, getLastListing } from '@/lib/last-listing';
 import { VariantSelector } from '../../../components/VariantSelector';
 import { useTemplateComponents } from '../../../hooks/useTemplateComponents';
+import { useNumerals } from '../../../hooks/useNumerals';
 import { toTemplateProduct } from '../../../templates/adapters';
 import { ProductCarousel } from '../../../templates/shared/ProductCarousel';
 import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label';
@@ -194,9 +195,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const { isLoading: templateLoading } = useTemplateComponents();
   const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
+  const { localize } = useNumerals();
   // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
   // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
+  const formatPrice = (amount: number) =>
+    formatPriceBase(amount, {
+      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
+    });
   // Prop layout wins (server-side fetch); ctx layout is the lazy-fetched fallback.
   const resolvedLayout = layout ?? ctxLayout ?? undefined;
   // Issue 2: pass productCardDefaults to all card surfaces on this page.
@@ -741,7 +746,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                       -
                     </button>
                     <span aria-live="polite" className="w-12 text-center font-medium">
-                      {quantity}
+                      {localize(quantity)}
                     </span>
                     <button
                       type="button"

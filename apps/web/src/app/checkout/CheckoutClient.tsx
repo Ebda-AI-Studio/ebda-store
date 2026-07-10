@@ -132,7 +132,10 @@ export default function CheckoutClient() {
   // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
   // (formatPriceBase defaults to Western digits when no locale is passed).
   // Passed down to PaymentStep as the `formatPrice` prop too.
-  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
+  const formatPrice = (amount: number) =>
+    formatPriceBase(amount, {
+      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
+    });
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

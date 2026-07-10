@@ -37,9 +37,14 @@ export function ProductListItem({
 }: ProductListItemProps) {
   const { t, isRtl } = useLanguage();
   const { store, layout } = useStore();
-  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
-  // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: isRtl ? 'ar' : 'en' });
+  // Locale-aware wrapper — only uses Arabic-Indic digits when the merchant
+  // opted in via StoreTheme.arabicNumerals AND the shopper is on the Arabic
+  // locale (formatPriceBase defaults to Western digits when no locale is
+  // passed / locale 'en').
+  const formatPrice = (amount: number) =>
+    formatPriceBase(amount, {
+      locale: isRtl && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
+    });
   const priceVisible = showCardPrice !== false;
   // Localized name for alt text + heading. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.

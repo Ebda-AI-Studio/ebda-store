@@ -92,7 +92,10 @@ export default function OrderDetailClient() {
   const { t, language } = useLanguage();
   // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
   // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
+  const formatPrice = (amount: number) =>
+    formatPriceBase(amount, {
+      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
+    });
   // Safe cast: this is a standard [id] route (not catch-all [...id]), so
   // params.id is always a single string in Next.js App Router.
   const orderId = params.id as string;

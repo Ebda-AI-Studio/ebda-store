@@ -4,6 +4,8 @@ import Image from 'next/image';
 import { Button, Input } from '@force/ui';
 import type { CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
+import { useStore } from '../../contexts/StoreContext';
+import { useNumerals } from '../../hooks/useNumerals';
 import { formatPrice as formatPriceBase } from '@/lib/format';
 import type { CheckoutCartItem, Coupon } from './types';
 
@@ -76,9 +78,16 @@ export function OrderSummary({
   summaryColors,
 }: OrderSummaryProps) {
   const { t, isRtl } = useLanguage();
-  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
-  // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: isRtl ? 'ar' : 'en' });
+  const { store } = useStore();
+  const { localize } = useNumerals();
+  // Locale-aware wrapper — only uses Arabic-Indic digits when the merchant
+  // opted in via StoreTheme.arabicNumerals AND the shopper is on the Arabic
+  // locale (formatPriceBase defaults to Western digits when no locale is
+  // passed / locale 'en').
+  const formatPrice = (amount: number) =>
+    formatPriceBase(amount, {
+      locale: isRtl && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
+    });
   const summaryLabelBold = summaryColors?.bold !== false;
   const summaryFontWeight = summaryLabelBold ? 'font-bold' : 'font-normal';
   const labelColorStyle = summaryColors?.labelColor
@@ -132,7 +141,7 @@ export function OrderSummary({
                   </div>
                 )}
                 <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground text-xs text-white">
-                  {item.quantity}
+                  {localize(item.quantity)}
                 </span>
               </div>
               <div className="flex flex-1 flex-col">
@@ -161,7 +170,7 @@ export function OrderSummary({
                 </span>
                 <span className="text-sm text-[hsl(var(--success))] ml-2">
                   {appliedCoupon.type === 'percentage'
-                    ? `${appliedCoupon.value}% ${t('off', '\u062e\u0635\u0645')}`
+                    ? `${localize(appliedCoupon.value)}% ${t('off', '\u062e\u0635\u0645')}`
                     : appliedCoupon.type === 'free_shipping'
                       ? t('Free shipping', '\u0634\u062d\u0646 \u0645\u062c\u0627\u0646\u064a')
                       : `${formatPrice(appliedCoupon.value)} ${t('off', '\u062e\u0635\u0645')}`}
@@ -219,7 +228,8 @@ export function OrderSummary({
                   {t('Use loyalty points', 'استخدام نقاط الولاء')}
                 </span>
                 <span className="block text-xs text-muted-foreground">
-                  {t('Balance', 'الرصيد')}: {loyalty.points.toLocaleString()} {t('points', 'نقطة')}
+                  {t('Balance', 'الرصيد')}: {localize(loyalty.points.toLocaleString())}{' '}
+                  {t('points', 'نقطة')}
                   {' · '}
                   {t('worth', 'بقيمة')} {pointsValueLabel(loyalty.points)}
                 </span>
@@ -256,7 +266,8 @@ export function OrderSummary({
                 </div>
                 {loyalty.pointsToRedeem > 0 && loyalty.pointsToRedeem < loyalty.minRedeemPoints && (
                   <p className="mt-2 text-sm text-destructive">
-                    {t('Minimum', 'الحد الأدنى')} {loyalty.minRedeemPoints.toLocaleString()}{' '}
+                    {t('Minimum', 'الحد الأدنى')}{' '}
+                    {localize(loyalty.minRedeemPoints.toLocaleString())}{' '}
                     {t('points to redeem', 'نقطة للاستخدام')}
                   </p>
                 )}

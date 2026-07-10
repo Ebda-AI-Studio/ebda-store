@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { CartTableProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useNumerals } from '../../hooks/useNumerals';
 
 /**
  * Modern template — cart item list. Each row is a card with the product
@@ -20,9 +21,10 @@ export default function ModernCartTable({
   typography,
 }: CartTableProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
+  const { localize } = useNumerals();
   const isRtl = isRtlProp ?? ctxIsRtl;
 
-  const format = (price: number) => `${(price / 1000).toFixed(3)} ${currency}`;
+  const format = (price: number) => `${localize((price / 1000).toFixed(3))} ${currency}`;
 
   return (
     <div className="space-y-3" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -106,7 +108,7 @@ export default function ModernCartTable({
                     className="min-w-[2ch] text-center text-sm font-semibold"
                     style={typography?.cta}
                   >
-                    {item.quantity}
+                    {localize(item.quantity)}
                   </span>
                   <button
                     type="button"

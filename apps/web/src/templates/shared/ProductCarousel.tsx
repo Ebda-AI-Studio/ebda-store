@@ -23,6 +23,7 @@ import type { CtaShape, CtaSize } from './card-size';
 import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
+import { useNumerals } from '../../hooks/useNumerals';
 import { getProductCardTextSizes, resolveColor } from '@force/shared';
 import { cn } from '@force/ui';
 import type { ProductCarouselProps } from '../types';
@@ -93,6 +94,7 @@ export function ProductCarousel({
   // When `store.theme.showQuickAdd === true`, in-stock non-variant
   // products get the overlay button; otherwise it's hidden.
   const { store, layout } = useStore();
+  const { localize } = useNumerals();
   const showQuickAdd = store.theme?.showQuickAdd === true;
   // Sprint 1 (2026-05-17): per-cardSize text-size pair, paired with
   // pack-styles flavor classes. Without this the previous `text-lg`
@@ -574,11 +576,12 @@ export function ProductCarousel({
                                     {carouselPricing.mode === 'fromMin'
                                       ? `${isRtl ? 'من ' : 'From '}`
                                       : ''}
-                                    {(carouselPricing.displayPrice / 1000).toFixed(3)} {currency}
+                                    {localize((carouselPricing.displayPrice / 1000).toFixed(3))}{' '}
+                                    {currency}
                                   </span>
                                   {carouselPricing.displayCompare && (
                                     <span className="text-sm text-muted-foreground line-through">
-                                      {(carouselPricing.displayCompare / 1000).toFixed(3)}
+                                      {localize((carouselPricing.displayCompare / 1000).toFixed(3))}
                                     </span>
                                   )}
                                 </div>

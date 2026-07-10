@@ -21,6 +21,7 @@ import {
   pageDensityStyle,
 } from '../../templates/shared/section-typography';
 import { useLastListing } from '../../hooks/useLastListing';
+import { useNumerals } from '../../hooks/useNumerals';
 import { resolveColor } from '@force/shared';
 
 export default function CartClient() {
@@ -87,9 +88,13 @@ export default function CartClient() {
     cta: cartZoneStyle(cartCtaZone),
   };
   const { language, t } = useLanguage();
+  const { localize } = useNumerals();
   // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
   // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) => formatPriceBase(amount, { locale: language });
+  const formatPrice = (amount: number) =>
+    formatPriceBase(amount, {
+      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
+    });
   const continuShoppingHref = useLastListing();
 
   // ── Summary-label color + bold (StoreTheme → per-store) ─────────────────
@@ -545,7 +550,7 @@ export default function CartClient() {
                                   </svg>
                                 </button>
                                 <span className="w-10 border-x border-border text-center text-sm font-semibold text-foreground">
-                                  {item.quantity}
+                                  {localize(item.quantity)}
                                 </span>
                                 <button
                                   onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
