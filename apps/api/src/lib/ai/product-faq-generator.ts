@@ -50,7 +50,12 @@ Product: ${product.name}${product.nameAr ? ` / ${product.nameAr}` : ''}
 Description: ${product.description ?? '(no description provided)'}
 
 Draft exactly ${count} FAQ pairs that real customers would ask about this specific product.
-Cover: sizing/fit, materials, shipping time, return policy, how to use, care instructions — pick the most relevant for this product.
+
+ACCURACY RULES — follow strictly:
+- Answer ONLY with facts explicitly present in the product name/description above, OR with general store policy that is always safe (shipping timeframes, returns, ordering). NEVER invent product specifics — do not state sizes, materials, ingredients, dimensions, weight, colours, capacity, or compatibility that are not written above. If a fact is not given, do not make one up: either ask a question you can answer safely, or skip that topic.
+- Do NOT restate information that is already in the description. Each FAQ must add NEW, useful information the description does not already cover — never paraphrase the description back to the customer.
+- Keep answers concise (1-2 sentences), concrete, and honest. No marketing fluff, no guesses hedged as facts.
+
 Each FAQ must have a question AND answer in BOTH English AND Arabic (formal MSA, not dialect).
 
 Return ONLY valid JSON — no markdown, no explanation:

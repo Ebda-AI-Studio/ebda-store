@@ -49,7 +49,7 @@ const ERROR_CAP = 50;
 const THROTTLE_MS = parseInt(process.env.AI_BULK_THROTTLE_MS || '2500', 10);
 const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
 // FAQ pairs to draft per product.
-const FAQS_PER_PRODUCT = 5;
+const FAQS_PER_PRODUCT = 3;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 

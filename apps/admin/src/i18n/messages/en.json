@@ -2464,10 +2464,6 @@
         "title": "Install Prompt",
         "description": "Show prompt to add app to home screen"
       },
-      "offline": {
-        "title": "Offline Support",
-        "description": "Cache pages for offline access"
-      },
       "push": {
         "title": "Push Notifications",
         "description": "Send notifications to customers (requires setup)"

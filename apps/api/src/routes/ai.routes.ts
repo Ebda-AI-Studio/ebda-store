@@ -459,7 +459,7 @@ router.get('/bulk/:jobId', async (req: Request, res: Response, next: NextFunctio
 
 const draftProductFaqsSchema = z.object({
   productId: z.string().min(1),
-  count: z.number().int().min(1).max(10).default(5),
+  count: z.number().int().min(1).max(10).default(3),
 });
 
 router.post(

@@ -59,14 +59,9 @@ export function PwaInstallBanner({ settings, pwaEnabled, onChange }: PwaInstallB
           onToggle={next => onChange({ ...settings, installPromptEnabled: next })}
         />
 
-        <ToggleRow
-          title={t('offline.title')}
-          description={t('offline.description')}
-          checked={settings.offlineEnabled}
-          disabled={!pwaEnabled}
-          onToggle={next => onChange({ ...settings, offlineEnabled: next })}
-        />
-
+        {/* Offline-support toggle removed: the storefront service worker has no
+            fetch handler and caches nothing (apps/web/public/sw.js is push-only),
+            so this toggle was a no-op that promised offline caching we don't do. */}
         <ToggleRow
           title={t('push.title')}
           description={t('push.description')}

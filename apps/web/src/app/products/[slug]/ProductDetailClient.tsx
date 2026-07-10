@@ -70,7 +70,9 @@ function ProductFAQSection({
         {t('Product Q&A', 'أسئلة وأجوبة المنتج')}
       </h2>
       <div className="space-y-3">
-        {faqs.map((faq, index) => {
+        {/* Show at most 3 FAQs — keeps the PDP focused and avoids a wall of
+            (sometimes redundant) auto-drafted Q&A below the product. */}
+        {faqs.slice(0, 3).map((faq, index) => {
           const question = isAr ? faq.questionAr || faq.question : faq.question;
           const answer = isAr ? faq.answerAr || faq.answer : faq.answer;
           return (
