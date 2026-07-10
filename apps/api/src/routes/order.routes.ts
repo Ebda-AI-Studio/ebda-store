@@ -123,7 +123,11 @@ router.get(
               variantName: true,
               quantity: true,
               price: true,
+              costPrice: true,
               total: true,
+              // Arabic name is not snapshotted on the line item — pull it from
+              // the (current) product. Null when the product was since deleted.
+              product: { select: { nameAr: true } },
             },
           },
         },
@@ -188,10 +192,12 @@ router.get(
         { header: 'Status', key: 'status', width: 14 },
         { header: 'Payment Status', key: 'paymentStatus', width: 16 },
         { header: 'Product', key: 'product', width: 28 },
+        { header: 'Product (AR)', key: 'productAr', width: 28 },
         { header: 'SKU', key: 'sku', width: 16 },
         { header: 'Variant', key: 'variant', width: 20 },
         { header: 'Qty', key: 'qty', width: 8 },
         { header: 'Unit Price (KWD)', key: 'unitPrice', width: 18 },
+        { header: 'Cost Price (KWD)', key: 'costPrice', width: 18 },
         { header: 'Line Total (KWD)', key: 'lineTotal', width: 18 },
       ];
 
@@ -251,10 +257,14 @@ router.get(
               status: order.status ?? '',
               paymentStatus: order.paymentStatus ?? '',
               product: item.productName,
+              productAr: item.product?.nameAr ?? '',
               sku: item.sku ?? '',
               variant: item.variantName ?? '',
               qty: item.quantity,
               unitPrice: Number((item.price / 1000).toFixed(3)),
+              // costPrice is snapshotted per line (fils) but nullable — leave the
+              // cell blank when unknown rather than showing a misleading 0.
+              costPrice: item.costPrice != null ? Number((item.costPrice / 1000).toFixed(3)) : '',
               lineTotal: Number((item.total / 1000).toFixed(3)),
             })
           );
@@ -275,7 +285,7 @@ router.get(
       }
       ordersSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
 
-      for (const col of ['unitPrice', 'lineTotal']) {
+      for (const col of ['unitPrice', 'costPrice', 'lineTotal']) {
         itemsSheet.getColumn(col).numFmt = '0.000';
       }
       itemsSheet.getColumn('orderDate').numFmt = 'yyyy-mm-dd';
