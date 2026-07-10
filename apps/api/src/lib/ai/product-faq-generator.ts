@@ -14,7 +14,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseAiJson } from './parse-ai-json';
 import { rethrowAsAppError } from './gemini-errors';
+import { validateFaqGrounding } from './faq-grounding-validator';
 import { recordUsage } from '../../services/ai.service';
+import logger from '../logger';
 
 export interface GeneratedProductFaq {
   question: string;
@@ -32,27 +34,61 @@ export interface GenerateProductFaqsInput {
     name: string;
     nameAr?: string | null;
     description?: string | null;
+    /** Stock keeping unit, when set — a safe concrete fact for the model. */
+    sku?: string | null;
+    /**
+     * Purchasable variant options (e.g. Size: 400 Gram / 700 Gram). These ARE
+     * facts the model may use for size/weight/variant questions — without them
+     * the model invents a single wrong figure (e.g. "200g") that contradicts
+     * the options actually shown on the storefront.
+     */
+    options?:
+      | {
+          name: string;
+          nameAr?: string | null;
+          values: { value: string; valueAr?: string | null }[];
+        }[]
+      | null;
   };
   /** How many FAQ pairs to draft (1..10). */
   count: number;
 }
 
 /**
+ * Render the concrete, verifiable product facts (SKU + purchasable variant
+ * options) as a prompt block. Empty string when there are none, so the prompt
+ * degrades to the name/description-only shape for simple products.
+ */
+function buildProductFactsBlock(product: GenerateProductFaqsInput['product']): string {
+  const lines: string[] = [];
+  if (product.sku) lines.push(`SKU: ${product.sku}`);
+  const opts = (product.options ?? []).filter(o => o?.name && o.values?.length);
+  for (const o of opts) {
+    const vals = o.values.map(v => (v.valueAr ? `${v.value} / ${v.valueAr}` : v.value)).join(', ');
+    lines.push(`${o.name}${o.nameAr ? ` / ${o.nameAr}` : ''}: ${vals}`);
+  }
+  if (lines.length === 0) return '';
+  return `\nAvailable options / variants (these ARE facts you may use):\n${lines.join('\n')}\n`;
+}
+
+/**
  * Build the product-FAQ prompt. Kept as a named function so the prompt is
  * a single source of truth across the synchronous route and the async sweep.
  */
-function buildProductFaqPrompt(input: GenerateProductFaqsInput): string {
+export function buildProductFaqPrompt(input: GenerateProductFaqsInput): string {
   const { storeName, product, count } = input;
+  const factsBlock = buildProductFactsBlock(product);
   return `You are an SEO + AEO expert helping a Kuwait-based e-commerce store write product FAQs.
 
 Store: ${storeName}
 Product: ${product.name}${product.nameAr ? ` / ${product.nameAr}` : ''}
 Description: ${product.description ?? '(no description provided)'}
-
+${factsBlock}
 Draft exactly ${count} FAQ pairs that real customers would ask about this specific product.
 
 ACCURACY RULES — follow strictly:
-- Answer ONLY with facts explicitly present in the product name/description above, OR with general store policy that is always safe (shipping timeframes, returns, ordering). NEVER invent product specifics — do not state sizes, materials, ingredients, dimensions, weight, colours, capacity, or compatibility that are not written above. If a fact is not given, do not make one up: either ask a question you can answer safely, or skip that topic.
+- Answer ONLY with facts explicitly present in the product name/description/options above, OR with general store policy that is always safe (shipping timeframes, returns, ordering). NEVER invent product specifics — do not state sizes, materials, ingredients, dimensions, weight, colours, capacity, or compatibility that are not written above. If a fact is not given, do not make one up: either ask a question you can answer safely, or skip that topic.
+- When the "Available options / variants" block is present, use THOSE exact values for any size/weight/variant question (e.g. list the sizes offered). NEVER state a single size/weight that is not one of the listed options — that is the most common accuracy failure.
 - Do NOT restate information that is already in the description. Each FAQ must add NEW, useful information the description does not already cover — never paraphrase the description back to the customer.
 - Keep answers concise (1-2 sentences), concrete, and honest. No marketing fluff, no guesses hedged as facts.
 
@@ -116,5 +152,22 @@ export async function generateProductFaqs(
   if (!Array.isArray(faqs)) {
     throw new Error('AI returned unexpected format');
   }
-  return faqs;
+
+  // Deterministic grounding guard — drop any FAQ whose answer states a
+  // measurement (weight/size/volume/dimension) not present in the product's
+  // known facts. This catches the residual "200g" hallucination the prompt
+  // rule alone can't guarantee, on BOTH the draft route and the bulk sweep.
+  const { kept, dropped } = validateFaqGrounding(faqs, input.product);
+  if (dropped.length > 0) {
+    logger.warn(
+      {
+        storeId: input.storeId,
+        product: input.product.name,
+        droppedCount: dropped.length,
+        offending: dropped.flatMap(d => d.offending),
+      },
+      'faq-grounding: dropped ungrounded measurement claim(s)'
+    );
+  }
+  return kept;
 }

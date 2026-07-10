@@ -12,7 +12,7 @@
  * Mount below the SEO section in the product edit page.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Button, Input, Textarea, useToast } from '@force/ui';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
@@ -50,415 +50,442 @@ interface Props {
   productId: string;
 }
 
-export function ProductFaqSection({ storeId, productId }: Props) {
-  const t = useT('products.edit.faqs');
-  const { success: toastSuccess, error: toastError } = useToast();
+/** Imperative handle so the product edit page's single "Generate with AI"
+ * button can trigger a FAQ draft alongside SEO + AEO, reusing this
+ * section's own draft endpoint call + review-before-save UX rather than
+ * duplicating the save/draft logic on the parent page. */
+export interface ProductFaqSectionHandle {
+  /** Fetches AI-drafted FAQs into the review list (same as clicking the
+   * section's own "Generate with AI" button). Returns true on success so
+   * the caller can report partial failure without throwing. */
+  generateWithAi: () => Promise<boolean>;
+}
 
-  const [faqs, setFaqs] = useState<ProductFaq[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
+  function ProductFaqSection({ storeId, productId }, ref) {
+    const t = useT('products.edit.faqs');
+    const { success: toastSuccess, error: toastError } = useToast();
 
-  // Key = faq id for saved rows. 'new' for the add-new inline form.
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>(EMPTY_EDIT);
-  const [saving, setSaving] = useState(false);
+    const [faqs, setFaqs] = useState<ProductFaq[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
 
-  // AI draft rows — shown above the add-new button, not yet persisted.
-  const [aiDrafts, setAiDrafts] = useState<AiDraftFaq[]>([]);
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [savingDraftIndex, setSavingDraftIndex] = useState<number | null>(null);
+    // Key = faq id for saved rows. 'new' for the add-new inline form.
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editState, setEditState] = useState<EditState>(EMPTY_EDIT);
+    const [saving, setSaving] = useState(false);
 
-  const [open, setOpen] = useState(true);
+    // AI draft rows — shown above the add-new button, not yet persisted.
+    const [aiDrafts, setAiDrafts] = useState<AiDraftFaq[]>([]);
+    const [aiGenerating, setAiGenerating] = useState(false);
+    const [savingDraftIndex, setSavingDraftIndex] = useState<number | null>(null);
 
-  const fetchFaqs = useCallback(async () => {
-    try {
-      setLoadError(false);
-      const { data, error } = await apiGet<{ data: ProductFaq[] }>(
-        `/api/v1/stores/${storeId}/products/${productId}/faqs`
+    const [open, setOpen] = useState(true);
+
+    const fetchFaqs = useCallback(async () => {
+      try {
+        setLoadError(false);
+        const { data, error } = await apiGet<{ data: ProductFaq[] }>(
+          `/api/v1/stores/${storeId}/products/${productId}/faqs`
+        );
+        if (error) {
+          setLoadError(true);
+          return;
+        }
+        setFaqs(data?.data ?? []);
+      } catch {
+        setLoadError(true);
+      } finally {
+        setLoading(false);
+      }
+    }, [storeId, productId]);
+
+    useEffect(() => {
+      fetchFaqs();
+    }, [fetchFaqs]);
+
+    // ── Add / Edit saved row ──────────────────────────────────────────────
+
+    function startEdit(faq: ProductFaq) {
+      setEditingId(faq.id);
+      setEditState({
+        question: faq.question,
+        questionAr: faq.questionAr ?? '',
+        answer: faq.answer,
+        answerAr: faq.answerAr ?? '',
+      });
+    }
+
+    function startNew() {
+      setEditingId('new');
+      setEditState(EMPTY_EDIT);
+    }
+
+    function cancelEdit() {
+      setEditingId(null);
+      setEditState(EMPTY_EDIT);
+    }
+
+    async function saveEdit() {
+      if (!editState.question.trim() || !editState.answer.trim()) return;
+      setSaving(true);
+      try {
+        if (editingId === 'new') {
+          const { data, error } = await apiPost<{ data: ProductFaq }>(
+            `/api/v1/stores/${storeId}/products/${productId}/faqs`,
+            editState
+          );
+          if (error || !data?.data) {
+            toastError(t('saveError'), '');
+            return;
+          }
+          setFaqs(prev => [...prev, data.data]);
+        } else {
+          const { data, error } = await apiPut<{ data: ProductFaq }>(
+            `/api/v1/stores/${storeId}/products/${productId}/faqs/${editingId}`,
+            editState
+          );
+          if (error || !data?.data) {
+            toastError(t('saveError'), '');
+            return;
+          }
+          setFaqs(prev => prev.map(f => (f.id === editingId ? data.data : f)));
+        }
+        cancelEdit();
+      } catch {
+        toastError(t('saveError'), '');
+      } finally {
+        setSaving(false);
+      }
+    }
+
+    // ── Delete ────────────────────────────────────────────────────────────
+
+    async function deleteFaq(id: string) {
+      if (!confirm(t('deleteConfirm'))) return;
+      const { error } = await apiDelete(
+        `/api/v1/stores/${storeId}/products/${productId}/faqs/${id}`
       );
       if (error) {
-        setLoadError(true);
+        toastError(t('deleteError'), '');
         return;
       }
-      setFaqs(data?.data ?? []);
-    } catch {
-      setLoadError(true);
-    } finally {
-      setLoading(false);
+      setFaqs(prev => prev.filter(f => f.id !== id));
     }
-  }, [storeId, productId]);
 
-  useEffect(() => {
-    fetchFaqs();
-  }, [fetchFaqs]);
+    // ── AI generation ─────────────────────────────────────────────────────
 
-  // ── Add / Edit saved row ──────────────────────────────────────────────
+    const generateWithAi = useCallback(async (): Promise<boolean> => {
+      setAiGenerating(true);
+      try {
+        const { data, error } = await apiPost<{
+          data: {
+            faqs: Array<{
+              question: string;
+              questionAr?: string;
+              answer: string;
+              answerAr?: string;
+            }>;
+          };
+        }>(`/api/v1/stores/${storeId}/ai/product-faqs/draft`, { productId, count: 5 });
+        if (error || !data?.data?.faqs?.length) {
+          toastError(t('aiError'), '');
+          return false;
+        }
+        const drafts: AiDraftFaq[] = data.data.faqs.map(f => ({ ...f, isDraft: true as const }));
+        setAiDrafts(drafts);
+        toastSuccess(t('aiSuccess', { count: String(drafts.length) }), '');
+        return true;
+      } catch {
+        toastError(t('aiError'), '');
+        return false;
+      } finally {
+        setAiGenerating(false);
+      }
+    }, [storeId, productId, t, toastError, toastSuccess]);
 
-  function startEdit(faq: ProductFaq) {
-    setEditingId(faq.id);
-    setEditState({
-      question: faq.question,
-      questionAr: faq.questionAr ?? '',
-      answer: faq.answer,
-      answerAr: faq.answerAr ?? '',
-    });
-  }
+    useImperativeHandle(ref, () => ({ generateWithAi }), [generateWithAi]);
 
-  function startNew() {
-    setEditingId('new');
-    setEditState(EMPTY_EDIT);
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setEditState(EMPTY_EDIT);
-  }
-
-  async function saveEdit() {
-    if (!editState.question.trim() || !editState.answer.trim()) return;
-    setSaving(true);
-    try {
-      if (editingId === 'new') {
+    async function saveAiDraft(index: number) {
+      const draft = aiDrafts[index];
+      if (!draft) return;
+      setSavingDraftIndex(index);
+      try {
         const { data, error } = await apiPost<{ data: ProductFaq }>(
           `/api/v1/stores/${storeId}/products/${productId}/faqs`,
-          editState
+          {
+            question: draft.question,
+            questionAr: draft.questionAr ?? null,
+            answer: draft.answer,
+            answerAr: draft.answerAr ?? null,
+          }
         );
         if (error || !data?.data) {
           toastError(t('saveError'), '');
           return;
         }
         setFaqs(prev => [...prev, data.data]);
-      } else {
-        const { data, error } = await apiPut<{ data: ProductFaq }>(
-          `/api/v1/stores/${storeId}/products/${productId}/faqs/${editingId}`,
-          editState
-        );
-        if (error || !data?.data) {
-          toastError(t('saveError'), '');
-          return;
-        }
-        setFaqs(prev => prev.map(f => (f.id === editingId ? data.data : f)));
-      }
-      cancelEdit();
-    } catch {
-      toastError(t('saveError'), '');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // ── Delete ────────────────────────────────────────────────────────────
-
-  async function deleteFaq(id: string) {
-    if (!confirm(t('deleteConfirm'))) return;
-    const { error } = await apiDelete(`/api/v1/stores/${storeId}/products/${productId}/faqs/${id}`);
-    if (error) {
-      toastError(t('deleteError'), '');
-      return;
-    }
-    setFaqs(prev => prev.filter(f => f.id !== id));
-  }
-
-  // ── AI generation ─────────────────────────────────────────────────────
-
-  async function generateWithAi() {
-    setAiGenerating(true);
-    try {
-      const { data, error } = await apiPost<{
-        data: {
-          faqs: Array<{ question: string; questionAr?: string; answer: string; answerAr?: string }>;
-        };
-      }>(`/api/v1/stores/${storeId}/ai/product-faqs/draft`, { productId, count: 5 });
-      if (error || !data?.data?.faqs?.length) {
-        toastError(t('aiError'), '');
-        return;
-      }
-      const drafts: AiDraftFaq[] = data.data.faqs.map(f => ({ ...f, isDraft: true as const }));
-      setAiDrafts(drafts);
-      toastSuccess(t('aiSuccess', { count: String(drafts.length) }), '');
-    } catch {
-      toastError(t('aiError'), '');
-    } finally {
-      setAiGenerating(false);
-    }
-  }
-
-  async function saveAiDraft(index: number) {
-    const draft = aiDrafts[index];
-    if (!draft) return;
-    setSavingDraftIndex(index);
-    try {
-      const { data, error } = await apiPost<{ data: ProductFaq }>(
-        `/api/v1/stores/${storeId}/products/${productId}/faqs`,
-        {
-          question: draft.question,
-          questionAr: draft.questionAr ?? null,
-          answer: draft.answer,
-          answerAr: draft.answerAr ?? null,
-        }
-      );
-      if (error || !data?.data) {
+        setAiDrafts(prev => prev.filter((_, i) => i !== index));
+      } catch {
         toastError(t('saveError'), '');
-        return;
+      } finally {
+        setSavingDraftIndex(null);
       }
-      setFaqs(prev => [...prev, data.data]);
+    }
+
+    function discardAiDraft(index: number) {
       setAiDrafts(prev => prev.filter((_, i) => i !== index));
-    } catch {
-      toastError(t('saveError'), '');
-    } finally {
-      setSavingDraftIndex(null);
     }
-  }
 
-  function discardAiDraft(index: number) {
-    setAiDrafts(prev => prev.filter((_, i) => i !== index));
-  }
-
-  function discardAllAiDrafts() {
-    setAiDrafts([]);
-  }
-
-  async function saveAllAiDrafts() {
-    // Save sequentially; array shrinks after each save so always target index 0.
-    const count = aiDrafts.length;
-    for (let i = 0; i < count; i++) {
-      await saveAiDraft(0);
+    function discardAllAiDrafts() {
+      setAiDrafts([]);
     }
-  }
 
-  // ── Render ────────────────────────────────────────────────────────────
+    async function saveAllAiDrafts() {
+      // Save sequentially; array shrinks after each save so always target index 0.
+      const count = aiDrafts.length;
+      for (let i = 0; i < count; i++) {
+        await saveAiDraft(0);
+      }
+    }
 
-  if (loading) {
+    // ── Render ────────────────────────────────────────────────────────────
+
+    if (loading) {
+      return (
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
+          <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+        {/* Section header with collapse toggle */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            className="flex items-center gap-2 text-lg font-semibold text-foreground hover:text-primary transition-colors"
+            aria-expanded={open}
+          >
+            <svg
+              className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            {t('title')}
+            {faqs.length > 0 && (
+              <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                {faqs.length}
+              </span>
+            )}
+          </button>
+
+          {open && (
+            <button
+              type="button"
+              onClick={generateWithAi}
+              disabled={aiGenerating}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#ff6e00]/40 bg-[#ff6e00]/5 px-3 py-1.5 text-xs font-semibold text-[#ff6e00] transition-colors hover:bg-[#ff6e00]/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span aria-hidden="true">✨</span>
+              {aiGenerating ? t('generating') : t('generateWithAi')}
+            </button>
+          )}
+        </div>
+
+        {open && (
+          <>
+            <p className="mb-4 text-xs text-muted-foreground">{t('description')}</p>
+
+            {loadError && <p className="mb-4 text-sm text-destructive">{t('loadError')}</p>}
+
+            {/* AI draft rows */}
+            {aiDrafts.length > 0 && (
+              <div className="mb-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[#ff6e00]">{t('reviewNote')}</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={saveAllAiDrafts}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {t('saveAll')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={discardAllAiDrafts}
+                      className="text-xs text-muted-foreground hover:underline"
+                    >
+                      {t('discardAll')}
+                    </button>
+                  </div>
+                </div>
+                {aiDrafts.map((draft, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-lg border border-[#ff6e00]/30 bg-[#ff6e00]/5 p-4"
+                  >
+                    <div className="mb-2 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          {t('question')}
+                        </p>
+                        <p className="text-sm text-foreground">{draft.question}</p>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          {t('questionAr')}
+                        </p>
+                        <p className="text-sm text-foreground" dir="rtl">
+                          {draft.questionAr ?? '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mb-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          {t('answer')}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{draft.answer}</p>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          {t('answerAr')}
+                        </p>
+                        <p className="text-sm text-muted-foreground" dir="rtl">
+                          {draft.answerAr ?? '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => saveAiDraft(idx)}
+                        disabled={savingDraftIndex === idx}
+                      >
+                        {savingDraftIndex === idx ? '…' : t('saveRow')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => discardAiDraft(idx)}
+                      >
+                        {t('cancelRow')}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Saved FAQ rows */}
+            {faqs.length === 0 && aiDrafts.length === 0 && (
+              <p className="mb-4 text-sm text-muted-foreground">{t('empty')}</p>
+            )}
+
+            {faqs.map(faq => (
+              <div key={faq.id} className="mb-3">
+                {editingId === faq.id ? (
+                  <FaqEditForm
+                    state={editState}
+                    onChange={setEditState}
+                    onSave={saveEdit}
+                    onCancel={cancelEdit}
+                    saving={saving}
+                    t={t}
+                  />
+                ) : (
+                  <div className="rounded-lg border bg-background p-4">
+                    <div className="mb-2 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          {t('question')}
+                        </p>
+                        <p className="text-sm font-medium text-foreground">{faq.question}</p>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          {t('questionAr')}
+                        </p>
+                        <p className="text-sm font-medium text-foreground" dir="rtl">
+                          {faq.questionAr ?? '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mb-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          {t('answer')}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          {t('answerAr')}
+                        </p>
+                        <p className="text-sm text-muted-foreground" dir="rtl">
+                          {faq.answerAr ?? '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      {faq.aiDrafted && !faq.manuallyEdited && (
+                        <span className="text-xs text-muted-foreground">AI</span>
+                      )}
+                      <div className="ml-auto flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEdit(faq)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteFaq(faq.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Add new inline form */}
+            {editingId === 'new' ? (
+              <FaqEditForm
+                state={editState}
+                onChange={setEditState}
+                onSave={saveEdit}
+                onCancel={cancelEdit}
+                saving={saving}
+                t={t}
+              />
+            ) : (
+              <Button type="button" variant="outline" size="sm" onClick={startNew} className="mt-2">
+                + {t('addFaq')}
+              </Button>
+            )}
+          </>
+        )}
       </div>
     );
   }
-
-  return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm">
-      {/* Section header with collapse toggle */}
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => setOpen(o => !o)}
-          className="flex items-center gap-2 text-lg font-semibold text-foreground hover:text-primary transition-colors"
-          aria-expanded={open}
-        >
-          <svg
-            className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          {t('title')}
-          {faqs.length > 0 && (
-            <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-              {faqs.length}
-            </span>
-          )}
-        </button>
-
-        {open && (
-          <button
-            type="button"
-            onClick={generateWithAi}
-            disabled={aiGenerating}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#ff6e00]/40 bg-[#ff6e00]/5 px-3 py-1.5 text-xs font-semibold text-[#ff6e00] transition-colors hover:bg-[#ff6e00]/10 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <span aria-hidden="true">✨</span>
-            {aiGenerating ? t('generating') : t('generateWithAi')}
-          </button>
-        )}
-      </div>
-
-      {open && (
-        <>
-          <p className="mb-4 text-xs text-muted-foreground">{t('description')}</p>
-
-          {loadError && <p className="mb-4 text-sm text-destructive">{t('loadError')}</p>}
-
-          {/* AI draft rows */}
-          {aiDrafts.length > 0 && (
-            <div className="mb-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-[#ff6e00]">{t('reviewNote')}</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={saveAllAiDrafts}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    {t('saveAll')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={discardAllAiDrafts}
-                    className="text-xs text-muted-foreground hover:underline"
-                  >
-                    {t('discardAll')}
-                  </button>
-                </div>
-              </div>
-              {aiDrafts.map((draft, idx) => (
-                <div key={idx} className="rounded-lg border border-[#ff6e00]/30 bg-[#ff6e00]/5 p-4">
-                  <div className="mb-2 grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        {t('question')}
-                      </p>
-                      <p className="text-sm text-foreground">{draft.question}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        {t('questionAr')}
-                      </p>
-                      <p className="text-sm text-foreground" dir="rtl">
-                        {draft.questionAr ?? '—'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mb-3 grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        {t('answer')}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{draft.answer}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        {t('answerAr')}
-                      </p>
-                      <p className="text-sm text-muted-foreground" dir="rtl">
-                        {draft.answerAr ?? '—'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => saveAiDraft(idx)}
-                      disabled={savingDraftIndex === idx}
-                    >
-                      {savingDraftIndex === idx ? '…' : t('saveRow')}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => discardAiDraft(idx)}
-                    >
-                      {t('cancelRow')}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Saved FAQ rows */}
-          {faqs.length === 0 && aiDrafts.length === 0 && (
-            <p className="mb-4 text-sm text-muted-foreground">{t('empty')}</p>
-          )}
-
-          {faqs.map(faq => (
-            <div key={faq.id} className="mb-3">
-              {editingId === faq.id ? (
-                <FaqEditForm
-                  state={editState}
-                  onChange={setEditState}
-                  onSave={saveEdit}
-                  onCancel={cancelEdit}
-                  saving={saving}
-                  t={t}
-                />
-              ) : (
-                <div className="rounded-lg border bg-background p-4">
-                  <div className="mb-2 grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        {t('question')}
-                      </p>
-                      <p className="text-sm font-medium text-foreground">{faq.question}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        {t('questionAr')}
-                      </p>
-                      <p className="text-sm font-medium text-foreground" dir="rtl">
-                        {faq.questionAr ?? '—'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mb-3 grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        {t('answer')}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{faq.answer}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        {t('answerAr')}
-                      </p>
-                      <p className="text-sm text-muted-foreground" dir="rtl">
-                        {faq.answerAr ?? '—'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    {faq.aiDrafted && !faq.manuallyEdited && (
-                      <span className="text-xs text-muted-foreground">AI</span>
-                    )}
-                    <div className="ml-auto flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startEdit(faq)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteFaq(faq.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Add new inline form */}
-          {editingId === 'new' ? (
-            <FaqEditForm
-              state={editState}
-              onChange={setEditState}
-              onSave={saveEdit}
-              onCancel={cancelEdit}
-              saving={saving}
-              t={t}
-            />
-          ) : (
-            <Button type="button" variant="outline" size="sm" onClick={startNew} className="mt-2">
-              + {t('addFaq')}
-            </Button>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
+);
 
 // ── Shared inline edit form ─────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import {
@@ -22,7 +22,7 @@ import { AITranslateMissingButton } from '../../../../../../components/AITransla
 import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPost, apiPut } from '../../../../../../lib/api';
 import { EditSidebar } from './_components/EditSidebar';
-import { ProductFaqSection } from './_components/ProductFaqSection';
+import { ProductFaqSection, type ProductFaqSectionHandle } from './_components/ProductFaqSection';
 import { AiFieldBadge } from './_components/AiFieldBadge';
 import { BalanceDescriptionButton } from './_components/BalanceDescriptionButton';
 
@@ -128,6 +128,10 @@ export default function EditProductPage() {
 
   const [seoGenerating, setSeoGenerating] = useState(false);
   const [seoMessage, setSeoMessage] = useState<string | null>(null);
+  // "Generate with AI" also drafts FAQs — reuses ProductFaqSection's own
+  // draft-endpoint call + review-before-save UX via an imperative handle
+  // instead of duplicating the FAQ save/draft logic here.
+  const faqSectionRef = useRef<ProductFaqSectionHandle>(null);
 
   const statuses = useMemo(
     () => [
@@ -290,37 +294,93 @@ export default function EditProductPage() {
     }));
   };
 
-  async function generateSeo(mode: 'fill-empty' | 'overwrite') {
+  /**
+   * "Generate with AI" — fills SEO meta, AEO meta, AND drafts FAQs in one
+   * action (the merchant-reported gap: it used to only touch SEO). Calls
+   * all three AI endpoints; partial-failure tolerant — if one call fails
+   * the other two still apply, and the failure is reported in seoMessage
+   * rather than aborting the whole action. FAQ drafting reuses
+   * ProductFaqSection's own draft-endpoint call (via imperative handle) so
+   * the review-before-save UX (accept/discard per row) isn't duplicated
+   * here — FAQs are never auto-persisted, matching fill-empty/overwrite
+   * mode only applying to the meta text fields.
+   */
+  async function generateAiContent(mode: 'fill-empty' | 'overwrite') {
     if (!product) return;
     setSeoMessage(null);
     setSeoGenerating(true);
+    const failures: string[] = [];
     try {
-      const { data, error: apiError } = await apiPost<{
-        suggestion: {
-          title: string;
-          titleAr: string;
-          description: string;
-          descriptionAr: string;
-          keywords: string[];
-        };
-      }>(`/api/v1/stores/${storeId}/ai/seo`, { kind: 'product', id: product.id });
-      if (apiError || !data) {
-        setSeoMessage(apiError?.message || 'AI generation failed');
-        return;
+      // Promise.allSettled (NOT all) so a REJECTED call can't abort the others —
+      // apiPost resolves {data,error} without throwing, but the FAQ handle's
+      // generateWithAi() can throw, and Promise.all would have rejected on it and
+      // discarded already-succeeded SEO/AEO writes. This is what makes the action
+      // genuinely partial-failure tolerant.
+      const settled = await Promise.allSettled([
+        apiPost<{
+          suggestion: {
+            title: string;
+            titleAr: string;
+            description: string;
+            descriptionAr: string;
+            keywords: string[];
+          };
+        }>(`/api/v1/stores/${storeId}/ai/seo`, { kind: 'product', id: product.id }),
+        apiPost<{ aeo: { en: string; ar: string } }>(
+          `/api/v1/stores/${storeId}/ai/product-meta-aeo`,
+          { productId: product.id }
+        ),
+        faqSectionRef.current?.generateWithAi() ?? Promise.resolve(true),
+      ]);
+      const seoResult =
+        settled[0].status === 'fulfilled'
+          ? settled[0].value
+          : { data: undefined, error: { message: 'request failed' } };
+      const aeoResult =
+        settled[1].status === 'fulfilled'
+          ? settled[1].value
+          : { data: undefined, error: { message: 'request failed' } };
+      const faqOk = settled[2].status === 'fulfilled' ? settled[2].value : false;
+
+      if (seoResult.error || !seoResult.data) {
+        failures.push(`SEO (${seoResult.error?.message || 'failed'})`);
+      } else {
+        const s = seoResult.data.suggestion;
+        setFormData(prev => ({
+          ...prev,
+          metaTitle: mode === 'overwrite' || !prev.metaTitle ? s.title : prev.metaTitle,
+          metaTitleAr: mode === 'overwrite' || !prev.metaTitleAr ? s.titleAr : prev.metaTitleAr,
+          metaDescription:
+            mode === 'overwrite' || !prev.metaDescription ? s.description : prev.metaDescription,
+          metaDescriptionAr:
+            mode === 'overwrite' || !prev.metaDescriptionAr
+              ? s.descriptionAr
+              : prev.metaDescriptionAr,
+        }));
       }
-      const s = data.suggestion;
-      setFormData(prev => ({
-        ...prev,
-        metaTitle: mode === 'overwrite' || !prev.metaTitle ? s.title : prev.metaTitle,
-        metaTitleAr: mode === 'overwrite' || !prev.metaTitleAr ? s.titleAr : prev.metaTitleAr,
-        metaDescription:
-          mode === 'overwrite' || !prev.metaDescription ? s.description : prev.metaDescription,
-        metaDescriptionAr:
-          mode === 'overwrite' || !prev.metaDescriptionAr
-            ? s.descriptionAr
-            : prev.metaDescriptionAr,
-      }));
-      setSeoMessage('AI filled the SEO fields. Review then click Save changes.');
+
+      if (aeoResult.error || !aeoResult.data) {
+        failures.push(`AEO (${aeoResult.error?.message || 'failed'})`);
+      } else {
+        const aeo = aeoResult.data.aeo;
+        setFormData(prev => ({
+          ...prev,
+          metaDescriptionAeo:
+            mode === 'overwrite' || !prev.metaDescriptionAeo ? aeo.en : prev.metaDescriptionAeo,
+          metaDescriptionAeoAr:
+            mode === 'overwrite' || !prev.metaDescriptionAeoAr ? aeo.ar : prev.metaDescriptionAeoAr,
+        }));
+      }
+
+      if (!faqOk) {
+        failures.push('FAQs (failed)');
+      }
+
+      setSeoMessage(
+        failures.length === 0
+          ? 'AI filled SEO + AEO and drafted FAQs (review the FAQ section below). Review then click Save changes.'
+          : `AI generation partially failed — ${failures.join(', ')}. The rest were applied; review then click Save changes.`
+      );
     } catch {
       setSeoMessage('Network error contacting AI');
     } finally {
@@ -836,9 +896,11 @@ export default function EditProductPage() {
             </div>
 
             {/* SEO meta — what shows up on Google + social shares.
-                "Generate with AI" pulls from the same /ai/seo endpoint
-                the bulk sweep uses, so per-product regeneration is
-                consistent with the catalogue-wide flow. */}
+                "Generate with AI" now fills SEO + AEO meta AND drafts FAQs
+                in one action (calls /ai/seo, /ai/product-meta-aeo, and the
+                FAQ section's own draft endpoint — the same endpoints the
+                bulk sweeps use, so per-product regeneration stays
+                consistent with the catalogue-wide flow). */}
             <div className="rounded-xl border bg-card p-6 shadow-sm">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -850,7 +912,7 @@ export default function EditProductPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => generateSeo('fill-empty')}
+                    onClick={() => generateAiContent('fill-empty')}
                     disabled={seoGenerating}
                     className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02]/40 bg-[#fc6b02]/5 px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -859,7 +921,7 @@ export default function EditProductPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => generateSeo('overwrite')}
+                    onClick={() => generateAiContent('overwrite')}
                     disabled={seoGenerating}
                     className="inline-flex items-center gap-2 rounded-lg border border-[#fc6b02] px-3 py-1.5 text-xs font-semibold text-[#fc6b02] transition-colors hover:bg-[#fc6b02]/5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -947,8 +1009,8 @@ export default function EditProductPage() {
               <div className="col-span-2 border-t border-border pt-4 mt-1">
                 <p className="text-xs text-muted-foreground mb-3">
                   <span className="font-medium text-foreground">AEO</span> — Conversational
-                  answer-engine copy for AI search (Perplexity, Google AI Overview). Auto-filled by
-                  the AEO sweep; you can edit here.
+                  answer-engine copy for AI search (Perplexity, Google AI Overview). Filled by
+                  "Generate with AI" above (or the catalogue-wide AEO sweep); you can edit here.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Textarea
@@ -973,7 +1035,9 @@ export default function EditProductPage() {
 
             {/* FAQ editor — rendered after product loads. Uses the existing
                 /products/:id/faqs CRUD endpoints + AI draft endpoint. */}
-            {product && <ProductFaqSection storeId={storeId} productId={product.id} />}
+            {product && (
+              <ProductFaqSection ref={faqSectionRef} storeId={storeId} productId={product.id} />
+            )}
           </div>
 
           <EditSidebar

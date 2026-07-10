@@ -11,6 +11,7 @@ import { rethrowAsAppError } from '../../ai/gemini-errors';
 import { recordUsage } from '../../../services/ai.service';
 import { AppError } from '../../../middleware/error-handler';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
+import { buildMetaAeoPrompt, generateProductMetaAeo } from '../../ai/product-meta-aeo-generator';
 
 const AI_UNAVAILABLE_MESSAGE = 'AI request failed — please try again shortly.';
 
@@ -1007,7 +1008,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
               }
               try {
                 await assertAiQuota();
-                const prompt = buildMetaPrompt('store', s.name, s.description ?? '');
+                const prompt = buildMetaAeoPrompt('store', s.name, s.description ?? '');
                 const genResult = await callWithRetry(
                   () => model.generateContent(prompt),
                   `meta-aeo:store:${storeId}`
@@ -1079,30 +1080,26 @@ const bulkAiMetaAeoFn = inngest.createFunction(
               }
               try {
                 await assertAiQuota();
-                const prompt = buildMetaPrompt('product', p.name, p.description ?? '', storeName);
-                const genResult = await callWithRetry(
-                  () => model.generateContent(prompt),
+                // Shared core — identical prompt + parse + usage-recording
+                // path as the per-product "Generate with AI" route
+                // (POST /ai/product-meta-aeo). DRY: both call
+                // generateProductMetaAeo so per-product and bulk AEO output
+                // never diverge.
+                const generated = await callWithRetry(
+                  () =>
+                    generateProductMetaAeo(
+                      { storeId, storeName, product: { name: p.name, description: p.description } },
+                      config.googleAiKey,
+                      MODEL
+                    ),
                   `meta-aeo:product:${p.id}`
-                ).catch((err: unknown) =>
-                  rethrowAsAppError(err, 'AI product meta AEO sweep failed')
                 );
-                const usage = genResult.response.usageMetadata;
-                await recordUsage(
-                  storeId,
-                  'aeo',
-                  usage?.promptTokenCount ?? 0,
-                  usage?.candidatesTokenCount ?? 0,
-                  false
-                );
-                const raw = stripFences(genResult.response.text());
-                const parsed = JSON.parse(raw) as { en: string; ar: string };
-                if (typeof parsed.en === 'string' && parsed.en.trim()) {
+                if (generated.en) {
                   await prisma.product.update({
                     where: { id: p.id },
                     data: {
-                      metaDescriptionAeo: parsed.en.trim().slice(0, 160),
-                      metaDescriptionAeoAr:
-                        parsed.ar?.trim().slice(0, 160) || p.metaDescriptionAeoAr || null,
+                      metaDescriptionAeo: generated.en,
+                      metaDescriptionAeoAr: generated.ar || p.metaDescriptionAeoAr || null,
                     },
                   });
                   bFilled++;
@@ -1152,7 +1149,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
             }
             try {
               await assertAiQuota();
-              const prompt = buildMetaPrompt('category', c.name, c.description ?? '', storeName);
+              const prompt = buildMetaAeoPrompt('category', c.name, c.description ?? '', storeName);
               const genResult = await callWithRetry(
                 () => model.generateContent(prompt),
                 `meta-aeo:category:${c.id}`
@@ -1273,47 +1270,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
 );
 export const bulkAiMetaAeo: InngestFunction.Any = bulkAiMetaAeoFn;
 
-// -----------------------------------------------------------------------
-// Prompt builder for conversational meta descriptions
-// -----------------------------------------------------------------------
-
-function buildMetaPrompt(
-  kind: 'store' | 'product' | 'category',
-  name: string,
-  description: string,
-  storeName?: string
-): string {
-  const context =
-    kind === 'store'
-      ? `Store name: "${name}"\nStore description: ${description || 'Not provided.'}`
-      : kind === 'category'
-        ? `Category: "${name}"\nFrom store: "${storeName ?? ''}"\nCategory description: ${
-            description || 'Not provided.'
-          }`
-        : `Product: "${name}"\nFrom store: "${storeName ?? ''}"\nProduct description: ${
-            description || 'Not provided.'
-          }`;
-
-  const naturalInclude =
-    kind === 'store'
-      ? 'the store name and its main product category'
-      : kind === 'category'
-        ? `the category name and the kinds of products it contains at ${storeName ?? 'the store'}`
-        : 'the product name and what it does or is for';
-
-  return `You are an AEO (Answer Engine Optimisation) expert writing meta descriptions for a Kuwait-based e-commerce ${kind}.
-
-${context}
-
-Write a meta description that directly answers the question a user might ask an AI assistant — like "What is ${name}?" or "What does ${
-    storeName ?? name
-  } sell?". Requirements:
-- Conversational, first-answer style — like the opening sentence of a Wikipedia article
-- Factual and specific, no marketing fluff or keyword stuffing
-- Between 130-160 characters (English)
-- Naturally include ${naturalInclude}
-- Both English and Arabic (formal MSA)
-
-Return ONLY a JSON object with keys "en" and "ar". No markdown, no code fences — pure JSON only.
-Example: {"en": "Force AI Store is a Kuwait-based online retailer ...", "ar": "فورس ستور متجر كويتي متخصص في ..."}`;
-}
+// Prompt builder for conversational meta descriptions (store/product/category)
+// now lives in lib/ai/product-meta-aeo-generator.ts as `buildMetaAeoPrompt` —
+// shared with the per-product "Generate with AI" route so both surfaces stay
+// in sync. Imported above as `buildMetaAeoPrompt`.

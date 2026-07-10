@@ -16,6 +16,7 @@ import { AIService } from '../services/ai.service';
 import { AppError } from '../middleware/error-handler';
 import { inngest } from '../lib/inngest/client';
 import { generateProductFaqs } from '../lib/ai/product-faq-generator';
+import { generateProductMetaAeo } from '../lib/ai/product-meta-aeo-generator';
 import { prisma } from '@force/database';
 import { AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import {
@@ -218,6 +219,79 @@ router.post('/seo', writeLimiter, async (req: Request, res: Response, next: Next
     next(error);
   }
 });
+
+// =====================================================================
+// Per-product AEO meta description — bilingual conversational
+// "What is X?" style meta description for a single product, drafted
+// inline (no Inngest job). Twin of the catalogue-wide bulk-ai-meta-aeo
+// sweep (Inngest) — both share `generateProductMetaAeo` (lib/ai/
+// product-meta-aeo-generator.ts) so per-product and bulk output never
+// diverge. Powers the product edit page's "Generate with AI" button
+// alongside /seo and /product-faqs/draft.
+// =====================================================================
+
+const productMetaAeoSchema = z.object({
+  productId: z.string().min(1),
+});
+
+router.post(
+  '/product-meta-aeo',
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const { productId } = productMetaAeoSchema.parse(req.body);
+
+      const product = await prisma.product.findFirst({
+        where: { id: productId, storeId },
+        select: { id: true, name: true, description: true },
+      });
+      if (!product) {
+        throw new AppError(404, 'NOT_FOUND', 'Product not found');
+      }
+
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { name: true },
+      });
+
+      // Accept GEMINI_API_KEY as a fallback so a prod deploy that set the shorter
+      // var name still works without a reconfig (same trap as /product-faqs/draft).
+      const apiKey = process.env.GOOGLE_GENERATIVE_AI_KEY ?? process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new AppError(503, 'AI_NOT_CONFIGURED', 'AI service is not configured');
+      }
+
+      let aeo;
+      try {
+        aeo = await generateProductMetaAeo(
+          {
+            storeId,
+            storeName: store?.name ?? storeId,
+            product: { name: product.name, description: product.description },
+          },
+          apiKey,
+          process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest'
+        );
+      } catch (err) {
+        // generateProductMetaAeo already converts Gemini/SDK errors into a
+        // well-classified AppError with a merchant-safe message — let those
+        // through unchanged. Only a genuine JSON-parse/shape failure (thrown
+        // as a plain Error) becomes AI_PARSE_ERROR.
+        if (err instanceof AppError) throw err;
+        throw new AppError(502, 'AI_PARSE_ERROR', 'AI returned unexpected format');
+      }
+
+      // AI usage is recorded inside generateProductMetaAeo() itself (feature
+      // 'aeo', the same bucket the bulk sweep uses) — recording it again here
+      // would double-count this single request against the quota cap.
+
+      res.json({ success: true, data: { aeo } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 const categorizeSchema = z.object({
   name: z.string().min(1).max(500),
@@ -479,6 +553,14 @@ router.post(
           nameAr: true,
           description: true,
           descriptionAr: true,
+          sku: true,
+          options: {
+            select: {
+              name: true,
+              nameAr: true,
+              values: { select: { value: true, valueAr: true } },
+            },
+          },
         },
       });
       if (!product) {
@@ -510,6 +592,8 @@ router.post(
               name: product.name,
               nameAr: product.nameAr,
               description: product.description,
+              sku: product.sku,
+              options: product.options,
             },
             count,
           },
