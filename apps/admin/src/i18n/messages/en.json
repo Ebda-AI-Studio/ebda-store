@@ -2401,12 +2401,12 @@
         "description": "Customers can add to home screen"
       },
       "offline": {
-        "title": "Offline Support",
-        "description": "Works even without internet"
+        "title": "Push Notifications",
+        "description": "Send order updates & offers to their device"
       },
       "fast": {
-        "title": "Fast Performance",
-        "description": "Cached assets load instantly"
+        "title": "App-Like Experience",
+        "description": "Opens full-screen, like a native app"
       }
     },
     "branding": {
