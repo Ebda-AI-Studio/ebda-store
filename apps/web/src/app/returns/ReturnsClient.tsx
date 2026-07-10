@@ -80,10 +80,11 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
       .then(res => res.json())
       .then(json => {
         if (json.success && json.data?.orders) {
-          // Only orders that are delivered (eligible for returns)
-          const eligible = (json.data.orders as Order[]).filter(o =>
-            ['delivered', 'completed'].includes(o.status)
-          );
+          // Only delivered orders are eligible for returns — matches the API's
+          // ReturnService.create guard (order status must be exactly
+          // 'delivered'). 'completed' is not a valid OrderStatus, so it never
+          // matched and only made the eligibility look broader than it is.
+          const eligible = (json.data.orders as Order[]).filter(o => o.status === 'delivered');
           setOrders(eligible);
         }
       })
@@ -142,15 +143,40 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
       return;
     }
 
+    // Build the full item objects the API's createReturnSchema requires
+    // (orderItemId + productId + productName + quantity) from the selected
+    // order's line items. Sending only { orderItemId } — as this form used to —
+    // fails Zod validation server-side, so the request never created a return.
+    const items = (selectedOrder?.items ?? [])
+      .filter(it => selectedItemIds.has(it.id))
+      .map(it => ({
+        orderItemId: it.id,
+        productId: it.productId,
+        productName: it.product?.name ?? '',
+        quantity: it.quantity,
+      }));
+
+    if (items.length === 0) {
+      setSubmitResult({
+        type: 'error',
+        text: t(
+          'Please select at least one item to return.',
+          'يرجى اختيار عنصر واحد على الأقل للإرجاع.'
+        ),
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await authFetch(`${API_URL}/stores/${storeId}/returns`, {
         method: 'POST',
         body: JSON.stringify({
           orderId: selectedOrderId,
-          items: Array.from(selectedItemIds).map(id => ({ orderItemId: id })),
+          type: 'return',
+          items,
           reason,
-          notes: notes.trim() || undefined,
+          customerNotes: notes.trim() || undefined,
         }),
       });
 
