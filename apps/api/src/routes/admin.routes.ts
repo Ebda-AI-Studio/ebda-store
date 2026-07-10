@@ -708,19 +708,42 @@ router.delete(
         }
       }
 
-      if (target.role === 'store_admin' && target.stores.length > 0) {
+      // Store ownership is independent of role — a super_admin (or any user)
+      // can be a store's `ownerId`. The guard must key on ownership, NOT on
+      // role: gating on `role === 'store_admin'` let an owning super_admin fall
+      // through to prisma.user.delete(), which then violated stores_owner_id_fkey
+      // and 500'd (Sentry: DELETE /admin/users/:id — FK constraint). Reassign or
+      // delete the owned stores first.
+      if (target.stores.length > 0) {
         const names = target.stores.map(s => s.name).join(', ');
-        res.status(400).json({
+        res.status(409).json({
           success: false,
           error: {
-            code: 'STORE_ADMIN_HAS_STORES',
+            code: 'USER_OWNS_STORES',
             message: `User still owns ${target.stores.length} store(s) (${names}). Reassign or delete those first.`,
           },
         });
         return;
       }
 
-      await prisma.user.delete({ where: { id } });
+      try {
+        await prisma.user.delete({ where: { id } });
+      } catch (delErr) {
+        // Any remaining FK reference (beyond the store-ownership guard above)
+        // surfaces as a clean 409 instead of a raw 500.
+        if (delErr instanceof Prisma.PrismaClientKnownRequestError && delErr.code === 'P2003') {
+          res.status(409).json({
+            success: false,
+            error: {
+              code: 'USER_HAS_REFERENCES',
+              message:
+                'User cannot be deleted because other records still reference them. Reassign or remove those first.',
+            },
+          });
+          return;
+        }
+        throw delErr;
+      }
 
       await auditLog({
         action: 'user.deleted',

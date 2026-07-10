@@ -4075,6 +4075,10 @@
     "title": "Users",
     "subtitle": "Manage all users on the platform",
     "inviteUser": "Invite User",
+    "email": "Email",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "password": "Password",
     "searchPlaceholder": "Search by name or email…",
     "filterRoleLabel": "Filter by role",
     "allRoles": "All Roles",
@@ -4102,6 +4106,7 @@
     "role": {
       "super_admin": "super admin",
       "store_admin": "store admin",
+      "staff": "staff",
       "customer": "customer"
     },
     "status": {

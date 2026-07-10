@@ -4075,6 +4075,10 @@
     "title": "المستخدمون",
     "subtitle": "إدارة جميع المستخدمين على المنصة",
     "inviteUser": "دعوة مستخدم",
+    "email": "البريد الإلكتروني",
+    "firstName": "الاسم الأول",
+    "lastName": "اسم العائلة",
+    "password": "كلمة المرور",
     "searchPlaceholder": "البحث بالاسم أو البريد الإلكتروني…",
     "filterRoleLabel": "تصفية حسب الدور",
     "allRoles": "جميع الأدوار",
@@ -4102,6 +4106,7 @@
     "role": {
       "super_admin": "مدير عام",
       "store_admin": "مدير متجر",
+      "staff": "موظف",
       "customer": "عميل"
     },
     "status": {

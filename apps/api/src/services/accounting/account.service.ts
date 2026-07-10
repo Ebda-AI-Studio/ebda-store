@@ -161,10 +161,36 @@ export async function getSystemAccountIdByCode(
       select: { id: true },
     });
   const acct = tx ? await findIt(tx) : await withRlsBypass(findIt);
-  if (!acct) {
+  if (acct) return acct.id;
+
+  // Self-heal chart-of-accounts template drift. A system code that exists in
+  // COA_TEMPLATE but is missing for this store — e.g. '1020' (Cash COD) was
+  // added to the template AFTER the store was seeded — used to throw here and
+  // fail the entire journal post (48× in Sentry for one store). Lazily upsert
+  // the single missing system account from the template instead (idempotent +
+  // race-safe on the storeId_code unique). Codes NOT in the template still
+  // throw — those are genuine caller bugs. Mirrors seedCoaForStore's row shape.
+  const tmpl = COA_TEMPLATE.find(row => row.code === code);
+  if (!tmpl) {
     throw new Error(`System account ${code} not found for store ${storeId} — seed COA first`);
   }
-  return acct.id;
+  const healOne = (client: Prisma.TransactionClient | typeof prisma) =>
+    client.account.upsert({
+      where: { storeId_code: { storeId, code: tmpl.code } },
+      create: {
+        storeId,
+        code: tmpl.code,
+        nameEn: tmpl.nameEn,
+        nameAr: tmpl.nameAr,
+        type: tmpl.type as AccountType,
+        isSystem: true,
+        isActive: true,
+      },
+      update: {},
+      select: { id: true },
+    });
+  const healed = tx ? await healOne(tx) : await withRlsBypass(healOne);
+  return healed.id;
 }
 
 export interface AccountsTreeNode {

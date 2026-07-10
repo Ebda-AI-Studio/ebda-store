@@ -3,6 +3,7 @@ import { Server, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { isPlatformOrigin } from '../lib/cors-cache';
 import { prisma } from '@force/database';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
@@ -54,21 +55,20 @@ class SocketService {
           // Reject requests with no origin (prevents sandboxed iframe attacks)
           if (!origin) return callback(null, false);
 
-          // Always allow platform URLs
-          const platformOrigins = [config.webUrl, config.adminUrl].filter(Boolean);
-          if (platformOrigins.includes(origin)) return callback(null, true);
-
-          // Allow Vercel preview/production deployments
+          // Reuse the SINGLE platform-origin allowlist shared with the Express
+          // CORS handler + CSRF middleware (lib/cors-cache). This inline list
+          // used to only cover webUrl/adminUrl + Vercel, so it dropped the
+          // Orders PWA (orders.force-ai.co) and the force-ai.co / forcemediakw
+          // prod fallbacks + CF Worker previews → the admin/orders WebSocket
+          // handshake failed CORS. Delegating here keeps the two configs from
+          // ever drifting again.
           if (
-            origin.endsWith('.vercel.app') &&
-            (/^https:\/\/force-web(-[a-z0-9]+)?\.vercel\.app$/.test(origin) ||
-              /^https:\/\/force-admin(-[a-z0-9]+)?\.vercel\.app$/.test(origin))
+            isPlatformOrigin(origin, {
+              webUrl: config.webUrl,
+              adminUrl: config.adminUrl,
+              nodeEnv: config.nodeEnv,
+            })
           ) {
-            return callback(null, true);
-          }
-
-          // Allow localhost in development
-          if (config.nodeEnv !== 'production' && origin.includes('localhost')) {
             return callback(null, true);
           }
 
