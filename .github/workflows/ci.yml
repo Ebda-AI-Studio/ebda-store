@@ -426,6 +426,17 @@ jobs:
       - name: Build database package
         run: npm run build -w packages/database
 
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          for i in {1..30}; do
+            if npx prisma db execute --url "postgresql://test:test@localhost:${{ job.services.postgres.ports['5432'] }}/force_test" --stdin <<< 'SELECT 1' 2>/dev/null; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Waiting for PostgreSQL... (attempt $i/30)"
+            sleep 2
+          done
+
       - name: Run database migrations (as the ephemeral Postgres superuser)
         # Migrations need DDL + role-creation privileges (CREATE ROLE, GRANT,
         # ALTER TABLE ... ENABLE/FORCE ROW LEVEL SECURITY) so they run as the
