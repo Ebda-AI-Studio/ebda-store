@@ -81,11 +81,25 @@ if [ "${SKIP_AI_GATE:-0}" != "1" ] && [ "$current_branch" != "main" ]; then
   if command -v claude >/dev/null 2>&1; then
     git diff "$RANGE" -- ':(exclude)**/package-lock.json' ':(exclude)**/*.lock' > /tmp/force-prepush.diff 2>/dev/null || true
     if [ -s /tmp/force-prepush.diff ]; then
-      {
-        printf 'Review this diff for CRITICAL bugs, security issues, and regressions ONLY. Be terse; list nothing if clean.\n\n'
-        cat /tmp/force-prepush.diff
-      } > /tmp/force-prepush-review.md
-      claude -p --model claude-opus-4-8 < /tmp/force-prepush-review.md || echo "! AI review advisory failed (non-blocking)"
+      # Dedup gate: skip the LLM call when this exact diff was already reviewed on
+      # this branch. Session mining 2026-07-11 found 11/15 review calls were
+      # byte-identical re-reviews (one diff reviewed 5x) — pure Opus spend for
+      # zero new signal. Marker lives in the worktree's git dir, keyed by branch.
+      diff_hash=$(shasum -a 256 /tmp/force-prepush.diff | cut -c1-16)
+      marker="$(git rev-parse --git-dir)/.ai-review-$(printf '%s' "$current_branch" | tr '/' '_')"
+      if [ -f "$marker" ] && [ "$(cat "$marker" 2>/dev/null)" = "$diff_hash" ]; then
+        echo "-> AI review skipped: identical diff already reviewed on this branch ($diff_hash)"
+      else
+        {
+          printf 'Review this diff for CRITICAL bugs, security issues, and regressions ONLY. Be terse; list nothing if clean.\n\n'
+          cat /tmp/force-prepush.diff
+        } > /tmp/force-prepush-review.md
+        if claude -p --model claude-opus-4-8 < /tmp/force-prepush-review.md; then
+          printf '%s' "$diff_hash" > "$marker"
+        else
+          echo "! AI review advisory failed (non-blocking)"
+        fi
+      fi
     fi
   else
     echo "! claude CLI not found; skipping AI review (npm i -g @anthropic-ai/claude-code)"
