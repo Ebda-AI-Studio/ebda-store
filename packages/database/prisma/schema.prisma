@@ -2307,6 +2307,16 @@ model LoyaltyTransaction {
   customer User   @relation(fields: [customerId], references: [id], onDelete: Cascade)
   order    Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
+  // At-most-one-earn-per-order is enforced by a PARTIAL unique index created in
+  // migration 20260711120000_loyalty_earn_unique.sql:
+  //   CREATE UNIQUE INDEX ... ON loyalty_transactions (store_id, order_id)
+  //   WHERE type = 'earn_purchase'
+  // A plain @@unique([storeId, orderId, type]) is NOT safe here — orderId is
+  // reused across other transaction types that legitimately repeat per order
+  // (e.g. `adjust` rows written by both reverseEarnedPointsFromOrder and
+  // reverseRedeemedPointsFromOrder can both exist for one refunded order).
+  // Prisma's schema DSL has no way to express a partial/filtered unique index,
+  // so this is a hand-written raw-SQL migration with no matching @@unique here.
   @@index([storeId])
   @@index([customerId])
   @@index([orderId])

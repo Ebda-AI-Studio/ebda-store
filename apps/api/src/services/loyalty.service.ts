@@ -396,6 +396,28 @@ export class LoyaltyService {
       });
     }
 
+    // Idempotency fast-path: award points at most once per order. Two separate
+    // `order/status-changed` events for the same delivered transition (admin
+    // double-click, or updateStatus called twice) spawn two independent Inngest
+    // runs — without this guard each would credit points again. A matching
+    // `earn_purchase` row means this order was already credited → no-op.
+    //
+    // This is a fast-path only, not the full guarantee: two concurrent calls
+    // for the same order can both pass this findFirst before either commits
+    // (the fanout runs concurrency: limit 5 per store). The DB-level partial
+    // unique index on (store_id, order_id) WHERE type='earn_purchase' (see
+    // migration 20260711120000_loyalty_earn_unique) closes that race — the
+    // loser's insert below hits P2002 and is caught as a no-op too.
+    if (orderId) {
+      const alreadyEarned = await prisma.loyaltyTransaction.findFirst({
+        where: { storeId, orderId, type: 'earn_purchase' },
+        select: { id: true },
+      });
+      if (alreadyEarned) {
+        return { pointsEarned: 0, newBalance: loyalty.points };
+      }
+    }
+
     // Get tier multiplier
     const tierInfo = this.getTierInfo(loyalty.totalEarned, settings);
 
@@ -450,13 +472,32 @@ export class LoyaltyService {
       );
     }
 
-    const results = await prisma.$transaction(txs);
-    const updated = results[0] as { points: number };
+    try {
+      const results = await prisma.$transaction(txs);
+      const updated = results[0] as { points: number };
 
-    return {
-      pointsEarned,
-      newBalance: updated.points,
-    };
+      return {
+        pointsEarned,
+        newBalance: updated.points,
+      };
+    } catch (err) {
+      // P2002 = unique constraint violation on the partial unique index
+      // (store_id, order_id) WHERE type='earn_purchase'. This means a
+      // concurrent earnPointsFromPurchase call for the SAME order won the
+      // race between this call's findFirst check above and its own insert —
+      // this call lost. Postgres aborts the ENTIRE transaction on any
+      // statement error, so the loyaltyPoints increment above was rolled
+      // back along with the insert — points were NOT double-incremented.
+      // Treat this exactly like the findFirst no-op above.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const current = await prisma.loyaltyPoints.findUnique({
+          where: { storeId_customerId: { storeId, customerId } },
+          select: { points: true },
+        });
+        return { pointsEarned: 0, newBalance: current?.points ?? loyalty.points };
+      }
+      throw err;
+    }
   }
 
   /**
