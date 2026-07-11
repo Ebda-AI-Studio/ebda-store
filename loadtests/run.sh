@@ -4,10 +4,11 @@
 #   ./run.sh checkout-flow
 #   ./run.sh api-bursts
 #   ./run.sh multi-store-storm
+#   ./run.sh lens-n-medium-traffic
 #   ./run.sh all
 #
 # Required env: STORE_ID (single-store scenarios).
-#               STORE_IDS (multi-store-storm — comma-separated UUIDs; see seed:loadtest).
+#               STORE_IDS (multi-store-storm, lens-n-medium-traffic — comma-separated UUIDs; see seed:loadtest).
 # Optional: BASE_URL, PRODUCT_SLUG (checkout only), LOAD_TEST_TOKEN.
 set -euo pipefail
 
@@ -19,8 +20,9 @@ if ! command -v k6 >/dev/null 2>&1; then
   exit 1
 fi
 
-# the multi-store storms use STORE_IDS (plural); all other scenarios use STORE_ID.
-if [ "$SCENARIO" = "multi-store-storm" ] || [ "$SCENARIO" = "multi-store-checkout-storm" ]; then
+# the multi-store storms (+ lens-n-medium-traffic) use STORE_IDS (plural);
+# all other scenarios use STORE_ID.
+if [ "$SCENARIO" = "multi-store-storm" ] || [ "$SCENARIO" = "multi-store-checkout-storm" ] || [ "$SCENARIO" = "lens-n-medium-traffic" ]; then
   if [ -z "${STORE_IDS:-}" ]; then
     echo "STORE_IDS env var is required for $SCENARIO (comma-separated store uuids)." >&2
     echo "Seed them first: npm run seed:loadtest --workspace @force/database" >&2
@@ -51,8 +53,9 @@ if [ "$SCENARIO" = "all" ]; then
   run api-bursts
   # checkout-flow last — it writes orders, run separately if you need it
   echo "(skipping checkout-flow in 'all' mode — run it explicitly)"
-  # multi-store-storm requires seeded STORE_IDS so it is excluded from 'all'
+  # multi-store-storm / lens-n-medium-traffic require seeded STORE_IDS so they are excluded from 'all'
   echo "(skipping multi-store-storm in 'all' mode — run it explicitly with STORE_IDS set)"
+  echo "(skipping lens-n-medium-traffic in 'all' mode — run it explicitly with STORE_IDS set, staging/load env only)"
 else
   run "$SCENARIO"
 fi

@@ -45,6 +45,24 @@ STORE_ID=<uuid> ./run.sh api-bursts
 | http_req_duration p95 | < 2500ms | order create now ~600ms faster post-Inngest |
 | http_req_failed rate  | < 2%     |                                             |
 
+`lens-n-medium-traffic` (ramp to 300 VUs across ~80 stores, ~7 min,
+**staging/dedicated load env only — see `loadtests/README.md`, "Lens N" section**):
+
+| Metric                                                     | Target  | Notes                                                                                                   |
+| ---------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------- |
+| http_req_duration p95 (overall)                            | < 500ms | Code-quality non-negotiable ceiling for the edge-cached public read path.                               |
+| ms_product_list / ms_category_list / ms_product_detail p95 | < 800ms | Same cross-tenant RLS-contention ceiling `multi-store-storm` already established, scaled to ~80 stores. |
+| ms_store_layout p95                                        | < 500ms | Edge-cached (`s-maxage=120`).                                                                           |
+| ms_health p95                                              | < 200ms | Single `SELECT 1`.                                                                                      |
+| http_req_failed rate                                       | < 1%    |                                                                                                         |
+
+This closes the "Lens N" gap — the ~30-80-store medium-traffic headroom
+was previously reasoned from the single-store and 20-store baselines
+above, not directly measured. **No run has been recorded here yet** — the
+first staging run's actual p95/error-rate numbers must be appended to the
+results table below (date, scenario `lens-n-medium-traffic`, VU count,
+store count) before this claim can be called measured rather than reasoned.
+
 ## When to re-run
 
 - Before any production deploy that touches the public read path
