@@ -97,7 +97,7 @@ export function OrdersTable({
           <Link
             href={`/stores/${storeId}/orders/${order.id}`}
             className="font-mono text-xs font-medium text-primary hover:underline"
-            onClick={e => e.stopPropagation()}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
             title={full}
           >
             {compact}
