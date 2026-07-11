@@ -113,7 +113,7 @@ const nextConfig = {
               // pulls additional scripts (jsonp sync) from api.onesignal.com.
               // 'unsafe-eval' is required by the v16 page SDK's runtime
               // (documented at https://documentation.onesignal.com/docs/web-push-csp).
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://connect.facebook.net https://analytics.tiktok.com https://sc-static.net https://static.ads-twitter.com https://s.pinimg.com https://vercel.live https://cdn.onesignal.com https://*.onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://connect.facebook.net https://analytics.tiktok.com https://sc-static.net https://static.ads-twitter.com https://s.pinimg.com https://cdn.onesignal.com https://*.onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com",
               // OneSignal v16 page SDK pulls a stylesheet from
               // https://onesignal.com/sdks/... at runtime — that's the
               // bare apex, not cdn., so include it explicitly.
@@ -124,7 +124,7 @@ const nextConfig = {
               // forcemediakw.com is the marketing-site origin: storefront's
               // maintenance page + bare-root redirect can trigger a browser
               // preconnect to it.
-              "connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co https://api-production-c058.up.railway.app https://*.r2.dev https://*.google-analytics.com https://*.facebook.com https://*.tiktok.com wss://store-api.forcemediakw.com wss://api.force-ai.co wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://vercel.live wss://vercel.live https://*.onesignal.com wss://*.onesignal.com https://forcemediakw.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
+              "connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co https://api-production-c058.up.railway.app https://*.r2.dev https://*.google-analytics.com https://*.facebook.com https://*.tiktok.com wss://store-api.forcemediakw.com wss://api.force-ai.co wss://api-production-c058.up.railway.app https://fonts.googleapis.com https://fonts.gstatic.com https://*.onesignal.com wss://*.onesignal.com https://forcemediakw.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com",
               // Required so /OneSignalSDKWorker.js can register as a service
               // worker — Push API mandates same-origin worker scripts.
               "worker-src 'self' blob:",
@@ -137,23 +137,19 @@ const nextConfig = {
               // mapsEmbedSrc()). Without these hosts Chrome blocks the frame
               // with "This content is blocked. Contact the site owner to fix
               // the issue." and the map renders as an empty/broken box.
-              'frame-src https://vercel.live https://www.facebook.com https://td.doubleclick.net https://www.google.com https://maps.google.com https://google.com',
+              'frame-src https://www.facebook.com https://td.doubleclick.net https://www.google.com https://maps.google.com https://google.com',
               // Allow framing from admin origins for the page-builder live
               // preview. Reads `STOREFRONT_FRAME_ANCESTORS` env var as a
               // space-separated allowlist; falls back to: platform admin
-              // production domain + Vercel preview wildcards (force-admin
-              // deploys + sharaf's-projects scope) + localhost dev. The
-              // Vercel wildcards cover preview URLs which change per deploy
-              // but are auth-gated by Vercel so framing them is safe.
-              // Storefront is otherwise non-frameable so clickjacking via
-              // other origins stays blocked.
+              // production domain + localhost dev. Storefront is otherwise
+              // non-frameable so clickjacking via other origins stays blocked.
               `frame-ancestors 'self' ${
                 process.env.STOREFRONT_FRAME_ANCESTORS ??
                 // admin.force-ai.co is the Cloudflare admin host — without it
                 // the page-builder live-preview iframe is CSP-blocked on CF
                 // (the storefront refuses to be framed). Kept alongside the
                 // legacy app.forcemediakw.com (Vercel admin) during cutover.
-                'https://admin.force-ai.co https://app.forcemediakw.com https://*.vercel.app http://localhost:3001 http://localhost:3000'
+                'https://admin.force-ai.co https://app.forcemediakw.com http://localhost:3001 http://localhost:3000'
               }`,
             ].join('; '),
           },
