@@ -187,6 +187,10 @@ export const translations = {
   Error: 'خطأ',
   Success: 'تم بنجاح',
   KWD: 'د.ك',
+  Retry: 'إعادة المحاولة',
+  'Something went wrong': 'حدث خطأ ما',
+  'Try Again': 'حاول مرة أخرى',
+  'Go Home': 'العودة للرئيسية',
 
   // Shipping
   'Free delivery on orders over 20 KWD': 'توصيل مجاني للطلبات فوق 20 د.ك',

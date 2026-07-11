@@ -27,9 +27,49 @@ interface HomepageTestimonial {
   createdAt: string;
 }
 
+interface ProductsApiResult {
+  data?: { products?: Product[] };
+}
+
+interface CategoriesApiResult {
+  data?: { categories?: Category[] };
+}
+
+/** Layout-independent homepage fetches — kicked off by the page component
+ *  concurrently with `fetchLayoutSettings` instead of waiting for layout
+ *  first (Lens M streaming fallback — see the HomePage() call site). */
+function fetchFeaturedProducts(
+  storeHeaders: Record<string, string>
+): Promise<ProductsApiResult | null> {
+  return fetch(`${API_URL}/public/products?featured=true&limit=8`, {
+    next: { revalidate: 60 },
+    headers: storeHeaders,
+  })
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null);
+}
+
+function fetchHomeCategories(
+  storeHeaders: Record<string, string>
+): Promise<CategoriesApiResult | null> {
+  return fetch(`${API_URL}/public/categories`, {
+    next: { revalidate: 60 },
+    headers: storeHeaders,
+  })
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null);
+}
+
 async function fetchHomepageData(
   store: { id: string; domain?: string },
-  layout: StoreLayoutSettings
+  layout: StoreLayoutSettings,
+  /** Optional promises for the two layout-independent requests, already
+   *  started by the caller (in parallel with the layout fetch) — avoids
+   *  re-issuing them here. */
+  prefetched?: {
+    featured?: Promise<ProductsApiResult | null>;
+    categories?: Promise<CategoriesApiResult | null>;
+  }
 ): Promise<{
   featuredProducts: Product[];
   newArrivals: Product[];
@@ -66,25 +106,47 @@ async function fetchHomepageData(
     ? `?minRating=${layout.testimonials.minRating}&verifiedOnly=${layout.testimonials.verifiedOnly}&limit=6`
     : null;
 
+  // Extra carousels (page-builder section duplication) — fetch products for
+  // any entries with `productSource === 'category'` or `'manual'`. Otherwise
+  // the storefront filter only sees the union of newArrivals/bestSellers/
+  // featured, which misses products in unrelated categories or manually-
+  // chosen products not in any of those lists. These depend only on
+  // `layout` (already resolved), NOT on the other homepage results below —
+  // so they're folded into the SAME Promise.all instead of a second
+  // sequential round-trip (Lens M streaming fallback).
+  const extras = layout.extraCarousels ?? [];
+  // For each unique category slug, pick the MAX requested fetch limit
+  // across all extras using that slug (default 50). One slug used by 2
+  // carousels with limits 100 + 80 → fetch 100 once, both carousels share.
+  const categoryFetchMap = new Map<string, number>();
+  for (const e of extras) {
+    if (e.enabled === false) continue;
+    if (e.productSource !== 'category') continue;
+    if (!e.categorySlug) continue;
+    const cap = Math.max(1, Math.min(200, e.categoryFetchLimit ?? 50));
+    const existing = categoryFetchMap.get(e.categorySlug) ?? 0;
+    if (cap > existing) categoryFetchMap.set(e.categorySlug, cap);
+  }
+  const categoryFetches = Array.from(categoryFetchMap.entries());
+  const manualIds = Array.from(
+    new Set(
+      extras
+        .filter(e => e.enabled !== false && e.productSource === 'manual')
+        .flatMap(e => e.manualProductIds ?? [])
+    )
+  );
+
   const [
     featuredResult,
     categoriesResult,
     newArrivalsResult,
     bestSellersResult,
     testimonialsResult,
+    categoryResults,
+    manualResult,
   ] = await Promise.all([
-    fetch(`${API_URL}/public/products?featured=true&limit=8`, {
-      next: { revalidate: 60 },
-      headers: storeHeaders,
-    })
-      .then(r => (r.ok ? r.json() : null))
-      .catch(() => null),
-    fetch(`${API_URL}/public/categories`, {
-      next: { revalidate: 60 },
-      headers: storeHeaders,
-    })
-      .then(r => (r.ok ? r.json() : null))
-      .catch(() => null),
+    prefetched?.featured ?? fetchFeaturedProducts(storeHeaders),
+    prefetched?.categories ?? fetchHomeCategories(storeHeaders),
     newArrivalsLimit > 0
       ? fetch(`${API_URL}/public/products?sort=newest&limit=${newArrivalsLimit}`, {
           next: { revalidate: 60 },
@@ -108,11 +170,33 @@ async function fetchHomepageData(
           .then(r => (r.ok ? r.json() : null))
           .catch(() => null)
       : Promise.resolve(null),
+    Promise.all(
+      categoryFetches.map(([slug, fetchLimit]) =>
+        fetch(
+          `${API_URL}/public/products?category=${encodeURIComponent(slug)}&limit=${fetchLimit}`,
+          { next: { revalidate: 60 }, headers: storeHeaders }
+        )
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null)
+      )
+    ),
+    manualIds.length > 0
+      ? fetch(
+          `${API_URL}/public/products?ids=${encodeURIComponent(manualIds.join(','))}&limit=50`,
+          {
+            next: { revalidate: 60 },
+            headers: storeHeaders,
+          }
+        )
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   let featuredProducts: Product[] = featuredResult?.data?.products ?? [];
 
-  // Fallback: latest 8 active products if there are no featured ones.
+  // Fallback: latest 8 active products if there are no featured ones. This
+  // genuinely depends on the featured-fetch outcome, so it stays sequential.
   if (featuredProducts.length === 0) {
     const fallbackResult = await fetch(`${API_URL}/public/products?limit=8`, {
       next: { revalidate: 60 },
@@ -128,55 +212,8 @@ async function fetchHomepageData(
   const bestSellers: Product[] = bestSellersResult?.data?.products ?? [];
   const testimonials: HomepageTestimonial[] = testimonialsResult?.data?.testimonials ?? [];
 
-  // Extra carousels (page-builder section duplication) — fetch products for
-  // any entries with `productSource === 'category'` or `'manual'`. Otherwise
-  // the storefront filter only sees the union of newArrivals/bestSellers/
-  // featured, which misses products in unrelated categories or manually-
-  // chosen products not in any of those lists.
-  const extras = layout.extraCarousels ?? [];
-  // For each unique category slug, pick the MAX requested fetch limit
-  // across all extras using that slug (default 50). One slug used by 2
-  // carousels with limits 100 + 80 → fetch 100 once, both carousels share.
-  const categoryFetchMap = new Map<string, number>();
-  for (const e of extras) {
-    if (e.enabled === false) continue;
-    if (e.productSource !== 'category') continue;
-    if (!e.categorySlug) continue;
-    const cap = Math.max(1, Math.min(200, e.categoryFetchLimit ?? 50));
-    const existing = categoryFetchMap.get(e.categorySlug) ?? 0;
-    if (cap > existing) categoryFetchMap.set(e.categorySlug, cap);
-  }
-  const categoryFetches = Array.from(categoryFetchMap.entries());
-  const manualIds = Array.from(
-    new Set(
-      extras
-        .filter(e => e.enabled !== false && e.productSource === 'manual')
-        .flatMap(e => e.manualProductIds ?? [])
-    )
-  );
-  const extraResults = await Promise.all([
-    ...categoryFetches.map(([slug, fetchLimit]) =>
-      fetch(`${API_URL}/public/products?category=${encodeURIComponent(slug)}&limit=${fetchLimit}`, {
-        next: { revalidate: 60 },
-        headers: storeHeaders,
-      })
-        .then(r => (r.ok ? r.json() : null))
-        .catch(() => null)
-    ),
-    manualIds.length > 0
-      ? fetch(
-          `${API_URL}/public/products?ids=${encodeURIComponent(manualIds.join(','))}&limit=50`,
-          {
-            next: { revalidate: 60 },
-            headers: storeHeaders,
-          }
-        )
-          .then(r => (r.ok ? r.json() : null))
-          .catch(() => null)
-      : Promise.resolve(null),
-  ]);
   const extraProductsMap = new Map<string, Product>();
-  for (const result of extraResults) {
+  for (const result of [...categoryResults, manualResult]) {
     const list: Product[] = result?.data?.products ?? [];
     for (const p of list) {
       if (p?.id) extraProductsMap.set(p.id, p);
@@ -238,6 +275,23 @@ export default async function HomePage({
     return <PlatformLanding />;
   }
 
+  // Kick off the two layout-independent homepage fetches (featured products
+  // + categories) concurrently with the layout fetch below, instead of
+  // waiting for layout first — layout is only needed to size the
+  // newArrivals/bestSellers/testimonials/extraCarousels requests inside
+  // fetchHomepageData (Lens M streaming fallback: full section-level
+  // Suspense streaming would require splitting the monolithic
+  // HomePageContent client component, whose section dividers/ordering
+  // read sibling sections' bgColor — too invasive for this pass; this is
+  // the safer parallelization-only fallback).
+  const storeHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Store-ID': store.id,
+    ...(store.domain ? { 'x-store-domain': store.domain } : {}),
+  };
+  const featuredPromise = fetchFeaturedProducts(storeHeaders);
+  const categoriesPromise = fetchHomeCategories(storeHeaders);
+
   const draftBundle = await fetchLayoutSettings(store.id, draftToken);
   const layout = draftBundle.layout;
   // Draft typography + theme override CSS — emitted in body so source order
@@ -249,7 +303,10 @@ export default async function HomePage({
       ? emitZoneCss(draftBundle.typography as Parameters<typeof emitZoneCss>[0], store.theme)
       : '';
   const { featuredProducts, newArrivals, bestSellers, categories, testimonials, extraProducts } =
-    await fetchHomepageData(store, layout);
+    await fetchHomepageData(store, layout, {
+      featured: featuredPromise,
+      categories: categoriesPromise,
+    });
 
   const siteUrl = getSiteUrl(store);
   const socialUrls = store.socialLinks

@@ -1,5 +1,8 @@
 export { ShopChrome } from './ShopChrome';
 export { MinimalChrome } from './MinimalChrome';
+export { SectionErrorBoundary } from './SectionErrorBoundary';
+export { SectionRetryNotice } from './SectionRetryNotice';
+export { RouteErrorFallback } from './RouteErrorFallback';
 export { StoreMaintenance, StoreMaintenanceGate } from './StoreMaintenance';
 export { CmsPageContent } from './CmsPageContent';
 export { SearchAutocomplete } from './SearchAutocomplete';

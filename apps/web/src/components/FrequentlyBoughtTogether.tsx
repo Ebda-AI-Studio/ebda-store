@@ -1,13 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
-import { useToast } from '@force/ui';
+import { useToast, Skeleton, SkeletonProductCard } from '@force/ui';
 import { API_URL } from '@/lib/api';
 import { PecannbeeProductCard } from '../templates/shared/PecannbeeProductCard';
 import { gridGapClass } from '../templates/shared/card-size';
+import { SectionRetryNotice } from './SectionRetryNotice';
+
+/** Loading placeholder matching the grid this section renders once data
+ *  resolves — avoids the pop-in layout shift the previous `return null`
+ *  caused while `isLoading` was true. */
+function FrequentlyBoughtTogetherSkeleton() {
+  return (
+    <div className="mt-16" aria-hidden="true">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Skeleton className="h-7 w-56" />
+        <Skeleton className="h-9 w-32 rounded-xl" />
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+        {[1, 2, 3, 4].map(i => (
+          <SkeletonProductCard key={i} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface RecommendedProduct {
   id: string;
@@ -31,7 +51,10 @@ interface FrequentlyBoughtTogetherProps {
 
 export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBoughtTogetherProps) {
   const [products, setProducts] = useState<RecommendedProduct[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Distinguishes a genuine fetch failure from "nothing to recommend" —
+  // both used to collapse into the same `return null` (Lens M graceful
+  // degradation).
+  const [status, setStatus] = useState<'loading' | 'ok' | 'empty' | 'error'>('loading');
   const { addItem, items: cartItems } = useCart();
   const { language, t } = useLanguage();
   const { store, layout } = useStore();
@@ -50,41 +73,57 @@ export function FrequentlyBoughtTogether({ storeId, productId }: FrequentlyBough
   const hasVariants = (p: RecommendedProduct): boolean =>
     Array.isArray(p.variants) && p.variants.length > 0;
 
-  useEffect(() => {
+  const fetchRecommendations = useCallback(async () => {
     if (!storeId || !productId) return;
-
-    async function fetchRecommendations() {
-      setIsLoading(true);
-      try {
-        const sessionId =
-          typeof window !== 'undefined' ? localStorage.getItem('sessionId') || '' : '';
-        const res = await fetch(
-          `${API_URL}/public/${storeId}/products/${productId}/recommendations`,
-          {
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Session-ID': sessionId,
-              'X-Store-ID': storeId,
-            },
-          }
-        );
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.success && data.data?.crossSell?.length) {
-          setProducts(data.data.crossSell);
+    setStatus('loading');
+    try {
+      const sessionId =
+        typeof window !== 'undefined' ? localStorage.getItem('sessionId') || '' : '';
+      const res = await fetch(
+        `${API_URL}/public/${storeId}/products/${productId}/recommendations`,
+        {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Session-ID': sessionId,
+            'X-Store-ID': storeId,
+          },
         }
-      } catch {
-        // Non-critical.
-      } finally {
-        setIsLoading(false);
+      );
+      if (!res.ok) {
+        setStatus('error');
+        return;
       }
+      const data = await res.json();
+      if (data.success && data.data?.crossSell?.length) {
+        setProducts(data.data.crossSell);
+        setStatus('ok');
+      } else {
+        setProducts([]);
+        setStatus('empty');
+      }
+    } catch {
+      setStatus('error');
     }
-
-    fetchRecommendations();
   }, [storeId, productId]);
 
-  if (isLoading || products.length === 0) return null;
+  useEffect(() => {
+    fetchRecommendations();
+  }, [fetchRecommendations]);
+
+  if (status === 'loading') return <FrequentlyBoughtTogetherSkeleton />;
+  if (status === 'error') {
+    return (
+      <div className="mt-16">
+        <SectionRetryNotice
+          onRetry={fetchRecommendations}
+          message="Couldn't load Frequently Bought Together."
+          messageAr="تعذّر تحميل قسم يُشترى معاً في الغالب."
+        />
+      </div>
+    );
+  }
+  if (status === 'empty' || products.length === 0) return null;
 
   const cartQuantities: Record<string, number> = {};
   for (const item of cartItems) cartQuantities[item.productId] = item.quantity;

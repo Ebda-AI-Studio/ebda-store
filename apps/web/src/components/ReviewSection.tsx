@@ -7,6 +7,7 @@ import { useStore } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { API_URL } from '../lib/api';
 import { formatDate as formatStoreDate } from '../lib/format-date';
+import { SectionRetryNotice } from './SectionRetryNotice';
 
 // Visual placeholders for the empty state. CRITICAL: these are NEVER
 // emitted as Schema.org Review markup — see ProductDetailPage's JSON-LD
@@ -155,6 +156,9 @@ export default function ReviewSection({ storeId, productId }: Props) {
   const [averageRating, setAverageRating] = useState<number>(0);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  // Distinguishes a genuine fetch failure from "no reviews yet" — both used
+  // to collapse into the same empty state (Lens M graceful degradation).
+  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
   // Track which reviews have the translate toggle active (show bodyTranslated)
   const [translatedIds, setTranslatedIds] = useState<Set<string>>(new Set());
 
@@ -180,6 +184,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
 
   const fetchReviews = useCallback(async () => {
     setIsLoading(true);
+    setStatus('loading');
     try {
       const res = await fetch(`${API_URL}/stores/${storeId}/reviews/product/${productId}`, {
         credentials: 'include',
@@ -191,13 +196,19 @@ export default function ReviewSection({ storeId, productId }: Props) {
         setReviews(json.data.reviews ?? []);
         setAverageRating(json.data.averageRating ?? 0);
         setTotalCount(json.data.totalCount ?? json.data.reviews?.length ?? 0);
+        setStatus('ok');
       } else {
+        // A well-formed but unsuccessful response (e.g. server error
+        // payload) is a failure, not "no reviews yet" — surface the retry
+        // affordance instead of the empty-state sample cards.
         setReviews([]);
         setTotalCount(0);
+        setStatus('error');
       }
     } catch {
       setReviews([]);
       setTotalCount(0);
+      setStatus('error');
     } finally {
       setIsLoading(false);
     }
@@ -413,11 +424,24 @@ export default function ReviewSection({ storeId, productId }: Props) {
         </div>
       )}
 
+      {/* Fetch failure — distinct from "no reviews yet" (Lens M graceful
+          degradation). Compact inline retry instead of the sample-card
+          empty state, which would otherwise misleadingly imply the store
+          just hasn't collected reviews yet. */}
+      {!isLoading && status === 'error' && (
+        <SectionRetryNotice
+          onRetry={fetchReviews}
+          message="Couldn't load reviews."
+          messageAr="تعذّر تحميل المراجعات."
+          className="mt-6"
+        />
+      )}
+
       {/* Empty state — labeled sample cards so the section doesn't feel empty.
           CRITICAL: these are NEVER emitted as Schema.org Review markup.
           JSON-LD emission (page.tsx) is gated on real verified-purchase
           published reviews only (Task 29) — that gate is unchanged here. */}
-      {!isLoading && reviews.length === 0 && (
+      {!isLoading && status === 'ok' && reviews.length === 0 && (
         <div className="mt-6">
           <p className="text-muted-foreground mb-8">
             {t(

@@ -19,7 +19,7 @@ import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
 import { useCart } from '../../../contexts/CartContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../../../contexts/StoreContext';
 import { useFeatures } from '../../../contexts/FeatureContext';
-import { ShopChrome } from '../../../components';
+import { ShopChrome, SectionErrorBoundary } from '../../../components';
 import { useLanguage, translations } from '../../../contexts/LanguageContext';
 import { trackViewContent, trackAddToCart } from '../../../components/MarketingPixels';
 import { recordFocusProduct, getLastListing } from '@/lib/last-listing';
@@ -857,13 +857,23 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             layout?.reviewSection?.enabled &&
             product &&
             store.id &&
-            store.id !== 'demo' && <ReviewSection storeId={store.id} productId={product.id} />}
+            store.id !== 'demo' && (
+              <SectionErrorBoundary section="reviews">
+                <ReviewSection storeId={store.id} productId={product.id} />
+              </SectionErrorBoundary>
+            )}
 
-          {/* Upsell / Cross-sell recommendations */}
+          {/* Upsell / Cross-sell recommendations — each section isolated so a
+              render error in one doesn't take down the other or the rest of
+              the PDP (Lens M graceful degradation). */}
           {isEnabled('upsell_crosssell') && product && store.id && store.id !== 'demo' && (
             <>
-              <FrequentlyBoughtTogether storeId={store.id} productId={product.id} />
-              <YouMightAlsoLike storeId={store.id} productId={product.id} />
+              <SectionErrorBoundary section="frequently-bought-together">
+                <FrequentlyBoughtTogether storeId={store.id} productId={product.id} />
+              </SectionErrorBoundary>
+              <SectionErrorBoundary section="you-might-also-like">
+                <YouMightAlsoLike storeId={store.id} productId={product.id} />
+              </SectionErrorBoundary>
             </>
           )}
 

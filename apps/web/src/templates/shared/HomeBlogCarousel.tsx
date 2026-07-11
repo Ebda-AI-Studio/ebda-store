@@ -29,12 +29,19 @@ export function HomeBlogCarousel({
     if (!store.blogEnabled) return;
     let cancelled = false;
     (async () => {
-      const res = await api.listBlogPosts(store.id, 8);
-      if (cancelled) return;
-      if (res.success && res.data?.posts) {
-        setPosts(res.data.posts);
-      } else {
-        setPosts([]);
+      try {
+        const res = await api.listBlogPosts(store.id, 8);
+        if (cancelled) return;
+        if (res.success && res.data?.posts) {
+          setPosts(res.data.posts);
+        } else {
+          setPosts([]);
+        }
+      } catch {
+        // Non-critical — a thrown fetch used to leave `posts` null forever
+        // (perpetual loading state). Treat it the same as "no posts" so
+        // the section just renders nothing, matching existing behavior.
+        if (!cancelled) setPosts([]);
       }
     })();
     return () => {

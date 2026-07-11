@@ -5,7 +5,7 @@ import type { Product, Category } from '@/lib/api';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
-import { ShopChrome } from '../components';
+import { ShopChrome, SectionErrorBoundary } from '../components';
 import { BrandStoryBlock } from '../templates/shared/BrandStoryBlock';
 import { TrustStrip } from '../templates/shared/TrustStrip';
 import { HomeBlogCarousel } from '../templates/shared/HomeBlogCarousel';
@@ -512,7 +512,7 @@ export function HomePageContent({
         // Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates with
         // the categories section above.
         const newArrivalsJSX = (
-          <>
+          <SectionErrorBoundary section="newArrivals">
             <SectionDivider
               settings={resolveSlotDividerSettings(layout.newArrivals.dividers, 'above')}
               hideForExplicitBg={!!(layout.categories.bgColor || layout.newArrivals.bgColor)}
@@ -587,7 +587,7 @@ export function HomePageContent({
                 )}
               </section>
             )}
-          </>
+          </SectionErrorBoundary>
         );
 
         // Best Sellers carousel.
@@ -600,7 +600,7 @@ export function HomePageContent({
         // when the merchant picks the `coolGrey` preset and is
         // the new default visual under `none`.
         const bestSellersJSX = (
-          <>
+          <SectionErrorBoundary section="bestSellers">
             <SectionDivider
               settings={resolveSlotDividerSettings(layout.bestSellers.dividers, 'above')}
               hideForExplicitBg={!!(layout.newArrivals.bgColor || layout.bestSellers.bgColor)}
@@ -675,7 +675,7 @@ export function HomePageContent({
                 )}
               </section>
             )}
-          </>
+          </SectionErrorBoundary>
         );
 
         // Sprint 3 + Bucket E (2026-05-17): brand story band.
@@ -683,73 +683,82 @@ export function HomePageContent({
         // as platform defaults — null-safe via internal guard.
         // Brand Story — folded into page-builder 2026-05-20.
         // Legacy fallback: `theme.showBrandStory`.
-        const brandStoryJSX =
-          (layout.brandStory?.enabled ?? store.theme?.showBrandStory !== false) ? (
-            <>
-              <SectionDivider
-                settings={resolveSlotDividerSettings(layout.brandStory?.dividers, 'above')}
-                hideForExplicitBg={!!(layout.bestSellers.bgColor || layout.brandStory?.bgColor)}
-              />
-              <BrandStoryBlock
-                image={store.heroImage ?? undefined}
-                body={store.description ?? undefined}
-                bodyAr={store.descriptionAr ?? undefined}
-                spacingSettings={layout.brandStory}
-              />
-            </>
-          ) : null;
+        const brandStoryJSX = (
+          <SectionErrorBoundary section="brandStory">
+            {(layout.brandStory?.enabled ?? store.theme?.showBrandStory !== false) ? (
+              <>
+                <SectionDivider
+                  settings={resolveSlotDividerSettings(layout.brandStory?.dividers, 'above')}
+                  hideForExplicitBg={!!(layout.bestSellers.bgColor || layout.brandStory?.bgColor)}
+                />
+                <BrandStoryBlock
+                  image={store.heroImage ?? undefined}
+                  body={store.description ?? undefined}
+                  bodyAr={store.descriptionAr ?? undefined}
+                  spacingSettings={layout.brandStory}
+                />
+              </>
+            ) : null}
+          </SectionErrorBoundary>
+        );
 
         // Blog Carousel — folded into page-builder 2026-05-20.
         // Legacy fallback: `store.blogEnabled`.
-        const blogCarouselJSX =
-          (layout.blogCarousel?.enabled ?? store.blogEnabled !== false) ? (
-            <>
-              <SectionDivider
-                settings={resolveSlotDividerSettings(layout.blogCarousel?.dividers, 'above')}
-                // Suppress when EITHER flanking section is colored. The
-                // preceding section (default order) is brandStory or
-                // bestSellers — checking only blogCarousel's own bgColor let a
-                // white divider band show over the white page bg between two
-                // brown sections (pecannbee). Mirrors the bestSellers/brandStory
-                // dividers which already check both sides.
-                hideForExplicitBg={
-                  !!(
-                    layout.bestSellers.bgColor ||
-                    layout.brandStory?.bgColor ||
-                    layout.blogCarousel?.bgColor
-                  )
-                }
-              />
-              <HomeBlogCarousel spacingSettings={layout.blogCarousel} />
-            </>
-          ) : null;
+        const blogCarouselJSX = (
+          <SectionErrorBoundary section="blogCarousel">
+            {(layout.blogCarousel?.enabled ?? store.blogEnabled !== false) ? (
+              <>
+                <SectionDivider
+                  settings={resolveSlotDividerSettings(layout.blogCarousel?.dividers, 'above')}
+                  // Suppress when EITHER flanking section is colored. The
+                  // preceding section (default order) is brandStory or
+                  // bestSellers — checking only blogCarousel's own bgColor let a
+                  // white divider band show over the white page bg between two
+                  // brown sections (pecannbee). Mirrors the bestSellers/brandStory
+                  // dividers which already check both sides.
+                  hideForExplicitBg={
+                    !!(
+                      layout.bestSellers.bgColor ||
+                      layout.brandStory?.bgColor ||
+                      layout.blogCarousel?.bgColor
+                    )
+                  }
+                />
+                <HomeBlogCarousel spacingSettings={layout.blogCarousel} />
+              </>
+            ) : null}
+          </SectionErrorBoundary>
+        );
 
         // Trust Strip — folded into page-builder 2026-05-20.
         // Ships 3 universal items (Fast Delivery / Quality / Support)
         // with bilingual platform copy. Auto-hides when disabled.
         // Legacy fallback: `theme.showTrustStrip`.
-        const trustStripJSX =
-          (layout.trustStrip?.enabled ?? store.theme?.showTrustStrip !== false) ? (
-            <>
-              <SectionDivider
-                settings={resolveSlotDividerSettings(layout.trustStrip?.dividers, 'above')}
-                // Suppress when EITHER flanking section is colored. The trust
-                // strip's preceding section (default order) is blogCarousel /
-                // brandStory / bestSellers — checking only the trust strip's own
-                // bgColor left a white divider band between the brown
-                // best-sellers and the trust strip (pecannbee, 2026-06-20).
-                hideForExplicitBg={
-                  !!(
-                    layout.bestSellers.bgColor ||
-                    layout.brandStory?.bgColor ||
-                    layout.blogCarousel?.bgColor ||
-                    layout.trustStrip?.bgColor
-                  )
-                }
-              />
-              <TrustStrip settings={layout.trustStrip} />
-            </>
-          ) : null;
+        const trustStripJSX = (
+          <SectionErrorBoundary section="trustStrip">
+            {(layout.trustStrip?.enabled ?? store.theme?.showTrustStrip !== false) ? (
+              <>
+                <SectionDivider
+                  settings={resolveSlotDividerSettings(layout.trustStrip?.dividers, 'above')}
+                  // Suppress when EITHER flanking section is colored. The trust
+                  // strip's preceding section (default order) is blogCarousel /
+                  // brandStory / bestSellers — checking only the trust strip's own
+                  // bgColor left a white divider band between the brown
+                  // best-sellers and the trust strip (pecannbee, 2026-06-20).
+                  hideForExplicitBg={
+                    !!(
+                      layout.bestSellers.bgColor ||
+                      layout.brandStory?.bgColor ||
+                      layout.blogCarousel?.bgColor ||
+                      layout.trustStrip?.bgColor
+                    )
+                  }
+                />
+                <TrustStrip settings={layout.trustStrip} />
+              </>
+            ) : null}
+          </SectionErrorBoundary>
+        );
 
         // Testimonials — auto-hides when no qualifying reviews.
         // Sprint 1: bg-[hsl(var(--bg-section-alt))] alternates
@@ -758,7 +767,7 @@ export function HomePageContent({
         // per-section bgColor. Per-section `testimonials.dividers.above`
         // wins over the legacy fallback.
         const testimonialsJSX = (
-          <>
+          <SectionErrorBoundary section="testimonials">
             <SectionDivider
               settings={resolveSlotDividerSettings(layout.testimonials.dividers, 'above')}
               hideForExplicitBg={
@@ -791,7 +800,7 @@ export function HomePageContent({
                 />
               </section>
             )}
-          </>
+          </SectionErrorBoundary>
         );
 
         // ── Section map + ordered render ──────────────────────────────────
@@ -860,7 +869,7 @@ export function HomePageContent({
           if (capped.length === 0) return null;
           if (!T.ProductCarousel) return null;
           return (
-            <React.Fragment key={`extra:${extra.id}`}>
+            <SectionErrorBoundary key={`extra:${extra.id}`} section={`extra:${extra.id}`}>
               {extra.dividers?.above?.enabled && (
                 <SectionDivider
                   settings={resolveSlotDividerSettings(extra.dividers, 'above')}
@@ -917,7 +926,7 @@ export function HomePageContent({
                   sectionBgColor={extra.bgColor}
                 />
               </section>
-            </React.Fragment>
+            </SectionErrorBoundary>
           );
         });
 
