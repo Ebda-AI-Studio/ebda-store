@@ -112,6 +112,20 @@ jobs:
       - name: Check formatting
         run: npm run format:check --if-present
 
+  # Client trust-boundary guard (Builder Reality Audit Lens K): the frontend is a
+  # display layer, not a trust layer. gitleaks/trufflehog scan the repo for committed
+  # secrets; this scans what actually ships to the BROWSER (client source + built
+  # bundle) for high-signal secret material + server-only env access. Pure bash —
+  # no node/build — so it's fast and runs on every PR.
+  client-secret-scan:
+    name: Client secret scan
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan client for secret leakage
+        run: bash scripts/scan-bundle-secrets.sh
+
   typecheck:
     name: Type Check
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
