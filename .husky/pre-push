@@ -46,6 +46,10 @@ npm run build -w packages/database -w packages/shared -w packages/ui >/dev/null 
 
 npm run lint
 
+# prettier gate — CI's Lint job runs format:check; mirroring it here keeps the
+# hook honest (a docs-only PR failed CI on formatting the local gate never ran)
+npm run format:check
+
 echo "-> typechecking apps..."
 npx tsc --noEmit -p apps/api/tsconfig.json
 npx tsc --noEmit -p apps/admin/tsconfig.json
