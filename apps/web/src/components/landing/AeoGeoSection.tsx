@@ -9,7 +9,7 @@ export function AeoGeoSection() {
   const { t } = useLanguage();
 
   return (
-    <section id="aeo-geo" className="relative overflow-hidden w-full bg-black py-20 md:py-28">
+    <section id="aeo-geo" className="relative overflow-hidden w-full bg-[#0b0a09] py-20 md:py-28">
       <Aurora />
       <div className="relative z-10 mx-auto max-w-5xl px-4">
         {/* Section header */}

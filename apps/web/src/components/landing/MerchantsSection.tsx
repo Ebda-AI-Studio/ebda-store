@@ -41,7 +41,7 @@ export function MerchantsSection() {
   const { t } = useLanguage();
 
   return (
-    <section id="merchants" className="relative overflow-hidden bg-black py-20 md:py-28">
+    <section id="merchants" className="relative overflow-hidden bg-[#0b0a09] py-20 md:py-28">
       <Aurora />
       <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <SectionHeader

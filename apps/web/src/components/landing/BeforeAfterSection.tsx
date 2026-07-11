@@ -57,7 +57,10 @@ function BrowserFrame({ children }: { children: React.ReactNode }) {
 export function BeforeAfterSection() {
   const { t } = useLanguage();
   return (
-    <section id="before-after" className="relative overflow-hidden bg-black px-4 py-20 md:py-28">
+    <section
+      id="before-after"
+      className="relative overflow-hidden bg-[#0b0a09] px-4 py-20 md:py-28"
+    >
       <Aurora />
       <div className="relative z-10 mx-auto max-w-6xl">
         <SectionHeader

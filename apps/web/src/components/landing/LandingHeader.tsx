@@ -1,8 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
-import { liquidbuttonVariants } from '@/components/ui/liquid-glass-button';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export function LandingHeader() {
@@ -11,11 +9,11 @@ export function LandingHeader() {
   const navLinks = [
     { label: t('What we do', 'ماذا نقدم'), href: '#features' },
     { label: t('Merchants', 'المتاجر'), href: '#merchants' },
-    { label: t('Contact', 'تواصل'), href: 'https://wa.me/96566740311' },
+    { label: t('Contact', 'تواصل'), href: 'https://wa.me/96541169141' },
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-black/60 backdrop-blur-md border-b border-white/10">
+    <header className="sticky top-0 z-50 bg-[#0b0a09]/72 backdrop-blur-md border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-6">
         {/* Logo + wordmark */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
@@ -49,16 +47,10 @@ export function LandingHeader() {
 
           {/* Get started CTA */}
           <a
-            href="https://wa.me/96566740311"
+            href="https://wa.me/96541169141"
             target="_blank"
             rel="noopener noreferrer"
-            className={cn(liquidbuttonVariants({ size: 'lg' }))}
-            style={{
-              backdropFilter: 'blur(12px) url("#container-glass")',
-              WebkitBackdropFilter: 'blur(12px) url("#container-glass")',
-              background: 'rgba(255,255,255,0.10)',
-              boxShadow: '0 4px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25)',
-            }}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-[#160b03] shadow-[0_6px_20px_rgba(255,106,26,0.3)] transition-transform hover:-translate-y-0.5"
           >
             {t('Get started', 'ابدأ الآن')}
           </a>

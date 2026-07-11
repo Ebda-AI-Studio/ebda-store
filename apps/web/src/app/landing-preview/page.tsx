@@ -1,26 +1,10 @@
 import type { Metadata } from 'next';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { HeroSection } from '@/components/landing/HeroSection';
-import { StatsStrip } from '@/components/landing/StatsStrip';
-import FeaturesSection from '@/components/landing/FeaturesSection';
-import { BeforeAfterSection } from '@/components/landing/BeforeAfterSection';
-import { AeoGeoSection } from '@/components/landing/AeoGeoSection';
-import { MerchantsSection } from '@/components/landing/MerchantsSection';
-import CtaSection from '@/components/landing/CtaSection';
-import { FooterSection } from '@/components/landing/FooterSection';
-import { FloatingWhatsApp } from '@/components/landing/FloatingWhatsApp';
-import { Reveal } from '@/components/landing/Reveal';
+import { EditorialLanding } from '@/components/landing/EditorialLanding';
 
 /**
- * Isolated preview of the redesigned Force AI platform landing.
- *
- * Lives at /landing-preview so the live landing (PlatformLanding.tsx) is never
- * touched until sign-off. One cohesive dark site: a sticky header, a WebGL hero,
- * the AI-native feature orbit, real Kuwaiti merchants, a sparkles CTA, and the
- * footer — glued together by the shared SectionHeader (orange hairline) motif,
- * liquid-glass CTAs, and a persistent WhatsApp float.
- *
- * noindex — work-in-progress preview, not canonical content.
+ * Preview alias of the editorial platform landing (now also the live landing at
+ * the platform root + 404). Kept as a stable review URL; noindex so it never
+ * competes with the canonical root for indexing.
  */
 export const metadata: Metadata = {
   title: 'Force AI — Landing Preview',
@@ -28,28 +12,5 @@ export const metadata: Metadata = {
 };
 
 export default function LandingPreviewPage() {
-  return (
-    <main className="bg-black">
-      <LandingHeader />
-      <HeroSection />
-      <StatsStrip />
-      <Reveal>
-        <FeaturesSection />
-      </Reveal>
-      <Reveal>
-        <BeforeAfterSection />
-      </Reveal>
-      <Reveal>
-        <AeoGeoSection />
-      </Reveal>
-      <Reveal>
-        <MerchantsSection />
-      </Reveal>
-      <Reveal>
-        <CtaSection />
-      </Reveal>
-      <FooterSection />
-      <FloatingWhatsApp />
-    </main>
-  );
+  return <EditorialLanding />;
 }

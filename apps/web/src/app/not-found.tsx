@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { PlatformLanding } from '../components/PlatformLanding';
+import { EditorialLanding } from '../components/landing/EditorialLanding';
 import { StoreNotFound } from '../components/StoreNotFound';
 import { getStore } from '../lib/store-resolver';
 
@@ -29,5 +29,5 @@ export default async function NotFound() {
     return <StoreNotFound store={store} />;
   }
 
-  return <PlatformLanding notFoundBanner />;
+  return <EditorialLanding notFoundBanner />;
 }

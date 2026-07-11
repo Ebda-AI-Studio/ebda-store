@@ -7,7 +7,7 @@
 export function FloatingWhatsApp() {
   return (
     <a
-      href="https://wa.me/96566740311"
+      href="https://wa.me/96541169141"
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with Force AI on WhatsApp"

@@ -303,7 +303,7 @@ export function FlickeringFooter() {
     {
       title: t('Get in touch', 'تواصل معنا'),
       links: [
-        { label: t('WhatsApp', 'واتساب'), href: 'https://wa.me/96566740311' },
+        { label: t('WhatsApp', 'واتساب'), href: 'https://wa.me/96541169141' },
         { label: t('Email', 'البريد'), href: 'mailto:info@force-ai.co' },
         { label: t('Force AI', 'فورس إيه آي'), href: 'https://force-ai.co' },
       ],
@@ -331,7 +331,7 @@ export function FlickeringFooter() {
             </p>
             <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
               <a
-                href="https://wa.me/96566740311"
+                href="https://wa.me/96541169141"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-primary transition-colors"

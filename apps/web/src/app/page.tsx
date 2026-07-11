@@ -5,7 +5,7 @@ import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { storeJsonLd, breadcrumbJsonLd, itemList, getSiteUrl } from '../lib/structured-data';
 import { JsonLd } from '../components/JsonLd';
 import { HomePageContent } from './HomePageContent';
-import { PlatformLanding } from '../components/PlatformLanding';
+import { EditorialLanding } from '../components/landing/EditorialLanding';
 import { emitZoneCss } from '../lib/emit-zone-css';
 
 /**
@@ -272,7 +272,7 @@ export default async function HomePage({
   // because the marketing site doesn't actually pitch the store-
   // builder service this URL belongs to.
   if (store.id === 'demo') {
-    return <PlatformLanding />;
+    return <EditorialLanding />;
   }
 
   // Kick off the two layout-independent homepage fetches (featured products

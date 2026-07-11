@@ -91,7 +91,7 @@ export default function FeaturesSection() {
   ];
 
   return (
-    <section id="features" className="relative w-full overflow-hidden bg-black py-20 md:py-28">
+    <section id="features" className="relative w-full overflow-hidden bg-[#0b0a09] py-20 md:py-28">
       <Aurora />
       <div className="relative z-10 mx-auto max-w-6xl px-4">
         <SectionHeader

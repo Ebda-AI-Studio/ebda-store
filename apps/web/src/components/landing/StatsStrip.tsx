@@ -63,7 +63,7 @@ export function StatsStrip() {
   const { t } = useLanguage();
 
   return (
-    <section id="stats" className="w-full bg-black border-y border-white/10 py-12">
+    <section id="stats" className="w-full bg-[#0b0a09] border-y border-white/10 py-12">
       <Reveal>
         <div className="mx-auto max-w-5xl px-4">
           <div className="grid grid-cols-2 gap-y-10 md:grid-cols-4">
