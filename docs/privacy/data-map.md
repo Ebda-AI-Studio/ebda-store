@@ -1,0 +1,143 @@
+# Data map (Record of Processing Activities)
+
+What personal data FWB collects, where it goes, why, how long it lives, and
+how it's deleted. This is the artifact that makes the cookie-consent banner
+(`apps/web/src/components/CookieConsentBanner.tsx`) and the erasure endpoint
+(`POST /auth/me/erase` → `AuthService.eraseAccount`) defensible under a
+GDPR / Kuwait Personal Data Protection Law 13/2023 audit — a regulator (or a
+client's counsel) can point at any category of data and get a straight
+answer: where it lives, on what legal basis, for how long, and how it's
+purged.
+
+Derived directly from the code (grepped, not guessed) on 2026-07-11. Companion
+to `docs/RETENTION.md` (which is the authoritative per-Postgres-table
+retention matrix) — this document adds the piece RETENTION.md doesn't cover:
+**every third-party destination** the data also flows to.
+
+## How to read this
+
+- **Legal basis** follows GDPR Art. 6(1): `contract` (needed to deliver the
+  order/account), `consent` (cookie-banner opt-in, revocable), `legitimate
+interest` (fraud prevention, security, service operation).
+- **Deletion path**: `eraseAccount` = covered by `AuthService.eraseAccount`
+  (customer-initiated `/auth/me/erase` or the monthly retention cron).
+  `propagated` = additionally pushed to the third party by the
+  `account/erased` Inngest event (see "Third-party erasure propagation"
+  below). `never collected if declined` = consent-gated, so a customer who
+  never opts in never generates the row in the first place. `not deletable
+per-user` = see the specific note.
+
+## 1. Primary store — Neon Postgres
+
+Full per-table matrix (retention days, exact columns, cron IDs) lives in
+`docs/RETENTION.md` — not duplicated here. Summary of the categories:
+
+| Category                                      | Tables                                                                                                  | Legal basis                                | Deletion path                                                                                                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity (name, email, phone, DOB)            | `users`                                                                                                 | contract                                   | `eraseAccount`                                                                                                                                            |
+| Addresses                                     | `addresses`, order `shippingAddress`/`billingAddress` JSON snapshots                                    | contract                                   | `eraseAccount` (addresses hard-deleted; order JSON scrubbed to `{anonymized:true}`)                                                                       |
+| Order history                                 | `orders`, `order_items`, `payments`                                                                     | contract + Kuwait MOF tax retention (≥5y)  | `eraseAccount` nulls `customerId` + scrubs address JSON; row itself survives 5y for tax, then the `order-anonymize-5y-monthly` cron scrubs any stragglers |
+| IP address + user agent                       | `audit_logs.ip` / `audit_logs.userAgent`                                                                | legitimate interest (security/audit trail) | 90 days hot, then archived to R2 (see §2) for 7y (SOX/ISO 27001), never customer-erasable mid-window (see §4)                                             |
+| Device/session (push endpoints)               | `push_subscriptions` (VAPID), `onesignal_subscriptions` (OneSignal player id, admin/staff only)         | consent (push opt-in)                      | `eraseAccount` (hard delete) + `propagated` for OneSignal (see §3)                                                                                        |
+| Loyalty / wishlist / cart / reviews / returns | `loyalty_points`, `loyalty_transactions`, `wishlists`, `carts`, `abandoned_carts`, `reviews`, `returns` | contract                                   | `eraseAccount` (hard delete, except reviews/returns which keep the body and drop only the author link)                                                    |
+
+## 2. Cloudflare R2 (object storage)
+
+| What                                                                        | Legal basis                              | Retention                                      | Deletion path                                                                                                        |
+| --------------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| User avatar images                                                          | contract                                 | Until replaced or account erased               | `eraseAccount` nulls `User.avatar`, then `deleteR2ObjectIfOrphan` best-effort deletes the object (`auth.service.ts`) |
+| Product / category images                                                   | n/a (merchant content, not customer PII) | Until replaced                                 | `r2-cleanup.service.ts` on replace; weekly `r2-orphan-sweep` reports/deletes orphans                                 |
+| Audit-log JSONL archives (contain `ip`, `userAgent`, `userId`, action JSON) | legitimate interest                      | 7 years (SOX / ISO 27001 tamper-evident trail) | **not deletable per-user** — see §4. Written by `audit-log-archive.ts` (`lib/inngest/functions/`)                    |
+| Encrypted DB backups (`.sql.gz.enc`)                                        | legitimate interest (disaster recovery)  | 30 days (see §5)                               | Auto-pruned by the backup workflow's lifecycle rule; not individually purgeable                                      |
+
+## 3. Third-party processors
+
+| Provider                                                                                                        | What personal data it receives                                                                                                                                                                                                                                                                                                                                                 | Legal basis                                                                    | Consent-gated?                                                                                                                                                                                                                                                                                                                                                                                                               | Deletion path                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PostHog** (product analytics)                                                                                 | Page views, click/behavioural events. `ip: false` (IP never sent — `PostHogProvider.tsx`). Visitor identity is an **anonymous, randomly-generated `distinct_id`** — the codebase does NOT call `posthog.identify(userId)` anywhere despite the intent documented in a comment, so PostHog never learns a Force `userId`/email today. Session replay is disabled platform-wide. | consent (`marketing` cookie category)                                          | Yes — `PostHogProvider` only calls `posthog.init()` after `consent.marketing === true`; **never collected if declined**                                                                                                                                                                                                                                                                                                      | `propagated`, but currently a no-op in practice: (a) no `POSTHOG_PERSONAL_API_KEY`/`POSTHOG_PROJECT_ID` is configured anywhere in this repo, so `deletePostHogPerson` warns and skips; (b) even once configured, there's no `userId` → `distinct_id` link to look the person up by (see above). Wired and ready in `privacy-propagation.service.ts` — becomes live once both are fixed.                                                                                                                                                                                                                                            |
+| **OneSignal** — storefront app                                                                                  | Push-subscribed shopper devices, tagged with `storeId` only (`OneSignalStorefrontInit.tsx`). No per-customer identifier is ever captured server-side.                                                                                                                                                                                                                          | consent (explicit opt-in prompt, `storefrontWebPushEnabled` + push permission) | Yes — subscription requires an explicit user action; **never collected if declined**                                                                                                                                                                                                                                                                                                                                         | **not deletable per-user via API** — there is no player id captured for storefront customers to delete. `eraseAccount` already removes the local `push_subscriptions`/`onesignal_subscriptions` rows (which are empty for storefront customers by design — see next row), which is the only server-side record that ever existed.                                                                                                                                                                                                                                                                                                  |
+| **OneSignal** — admin/orders apps                                                                               | Player id + `(role, store_id, user_id)` tags, for **staff/admin devices only** (`apps/admin/src/components/OneSignalInit.tsx` explicitly skips `role === 'customer'`)                                                                                                                                                                                                          | legitimate interest (operational tooling, not customer-facing)                 | No (internal tooling)                                                                                                                                                                                                                                                                                                                                                                                                        | `eraseAccount` hard-deletes the `onesignal_subscriptions` row (moot for customers — the table never holds their rows). `propagated`: `deleteOneSignalPlayers` calls `DELETE /players/:id` for any row that does exist, using the admin app's REST key.                                                                                                                                                                                                                                                                                                                                                                             |
+| **Meta / TikTok Conversions API (server-side CAPI)**                                                            | Purchase events: SHA-256 **hashed** email + phone (never raw — `pixels-capi.service.ts` §"PII HANDLING"), order total/currency, event id                                                                                                                                                                                                                                       | legitimate interest (advertising measurement, merchant's ad account)           | Fires independent of the storefront pixel banner state today — CAPI is a server-side merchant integration, not gated on the storefront visitor's own consent choice. _(Flagged as a follow-up: the client-side pixels ARE consent-gated per row below; CAPI firing regardless of visitor consent is a gap worth closing in a future pass — out of scope for this one, called out here for honesty rather than left silent.)_ | **not deletable per-user via API** — Meta/TikTok CAPI is a one-way event stream, not a queryable stored profile FWB can call a deletion endpoint against. The data received is already pseudonymized (hashed, one-way, not reversible by FWB or, per Meta/TikTok's own spec, easily reversible by them either). A data-subject erasure request affecting Meta/TikTok's own ad-platform copy must go through the merchant's own ad account / Meta's or TikTok's data-subject-request tooling — that's between the shopper and Meta/TikTok as an independent controller of their ad-account data, not something FWB's API can reach. |
+| **Meta / TikTok / Snapchat / Twitter / Pinterest — client-side pixels**                                         | Page views + standard e-commerce events (view, add-to-cart, purchase), browser fingerprint/cookie-based, per the platform SDK's own behavior                                                                                                                                                                                                                                   | consent (`marketing` cookie category)                                          | Yes — `MarketingPixelsInner` (`MarketingPixels.tsx`) only fires (`allowFire`) when `marketing_pixels` feature is on AND `consent.marketing === true`; SSR-gated too (not even rendered without consent). **Never collected if declined.**                                                                                                                                                                                    | Same as CAPI above — not a per-user-deletable stored profile FWB controls. Turning consent off on a future visit stops new collection; it doesn't retroactively purge what the ad platform already ingested (standard for all pixel-based advertising).                                                                                                                                                                                                                                                                                                                                                                            |
+| **Sentry** (error monitoring, all 4 apps: api/web/admin/orders)                                                 | Stack traces, request URL/method, sanitized headers (Authorization/Cookie/CSRF stripped — `sentry.service.ts`), and whatever ends up in an exception's message/context (occasionally an id, rarely PII, never deliberately). `sendDefaultPii` is not enabled.                                                                                                                  | legitimate interest (operational — crash diagnosis)                            | No (operational tooling, DSN-gated — off entirely if unset)                                                                                                                                                                                                                                                                                                                                                                  | Not per-user erasable via this codebase — Sentry error events aren't linked to a `userId` today (`posthog_distinct_id` tag is the only cross-linking hook, and only client-side). Sentry's own data-retention default (90 days) is the practical bound; not integrated with `eraseAccount`.                                                                                                                                                                                                                                                                                                                                        |
+| **Resend** (transactional email)                                                                                | Recipient email, name, order confirmation content (items, totals, shipping address) — sent per-email, not stored as a queryable "contact" the way a marketing ESP would                                                                                                                                                                                                        | contract (order confirmation is core service delivery)                         | No — required to fulfill the order/account action that triggered the email                                                                                                                                                                                                                                                                                                                                                   | Not deletable per-send after the fact (email already delivered to the recipient's inbox — same as any transactional email). Resend's own dashboard log of _that FWB sent this email_ is provider-side operational metadata, not a customer profile; FWB doesn't push deletion requests to Resend for it. Going forward, `eraseAccount` prevents FUTURE emails to that address at the FWB layer (address is rewritten to `erased-<uuid>@anonymized.local`).                                                                                                                                                                         |
+| **Payment providers** (Tap, MyFatoorah, Hesabe, UPayments) — noted for completeness, out of scope for this pass | Name, phone, email, amount, order reference — required to initiate a Kuwait-market card/KNET payment                                                                                                                                                                                                                                                                           | contract                                                                       | No — required to complete the transaction the shopper initiated                                                                                                                                                                                                                                                                                                                                                              | Governed by each provider's own regulatory obligations as an independent PCI-scoped processor (they retain transaction records per their own compliance requirements, e.g. AML). Not in FWB's control to delete; not attempted here.                                                                                                                                                                                                                                                                                                                                                                                               |
+
+## 4. Two intentional "won't erase" categories — and why
+
+Not every category above is erasable on request, and that's a defensible
+design choice, not an oversight:
+
+1. **Audit logs (`audit_logs` table + R2 JSONL archive).** These exist
+   specifically to be tamper-evident proof of what happened, including
+   who did it — erasing an entry on the erased user's own request would
+   defeat the purpose (imagine a fraud investigation where the suspect
+   could delete their own trail by clicking "delete my account"). GDPR
+   Art. 17(3)(b) explicitly carves out an exception for legal-obligation /
+   legitimate-interest records like this. They still expire on their own
+   schedule (90 days hot → 7 years archived, then gone — see
+   `docs/RETENTION.md`).
+2. **Advertising-platform copies (Meta/TikTok/Snap pixels + CAPI, §3).**
+   FWB never stores a queryable "this is customer X's ad-platform profile"
+   record — it only ever SENDS pseudonymized events outward. There is
+   nothing in FWB's own systems to delete beyond what `eraseAccount`
+   already removes (the local order/customer link). A shopper who wants
+   their data removed from Meta's or TikTok's own ad systems needs to use
+   THOSE platforms' own subject-access tooling — that's a relationship
+   between the shopper and Meta/TikTok as independent data controllers of
+   their advertising data, not something reachable through FWB's API.
+
+## 5. Deletion & backups — the honest erasure boundary
+
+`eraseAccount` (+ its third-party propagation, §3) only ever mutates the
+CURRENT, live copy of the data. FWB also keeps point-in-time recovery and
+backup copies of the whole database for disaster recovery
+(`docs/DB-BACKUP-RESTORE.md`), and those copies are, by construction, taken
+at a moment in time — an erasure that happens today doesn't retroactively
+edit a backup that was already taken yesterday.
+
+Concretely, as of 2026-07-11 (`docs/DB-BACKUP-RESTORE.md` is the live
+source of truth if these numbers ever change):
+
+- **Neon PITR (point-in-time recovery): 7-day window.** If production is
+  ever restored to a timestamp from BEFORE an erasure, that customer's
+  pre-erasure PII reappears until the erase is re-applied (or re-run — it's
+  idempotent). This window is short and only used for genuine incident
+  recovery, never a routine operation.
+- **Daily `pg_dump` backups (local Mac + R2, encrypted): 30-day retention
+  on both layers.** An erased user's PII persists in progressively older
+  dumps until they roll off this 30-day window. This is the LONGEST
+  possible reappearance window across all backup layers today.
+
+**Plain-language boundary statement:** once a customer's data is erased,
+FWB's live systems reflect that immediately, and the third-party
+propagation in §3 runs within minutes (best-effort). Standing backups mean
+a genuinely complete purge — including every backup copy — takes up to
+**30 days** (the longer of the two backup layers above) to fully roll off,
+and up to 7 additional days of PITR exposure if a disaster-recovery
+restore happens to land on a pre-erasure timestamp during that window.
+This is disclosed here, in `docs/DB-BACKUP-RESTORE.md`, and should be the
+answer given to any data-subject request that asks specifically about
+backup persistence.
+
+## Third-party erasure propagation — how it's wired
+
+`AuthService.eraseAccount` fires an `account/erased` Inngest event
+immediately after its anonymization transaction commits (see
+`apps/api/src/services/auth.service.ts`). A dedicated consumer,
+`apps/api/src/lib/inngest/functions/account-erased-propagation.ts`, then
+calls `apps/api/src/services/privacy-propagation.service.ts` to best-effort
+delete the user's copy at each configured third party (§3). This is
+deliberately decoupled from the erase transaction and from the HTTP
+response the customer receives:
+
+- The Postgres anonymization is the transaction that MUST succeed — it's
+  synchronous, in the request path, and already committed by the time any
+  propagation runs.
+- Every propagation step is independently retried by Inngest and logged on
+  failure, but a failure can never roll back the anonymization or surface
+  as an error to the customer who requested erasure.
+- Nothing here ever logs the user's email, name, phone, or other PII —
+  only the opaque `userId` (already the established logging convention
+  across this codebase) and provider-issued opaque ids (OneSignal player
+  id, PostHog person id).

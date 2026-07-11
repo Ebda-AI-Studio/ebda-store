@@ -9,6 +9,7 @@ import { accountLockout } from './account-lockout.service';
 import logger from '../lib/logger';
 import { redis } from './redis.service';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
+import { inngest } from '../lib/inngest/client';
 
 interface TokenPayload {
   userId: string;
@@ -914,6 +915,17 @@ export class AuthService {
     const anonymizedEmail = `erased-${user.id}@anonymized.local`;
     const anonymizedAddressJson = { anonymized: true } as const;
 
+    // Capture third-party identifiers BEFORE the transaction deletes the
+    // local rows that carry them — the account/erased propagation consumer
+    // (fired after commit, below) needs these to reach OneSignal's API.
+    // Read-only, so it doesn't need to be inside the transaction.
+    const oneSignalPlayerIds = (
+      await prisma.oneSignalSubscription.findMany({
+        where: { userId },
+        select: { playerId: true },
+      })
+    ).map(s => s.playerId);
+
     await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
       // Orders: preserve for tax records (Kuwait MOF ≥5y), drop the PII.
       // The customer FK is already `onDelete: SetNull` but we explicitly
@@ -981,6 +993,18 @@ export class AuthService {
         logger.warn({ err, userId }, '[auth.eraseAccount] r2 avatar cleanup failed')
       );
     }
+
+    // Third-party deletion propagation (GDPR Art. 17 / Kuwait Law 13/2023
+    // Art. 17): OneSignal + PostHog. Fire-and-forget, same discipline as the
+    // R2 cleanup above — the primary anonymization already committed, so a
+    // dead Inngest connection must never surface as a failed erase. See
+    // lib/inngest/functions/account-erased-propagation.ts +
+    // services/privacy-propagation.service.ts.
+    inngest
+      .send({ name: 'account/erased', data: { userId, oneSignalPlayerIds } })
+      .catch(err =>
+        logger.warn({ err, userId }, '[auth.eraseAccount] account/erased enqueue failed')
+      );
   }
 
   /**

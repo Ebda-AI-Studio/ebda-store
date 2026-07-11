@@ -6,6 +6,9 @@ Companion document to:
 - `~/.claude/CLAUDE.md` § Production Reality gates rule 9 (GDPR erasure).
 - `docs/superpowers/plans/2026-05-13-iceberg-audit-v2.md` § Tier 1 item #16
   and Tier 3 item #15.
+- `docs/privacy/data-map.md` — the third-party-destination companion to
+  this table (PostHog / OneSignal / pixels & CAPI / Sentry / Resend / R2 /
+  backups), plus the erasure-propagation and backup-boundary writeups.
 
 The policy reconciles two opposing legal pressures on FWB:
 
@@ -89,10 +92,13 @@ load.
 - **Per-store retention overrides**: some merchants may want shorter
   retention for compliance with stricter regional regs. Today every
   store inherits the platform defaults above.
-- **Backup retention**: Neon snapshots are kept for 9 commits via
-  `prod-<sha>` branches (free-tier 10-branch cap). The
-  oldest-snapshot retention is therefore "however long 9 commits
-  ago is" — typically a few days. Long-term backups land on R2
-  via the per-project `scripts/backup-db.sh` (keeps last 30 local
-  pg_dumps). Both are belt-and-suspenders only; the source of
-  truth for retention enforcement is the live DB columns above.
+- **Backup retention** (corrected 2026-07-11 — the previous "9 commits via
+  `prod-<sha>` branches" description was stale; per-commit Neon snapshots
+  were retired 2026-06-08): recovery today is **Neon PITR (7-day window)**
+  as the primary near-zero-RPO path, plus **daily encrypted `pg_dump`s to
+  local Mac + R2 (30-day retention on both)** as the belt-and-suspenders
+  layer. Full detail: `docs/DB-BACKUP-RESTORE.md`. Both layers mean an
+  erased user's PII can persist in a backup for up to 30 days after
+  erasure (the dump layer) — see `docs/privacy/data-map.md` § "Deletion &
+  backups" for the full erasure-boundary writeup. The source of truth for
+  live retention enforcement is still the DB columns above.

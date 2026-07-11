@@ -54,6 +54,7 @@ import { bulkAiCategorize } from './bulk-ai-categorize';
 import { bulkAiImageAlt } from './bulk-ai-image-alt';
 import { bulkAiExcerpt } from './bulk-ai-excerpt';
 import { bulkAiTags } from './bulk-ai-tags';
+import { accountErasedPropagation } from './account-erased-propagation';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -149,4 +150,7 @@ export const inngestFunctions: InngestFunction.Any[] = [
   bulkAiImageAlt,
   bulkAiExcerpt,
   bulkAiTags,
+  // Right-to-erasure third-party propagation: OneSignal player deletion +
+  // PostHog person deletion, fired after AuthService.eraseAccount commits.
+  accountErasedPropagation,
 ];

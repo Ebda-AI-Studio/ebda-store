@@ -229,6 +229,23 @@ type BulkAiTagsEvent = EventPayload & {
   };
 };
 
+// Fired after AuthService.eraseAccount's Postgres transaction has already
+// committed — the third-party propagation consumer (OneSignal player
+// deletion + PostHog person deletion) runs entirely off this event so a
+// slow/failing provider can never block or roll back the erase response.
+// See apps/api/src/services/privacy-propagation.service.ts.
+type AccountErasedEvent = EventPayload & {
+  name: 'account/erased';
+  data: {
+    userId: string;
+    /** OneSignal player/subscription ids captured before the erase
+     *  transaction deleted the local OneSignalSubscription rows. Almost
+     *  always empty for customer erasures — see the caveat in
+     *  privacy-propagation.service.ts. */
+    oneSignalPlayerIds: string[];
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -253,7 +270,8 @@ export type AppEvent =
   | BulkAiCategorizeEvent
   | BulkAiImageAltEvent
   | BulkAiExcerptEvent
-  | BulkAiTagsEvent;
+  | BulkAiTagsEvent
+  | AccountErasedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots
