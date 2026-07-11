@@ -3,9 +3,7 @@ import { generateOrderNumber } from '../utils/order-number';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
 import { CouponService } from './coupon.service';
-import { EmailService } from './email.service';
 import { socketService } from './socket.service';
-import { notificationDispatcher } from './notification-dispatcher.service';
 import { featureService } from './feature.service';
 import {
   decrementProductInventory,
@@ -14,7 +12,7 @@ import {
   forceDecrementVariantInventory,
 } from './inventory-decrement';
 import { inngest } from '../lib/inngest/client';
-import { shippingCarrierService } from './shipping-carrier.service';
+import { handleOrderStatusChanged } from '../lib/inngest/functions/order-status-changed';
 import { ShippingService } from './shipping.service';
 import { LoyaltyService, computeRedemption } from './loyalty.service';
 import { affiliateService } from './affiliate.service';
@@ -923,7 +921,6 @@ export class OrderService {
         },
       },
     });
-    const orderLocale = (updatedOrder.locale ?? undefined) as 'en' | 'ar' | undefined;
 
     // Append-only status audit trail. `order.status` was read (via getById)
     // BEFORE the update above, so it is the true prior status. Best-effort:
@@ -982,198 +979,55 @@ export class OrderService {
       });
     }
 
-    // Process affiliate commission on delivery (fire-and-forget)
+    // Post-purchase side effects (payment-success / shipped / admin-refund
+    // emails, WhatsApp/SMS/push dispatch, affiliate commission, loyalty award,
+    // shipping-carrier auto-create) now fan out on the `order/status-changed`
+    // Inngest event as retriable steps that dead-letter on failure (Lens E,
+    // E2-4) — they used to run here as in-process fire-and-forget `.catch(log)`
+    // calls that vanished silently on a provider outage or a mid-deploy. Only
+    // the money reversal (applyRefundEffects, above — awaited) and the
+    // real-time socket ping (below — fast in-process) stay inline.
     if (status === 'delivered') {
-      // Queue review-request email (7-day delay handled inside the Inngest fn)
+      // Existing event kept: 7-day review-request job + WBS delivered notify.
       inngest
         .send({ name: 'order/delivered', data: { orderId, storeId } })
         .catch((err: unknown) =>
-          logger.error({ err, orderId }, 'Failed to enqueue review-request event')
+          logger.error({ err, orderId }, 'Failed to enqueue order/delivered event')
         );
-
-      affiliateService
-        .processCommission(storeId, orderId)
-        .catch(err => logger.error({ err }, 'Affiliate commission processing failed'));
-
-      // Award loyalty points for the purchase. Defined in
-      // loyalty.service for months but never invoked anywhere — every
-      // delivered order silently failed to credit the customer's
-      // points balance, while the admin loyalty UI cheerfully
-      // advertised the program. Fire-and-forget: a missing customerId
-      // (guest checkout) returns null and short-circuits inside the
-      // service, and any exception is swallowed by the .catch so we
-      // never fail the status update over a points-credit glitch.
-      if (updatedOrder.customerId) {
-        LoyaltyService.earnPointsFromPurchase(
-          storeId,
-          updatedOrder.customerId,
-          orderId,
-          updatedOrder.total
-        ).catch(err =>
-          logger.error(
-            { err, storeId, orderId, customerId: updatedOrder.customerId },
-            'Loyalty earn-from-purchase failed'
-          )
-        );
-      }
     }
-
-    // Auto-ship on confirmation (fire-and-forget)
-    if (status === 'confirmed') {
-      featureService
-        .isFeatureEnabled(storeId, 'shipping_carriers')
-        .then(shippingEnabled => {
-          if (shippingEnabled) {
-            shippingCarrierService
-              .createShipmentForOrder(storeId, orderId)
-              .catch(err => logger.error({ err, storeId, orderId }, 'Auto-ship failed'));
-          }
-        })
-        .catch(err => logger.error({ err, storeId }, 'Auto-ship feature check failed'));
-    }
-
-    // Status was committed — return to caller as fast as possible.
-    // Emails + notifications fan out fire-and-forget so a slow / unreachable
-    // SMTP host or notification provider can't block the admin status-change
-    // response (mirrors the OrderService.create fix).
-    const customerEmail = updatedOrder.customer?.email || '';
-    const customerName =
-      `${updatedOrder.customer?.firstName || ''} ${updatedOrder.customer?.lastName || ''}`.trim() ||
-      customerEmail ||
-      'Customer';
-    const shippingAddrFull = updatedOrder.shippingAddress as {
-      firstName: string;
-      lastName: string;
-      address1: string;
-      address2?: string;
-      city: string;
-      state: string;
-      postalCode: string;
-      country: string;
-      phone?: string;
-    } | null;
-    const customerPhone = shippingAddrFull?.phone ?? undefined;
-
     if (status === 'shipped') {
-      void EmailService.sendOrderShipped(
-        storeId,
-        {
-          customerEmail,
-          customerName,
-          orderNumber: updatedOrder.orderNumber,
-          // trackingNumber and trackingUrl can be passed when available
-        },
-        orderLocale
-      ).catch(err => logger.error({ err }, 'Failed to send order shipped email'));
-
-      // Fire order/shipped Inngest event so the WBS bridge (and future listeners)
-      // can send a WhatsApp shipping notification.
+      // Existing event kept: WBS shipping notification.
       inngest
         .send({ name: 'order/shipped', data: { orderId, storeId } })
         .catch((err: unknown) =>
           logger.error({ err, orderId }, 'Failed to enqueue order/shipped event')
         );
-    } else if (status === 'confirmed' && shippingAddrFull) {
-      // Payment success / order confirmed
-      void EmailService.sendPaymentSuccess(
-        storeId,
-        {
-          orderNumber: updatedOrder.orderNumber,
-          customerName,
-          customerEmail,
-          items: updatedOrder.items.map(item => ({
-            name: item.productName,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          subtotal: updatedOrder.subtotal,
-          tax: updatedOrder.tax,
-          shipping: updatedOrder.shipping,
-          total: updatedOrder.total,
-          shippingAddress: shippingAddrFull,
-        },
-        orderLocale
-      ).catch(err => logger.error({ err }, 'Failed to send payment success email'));
-    } else if (status === 'refunded' && hadCapturedPayment) {
-      // Gated on a captured payment — same reasoning as the refund_processed
-      // dispatch + applyRefundEffects above. No money captured ⇒ no refund ⇒
-      // no admin refund email.
-      void EmailService.sendAdminRefund({
-        orderNumber: updatedOrder.orderNumber,
-        amount: updatedOrder.total,
-        reason: 'Order refunded',
-      }).catch(err => logger.error({ err }, 'Failed to send admin refund email'));
     }
-
-    // Dispatch to WhatsApp/SMS/Push channels (fire-and-forget, including the
-    // store-name lookup so we never block the response on Prisma either).
-    if (
-      status === 'shipped' ||
-      status === 'delivered' ||
-      status === 'cancelled' ||
-      status === 'refunded'
-    ) {
-      void prisma.store
-        .findUnique({ where: { id: storeId }, select: { name: true } })
-        .catch(() => null)
-        .then(storeForNotification => {
-          const storeName = storeForNotification?.name ?? storeId;
-          if (status === 'shipped') {
-            return notificationDispatcher
-              .dispatch(storeId, 'order_shipped', {
-                customerName,
-                customerPhone,
-                orderNumber: updatedOrder.orderNumber,
-                total: updatedOrder.total,
-                storeId,
-                storeName,
-              })
-              .catch(err => logger.error({ err }, 'Notification dispatch failed (shipped)'));
-          }
-          if (status === 'delivered') {
-            return notificationDispatcher
-              .dispatch(storeId, 'order_delivered', {
-                customerName,
-                customerPhone,
-                orderNumber: updatedOrder.orderNumber,
-                total: updatedOrder.total,
-                storeId,
-                storeName,
-              })
-              .catch(err => logger.error({ err }, 'Notification dispatch failed (delivered)'));
-          }
-          if (status === 'cancelled') {
-            return notificationDispatcher
-              .dispatch(storeId, 'order_cancelled', {
-                customerName,
-                customerPhone,
-                orderNumber: updatedOrder.orderNumber,
-                total: updatedOrder.total,
-                storeId,
-                storeName,
-              })
-              .catch(err => logger.error({ err }, 'Notification dispatch failed (cancelled)'));
-          }
-          // status === 'refunded'.
-          // Only tell the customer "refund processed" when there was an
-          // actual captured payment to refund. A `refunded` status on an
-          // order that never collected money (defensive — the normal path
-          // gates applyRefundEffects above) must not claim a refund happened.
-          if (!hadCapturedPayment) {
-            return Promise.resolve();
-          }
-          return notificationDispatcher
-            .dispatch(storeId, 'refund_processed', {
-              customerName,
-              customerPhone,
-              orderNumber: updatedOrder.orderNumber,
-              amount: updatedOrder.total,
-              storeId,
-              storeName,
-            })
-            .catch(err => logger.error({ err }, 'Notification dispatch failed (refunded)'));
-        });
-    }
+    inngest
+      .send({
+        name: 'order/status-changed',
+        data: { orderId, storeId, status, hadCapturedPayment },
+      })
+      .catch((err: unknown) => {
+        // Unlike `order/created` (which has order-created-stuck-sweep), this
+        // event has no recovery sweep — so a failed enqueue (Inngest outage /
+        // mid-deploy) would silently lose EVERY migrated side effect. Fall back
+        // to running the fanout in-process (same pattern as the payment-webhook
+        // inline fallback). Dynamic import avoids a load-time import cycle
+        // (the fanout pulls in several services). Best-effort + non-blocking.
+        logger.error(
+          { err, orderId, status },
+          'Failed to enqueue order/status-changed — running fanout inline as fallback'
+        );
+        handleOrderStatusChanged(orderId, storeId, status, hadCapturedPayment, {
+          run: <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn(),
+        }).catch((e: unknown) =>
+          logger.error(
+            { err: e, orderId, status },
+            'order/status-changed inline fallback also failed'
+          )
+        );
+      });
 
     // Send real-time notification to customer
     try {

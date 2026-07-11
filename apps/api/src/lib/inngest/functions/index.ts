@@ -48,6 +48,7 @@ import { paymentAbandonmentSweep } from './payment-abandonment-sweep';
 import { paymentWebhookProcess } from './payment-webhook-process';
 import { paymentWebhookStuckSweep } from './payment-webhook-stuck-sweep';
 import { orderCreatedStuckSweep } from './order-created-stuck-sweep';
+import { orderStatusChanged } from './order-status-changed';
 import { bulkAiBalanceDescriptions } from './bulk-ai-balance-descriptions';
 import { bulkAiRevertBalance } from './bulk-ai-revert-balance';
 import { bulkAiCategorize } from './bulk-ai-categorize';
@@ -140,6 +141,10 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // Safety net: re-sends order/created for PAID orders whose fanout never ran
   // (the order/created enqueue is fire-and-forget with no fallback). 5-min cron.
   orderCreatedStuckSweep,
+  // Post-purchase status-transition side effects (emails/push/dispatch/affiliate/
+  // loyalty/auto-ship) migrated off updateStatus's in-process fire-and-forget onto
+  // retriable Inngest steps that dead-letter on failure (Lens E, E2-4).
+  orderStatusChanged,
   // AI description-language balancer: translates the richer EN/AR description
   // into the thinner language across the whole catalogue. Revert backup included.
   bulkAiBalanceDescriptions,

@@ -1,6 +1,11 @@
 import { prisma } from '@force/database';
 import { config } from '../config';
 import { ResendService } from './resend.service';
+// Static import is safe despite the email-queue↔email-service cycle: both sides
+// use the other only at call-time (sendForStore / the queue's drain), never at
+// module load, so ES live-bindings resolve it. `queue: true` routes order emails
+// through the durable Redis retry queue (E2-5).
+import { emailQueue } from './email-queue.service';
 import { welcomeTemplate } from './email-templates/welcome';
 import { passwordResetTemplate } from './email-templates/password-reset';
 import { emailVerificationTemplate } from './email-templates/email-verification';
@@ -319,7 +324,13 @@ export class EmailService {
       content: string;
       text?: string;
       language?: 'en' | 'ar';
-    }
+    },
+    // `queue: true` routes the rendered email through the durable Redis retry
+    // queue (email-queue.service) instead of calling Resend inline — used by the
+    // order-lifecycle emails so a transient Resend failure retries (3×) instead
+    // of vanishing. The queue drains back through EmailService.sendRaw, so no
+    // recursion. Lazy import breaks the EmailService↔emailQueue cycle.
+    opts?: { queue?: boolean }
   ): Promise<void> {
     const store = await prisma.store.findUnique({
       where: { id: storeId },
@@ -352,6 +363,15 @@ export class EmailService {
       address: store.address,
       defaultLanguage: language,
     });
+    if (opts?.queue) {
+      await emailQueue.enqueue(storeId, {
+        to: args.to,
+        subject: args.subject,
+        html,
+        text: args.text,
+      });
+      return;
+    }
     await ResendService.sendBrandedEmail(storeId, {
       to: args.to,
       subject: args.subject,
@@ -363,13 +383,16 @@ export class EmailService {
   /**
    * Platform-level send (no store context). Used for admin alerts only.
    */
-  private static async sendPlatform(args: {
-    to: string | string[];
-    subject: string;
-    content: string;
-    text?: string;
-    replyTo?: string;
-  }): Promise<void> {
+  private static async sendPlatform(
+    args: {
+      to: string | string[];
+      subject: string;
+      content: string;
+      text?: string;
+      replyTo?: string;
+    },
+    opts?: { queue?: boolean }
+  ): Promise<void> {
     const html = renderBrandedShell(args.content, {
       name: 'Force AI Store',
       nameAr: null,
@@ -380,6 +403,11 @@ export class EmailService {
       address: null,
       defaultLanguage: 'en',
     });
+    if (opts?.queue) {
+      // Durable retry queue (storeId=null → platform sender on drain).
+      await emailQueue.enqueue(null, { to: args.to, subject: args.subject, html, text: args.text });
+      return;
+    }
     const r = await getPlatformResend();
     const payload: Record<string, unknown> = {
       from: 'Force AI Store <noreply@force-ai.co>',
@@ -455,7 +483,11 @@ export class EmailService {
         : 'en');
     const subject = orderConfirmationTemplate.subject[lang](data, store.name);
     const content = orderConfirmationTemplate[lang](data, store.name);
-    await this.sendForStore(storeId, { to: data.customerEmail, subject, content, language: lang });
+    await this.sendForStore(
+      storeId,
+      { to: data.customerEmail, subject, content, language: lang },
+      { queue: true }
+    );
   }
 
   /**
@@ -505,7 +537,11 @@ export class EmailService {
         : 'en');
     const subject = paymentSuccessTemplate.subject[lang](data, store.name);
     const content = paymentSuccessTemplate[lang](data, store.name);
-    await this.sendForStore(storeId, { to: data.customerEmail, subject, content, language: lang });
+    await this.sendForStore(
+      storeId,
+      { to: data.customerEmail, subject, content, language: lang },
+      { queue: true }
+    );
   }
 
   /**
@@ -563,7 +599,11 @@ export class EmailService {
         : 'en');
     const subject = orderShippedTemplate.subject[lang](data, store.name);
     const content = orderShippedTemplate[lang](data, store.name);
-    await this.sendForStore(storeId, { to: data.customerEmail, subject, content, language: lang });
+    await this.sendForStore(
+      storeId,
+      { to: data.customerEmail, subject, content, language: lang },
+      { queue: true }
+    );
   }
 
   /**
@@ -853,11 +893,14 @@ export class EmailService {
    */
   static async sendAdminNewOrder(data: OrderEmailData): Promise<void> {
     const content = this.adminNewOrderTemplate(data);
-    await this.sendPlatform({
-      to: config.smtpFromEmail,
-      subject: `New Order Received - #${data.orderNumber}`,
-      content,
-    });
+    await this.sendPlatform(
+      {
+        to: config.smtpFromEmail,
+        subject: `New Order Received - #${data.orderNumber}`,
+        content,
+      },
+      { queue: true }
+    );
   }
 
   /**
@@ -869,11 +912,14 @@ export class EmailService {
     reason?: string;
   }): Promise<void> {
     const content = this.adminRefundTemplate(data);
-    await this.sendPlatform({
-      to: config.smtpFromEmail,
-      subject: `Refund Processed - Order #${data.orderNumber}`,
-      content,
-    });
+    await this.sendPlatform(
+      {
+        to: config.smtpFromEmail,
+        subject: `Refund Processed - Order #${data.orderNumber}`,
+        content,
+      },
+      { queue: true }
+    );
   }
 
   /**

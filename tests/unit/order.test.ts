@@ -106,6 +106,10 @@ vi.mock('@api/services/cart.service', () => ({
 vi.mock('@api/lib/inngest/client', () => ({
   inngest: {
     send: vi.fn().mockResolvedValue({ ids: [] }),
+    // order.service.ts transitively imports order-status-changed.ts, which
+    // registers a fan-out via inngest.createFunction at module load. The mock
+    // must expose it or the whole suite fails to import.
+    createFunction: vi.fn(() => ({})),
   },
 }));
 
@@ -945,13 +949,15 @@ describe('OrderService', () => {
 
         await OrderService.updateStatus(mockStoreId, 'order-123', 'shipped');
 
-        expect(EmailService.sendOrderShipped).toHaveBeenCalledWith(
-          mockStoreId,
+        // Post-purchase side effects (shipped email + dispatch) now fan out on
+        // the order/status-changed Inngest event (Lens E, E2-4) — the actual
+        // EmailService call is asserted in order-status-changed.test.ts.
+        // updateStatus just emits the event.
+        expect(inngest.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            customerEmail: mockCustomer.email,
-            orderNumber: mockOrder.orderNumber,
-          }),
-          undefined // locale — mock order has no locale set
+            name: 'order/status-changed',
+            data: expect.objectContaining({ status: 'shipped' }),
+          })
         );
       });
 
@@ -967,7 +973,13 @@ describe('OrderService', () => {
 
         await OrderService.updateStatus(mockStoreId, 'order-123', 'confirmed');
 
-        expect(EmailService.sendPaymentSuccess).toHaveBeenCalled();
+        // Payment-success email now fans out on order/status-changed (E2-4).
+        expect(inngest.send).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'order/status-changed',
+            data: expect.objectContaining({ status: 'confirmed' }),
+          })
+        );
       });
 
       it('should send admin refund email', async () => {
@@ -983,10 +995,13 @@ describe('OrderService', () => {
 
         await OrderService.updateStatus(mockStoreId, 'order-123', 'refunded');
 
-        expect(EmailService.sendAdminRefund).toHaveBeenCalledWith(
+        // Admin-refund email now fans out on order/status-changed with
+        // hadCapturedPayment=true (E2-4) — the gate + send are asserted in
+        // order-status-changed.test.ts.
+        expect(inngest.send).toHaveBeenCalledWith(
           expect.objectContaining({
-            orderNumber: mockOrder.orderNumber,
-            amount: mockOrder.total,
+            name: 'order/status-changed',
+            data: expect.objectContaining({ status: 'refunded', hadCapturedPayment: true }),
           })
         );
       });
@@ -1076,8 +1091,14 @@ describe('OrderService', () => {
 
       expect(tx.inventoryHistory.create).toHaveBeenCalledTimes(1);
       expect(prisma.coupon.updateMany).toHaveBeenCalledTimes(1);
-      expect(inngest.send).toHaveBeenCalledTimes(1);
-      expect(inngest.send).toHaveBeenCalledWith(
+      // applyRefundEffects fires order/refunded exactly once; updateStatus now
+      // ALSO fires order/status-changed (Lens E, E2-4) → two sends total.
+      expect(inngest.send).toHaveBeenCalledTimes(2);
+      const refundedCalls = vi
+        .mocked(inngest.send)
+        .mock.calls.filter(c => (c[0] as { name?: string })?.name === 'order/refunded');
+      expect(refundedCalls).toHaveLength(1);
+      expect(refundedCalls[0][0]).toEqual(
         expect.objectContaining({
           name: 'order/refunded',
           data: expect.objectContaining({ orderId: 'order-123' }),

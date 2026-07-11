@@ -10,6 +10,7 @@ import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
 import { config } from '../config';
 import logger from '../lib/logger';
+import { inngest } from '../lib/inngest/client';
 import { streamXlsxResponse } from '../lib/exports/xlsx';
 import {
   prisma,
@@ -1685,6 +1686,126 @@ router.post(
       });
     } catch (error) {
       next(error);
+    }
+  }
+);
+
+// ── Webhook events (payment inbox) — super-admin observability + replay ──
+// Builder Reality Audit Lens E, E3-4. The WebhookEvent inbox is the durable
+// record of every payment-provider webhook. A wedged/failed row P0-alerts
+// (alerts-failure-watch + payment-webhook-stuck-sweep) but had no UI to inspect
+// or replay it — an operator's only recourse was Prisma Studio. This surfaces
+// the rows + a one-click replay (re-fires payment/webhook.received; safe by
+// construction — handleWebhook is idempotency-guarded).
+router.get(
+  '/webhook-events',
+  requireRole(['super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { page: pageStr, limit: limitStr, status, provider } = req.query;
+      const { page, limit, skip } = parsePagination(pageStr, limitStr);
+      const where: Record<string, unknown> = {};
+      if (typeof status === 'string' && status) where.status = status;
+      if (typeof provider === 'string' && provider) where.provider = provider;
+      const [events, total] = await withRlsBypass(tx =>
+        Promise.all([
+          tx.webhookEvent.findMany({
+            where,
+            select: {
+              id: true,
+              provider: true,
+              storeId: true,
+              status: true,
+              attempts: true,
+              lastError: true,
+              resultOrderId: true,
+              resultStatus: true,
+              idempotencyKey: true,
+              receivedAt: true,
+            },
+            orderBy: { receivedAt: 'desc' },
+            skip,
+            take: limit,
+          }),
+          tx.webhookEvent.count({ where }),
+        ])
+      );
+      res.json({
+        success: true,
+        data: {
+          events,
+          pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/webhook-events/:id/replay',
+  requireRole(['super_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const force = req.body?.force === true || req.query.force === 'true';
+      const row = await withRlsBypass(tx =>
+        tx.webhookEvent.findUnique({
+          where: { id },
+          select: { id: true, provider: true, idempotencyKey: true, storeId: true, status: true },
+        })
+      );
+      if (!row) {
+        res.status(404).json({ success: false, error: 'WEBHOOK_EVENT_NOT_FOUND' });
+        return;
+      }
+      // Money-path guard: replaying an already-`processed` webhook re-fires the
+      // payment mutation, and while handleWebhook is idempotency-guarded (inbox
+      // status, Order.webhookProcessedAt, status equality) so it can never
+      // double-APPLY, re-processing a settled payment must be a DELIBERATE act,
+      // not an accidental one-click. Require `force` to replay a processed row.
+      if (row.status === 'processed' && !force) {
+        res.status(409).json({
+          success: false,
+          error: 'WEBHOOK_ALREADY_PROCESSED',
+          message: 'This webhook is already processed. Re-send force:true to replay it anyway.',
+        });
+        return;
+      }
+      // Reset to a fresh received/attempts=0 so the consumer treats it as
+      // undelivered, then re-fire. `receivedAt` is bumped to now so the
+      // payment-webhook-stuck-sweep (which re-sends rows stuck in
+      // received/attempts=0 past STUCK_WEBHOOK_MINUTES by AGE) does not ALSO
+      // re-fire this row in the window before the consumer claims it — that
+      // would double-send `payment/webhook.received` for one replay.
+      await withRlsBypass(tx =>
+        tx.webhookEvent.update({
+          where: { id },
+          data: { status: 'received', attempts: 0, lastError: null, receivedAt: new Date() },
+        })
+      );
+      await inngest.send({
+        name: 'payment/webhook.received',
+        data: {
+          webhookEventId: row.id,
+          provider: row.provider,
+          idempotencyKey: row.idempotencyKey,
+          storeId: row.storeId ?? undefined,
+        },
+      });
+      await auditLog({
+        action: 'webhook_event.replay',
+        userId: req.user!.userId,
+        resourceType: 'setting',
+        resourceId: row.id,
+        details: { provider: row.provider },
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.json({ success: true, data: { replayed: row.id } });
+    } catch (err) {
+      next(err);
     }
   }
 );
