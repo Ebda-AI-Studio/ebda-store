@@ -41,6 +41,9 @@ function IndeterminateCheckbox({
 
 interface ProductsTableProps {
   storeId: string;
+  /** Current products-list URL (path + filters/search/page), used as the
+   *  `returnTo` target so edit/view links land back on this exact view. */
+  listUrl: string;
   products: Product[];
   loading: boolean;
   hasActiveFilters: boolean;
@@ -52,6 +55,7 @@ interface ProductsTableProps {
 
 export function ProductsTable({
   storeId,
+  listUrl,
   products,
   loading,
   hasActiveFilters,
@@ -85,7 +89,9 @@ export function ProductsTable({
   }
 
   if (products.length === 0) {
-    return <EmptyProductsState storeId={storeId} hasActiveFilters={hasActiveFilters} />;
+    return (
+      <EmptyProductsState storeId={storeId} hasActiveFilters={hasActiveFilters} listUrl={listUrl} />
+    );
   }
 
   function productThumb(product: Product) {
@@ -243,12 +249,16 @@ export function ProductsTable({
               </Button>
             </Link>
           )}
-          <Link href={`/stores/${storeId}/products/${product.id}/edit`}>
+          <Link
+            href={`/stores/${storeId}/products/${product.id}/edit?returnTo=${encodeURIComponent(listUrl)}`}
+          >
             <Button variant="outline" size="sm">
               {t('actions.edit')}
             </Button>
           </Link>
-          <Link href={`/stores/${storeId}/products/${product.id}`}>
+          <Link
+            href={`/stores/${storeId}/products/${product.id}?returnTo=${encodeURIComponent(listUrl)}`}
+          >
             <Button variant="outline" size="sm">
               {t('actions.view')}
             </Button>

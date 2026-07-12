@@ -116,17 +116,26 @@ export default function StoreProductsPage() {
       .catch(() => setCategories([]));
   }, [isAuthenticated, storeId]);
 
-  // Mirror the current filter state into the URL (replace, no history spam) so
-  // Back from a product restores the same search + category + status + page.
-  useEffect(() => {
+  // The current list URL (path + filter/search/page query), recomputed from
+  // state rather than read back from the browser location so it's correct
+  // even before the URL-sync effect below has flushed. Passed to row/toolbar
+  // links as `returnTo` so saving/cancelling a product lands back on this
+  // exact filtered+searched+paginated view instead of the bare list.
+  const listUrl = useMemo(() => {
     const qp = new URLSearchParams();
     if (search) qp.set('q', search);
     if (statusFilter !== 'active') qp.set('status', statusFilter);
     if (categoryFilter) qp.set('category', categoryFilter);
     if (page > 1) qp.set('page', String(page));
     const qs = qp.toString();
-    router.replace(`/stores/${storeId}/products${qs ? `?${qs}` : ''}`, { scroll: false });
-  }, [router, storeId, search, statusFilter, categoryFilter, page]);
+    return `/stores/${storeId}/products${qs ? `?${qs}` : ''}`;
+  }, [storeId, search, statusFilter, categoryFilter, page]);
+
+  // Mirror the current filter state into the URL (replace, no history spam) so
+  // Back from a product restores the same search + category + status + page.
+  useEffect(() => {
+    router.replace(listUrl, { scroll: false });
+  }, [router, listUrl]);
 
   // Fetch products whenever any of the list-query inputs change. fetchProducts
   // is memoized on [isAuthenticated, storeId, page, statusFilter, debouncedSearch]
@@ -233,7 +242,7 @@ export default function StoreProductsPage() {
     <AdminLayout
       title={t('title', { storeName })}
       subtitle={t('subtitle', { storeName: store?.name ?? t('fallbackThisStore') })}
-      actions={<ProductsToolbar storeId={storeId} />}
+      actions={<ProductsToolbar storeId={storeId} listUrl={listUrl} />}
     >
       <ProductFilters
         search={search}
@@ -247,6 +256,7 @@ export default function StoreProductsPage() {
 
       <ProductsTable
         storeId={storeId}
+        listUrl={listUrl}
         products={products}
         loading={loading}
         hasActiveFilters={hasActiveFilters}

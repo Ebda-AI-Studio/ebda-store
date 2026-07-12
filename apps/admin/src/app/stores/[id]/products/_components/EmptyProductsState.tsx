@@ -7,9 +7,16 @@ import { useT } from '@/i18n/useT';
 interface EmptyProductsStateProps {
   storeId: string;
   hasActiveFilters: boolean;
+  /** Current products-list URL, used as the `returnTo` target for the
+   *  "Add product" CTA so creating a product lands back on this view. */
+  listUrl: string;
 }
 
-export function EmptyProductsState({ storeId, hasActiveFilters }: EmptyProductsStateProps) {
+export function EmptyProductsState({
+  storeId,
+  hasActiveFilters,
+  listUrl,
+}: EmptyProductsStateProps) {
   const t = useT('products.list.empty');
 
   return (
@@ -34,7 +41,10 @@ export function EmptyProductsState({ storeId, hasActiveFilters }: EmptyProductsS
         {hasActiveFilters ? t('descriptionFiltered') : t('description')}
       </p>
       {!hasActiveFilters && (
-        <Link href={`/stores/${storeId}/products/new`} className="mt-4 inline-block">
+        <Link
+          href={`/stores/${storeId}/products/new?returnTo=${encodeURIComponent(listUrl)}`}
+          className="mt-4 inline-block"
+        >
           <Button size="sm">{t('addProduct')}</Button>
         </Link>
       )}

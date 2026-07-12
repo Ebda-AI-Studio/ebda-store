@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import {
   recommendedSizeTextForTemplate,
@@ -65,6 +65,7 @@ interface Category {
 export default function EditProductPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAuthenticated } = useAuth();
   const storeId = params?.id as string;
   const productId = params?.productId as string;
@@ -73,6 +74,20 @@ export default function EditProductPage() {
   const tFields = useT('products.edit.fields');
   const tStatusOptions = useT('products.edit.statusOptions');
   const locale = useLocale();
+
+  // Plain products-list URL — the fallback whenever `returnTo` is absent or
+  // doesn't point back into this store's product list (open-redirect guard).
+  const plainProductsUrl = `/stores/${storeId}/products`;
+  const returnTo = useMemo(() => {
+    const raw = searchParams.get('returnTo');
+    if (!raw) return plainProductsUrl;
+    try {
+      const decoded = decodeURIComponent(raw);
+      return decoded.startsWith(plainProductsUrl) ? decoded : plainProductsUrl;
+    } catch {
+      return plainProductsUrl;
+    }
+  }, [searchParams, plainProductsUrl]);
 
   const [product, setProduct] = useState<Product | null>(null);
   // Local mirror of the product's AI-provenance map. Kept in state so the
@@ -487,9 +502,11 @@ export default function EditProductPage() {
       // Return to the products list after a successful edit (matches the
       // create flow), so the merchant lands back where they can keep working
       // through their catalog instead of on the single-product detail page.
+      // `returnTo` (when present and same-store) restores the exact
+      // filtered+searched+paginated list view the merchant came from.
       // invalidate App Router cache so the destination list re-fetches the saved row
       router.refresh();
-      router.push(`/stores/${storeId}/products`);
+      router.push(returnTo);
     } catch {
       setError(t('updateFailed'));
     } finally {
@@ -541,7 +558,7 @@ export default function EditProductPage() {
           </div>
           <h3 className="mt-4 text-lg font-medium text-foreground">{error}</h3>
           {notFound && <p className="mt-2 text-sm text-muted-foreground">{t('notFoundBody')}</p>}
-          <Button className="mt-6" onClick={() => router.push(`/stores/${storeId}/products`)}>
+          <Button className="mt-6" onClick={() => router.push(returnTo)}>
             {t('backToProducts')}
           </Button>
         </div>
@@ -1054,7 +1071,9 @@ export default function EditProductPage() {
             isBestSeller={formData.isBestSeller}
             onIsBestSellerChange={value => updateField('isBestSeller', value)}
             saving={saving}
-            onCancel={() => router.push(`/stores/${storeId}/products/${productId}`)}
+            // Cancel returns to the LIST (returnTo), not the product view page —
+            // the merchant is bailing out of editing back to where they were.
+            onCancel={() => router.push(returnTo)}
             storeId={storeId}
             productName={formData.name}
             productDescription={formData.description}

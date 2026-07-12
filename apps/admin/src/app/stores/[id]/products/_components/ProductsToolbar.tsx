@@ -6,14 +6,17 @@ import { useT } from '@/i18n/useT';
 
 interface ProductsToolbarProps {
   storeId: string;
+  /** Current products-list URL (path + filters/search/page), used as the
+   *  `returnTo` target so creating a product lands back on this exact view. */
+  listUrl: string;
 }
 
-export function ProductsToolbar({ storeId }: ProductsToolbarProps) {
+export function ProductsToolbar({ storeId, listUrl }: ProductsToolbarProps) {
   const t = useT('products.list.toolbar');
 
   return (
     <div className="flex gap-2">
-      <Link href={`/stores/${storeId}/products/new`}>
+      <Link href={`/stores/${storeId}/products/new?returnTo=${encodeURIComponent(listUrl)}`}>
         <Button size="sm">
           <svg className="me-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

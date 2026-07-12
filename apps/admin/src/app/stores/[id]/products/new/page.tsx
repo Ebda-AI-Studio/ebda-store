@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button, Input, Textarea, Select } from '@force/ui';
 import {
   recommendedSizeTextForTemplate,
@@ -26,9 +26,24 @@ interface Category {
 export default function NewProductPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const storeId = params?.id as string;
   const { isAuthenticated } = useAuth();
   const t = useT('products.new');
+
+  // Plain products-list URL — the fallback whenever `returnTo` is absent or
+  // doesn't point back into this store's product list (open-redirect guard).
+  const plainProductsUrl = `/stores/${storeId}/products`;
+  const returnTo = useMemo(() => {
+    const raw = searchParams.get('returnTo');
+    if (!raw) return plainProductsUrl;
+    try {
+      const decoded = decodeURIComponent(raw);
+      return decoded.startsWith(plainProductsUrl) ? decoded : plainProductsUrl;
+    } catch {
+      return plainProductsUrl;
+    }
+  }, [searchParams, plainProductsUrl]);
 
   const statuses = [
     { value: 'draft', label: t('statusOptions.draft') },
@@ -178,7 +193,7 @@ export default function NewProductPage() {
       if (data) {
         // invalidate App Router cache so the destination list re-fetches the saved row
         router.refresh();
-        router.push(`/stores/${storeId}/products`);
+        router.push(returnTo);
       }
     } catch {
       setError(t('errors.createFailed'));
@@ -436,7 +451,7 @@ export default function NewProductPage() {
                   type="button"
                   variant="outline"
                   className="w-full"
-                  onClick={() => router.push(`/stores/${storeId}/products`)}
+                  onClick={() => router.push(returnTo)}
                 >
                   {t('actions.cancel')}
                 </Button>
