@@ -297,7 +297,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
   // z-50 sits above the bar (z-40); the backdrop closes on tap.
   const drawer = (
     <div
-      className={`fixed inset-0 z-50 md:hidden transition-opacity duration-200 ${
+      className={`fixed inset-0 z-50 md:hidden transition-opacity duration-[var(--duration-fast)] ${
         menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
       aria-hidden={!menuOpen}
@@ -315,7 +315,7 @@ export function BottomTabBar({ bottomBar, theme, navigation = [] }: BottomTabBar
         aria-modal="true"
         aria-label={menuLabel}
         dir={isRtl ? 'rtl' : 'ltr'}
-        className={`absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-foreground/10 bg-[hsl(var(--bg-section-alt))] pb-[calc(56px+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-200 ${
+        className={`absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-foreground/10 bg-[hsl(var(--bg-section-alt))] pb-[calc(56px+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-[var(--duration-fast)] ${
           menuOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
         style={resolvedBg ? { backgroundColor: resolvedBg } : undefined}

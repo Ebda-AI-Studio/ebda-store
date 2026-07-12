@@ -432,7 +432,7 @@ function ButtonRender({
   const isActive = button.kind === 'music' && musicPlaying === button.id;
 
   const baseClass =
-    'group relative flex h-12 w-12 items-center justify-center rounded-full shadow-lg overflow-hidden transition-transform duration-200 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-primary';
+    'group relative flex h-12 w-12 items-center justify-center rounded-full shadow-lg overflow-hidden transition-transform duration-[var(--duration-fast)] hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-primary';
 
   // For PNG-icon kinds (whatsapp/instagram/tiktok) the PNG already carries
   // its own colored circle. Rendering a button bg behind it creates a
@@ -582,7 +582,7 @@ export function FloatingWidget({ config, theme, isRtl, contact, socials }: Float
         aria-label={
           isRtl ? (config.toggleLabelAr ?? 'القائمة العائمة') : (config.toggleLabel ?? 'Open menu')
         }
-        className="group relative flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition-transform duration-200 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-primary"
+        className="group relative flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition-transform duration-[var(--duration-fast)] hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-primary"
         style={{ backgroundColor: toggleBg }}
       >
         {config.toggleIconUrl ? (
@@ -597,7 +597,7 @@ export function FloatingWidget({ config, theme, isRtl, contact, socials }: Float
             strokeWidth={2.2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className={`transition-transform duration-300 ${expanded ? 'rotate-45' : ''}`}
+            className={`transition-transform duration-[var(--duration-base)] ${expanded ? 'rotate-45' : ''}`}
           >
             {expanded ? (
               <path d="M18 6L6 18M6 6l12 12" />

@@ -40,7 +40,9 @@ export default function ElegantCategoryCard({
           Mobile-tame: aspect-square (1:1) on phones so a 2-col grid of
           categories doesn't blow past a screen height each. Original
           tall 2/3 ratio kept on sm+ where there's room. */}
-      <div className={`relative ${aspectClass} overflow-hidden ${radiusClass} bg-muted mb-3`}>
+      <div
+        className={`relative ${aspectClass} overflow-hidden ${radiusClass} bg-muted shimmer mb-3`}
+      >
         {category.image ? (
           <img
             src={category.image}

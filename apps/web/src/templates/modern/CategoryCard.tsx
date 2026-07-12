@@ -53,7 +53,7 @@ export default function ModernCategoryCard({
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div
-        className={`relative ${aspectClass} ${radiusClass} overflow-hidden bg-muted shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] ${hoverShadow} transition-shadow duration-500 ease-out`}
+        className={`relative ${aspectClass} ${radiusClass} overflow-hidden bg-muted shimmer shadow-[0_4px_12px_-6px_hsl(var(--foreground)/0.10)] ${hoverShadow} transition-shadow duration-500 ease-out`}
       >
         {category.image ? (
           <img

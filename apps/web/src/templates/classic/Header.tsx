@@ -306,9 +306,20 @@ export default function ClassicHeader({
         </form>
       </div>
 
-      {/* Mobile menu */}
-      {isMenuOpen && (
-        <div className="md:hidden border-t border-border/40 bg-white dark:bg-background">
+      {/* Mobile menu — item 5 (2026-07-12): shared grid-rows enter/exit
+          (220ms in / 160ms out, same axis both ways, motion-safe). Always
+          rendered so the exit transition can play; `motion-reduce:duration-0`
+          makes the open/close instant for reduced-motion users instead of
+          skipping the toggle. `inert` + `aria-hidden` when collapsed so the
+          visually-hidden nav/search can't take keyboard focus or be
+          announced by screen readers (a11y parity with the previous
+          conditional-mount behavior). */}
+      <div
+        className={`md:hidden grid overflow-hidden transition-[grid-template-rows] ease-out motion-reduce:duration-0 border-t border-border/40 bg-white dark:bg-background ${isMenuOpen ? 'grid-rows-[1fr] duration-[220ms]' : 'grid-rows-[0fr] duration-[160ms]'}`}
+        aria-hidden={!isMenuOpen}
+        {...(!isMenuOpen ? ({ inert: '' } as unknown as React.HTMLAttributes<HTMLDivElement>) : {})}
+      >
+        <div className="min-h-0 overflow-hidden">
           <nav className="container mx-auto px-4 py-5" dir={isRtl ? 'rtl' : 'ltr'}>
             <ul className="space-y-1">
               {navigation.map(item => (
@@ -344,7 +355,7 @@ export default function ClassicHeader({
             </form>
           </nav>
         </div>
-      )}
+      </div>
     </header>
   );
 }

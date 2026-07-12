@@ -96,17 +96,23 @@ export default function MinimalCategoryGrid({
         <div
           className={`grid ${gridGapClass(cardGap)} ${gridColsClass(cappedMobile, cappedDesktop)}`}
         >
-          {categories.map(category => {
+          {categories.map((category, i) => {
             const frame = cardFrameClass(showCardFrame ?? true, cardFrameStyle);
+            // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
+            // motion-safe only — no layout shift (opacity/transform only).
+            const staggerCls =
+              'motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100';
+            const staggerStyle = { ['--i' as string]: i } as React.CSSProperties;
             return frame ? (
               <div
                 key={category.id}
-                className={`${frame} ${cardFrameWidthClass(cardFrameWidth)} ${cardFrameSizeClass(cardFrameSize)} ${categorySizeClass(cardSize)} mx-auto w-full`}
-                style={
-                  store.theme
+                className={`${staggerCls} ${frame} ${cardFrameWidthClass(cardFrameWidth)} ${cardFrameSizeClass(cardFrameSize)} ${categorySizeClass(cardSize)} mx-auto w-full`}
+                style={{
+                  ...staggerStyle,
+                  ...(store.theme
                     ? { borderColor: resolveColor(cardFrameColor ?? 'token:primary', store.theme) }
-                    : undefined
-                }
+                    : undefined),
+                }}
               >
                 <CategoryCard
                   cardSize={cardSize}
@@ -122,19 +128,20 @@ export default function MinimalCategoryGrid({
                 />
               </div>
             ) : (
-              <CategoryCard
-                cardSize={cardSize}
-                cardAspect={cardAspect}
-                cardShape={cardShape}
-                captionPosition={captionPosition}
-                showLabel={showLabel}
-                showHover={showHover}
-                key={category.id}
-                category={category}
-                isRtl={isRtl}
-                urlPrefix={urlPrefix}
-                categoryLabelZone={categoryLabelZone}
-              />
+              <div key={category.id} className={staggerCls} style={staggerStyle}>
+                <CategoryCard
+                  cardSize={cardSize}
+                  cardAspect={cardAspect}
+                  cardShape={cardShape}
+                  captionPosition={captionPosition}
+                  showLabel={showLabel}
+                  showHover={showHover}
+                  category={category}
+                  isRtl={isRtl}
+                  urlPrefix={urlPrefix}
+                  categoryLabelZone={categoryLabelZone}
+                />
+              </div>
             );
           })}
         </div>

@@ -301,6 +301,67 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         </label>
       </div>
 
+      {/* ── Persona chrome (2026-07-12) ──────────────────────────────────── */}
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            Persona chrome completion / إتمام هوية القالب
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Off by default on existing stores; new stores are created with this on. Adds
+            theme-specific chrome using your existing colors: hairline-flanked heading + whisper
+            see-all link on Elegant, circular category tiles on Classic, bordered header + inverted
+            footer on Bold. No change to card sizes, product name/price text, fonts, or colors.
+          </p>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={branding.theme.personaChromeV2 === true}
+            onChange={e =>
+              onChange({
+                ...branding,
+                theme: { ...branding.theme, personaChromeV2: e.target.checked },
+              })
+            }
+            className="h-4 w-4 cursor-pointer accent-primary"
+          />
+          <span className="text-xs text-foreground">
+            Enable persona chrome completion / تفعيل إتمام هوية القالب
+          </span>
+        </label>
+      </div>
+
+      {/* ── Card-frame dedup (2026-07-12) ────────────────────────────────── */}
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            Remove doubled card frame / إزالة الإطار المزدوج للبطاقات
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Off by default on existing stores; new stores are created with this on. When your
+            homepage carousels/strips have "Show card frame" enabled, this removes the extra inner
+            border so each card shows a single frame instead of two nested ones.
+          </p>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={branding.theme.frameChromeDedup === true}
+            onChange={e =>
+              onChange({
+                ...branding,
+                theme: { ...branding.theme, frameChromeDedup: e.target.checked },
+              })
+            }
+            className="h-4 w-4 cursor-pointer accent-primary"
+          />
+          <span className="text-xs text-foreground">
+            Enable single card frame / تفعيل إطار واحد للبطاقات
+          </span>
+        </label>
+      </div>
+
       {/* ── Uppercase styling ─────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>

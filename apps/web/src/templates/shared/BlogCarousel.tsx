@@ -88,7 +88,7 @@ export function BlogCarousel({ posts, spacingSettings }: BlogCarouselProps) {
                         fill
                         sizes="(max-width: 640px) 78vw, (max-width: 1024px) 48vw, 24vw"
                         loading="lazy"
-                        className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        className="object-cover transition-transform duration-[var(--duration-slow)] group-hover:scale-[1.03]"
                       />
                     ) : null}
                   </div>

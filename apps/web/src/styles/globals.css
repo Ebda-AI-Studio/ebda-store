@@ -83,6 +83,22 @@
     --transition-normal: 200ms;
     --transition-slow: 300ms;
 
+    /* Motion duration/easing token scale (2026-07-12 design structural batch,
+       item 1). Value-preserving: these are the exact values every theme's
+       hover/CTA/hero motion already used as Tailwind literals
+       (duration-200/300/500/700, ease-out, ease-in-out). Threading them
+       through pack-styles.ts + the shared cross-theme components lets each
+       theme "declare its pacing once" without changing any computed value —
+       ease-out/ease-in-out match Tailwind's own cubic-bezier definitions
+       (tailwind.config transitionTimingFunction), not the native CSS
+       keywords, so swapping the class for the var changes nothing rendered. */
+    --duration-fast: 200ms; /* bold's snappy pace */
+    --duration-base: 300ms; /* CTA micro-transitions, colors */
+    --duration-slow: 500ms; /* modern/classic/minimal default hover pace */
+    --duration-slower: 700ms; /* elegant's glacial pace */
+    --ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);

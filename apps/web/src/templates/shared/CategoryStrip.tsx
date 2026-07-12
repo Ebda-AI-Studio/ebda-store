@@ -65,6 +65,10 @@ export function CategoryStrip({
   const { store } = useStore();
   const styles = getPackStyles(pack);
   const isOverlay = captionPosition === 'overlay';
+  // Item 4 (2026-07-12): see ProductCarousel.tsx — suppresses the inner
+  // pack-style frame when the outer showCardFrame is on AND the merchant
+  // opted into frameChromeDedup. Default unchanged otherwise.
+  const dedupInnerFrame = !!showCardFrame && store.theme?.frameChromeDedup === true;
   if (categories.length === 0) return null;
   const sizeCap = categorySizeClass(cardSize);
   const shape = cardShapeClasses(cardShape);
@@ -98,17 +102,22 @@ export function CategoryStrip({
           className={`-mx-4 flex snap-x snap-mandatory ${gridGapClass(cardGap)} overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-6`}
           style={{ scrollbarWidth: 'thin' }}
         >
-          {categories.map(cat => {
+          {categories.map((cat, i) => {
             const name = isRtl ? (cat.nameAr ?? cat.name) : (cat.name ?? cat.nameAr);
             const href = `${urlPrefix}/products?category=${cat.slug ?? cat.id}`;
             return (
               <li
                 key={cat.id}
-                className={`snap-start shrink-0 w-[60vw] sm:w-[36vw] md:w-[30vw] lg:w-[26vw] xl:w-[22vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
+                // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
+                // motion-safe only — no layout shift (opacity/transform only).
+                className={`motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100 snap-start shrink-0 w-[60vw] sm:w-[36vw] md:w-[30vw] lg:w-[26vw] xl:w-[22vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
                 style={
-                  showCardFrame && cardFrameColor && store.theme
-                    ? { borderColor: resolveColor(cardFrameColor, store.theme) }
-                    : undefined
+                  {
+                    ['--i' as string]: i,
+                    ...(showCardFrame && cardFrameColor && store.theme
+                      ? { borderColor: resolveColor(cardFrameColor, store.theme) }
+                      : undefined),
+                  } as React.CSSProperties
                 }
               >
                 <Link
@@ -117,7 +126,7 @@ export function CategoryStrip({
                   className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-2xl"
                 >
                   <div
-                    className={`relative ${aspectCls} ${shape.radius} overflow-hidden ${showHover ? 'transition-transform duration-700 ease-out group-hover:scale-[1.015]' : ''} ${styles.categoryFrame}`}
+                    className={`relative ${aspectCls} ${shape.radius} overflow-hidden shimmer ${showHover ? 'transition-transform duration-[var(--duration-slower)] ease-[var(--ease-out)] group-hover:scale-[1.015]' : ''} ${dedupInnerFrame ? '' : styles.categoryFrame}`}
                   >
                     {cat.image ? (
                       <Image
@@ -125,7 +134,7 @@ export function CategoryStrip({
                         alt={name ?? ''}
                         fill
                         sizes="(max-width: 640px) 60vw, (max-width: 768px) 36vw, (max-width: 1024px) 30vw, (max-width: 1280px) 26vw, 400px"
-                        className={`object-cover ${showHover ? 'transition-transform duration-700 ease-out group-hover:scale-[1.04]' : ''}`}
+                        className={`object-cover ${showHover ? 'transition-transform duration-[var(--duration-slower)] ease-[var(--ease-out)] group-hover:scale-[1.04]' : ''}`}
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-muted-foreground">

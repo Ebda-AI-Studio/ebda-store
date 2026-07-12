@@ -158,14 +158,14 @@ export function cardFrameClass(
   // color and don't conflict with width classes from cardFrameWidthClass().
   switch (style) {
     case 'outline':
-      return 'rounded-xl border-foreground/25 bg-card/50 transition-colors duration-300 hover:border-foreground/45';
+      return 'rounded-xl border-foreground/25 bg-card/50 transition-colors duration-[var(--duration-base)] hover:border-foreground/45';
     case 'shadow':
-      return 'rounded-2xl border-foreground/10 bg-card shadow-md transition-shadow duration-300 hover:shadow-lg';
+      return 'rounded-2xl border-foreground/10 bg-card shadow-md transition-shadow duration-[var(--duration-base)] hover:shadow-lg';
     case 'paper':
-      return 'rounded-lg border-foreground/10 bg-card shadow-[0_10px_28px_-12px_hsl(var(--foreground)/0.25)] transition-shadow duration-300 hover:shadow-[0_14px_36px_-12px_hsl(var(--foreground)/0.30)]';
+      return 'rounded-lg border-foreground/10 bg-card shadow-[0_10px_28px_-12px_hsl(var(--foreground)/0.25)] transition-shadow duration-[var(--duration-base)] hover:shadow-[0_14px_36px_-12px_hsl(var(--foreground)/0.30)]';
     case 'soft':
     default:
-      return 'rounded-2xl border-foreground/15 bg-card shadow-md transition-shadow duration-300 hover:shadow-lg';
+      return 'rounded-2xl border-foreground/15 bg-card shadow-md transition-shadow duration-[var(--duration-base)] hover:shadow-lg';
   }
 }
 

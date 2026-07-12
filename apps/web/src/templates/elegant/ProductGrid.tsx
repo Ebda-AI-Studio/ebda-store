@@ -47,18 +47,25 @@ export default function ElegantProductGrid({
         {/* Products Grid */}
         <div className={`grid ${gridCols} gap-3 md:gap-4`}>
           {products.map((product, i) => (
-            <ProductCard
+            // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
+            // motion-safe only — no layout shift (opacity/transform only).
+            <div
               key={product.id}
-              product={product}
-              isRtl={isRtl}
-              onAddToCart={onAddToCart}
-              quantityInCart={cartQuantities[product.id]}
-              urlPrefix={urlPrefix}
-              isInCompare={compareIds?.has(product.id) ?? false}
-              onToggleCompare={onToggleCompare}
-              onRemoveFromWishlist={onRemoveFromWishlist}
-              priority={i < 6}
-            />
+              className="motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100"
+              style={{ ['--i' as string]: i } as React.CSSProperties}
+            >
+              <ProductCard
+                product={product}
+                isRtl={isRtl}
+                onAddToCart={onAddToCart}
+                quantityInCart={cartQuantities[product.id]}
+                urlPrefix={urlPrefix}
+                isInCompare={compareIds?.has(product.id) ?? false}
+                onToggleCompare={onToggleCompare}
+                onRemoveFromWishlist={onRemoveFromWishlist}
+                priority={i < 6}
+              />
+            </div>
           ))}
         </div>
 

@@ -84,6 +84,19 @@ export interface StoreTheme {
    */
   storefrontWebPushEnabled?: boolean;
   /**
+   * 2026-07-12 persona-completion chrome pass (elegant hairline title +
+   * whisper see-all, classic circular category tiles, bold bordered
+   * header + inverted footer). Default false — existing stores unaffected;
+   * seeded true on new stores at creation. Toggled via Branding → Theme.
+   */
+  personaChromeV2?: boolean;
+  /**
+   * Suppresses the doubled card-frame look on ProductCarousel + CategoryStrip
+   * when showCardFrame is on. Default false — existing stores unaffected;
+   * seeded true on new stores at creation. Toggled via Branding → Theme.
+   */
+  frameChromeDedup?: boolean;
+  /**
    * Merchant-controlled display order for footer social icons.
    * Array of platform keys (e.g. ['tiktok','instagram','whatsapp']).
    * Edited in Branding → Social Links. 2026-06-27.

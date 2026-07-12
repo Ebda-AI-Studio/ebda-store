@@ -134,7 +134,7 @@ export function HeroSlider({
         {slides.map((slide, i) => (
           <div
             key={i}
-            className={`absolute inset-0 transition-opacity duration-700 ${
+            className={`absolute inset-0 transition-opacity duration-[var(--duration-slower)] ${
               i === activeIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
             aria-hidden={i !== activeIndex}

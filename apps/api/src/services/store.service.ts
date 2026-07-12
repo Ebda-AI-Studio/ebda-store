@@ -213,6 +213,12 @@ export class StoreService {
           timezone: 'Asia/Kuwait',
           locale: 'en-KW',
         },
+        // 2026-07-12 design structural batch: new stores get the persona-chrome
+        // completion + card-frame dedup ON by default (Ahmad-approved for NEW
+        // stores only — every existing store keeps these flags undefined/false
+        // and renders unchanged). Merchant can still toggle either off via
+        // Branding → Theme.
+        theme: { personaChromeV2: true, frameChromeDedup: true },
       },
       include: {
         owner: {

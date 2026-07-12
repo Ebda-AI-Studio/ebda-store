@@ -215,7 +215,7 @@ function ModernProductCard({
       >
         {/* Image Container — item 8: aspect+radius from admin overrides. */}
         <div
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted shimmer ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {product.images?.[0]?.url ? (
             <>

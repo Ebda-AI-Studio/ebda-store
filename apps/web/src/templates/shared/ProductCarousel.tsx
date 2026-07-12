@@ -96,6 +96,11 @@ export function ProductCarousel({
   const { store, layout } = useStore();
   const { localize } = useNumerals();
   const showQuickAdd = store.theme?.showQuickAdd === true;
+  // Item 4 (2026-07-12): when the merchant already has the outer showCardFrame
+  // frame on AND opts into frameChromeDedup, suppress the inner pack-style
+  // card chrome so cards show ONE frame instead of two nested ones. Default
+  // (flag off/undefined) keeps today's doubled-frame rendering unchanged.
+  const dedupInnerFrame = !!showCardFrame && store.theme?.frameChromeDedup === true;
   // Sprint 1 (2026-05-17): per-cardSize text-size pair, paired with
   // pack-styles flavor classes. Without this the previous `text-lg`
   // names looked oversized inside `xs`/`sm` card widths and undersized
@@ -259,7 +264,7 @@ export function ProductCarousel({
               type="button"
               aria-label={isRtl ? 'السابق' : 'Previous'}
               onClick={() => scrollByOneCard('prev')}
-              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-colors duration-300 ease-out cursor-pointer start-2"
+              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-colors duration-[var(--duration-base)] ease-[var(--ease-out)] cursor-pointer start-2"
             >
               <svg
                 className="h-5 w-5"
@@ -283,7 +288,7 @@ export function ProductCarousel({
               type="button"
               aria-label={isRtl ? 'التالي' : 'Next'}
               onClick={() => scrollByOneCard('next')}
-              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-colors duration-300 ease-out cursor-pointer end-2"
+              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-colors duration-[var(--duration-base)] ease-[var(--ease-out)] cursor-pointer end-2"
             >
               <svg
                 className="h-5 w-5"
@@ -344,11 +349,16 @@ export function ProductCarousel({
                   // cards without theme code changes.
                   // showCardFrame (opt-in) adds rounded-2xl bg-card border +
                   // shadow around each card so they read as contained tiles.
-                  className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
+                  // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
+                  // motion-safe only — no layout shift (opacity/transform only).
+                  className={`motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100 snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
                   style={
-                    showCardFrame && cardFrameColor && store.theme
-                      ? { borderColor: resolveColor(cardFrameColor, store.theme) }
-                      : undefined
+                    {
+                      ['--i' as string]: i,
+                      ...(showCardFrame && cardFrameColor && store.theme
+                        ? { borderColor: resolveColor(cardFrameColor, store.theme) }
+                        : undefined),
+                    } as React.CSSProperties
                   }
                 >
                   {/* Sprint 2 (2026-05-17): hover-scale 1.02 on the card
@@ -360,9 +370,9 @@ export function ProductCarousel({
                       verified zero rendered-output change. */}
                   <div
                     className={cn(
-                      'flex flex-col h-full overflow-hidden transition-[transform,box-shadow] duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
+                      'flex flex-col h-full overflow-hidden transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)] md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
                       shape.radius,
-                      styles.card
+                      dedupInnerFrame ? '' : styles.card
                     )}
                   >
                     <Link
@@ -371,7 +381,7 @@ export function ProductCarousel({
                       className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       <div
-                        className={`group/img relative ${effectiveAspectCls} ${imgRadiusCls || shape.radius} overflow-hidden bg-muted`}
+                        className={`group/img relative ${effectiveAspectCls} ${imgRadiusCls || shape.radius} overflow-hidden bg-muted shimmer`}
                       >
                         {/* Task 3 B4: OOS badge customization via productCardDefaults. */}
                         <OutOfStockRibbon
@@ -419,7 +429,7 @@ export function ProductCarousel({
                               // image to crossfade IN. Without this guard,
                               // single-image products go transparent on
                               // hover and reveal the empty bg-muted box.
-                              className={`object-cover transition-opacity duration-500 ${
+                              className={`object-cover transition-opacity duration-[var(--duration-slow)] ${
                                 showHover && product.images?.[1]?.url
                                   ? 'group-hover/img:opacity-0'
                                   : ''
@@ -433,7 +443,7 @@ export function ProductCarousel({
                                 fill
                                 sizes="(max-width: 640px) 60vw, (max-width: 1024px) 30vw, 300px"
                                 loading="lazy"
-                                className="absolute inset-0 object-cover opacity-0 transition-opacity duration-500 group-hover/img:opacity-100"
+                                className="absolute inset-0 object-cover opacity-0 transition-opacity duration-[var(--duration-slow)] group-hover/img:opacity-100"
                               />
                             )}
                           </>

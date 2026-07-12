@@ -268,9 +268,22 @@ export default function MinimalHeader({
           </form>
         </div>
 
-        {/* Mobile menu */}
-        {isMenuOpen && (
-          <nav className="lg:hidden pb-6">
+        {/* Mobile menu — item 5 (2026-07-12): shared grid-rows enter/exit
+            (220ms in / 160ms out, same axis both ways, motion-safe). Always
+            rendered so the exit transition can play; `motion-reduce:duration-0`
+            makes the open/close instant for reduced-motion users instead of
+            skipping the toggle. `inert` + `aria-hidden` when collapsed so the
+            visually-hidden nav can't take keyboard focus or be announced by
+            screen readers (a11y parity with the previous conditional-mount
+            behavior). */}
+        <div
+          className={`lg:hidden grid overflow-hidden transition-[grid-template-rows] ease-out motion-reduce:duration-0 ${isMenuOpen ? 'grid-rows-[1fr] duration-[220ms]' : 'grid-rows-[0fr] duration-[160ms]'}`}
+          aria-hidden={!isMenuOpen}
+          {...(!isMenuOpen
+            ? ({ inert: '' } as unknown as React.HTMLAttributes<HTMLDivElement>)
+            : {})}
+        >
+          <nav className="min-h-0 overflow-hidden pb-6">
             <ul className="space-y-5 text-center">
               {navigation.map(item => (
                 <li key={item.href}>
@@ -285,7 +298,7 @@ export default function MinimalHeader({
               ))}
             </ul>
           </nav>
-        )}
+        </div>
       </div>
     </header>
   );

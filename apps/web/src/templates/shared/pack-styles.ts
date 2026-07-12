@@ -59,9 +59,9 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // (4) sectionHeading font-bold→font-semibold (introduces mid-weight
     // hierarchy), (5) heroCta rounded-full→rounded-2xl + brand fill (matches
     // in-page cards). See design.md "Theme 1 — Modern" persona spec.
-    card: 'rounded-2xl border border-primary/15 bg-card hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.18)] hover:border-primary/35 hover:-translate-y-0.5 transition-[box-shadow,border-color,transform] duration-500 ease-out',
+    card: 'rounded-2xl border border-primary/15 bg-card hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.18)] hover:border-primary/35 hover:-translate-y-0.5 transition-[box-shadow,border-color,transform] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
     categoryFrame:
-      'rounded-2xl bg-muted shadow-[0_10px_30px_-18px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.14)] transition-shadow duration-700 ease-out',
+      'rounded-2xl bg-muted shadow-[0_10px_30px_-18px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.14)] transition-shadow duration-[var(--duration-slower)] ease-[var(--ease-out)]',
     categoryCaption: 'text-base sm:text-lg font-semibold text-foreground tracking-tight',
     // 2026-05-16: Ahmad standing rule — main reading text minimum 16px
     // across all themes for legibility. Theme identity stays via weight
@@ -74,40 +74,40 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardName: 'font-semibold text-foreground tracking-tight leading-snug',
     productCardPrice: 'font-bold text-primary tracking-tight',
     productCardCta:
-      'whitespace-nowrap rounded-2xl bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-300 ease-out min-h-[44px]',
+      'whitespace-nowrap rounded-2xl bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors duration-[var(--duration-base)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-semibold text-foreground/70 hover:text-foreground transition-colors duration-300',
+      'text-sm font-semibold text-foreground/70 hover:text-foreground transition-colors duration-[var(--duration-base)]',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/5 to-foreground/35',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight drop-shadow-xl leading-[1.05]',
     heroCta:
-      'rounded-2xl bg-primary px-8 py-4 text-base font-semibold text-primary-foreground hover:bg-primary/90 hover:-translate-y-0.5 shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] transition-[background-color,transform] duration-500 ease-out min-h-[44px]',
+      'rounded-2xl bg-primary px-8 py-4 text-base font-semibold text-primary-foreground hover:bg-primary/90 hover:-translate-y-0.5 shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] transition-[background-color,transform] duration-[var(--duration-slow)] ease-[var(--ease-out)] min-h-[44px]',
     testimonialCard:
-      'rounded-2xl border border-border/60 bg-card p-7 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.10)] hover:border-foreground/15 transition-[box-shadow,border-color] duration-500 ease-out',
+      'rounded-2xl border border-border/60 bg-card p-7 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.10)] hover:border-foreground/15 transition-[box-shadow,border-color] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
     testimonialAuthor: 'text-base font-semibold text-foreground tracking-tight',
   },
   classic: {
     // Sharp corners, solid borders, slow restrained hovers (500ms).
-    card: 'border border-primary/25 bg-card hover:border-primary/55 hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.18)] transition-[border-color,box-shadow] duration-500 ease-out',
+    card: 'border border-primary/25 bg-card hover:border-primary/55 hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.18)] transition-[border-color,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
     categoryFrame:
-      'rounded-sm border border-border bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out',
+      'rounded-sm border border-border bg-muted group-hover:border-foreground/35 transition-colors duration-[var(--duration-slower)] ease-[var(--ease-out)]',
     categoryCaption: 'text-base sm:text-lg font-serif font-normal text-foreground tracking-tight',
     productCardName: 'font-serif font-normal text-foreground tracking-tight leading-snug',
     productCardPrice: 'font-serif font-medium text-foreground tracking-tight',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-sm font-serif tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-500 ease-out min-h-[44px]',
+      'whitespace-nowrap border-y border-foreground bg-foreground px-5 py-3.5 text-sm font-serif tracking-[0.22em] text-background hover:bg-foreground/85 transition-colors duration-[var(--duration-slow)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-normal tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-serif ui-caps-toggle tracking-[0.22em] text-foreground/70 hover:text-foreground transition-colors duration-500',
+      'text-sm font-serif ui-caps-toggle tracking-[0.22em] text-foreground/70 hover:text-foreground transition-colors duration-[var(--duration-slow)]',
     heroOverlay: 'bg-gradient-to-b from-foreground/10 via-foreground/15 to-foreground/40',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif font-normal tracking-tight drop-shadow-xl leading-[1.05]',
     heroCta:
-      'border border-white bg-transparent px-10 py-4 font-serif text-sm tracking-[0.22em] ui-caps-toggle text-white hover:bg-white hover:text-foreground transition-colors duration-500 ease-out min-h-[44px]',
+      'border border-white bg-transparent px-10 py-4 font-serif text-sm tracking-[0.22em] ui-caps-toggle text-white hover:bg-white hover:text-foreground transition-colors duration-[var(--duration-slow)] ease-[var(--ease-out)] min-h-[44px]',
     testimonialCard: 'border border-border bg-background p-7',
     testimonialAuthor: 'text-sm font-serif ui-caps-toggle tracking-[0.22em] text-foreground',
   },
@@ -124,27 +124,27 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // images). See design.md "Theme 3 — Minimal" persona spec.
     // No-chrome philosophy: NO border, NO radius, NO shadow on cards. Page
     // bg shows through. CTA is an underlined link, never a button frame.
-    card: 'border border-primary/15 bg-transparent hover:border-primary/30 transition-colors duration-500 ease-out',
+    card: 'border border-primary/15 bg-transparent hover:border-primary/30 transition-colors duration-[var(--duration-slow)] ease-[var(--ease-out)]',
     categoryFrame: 'bg-transparent',
     // Minimal's identity is whitespace + tiny tracking + ULTRA-light weight.
     // Main text still hits 16px floor for legibility (Ahmad standing rule).
     categoryCaption:
-      'text-base font-extralight tracking-[0.22em] ui-caps-toggle text-muted-foreground group-hover:text-foreground transition-colors duration-500',
+      'text-base font-extralight tracking-[0.22em] ui-caps-toggle text-muted-foreground group-hover:text-foreground transition-colors duration-[var(--duration-slow)]',
     productCardName:
-      'tracking-[0.18em] font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-500',
+      'tracking-[0.18em] font-extralight text-muted-foreground group-hover:text-foreground transition-colors duration-[var(--duration-slow)]',
     productCardPrice: 'tracking-wide font-extralight text-muted-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-sm font-medium tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-500 ease-out min-h-[44px]',
+      'whitespace-nowrap mx-auto inline-block border-b border-foreground/70 pb-1 text-sm font-medium tracking-[0.28em] text-foreground hover:text-foreground/70 hover:border-foreground/40 bg-transparent transition-colors duration-[var(--duration-slow)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-extralight ui-caps-toggle tracking-[0.28em] text-muted-foreground hover:text-foreground transition-colors duration-500',
+      'text-sm font-extralight ui-caps-toggle tracking-[0.28em] text-muted-foreground hover:text-foreground transition-colors duration-[var(--duration-slow)]',
     heroOverlay: 'bg-gradient-to-b from-transparent via-transparent to-foreground/30',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-tight drop-shadow-xl leading-[1.05]',
     heroCta:
-      'inline-block border-b border-white pb-2 text-sm font-medium ui-caps-toggle tracking-[0.22em] text-white hover:border-white/50 hover:text-white/80 transition-colors duration-500 ease-out min-h-[44px]',
+      'inline-block border-b border-white pb-2 text-sm font-medium ui-caps-toggle tracking-[0.22em] text-white hover:border-white/50 hover:text-white/80 transition-colors duration-[var(--duration-slow)] ease-[var(--ease-out)] min-h-[44px]',
     testimonialCard: 'border-t border-border/40 bg-transparent py-10',
     testimonialAuthor: 'text-sm font-extralight text-foreground tracking-wide',
   },
@@ -155,52 +155,52 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // Hover drops the card ONTO the +6px/+6px offset shadow (down-right),
     // per design.md "Card hover translate-x-1 translate-y-1 (shadow appears
     // to fall behind)" — the previous -translate-y-1 lifted AWAY from it.
-    card: 'border-2 border-primary bg-card hover:translate-x-1 hover:translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--primary)/0.92)] transition-[transform,box-shadow] duration-200 ease-out',
+    card: 'border-2 border-primary bg-card hover:translate-x-1 hover:translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--primary)/0.92)] transition-[transform,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
     categoryFrame:
-      'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-200 ease-out',
+      'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-[var(--duration-fast)] ease-[var(--ease-out)]',
     categoryCaption: 'text-base font-black ui-caps-toggle tracking-[0.05em] text-foreground',
     productCardName: 'font-black tracking-[0.02em] text-foreground leading-tight',
     productCardPrice: 'font-black text-foreground tracking-tight',
     productCardCta:
-      'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-200 ease-out min-h-[44px]',
+      'whitespace-nowrap border-t-2 border-foreground bg-foreground px-5 py-3.5 text-sm font-black tracking-[0.18em] text-background hover:bg-primary hover:text-primary-foreground transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black ui-caps-toggle tracking-tight text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-black ui-caps-toggle tracking-[0.18em] text-foreground hover:text-primary transition-colors duration-200',
+      'text-sm font-black ui-caps-toggle tracking-[0.18em] text-foreground hover:text-primary transition-colors duration-[var(--duration-fast)]',
     heroOverlay: 'bg-gradient-to-b from-foreground/20 via-foreground/30 to-foreground/65',
     heroHeadline:
       'text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black ui-caps-toggle tracking-tight drop-shadow-2xl leading-[0.9]',
     heroCta:
-      'border-2 border-white bg-transparent px-8 py-4 text-base font-black ui-caps-toggle tracking-[0.18em] text-white hover:bg-white hover:text-foreground transition-colors duration-200 ease-out min-h-[44px]',
+      'border-2 border-white bg-transparent px-8 py-4 text-base font-black ui-caps-toggle tracking-[0.18em] text-white hover:bg-white hover:text-foreground transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out)] min-h-[44px]',
     testimonialCard: 'border-2 border-foreground bg-card p-7',
     testimonialAuthor: 'text-base font-black ui-caps-toggle tracking-[0.05em] text-foreground',
   },
   elegant: {
     // Hairline borders only — `border-foreground/10` to /20. Strict 200–500
     // weight range. Long 500–700ms transitions for unhurried hovers.
-    card: 'border border-primary/20 bg-card hover:border-primary/40 transition-colors duration-700 ease-out',
+    card: 'border border-primary/20 bg-card hover:border-primary/40 transition-colors duration-[var(--duration-slower)] ease-[var(--ease-out)]',
     categoryFrame:
-      'rounded-md border border-foreground/10 bg-muted group-hover:border-foreground/25 transition-colors duration-700 ease-out',
+      'rounded-md border border-foreground/10 bg-muted group-hover:border-foreground/25 transition-colors duration-[var(--duration-slower)] ease-[var(--ease-out)]',
     // Elegant's identity is hairline weight + wide tracking — but main
     // text still hits 16px floor. Tracking + extralight weight carry
     // the elegant voice; size carries the legibility.
     categoryCaption:
-      'text-base font-extralight ui-caps-toggle tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
+      'text-base font-extralight ui-caps-toggle tracking-[0.28em] text-foreground/75 group-hover:text-foreground transition-colors duration-[var(--duration-slower)]',
     productCardName:
-      'font-light tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-700',
+      'font-light tracking-[0.22em] text-foreground/75 group-hover:text-foreground transition-colors duration-[var(--duration-slower)]',
     productCardPrice: 'font-light tracking-wide text-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-colors duration-700 ease-out min-h-[44px]',
+      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-colors duration-[var(--duration-slower)] ease-[var(--ease-out)] min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
-      'text-sm font-light ui-caps-toggle tracking-[0.32em] text-foreground/60 hover:text-foreground transition-colors duration-700',
+      'text-sm font-light ui-caps-toggle tracking-[0.32em] text-foreground/60 hover:text-foreground transition-colors duration-[var(--duration-slower)]',
     heroOverlay: 'bg-gradient-to-b from-foreground/0 via-foreground/10 to-foreground/30',
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-[-0.01em] drop-shadow-xl leading-[1.05]',
     heroCta:
-      'border border-white bg-transparent px-10 py-4 text-sm font-medium ui-caps-toggle tracking-[0.32em] text-white hover:bg-white hover:text-foreground transition-colors duration-700 ease-out min-h-[44px]',
+      'border border-white bg-transparent px-10 py-4 text-sm font-medium ui-caps-toggle tracking-[0.32em] text-white hover:bg-white hover:text-foreground transition-colors duration-[var(--duration-slower)] ease-[var(--ease-out)] min-h-[44px]',
     testimonialCard: 'border-t border-foreground/15 bg-transparent py-10',
     testimonialAuthor: 'text-sm font-light ui-caps-toggle tracking-[0.22em] text-foreground/80',
   },

@@ -106,14 +106,24 @@ export default function BoldCategoryGrid({
           {categories.map((category, index) => {
             const stagger = index % 2 === 1 ? 'lg:translate-y-8' : '';
             const frame = cardFrameClass(showCardFrame ?? true, cardFrameStyle);
+            // Item 3 (2026-07-12): first-render stagger FADE (distinct from
+            // the `stagger` layout offset above), 40ms step, motion-safe
+            // only — no layout shift (opacity/transform only).
+            const enterStaggerCls =
+              'motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100';
             return (
               <div
                 key={category.id}
-                className={`${stagger} ${frame} ${frame ? cardFrameWidthClass(cardFrameWidth) : ''} ${frame ? cardFrameSizeClass(cardFrameSize) : ''} ${frame ? `${categorySizeClass(cardSize)} mx-auto w-full` : ''}`.trim()}
+                className={`${enterStaggerCls} ${stagger} ${frame} ${frame ? cardFrameWidthClass(cardFrameWidth) : ''} ${frame ? cardFrameSizeClass(cardFrameSize) : ''} ${frame ? `${categorySizeClass(cardSize)} mx-auto w-full` : ''}`.trim()}
                 style={
-                  frame && store.theme
-                    ? { borderColor: resolveColor(cardFrameColor ?? 'token:primary', store.theme) }
-                    : undefined
+                  {
+                    ['--i' as string]: index,
+                    ...(frame && store.theme
+                      ? {
+                          borderColor: resolveColor(cardFrameColor ?? 'token:primary', store.theme),
+                        }
+                      : undefined),
+                  } as React.CSSProperties
                 }
               >
                 <CategoryCard

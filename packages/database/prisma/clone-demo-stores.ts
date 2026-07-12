@@ -27,7 +27,7 @@
  * recreates them, so it's safe to run repeatedly.
  */
 
-import { PrismaClient, type StoreTemplate } from '@prisma/client';
+import { PrismaClient, type StoreTemplate, type Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -129,9 +129,20 @@ async function cloneInto(
     ...scalars
   } = source;
 
+  // 2026-07-12 design structural batch: demo stores showcase the new
+  // persona-chrome + card-frame-dedup defaults even though the SOURCE
+  // (wady-aljuz, a live client) intentionally keeps both flags off/undefined
+  // — override on top of the copied theme rather than mutating the source.
+  const sourceTheme =
+    source.theme && typeof source.theme === 'object'
+      ? (source.theme as Record<string, unknown>)
+      : {};
+  const demoTheme = { ...sourceTheme, personaChromeV2: true, frameChromeDedup: true };
+
   const newStore = await prisma.store.create({
     data: {
       ...scalars,
+      theme: demoTheme as Prisma.InputJsonValue,
       name: `${source.name} — ${tpl.label}`,
       nameAr: source.nameAr
         ? `${source.nameAr} — ${tpl.labelAr}`

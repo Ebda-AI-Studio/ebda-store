@@ -6,6 +6,7 @@ import { CartIcon } from '@force/ui';
 import { StoreLogo } from '../shared/StoreLogo';
 import type { HeaderProps } from '../types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStore } from '../../contexts/StoreContext';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { SearchAutocomplete } from '../../components/SearchAutocomplete';
 
@@ -20,7 +21,13 @@ export default function BoldHeader({
   headerBgColor,
 }: HeaderProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
+  const { store } = useStore();
   const isRtl = isRtlProp ?? ctxIsRtl;
+  // Item 2 (2026-07-12) persona-completion: bold's bordered-header chrome
+  // (design.md "border-2 header") — same border color already in use
+  // (border-white/10), just applied on all sides instead of only bottom.
+  // No new color, chrome only.
+  const personaBorder = store.theme?.personaChromeV2 === true;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -51,7 +58,7 @@ export default function BoldHeader({
   return (
     <>
       <header
-        className="bg-gray-950 text-white sticky top-0 z-50 border-b border-white/10"
+        className={`bg-gray-950 text-white sticky top-0 z-50 border-white/10 ${personaBorder ? 'border-2' : 'border-b'}`}
         style={headerBgColor ? { backgroundColor: headerBgColor } : undefined}
       >
         <div className="container mx-auto px-4">
@@ -254,9 +261,10 @@ export default function BoldHeader({
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay — item 5 (2026-07-12): shared enter/exit curve
+          (220ms in / 160ms out, motion-safe via motion-reduce:duration-0). */}
       <div
-        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-200 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-40 md:hidden transition-opacity ease-out motion-reduce:duration-0 ${isMenuOpen ? 'opacity-100 pointer-events-auto duration-[220ms]' : 'opacity-0 pointer-events-none duration-[160ms]'}`}
         onClick={() => setIsMenuOpen(false)}
         aria-hidden="true"
       >
@@ -264,9 +272,10 @@ export default function BoldHeader({
       </div>
 
       {/* Mobile Menu Drawer — capped at 320px so on a 320px screen the
-          overlay still has a touch-target outside the panel for dismiss. */}
+          overlay still has a touch-target outside the panel for dismiss.
+          Item 5 (2026-07-12): same enter/exit curve as the overlay above. */}
       <div
-        className={`fixed top-0 ${isRtl ? 'left-0' : 'right-0'} z-50 h-full w-[85vw] max-w-xs bg-gray-950 border-l border-white/10 md:hidden transition-transform duration-200 ease-out overscroll-contain ${isMenuOpen ? 'translate-x-0' : isRtl ? '-translate-x-full' : 'translate-x-full'}`}
+        className={`fixed top-0 ${isRtl ? 'left-0' : 'right-0'} z-50 h-full w-[85vw] max-w-xs bg-gray-950 border-l border-white/10 md:hidden transition-transform ease-out motion-reduce:duration-0 overscroll-contain ${isMenuOpen ? 'translate-x-0 duration-[220ms]' : isRtl ? '-translate-x-full duration-[160ms]' : 'translate-x-full duration-[160ms]'}`}
         aria-label={isRtl ? 'قائمة التنقل' : 'Navigation menu'}
       >
         <div className="flex items-center justify-between p-4 border-b border-white/10">

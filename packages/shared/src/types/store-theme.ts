@@ -310,6 +310,31 @@ export interface StoreTheme {
   storefrontWebPushEnabled?: boolean;
 
   /**
+   * When true, enables the 2026-07-12 "persona completion" chrome pass on
+   * elegant (hairline-flanked title + whisper top-border see-all link),
+   * classic (circular category tiles via the existing `cardShapeClasses`
+   * shape vocabulary), and bold (bordered header + inverted footer). Chrome
+   * only — never touches card size, product name/price typography, fonts,
+   * or colors (uses existing theme tokens). Default false/undefined so
+   * every EXISTING store (incl. wady-aljuz + Pecannbee) renders exactly as
+   * today. Seeded `true` at store-creation time for NEW stores only
+   * (`StoreService.create`) and for demo clones (`clone-demo-stores.ts`);
+   * existing stores can still opt in manually via Branding → Theme.
+   */
+  personaChromeV2?: boolean;
+
+  /**
+   * When true, suppresses the inner pack-style card chrome
+   * (`styles.card` / `styles.categoryFrame`) on `ProductCarousel` +
+   * `CategoryStrip` whenever the section's `showCardFrame` outer frame is
+   * also active — removes the doubled-frame look. Default false/undefined
+   * keeps today's rendering (both frames) on every EXISTING store. Seeded
+   * `true` at store-creation time for NEW stores only (same seeding path
+   * as `personaChromeV2`); existing stores can opt in via Branding → Theme.
+   */
+  frameChromeDedup?: boolean;
+
+  /**
    * Merchant-controlled display order for footer social icons.
    * An array of platform keys (e.g. ['tiktok','instagram','whatsapp']) that
    * defines the left-to-right (or start-to-end in RTL) sequence in the footer.

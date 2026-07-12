@@ -152,7 +152,7 @@ function BoldProductCard({
         {/* Image — PC-3: aspect driven by cardShape/cardAspect; bold theme
             default stays aspect-square to preserve the streetwear brand identity. */}
         <div
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square'}`}
+          className={`relative overflow-hidden bg-muted shimmer ${imgRadiusCls} ${imgAspectCls || aspectOverride || 'aspect-square'}`}
         >
           {/* Platform-level OOS ribbon (red, prominent) — same visual
               across every theme (2026-05-16).

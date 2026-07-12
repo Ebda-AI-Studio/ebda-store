@@ -296,9 +296,10 @@ export default function ModernHeader({
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay — item 5 (2026-07-12): shared enter/exit curve
+          (220ms in / 160ms out, motion-safe via motion-reduce:duration-0). */}
       <div
-        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-40 md:hidden transition-opacity ease-out motion-reduce:duration-0 ${isMenuOpen ? 'opacity-100 pointer-events-auto duration-[220ms]' : 'opacity-0 pointer-events-none duration-[160ms]'}`}
         onClick={() => setIsMenuOpen(false)}
         aria-hidden="true"
       >
@@ -306,9 +307,10 @@ export default function ModernHeader({
       </div>
 
       {/* Mobile Menu Drawer — capped at 320px so on a 320px screen the
-          overlay still has a touch-target outside the panel for dismiss. */}
+          overlay still has a touch-target outside the panel for dismiss.
+          Item 5 (2026-07-12): same enter/exit curve as the overlay above. */}
       <div
-        className={`fixed top-0 ${isRtl ? 'left-0' : 'right-0'} z-50 h-full w-[85vw] max-w-xs bg-background shadow-2xl md:hidden transition-transform duration-300 ease-in-out overscroll-contain ${isMenuOpen ? 'translate-x-0' : isRtl ? '-translate-x-full' : 'translate-x-full'}`}
+        className={`fixed top-0 ${isRtl ? 'left-0' : 'right-0'} z-50 h-full w-[85vw] max-w-xs bg-background shadow-2xl md:hidden transition-transform ease-out motion-reduce:duration-0 overscroll-contain ${isMenuOpen ? 'translate-x-0 duration-[220ms]' : isRtl ? '-translate-x-full duration-[160ms]' : 'translate-x-full duration-[160ms]'}`}
         aria-label={isRtl ? 'قائمة التنقل' : 'Navigation menu'}
       >
         <div className="flex items-center justify-between p-4 border-b border-border">

@@ -53,11 +53,21 @@ export default function BoldFooter({
   const lgColsClass =
     totalCells >= 6 ? 'lg:grid-cols-6' : totalCells === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4';
 
+  // Item 2 (2026-07-12) persona-completion: bold's inverted footer
+  // (design.md "inverted footer — accent is the only color on the bar").
+  // Only auto-inverts when the merchant hasn't picked a custom bgColor —
+  // an explicit merchant color pick always wins over the persona default.
+  // Uses only the existing --foreground/--background tokens (swapped
+  // roles), never a new color.
+  const invertFooter = theme?.personaChromeV2 === true && !bgColor;
+  const fgFull = invertFooter ? 'text-background' : 'text-foreground';
+  const fgMuted = invertFooter ? 'text-background/75' : 'text-foreground/75';
+
   return (
     <footer
       data-zone="footer"
       style={bgColor ? { backgroundColor: bgColor } : undefined}
-      className={`${bgColor ? '' : 'bg-[hsl(var(--bg-section-alt))]'} text-foreground mt-auto`}
+      className={`${bgColor ? '' : invertFooter ? 'bg-foreground' : 'bg-[hsl(var(--bg-section-alt))]'} ${fgFull} mt-auto`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
@@ -91,12 +101,14 @@ export default function BoldFooter({
                 }
               />
             ) : (
-              <h3 className="hidden md:block text-3xl font-black ui-caps-toggle tracking-wider mb-6 text-foreground">
+              <h3
+                className={`hidden md:block text-3xl font-black ui-caps-toggle tracking-wider mb-6 ${fgFull}`}
+              >
                 {displayName}
               </h3>
             )}
             {displayDescription && (
-              <p className="text-foreground/75 text-sm leading-relaxed max-w-sm mb-8">
+              <p className={`${fgMuted} text-sm leading-relaxed max-w-sm mb-8`}>
                 {displayDescription}
               </p>
             )}
@@ -110,7 +122,7 @@ export default function BoldFooter({
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-foreground hover:text-primary transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    className={`${fgFull} hover:text-primary transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                     aria-label={s.key}
                   >
                     <SocialGlyph
@@ -129,7 +141,7 @@ export default function BoldFooter({
           {footerSections.length > 0 ? (
             footerSections.map(section => (
               <div key={section.key}>
-                <h4 className="text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 text-foreground">
+                <h4 className={`text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 ${fgFull}`}>
                   {section.heading}
                 </h4>
                 <ul className="space-y-3">
@@ -137,7 +149,7 @@ export default function BoldFooter({
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        className={`text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                       >
                         <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-[width] duration-200 shrink-0" />
                         {link.label}
@@ -149,7 +161,7 @@ export default function BoldFooter({
             ))
           ) : (
             <div>
-              <h4 className="text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 text-foreground">
+              <h4 className={`text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 ${fgFull}`}>
                 {isRtl ? 'روابط سريعة' : 'Quick Links'}
               </h4>
               <ul className="space-y-3">
@@ -157,7 +169,7 @@ export default function BoldFooter({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className={`text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                     >
                       <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-[width] duration-200 shrink-0" />
                       {isRtl && item.labelAr ? item.labelAr : item.label}
@@ -172,7 +184,7 @@ export default function BoldFooter({
               hollow column. */}
           {hasContact && (
             <div>
-              <h4 className="text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 text-foreground">
+              <h4 className={`text-xs font-black ui-caps-toggle tracking-[0.2em] mb-6 ${fgFull}`}>
                 {isRtl ? 'تواصل معنا' : 'Get in Touch'}
               </h4>
               <ul className="space-y-3">
@@ -180,7 +192,7 @@ export default function BoldFooter({
                   <li>
                     <a
                       href={`mailto:${contact.email}`}
-                      className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className={`text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                     >
                       {contact.email}
                     </a>
@@ -190,7 +202,7 @@ export default function BoldFooter({
                   <li>
                     <a
                       href={`tel:${contact.phone}`}
-                      className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className={`text-sm ${fgMuted} hover:text-primary transition-colors duration-200 font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                       dir="ltr"
                     >
                       {displayPhone}
@@ -198,7 +210,7 @@ export default function BoldFooter({
                   </li>
                 )}
                 {displayAddress && (
-                  <li className="text-sm text-foreground/75">
+                  <li className={`text-sm ${fgMuted}`}>
                     {addressMapHref ? (
                       <a
                         href={addressMapHref}

@@ -68,6 +68,15 @@ export default function ClassicCategoryGrid({
     mobileColumns ? Math.min(mobileColumns, Math.max(1, categories.length)) : undefined
   ) as 1 | 2 | 3 | undefined;
 
+  // Item 2 (2026-07-12) persona-completion: classic's circular-tile identity
+  // (design.md "jewelry-grid feel") only when personaChromeV2 is on AND the
+  // merchant hasn't picked an explicit shape — reuses the existing
+  // cardShapeClasses('circle') vocabulary, never a new shape. Merchant's
+  // explicit pick always wins.
+  const personaChromeV2 = store.theme?.personaChromeV2 === true;
+  const effectiveCardShape =
+    personaChromeV2 && (cardShape === undefined || cardShape === 'theme') ? 'circle' : cardShape;
+
   return (
     <section dir={isRtl ? 'rtl' : 'ltr'} data-zone="categories">
       <div className="container mx-auto px-4">
@@ -94,22 +103,28 @@ export default function ClassicCategoryGrid({
         <div
           className={`grid ${gridGapClass(cardGap)} ${gridColsClass(cappedMobile, cappedDesktop)}`}
         >
-          {categories.map(category => {
+          {categories.map((category, i) => {
             const frame = cardFrameClass(showCardFrame ?? true, cardFrameStyle);
+            // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
+            // motion-safe only — no layout shift (opacity/transform only).
+            const staggerCls =
+              'motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100';
+            const staggerStyle = { ['--i' as string]: i } as React.CSSProperties;
             return frame ? (
               <div
                 key={category.id}
-                className={`${frame} ${cardFrameWidthClass(cardFrameWidth)} ${cardFrameSizeClass(cardFrameSize)} ${categorySizeClass(cardSize)} mx-auto w-full`}
-                style={
-                  store.theme
+                className={`${staggerCls} ${frame} ${cardFrameWidthClass(cardFrameWidth)} ${cardFrameSizeClass(cardFrameSize)} ${categorySizeClass(cardSize)} mx-auto w-full`}
+                style={{
+                  ...staggerStyle,
+                  ...(store.theme
                     ? { borderColor: resolveColor(cardFrameColor ?? 'token:primary', store.theme) }
-                    : undefined
-                }
+                    : undefined),
+                }}
               >
                 <CategoryCard
                   cardSize={cardSize}
                   cardAspect={cardAspect}
-                  cardShape={cardShape}
+                  cardShape={effectiveCardShape}
                   captionPosition={captionPosition}
                   showLabel={showLabel}
                   showHover={showHover}
@@ -120,19 +135,20 @@ export default function ClassicCategoryGrid({
                 />
               </div>
             ) : (
-              <CategoryCard
-                cardSize={cardSize}
-                cardAspect={cardAspect}
-                cardShape={cardShape}
-                captionPosition={captionPosition}
-                showLabel={showLabel}
-                showHover={showHover}
-                key={category.id}
-                category={category}
-                isRtl={isRtl}
-                urlPrefix={urlPrefix}
-                categoryLabelZone={categoryLabelZone}
-              />
+              <div key={category.id} className={staggerCls} style={staggerStyle}>
+                <CategoryCard
+                  cardSize={cardSize}
+                  cardAspect={cardAspect}
+                  cardShape={effectiveCardShape}
+                  captionPosition={captionPosition}
+                  showLabel={showLabel}
+                  showHover={showHover}
+                  category={category}
+                  isRtl={isRtl}
+                  urlPrefix={urlPrefix}
+                  categoryLabelZone={categoryLabelZone}
+                />
+              </div>
             );
           })}
         </div>

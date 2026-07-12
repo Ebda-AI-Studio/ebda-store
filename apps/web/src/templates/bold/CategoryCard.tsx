@@ -39,7 +39,7 @@ export default function BoldCategoryCard({
       {/* Card with dynamic hover. Aspect + radius come from cardShape
           when set, else bold's brutalist defaults. */}
       <div
-        className={`relative ${aspectClass} ${radiusClass} overflow-hidden bg-primary shadow-[0_18px_44px_-18px_hsl(var(--foreground)/0.30)] transition-transform duration-300 ease-out group-hover:scale-[1.015] group-hover:-rotate-[0.5deg]`}
+        className={`relative ${aspectClass} ${radiusClass} overflow-hidden bg-primary shimmer shadow-[0_18px_44px_-18px_hsl(var(--foreground)/0.30)] transition-transform duration-300 ease-out group-hover:scale-[1.015] group-hover:-rotate-[0.5deg]`}
       >
         {/* Image */}
         {category.image ? (

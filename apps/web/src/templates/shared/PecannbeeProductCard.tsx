@@ -223,7 +223,7 @@ function PecannbeeProductCardImpl({
       // verified zero rendered-output change for the `showCardFrame` +
       // pack-style combination (see design-sweep PR).
       className={cn(
-        'group relative flex flex-col w-full mx-auto transition-[transform,box-shadow] duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
+        'group relative flex flex-col w-full mx-auto transition-[transform,box-shadow] duration-[var(--duration-slow)] ease-[var(--ease-out)] md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
         sizeCap || 'md:max-w-[200px]',
         frameCls,
         shape.radius,
@@ -252,7 +252,7 @@ function PecannbeeProductCardImpl({
         // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
         // but before:-inset-1.5 grows the actual tap target to ~52px so it
         // clears the 44px a11y floor without changing the rendered size.
-        className={`before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[transform,background-color,color] duration-300 ease-out hover:scale-[1.05] hover:bg-white active:scale-95 cursor-pointer ${
+        className={`before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[transform,background-color,color] duration-[var(--duration-base)] ease-[var(--ease-out)] hover:scale-[1.05] hover:bg-white active:scale-95 cursor-pointer ${
           isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
         }`}
       >
@@ -282,7 +282,7 @@ function PecannbeeProductCardImpl({
             when normalizeImages is on, object-fill bg ensures transparent PNGs read cleanly.
             overflow-hidden STAYS on the image div so images still clip to the shape. */}
         <div
-          className={`relative overflow-hidden bg-muted ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted shimmer ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {img ? (
             <>
@@ -292,7 +292,7 @@ function PecannbeeProductCardImpl({
                 fill
                 priority={priority}
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
-                className={`${normalizeImages ? 'object-cover' : 'object-cover'} transition-opacity duration-500 ${
+                className={`${normalizeImages ? 'object-cover' : 'object-cover'} transition-opacity duration-[var(--duration-slow)] ${
                   showHover !== false && product.images?.[1]?.url ? 'group-hover/img:opacity-0' : ''
                 }`}
                 style={normalizeImages ? { objectFit: 'cover' } : undefined}
@@ -304,7 +304,7 @@ function PecannbeeProductCardImpl({
                   fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
                   loading="lazy"
-                  className="absolute inset-0 object-cover opacity-0 transition-opacity duration-500 group-hover/img:opacity-100"
+                  className="absolute inset-0 object-cover opacity-0 transition-opacity duration-[var(--duration-slow)] group-hover/img:opacity-100"
                 />
               )}
             </>
