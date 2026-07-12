@@ -27,11 +27,12 @@
  * config in this repo relies on). A preview/unconfigured deploy with no
  * SENTRY_DSN var still builds and serves traffic normally.
  *
- * FOLLOW-UP if `OPENNEXT_CACHE=true` is ever enabled for this app: the
- * generated worker also exports `DOQueueHandler` / `DOShardedTagCache`
- * (Durable Object bindings for the R2 cache + tag cache) which this custom
- * entry must re-export — see the OpenNext howto above. Not needed today
- * (OPENNEXT_CACHE is off by default — see cf-deploy.yml).
+ * OPENNEXT_CACHE=true (live since 2026-07-12): the generated worker also
+ * exports `DOQueueHandler` / `DOShardedTagCache` (Durable Objects for the R2
+ * cache + tag cache). Those are re-exported by the GENERATED wrapper entry
+ * `cache-worker-entry.ts` (emitted by scripts/cf-setup-local.sh, which then
+ * points wrangler `main` at the wrapper instead of this file) — this file
+ * stays DO-free so the cache-off configuration keeps working unchanged.
  */
 
 // @ts-expect-error — `.open-next/worker.js` is generated at build time by
