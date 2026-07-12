@@ -77,6 +77,7 @@ export default function ClassicHero({
             <div className={image ? (isRtl ? 'text-right' : 'text-left') : 'text-center'}>
               <Link
                 href={safeCtaLink}
+                data-cta="button"
                 className="group inline-flex min-h-[44px] items-center gap-3 border border-foreground px-9 py-3.5 font-serif text-sm tracking-[0.22em] uppercase text-foreground hover:bg-foreground hover:text-background transition-colors duration-500 ease-out cursor-pointer"
               >
                 <span>{displayCta}</span>

@@ -264,7 +264,7 @@ export default function ElegantHeader({
 
         {/* Desktop search field — expands below nav on md+ only. */}
         <div
-          className={`hidden md:block overflow-visible transition-all duration-500 ${isSearchOpen ? 'max-h-24 opacity-100 py-6 border-t border-border/50' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
+          className={`hidden md:block overflow-visible transition-[max-height,opacity,padding,border-width] duration-500 ${isSearchOpen ? 'max-h-24 opacity-100 py-6 border-t border-border/50' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
         >
           <form onSubmit={handleSearch} className="relative max-w-lg mx-auto">
             <input

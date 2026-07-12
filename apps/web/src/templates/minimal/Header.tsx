@@ -112,7 +112,7 @@ export default function MinimalHeader({
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="hidden lg:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="hidden lg:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               aria-label={isRtl ? 'بحث' : 'Search'}
               aria-expanded={isSearchOpen}
             >
@@ -142,7 +142,7 @@ export default function MinimalHeader({
             {/* Account */}
             <Link
               href={isLoggedIn ? `${urlPrefix}/account` : `${urlPrefix}/auth/login`}
-              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               aria-label={isRtl ? 'الحساب' : 'Account'}
             >
               <svg
@@ -164,7 +164,7 @@ export default function MinimalHeader({
             {/* Cart */}
             <Link
               href={`${urlPrefix}/cart`}
-              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="relative hidden md:inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               aria-label={isRtl ? `سلة التسوق (${cartItemCount})` : `Cart (${cartItemCount} items)`}
             >
               <CartIcon className="w-4 h-4" strokeWidth={1} aria-hidden="true" />
@@ -181,7 +181,7 @@ export default function MinimalHeader({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="lg:hidden inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer"
+              className="lg:hidden inline-flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               aria-label={isRtl ? 'القائمة' : 'Menu'}
               aria-expanded={isMenuOpen}
             >
@@ -243,7 +243,7 @@ export default function MinimalHeader({
         {/* Desktop search field — smooth expand toggled by the search icon
             in the actions row. lg+ only since mobile has its own row above. */}
         <div
-          className={`hidden lg:block overflow-visible transition-all duration-300 ${
+          className={`hidden lg:block overflow-visible transition-[max-height,opacity,padding] duration-300 ${
             isSearchOpen ? 'max-h-16 opacity-100 pb-4' : 'max-h-0 opacity-0 pointer-events-none'
           }`}
         >

@@ -217,7 +217,18 @@ function PecannbeeProductCardImpl({
       // Task 3 Part A: overflow-hidden REMOVED from article so the absolute
       // wishlist heart (now a sibling of the Link, not inside the image div)
       // is never clipped by the article's rounded corners.
-      className={`group relative flex flex-col w-full mx-auto transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${sizeCap || 'md:max-w-[200px]'} ${frameCls} ${shape.radius} ${styles.card}`}
+      // cn() (tailwind-merge) routes this concatenation so conflicting
+      // frame-vs-pack utilities (rounded-*, border-*, bg-card, duration-*)
+      // collapse to one winner instead of both landing in the DOM —
+      // verified zero rendered-output change for the `showCardFrame` +
+      // pack-style combination (see design-sweep PR).
+      className={cn(
+        'group relative flex flex-col w-full mx-auto transition-[transform,box-shadow] duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
+        sizeCap || 'md:max-w-[200px]',
+        frameCls,
+        shape.radius,
+        styles.card
+      )}
       style={
         showCardFrame && cardFrameColor && store.theme
           ? { borderColor: resolveColor(cardFrameColor, store.theme) }
@@ -238,7 +249,10 @@ function PecannbeeProductCardImpl({
         onClick={handleWishlist}
         aria-label={isRtl ? 'إضافة للمفضلة' : 'Add to wishlist'}
         aria-pressed={isWishlisted}
-        className={`absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out hover:scale-[1.05] hover:bg-white cursor-pointer ${
+        // Touch hitbox: the visual circle stays 40px (h-10 w-10, unchanged),
+        // but before:-inset-1.5 grows the actual tap target to ~52px so it
+        // clears the 44px a11y floor without changing the rendered size.
+        className={`before:absolute before:-inset-1.5 before:content-[''] absolute top-3 start-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 backdrop-blur-sm shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[transform,background-color,color] duration-300 ease-out hover:scale-[1.05] hover:bg-white active:scale-95 cursor-pointer ${
           isWishlisted ? 'text-destructive' : 'text-foreground/70 hover:text-foreground'
         }`}
       >
@@ -261,7 +275,7 @@ function PecannbeeProductCardImpl({
       <Link
         href={href}
         prefetch={false}
-        className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="group/img block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       >
         {/* Image: item 8 — aspect+radius driven by per-store cardImageAspect/cardImageRadius;
             falls back to the mobile-square / desktop-portrait theme default. Item 10 —

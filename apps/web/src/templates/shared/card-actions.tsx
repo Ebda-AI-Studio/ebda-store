@@ -33,7 +33,7 @@ export function CompareButton({
         e.stopPropagation();
         onToggle(productId);
       }}
-      className={`absolute top-3 start-3 z-10 flex h-11 w-11 items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-all ${
+      className={`absolute top-3 start-3 z-10 flex h-11 w-11 items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-[background-color,color,transform] ${
         isInCompare
           ? 'bg-primary text-primary-foreground scale-105'
           : 'bg-background/95 text-muted-foreground hover:bg-background hover:text-foreground'
@@ -99,7 +99,7 @@ export function RemoveFromWishlistButton({
         e.stopPropagation();
         onRemove(productId);
       }}
-      className={`absolute top-3 end-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-background/95 text-destructive shadow-md backdrop-blur-sm transition-all hover:bg-destructive hover:text-[hsl(var(--destructive-foreground))] ${className}`}
+      className={`absolute top-3 end-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-background/95 text-destructive shadow-md backdrop-blur-sm transition-colors hover:bg-destructive hover:text-[hsl(var(--destructive-foreground))] ${className}`}
       aria-label={isRtl ? 'إزالة من المفضلة' : 'Remove from wishlist'}
       title={isRtl ? 'إزالة من المفضلة' : 'Remove from wishlist'}
     >

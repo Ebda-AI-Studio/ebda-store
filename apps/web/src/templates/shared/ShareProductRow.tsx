@@ -80,7 +80,9 @@ export function ShareProductRow({ productName, url, className = '' }: ShareProdu
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`${isRtl ? 'مشاركة على' : 'Share on'} ${s.label}`}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-foreground/5 hover:bg-foreground/10 text-foreground/80 hover:text-foreground transition-colors"
+            // Touch hitbox: visual circle stays 36px; before:-inset-2 grows
+            // the tap target to ~44px without changing rendered size.
+            className="relative before:absolute before:-inset-2 before:content-[''] inline-flex h-9 w-9 items-center justify-center rounded-full bg-foreground/5 hover:bg-foreground/10 text-foreground/80 hover:text-foreground transition-colors"
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
               <path d={s.iconPath} />
@@ -91,7 +93,9 @@ export function ShareProductRow({ productName, url, className = '' }: ShareProdu
           type="button"
           onClick={handleCopy}
           aria-label={isRtl ? 'نسخ الرابط' : 'Copy link'}
-          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-foreground/5 hover:bg-foreground/10 text-foreground/80 hover:text-foreground transition-colors px-3 text-[11px] font-medium"
+          // Touch hitbox: visual height stays 36px; before:-inset-y-2 grows
+          // the vertical tap target to ~44px without changing rendered size.
+          className="relative before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-foreground/5 hover:bg-foreground/10 text-foreground/80 hover:text-foreground transition-colors px-3 text-[11px] font-medium"
         >
           {copied ? (
             <>

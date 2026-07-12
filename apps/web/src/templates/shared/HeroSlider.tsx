@@ -171,7 +171,7 @@ export function HeroSlider({
               isRtl ? `الشريحة ${i + 1} من ${slides.length}` : `Slide ${i + 1} of ${slides.length}`
             }
             onClick={() => goTo(i)}
-            className={`h-2 rounded-full transition-all ${
+            className={`h-2 rounded-full transition-[width,background-color,box-shadow] ${
               i === activeIndex ? 'w-6 bg-white shadow-md' : 'w-2 bg-white/60 hover:bg-white/80'
             }`}
           />

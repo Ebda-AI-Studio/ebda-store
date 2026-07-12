@@ -78,7 +78,7 @@ export default function ClassicCartTable({
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="inline-flex min-h-[44px] items-center text-base uppercase tracking-widest text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
+                  className="inline-flex min-h-[44px] items-center text-base uppercase tracking-widest text-muted-foreground hover:text-destructive transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
                   style={typography?.cta}
                 >
@@ -91,7 +91,7 @@ export default function ClassicCartTable({
                     type="button"
                     disabled={item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    className="h-11 w-11 text-muted-foreground hover:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer"
+                    className="h-11 w-11 text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
                     style={typography?.cta}
                   >
@@ -103,7 +103,7 @@ export default function ClassicCartTable({
                   <button
                     type="button"
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="h-11 w-11 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer"
+                    className="h-11 w-11 text-muted-foreground hover:bg-muted transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground cursor-pointer"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                     style={typography?.cta}
                   >

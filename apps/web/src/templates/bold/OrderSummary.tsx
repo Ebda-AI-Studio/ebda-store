@@ -115,21 +115,23 @@ export default function BoldOrderSummary({
           {ctaHref ? (
             <Link
               href={ctaHref}
+              data-cta="button"
               className="flex h-14 w-full items-center justify-center bg-primary px-5 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
               aria-disabled={ctaDisabled}
               style={typography?.cta}
             >
-              {ctaText} →
+              {ctaText} {isRtl ? '←' : '→'}
             </Link>
           ) : (
             <button
               type="button"
               onClick={onCtaClick}
               disabled={ctaDisabled || ctaLoading}
+              data-cta="button"
               className="flex h-14 w-full items-center justify-center bg-primary px-5 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 transition-colors duration-200 ease-out disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
               style={typography?.cta}
             >
-              {ctaLoading ? '···' : `${ctaText} →`}
+              {ctaLoading ? '···' : `${ctaText} ${isRtl ? '←' : '→'}`}
             </button>
           )}
         </div>

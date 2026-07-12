@@ -265,7 +265,7 @@ export default function ModernHeader({
           {/* Desktop Search Bar (Expandable) — md+ only, triggered by the
               search-toggle icon in the actions row above. */}
           <div
-            className={`hidden md:block overflow-visible transition-all duration-300 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-border/60' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
+            className={`hidden md:block overflow-visible transition-[max-height,opacity,padding,border-width] duration-300 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-border/60' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
           >
             <form onSubmit={handleSearch} className="relative flex gap-2">
               <input
@@ -298,7 +298,7 @@ export default function ModernHeader({
 
       {/* Mobile Menu Overlay */}
       <div
-        className={`fixed inset-0 z-40 md:hidden transition-all duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setIsMenuOpen(false)}
         aria-hidden="true"
       >

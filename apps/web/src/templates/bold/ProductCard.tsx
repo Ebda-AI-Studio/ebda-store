@@ -145,7 +145,7 @@ function BoldProductCard({
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
         prefetch={false}
-        className="group block relative overflow-hidden rounded-2xl bg-background border-2 border-foreground/40 hover:border-foreground hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-all duration-200 ease-out cursor-pointer"
+        className="group block relative overflow-hidden rounded-2xl bg-background border-2 border-foreground/40 hover:border-foreground hover:translate-x-1 hover:translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-[transform,box-shadow] duration-200 ease-out cursor-pointer"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -192,7 +192,7 @@ function BoldProductCard({
                   product.images[0].alt || (isRtl && product.nameAr ? product.nameAr : product.name)
                 }
                 className={cn(
-                  'object-cover transition-all duration-300 ease-out',
+                  'object-cover transition-[opacity,transform] duration-300 ease-out',
                   isHovered && 'scale-[1.05]'
                 )}
                 style={{
@@ -212,7 +212,7 @@ function BoldProductCard({
                     (isRtl && product.nameAr ? product.nameAr : product.name)
                   }
                   className={cn(
-                    'absolute inset-0 object-cover transition-all duration-300 ease-out',
+                    'absolute inset-0 object-cover transition-[opacity,transform] duration-300 ease-out',
                     isHovered && 'scale-[1.05]'
                   )}
                   style={{
@@ -272,7 +272,7 @@ function BoldProductCard({
             Touch devices can't trigger :hover, so the button stayed unreachable on phones. */}
           <div
             className={cn(
-              'absolute bottom-0 inset-x-0 transition-all duration-200',
+              'absolute bottom-0 inset-x-0 transition-[opacity,transform] duration-200',
               'opacity-100 translate-y-0',
               'lg:opacity-0 lg:translate-y-full',
               isHovered && 'lg:opacity-100 lg:translate-y-0'

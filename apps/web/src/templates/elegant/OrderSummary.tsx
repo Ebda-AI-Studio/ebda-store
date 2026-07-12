@@ -113,6 +113,7 @@ export default function ElegantOrderSummary({
         (ctaHref ? (
           <Link
             href={ctaHref}
+            data-cta="button"
             className="mt-8 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-medium uppercase tracking-[0.3em] text-background hover:bg-foreground/85 transition-colors duration-700 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             aria-disabled={ctaDisabled}
             style={typography?.cta}
@@ -124,6 +125,7 @@ export default function ElegantOrderSummary({
             type="button"
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
+            data-cta="button"
             className="mt-8 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-medium uppercase tracking-[0.3em] text-background hover:bg-foreground/85 disabled:opacity-40 transition-colors duration-700 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
             style={typography?.cta}
           >

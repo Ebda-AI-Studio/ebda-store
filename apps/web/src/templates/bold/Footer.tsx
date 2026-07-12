@@ -139,7 +139,7 @@ export default function BoldFooter({
                         href={link.href}
                         className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
-                        <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-all duration-200 shrink-0" />
+                        <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-[width] duration-200 shrink-0" />
                         {link.label}
                       </Link>
                     </li>
@@ -159,7 +159,7 @@ export default function BoldFooter({
                       href={item.href}
                       className="text-sm text-foreground/75 hover:text-primary transition-colors duration-200 font-medium inline-flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
-                      <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-all duration-200 shrink-0" />
+                      <span className="w-0 group-hover:w-3 h-0.5 bg-primary transition-[width] duration-200 shrink-0" />
                       {isRtl && item.labelAr ? item.labelAr : item.label}
                     </Link>
                   </li>

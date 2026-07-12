@@ -948,6 +948,25 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Design-sweep a11y rule: honor prefers-reduced-transparency by dropping
+   any backdrop-blur to a flat background so users who've asked for less
+   translucency don't get a blurred/frosted surface. Two-part rule: the
+   filter removal uses attribute-selector specificity (ties Tailwind's
+   .backdrop-blur-* and wins on source order — this file sits after
+   @tailwind utilities); the background fallback sits in :where() at zero
+   specificity so any element carrying its own semantic bg-* utility
+   (e.g. bg-destructive on a wishlisted heart, bg-white/95 on carousel
+   chrome) keeps its color and only the blur is removed. */
+@media (prefers-reduced-transparency: reduce) {
+  [class*='backdrop-blur'] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  :where([class*='backdrop-blur']) {
+    background-color: hsl(var(--background));
+  }
+}
+
 /* ── Phase C interaction polish (UI/UX audit P2) ─────────────────────────── */
 
 /* Snappier taps: remove the 300ms double-tap-zoom delay on interactive

@@ -109,7 +109,7 @@ export default function ModernOrderSummary({
         (ctaHref ? (
           <Link
             href={ctaHref}
-            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-all duration-300 ease-out hover:bg-primary/90 hover:shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-[background-color,box-shadow] duration-300 ease-out hover:bg-primary/90 hover:shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             aria-disabled={ctaDisabled}
             style={typography?.cta}
           >
@@ -120,7 +120,7 @@ export default function ModernOrderSummary({
             type="button"
             onClick={onCtaClick}
             disabled={ctaDisabled || ctaLoading}
-            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-all duration-300 ease-out hover:bg-primary/90 hover:shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold tracking-tight text-primary-foreground transition-[background-color,box-shadow] duration-300 ease-out hover:bg-primary/90 hover:shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             style={typography?.cta}
           >
             {ctaLoading ? (

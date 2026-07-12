@@ -94,7 +94,8 @@ export default function ElegantHero({
               </p>
               <Link
                 href={resolvedCtaLink}
-                className="group inline-flex items-center gap-4 px-8 py-4 border border-foreground text-foreground text-sm tracking-[0.25em] uppercase font-medium hover:bg-foreground hover:text-background transition-all duration-500 cursor-pointer"
+                data-cta="button"
+                className="group inline-flex items-center gap-4 px-8 py-4 border border-foreground text-foreground text-sm tracking-[0.25em] uppercase font-medium hover:bg-foreground hover:text-background transition-colors duration-500 cursor-pointer"
               >
                 {displayCta}
                 <svg
@@ -143,7 +144,8 @@ export default function ElegantHero({
               </p>
               <Link
                 href={resolvedCtaLink}
-                className="group inline-flex items-center gap-4 px-10 py-4 border border-foreground text-foreground text-sm tracking-[0.25em] uppercase font-medium hover:bg-foreground hover:text-background transition-all duration-500 cursor-pointer"
+                data-cta="button"
+                className="group inline-flex items-center gap-4 px-10 py-4 border border-foreground text-foreground text-sm tracking-[0.25em] uppercase font-medium hover:bg-foreground hover:text-background transition-colors duration-500 cursor-pointer"
               >
                 {displayCta}
                 <svg

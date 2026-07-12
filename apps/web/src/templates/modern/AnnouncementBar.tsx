@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { sanitizeUrl } from '@force/shared';
 import type { AnnouncementBarProps } from '../types';
@@ -22,21 +22,10 @@ export default function ModernAnnouncementBar({
   const isRtl = isRtlProp ?? ctxIsRtl;
   const [isDismissed, setIsDismissed] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [shouldMarquee, setShouldMarquee] = useState(false);
-  const textRef = useRef<HTMLSpanElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
-
-  useEffect(() => {
-    if (textRef.current && containerRef.current) {
-      const textWidth = textRef.current.scrollWidth;
-      const containerWidth = containerRef.current.offsetWidth;
-      setShouldMarquee(textWidth > containerWidth * 0.7);
-    }
-  }, [text, textAr]);
 
   if (isDismissed) return null;
 
@@ -53,7 +42,7 @@ export default function ModernAnnouncementBar({
 
   return (
     <div
-      className="relative overflow-hidden transition-all duration-300"
+      className="relative overflow-hidden transition-[max-height,opacity] duration-300"
       style={{
         maxHeight: isVisible ? '48px' : '0px',
         opacity: isVisible ? 1 : 0,
@@ -62,11 +51,12 @@ export default function ModernAnnouncementBar({
       }}
     >
       <div className="py-2 px-4">
-        <div ref={containerRef} className="flex items-center justify-center gap-3 overflow-hidden">
-          <div
-            className={`flex items-center gap-3 ${shouldMarquee ? 'motion-safe:animate-marquee whitespace-nowrap' : ''}`}
-          >
-            <span ref={textRef} className="text-sm font-medium tracking-wide">
+        <div className="flex items-center justify-center gap-3 overflow-hidden">
+          {/* min-w-0 + truncate: long announcements stay on one line and
+              ellipsize instead of wrapping past the 48px bar cap (the removed
+              dead marquee branch previously forced whitespace-nowrap). */}
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="min-w-0 truncate text-sm font-medium tracking-wide">
               {displayText}
             </span>
             {link && (

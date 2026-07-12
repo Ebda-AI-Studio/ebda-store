@@ -57,7 +57,7 @@ export default function ModernHero({
             <div className="mt-10 flex justify-center">
               <Link
                 href={safeCtaLink}
-                className="group inline-flex min-h-[44px] items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] transition-all duration-500 ease-out hover:shadow-[0_22px_48px_-18px_hsl(var(--primary)/0.55)] hover:-translate-y-0.5"
+                className="group inline-flex min-h-[44px] items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] transition-[background-color,box-shadow,transform] duration-500 ease-out hover:shadow-[0_22px_48px_-18px_hsl(var(--primary)/0.55)] hover:-translate-y-0.5"
               >
                 {displayCta}
                 <svg
@@ -111,7 +111,7 @@ export default function ModernHero({
             >
               <Link
                 href={safeCtaLink}
-                className="group inline-flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-lg shadow-primary/20 transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 w-full sm:w-auto justify-center"
+                className="group inline-flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 font-semibold text-base shadow-lg shadow-primary/20 transition-[background-color,box-shadow,transform] duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 w-full sm:w-auto justify-center"
               >
                 {displayCta}
                 <svg

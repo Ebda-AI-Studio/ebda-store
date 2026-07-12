@@ -37,17 +37,19 @@ export default function MinimalEmptyState({
         (ctaHref ? (
           <Link
             href={ctaHref}
+            data-cta="link"
             className="mt-8 border-b border-foreground pb-1 text-sm text-foreground hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
-            {displayCta} →
+            {displayCta} {isRtl ? '←' : '→'}
           </Link>
         ) : (
           <button
             type="button"
             onClick={onCtaClick}
+            data-cta="link"
             className="mt-8 border-b border-foreground pb-1 text-sm text-foreground hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
-            {displayCta} →
+            {displayCta} {isRtl ? '←' : '→'}
           </button>
         ))}
     </div>

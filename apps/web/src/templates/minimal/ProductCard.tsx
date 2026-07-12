@@ -150,7 +150,7 @@ function MinimalProductCard({
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
         prefetch={false}
-        className="group block cursor-pointer"
+        className="group block cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       >
         {/* Image — PC-3: aspect driven by cardShape/cardAspect; falls back to
             mobile-square / desktop-portrait theme default. */}

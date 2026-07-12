@@ -259,7 +259,7 @@ export function ProductCarousel({
               type="button"
               aria-label={isRtl ? 'السابق' : 'Previous'}
               onClick={() => scrollByOneCard('prev')}
-              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-all duration-300 ease-out cursor-pointer start-2"
+              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-colors duration-300 ease-out cursor-pointer start-2"
             >
               <svg
                 className="h-5 w-5"
@@ -283,7 +283,7 @@ export function ProductCarousel({
               type="button"
               aria-label={isRtl ? 'التالي' : 'Next'}
               onClick={() => scrollByOneCard('next')}
-              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-all duration-300 ease-out cursor-pointer end-2"
+              className="absolute top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-11 w-11 items-center justify-center rounded-full bg-card border border-foreground/10 shadow-[0_10px_24px_-12px_hsl(var(--foreground)/0.18)] hover:bg-muted text-foreground transition-colors duration-300 ease-out cursor-pointer end-2"
             >
               <svg
                 className="h-5 w-5"
@@ -353,9 +353,17 @@ export function ProductCarousel({
                 >
                   {/* Sprint 2 (2026-05-17): hover-scale 1.02 on the card
                       frame for the same micro-payoff PecannbeeProductCard
-                      now uses. Mobile loses nothing (no hover state). */}
+                      now uses. Mobile loses nothing (no hover state).
+                      cn() (tailwind-merge) resolves the shape/pack-style
+                      concatenation so conflicting utilities (rounded-*,
+                      duration-*, transition-*) collapse to one winner —
+                      verified zero rendered-output change. */}
                   <div
-                    className={`flex flex-col h-full overflow-hidden transition-all duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)] ${shape.radius} ${styles.card}`}
+                    className={cn(
+                      'flex flex-col h-full overflow-hidden transition-[transform,box-shadow] duration-500 ease-out md:hover:scale-[1.02] md:hover:shadow-[0_20px_40px_-20px_hsl(var(--foreground)/0.18)]',
+                      shape.radius,
+                      styles.card
+                    )}
                   >
                     <Link
                       href={href}
@@ -480,7 +488,9 @@ export function ProductCarousel({
                               onAddToCart(product.id);
                             }}
                             aria-label={isRtl ? 'إضافة للسلة' : 'Add to cart'}
-                            className="absolute bottom-3 end-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-[0_8px_20px_-6px_hsl(var(--primary)/0.5)] hover:scale-110 transition-transform cursor-pointer"
+                            // Touch hitbox: visual circle stays 40px; before:-inset-1.5
+                            // grows the tap target to ~52px without changing rendered size.
+                            className="before:absolute before:-inset-1.5 before:content-[''] absolute bottom-3 end-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-[0_8px_20px_-6px_hsl(var(--primary)/0.5)] hover:scale-110 active:scale-95 transition-transform cursor-pointer"
                           >
                             <svg
                               className="h-5 w-5"

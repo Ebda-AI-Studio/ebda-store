@@ -170,7 +170,7 @@ function ModernProductCard({
       {!onRemoveFromWishlist && onAddToWishlist !== undefined && (
         <div
           className={cn(
-            'absolute top-3 z-20 flex flex-col gap-2 transition-all duration-300',
+            'absolute top-3 z-20 flex flex-col gap-2 transition-[opacity,transform] duration-300',
             isRtl ? 'left-3' : 'right-3',
             'opacity-100 translate-x-0',
             'lg:opacity-0 lg:translate-x-3',
@@ -180,7 +180,7 @@ function ModernProductCard({
           <button
             onClick={handleWishlist}
             className={cn(
-              'h-11 w-11 rounded-full flex items-center justify-center shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-all duration-300 ease-out cursor-pointer backdrop-blur-sm',
+              'h-11 w-11 rounded-full flex items-center justify-center shadow-[0_8px_20px_-8px_hsl(var(--foreground)/0.30)] transition-[background-color,color,transform] duration-300 ease-out cursor-pointer backdrop-blur-sm',
               isWishlisted
                 ? 'bg-destructive text-destructive-foreground scale-[1.05]'
                 : 'bg-white/95 text-foreground hover:bg-white hover:scale-[1.05]'
@@ -209,7 +209,7 @@ function ModernProductCard({
       <Link
         href={`${urlPrefix}/products/${product.slug}`}
         prefetch={false}
-        className="group relative bg-background rounded-xl overflow-hidden border border-border/60 hover:border-foreground/15 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.12)] hover:-translate-y-0.5 transition-all duration-500 ease-out flex flex-col cursor-pointer"
+        className="group relative bg-background rounded-xl overflow-hidden border border-border/60 hover:border-foreground/15 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.12)] hover:-translate-y-0.5 transition-[border-color,box-shadow,transform] duration-500 ease-out flex flex-col cursor-pointer"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -319,7 +319,7 @@ function ModernProductCard({
           {/* Quick Add Button — always visible on touch; slides up on hover for pointer devices */}
           <div
             className={cn(
-              'absolute bottom-0 inset-x-0 transition-all duration-300 ease-out',
+              'absolute bottom-0 inset-x-0 transition-[opacity,transform] duration-300 ease-out',
               'opacity-100 translate-y-0',
               'lg:opacity-0 lg:translate-y-full',
               isHovered && 'lg:opacity-100 lg:translate-y-0'

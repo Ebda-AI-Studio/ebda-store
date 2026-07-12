@@ -71,7 +71,7 @@ export default function BoldCartTable({
                 <button
                   type="button"
                   onClick={() => onRemove?.(item.id)}
-                  className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background text-2xl font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 cursor-pointer"
+                  className="h-11 w-11 flex-shrink-0 border-2 border-foreground bg-background text-2xl font-black text-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 cursor-pointer"
                   aria-label={isRtl ? 'إزالة' : 'Remove'}
                   style={typography?.cta}
                 >
@@ -84,7 +84,7 @@ export default function BoldCartTable({
                     type="button"
                     disabled={item.quantity <= 1}
                     onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
+                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background disabled:opacity-30 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
                     aria-label={isRtl ? 'تقليل' : 'Decrease'}
                     style={typography?.cta}
                   >
@@ -99,7 +99,7 @@ export default function BoldCartTable({
                   <button
                     type="button"
                     onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
+                    className="h-11 w-11 font-black text-foreground hover:bg-foreground hover:text-background transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 cursor-pointer"
                     aria-label={isRtl ? 'زيادة' : 'Increase'}
                     style={typography?.cta}
                   >

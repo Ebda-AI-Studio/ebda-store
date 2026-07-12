@@ -165,7 +165,7 @@ function ElegantProductCard({
         <button
           onClick={handleWishlist}
           className={cn(
-            'absolute top-4 z-20 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-all duration-300 cursor-pointer',
+            'absolute top-4 z-20 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center transition-opacity duration-300 cursor-pointer',
             isRtl ? 'left-4' : 'right-4',
             'opacity-100 lg:opacity-0',
             (isHovered || isWishlisted) && 'lg:opacity-100'
@@ -256,11 +256,15 @@ function ElegantProductCard({
                   product.images[0].alt || (isRtl && product.nameAr ? product.nameAr : product.name)
                 }
                 className={cn(
-                  'object-cover transition-all duration-500',
+                  'object-cover',
                   isHovered ? 'brightness-95 scale-[1.02]' : 'brightness-100 scale-100'
                 )}
                 style={{
                   opacity: isHovered && showHover !== false && product.images[1]?.url ? 0 : 1,
+                  // Inline transition already covers opacity/filter/transform —
+                  // the class-based transition-all this replaced was fully
+                  // overridden by this inline style (higher specificity) and
+                  // never actually applied; dropped as dead code.
                   transition: 'opacity 500ms, filter 500ms, transform 500ms',
                   ...(normalizeImages ? { objectFit: 'cover' } : {}),
                 }}
@@ -322,7 +326,7 @@ function ElegantProductCard({
               Task 3 B2: thread CTA customization props. */}
           <div
             className={cn(
-              'absolute bottom-0 inset-x-0 bg-background/95 backdrop-blur-sm transition-all duration-300',
+              'absolute bottom-0 inset-x-0 bg-background/95 backdrop-blur-sm transition-[opacity,transform] duration-300',
               'opacity-100 translate-y-0',
               'lg:opacity-0 lg:translate-y-full',
               isHovered && 'lg:opacity-100 lg:translate-y-0'

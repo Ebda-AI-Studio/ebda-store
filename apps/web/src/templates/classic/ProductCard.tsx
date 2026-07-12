@@ -151,7 +151,7 @@ function ClassicProductCard({
         {/* Image container — PC-3: aspect driven by cardShape/cardAspect;
             falls back to mobile-square / desktop-portrait theme default. */}
         <div
-          className={`relative overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-all duration-500 ease-out mb-3 ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-muted border border-border group-hover:border-foreground/35 group-hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.20)] transition-[border-color,box-shadow] duration-500 ease-out mb-3 ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {onToggleCompare && (
             <CompareButton
@@ -175,7 +175,7 @@ function ClassicProductCard({
                 alt={
                   product.images[0].alt || (isRtl && product.nameAr ? product.nameAr : product.name)
                 }
-                className={`w-full h-full object-cover group-hover:scale-[1.04] transition-all duration-700 ease-out ${
+                className={`w-full h-full object-cover group-hover:scale-[1.04] transition-[opacity,transform] duration-700 ease-out ${
                   showHover !== false && product.images[1]?.url ? 'group-hover:opacity-0' : ''
                 }`}
                 style={normalizeImages ? { objectFit: 'cover' } : undefined}
@@ -192,7 +192,7 @@ function ClassicProductCard({
                     product.images[1].alt ||
                     (isRtl && product.nameAr ? product.nameAr : product.name)
                   }
-                  className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 group-hover:scale-[1.04] transition-all duration-700 ease-out"
+                  className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 group-hover:scale-[1.04] transition-[opacity,transform] duration-700 ease-out"
                   style={normalizeImages ? { objectFit: 'cover' } : undefined}
                   fill
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"

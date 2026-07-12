@@ -113,7 +113,7 @@ export default function ClassicCategoryCard({
 
           {/* Underline animation */}
           <div className="mt-4 flex justify-center">
-            <div className="w-0 h-px bg-primary group-hover:w-12 transition-all duration-500" />
+            <div className="w-0 h-px bg-primary group-hover:w-12 transition-[width] duration-500" />
           </div>
         </>
       )}

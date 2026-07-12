@@ -114,7 +114,7 @@ export function CategoryStrip({
                 <Link
                   href={href}
                   prefetch={false}
-                  className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 rounded-2xl"
+                  className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-2xl"
                 >
                   <div
                     className={`relative ${aspectCls} ${shape.radius} overflow-hidden ${showHover ? 'transition-transform duration-700 ease-out group-hover:scale-[1.015]' : ''} ${styles.categoryFrame}`}

@@ -223,7 +223,7 @@ export default function BoldHeader({
           {/* Desktop expandable search bar — md+ only, toggled via the
               search icon in the actions row. */}
           <div
-            className={`hidden md:block overflow-visible transition-all duration-200 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-white/10' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
+            className={`hidden md:block overflow-visible transition-[max-height,opacity,padding,border-width] duration-200 ${isSearchOpen ? 'max-h-20 opacity-100 py-3 border-t border-white/10' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}
           >
             <form onSubmit={handleSearch} className="relative flex gap-2">
               <input
@@ -256,7 +256,7 @@ export default function BoldHeader({
 
       {/* Mobile Menu Overlay */}
       <div
-        className={`fixed inset-0 z-40 md:hidden transition-all duration-200 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-200 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setIsMenuOpen(false)}
         aria-hidden="true"
       >

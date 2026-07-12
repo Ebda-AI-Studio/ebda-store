@@ -60,6 +60,7 @@ export default function ElegantEmptyState({
         (ctaHref ? (
           <Link
             href={ctaHref}
+            data-cta="link"
             className="mt-10 inline-block border-b border-foreground pb-1 text-xs font-light uppercase tracking-[0.3em] text-foreground hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
             {displayCta} →
@@ -68,6 +69,7 @@ export default function ElegantEmptyState({
           <button
             type="button"
             onClick={onCtaClick}
+            data-cta="link"
             className="mt-10 border-b border-foreground pb-1 text-xs font-light uppercase tracking-[0.3em] text-foreground hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
             {displayCta} →

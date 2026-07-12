@@ -21,7 +21,11 @@ export default function BoldAnnouncementBar({
     <div className="flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base">
       <span className="text-base sm:text-xl shrink-0">🔥</span>
       <span className="font-black tracking-wide text-center">{displayText}</span>
-      {link && <span className="inline-flex items-center gap-1 font-black shrink-0">→</span>}
+      {link && (
+        <span className="inline-flex items-center gap-1 font-black shrink-0">
+          {isRtl ? '←' : '→'}
+        </span>
+      )}
     </div>
   );
 

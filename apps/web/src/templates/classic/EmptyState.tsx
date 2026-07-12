@@ -58,6 +58,7 @@ export default function ClassicEmptyState({
         (ctaHref ? (
           <Link
             href={ctaHref}
+            data-cta="button"
             className="mt-8 inline-flex h-11 items-center border border-foreground bg-foreground px-6 text-xs font-semibold uppercase tracking-widest text-background hover:bg-foreground/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
           >
             {displayCta}
@@ -66,6 +67,7 @@ export default function ClassicEmptyState({
           <button
             type="button"
             onClick={onCtaClick}
+            data-cta="button"
             className="mt-8 inline-flex h-11 items-center border border-foreground bg-foreground px-6 text-xs font-semibold uppercase tracking-widest text-background hover:bg-foreground/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
           >
             {displayCta}

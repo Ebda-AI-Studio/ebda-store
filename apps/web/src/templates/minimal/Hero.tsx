@@ -43,7 +43,8 @@ export default function MinimalHero({
             touch-friendly without violating the typographic minimalism. */}
         <Link
           href={safeCtaLink}
-          className="group inline-flex min-h-[44px] items-center gap-2.5 px-3 py-3 text-sm tracking-[0.22em] uppercase text-foreground hover:text-foreground/60 transition-colors duration-500 ease-out cursor-pointer"
+          data-cta="link"
+          className="group inline-flex min-h-[44px] items-center gap-2.5 px-3 py-3 text-sm tracking-[0.22em] uppercase text-foreground hover:text-primary transition-colors duration-500 ease-out cursor-pointer"
         >
           <span>{displayCta}</span>
           <svg

@@ -59,7 +59,7 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // (4) sectionHeading font-bold→font-semibold (introduces mid-weight
     // hierarchy), (5) heroCta rounded-full→rounded-2xl + brand fill (matches
     // in-page cards). See design.md "Theme 1 — Modern" persona spec.
-    card: 'rounded-2xl border border-primary/15 bg-card hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.18)] hover:border-primary/35 hover:-translate-y-0.5 transition-all duration-500 ease-out',
+    card: 'rounded-2xl border border-primary/15 bg-card hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.18)] hover:border-primary/35 hover:-translate-y-0.5 transition-[box-shadow,border-color,transform] duration-500 ease-out',
     categoryFrame:
       'rounded-2xl bg-muted shadow-[0_10px_30px_-18px_hsl(var(--foreground)/0.10)] group-hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.14)] transition-shadow duration-700 ease-out',
     categoryCaption: 'text-base sm:text-lg font-semibold text-foreground tracking-tight',
@@ -83,14 +83,14 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight drop-shadow-xl leading-[1.05]',
     heroCta:
-      'rounded-2xl bg-primary px-8 py-4 text-base font-semibold text-primary-foreground hover:bg-primary/90 hover:-translate-y-0.5 shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] transition-all duration-500 ease-out min-h-[44px]',
+      'rounded-2xl bg-primary px-8 py-4 text-base font-semibold text-primary-foreground hover:bg-primary/90 hover:-translate-y-0.5 shadow-[0_18px_40px_-18px_hsl(var(--primary)/0.45)] transition-[background-color,transform] duration-500 ease-out min-h-[44px]',
     testimonialCard:
-      'rounded-2xl border border-border/60 bg-card p-7 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.10)] hover:border-foreground/15 transition-all duration-500 ease-out',
+      'rounded-2xl border border-border/60 bg-card p-7 hover:shadow-[0_24px_48px_-20px_hsl(var(--foreground)/0.10)] hover:border-foreground/15 transition-[box-shadow,border-color] duration-500 ease-out',
     testimonialAuthor: 'text-base font-semibold text-foreground tracking-tight',
   },
   classic: {
     // Sharp corners, solid borders, slow restrained hovers (500ms).
-    card: 'border border-primary/25 bg-card hover:border-primary/55 hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.18)] transition-all duration-500 ease-out',
+    card: 'border border-primary/25 bg-card hover:border-primary/55 hover:shadow-[0_18px_36px_-22px_hsl(var(--foreground)/0.18)] transition-[border-color,box-shadow] duration-500 ease-out',
     categoryFrame:
       'rounded-sm border border-border bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out',
     categoryCaption: 'text-base sm:text-lg font-serif font-normal text-foreground tracking-tight',
@@ -152,7 +152,10 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     // Brutalist core preserved: 2px borders + offset shadow on hover.
     // Offset shadow tinted to foreground (token-driven) so it adapts to
     // light/dark theme — not a flat black drop. Bold's voice keeps 200ms.
-    card: 'border-2 border-primary bg-card hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--primary)/0.92)] transition-all duration-200 ease-out',
+    // Hover drops the card ONTO the +6px/+6px offset shadow (down-right),
+    // per design.md "Card hover translate-x-1 translate-y-1 (shadow appears
+    // to fall behind)" — the previous -translate-y-1 lifted AWAY from it.
+    card: 'border-2 border-primary bg-card hover:translate-x-1 hover:translate-y-1 hover:shadow-[6px_6px_0_0_hsl(var(--primary)/0.92)] transition-[transform,box-shadow] duration-200 ease-out',
     categoryFrame:
       'rounded-2xl border-2 border-foreground bg-muted group-hover:shadow-[6px_6px_0_0_hsl(var(--foreground)/0.92)] transition-shadow duration-200 ease-out',
     categoryCaption: 'text-base font-black ui-caps-toggle tracking-[0.05em] text-foreground',
@@ -188,7 +191,7 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     productCardPrice: 'font-light tracking-wide text-foreground',
     productCardBody: 'text-center',
     productCardCta:
-      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-all duration-700 ease-out min-h-[44px]',
+      'whitespace-nowrap border-t border-foreground/15 bg-transparent px-5 py-3.5 text-sm font-medium tracking-[0.32em] text-foreground hover:bg-foreground hover:text-background transition-colors duration-700 ease-out min-h-[44px]',
     sectionHeading:
       'text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extralight tracking-[-0.01em] text-foreground leading-[1.1] text-balance',
     sectionSeeAll:
@@ -197,7 +200,7 @@ const PACK_STYLES: Record<TemplateId, PackStyles> = {
     heroHeadline:
       'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extralight tracking-[-0.01em] drop-shadow-xl leading-[1.05]',
     heroCta:
-      'border border-white bg-transparent px-10 py-4 text-sm font-medium ui-caps-toggle tracking-[0.32em] text-white hover:bg-white hover:text-foreground transition-all duration-700 ease-out min-h-[44px]',
+      'border border-white bg-transparent px-10 py-4 text-sm font-medium ui-caps-toggle tracking-[0.32em] text-white hover:bg-white hover:text-foreground transition-colors duration-700 ease-out min-h-[44px]',
     testimonialCard: 'border-t border-foreground/15 bg-transparent py-10',
     testimonialAuthor: 'text-sm font-light ui-caps-toggle tracking-[0.22em] text-foreground/80',
   },

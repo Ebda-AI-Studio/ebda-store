@@ -54,17 +54,19 @@ export default function BoldEmptyState({
         (ctaHref ? (
           <Link
             href={ctaHref}
+            data-cta="button"
             className="mt-8 inline-flex h-12 items-center bg-primary px-8 text-sm font-black uppercase tracking-widest text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
           >
-            {displayCta} →
+            {displayCta} {isRtl ? '←' : '→'}
           </Link>
         ) : (
           <button
             type="button"
             onClick={onCtaClick}
+            data-cta="button"
             className="mt-8 inline-flex h-12 items-center bg-primary px-8 text-sm font-black uppercase tracking-widest text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
           >
-            {displayCta} →
+            {displayCta} {isRtl ? '←' : '→'}
           </button>
         ))}
     </div>
