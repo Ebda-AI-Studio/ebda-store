@@ -440,6 +440,7 @@ export function HomePageContent({
                     showSubtitleLines: layout.categories.showSubtitleLines,
                     dividers: layout.categories.dividers,
                     seeAllHref: storeUrl('/products'),
+                    urlPrefix: storeUrl(''),
                     isRtl,
                     cardSize: layout.categories.cardSize,
                     cardAspect: layout.categories.cardAspect,
@@ -528,6 +529,7 @@ export function HomePageContent({
               >
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
+                    urlPrefix={storeUrl('')}
                     products={templateNewArrivals}
                     title={newArrivalsTitle}
                     titleAr={newArrivalsTitleAr}
@@ -578,6 +580,7 @@ export function HomePageContent({
                 ) : (
                   <div className={sectionSpacingClasses(layout.newArrivals).innerContainerClass}>
                     <T.ProductGrid
+                      urlPrefix={storeUrl('')}
                       products={templateNewArrivals}
                       title={newArrivalsTitle}
                       titleAr={newArrivalsTitleAr}
@@ -616,6 +619,7 @@ export function HomePageContent({
               >
                 {T.ProductCarousel ? (
                   <T.ProductCarousel
+                    urlPrefix={storeUrl('')}
                     products={templateBestSellers}
                     title={bestSellersTitle}
                     titleAr={bestSellersTitleAr}
@@ -666,6 +670,7 @@ export function HomePageContent({
                 ) : (
                   <div className={sectionSpacingClasses(layout.bestSellers).innerContainerClass}>
                     <T.ProductGrid
+                      urlPrefix={storeUrl('')}
                       products={templateBestSellers}
                       title={bestSellersTitle}
                       titleAr={bestSellersTitleAr}
@@ -897,6 +902,7 @@ export function HomePageContent({
                 style={sectionBgStyle(extra.bgColor, store.theme)}
               >
                 <T.ProductCarousel
+                  urlPrefix={storeUrl('')}
                   products={capped}
                   title={extra.title}
                   titleAr={extra.titleAr}
@@ -951,6 +957,7 @@ export function HomePageContent({
           <section className="bg-[hsl(var(--bg-section-alt))] py-12 sm:py-16 lg:py-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <T.ProductGrid
+                urlPrefix={storeUrl('')}
                 products={templateProducts}
                 title="Featured Products"
                 titleAr="منتجات مميزة"
