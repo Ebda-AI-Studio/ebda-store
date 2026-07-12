@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { CartIcon } from '@force/ui';
 import { filsToKwd } from '@/lib/format';
@@ -40,6 +42,7 @@ export function AbandonedCartsTable({
   onStatusFilterChange,
   onPageChange,
 }: AbandonedCartsTableProps) {
+  const storeId = useParams().id as string;
   const t = useT('abandonedCarts.list');
   const tStatus = useT('abandonedCarts.status');
   const tKwd = useT('abandonedCarts.stats');
@@ -75,6 +78,13 @@ export function AbandonedCartsTable({
           </div>
           <p className="font-semibold text-foreground">{t('empty')}</p>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">{t('emptyDescription')}</p>
+          <p className="mt-3 max-w-md text-sm text-muted-foreground">{t('emptyOrdersHint')}</p>
+          <Link
+            href={`/stores/${storeId}/orders?status=pending`}
+            className="mt-1 text-sm font-medium text-primary hover:underline"
+          >
+            {t('emptyOrdersLink')}
+          </Link>
         </div>
       ) : (
         <>
