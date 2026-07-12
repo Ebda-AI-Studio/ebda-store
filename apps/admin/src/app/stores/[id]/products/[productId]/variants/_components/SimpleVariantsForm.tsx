@@ -283,7 +283,11 @@ export function SimpleVariantsForm({
           option: { id: string };
         }>(`/api/v1/stores/${storeId}/products/${productId}/options`, {
           name: t('defaultOptionName'),
-          nameAr: t('defaultOptionNameAr'),
+          // Leave nameAr blank so the Arabic storefront derives the axis label
+          // smartly from the values (weight → الوزن, volume → الحجم, size →
+          // المقاس). Stamping a generic "متغير" here surfaced it verbatim on the
+          // PDP. See apps/web/src/lib/option-localization.ts.
+          nameAr: undefined,
           values: populated.map(r => ({
             value: r.value.trim(),
             valueAr: r.valueAr.trim() || undefined,

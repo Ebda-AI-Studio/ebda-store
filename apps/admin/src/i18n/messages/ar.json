@@ -781,7 +781,6 @@
         "errorPriceRequired": "أدخل سعرًا لـ «{name}».",
         "errorPriceInvalid": "سعر «{name}» يجب أن يكون رقمًا موجبًا.",
         "defaultOptionName": "Variant",
-        "defaultOptionNameAr": "متغير",
         "parentSkuNote": "تُولَّد أرقام SKU تلقائيًا بصيغة “{sku}-<اسم المتغير>”.",
         "multiAxisLockNote": "أسماء المتغيرات متعددة المحاور مقفلة — يمكنك فقط تعديل السعر والمخزون والصورة."
       }

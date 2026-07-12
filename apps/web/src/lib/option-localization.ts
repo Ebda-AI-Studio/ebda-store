@@ -8,11 +8,13 @@
  * translate the common cases at DISPLAY time so the Arabic store reads Arabic
  * platform-wide, WITHOUT mutating the stored data.
  *
- * Precedence: a merchant-supplied `nameAr`/`valueAr` ALWAYS wins; the maps below
- * are only the fallback when that translation is empty and the locale is Arabic.
+ * Precedence: a MEANINGFUL merchant-supplied `nameAr`/`valueAr` wins; generic
+ * placeholder axis names (notably the old admin default "متغير") are ignored so
+ * smart value-driven detection runs; the maps below are the last fallback.
  *
- * Note on "Size": this is a FOOD/grocery platform, so Size means volume/weight
- * → الحجم (NOT المقاس, which reads as a clothing fit).
+ * Axis labelling is value-aware (see `localizeOptionName`): weight-unit values →
+ * الوزن, volume-unit values → الحجم, garment letter-sizes → المقاس. We never
+ * surface the placeholder "متغير".
  */
 
 const OPTION_NAME_AR: Record<string, string> = {
@@ -66,31 +68,87 @@ const VALUE_TOKEN_AR: Array<[RegExp, string]> = [
 ];
 
 /** Garment letter-size tokens (S / M / L / XL / XXL / 2XL …). These are
- *  unambiguously clothing sizes (a weight/volume is never "XL"), so when a
- *  "Size" option's values look like these we translate the axis as مقاس
- *  (garment fit) rather than حجم (volume/weight, the food default). */
+ *  unambiguously clothing sizes (a weight/volume is never "XL"), so when an
+ *  option's values look like these we translate the axis as المقاس (clothing
+ *  fit) rather than الحجم (volume) or الوزن (weight). */
 const GARMENT_SIZE_RE = /^(xs|s|m|l|xl|xxl|xxxl|[2-5]xl)$/i;
+
+/** A value carries a WEIGHT unit (185 Gram, 1 KG, 500g, ٧٠٠ جرام). The Latin
+ *  branch uses `\b`; the Arabic branch omits it (`\b` is unreliable on Arabic
+ *  script). A leading digit is required so a stray "g"/"l" doesn't false-match. */
+const WEIGHT_VALUE_RE =
+  /[0-9٠-٩۰-۹]\s*(?:kilograms?|kgs?|milligrams?|grams?|gms?|mg|g)\b|[0-9٠-٩۰-۹]\s*(?:كيلوجرام|كيلوغرام|كيلو|كجم|جرامات|جرام|غرام|جم|مجم)/i;
+
+/** A value carries a VOLUME unit (500 ml, 1 Liter, ٢ لتر). */
+const VOLUME_VALUE_RE =
+  /[0-9٠-٩۰-۹]\s*(?:milliliters?|mls?|liters?|litres?|l)\b|[0-9٠-٩۰-۹]\s*(?:مليلتر|لتر|مل)/i;
+
+/** Arabic/English axis names that are GENERIC placeholders (no real meaning) —
+ *  treated as if `nameAr` were blank so the smart value-driven detection runs.
+ *  Notably includes "متغير" (the old admin default) which we must never show. */
+const GENERIC_AXIS_NAMES = new Set([
+  'متغير',
+  'الخيار',
+  'خيار',
+  'الخيارات',
+  'variant',
+  'variants',
+  'option',
+  'options',
+]);
+
+function anyValueMatches(values: string[] | undefined, re: RegExp): boolean {
+  if (!values || values.length === 0) return false;
+  return values.some(v => re.test(v.trim()));
+}
 
 function looksLikeGarmentSizes(values?: string[]): boolean {
   if (!values || values.length === 0) return false;
   return values.some(v => GARMENT_SIZE_RE.test(v.trim()));
 }
 
-/** Localise an option axis label ("Size" → "الحجم"). Merchant Arabic wins; else
- *  the option-name map; else English. For the ambiguous "Size" axis it is
- *  context-aware: garment letter-sizes in `values` → مقاس (clothing fit),
- *  otherwise الحجم (food/grocery volume-weight default). */
+/** The axis type inferred from the option VALUES (units are unambiguous). */
+function detectAxisFromValues(values?: string[]): 'weight' | 'volume' | 'garment' | null {
+  if (anyValueMatches(values, WEIGHT_VALUE_RE)) return 'weight';
+  if (anyValueMatches(values, VOLUME_VALUE_RE)) return 'volume';
+  if (looksLikeGarmentSizes(values)) return 'garment';
+  return null;
+}
+
+/** Locale-appropriate label per detected axis type. */
+const AXIS_LABEL: Record<'weight' | 'volume' | 'garment', { en: string; ar: string }> = {
+  weight: { en: 'Weight', ar: 'الوزن' },
+  volume: { en: 'Size', ar: 'الحجم' },
+  garment: { en: 'Size', ar: 'المقاس' },
+};
+
+/** Localise an option axis label for BOTH storefront locales. Precedence:
+ *  1. VALUE-driven detection wins (units are unambiguous) — a "Size"/"Variant"
+ *     axis whose values are "400 Gram / 700 Gram" reads Weight / الوزن, not
+ *     "Variant" / الحجم;
+ *  2. a MEANINGFUL merchant name for the active locale — generic placeholders
+ *     ("Variant", "Option", the old "متغير" default) are ignored so they never
+ *     surface;
+ *  3. the option-name map (Arabic) / the English name; else a neutral fallback
+ *     ("Options" / الخيار). The label is NEVER "متغير" or a bare "Variant". */
 export function localizeOptionName(
   name: string,
   nameAr: string | null | undefined,
   isRtl: boolean,
   values?: string[]
 ): string {
-  if (!isRtl) return name;
-  if (nameAr && nameAr.trim()) return nameAr;
-  const key = name.trim().toLowerCase();
-  if (key === 'size' && looksLikeGarmentSizes(values)) return 'مقاس';
-  return OPTION_NAME_AR[key] ?? name;
+  const axis = detectAxisFromValues(values);
+  if (axis) return isRtl ? AXIS_LABEL[axis].ar : AXIS_LABEL[axis].en;
+
+  if (isRtl) {
+    const trimmedAr = nameAr?.trim();
+    if (trimmedAr && !GENERIC_AXIS_NAMES.has(trimmedAr.toLowerCase())) return trimmedAr;
+    return OPTION_NAME_AR[name.trim().toLowerCase()] ?? 'الخيار';
+  }
+
+  const trimmedEn = name?.trim();
+  if (trimmedEn && !GENERIC_AXIS_NAMES.has(trimmedEn.toLowerCase())) return trimmedEn;
+  return 'Options';
 }
 
 /** Localise an option value ("185 Gram" → "185 جرام"). Translates every known
