@@ -1,13 +1,19 @@
 import { Metadata } from 'next';
-import dynamic from 'next/dynamic';
+// Renamed from the conventional `dynamic` to avoid colliding with the route
+// segment config export of the same name below (tenant-cacheable routing,
+// Phase 1 — see docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9).
+import nextDynamic from 'next/dynamic';
 
-const SettingsClient = dynamic(() => import('./SettingsClient'), {
+const SettingsClient = nextDynamic(() => import('./SettingsClient'), {
   loading: () => (
     <div className="flex min-h-[50vh] items-center justify-center">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
     </div>
   ),
 });
+
+// Track-B — see app/cart/page.tsx sibling comment; same rationale.
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Account Settings',

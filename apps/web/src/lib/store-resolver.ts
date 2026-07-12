@@ -564,6 +564,49 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
 }
 
 /**
+ * Params-based sibling of {@link getStoreOrNotFound} for the tenant-cacheable
+ * Track-A route tree (`app/tenant-store/[tenant]/[locale]/`, dark-launched behind
+ * `STOREFRONT_TENANT_ROUTING` — see
+ * `docs/plans/2026-07-12-tenant-cacheable-routing.md` §3.6/§9 Phase 1).
+ *
+ * Track-A pages must resolve the store from the matched `[tenant]` ROUTE
+ * PARAM (baked into the pathname by `middleware.ts`) instead of
+ * `headers()`/`cookies()` — Next's Full Route Cache keys on the resolved
+ * pathname only, so a header-based resolver would either force the route
+ * dynamic (no caching benefit) or, worse, let one merchant's cached HTML
+ * leak onto another merchant's domain if the layout chain ever stopped
+ * reading the header at all. Reading `params` instead is Dynamic-API-free
+ * and safe to cache.
+ *
+ * This function is purely ADDITIVE — it does not modify or replace
+ * `getStore()` / `getStoreOrNotFound()`, which stay exactly as-is for every
+ * existing flat/header-based route (Track B, and the legacy tree while the
+ * rewrite is flag-off).
+ *
+ * `tenant` is the middleware-encoded tenant key:
+ *  - a normalized custom domain (e.g. `"wadyaljuz.com"`), OR
+ *  - `slug:<slug>` for platform-path stores (e.g. `"slug:palora"`).
+ *
+ * Triggers Next's `notFound()` when the tenant doesn't resolve to an active
+ * store — mirrors `getStoreOrNotFound()`'s behavior for unknown
+ * domains/slugs so an unknown tenant lands on the branded 404 instead of
+ * silently rendering the demo store.
+ */
+export async function getStoreByTenantParam(tenant: string): Promise<ResolvedStore> {
+  const SLUG_PREFIX = 'slug:';
+  if (tenant.startsWith(SLUG_PREFIX)) {
+    const slug = tenant.slice(SLUG_PREFIX.length);
+    const store = await resolveStoreBySlug(slug);
+    if (!store) notFound();
+    return store;
+  }
+
+  const store = await resolveStoreByDomain(tenant);
+  if (!store) notFound();
+  return store;
+}
+
+/**
  * Get store by ID (for admin panel)
  */
 export async function getStoreById(storeId: string): Promise<ResolvedStore | null> {

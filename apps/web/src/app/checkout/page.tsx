@@ -3,6 +3,9 @@ import { Suspense } from 'react';
 import CheckoutClient from './CheckoutClient';
 import WaTokenHydrator from './WaTokenHydrator';
 
+// Track-B — see cart/page.tsx sibling comment; same rationale.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Checkout',
   description: 'Complete your purchase.',

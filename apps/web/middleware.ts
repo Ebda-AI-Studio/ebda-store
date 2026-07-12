@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { isPlatformHost } from '@/lib/platform-host';
+// Relative import (not the `@/*` tsconfig alias) so this file is importable
+// directly from the root Vitest suite, which has no per-workspace `@/*`
+// alias plugin (each app's `@/*` points at its OWN `src/`, so a single
+// global alias would be ambiguous across apps/{web,admin,api,orders}).
+// Zero behavior change — Next.js resolves both forms identically.
+import { isPlatformHost } from './src/lib/platform-host';
 
 /**
  * Check if a hostname is a platform domain (not a custom store domain).
@@ -86,6 +91,79 @@ const KNOWN_APP_ROUTES = new Set([
 ]);
 
 /**
+ * Route roots eligible for the tenant-cacheable Track-A rewrite. Dark-
+ * launched behind `STOREFRONT_TENANT_ROUTING` — see
+ * `docs/plans/2026-07-12-tenant-cacheable-routing.md` §3.3/§4/§9 Phase 1.
+ * Anonymous, non-personalized surfaces only (home is handled separately as
+ * the empty-path case in `isCacheableTrackARoute`); every other route
+ * (cart, checkout, account, auth, wishlist, search, compare, review, and
+ * anything not listed here) stays on today's header-based resolution
+ * untouched. Purely additive to `KNOWN_APP_ROUTES` above, not a replacement.
+ */
+const CACHEABLE_ROUTES = new Set([
+  'products',
+  'categories',
+  'blog',
+  'about',
+  'faq',
+  'how-to-guides',
+  'contact',
+  'locations',
+  'privacy',
+  'terms',
+  'returns',
+  'shipping',
+]);
+
+/** `pathname` is the (already slug-stripped, for platform domains) route the
+ *  storefront will actually render — i.e. what `extractStoreSlug` returns as
+ *  `rewrittenPath`, or the raw pathname on a custom domain. */
+function isCacheableTrackARoute(pathname: string): boolean {
+  if (pathname === '/' || pathname === '') return true;
+  const firstSegment = pathname.replace(/^\//, '').split('/')[0];
+  return CACHEABLE_ROUTES.has(firstSegment);
+}
+
+/**
+ * Whether the dark-launched middleware rewrite is live. Read INSIDE the
+ * request handler (never hoisted to module scope) — Cloudflare Workers
+ * don't reliably expose `process.env` at module-eval time (see scoped
+ * memory `feedback-workers-no-module-env-secrets`). Unset, or any value
+ * other than the literal string `"true"`, is completely inert: every
+ * branch below falls through to today's header-only resolution, byte-for-
+ * byte unchanged. Never flipped on in Phase 1 (see plan §9) — Phase 2
+ * flips it on a CF preview Worker only.
+ */
+function storefrontTenantRoutingEnabled(): boolean {
+  return process.env.STOREFRONT_TENANT_ROUTING === 'true';
+}
+
+/** Resolve the locale that gets baked into the `/tenant-store/[tenant]/[locale]`
+ *  rewrite target. Mirrors the cookie read in `app/layout.tsx` (`force-
+ *  language`), but — unlike the layout — this runs in middleware, so it
+ *  can decide the CACHE KEY itself instead of forcing dynamic rendering to
+ *  read the cookie at render time (plan §7). Falls back to `en` when the
+ *  cookie is absent; a store's own `defaultLanguage` preference isn't
+ *  available here without an extra store fetch, so honoring it is deferred
+ *  to a later phase (see PR notes) — inert either way while the flag is off. */
+function resolveTrackALocale(request: NextRequest): 'en' | 'ar' {
+  return request.cookies.get('force-language')?.value === 'ar' ? 'ar' : 'en';
+}
+
+/** Build the internal (never customer-visible) rewrite target for the
+ *  tenant-cacheable Track-A tree. `tenantKey` is either a normalized custom
+ *  domain or `slug:<slug>` for platform-path stores (plan §3.3);
+ *  `encodeURIComponent` keeps the `slug:` colon path-segment-safe — Next
+ *  decodes it back on the way into `params.tenant`. */
+function buildStoreTreeUrl(request: NextRequest, tenantKey: string, pathname: string): URL {
+  const locale = resolveTrackALocale(request);
+  const url = request.nextUrl.clone();
+  const suffix = pathname === '/' ? '' : pathname;
+  url.pathname = `/tenant-store/${encodeURIComponent(tenantKey)}/${locale}${suffix}`;
+  return url;
+}
+
+/**
  * Extract store slug from the first path segment on platform domains.
  * Returns the slug and the remaining path, or null if the first segment is a known route.
  */
@@ -113,6 +191,17 @@ function extractStoreSlug(pathname: string): { slug: string; rewrittenPath: stri
 
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
+
+  // /tenant-store/* is an INTERNAL rewrite target only (rewrites don't re-enter
+  // middleware, so this guard never sees them). A direct external hit here would
+  // bypass the Host→tenant binding — any domain could render any tenant's
+  // storefront (cross-tenant boundary violation + duplicate-content SEO surface),
+  // flag on or off, because the route tree exists in the build regardless.
+  // Client-side navigation is unaffected: Next keeps the ORIGINAL URL for RSC
+  // requests through a rewrite, so real traffic never addresses this path.
+  if (request.nextUrl.pathname.startsWith('/tenant-store/')) {
+    return new NextResponse(null, { status: 404 });
+  }
 
   // www → apex canonical 301 for CUSTOM store domains only. Platform www hosts
   // (www.forcemediakw.com / www.force-ai.co) are real platform hosts and are
@@ -234,6 +323,23 @@ export function middleware(request: NextRequest) {
       return draftCookie(response);
     }
 
+    // Dark-launched tenant-cacheable rewrite (Phase 1). Inert unless
+    // STOREFRONT_TENANT_ROUTING=true AND this isn't the admin page-builder
+    // preview iframe AND the route is on the Track-A allowlist — see
+    // docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
+    if (
+      storefrontTenantRoutingEnabled() &&
+      !isPreviewIframe &&
+      isCacheableTrackARoute(request.nextUrl.pathname)
+    ) {
+      const storeTreeUrl = buildStoreTreeUrl(request, storeIdentifier, request.nextUrl.pathname);
+      const response = NextResponse.rewrite(storeTreeUrl, {
+        request: { headers: requestHeaders },
+      });
+      response.headers.set('x-store-domain', storeIdentifier);
+      return draftCookie(response);
+    }
+
     // Create response with modified headers
     const response = NextResponse.next({
       request: { headers: requestHeaders },
@@ -251,8 +357,20 @@ export function middleware(request: NextRequest) {
     // Set slug header and rewrite URL to strip the slug prefix
     requestHeaders.set('x-store-slug', slugInfo.slug);
 
-    const url = request.nextUrl.clone();
-    url.pathname = slugInfo.rewrittenPath;
+    // Dark-launched tenant-cacheable rewrite (Phase 1) — same gate as the
+    // custom-domain branch above, keyed on `slug:<slug>` instead of the
+    // domain. See docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
+    const storeTreeEligible =
+      storefrontTenantRoutingEnabled() &&
+      !isPreviewIframe &&
+      isCacheableTrackARoute(slugInfo.rewrittenPath);
+
+    const url = storeTreeEligible
+      ? buildStoreTreeUrl(request, `slug:${slugInfo.slug}`, slugInfo.rewrittenPath)
+      : request.nextUrl.clone();
+    if (!storeTreeEligible) {
+      url.pathname = slugInfo.rewrittenPath;
+    }
 
     const response = NextResponse.rewrite(url, {
       request: { headers: requestHeaders },
@@ -294,6 +412,23 @@ export function middleware(request: NextRequest) {
   const cookieSlug = request.cookies.get('x-store-slug')?.value;
   if (cookieSlug) {
     requestHeaders.set('x-store-slug', cookieSlug);
+  }
+
+  // Dark-launched tenant-cacheable rewrite (Phase 1) — same gate, keyed on
+  // the cookie-carried slug. See
+  // docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
+  if (
+    cookieSlug &&
+    storefrontTenantRoutingEnabled() &&
+    !isPreviewIframe &&
+    isCacheableTrackARoute(request.nextUrl.pathname)
+  ) {
+    const storeTreeUrl = buildStoreTreeUrl(request, `slug:${cookieSlug}`, request.nextUrl.pathname);
+    return draftCookie(
+      NextResponse.rewrite(storeTreeUrl, {
+        request: { headers: requestHeaders },
+      })
+    );
   }
 
   return draftCookie(

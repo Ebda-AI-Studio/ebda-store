@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import LoginClient from './LoginClient';
 
+// Track-B — see app/cart/page.tsx sibling comment; same rationale.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Login',
   description: 'Sign in to your account.',

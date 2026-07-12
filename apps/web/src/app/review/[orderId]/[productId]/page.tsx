@@ -19,6 +19,10 @@ interface ReviewStore {
   logo?: string | null;
 }
 
+// Track-B (order-specific, must stay per-request) — see
+// app/cart/page.tsx sibling comment; same rationale.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Submit Review',
   robots: { index: false, follow: false },
