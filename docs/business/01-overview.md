@@ -65,7 +65,7 @@ Most platforms give you a theme picker and call it customization. Force AI Store
 - **Smart Palette** — pick 1-3 seed colors, get a full WCAG-compliant palette applied across the whole store automatically; the canonical brand-color editor (lives in Page Builder)
 - **Page Builder** — the single destination for all design decisions: brand colors (Smart Palette), fonts (Typography library), hero banner slides, per-section backgrounds, section order, Navigation links, Footer links, and Category page config
 - **7 visual toggles** — brand badges on product cards, quick-add buttons, brand story block, trust strip, dividers, mobile floating widget, blog
-- **Per-store custom domain** — your-shop.com, auto-provisioned through our Vercel integration
+- **Per-store custom domain** — your-shop.com, auto-provisioned through our Cloudflare-for-SaaS integration
 - **Per-store branded email** — order confirmations come from your domain, not ours
 
 ---
@@ -104,7 +104,7 @@ Most platforms give you a theme picker and call it customization. Force AI Store
 ## Where we run
 
 - **Kuwait & GCC focus** — Tap, MyFatoorah, Hesabe, UPayments. KNET-native. Arabic-primary. KWD-default.
-- **Hosted infrastructure** — Vercel (CDN + serverless), Railway (API), Neon Postgres (database), Cloudflare R2 (storage). Multi-region read latency under 200ms across the GCC.
+- **Hosted infrastructure** — Cloudflare Workers (CDN + serverless), Railway (API), Neon Postgres (database), Cloudflare R2 (storage). Multi-region read latency under 200ms across the GCC.
 - **Service availability** — we monitor uptime publicly at our status page. P0 incidents alert our team within 30 seconds via Telegram.
 
 ---

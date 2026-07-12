@@ -25,8 +25,8 @@ hold:
 2. The `Content-Type` is `application/json` OR the request carries an
    `X-Requested-With` header.
 3. The `Origin` header matches a **platform origin** (admin, web,
-   Vercel preview, localhost in dev). Custom merchant domains DO NOT
-   qualify.
+   Cloudflare Workers preview, localhost in dev). Custom merchant
+   domains DO NOT qualify.
 
 ### Why the skip is safe for platform origins
 

@@ -8,9 +8,9 @@
 
 ### Platform & Infrastructure
 
-- [x] Monorepo architecture (npm workspaces) — apps: api, admin, web; packages: database, shared, ui, config
+- [x] Monorepo architecture (npm workspaces) — apps: api, admin, web, orders; packages: database, shared, ui, config
 - [x] Multi-tenancy with Row-Level Security (RLS) — database-level tenant isolation via AsyncLocalStorage + Prisma Proxy; non-owner `force_app` role enforces RLS in production
-- [x] Custom domains — auto-provisioned per merchant via Vercel API with SSL
+- [x] Custom domains — auto-provisioned per merchant via Cloudflare-for-SaaS Custom Hostnames with SSL
 - [x] Role-based access — Super Admin (platform-wide), Store Admin (single store), Customer (storefront)
 - [x] Horizontal-scaling readiness — Redis adapter plumbing, Redis-backed rate-limiting, pooled DB connections; see `docs/SCALING.md`
 - [x] Upgrade-marketing gate — merchants who open a plan-gated feature see an on-brand "Available on the [Plan] plan" upsell page instead of a silent redirect
@@ -155,7 +155,7 @@ These items are sequenced from `docs/HANDOFF-2026-06-01.md`. Priority order is a
 | **Payments**        | Tap Payments, MyFatoorah, Hesabe, UPayments (Kuwait KNET gateways) |
 | **Email**           | Resend                                                             |
 | **Push**            | OneSignal + Web Push (VAPID)                                       |
-| **Hosting**         | Vercel (admin + storefront) + Railway (API)                        |
+| **Hosting**         | Cloudflare Workers (admin + storefront + orders) + Railway (API)   |
 | **Testing**         | Vitest (332+ tests)                                                |
 
 ---

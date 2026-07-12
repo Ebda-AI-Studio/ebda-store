@@ -18,7 +18,7 @@ goes through a custom proposal and onboarding process:
 1. **Request a proposal** — contact us at [hello@forcemediakw.com](mailto:hello@forcemediakw.com)
    or via WhatsApp. We'll schedule a 30-minute call to understand your needs.
 2. **Receive and sign a custom proposal** — we send a written proposal within 2-3 business days
-   covering setup fee, monthly fee, and the feature set tailored to your business.
+   covering setup fee, annual platform fee, and the feature set tailored to your business.
 3. **Onboarding begins** — once you sign and pay the deposit, we handle:
    - Store provisioning and theme configuration
    - Brand setup (logo, colors, fonts, hero images)
@@ -120,9 +120,9 @@ Provider fees are paid by you to your provider (not to Force AI Store). Typical 
 | Hesabe     | ~2.5% | ~3.5%            | —             |
 | UPayments  | ~2.5% | ~3.0%            | —             |
 
-**Force AI Store does not take a cut of your sales.** Your contract is a fixed setup fee + monthly
-platform fee. Payment provider fees (2-3.5% per transaction) go directly from your customer to your
-payment gateway — not through us.
+**Force AI Store does not take a cut of your sales.** Your contract is a fixed setup fee + one-time
+yearly platform fee — not a monthly subscription. Payment provider fees (2-3.5% per transaction) go
+directly from your customer to your payment gateway — not through us.
 
 ### Can I use Stripe?
 
@@ -152,13 +152,14 @@ self-serve subscription with a public price list. Pricing depends on:
 
 **How to get a real quote:** [contact us](mailto:hello@forcemediakw.com) with a short description
 of your business. We'll send a custom proposal within 2-3 business days. Most Kuwait SMBs land in
-the **[setup fee 500-1,000 KWD] + [monthly 50-150 KWD]** range, but every contract is custom.
+the **[setup fee 500-1,000 KWD] + [annual platform fee 50-150 KWD/mo equivalent]** range, but every
+contract is custom.
 
 **No hidden fees:** the proposal you sign is the price you pay. Payment provider fees
 (Tap/MyFatoorah/Hesabe/UPayments charge 2-3.5% per transaction) go directly to your gateway —
 Force AI Store doesn't take a cut.
 
-Annual prepay typically saves 2 months of fees.
+The annual rate already includes 2 months free vs. the monthly-equivalent rate.
 
 ### Are there any hidden fees?
 
@@ -192,7 +193,8 @@ We'll send an updated proposal for the additions; the change applies the same bi
 
 ### Do you offer discounts?
 
-- **Annual prepay:** typically save ~2 months of monthly fees if you prepay 12 months
+- **Included in the annual rate:** ~2 months free vs. the monthly-equivalent rate, baked into
+  every annual quote
 - **Migration discount:** if you're migrating from another platform — ask us for the switcher
   discount during your proposal call
 - **Multiple stores:** discounts for clients running 2+ stores under one account
@@ -395,9 +397,10 @@ Arabic + English).
 
 ### Can I cancel anytime?
 
-Yes. Cancel from the admin → Settings → Billing → Cancel subscription. You keep access until the
-end of your current billing period. We delete your store data 30 days after cancellation
-(configurable — contact us if you need it kept longer).
+Yes — per your contract's cancellation terms. Contact your Force AI account manager (email or
+WhatsApp) to cancel; there's no self-serve billing dashboard since every contract is custom. You
+keep access until the end of your current billing period. We delete your store data 30 days after
+cancellation (configurable — contact us if you need it kept longer).
 
 ---
 
@@ -406,7 +409,7 @@ end of your current billing period. We delete your store data 30 days after canc
 ### What's your tech stack?
 
 - **Backend:** Express.js + Prisma + PostgreSQL (Neon serverless)
-- **Frontend:** Next.js 16 (App Router) on Vercel
+- **Frontend:** Next.js 16 (App Router) on Cloudflare Workers
 - **Storage:** Cloudflare R2 (S3-compatible)
 - **Async jobs:** Inngest
 - **AI:** our AI engine (for translation, SEO, categorization, and WhatsApp bot intelligence)
@@ -418,7 +421,7 @@ reliable, well-supported tools so you don't have to think about them.
 
 ### Do you have an API?
 
-Internal API exists; public-facing API is on the roadmap (currently used by our Vercel storefronts
+Internal API exists; public-facing API is on the roadmap (currently used by our own storefronts
 only). If you have a specific integration need, contact us.
 
 ### Is the code open source?

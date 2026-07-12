@@ -96,6 +96,6 @@ for r in force-website-builder whatsapp-broadcaster Force-Media-CRM; do
 done
 ```
 
-> Tiers: Neon Pro · Vercel + Railway Hobby ($10 cap) · GitHub Pro (3000 Actions min/mo).
+> Tiers: Neon Pro · Cloudflare Workers + Railway Hobby ($10 cap) · GitHub Pro (3000 Actions min/mo).
 > Cloud fallback (`USE_SELF_HOSTED=false`) is genuinely cheap on these tiers — self-hosted is a
 > cost optimization, not a hard requirement, so prefer flipping to cloud over fighting a sick box.

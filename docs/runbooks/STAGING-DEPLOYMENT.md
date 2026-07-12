@@ -1,5 +1,14 @@
 # Staging deployment + promotion flow
 
+> **SUPERSEDED (2026-07).** This runbook describes the Vercel-dashboard-based staging
+> flow from 2026-05-27. The frontends (`apps/web`, `apps/admin`, `apps/orders`) have
+> since fully migrated off Vercel to Cloudflare Workers (`cf-deploy.yml`, deploys on
+> every push to `main` — see `docs/DEPLOYMENT.md`). Per `docs/DEPLOYMENT.md`
+> ("Environments & staging posture", current as of 2026-07-10), **there is no
+> separate staging Railway/Cloudflare environment today** — PR previews are
+> non-functional-by-default instead. Treat everything below as historical context
+> for the reasoning, not as the current deploy procedure.
+
 > Status: **LIVE since 2026-05-27 afternoon.** Ahmad completed the Railway +
 > Vercel dashboard flips; staging now tracks the `staging` branch and prod
 > tracks `main`. All work goes feature → staging → main via PR promotion.

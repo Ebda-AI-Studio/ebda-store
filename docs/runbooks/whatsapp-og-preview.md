@@ -81,7 +81,7 @@ but subsequent pastes of the same URL show the cached version for hours.
 
 ### After a logo/OG image change in Admin
 
-1. Deploy the change (Vercel auto-deploy on push to `main`).
+1. Deploy the change (`cf-deploy.yml` auto-deploys the storefront Worker on push to `main`).
 2. Paste `https://your-store.com/opengraph-image` in a browser tab — verify the
    new logo appears.
 3. Use the Facebook Sharing Debugger to scrape the store's homepage URL. This
@@ -90,16 +90,11 @@ but subsequent pastes of the same URL show the cached version for hours.
 
 ### Cache busting for the generated card
 
-The `/opengraph-image` route is cached by Next.js and Vercel's CDN. If you need
-to force-refresh the generated card after a brand color or logo change:
-
-```bash
-# Using Vercel CLI — purge cache for the OG image route
-vercel --prod -- purge /opengraph-image
-```
-
-Or via the Facebook Sharing Debugger "Scrape Again" button — WhatsApp reads from
-Facebook's scrape cache and this forces a re-fetch from the origin.
+The `/opengraph-image` route is cached by Next.js and Cloudflare's edge cache. If you need
+to force-refresh the generated card after a brand color or logo change, purge the URL from
+the Cloudflare dashboard (Caching → Configuration → Custom Purge) or via the Facebook Sharing
+Debugger "Scrape Again" button — WhatsApp reads from Facebook's scrape cache and this forces a
+re-fetch from the origin.
 
 ---
 

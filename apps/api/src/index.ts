@@ -156,7 +156,7 @@ app.use(
       // is set, which does not block non-browser clients.
       if (!origin) return callback(null, false);
 
-      // Platform origins (storefront / admin / vercel previews / localhost) —
+      // Platform origins (storefront / admin / Cloudflare Workers previews / localhost) —
       // single source of truth shared with the CSRF middleware so the two
       // can never drift. Custom merchant domains fall through to the DB
       // lookup below; they're CORS-allowed but the CSRF token check

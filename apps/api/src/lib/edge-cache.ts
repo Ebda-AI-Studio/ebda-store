@@ -1,7 +1,7 @@
 import type { Response } from 'express';
 
 /**
- * Apply CDN-friendly Cache-Control + Vary headers so Vercel's edge
+ * Apply CDN-friendly Cache-Control + Vary headers so the CDN's edge
  * caches public read responses. Most storefront reads are tenant-scoped
  * via path or `x-store-id` header — we Vary on `x-store-id` so two
  * tenants don't collide on the same cache key, plus Accept-Language
@@ -15,7 +15,7 @@ import type { Response } from 'express';
  * roughly `sMaxAge` because the API also calls `invalidateCached(...)`
  * on writes (Redis L1 layer); the edge L2 just respects the TTL.
  *
- * Don't apply to authenticated reads — Vercel won't cache responses
+ * Don't apply to authenticated reads — the CDN won't cache responses
  * with `Cache-Control: private` or with cookies. Public reads only.
  */
 export function setEdgeCache(
@@ -32,7 +32,7 @@ export function setEdgeCache(
 ): void {
   const swr = opts.staleWhileRevalidate ?? opts.sMaxAge * 5;
   res.setHeader('Cache-Control', `public, s-maxage=${opts.sMaxAge}, stale-while-revalidate=${swr}`);
-  // Vercel edge respects Vary; combine our default with any caller-supplied tokens.
+  // The CDN edge respects Vary; combine our default with any caller-supplied tokens.
   const vary = ['x-store-id', ...(opts.varyOn ?? [])];
   res.setHeader('Vary', vary.join(', '));
 }

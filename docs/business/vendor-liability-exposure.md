@@ -41,7 +41,7 @@ DPA exists at [railway.com/legal/dpa](https://railway.com/legal/dpa) (per search
 ### Cloudflare
 
 [cloudflare.com/terms/](https://www.cloudflare.com/terms/), Self-Serve Subscription Agreement, effective **2025-09-12**: aggregate liability capped at amounts paid **in the 12 months prior to the claim**. The important nuance for FWB: **§2.6 zeroes out liability entirely for any "Free Services"** — "WE WILL HAVE NO LIABILITY FOR ANY HARM OR DAMAGE ARISING OUT OF OR IN CONNECTION WITH ANY FREE SERVICES." If any of FWB's Workers/R2/DNS usage sits on a free-tier product (as opposed to paid Workers/R2 usage), that specific product line carries **zero contractual liability**, not just a low one. **Action item: enumerate which Cloudflare products FWB actually pays for vs. uses on free tier, since the free-tier carve-out is a materially different (worse) risk posture than the 12-month-fees cap.**
-This is the Self-Serve agreement; Cloudflare also offers Enterprise terms with negotiated SLAs and typically higher/different caps — not confirmed whether applicable here (Force AI's Vercel Pro/Cloudflare relationship per user memory suggests self-serve paid tiers, not an Enterprise contract, but this should be confirmed against the actual CF account).
+This is the Self-Serve agreement; Cloudflare also offers Enterprise terms with negotiated SLAs and typically higher/different caps — not confirmed whether applicable here (Force AI's Cloudflare relationship per user memory suggests self-serve paid tiers, not an Enterprise contract, but this should be confirmed against the actual CF account).
 
 ### Resend
 

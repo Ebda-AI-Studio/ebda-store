@@ -107,7 +107,7 @@ Visual: 5-6 phone/laptop mockups in a tight grid.
   - **Wady Aljuz** (food/grocery): 235 products, 8 categories, KWD ~5,000 GMV/mo
   - **Palora** (lifestyle): bilingual, mobile-first
 - **Codebase:** 1,158 files, 79 database models, 30 async background jobs, 5 themes
-- **Infrastructure:** Vercel Pro + Neon Launch (paid), 99.9% uptime since launch
+- **Infrastructure:** Cloudflare Workers + Neon Launch (paid), 99.9% uptime since launch
 - **Zero security vulnerabilities** at every npm audit severity (verified 2026-06-15)
 - **Comprehensive audit completed** (security, performance, infrastructure, business) — see
   internal `docs/audits/`
@@ -127,7 +127,7 @@ How it works:
 
 1. Client comes to Force AI / Force Media
 2. Sees the feature catalog, picks what they need
-3. Force AI sends a custom proposal (setup fee + monthly platform fee + addon features)
+3. Force AI sends a custom proposal (setup fee + one-time yearly platform fee + addon features)
 4. Client signs + pays
 5. Force AI does the onboarding personally — brand setup, catalog import, theme config, training
    session
@@ -186,7 +186,7 @@ Visual: Kuwait market funnel → SMB segment → Force AI Store's wedge.
 | ------------------------------------ | ------------------------------------------------------------ | --------------------------------------------------------- |
 | Bilingual content already translated | 0 (we import existing content)                               | High (other platforms need re-translation or a paid app)  |
 | KNET integration                     | 0 (we configure for them)                                    | Medium (third-party plugin setup + testing)               |
-| Custom domain                        | 0 (we provision via Vercel API)                              | 0                                                         |
+| Custom domain                        | 0 (we provision via Cloudflare-for-SaaS)                     | 0                                                         |
 | Product data export                  | 0 (CSV / Excel export)                                       | 0                                                         |
 | Storefront design                    | Low (5 themes to pick from)                                  | 0                                                         |
 | WhatsApp DM ordering bot             | 0 (baseline-included; live ordering needs a WABA activation) | High (no equivalent exists on other Gulf platforms)       |

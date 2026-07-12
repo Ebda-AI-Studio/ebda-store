@@ -10,7 +10,7 @@ updated: 2026-05-24
 **Pre-conditions:**
 
 - Preview/staging admin at `https://<preview-admin-domain>/`
-- A spare custom domain for testing (e.g. `uat-test-store.forcemediakw.com` — a real DNS record pointing at Vercel's preview, OR any slug-based access)
+- A spare custom domain for testing (e.g. `uat-test-store.forcemediakw.com` — a real DNS record pointing at the Cloudflare Workers preview, OR any slug-based access)
 - Cloudflare R2 staging bucket accessible for logo upload
 - Test store from a previous run deleted (or use a fresh slug)
 

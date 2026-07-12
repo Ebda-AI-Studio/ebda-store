@@ -65,7 +65,7 @@ rules: [
 ],
 ```
 
-> **Note:** As of 2026, many training scrapers ignore `robots.txt` or spoof User-Agents. `robots.txt` directives are a policy declaration, not enforcement. For real blocking, use Cloudflare WAF or Vercel Edge Middleware rate-limiting by IP range.
+> **Note:** As of 2026, many training scrapers ignore `robots.txt` or spoof User-Agents. `robots.txt` directives are a policy declaration, not enforcement. For real blocking, use Cloudflare WAF rate-limiting by IP range.
 
 ---
 

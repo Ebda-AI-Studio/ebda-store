@@ -46,24 +46,12 @@ export function isPlatformOrigin(
   if (origin === 'https://orders.forcemediakw.com') return true;
 
   // force-ai.co platform origins — the 2026-06 domain rebrand (Vercel→Cloudflare
-  // migration). Added AHEAD of the DNS cutover so CORS/CSRF are ready the moment
-  // the frontends move; harmless until those subdomains resolve. Mirror of the
+  // migration, completed 2026-07; Vercel is fully decommissioned). Mirror of the
   // forcemediakw.com platform origins above. (whatsapp[-api].force-ai.co belong
   // to the WhatsApp Bulk Sender — a different API — so they are NOT listed here.)
   if (origin === 'https://store.force-ai.co') return true;
   if (origin === 'https://admin.force-ai.co') return true;
   if (origin === 'https://orders.force-ai.co') return true;
-
-  // Vercel preview / production deployments for the project (strict
-  // prefix match, same regex as the CORS handler).
-  if (
-    origin.endsWith('.vercel.app') &&
-    (/^https:\/\/force-web(-[a-z0-9]+)?\.vercel\.app$/.test(origin) ||
-      /^https:\/\/force-admin(-[a-z0-9]+)?\.vercel\.app$/.test(origin) ||
-      /^https:\/\/force-orders(-[a-z0-9]+)?\.vercel\.app$/.test(origin))
-  ) {
-    return true;
-  }
 
   // Cloudflare Workers preview deploys for the project (OpenNext migration).
   // SCOPED to OUR account subdomain + our worker names — NOT any *.workers.dev,

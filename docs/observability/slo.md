@@ -23,26 +23,26 @@ Monitoring stack: **Sentry** (error budgets, latency sampling) · **UptimeRobot*
 
 ---
 
-## 2. admin — Next.js (Vercel)
+## 2. admin — Next.js (Cloudflare Workers)
 
-| SLO                             | Target                    | Error Budget (30 days)                       | Measurement                           |
-| ------------------------------- | ------------------------- | -------------------------------------------- | ------------------------------------- |
-| Availability (Vercel edge)      | **99.9 %**                | 43 min / month downtime                      | UptimeRobot on `app.forcemediakw.com` |
-| Core Web Vitals — LCP (desktop) | **< 2.5 s**               | Lighthouse CI nightly job · Vercel Analytics |
-| Core Web Vitals — CLS           | **< 0.1**                 | Same                                         |
-| JS error rate                   | **< 0.1 %** of page loads | Sentry `NEXT_PUBLIC_SENTRY_DSN` capture      |
+| SLO                             | Target                    | Error Budget (30 days)                               | Measurement                        |
+| ------------------------------- | ------------------------- | ---------------------------------------------------- | ---------------------------------- |
+| Availability (Cloudflare edge)  | **99.9 %**                | 43 min / month downtime                              | UptimeRobot on `admin.force-ai.co` |
+| Core Web Vitals — LCP (desktop) | **< 2.5 s**               | Lighthouse CI nightly job · Cloudflare Web Analytics |
+| Core Web Vitals — CLS           | **< 0.1**                 | Same                                                 |
+| JS error rate                   | **< 0.1 %** of page loads | Sentry `NEXT_PUBLIC_SENTRY_DSN_ADMIN` capture        |
 
 ---
 
-## 3. web (storefront) — Next.js (Vercel)
+## 3. web (storefront) — Next.js (Cloudflare Workers)
 
-| SLO                            | Target       | Error Budget (30 days)                              | Measurement                        |
-| ------------------------------ | ------------ | --------------------------------------------------- | ---------------------------------- |
-| Availability (Vercel edge)     | **99.9 %**   | 43 min / month downtime                             | UptimeRobot on per-tenant root URL |
-| Core Web Vitals — LCP (mobile) | **< 2.5 s**  | Lighthouse CI nightly · Vercel Real User Monitoring |
-| Core Web Vitals — CLS          | **< 0.1**    | Same                                                |
-| Time to First Byte (TTFB)      | **< 200 ms** | Vercel Analytics p75 TTFB (ISR/SSR pages)           |
-| JS error rate                  | **< 0.1 %**  | Sentry storefront capture                           |
+| SLO                            | Target       | Error Budget (30 days)                            | Measurement                        |
+| ------------------------------ | ------------ | ------------------------------------------------- | ---------------------------------- |
+| Availability (Cloudflare edge) | **99.9 %**   | 43 min / month downtime                           | UptimeRobot on per-tenant root URL |
+| Core Web Vitals — LCP (mobile) | **< 2.5 s**  | Lighthouse CI nightly · Cloudflare Web Analytics  |
+| Core Web Vitals — CLS          | **< 0.1**    | Same                                              |
+| Time to First Byte (TTFB)      | **< 200 ms** | Cloudflare Web Analytics p75 TTFB (ISR/SSR pages) |
+| JS error rate                  | **< 0.1 %**  | Sentry `NEXT_PUBLIC_SENTRY_DSN_WEB` capture       |
 
 ---
 
@@ -81,4 +81,4 @@ Override with `OTEL_TRACES_SAMPLER=always_on` for debugging a specific incident.
 - **Rollback procedure:** `docs/ROLLBACK.md`
 - **Alerting bridge:** `apps/api/src/services/alerts.service.ts` (Telegram)
 - **UptimeRobot:** configured in `docs/runbooks/` per Ahmad's account
-- **Sentry DSN:** set via `SENTRY_DSN` Railway env var (API) and `NEXT_PUBLIC_SENTRY_DSN` Vercel env var (admin/web)
+- **Sentry DSN:** set via `SENTRY_DSN` Railway env var (API) and `NEXT_PUBLIC_SENTRY_DSN_ADMIN` / `NEXT_PUBLIC_SENTRY_DSN_WEB` GitHub repo variables, passed to the Cloudflare Workers build (admin/web) — see `docs/ENVIRONMENT.md`

@@ -164,9 +164,9 @@ GitHub matches when ALL listed labels are present, so the workflow lands on the 
 
 With Docker installed in WSL2, postgres and redis service containers work on the self-hosted runner.
 Flip lint / typecheck / audit / gitleaks / **integration tests** to self-hosted. Keep on `ubuntu-latest`:
-deploys (`railway up`, `vercel deploy`, `gh release create`), npm publish, Telegram `notify-failure`
+deploys (`railway up`, `wrangler deploy`, `gh release create`), npm publish, Telegram `notify-failure`
 (must survive runner-offline), and any job that exfiltrates via a third-party token (Sentry release
-upload, OneSignal admin push, Resend API key, Vercel API). Playwright/E2E: conservative default —
+upload, OneSignal admin push, Resend API key, Cloudflare API token). Playwright/E2E: conservative default —
 keep on cloud until browser download is verified inside WSL2 (decide per repo).
 
 ```yaml
@@ -184,7 +184,7 @@ jobs:
   e2e:
     runs-on: ubuntu-latest # playwright install downloads browsers; leave on cloud for now
   deploy:
-    runs-on: ubuntu-latest # token-exfil (RAILWAY_TOKEN / VERCEL_TOKEN) — stays on cloud
+    runs-on: ubuntu-latest # token-exfil (RAILWAY_TOKEN / CLOUDFLARE_API_TOKEN) — stays on cloud
   notify-failure:
     runs-on: ubuntu-latest # must fire even when self-hosted runner is offline
 ```

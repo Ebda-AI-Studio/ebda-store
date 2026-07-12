@@ -24,7 +24,7 @@ Per Ahmad's standing 2026-05-22 description:
    - Brand assets (logo, colors, fonts, hero images)
    - Excel file with categories, product names + AR translations, descriptions + AR translations,
      prices, images
-   - Domain (or you provision via Vercel)
+   - Domain (or you provision via Cloudflare-for-SaaS)
    - Payment provider setup (Tap/MyFatoorah/Hesabe/UPayments account creation if needed)
 6. **You enable features via super_admin** — flip the per-store flags in `StoreFeature` for
    whatever the client signed and paid for
@@ -65,8 +65,9 @@ under ~$40/mo is unprofitable. At 100 merchants, $9/mo is the floor.
 
 - **Setup fee** (one-off) — your time onboarding the client (data import, branding setup, theme
   configuration, training). Recommended: 200-1000 KWD depending on complexity.
-- **Monthly platform fee** — covers infra + ongoing support + AI quotas + new features as they
-  ship. Recommended: above the loaded cost floor + your margin.
+- **Annual platform fee** (one-time yearly charge, quoted at a monthly-equivalent rate) — covers
+  infra + ongoing support + AI quotas + new features as they ship. Recommended: above the loaded
+  cost floor + your margin.
 
 ### 2b. INTERNAL — Market reference benchmarks (NEVER shown to clients)
 
@@ -113,24 +114,24 @@ Also included in every tier at no extra charge:
 
 #### Professional plan — Starter + the following
 
-| Feature group                                                       | What to say in the proposal                                                  | Incremental price band vs Starter      |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------- |
-| `loyalty`                                                           | "Customer loyalty program — points, tiers, rewards"                          | Setup: 100-300 KWD + Monthly: 5-15 KWD |
-| `push_notifications`                                                | "Web push to opt-in customers"                                               | Setup: 50-100 KWD + Monthly: 2-8 KWD   |
-| `upsell_crosssell`                                                  | "AI-driven product recommendations + bundles"                                | Setup: 50-100 KWD + Monthly: 3-10 KWD  |
-| `inventory.stock_alerts`                                            | "Auto-email when stock drops below your threshold"                           | Included in Professional               |
-| `inventory.backorder`                                               | "Accept orders for out-of-stock products, queue for fulfillment"             | Included in Professional               |
-| `accounting.basic` + `accounting.expenses` + `accounting.invoicing` | "Full Chart of Accounts, journal, P&L, expenses, Kuwait-compliant invoicing" | Included in Professional               |
+| Feature group                                                       | What to say in the proposal                                                  | Incremental price band vs Starter               |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| `loyalty`                                                           | "Customer loyalty program — points, tiers, rewards"                          | Setup: 100-300 KWD + Annual: 5-15 KWD/mo equiv. |
+| `push_notifications`                                                | "Web push to opt-in customers"                                               | Setup: 50-100 KWD + Annual: 2-8 KWD/mo equiv.   |
+| `upsell_crosssell`                                                  | "AI-driven product recommendations + bundles"                                | Setup: 50-100 KWD + Annual: 3-10 KWD/mo equiv.  |
+| `inventory.stock_alerts`                                            | "Auto-email when stock drops below your threshold"                           | Included in Professional                        |
+| `inventory.backorder`                                               | "Accept orders for out-of-stock products, queue for fulfillment"             | Included in Professional                        |
+| `accounting.basic` + `accounting.expenses` + `accounting.invoicing` | "Full Chart of Accounts, journal, P&L, expenses, Kuwait-compliant invoicing" | Included in Professional                        |
 
 #### Enterprise plan — Professional + the following
 
-| Feature group                                                                                                   | What to say in the proposal                                                                                                         | Incremental price band vs Professional                  |
-| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `affiliate`                                                                                                     | "Affiliate program — let influencers earn % per sale, track commissions"                                                            | Setup: 100-200 KWD + Monthly: 5-10 KWD                  |
-| `sms`                                                                                                           | "Order updates via SMS (Kuwait carriers)"                                                                                           | Setup: 50-150 KWD + Monthly: 3-10 KWD + SMS-per-message |
-| `floating_widget`                                                                                               | "Sticky WhatsApp/Instagram/music button on every storefront page"                                                                   | Setup: 50-100 KWD + Monthly: 2-8 KWD                    |
-| `inventory.multi_warehouse`, `inventory.barcode`, `inventory.purchase_orders`, `inventory.bulk_adjustments`     | "Full warehouse management — barcode scanning (receive/pick/cycle-count), multi-location stock, PO workflow"                        | Included in Enterprise                                  |
-| `accounting.tax_reports`, `accounting.multi_currency`, `accounting.profit_anomaly`, `accounting.bank_reconcile` | "Advanced accounting: VAT/tax reports (XLSX), multi-currency FX + KWD conversion, profit anomaly AI, bank reconciliation (CSV/OFX)" | Included in Enterprise                                  |
+| Feature group                                                                                                   | What to say in the proposal                                                                                                         | Incremental price band vs Professional                           |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `affiliate`                                                                                                     | "Affiliate program — let influencers earn % per sale, track commissions"                                                            | Setup: 100-200 KWD + Annual: 5-10 KWD/mo equiv.                  |
+| `sms`                                                                                                           | "Order updates via SMS (Kuwait carriers)"                                                                                           | Setup: 50-150 KWD + Annual: 3-10 KWD/mo equiv. + SMS-per-message |
+| `floating_widget`                                                                                               | "Sticky WhatsApp/Instagram/music button on every storefront page"                                                                   | Setup: 50-100 KWD + Annual: 2-8 KWD/mo equiv.                    |
+| `inventory.multi_warehouse`, `inventory.barcode`, `inventory.purchase_orders`, `inventory.bulk_adjustments`     | "Full warehouse management — barcode scanning (receive/pick/cycle-count), multi-location stock, PO workflow"                        | Included in Enterprise                                           |
+| `accounting.tax_reports`, `accounting.multi_currency`, `accounting.profit_anomaly`, `accounting.bank_reconcile` | "Advanced accounting: VAT/tax reports (XLSX), multi-currency FX + KWD conversion, profit anomaly AI, bank reconciliation (CSV/OFX)" | Included in Enterprise                                           |
 
 > **`whatsapp` admin access is baseline-included on every plan (Starter, Professional, Enterprise —
 > even the `free` grace state).** Per `packages/shared/src/plan-baselines.ts`, `whatsapp` is in
@@ -142,7 +143,7 @@ Also included in every tier at no extra charge:
 > **What you still charge for is the activation SERVICE, not the feature gate.** Turning on live
 > WhatsApp ordering requires an active Force AI WhatsApp Business Platform account + a
 > Meta-approved WABA connected to the store — real setup work (Meta review, catalog provisioning,
-> phone-number linking) worth quoting: Setup 150-300 KWD + Monthly 10-25 KWD. Bot intelligence
+> phone-number linking) worth quoting: Setup 150-300 KWD + Annual 10-25 KWD/mo equiv. Bot intelligence
 > (NLU, voice, photo matching, returning-customer personalization) is included in that activation
 > at no extra charge — the platform absorbs the AI cost.
 
@@ -175,7 +176,7 @@ base.
 | ------------------------------------------------------------ | ------------------------------------------------------ |
 | Custom payment provider integration (beyond the 4 supported) | Custom quote — 1500+ KWD setup                         |
 | Custom storefront design (outside the 5 themes)              | Custom quote — usually decline or refer to Force Media |
-| API access for client's external systems                     | Custom quote — 500+ KWD setup + monthly access fee     |
+| API access for client's external systems                     | Custom quote — 500+ KWD setup + annual access fee      |
 | Multi-store under one account                                | Custom quote — pre-codebase support, 2000+ KWD setup   |
 
 Custom dev requests are where Force AI margin is highest BUT also where scope creep risk is
@@ -195,7 +196,7 @@ part of the onboarding service:
 What Force AI Store charges the merchant:
 
 - One-off setup fee (your time onboarding)
-- Monthly platform fee (recurring)
+- Annual platform fee (one-time yearly charge)
 - Optional add-ons (paid per feature unlocked)
 
 The merchant pays payment provider fees (2-3.5% per transaction) directly to
@@ -209,7 +210,8 @@ standpoint and the merchant keeps 100% of every sale (minus what their gateway c
 - **Kuwait merchants negotiate.** Expect 10-30% pushback on first quote. Build that into your
   initial number.
 - **Round numbers anchor better** (50, 100, 250, 500, 1000 KWD) than precise ones (47, 113, 287)
-- **Annual prepay discount is expected** — typical 10-20% off if they prepay 12 months
+- **A discount off the initial annual quote is expected** — typical 10-20% off the first number
+  you give (there's no separate "monthly vs. annual" negotiation — the fee is annual by default)
 - **Q4 / Ramadan** (peak shopping seasons) — merchants are more price-sensitive at quote time but
   less likely to churn after launch
 - **Bilingual proposals** — if the client speaks Arabic, send the proposal in both languages. Force
@@ -230,7 +232,7 @@ Setup fee: 500 KWD (one-off)
   - Custom domain provisioning
   - 1-hour live training session
 
-Monthly platform fee: 50 KWD/mo
+Annual platform fee: 50 KWD/mo equivalent (billed as one yearly payment)
   - Hosting, bandwidth, SSL
   - All Band 1 (core) features
   - Bilingual AI translation (within quota)
@@ -239,7 +241,7 @@ Monthly platform fee: 50 KWD/mo
   - Updates + new features as we ship them
   - 3 staff accounts
 
-Annual prepay discount: 2 months free (effectively 17% off)
+Built into the annual rate: 2 months free vs. the monthly-equivalent rate (effectively 17% off)
 Annual total: 1100 KWD (500 setup + 600 / 12 mo @ 50)
 ```
 
@@ -253,7 +255,7 @@ Setup fee: 1000 KWD (one-off)
   - + Affiliate program setup
   - + 2-hour live training session
 
-Monthly platform fee: 100 KWD/mo
+Annual platform fee: 100 KWD/mo equivalent (billed as one yearly payment)
   - Everything in Basic
   - + WhatsApp order notifications
   - + Loyalty program
@@ -263,7 +265,7 @@ Monthly platform fee: 100 KWD/mo
   - Priority support (email + WhatsApp, 4hr response)
   - 10 staff accounts
 
-Annual prepay discount: 2 months free
+Built into the annual rate: 2 months free vs. the monthly-equivalent rate
 Annual total: 2200 KWD (1000 setup + 1200 / 12 mo @ 100)
 ```
 
@@ -272,7 +274,7 @@ Annual total: 2200 KWD (1000 setup + 1200 / 12 mo @ 100)
 Each enterprise prospect gets a fully custom contract. Typical contract value:
 
 - Setup: 2000-5000+ KWD (white-label, custom integrations, dedicated infrastructure setup)
-- Monthly: 250-500+ KWD (multi-store, dedicated support, SLA, white-label)
+- Annual: 250-500+ KWD/mo equiv. (multi-store, dedicated support, SLA, white-label)
 
 **Do not publish enterprise pricing.** Negotiate based on the client's specific needs + alternatives.
 
@@ -284,10 +286,10 @@ Each enterprise prospect gets a fully custom contract. Typical contract value:
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | "Platform X is only $39/mo"                            | "That's the subscription line item. Add a translation app, a KNET plugin, WhatsApp notifications, and someone to set it up — you're at $80-150/mo, fully unmanaged. We deliver all of that in one bill, fully configured."                                                                                                                                                                                                                                        |
 | "Another platform is cheaper"                          | "A lower monthly line item often means more add-ons and more of your time managing them. We include AI translation, KNET, WhatsApp, accounting, and full inventory in the platform — compare the full basket, not the subscription fee."                                                                                                                                                                                                                          |
-| "Can I do month-to-month?"                             | "Yes, but we offer 2 months free on annual prepay — most clients pick that. Month-to-month is fine for the first 3 months while you decide."                                                                                                                                                                                                                                                                                                                      |
+| "Can I do month-to-month?"                             | "No — Force AI Store is sold as a one-time yearly fee, not a monthly subscription. That's part of what keeps this a managed-agency engagement instead of a self-serve SaaS tier."                                                                                                                                                                                                                                                                                 |
 | "What if I want to leave?"                             | "Your data is yours. We export everything as CSV/Excel. Your custom domain transfers back to your registrar. We give you 30 days of read-only access after cancellation to download anything you need."                                                                                                                                                                                                                                                           |
 | "What about my customer reviews / orders / customers?" | "All exportable. We use standard formats — you can import them into any other platform."                                                                                                                                                                                                                                                                                                                                                                          |
-| "Why do I need an annual contract?"                    | "You don't — we offer monthly too. The annual contract saves you 2 months of fees and locks in your current pricing if our rates change."                                                                                                                                                                                                                                                                                                                         |
+| "Why do I need an annual contract?"                    | "It's the model, not an upsell — Force AI Store is sold as a one-time yearly fee per client, so the contract term is annual and locks in your pricing for the year."                                                                                                                                                                                                                                                                                              |
 | "How do I know you can hold the 99.5% uptime SLA?"     | Walk them through §6.5 below: CI-gated pushes (pre-push hook + GitHub Actions CI must pass before code reaches production); daily local pg_dump backups (30-day retention) so any deploy can be rolled back with a pg_restore in <30min; Inngest functions self-register on boot so post-deploy job queues never stall; Telegram + watchdog alert pipeline pages on any main-branch CI failure within 17min. Offer to share `docs/ROLLBACK.md` for them to audit. |
 | "What happens if there's an outage?"                   | "We get paged automatically — the Telegram alert hits within minutes of any main-branch CI failure or service health degradation. For a critical-severity incident we have a 4h response SLA and a tested rollback procedure that reverts the bad deploy + restores the previous database backup in <5min. The SLA carries a credit (1 day of service term extension per excess downtime hour, capped at 30/year)."                                               |
 
@@ -308,8 +310,8 @@ Before sending a proposal:
 - [ ] Identify any Band 3 white-glove services they need (catalog import, photoshoot, branding)
 - [ ] Identify any Band 4 custom dev — if yes, fixed-scope contract addendum
 - [ ] Setup fee = ABOVE your time cost + reasonable margin
-- [ ] Monthly fee = ABOVE the loaded cost floor (currently ~$40 USD / 12 KWD at small scale)
-- [ ] Annual prepay discount included (2 months free)
+- [ ] Annual fee's monthly-equivalent rate = ABOVE the loaded cost floor (currently ~$40 USD / 12 KWD at small scale)
+- [ ] Annual-rate discount reflected in the quote (2 months free vs. monthly-equivalent rate)
 - [ ] Contract terms: deposit %, completion %, cancellation policy, data export commitment
 - [ ] Bilingual proposal if client speaks Arabic
 
@@ -351,9 +353,9 @@ audit:
 
 | SLA clause                              | Backing infrastructure                                                                                                                                                                                                                                                                                                         |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 99.5% monthly uptime                    | CI-gated pushes (pre-push hook + GitHub Actions must pass before code reaches production) · Railway + Vercel auto-deploys gated by CI green · Inngest functions self-register on boot so post-deploy job queues don't stall (`apps/api/src/index.ts` self-PUT to `/api/v1/inngest` 3s after listen)                            |
+| 99.5% monthly uptime                    | CI-gated pushes (pre-push hook + GitHub Actions must pass before code reaches production) · Railway + Cloudflare Workers deploys gated by CI green · Inngest functions self-register on boot so post-deploy job queues don't stall (`apps/api/src/index.ts` self-PUT to `/api/v1/inngest` 3s after listen)                     |
 | 24h support response                    | Telegram alert pipeline fires on every main-branch CI failure with branch / sha / commit title / author / failed jobs in one message · cross-repo watchdog re-pages every 2h until acknowledged · Uptime monitor + alert bridge on critical endpoints                                                                          |
-| 4h critical response                    | Auto-fix watchdog detects red main within 17min · Telegram + email dual channel · `scripts/rollback.sh` reverts the bad deploy + redeploys Vercel + Railway in <5min                                                                                                                                                           |
+| 4h critical response                    | Auto-fix watchdog detects red main within 17min · Telegram + email dual channel · `scripts/rollback.sh` reverts the bad deploy + redeploys Cloudflare Workers + Railway in <5min                                                                                                                                               |
 | Daily backups + 30-day retention        | Daily local `pg_dump` via launchd `com.forceai.neon-backup` (3:30am, 30-day rotation at `~/Desktop/projects/_backups/force-website-builder/`) · `scripts/backup-db.sh` for on-demand dumps · `docs/ROLLBACK.md` §C documents the pg_restore procedure                                                                          |
 | Kuwait Law 13/2023 Data Processor split | `/auth/me/erase` + `/auth/me/export` endpoints actually implemented · 72h breach notification path via alert bridge · per-store tenant isolation via RLS (`apps/api/src/middleware/tenant-context.ts`)                                                                                                                         |
 | Payment auditability (dispute-proof)    | Append-only `payment_events` table records every payment-status transition + raw provider webhook payload (`apps/api/src/services/payment-event.service.ts`) · `GET /api/v1/payments/:id/events` returns the full lifecycle · 6-month-later dispute can be reconstructed with proof from Tap / MyFatoorah / Hesabe / UPayments |
