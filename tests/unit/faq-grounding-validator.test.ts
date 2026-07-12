@@ -17,7 +17,6 @@ const sizedProduct = {
   name: 'PB Dragee Pecan Caramel',
   nameAr: 'بي بي دراجيه بيكان كراميل',
   description: 'Roasted pecans in a peanut-butter caramel shell.',
-  sku: '1003',
   options: [
     {
       name: 'Size',

@@ -172,7 +172,6 @@ const bulkAiProductFaqsFn = inngest.createFunction(
               name: true,
               nameAr: true,
               description: true,
-              sku: true,
               options: {
                 select: {
                   name: true,
@@ -224,7 +223,6 @@ const bulkAiProductFaqsFn = inngest.createFunction(
                         name: product.name,
                         nameAr: product.nameAr,
                         description: product.description,
-                        sku: product.sku,
                         options: product.options,
                       },
                       count: FAQS_PER_PRODUCT,

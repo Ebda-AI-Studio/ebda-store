@@ -553,7 +553,6 @@ router.post(
           nameAr: true,
           description: true,
           descriptionAr: true,
-          sku: true,
           options: {
             select: {
               name: true,
@@ -592,7 +591,6 @@ router.post(
               name: product.name,
               nameAr: product.nameAr,
               description: product.description,
-              sku: product.sku,
               options: product.options,
             },
             count,

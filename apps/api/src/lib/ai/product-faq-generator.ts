@@ -34,13 +34,15 @@ export interface GenerateProductFaqsInput {
     name: string;
     nameAr?: string | null;
     description?: string | null;
-    /** Stock keeping unit, when set — a safe concrete fact for the model. */
-    sku?: string | null;
     /**
      * Purchasable variant options (e.g. Size: 400 Gram / 700 Gram). These ARE
      * facts the model may use for size/weight/variant questions — without them
      * the model invents a single wrong figure (e.g. "200g") that contradicts
      * the options actually shown on the storefront.
+     *
+     * NOTE: the SKU is deliberately NOT fed to the prompt — it is an internal
+     * code of no value to a shopper, and feeding it invited pointless "how do I
+     * identify this product → SKU 1003" filler FAQs.
      */
     options?:
       | {
@@ -55,13 +57,13 @@ export interface GenerateProductFaqsInput {
 }
 
 /**
- * Render the concrete, verifiable product facts (SKU + purchasable variant
- * options) as a prompt block. Empty string when there are none, so the prompt
- * degrades to the name/description-only shape for simple products.
+ * Render the concrete, verifiable product facts (purchasable variant options)
+ * as a prompt block. Empty string when there are none, so the prompt degrades
+ * to the name/description-only shape for simple products. The SKU is
+ * intentionally excluded — see the input type note.
  */
 function buildProductFactsBlock(product: GenerateProductFaqsInput['product']): string {
   const lines: string[] = [];
-  if (product.sku) lines.push(`SKU: ${product.sku}`);
   const opts = (product.options ?? []).filter(o => o?.name && o.values?.length);
   for (const o of opts) {
     const vals = o.values.map(v => (v.valueAr ? `${v.value} / ${v.valueAr}` : v.value)).join(', ');
@@ -84,7 +86,13 @@ Store: ${storeName}
 Product: ${product.name}${product.nameAr ? ` / ${product.nameAr}` : ''}
 Description: ${product.description ?? '(no description provided)'}
 ${factsBlock}
-Draft exactly ${count} FAQ pairs that real customers would ask about this specific product.
+Draft UP TO ${count} FAQ pairs that a real shopper would genuinely ask about this specific product before buying it or while using it.
+
+QUESTION-SELECTION RULES — follow strictly:
+- Only include a FAQ that answers something a customer actually wonders about: sizing/fit, materials, shipping time, return policy, how to use, care instructions, compatibility. Pick the ones most relevant to THIS product.
+- Quality over quantity: if fewer than ${count} genuinely useful questions exist for this product, return FEWER. NEVER pad to the count with filler.
+- NEVER ask meta or operational questions about the product record itself — e.g. "how do I identify this product", "what is the product code/SKU", "does this product exist", "how do I find this on the site". Shoppers browse the store; they never order by an internal code.
+- NEVER mention an SKU, product code, internal ID, or database field in a question OR an answer.
 
 ACCURACY RULES — follow strictly:
 - Answer ONLY with facts explicitly present in the product name/description/options above, OR with general store policy that is always safe (shipping timeframes, returns, ordering). NEVER invent product specifics — do not state sizes, materials, ingredients, dimensions, weight, colours, capacity, or compatibility that are not written above. If a fact is not given, do not make one up: either ask a question you can answer safely, or skip that topic.

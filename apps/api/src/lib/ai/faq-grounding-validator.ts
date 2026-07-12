@@ -7,7 +7,7 @@
  * AFTER generation: it extracts measurement claims (a number paired with a
  * weight/volume/length unit) from each answer and drops any FAQ whose answer
  * states a measurement that does NOT appear in the product's known facts
- * (name / description / sku / variant options).
+ * (name / description / variant options).
  *
  * Scope is deliberately narrow + high-precision: only NUMBER+UNIT claims are
  * checked (the most common and most damaging invented spec). Quantities without
@@ -74,12 +74,7 @@ export function extractMeasurements(text: string): Set<string> {
 
 /** All measurement tokens the product legitimately supports (the allow-set). */
 function knownMeasurements(product: FaqProduct): Set<string> {
-  const parts: string[] = [
-    product.name,
-    product.nameAr ?? '',
-    product.description ?? '',
-    product.sku ?? '',
-  ];
+  const parts: string[] = [product.name, product.nameAr ?? '', product.description ?? ''];
   for (const o of product.options ?? []) {
     if (!o?.values) continue;
     for (const v of o.values) {
