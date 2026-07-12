@@ -14,6 +14,7 @@ import { getAuthUser } from '../utils/store-helpers';
 import { requireFeature } from '../middleware/feature-gate';
 import { featureService } from '../services/feature.service';
 import { bustCorsCache } from '../lib/cors-cache';
+import { invalidateCached } from '../lib/public-cache';
 import { auditLog } from '../middleware/security';
 import { isSafeUrl } from '@force/shared';
 import {
@@ -1309,6 +1310,15 @@ router.put(
       // Bust CORS cache so the new domain works immediately
       if (domain) bustCorsCache(domain);
       if (oldDomain && oldDomain !== domain) bustCorsCache(oldDomain);
+
+      // Bust the `/public/store/resolve` cache for both the new domain (in
+      // case a prior lookup already cached a miss) and the old one — the
+      // domain-clearing branch above uses a raw `prisma.store.update` that
+      // bypasses `StoreService.update`'s `bustStoreCaches` call, so this is
+      // the only invalidation for that path.
+      if (domain) void invalidateCached(`public:store:resolve:${domain}`);
+      if (oldDomain && oldDomain !== domain)
+        void invalidateCached(`public:store:resolve:${oldDomain}`);
 
       // Get verification status
       let domainStatus: import('../services/domain-provider').DomainStatus | null = null;

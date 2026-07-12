@@ -1293,96 +1293,128 @@ router.get(
       // are stored in the DB and how the storefront middleware normalizes them.
       const domain = rawDomain.toLowerCase().replace(/^www\./, '');
 
-      // Find store by domain. Suspended stores are returned with their
-      // `status` so the storefront can render the branded maintenance page
-      // for that store. Inactive (archived/draft) and soft-deleted stores
-      // stay hidden — those should still 404.
-      const store = await prisma.store.findFirst({
-        where: {
-          domain,
-          status: { in: ['active', 'suspended'] },
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          name: true,
-          nameAr: true,
-          slug: true,
-          domain: true,
-          status: true,
-          logo: true,
-          logoAr: true,
-          favicon: true,
-          description: true,
-          descriptionAr: true,
-          currency: true,
-          timezone: true,
-          template: true,
-          theme: true,
-          typography: true,
-          socialLinks: true,
-          email: true,
-          phone: true,
-          phoneAr: true,
-          whatsapp: true,
-          address: true,
-          addressAr: true,
-          announcementBar: true,
-          metaTitle: true,
-          metaTitleAr: true,
-          metaDescription: true,
-          metaDescriptionAr: true,
-          metaDescriptionAeo: true,
-          metaDescriptionAeoAr: true,
-          ogImage: true,
-          twitterHandle: true,
-          googleSiteVerification: true,
-          settings: true,
-          taxEnabled: true,
-          taxIncludedInPrice: true,
-          marketingPixels: true,
-          pwaEnabled: true,
-          pwaSettings: true,
-          blogEnabled: true,
-          locationsEnabled: true,
-          heroTitle: true,
-          heroTitleAr: true,
-          heroSubtitle: true,
-          heroSubtitleAr: true,
-          heroCtaText: true,
-          heroCtaTextAr: true,
-          heroCtaLink: true,
-          heroImage: true,
-          llmsTxt: true,
-          aboutJson: true,
-          faqs: {
-            where: { isActive: true },
-            orderBy: { orderIndex: 'asc' },
-            select: {
-              id: true,
-              question: true,
-              questionAr: true,
-              answer: true,
-              answerAr: true,
+      // Redis-cached (120s, same shape/TTL as /stores/:slugOrId above) —
+      // this is the domain→store lookup every storefront page load depends
+      // on, so it must not hit Postgres on every request.
+      const result = await getCached(`public:store:resolve:${domain}`, 120, async () => {
+        // Find store by domain. Suspended stores are returned with their
+        // `status` so the storefront can render the branded maintenance page
+        // for that store. Inactive (archived/draft) and soft-deleted stores
+        // stay hidden — those should still 404.
+        const store = await prisma.store.findFirst({
+          where: {
+            domain,
+            status: { in: ['active', 'suspended'] },
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            slug: true,
+            domain: true,
+            status: true,
+            logo: true,
+            logoAr: true,
+            favicon: true,
+            description: true,
+            descriptionAr: true,
+            currency: true,
+            timezone: true,
+            template: true,
+            theme: true,
+            typography: true,
+            socialLinks: true,
+            email: true,
+            phone: true,
+            phoneAr: true,
+            whatsapp: true,
+            address: true,
+            addressAr: true,
+            announcementBar: true,
+            metaTitle: true,
+            metaTitleAr: true,
+            metaDescription: true,
+            metaDescriptionAr: true,
+            metaDescriptionAeo: true,
+            metaDescriptionAeoAr: true,
+            ogImage: true,
+            twitterHandle: true,
+            googleSiteVerification: true,
+            settings: true,
+            taxEnabled: true,
+            taxIncludedInPrice: true,
+            marketingPixels: true,
+            pwaEnabled: true,
+            pwaSettings: true,
+            blogEnabled: true,
+            locationsEnabled: true,
+            heroTitle: true,
+            heroTitleAr: true,
+            heroSubtitle: true,
+            heroSubtitleAr: true,
+            heroCtaText: true,
+            heroCtaTextAr: true,
+            heroCtaLink: true,
+            heroImage: true,
+            llmsTxt: true,
+            aboutJson: true,
+            faqs: {
+              where: { isActive: true },
+              orderBy: { orderIndex: 'asc' },
+              select: {
+                id: true,
+                question: true,
+                questionAr: true,
+                answer: true,
+                answerAr: true,
+              },
+            },
+            howtos: {
+              where: { isActive: true },
+              orderBy: { orderIndex: 'asc' },
+              select: {
+                id: true,
+                title: true,
+                titleAr: true,
+                description: true,
+                descriptionAr: true,
+                steps: true,
+                stepsAr: true,
+              },
             },
           },
-          howtos: {
-            where: { isActive: true },
-            orderBy: { orderIndex: 'asc' },
-            select: {
-              id: true,
-              title: true,
-              titleAr: true,
-              description: true,
-              descriptionAr: true,
-              steps: true,
-              stepsAr: true,
-            },
-          },
-        },
+        });
+
+        if (!store) return null;
+
+        const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
+
+        // Surface CMS pages that the merchant has explicitly turned off
+        // ("Show on storefront" toggle in /content). The storefront uses
+        // this to hide footer links pointing at those slugs — without it,
+        // a customer would click "Privacy" in the footer and land on a
+        // "Page unavailable" message, which is a worse UX than the link
+        // simply not being there. Only rows that exist AND are unpublished
+        // need to be reported; if the row is missing the storefront falls
+        // back to its built-in copy and the link should still work.
+        const disabledPages = await prisma.storePage.findMany({
+          where: { storeId: store.id, isPublished: false },
+          select: { slug: true },
+        });
+        const disabledCmsSlugs = disabledPages.map(p => p.slug);
+
+        // Strip server-only marketing-pixel secrets before the store reaches the
+        // public storefront + edge cache (browser pixels use public IDs only).
+        const publicStore = {
+          ...store,
+          marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
+        };
+
+        return { store: publicStore, enabledFeatures, disabledCmsSlugs };
       });
 
-      if (!store) {
+      if (!result) {
         res.status(404).json({
           success: false,
           error: { code: 'STORE_NOT_FOUND', message: 'No store found for the specified domain' },
@@ -1390,33 +1422,10 @@ router.get(
         return;
       }
 
-      const enabledFeatures = await featureService.getEnabledFeatureKeys(store.id);
-
-      // Surface CMS pages that the merchant has explicitly turned off
-      // ("Show on storefront" toggle in /content). The storefront uses
-      // this to hide footer links pointing at those slugs — without it,
-      // a customer would click "Privacy" in the footer and land on a
-      // "Page unavailable" message, which is a worse UX than the link
-      // simply not being there. Only rows that exist AND are unpublished
-      // need to be reported; if the row is missing the storefront falls
-      // back to its built-in copy and the link should still work.
-      const disabledPages = await prisma.storePage.findMany({
-        where: { storeId: store.id, isPublished: false },
-        select: { slug: true },
-      });
-      const disabledCmsSlugs = disabledPages.map(p => p.slug);
-
-      // Strip server-only marketing-pixel secrets before the store reaches the
-      // public storefront + edge cache (browser pixels use public IDs only).
-      const publicStore = {
-        ...store,
-        marketingPixels: stripMarketingPixelSecrets(store.marketingPixels),
-      };
-
       setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
       res.json({
         success: true,
-        data: { store: publicStore, enabledFeatures, disabledCmsSlugs },
+        data: result,
       });
     } catch (error) {
       next(error);
@@ -1687,12 +1696,19 @@ router.post('/contact', writeLimiter, async (req: Request, res: Response, next: 
 
     const data = contactSchema.parse(req.body);
 
-    // Send notification email to admin
-    await EmailService.sendContactForm({
+    // Fire-and-forget notification email to admin — don't await so a slow /
+    // misconfigured SMTP server doesn't keep the visitor staring at a
+    // spinner (matches the newsletter-signup handler above).
+    EmailService.sendContactForm({
       name: data.name,
       email: data.email,
       subject: data.subject,
       message: data.message,
+    }).catch(err => {
+      logger.warn(
+        { err: err instanceof Error ? err.message : 'unknown' },
+        '[CONTACT] notification email failed'
+      );
     });
 
     res.json({

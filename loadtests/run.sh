@@ -5,10 +5,12 @@
 #   ./run.sh api-bursts
 #   ./run.sh multi-store-storm
 #   ./run.sh lens-n-medium-traffic
+#   ./run.sh lens-scaling-admin-auth
 #   ./run.sh all
 #
 # Required env: STORE_ID (single-store scenarios).
 #               STORE_IDS (multi-store-storm, lens-n-medium-traffic — comma-separated UUIDs; see seed:loadtest).
+#               ADMIN_EMAIL, ADMIN_PASSWORD (lens-scaling-admin-auth only).
 # Optional: BASE_URL, PRODUCT_SLUG (checkout only), LOAD_TEST_TOKEN.
 set -euo pipefail
 
@@ -34,6 +36,12 @@ else
     echo "STORE_ID env var is required (a public storefront uuid)." >&2
     exit 1
   fi
+  if [ "$SCENARIO" = "lens-scaling-admin-auth" ]; then
+    if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; then
+      echo "ADMIN_EMAIL and ADMIN_PASSWORD env vars are required for lens-scaling-admin-auth." >&2
+      exit 1
+    fi
+  fi
 fi
 
 run() {
@@ -56,6 +64,7 @@ if [ "$SCENARIO" = "all" ]; then
   # multi-store-storm / lens-n-medium-traffic require seeded STORE_IDS so they are excluded from 'all'
   echo "(skipping multi-store-storm in 'all' mode — run it explicitly with STORE_IDS set)"
   echo "(skipping lens-n-medium-traffic in 'all' mode — run it explicitly with STORE_IDS set, staging/load env only)"
+  echo "(skipping lens-scaling-admin-auth in 'all' mode — run it explicitly with ADMIN_EMAIL/ADMIN_PASSWORD set)"
 else
   run "$SCENARIO"
 fi

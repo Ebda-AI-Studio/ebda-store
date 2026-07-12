@@ -36,6 +36,7 @@ import { sendAlert } from './alerts.service';
 import { OneSignalService } from './onesignal.service';
 import { recordPaymentEvent } from './payment-event.service';
 import type { PaymentStatusResponse } from './payment-providers/types';
+import { invalidateCustomersCache } from '../lib/public-cache';
 
 export type ConfirmSource = 'admin_refresh' | 'guest_verify';
 
@@ -219,6 +220,10 @@ export async function confirmPaymentFromProviderStatus(
       }),
     ]);
 
+    // Bust the admin aggregated-customers snapshot — this paymentStatus
+    // transition changes the paid/total-spent counts it aggregates.
+    await invalidateCustomersCache(order.storeId);
+
     await recordPaymentEvent({
       paymentId: payment.id,
       storeId: order.storeId,
@@ -328,6 +333,10 @@ export async function confirmPaymentFromProviderStatus(
         data: { paymentStatus: 'failed' },
       }),
     ]);
+
+    // Bust the admin aggregated-customers snapshot — this paymentStatus
+    // transition changes the paid/failed counts it aggregates.
+    await invalidateCustomersCache(order.storeId);
 
     await recordPaymentEvent({
       paymentId: payment.id,

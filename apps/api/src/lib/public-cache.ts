@@ -126,3 +126,19 @@ export async function invalidateStoreProductCaches(storeId: string): Promise<voi
   await invalidateCachedPrefix(`public:product:${storeId}:`);
   await invalidateCachedPrefix(`public:suggest:${storeId}:`);
 }
+
+/** Cache key for the admin aggregated-customers snapshot (`customers.routes.ts`). */
+export function customersCacheKey(storeId: string): string {
+  return `customers-agg:${storeId}`;
+}
+
+/**
+ * Invalidate the cached aggregated-customers snapshot for a store. Lives here
+ * (rather than `routes/customers.routes.ts`) so services — which can't import
+ * from `routes/` (see module doc comment above) — can bust this cache from
+ * order-mutation paths (status changes, payment updates, cancellations)
+ * instead of waiting out the 300s TTL.
+ */
+export async function invalidateCustomersCache(storeId: string): Promise<void> {
+  await invalidateCached(customersCacheKey(storeId));
+}

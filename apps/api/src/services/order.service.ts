@@ -19,7 +19,7 @@ import { affiliateService } from './affiliate.service';
 import { auditLog } from '../middleware/security';
 import { hasCapturedPayment, shouldApplyRefundEffects } from './order-refund-gating';
 import logger from '../lib/logger';
-import { invalidateStoreProductCaches } from '../lib/public-cache';
+import { invalidateStoreProductCaches, invalidateCustomersCache } from '../lib/public-cache';
 
 /**
  * Bust the storefront product caches (list / detail / suggest — all carry
@@ -108,9 +108,18 @@ export class OrderService {
        * confirmed/processing/shipped/delivered/cancelled/refunded.
        */
       confirmedOnly?: boolean;
+      /**
+       * Opaque order id from a previous response's `meta.nextCursor`. When
+       * present, uses keyset pagination instead of `skip`/`OFFSET` — O(1) at
+       * the DB level regardless of page depth, matching the pattern
+       * `ProductService.listPublic` already uses (`product.service.ts:1338`).
+       * Additive: existing offset-based callers (admin order list, Orders
+       * PWA) are unaffected — this only activates when `cursor` is passed.
+       */
+      cursor?: string;
     } = {}
   ) {
-    const { status, customerId, from, to, confirmedOnly } = options;
+    const { status, customerId, from, to, confirmedOnly, cursor } = options;
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
@@ -143,34 +152,45 @@ export class OrderService {
       if (to) (where.createdAt as any).lte = to;
     }
 
-    const [orders, total] = await Promise.all([
-      prisma.order.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          // `phone` is included so the admin customers page can surface
-          // it without doing a second query. Stays nullable on the User
-          // record itself.
-          customer: {
-            select: { id: true, email: true, firstName: true, lastName: true, phone: true },
-          },
-          items: true,
-          payments: { select: { provider: true, status: true } },
-          _count: { select: { items: true } },
+    const baseFindManyArgs = {
+      where,
+      include: {
+        // `phone` is included so the admin customers page can surface
+        // it without doing a second query. Stays nullable on the User
+        // record itself.
+        customer: {
+          select: { id: true, email: true, firstName: true, lastName: true, phone: true },
         },
-        orderBy: { createdAt: 'desc' },
-      }),
+        items: true,
+        payments: { select: { provider: true, status: true } },
+        _count: { select: { items: true } },
+      },
+      orderBy: { createdAt: 'desc' as const },
+    };
+
+    // Cursor path fetches one extra row (`limit + 1`) so we know whether a
+    // next page exists without a second COUNT query.
+    const findManyArgs = cursor
+      ? { ...baseFindManyArgs, cursor: { id: cursor }, skip: 1, take: limit + 1 }
+      : { ...baseFindManyArgs, skip, take: limit };
+
+    const [ordersRaw, total] = await Promise.all([
+      prisma.order.findMany(findManyArgs),
       prisma.order.count({ where }),
     ]);
+
+    const orders = cursor && ordersRaw.length > limit ? ordersRaw.slice(0, limit) : ordersRaw;
+    const nextCursor =
+      cursor && ordersRaw.length > limit ? (ordersRaw[limit] as { id: string }).id : undefined;
 
     return {
       orders,
       meta: {
-        page,
+        page: cursor ? undefined : page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: cursor ? undefined : Math.ceil(total / limit),
+        nextCursor,
       },
     };
   }
@@ -921,6 +941,12 @@ export class OrderService {
         },
       },
     });
+
+    // Bust the admin aggregated-customers snapshot — a status change can move
+    // an order in/out of the totals it aggregates (total-spent, order-count,
+    // last-order-date), so the cache must not serve a stale snapshot for up
+    // to its 300s TTL after a mutation like this.
+    await invalidateCustomersCache(storeId);
 
     // Append-only status audit trail. `order.status` was read (via getById)
     // BEFORE the update above, so it is the true prior status. Best-effort:

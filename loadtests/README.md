@@ -30,17 +30,23 @@ STORE_IDS=$(cat loadtests/.loadtest-store-ids.txt) ./run.sh multi-store-storm
 STORE_IDS=$(cat loadtests/.loadtest-store-ids.txt) \
 BASE_URL=https://<staging-host>/api/v1 \
 ./run.sh lens-n-medium-traffic
+
+# Authenticated admin order-list cost curve (requires a dedicated
+# load-test admin/staff account — see section below):
+STORE_ID=<uuid> ADMIN_EMAIL=<email> ADMIN_PASSWORD=<password> \
+./run.sh lens-scaling-admin-auth
 ```
 
 ## Scenarios
 
-| File                       | What it tests                                                     | Profile                                                   |
-| -------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------- |
-| `storefront-browse.js`     | Public read path: products, categories, detail                    | Ramp 25 → 50 VUs over 3 min                               |
-| `api-bursts.js`            | Flash-sale spike on the cached list endpoint                      | 200 req/s constant for 1 min                              |
-| `checkout-flow.js`         | Guest checkout: cart → add → place                                | Ramp 5 → 10 VUs (writes real orders, staging only!)       |
-| `multi-store-storm.js`     | Cross-tenant concurrent load across N stores                      | Ramp 50 → 100 VUs over 4 min (see below)                  |
-| `lens-n-medium-traffic.js` | Medium-traffic headroom across ~30-80 stores + `/health` + layout | Ramp to 200-400 VUs (default 300) over ~7 min (see below) |
+| File                         | What it tests                                                                       | Profile                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `storefront-browse.js`       | Public read path: products, categories, detail                                      | Ramp 25 → 50 VUs over 3 min                               |
+| `api-bursts.js`              | Flash-sale spike on the cached list endpoint                                        | 200 req/s constant for 1 min                              |
+| `checkout-flow.js`           | Guest checkout: cart → add → place                                                  | Ramp 5 → 10 VUs (writes real orders, staging only!)       |
+| `multi-store-storm.js`       | Cross-tenant concurrent load across N stores                                        | Ramp 50 → 100 VUs over 4 min (see below)                  |
+| `lens-n-medium-traffic.js`   | Medium-traffic headroom across ~30-80 stores + `/health` + layout                   | Ramp to 200-400 VUs (default 300) over ~7 min (see below) |
+| `lens-scaling-admin-auth.js` | Authenticated admin order-list OFFSET-pagination cost curve (login once, reuse JWT) | Ramp 1 → 5 VUs over ~2 min (see below)                    |
 
 ### Multi-store storm
 
@@ -154,6 +160,56 @@ find the actual ceiling, and record the numbers in
 A failing run at the documented 300-VU/80-store profile means the
 "reasoned, not measured" headroom claim doesn't hold — treat it the same
 as any other p95 > 500ms regression per the code-quality rule.
+
+### Authenticated admin order-list cost curve
+
+Closes the load-testing gap noted in
+`docs/audits/2026-07-12-scaling-cliff-reel.md` finding #6: every other
+scenario in this suite exercises the **public/guest** storefront surface —
+none of them log in and drive an **authenticated admin session**.
+`OrderService.list` (`apps/api/src/services/order.service.ts`) is
+OFFSET-pagination-only for the admin/Orders-PWA order list (finding #4) —
+its cost is _reasoned_ to grow with page depth (`OFFSET N` forces Postgres
+to walk past N rows even with the covering index in place) but was never
+_measured_. `lens-scaling-admin-auth.js` is that measurement.
+
+**Requires a dedicated load-test admin/staff account** — never point this
+at a real merchant's own credentials. Read-only (no writes), but still
+recommended against staging when possible, same caution as
+`checkout-flow.js`.
+
+**Traffic model.** `setup()` logs in ONCE for the whole run (`POST
+/auth/login`) and shares the resulting JWT across every VU — logging in
+per-VU would trip the 15-req/15min/IP+email `authLimiter` almost
+immediately at any real VU count, since auth isn't what this scenario is
+measuring. Each iteration reuses that JWT to hit `GET
+/stores/:storeId/orders` at a few page depths (default `1,25,100`,
+override via `PAGE_DEPTHS`) at `limit=50`, recording latency into a
+separate `ms_orders_page_<depth>` Trend per depth — same per-metric
+convention as `lens-n-medium-traffic.js` — so a slow deep page doesn't
+mask a fast shallow one.
+
+**VU profile — why 5 peak, not a heavy ramp.** This scenario measures a
+cost _curve_ (how latency grows with page depth), not a concurrency
+ceiling — a handful of concurrent admin sessions is the realistic shape
+for the Orders PWA / admin dashboard; heavier concurrent-admin load isn't
+a realistic production profile for this route. Ramp 20s → `LENS_ADMIN_MAX_VUS`
+VUs (default 5), hold 90s, ramp down 10s.
+
+**Thresholds.**
+
+| Metric                                                | Threshold | Why                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `http_req_failed`                                     | rate<2%   | Matches `checkout-flow.js`'s floor for an auth-gated flow.                                                                                                                                                                                                                           |
+| `http_req_duration` (overall p95)                     | <500ms    | The code-quality non-negotiable ("fix p95 > 500ms before ship") — what the shallow/first page must clear.                                                                                                                                                                            |
+| `ms_orders_page_<first depth>` (p95)                  | <500ms    | Hard-failing. Page 1 is the common case (every admin dashboard visit) and must stay fast regardless of how deep OTHER admins have paged.                                                                                                                                             |
+| `ms_orders_page_<deeper depths>` (p95, informational) | not gated | Under the current OFFSET-only `OrderService.list`, latency growing with page depth is EXPECTED — that growth is exactly what this scenario measures, not a regression to gate on. Once deep-paging admin/Orders-PWA callers adopt the cursor path (finding #2), re-baseline tighter. |
+
+**Interpreting results.** After a run, compare `ms_orders_page_1` against
+`ms_orders_page_25` / `ms_orders_page_100` (or your `PAGE_DEPTHS`) — a
+growing p95 across depths confirms finding #4's OFFSET cost curve on real
+data; record the numbers in `docs/perf/loadtest-2026-05.md` alongside the
+existing baseline entries.
 
 ## Targets and thresholds
 

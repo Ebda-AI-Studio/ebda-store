@@ -12,12 +12,22 @@ import { revalidateStorefront } from '../lib/revalidate-storefront';
 /**
  * Bust every public-cache entry that depends on a store record. The
  * `public:store:<slugOrId>` key is hit by both the slug and the UUID
- * paths, so we invalidate both. Categories and product lists are
- * separate keys handled by their own services, but a store update can
- * still change the embedded settings (currency, theme) the storefront
- * shows next to product cards — so we also drop product/category
- * caches for the same store. Cheap relative to the cost of serving
- * stale settings to a customer mid-purchase.
+ * paths, so we invalidate both. `public:store:resolve:<domain>` backs
+ * `GET /public/store/resolve` (the domain→store lookup every storefront
+ * page load depends on) — bust it too so a domain-header'd merchant edit
+ * shows up immediately instead of waiting out the 120s TTL. Categories
+ * and product lists are separate keys handled by their own services, but
+ * a store update can still change the embedded settings (currency, theme)
+ * the storefront shows next to product cards — so we also drop
+ * product/category caches for the same store. Cheap relative to the cost
+ * of serving stale settings to a customer mid-purchase.
+ *
+ * NOTE: on a domain CHANGE, only the CURRENT `domain` value is known here
+ * (callers pass `updatedStore.domain`, i.e. the NEW domain post-write) —
+ * the old domain's `public:store:resolve:<oldDomain>` entry is left to
+ * expire on its own 120s TTL rather than being explicitly busted. Bounded
+ * staleness, not unbounded; see `docs/audits/2026-07-12-scaling-cliff-reel.md`
+ * finding #1.
  */
 async function bustStoreCaches(
   storeId: string,
@@ -26,6 +36,7 @@ async function bustStoreCaches(
 ): Promise<void> {
   await invalidateCached(`public:store:${storeId}`);
   if (slug) await invalidateCached(`public:store:${slug}`);
+  if (domain) await invalidateCached(`public:store:resolve:${domain}`);
   await invalidateCached(`public:categories:${storeId}`);
   await invalidateCachedPrefix(`public:products:${storeId}:`);
   // Purge the storefront's Next data cache too (fire-and-forget, no-op if the

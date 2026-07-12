@@ -10,6 +10,7 @@ import { OneSignalService } from '../onesignal.service';
 import { redis } from '../redis.service';
 import { sendAlert } from '../alerts.service';
 import { recordPaymentEvent } from '../payment-event.service';
+import { invalidateCustomersCache } from '../../lib/public-cache';
 import {
   IPaymentProvider,
   PaymentProvider,
@@ -725,6 +726,9 @@ export class PaymentService {
             ]
           : []),
       ]);
+      // Bust the admin aggregated-customers snapshot on a paymentStatus
+      // transition — this changes the paid/refunded counts it aggregates.
+      if (effectiveStoreId) await invalidateCustomersCache(effectiveStoreId);
     } catch (txError) {
       logger.error(
         {
@@ -993,6 +997,9 @@ export class PaymentService {
               '[PAYMENT WEBHOOK] order status update failed after out-of-band refund'
             )
           );
+        // Bust the admin aggregated-customers snapshot — this paymentStatus
+        // transition changes the paid/refunded counts it aggregates.
+        await invalidateCustomersCache(payment.order.storeId);
       }
 
       return { success: true, status: newStatus, orderId: payment.orderId };
@@ -1156,6 +1163,9 @@ export class PaymentService {
           paymentStatus: orderPaymentStatus,
         },
       });
+      // Bust the admin aggregated-customers snapshot — this paymentStatus
+      // transition changes the paid/failed/refunded counts it aggregates.
+      if (payment.order?.storeId) await invalidateCustomersCache(payment.order.storeId);
     }
 
     // Online-payment notifications fire HERE, not at order creation. order.service.ts

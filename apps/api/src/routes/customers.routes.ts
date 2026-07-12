@@ -6,7 +6,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { AppError } from '../middleware/error-handler';
 import { writeLimiter } from '../middleware/security';
-import { getCached, invalidateCached } from '../lib/public-cache';
+import { getCached, customersCacheKey, invalidateCustomersCache } from '../lib/public-cache';
 
 const router = Router({ mergeParams: true });
 
@@ -19,19 +19,11 @@ const router = Router({ mergeParams: true });
  */
 const CUSTOMERS_CACHE_TTL_SECONDS = 300;
 
-function customersCacheKey(storeId: string): string {
-  return `customers-agg:${storeId}`;
-}
-
-/**
- * Invalidate the cached aggregation for a store. Exported so order-mutation
- * paths (status changes, payment updates, cancellations) can bust the cache
- * instead of waiting out the TTL. Currently unused elsewhere in this repo —
- * safe no-op call sites can adopt it as those flows are touched.
- */
-export async function invalidateCustomersCache(storeId: string): Promise<void> {
-  await invalidateCached(customersCacheKey(storeId));
-}
+// `customersCacheKey` / `invalidateCustomersCache` now live in
+// `../lib/public-cache` so `OrderService` (which can't import from `routes/`)
+// can call the invalidator directly from order-mutation paths. Re-exported
+// here for any existing importer of this module.
+export { invalidateCustomersCache };
 
 // staff can read customer records (needed for order context lookups).
 // writeLimiter caps the heavy aggregation endpoints (full order-table scan

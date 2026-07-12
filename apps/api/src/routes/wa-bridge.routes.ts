@@ -26,11 +26,13 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
+import { makeRateLimitStore } from '../middleware/security';
 import logger from '../lib/logger';
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
 import { CustomerAddressService } from '../services/customer-address.service';
 import { encryption } from '../services/encryption.service';
 import { featureService } from '../services/feature.service';
+import { redis } from '../services/redis.service';
 
 const addressSvc = new CustomerAddressService(prisma as any);
 
@@ -64,6 +66,10 @@ const bridgeRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Redis-backed so the 120/min cap is shared across all API replicas (F8)
+  // instead of multiplying by replica count — matches every other limiter
+  // in the codebase (`middleware/security.ts`).
+  store: makeRateLimitStore(redis.getClient(), 'wa-bridge'),
 });
 
 // Rate limit applies to every wa-bridge call (including the
