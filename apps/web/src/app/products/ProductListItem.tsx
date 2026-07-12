@@ -6,7 +6,7 @@ import type { Product } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { formatPrice as formatPriceBase } from '@/lib/format';
 import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
-import { useStore } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
 import { cn, CartIcon } from '@force/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
@@ -37,6 +37,7 @@ export function ProductListItem({
 }: ProductListItemProps) {
   const { t, isRtl } = useLanguage();
   const { store, layout } = useStore();
+  const storeUrl = useStoreUrl();
   // Locale-aware wrapper — only uses Arabic-Indic digits when the merchant
   // opted in via StoreTheme.arabicNumerals AND the shopper is on the Arabic
   // locale (formatPriceBase defaults to Western digits when no locale is
@@ -109,7 +110,7 @@ export function ProductListItem({
 
   return (
     <Link
-      href={`/products/${product.slug}`}
+      href={storeUrl(`/products/${product.slug}`)}
       className="flex gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-lg"
     >
       {/* Image */}
