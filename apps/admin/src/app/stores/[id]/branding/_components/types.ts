@@ -97,6 +97,13 @@ export interface StoreTheme {
    */
   frameChromeDedup?: boolean;
   /**
+   * When true, elegant's empty-state CTA arrow flips direction for RTL
+   * (`←` in Arabic, `→` in English) instead of always rendering `→`.
+   * Default false — existing stores unaffected; seeded true on new stores
+   * at creation. Toggled via Branding → Theme. 2026-07-12.
+   */
+  rtlPolish?: boolean;
+  /**
    * Merchant-controlled display order for footer social icons.
    * Array of platform keys (e.g. ['tiktok','instagram','whatsapp']).
    * Edited in Branding → Social Links. 2026-06-27.

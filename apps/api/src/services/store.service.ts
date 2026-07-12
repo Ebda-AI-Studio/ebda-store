@@ -218,7 +218,16 @@ export class StoreService {
         // stores only — every existing store keeps these flags undefined/false
         // and renders unchanged). Merchant can still toggle either off via
         // Branding → Theme.
-        theme: { personaChromeV2: true, frameChromeDedup: true },
+        // 2026-07-12 design-sweep batch: new stores also get a neutral-slate
+        // OOS ribbon (harmonizes better than the platform's original fixed
+        // terracotta) + rtlPolish (RTL-correct empty-state CTA arrow on
+        // elegant). Existing stores keep both undefined and render unchanged.
+        theme: {
+          personaChromeV2: true,
+          frameChromeDedup: true,
+          oosRibbonColor: '#6b7280',
+          rtlPolish: true,
+        },
       },
       include: {
         owner: {

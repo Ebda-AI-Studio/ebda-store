@@ -362,6 +362,36 @@ export function ThemeTab({ branding, onChange, storeId }: ThemeTabProps) {
         </label>
       </div>
 
+      {/* ── RTL polish (2026-07-12) ───────────────────────────────────────── */}
+      <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            RTL arrow polish (Elegant) / تحسين اتجاه السهم للعربية
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Off by default on existing stores; new stores are created with this on. Fixes the
+            Elegant theme's empty-state CTA arrow to point the correct reading direction in Arabic
+            (← instead of always →).
+          </p>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={branding.theme.rtlPolish === true}
+            onChange={e =>
+              onChange({
+                ...branding,
+                theme: { ...branding.theme, rtlPolish: e.target.checked },
+              })
+            }
+            className="h-4 w-4 cursor-pointer accent-primary"
+          />
+          <span className="text-xs text-foreground">
+            Enable RTL arrow polish / تفعيل تحسين اتجاه السهم
+          </span>
+        </label>
+      </div>
+
       {/* ── Uppercase styling ─────────────────────────────────────────────── */}
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
         <div>

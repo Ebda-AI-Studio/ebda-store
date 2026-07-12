@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { EmptyStateProps } from '../types';
 import { useRtlText } from '../shared/useRtlText';
+import { useStore } from '../../contexts/StoreContext';
 
 export default function ElegantEmptyState({
   title,
@@ -25,6 +26,12 @@ export default function ElegantEmptyState({
     ctaLabelAr,
     isRtl: isRtlProp,
   });
+  // rtlPolish (2026-07-12): default false/undefined keeps the always-'→'
+  // rendering below for EXISTING stores (incl. wady-aljuz/elegant). When on,
+  // the arrow flips to '←' for RTL so it points the correct reading direction.
+  const { store } = useStore();
+  const rtlPolish = store.theme?.rtlPolish === true;
+  const ctaArrow = rtlPolish ? (isRtl ? '←' : '→') : '→';
 
   return (
     <div
@@ -63,7 +70,7 @@ export default function ElegantEmptyState({
             data-cta="link"
             className="mt-10 inline-block border-b border-foreground pb-1 text-xs font-light uppercase tracking-[0.3em] text-foreground hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
-            {displayCta} →
+            {displayCta} {ctaArrow}
           </Link>
         ) : (
           <button
@@ -72,7 +79,7 @@ export default function ElegantEmptyState({
             data-cta="link"
             className="mt-10 border-b border-foreground pb-1 text-xs font-light uppercase tracking-[0.3em] text-foreground hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
           >
-            {displayCta} →
+            {displayCta} {ctaArrow}
           </button>
         ))}
     </div>

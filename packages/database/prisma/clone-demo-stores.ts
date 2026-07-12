@@ -133,11 +133,19 @@ async function cloneInto(
   // persona-chrome + card-frame-dedup defaults even though the SOURCE
   // (wady-aljuz, a live client) intentionally keeps both flags off/undefined
   // — override on top of the copied theme rather than mutating the source.
+  // 2026-07-12 design-sweep batch: same override for the new-store-only OOS
+  // ribbon token + rtlPolish flag — the source stays untouched/unaffected.
   const sourceTheme =
     source.theme && typeof source.theme === 'object'
       ? (source.theme as Record<string, unknown>)
       : {};
-  const demoTheme = { ...sourceTheme, personaChromeV2: true, frameChromeDedup: true };
+  const demoTheme = {
+    ...sourceTheme,
+    personaChromeV2: true,
+    frameChromeDedup: true,
+    oosRibbonColor: '#6b7280',
+    rtlPolish: true,
+  };
 
   const newStore = await prisma.store.create({
     data: {

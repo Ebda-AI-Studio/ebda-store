@@ -335,6 +335,37 @@ export interface StoreTheme {
   frameChromeDedup?: boolean;
 
   /**
+   * Out-of-stock ribbon/badge background color — the diagonal corner ribbon
+   * rendered by `OutOfStockRibbon` in `templates/shared/ProductCardCta.tsx`
+   * when the merchant hasn't opted into the full `oosLabel*` badge
+   * customization system (`productCardDefaults`). Accepts a `token:<name>`
+   * reference (see `COLOR_TOKENS`) or a raw hex/hsl string, resolved via
+   * `resolveColor`. Default (undefined): renders the platform's original
+   * hardcoded terracotta `hsl(15 60% 33%)` — zero visual change for every
+   * EXISTING store (incl. wady-aljuz + Pecannbee), no backfill. Seeded to a
+   * neutral slate (`#6b7280`, matching `DEFAULT_THEME.mutedForeground`'s hue)
+   * at store-creation time for NEW stores only (`StoreService.create`) and
+   * for demo clones (`clone-demo-stores.ts`) — same seeding path as
+   * `personaChromeV2`/`frameChromeDedup`; existing stores can opt in
+   * manually. 2026-07-12 design-sweep batch.
+   */
+  oosRibbonColor?: string;
+
+  /**
+   * When true, elegant's empty-state CTA arrow flips direction for RTL
+   * (`←` in Arabic, `→` in English) instead of always rendering `→`
+   * regardless of reading direction. Chrome only — no layout, color, or
+   * copy change. Default false/undefined so every EXISTING store (incl.
+   * wady-aljuz, which uses the elegant template) keeps today's
+   * always-`→` rendering. Seeded `true` at store-creation time for NEW
+   * stores only (`StoreService.create`) and for demo clones
+   * (`clone-demo-stores.ts`) — same seeding path as `personaChromeV2`;
+   * existing stores can opt in manually via Branding → Theme. 2026-07-12
+   * design-sweep batch.
+   */
+  rtlPolish?: boolean;
+
+  /**
    * Merchant-controlled display order for footer social icons.
    * An array of platform keys (e.g. ['tiktok','instagram','whatsapp']) that
    * defines the left-to-right (or start-to-end in RTL) sequence in the footer.

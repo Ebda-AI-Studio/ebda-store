@@ -290,6 +290,13 @@ export function OutOfStockRibbon({
   // right edge of the card). The -45deg rotation also flips sign so
   // the text reads correctly from the corner outward.
   const rotation = isRtl ? 45 : -45;
+  // theme.oosRibbonColor: value-preserving theme token (2026-07-12). Default
+  // (undefined) resolves to the exact original hardcoded terracotta so every
+  // EXISTING store renders byte-identical; new stores are seeded a neutral
+  // slate that harmonizes better with an arbitrary brand palette.
+  const ribbonBg =
+    (theme?.oosRibbonColor && theme && resolveColor(theme.oosRibbonColor, theme)) ??
+    'hsl(15 60% 33%)';
   return (
     <div
       className={`pointer-events-none absolute top-0 start-0 z-10 h-[88px] w-[88px] overflow-hidden ${className}`}
@@ -298,7 +305,7 @@ export function OutOfStockRibbon({
       <span
         className="absolute top-[18px] start-[-34px] w-[160px] py-1 text-center text-[10px] font-bold uppercase tracking-wider text-white shadow-md"
         style={{
-          backgroundColor: 'hsl(15 60% 33%)',
+          backgroundColor: ribbonBg,
           transform: `rotate(${rotation}deg)`,
         }}
       >
