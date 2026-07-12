@@ -147,15 +147,18 @@ export default function WishlistClient() {
 
   async function removeFromWishlist(itemId: string) {
     setActionError(null);
+    // Optimistic remove — drop from state immediately, roll back on failure.
+    const previousItems = items;
+    setItems(prev => prev.filter(item => item.id !== itemId));
     try {
       const response = await api.delete(`/wishlist/${itemId}`);
-      if (response.success) {
-        setItems(prev => prev.filter(item => item.id !== itemId));
-      } else {
+      if (!response.success) {
+        setItems(previousItems);
         setActionError('Failed to remove item from wishlist');
       }
     } catch (err) {
       console.error('Failed to remove item:', err);
+      setItems(previousItems);
       setActionError('Failed to remove item. Please try again.');
     }
   }

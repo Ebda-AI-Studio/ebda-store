@@ -351,6 +351,9 @@ describe('OrderService', () => {
               // return_stock idempotency marker: null = not yet restored.
               findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue({}),
+              // Order creation now writes the sale-line ledger via a single
+              // batched createMany instead of one create() per cart line.
+              createMany: vi.fn().mockResolvedValue({ count: 0 }),
             },
             // refund_effects_applied marker (F2 rework) — this tx mock is
             // reused by other describe blocks whose own beforeEach doesn't

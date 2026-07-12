@@ -129,24 +129,55 @@ async function createVariantsForProductTx(
   await tx.productVariant.deleteMany({ where: { productId } });
   await tx.productOption.deleteMany({ where: { productId } });
 
-  // 1) Options + values → (name|value) -> valueId map.
+  // 1) Options, batched. Correlate created rows back by `name` (distinct per
+  // product per collectOptions) rather than assuming createManyAndReturn
+  // preserves input order.
   const collected = collectOptions(variants);
-  const valueIdByKey = new Map<string, string>();
-  for (let oi = 0; oi < collected.length; oi++) {
-    const opt = collected[oi];
-    const option = await tx.productOption.create({
-      data: { productId, name: opt.name, position: oi },
+  const createdOptions =
+    collected.length > 0
+      ? await tx.productOption.createManyAndReturn({
+          data: collected.map((opt, oi) => ({ productId, name: opt.name, position: oi })),
+        })
+      : [];
+  const optionIdByName = new Map(createdOptions.map(o => [o.name, o.id]));
+  const nameByOptionId = new Map(createdOptions.map(o => [o.id, o.name]));
+
+  // 2) Option values, batched. Correlate by (optionId, value) — distinct per
+  // option per collectOptions — into the same `name|value` -> valueId map
+  // the junction-building step below expects.
+  const valueRows: Array<{ optionId: string; value: string; position: number }> = [];
+  for (const opt of collected) {
+    const optionId = optionIdByName.get(opt.name)!;
+    opt.values.forEach((value, vi) => {
+      valueRows.push({ optionId, value, position: vi });
     });
-    for (let vi = 0; vi < opt.values.length; vi++) {
-      const value = await tx.productOptionValue.create({
-        data: { optionId: option.id, value: opt.values[vi], position: vi },
-      });
-      valueIdByKey.set(`${opt.name}|${opt.values[vi]}`, value.id);
-    }
+  }
+  const createdValues =
+    valueRows.length > 0
+      ? await tx.productOptionValue.createManyAndReturn({ data: valueRows })
+      : [];
+  const valueIdByKey = new Map<string, string>();
+  for (const row of createdValues) {
+    const name = nameByOptionId.get(row.optionId);
+    if (name) valueIdByKey.set(`${name}|${row.value}`, row.id);
   }
 
-  // 2) Variants + junction rows.
-  let count = 0;
+  // 3) Variants, batched. Correlate by `position` (the original array index,
+  // unique per created variant — matches the pre-batch loop's `vi`).
+  const variantPairsByPosition = new Map<number, Array<{ name: string; value: string }>>();
+  const variantRows: Array<{
+    productId: string;
+    title: string;
+    sku: string | null;
+    barcode: string | null;
+    price: number | null;
+    compareAtPrice: number | null;
+    costPrice: number | null;
+    inventory: number;
+    weight: number | null;
+    imageUrl: string | null;
+    position: number;
+  }> = [];
   for (let vi = 0; vi < variants.length; vi++) {
     const v = variants[vi];
     const pairs: Array<{ name: string; value: string }> = [];
@@ -157,35 +188,46 @@ async function createVariantsForProductTx(
     }
     if (pairs.length === 0) continue; // malformed variant row — skip
 
-    const variant = await tx.productVariant.create({
-      data: {
-        productId,
-        title: buildVariantTitle(pairs.map(p => p.value)),
-        sku: v.sku || null,
-        barcode: v.barcode || null,
-        price: v.price ?? null,
-        compareAtPrice: v.compareAtPrice ?? null,
-        costPrice: v.costPrice ?? null,
-        inventory: v.inventory ?? 0,
-        weight: v.weight ?? null,
-        imageUrl: v.imageUrl || null,
-        position: vi,
-      },
+    variantRows.push({
+      productId,
+      title: buildVariantTitle(pairs.map(p => p.value)),
+      sku: v.sku || null,
+      barcode: v.barcode || null,
+      price: v.price ?? null,
+      compareAtPrice: v.compareAtPrice ?? null,
+      costPrice: v.costPrice ?? null,
+      inventory: v.inventory ?? 0,
+      weight: v.weight ?? null,
+      imageUrl: v.imageUrl || null,
+      position: vi,
     });
+    variantPairsByPosition.set(vi, pairs);
+  }
 
+  const createdVariants =
+    variantRows.length > 0
+      ? await tx.productVariant.createManyAndReturn({ data: variantRows })
+      : [];
+  const variantIdByPosition = new Map(createdVariants.map(v => [v.position, v.id]));
+
+  // 4) Junction rows, batched in a single createMany.
+  const junctionRows: Array<{ variantId: string; valueId: string }> = [];
+  for (const [position, pairs] of variantPairsByPosition) {
+    const variantId = variantIdByPosition.get(position);
+    if (!variantId) continue;
     for (const p of pairs) {
       const valueId = valueIdByKey.get(`${p.name}|${p.value}`);
       if (!valueId) continue;
-      await tx.productVariantOption.create({
-        data: { variantId: variant.id, valueId },
-      });
+      junctionRows.push({ variantId, valueId });
     }
-    count++;
+  }
+  if (junctionRows.length > 0) {
+    await tx.productVariantOption.createMany({ data: junctionRows });
   }
 
-  // 3) We bypass variant.service, so we own the hasVariants flag.
+  // 5) We bypass variant.service, so we own the hasVariants flag.
   await tx.product.update({ where: { id: productId }, data: { hasVariants: true } });
-  return count;
+  return createdVariants.length;
 }
 
 interface ExportOptions {

@@ -78,6 +78,9 @@ export class TapPaymentProvider implements IPaymentProvider {
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
+      // A hung provider request must degrade exactly like a network error
+      // (fail-soft catch upstream), not hang the checkout indefinitely.
+      signal: AbortSignal.timeout(8000),
     });
 
     const data = (await response.json()) as { errors?: { description: string }[] };

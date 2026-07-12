@@ -111,6 +111,9 @@ export class HesabePaymentProvider implements IPaymentProvider {
         'Content-Type': 'application/json',
       },
       body: encryptedData ? JSON.stringify({ data: encryptedData }) : undefined,
+      // A hung provider request must degrade exactly like a network error
+      // (fail-soft catch upstream), not hang the checkout indefinitely.
+      signal: AbortSignal.timeout(8000),
     });
 
     const result = (await response.json()) as HesabeCheckoutResponse;

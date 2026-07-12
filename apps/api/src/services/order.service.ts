@@ -625,24 +625,28 @@ export class OrderService {
       // Record inventory history. The decrement already happened atomically in
       // the loop above (stockChanges holds the accurate pre/post PRODUCT stock
       // per line); here we only write the ledger, atomic with the order via the
-      // same transaction, using newOrder.id as the reference (DB-010).
-      for (const item of cart.items) {
-        if (!item.product.trackInventory) continue;
+      // same transaction, using newOrder.id as the reference (DB-010). Collected
+      // and written as a single createMany instead of one create() per line item.
+      const inventoryHistoryRows = cart.items.flatMap(item => {
+        if (!item.product.trackInventory) return [];
         const variantId = (item as { variantId?: string }).variantId;
         const sc = stockChanges.get(`${item.productId}::${variantId ?? ''}`);
-        if (!sc) continue;
-        await tx.inventoryHistory.create({
-          data: {
+        if (!sc) return [];
+        return [
+          {
             productId: item.productId,
             storeId,
-            type: 'sale',
+            type: 'sale' as const,
             quantity: -item.quantity,
             previousStock: sc.previousStock,
             newStock: sc.newStock,
             reason: 'Sold via order',
             reference: newOrder.id,
           },
-        });
+        ];
+      });
+      if (inventoryHistoryRows.length > 0) {
+        await tx.inventoryHistory.createMany({ data: inventoryHistoryRows });
       }
 
       // Create BackorderLine rows and mark OrderItems as cost-deferred for any

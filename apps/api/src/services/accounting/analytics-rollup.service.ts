@@ -262,8 +262,20 @@ export async function runCohortRollup(storeId: string): Promise<number> {
     cohortCustomers.get(ym)!.add(key);
   }
 
-  // Step 6: iterate cohort months and period offsets
-  let rowsWritten = 0;
+  // Step 6: compute every cohort/offset row first (pure — no DB I/O), then
+  // batch-write: one createMany for brand-new rows, individual updates only
+  // for rows a prior run already wrote (reruns of the same period). This
+  // replaces one findFirst + create/update round-trip per row with a single
+  // batched query for the common (fresh) case.
+  type CohortRow = {
+    cohortMonth: string;
+    periodOffset: number;
+    customersTotal: number;
+    customersActive: number;
+    ordersInPeriod: number;
+    revenueInPeriod: number;
+  };
+  const computedRows: CohortRow[] = [];
 
   for (const cohortYm of cohortMonths) {
     const cohortSet = cohortCustomers.get(cohortYm);
@@ -290,44 +302,68 @@ export async function runCohortRollup(storeId: string): Promise<number> {
       );
 
       const activeSet = new Set(windowOrders.map(o => o.key));
-      const customersActive = activeSet.size;
-      const ordersInPeriod = windowOrders.length;
-      const revenueInPeriod = windowOrders.reduce((sum, o) => sum + o.total, 0);
 
-      // findFirst + create/update (null-safety pattern — same as B3 T3/T4)
+      computedRows.push({
+        cohortMonth: cohortYm,
+        periodOffset: offset,
+        customersTotal,
+        customersActive: activeSet.size,
+        ordersInPeriod: windowOrders.length,
+        revenueInPeriod: windowOrders.reduce((sum, o) => sum + o.total, 0),
+      });
+    }
+  }
+
+  let rowsWritten = 0;
+
+  if (computedRows.length > 0) {
+    const existing = await prisma.customerCohortSnapshot.findMany({
+      where: { storeId, cohortMonth: { in: cohortMonths } },
+      select: { id: true, cohortMonth: true, periodOffset: true },
+    });
+    const existingIdByKey = new Map(
+      existing.map(e => [`${e.cohortMonth}::${e.periodOffset}`, e.id])
+    );
+
+    const toCreate: Array<CohortRow & { storeId: string; computedAt: Date }> = [];
+    const toUpdate: Array<{ id: string; row: CohortRow }> = [];
+    for (const row of computedRows) {
+      const existingId = existingIdByKey.get(`${row.cohortMonth}::${row.periodOffset}`);
+      if (existingId) {
+        toUpdate.push({ id: existingId, row });
+      } else {
+        toCreate.push({ storeId, ...row, computedAt: new Date() });
+      }
+    }
+
+    if (toCreate.length > 0) {
       try {
-        const existing = await prisma.customerCohortSnapshot.findFirst({
-          where: { storeId, cohortMonth: cohortYm, periodOffset: offset },
-          select: { id: true },
+        await prisma.customerCohortSnapshot.createMany({ data: toCreate });
+        rowsWritten += toCreate.length;
+      } catch (err) {
+        logger.error(
+          { err, storeId, count: toCreate.length },
+          'cohort-rollup: batched create failed'
+        );
+      }
+    }
+
+    for (const { id, row } of toUpdate) {
+      try {
+        await prisma.customerCohortSnapshot.update({
+          where: { id },
+          data: {
+            customersTotal: row.customersTotal,
+            customersActive: row.customersActive,
+            ordersInPeriod: row.ordersInPeriod,
+            revenueInPeriod: row.revenueInPeriod,
+            computedAt: new Date(),
+          },
         });
-
-        const payload = {
-          customersTotal,
-          customersActive,
-          ordersInPeriod,
-          revenueInPeriod,
-          computedAt: new Date(),
-        };
-
-        if (existing) {
-          await prisma.customerCohortSnapshot.update({
-            where: { id: existing.id },
-            data: payload,
-          });
-        } else {
-          await prisma.customerCohortSnapshot.create({
-            data: {
-              storeId,
-              cohortMonth: cohortYm,
-              periodOffset: offset,
-              ...payload,
-            },
-          });
-        }
         rowsWritten++;
       } catch (err) {
         logger.error(
-          { err, storeId, cohortYm, offset },
+          { err, storeId, cohortYm: row.cohortMonth, offset: row.periodOffset },
           'cohort-rollup: failed to write snapshot row'
         );
       }
@@ -350,7 +386,18 @@ export async function runCohortRollup(storeId: string): Promise<number> {
  */
 export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<number> {
   const today = kwDayStart(new Date());
-  let rowsWritten = 0;
+
+  type FunnelRow = {
+    periodDate: Date;
+    productViews: number;
+    cartsCreated: number;
+    cartItemsAdded: number;
+    checkoutsStarted: number;
+    ordersCompleted: number;
+    ordersAbandoned: number;
+    revenueFils: number;
+  };
+  const computedRows: FunnelRow[] = [];
 
   for (let d = daysBack; d >= 1; d--) {
     const dayStart = kwDaysAgo(d, new Date(today.getTime() + KW_OFFSET_MS)); // shift back to KW reference
@@ -411,42 +458,74 @@ export async function runFunnelRollup(storeId: string, daysBack = 7): Promise<nu
     });
     const productViews = productViewsAgg._sum.count ?? 0;
 
-    try {
-      const periodDate = dayStart; // store as UTC midnight-aligned KW day start
+    computedRows.push({
+      periodDate: dayStart, // store as UTC midnight-aligned KW day start
+      productViews,
+      cartsCreated,
+      cartItemsAdded,
+      checkoutsStarted,
+      ordersCompleted,
+      ordersAbandoned,
+      revenueFils,
+    });
+  }
 
-      const existing = await prisma.funnelSnapshot.findFirst({
-        where: { storeId, periodDate },
-        select: { id: true },
-      });
+  // Batch-write: one createMany for brand-new days, individual updates only
+  // for days a prior run already wrote (reruns of the same window).
+  let rowsWritten = 0;
 
-      const payload = {
-        productViews,
-        cartsCreated,
-        cartItemsAdded,
-        checkoutsStarted,
-        ordersCompleted,
-        ordersAbandoned,
-        revenueFils,
-        computedAt: new Date(),
-      };
+  if (computedRows.length > 0) {
+    const existing = await prisma.funnelSnapshot.findMany({
+      where: { storeId, periodDate: { in: computedRows.map(r => r.periodDate) } },
+      select: { id: true, periodDate: true },
+    });
+    const existingIdByDate = new Map(existing.map(e => [e.periodDate.getTime(), e.id]));
 
-      if (existing) {
-        await prisma.funnelSnapshot.update({
-          where: { id: existing.id },
-          data: payload,
-        });
+    const toCreate: Array<FunnelRow & { storeId: string; computedAt: Date }> = [];
+    const toUpdate: Array<{ id: string; row: FunnelRow }> = [];
+    for (const row of computedRows) {
+      const existingId = existingIdByDate.get(row.periodDate.getTime());
+      if (existingId) {
+        toUpdate.push({ id: existingId, row });
       } else {
-        await prisma.funnelSnapshot.create({
+        toCreate.push({ storeId, ...row, computedAt: new Date() });
+      }
+    }
+
+    if (toCreate.length > 0) {
+      try {
+        await prisma.funnelSnapshot.createMany({ data: toCreate });
+        rowsWritten += toCreate.length;
+      } catch (err) {
+        logger.error(
+          { err, storeId, count: toCreate.length },
+          'funnel-rollup: batched create failed'
+        );
+      }
+    }
+
+    for (const { id, row } of toUpdate) {
+      try {
+        await prisma.funnelSnapshot.update({
+          where: { id },
           data: {
-            storeId,
-            periodDate,
-            ...payload,
+            productViews: row.productViews,
+            cartsCreated: row.cartsCreated,
+            cartItemsAdded: row.cartItemsAdded,
+            checkoutsStarted: row.checkoutsStarted,
+            ordersCompleted: row.ordersCompleted,
+            ordersAbandoned: row.ordersAbandoned,
+            revenueFils: row.revenueFils,
+            computedAt: new Date(),
           },
         });
+        rowsWritten++;
+      } catch (err) {
+        logger.error(
+          { err, storeId, dayStart: row.periodDate },
+          'funnel-rollup: failed to write snapshot row'
+        );
       }
-      rowsWritten++;
-    } catch (err) {
-      logger.error({ err, storeId, dayStart }, 'funnel-rollup: failed to write snapshot row');
     }
   }
 
@@ -543,8 +622,19 @@ export async function runRfmRollup(storeId: string): Promise<number> {
   const freqArr = metrics.map(m => m.paidCount);
   const monArr = metrics.map(m => m.totalPaidFils);
 
-  // Step 5: write snapshots
-  let rowsWritten = 0;
+  // Step 5: compute every customer's row first (pure), then batch-write: one
+  // createMany for customers with no prior snapshot, individual updates only
+  // for customers a prior run already segmented (need their previousSegment).
+  type RfmRow = {
+    customerId: string;
+    isGuest: boolean;
+    recencyDays: number;
+    frequencyOrders: number;
+    monetaryFils: number;
+    rfmScore: number;
+    segment: RfmSegment;
+  };
+  const computedRows: RfmRow[] = [];
 
   for (const m of metrics) {
     const rQ = quintile(recencyArr, m.recencyDays, true); // invert: lower days = better
@@ -559,44 +649,69 @@ export async function runRfmRollup(storeId: string): Promise<number> {
       mQ,
     });
 
-    try {
-      // Load previous snapshot for previousSegment field
-      const prev = await prisma.customerRfmSnapshot.findFirst({
-        where: { storeId, customerId: m.key },
-        select: { id: true, segment: true },
-      });
+    computedRows.push({
+      customerId: m.key,
+      isGuest: m.isGuest,
+      recencyDays: m.recencyDays,
+      frequencyOrders: m.paidCount,
+      monetaryFils: m.totalPaidFils,
+      rfmScore,
+      segment,
+    });
+  }
 
-      const payload = {
-        isGuest: m.isGuest,
-        recencyDays: m.recencyDays,
-        frequencyOrders: m.paidCount,
-        monetaryFils: m.totalPaidFils,
-        rfmScore,
-        segment,
-        previousSegment: prev?.segment ?? null,
-        computedAt: new Date(),
-      };
+  let rowsWritten = 0;
 
+  if (computedRows.length > 0) {
+    const existing = await prisma.customerRfmSnapshot.findMany({
+      where: { storeId, customerId: { in: computedRows.map(r => r.customerId) } },
+      select: { id: true, customerId: true, segment: true },
+    });
+    const existingByCustomerId = new Map(existing.map(e => [e.customerId, e]));
+
+    const toCreate: Array<RfmRow & { storeId: string; previousSegment: null; computedAt: Date }> =
+      [];
+    const toUpdate: Array<{ id: string; row: RfmRow; previousSegment: RfmSegment }> = [];
+    for (const row of computedRows) {
+      const prev = existingByCustomerId.get(row.customerId);
       if (prev) {
-        await prisma.customerRfmSnapshot.update({
-          where: { id: prev.id },
-          data: payload,
-        });
+        toUpdate.push({ id: prev.id, row, previousSegment: prev.segment });
       } else {
-        await prisma.customerRfmSnapshot.create({
+        toCreate.push({ storeId, ...row, previousSegment: null, computedAt: new Date() });
+      }
+    }
+
+    if (toCreate.length > 0) {
+      try {
+        await prisma.customerRfmSnapshot.createMany({ data: toCreate });
+        rowsWritten += toCreate.length;
+      } catch (err) {
+        logger.error({ err, storeId, count: toCreate.length }, 'rfm-rollup: batched create failed');
+      }
+    }
+
+    for (const { id, row, previousSegment } of toUpdate) {
+      try {
+        await prisma.customerRfmSnapshot.update({
+          where: { id },
           data: {
-            storeId,
-            customerId: m.key,
-            ...payload,
+            isGuest: row.isGuest,
+            recencyDays: row.recencyDays,
+            frequencyOrders: row.frequencyOrders,
+            monetaryFils: row.monetaryFils,
+            rfmScore: row.rfmScore,
+            segment: row.segment,
+            previousSegment,
+            computedAt: new Date(),
           },
         });
+        rowsWritten++;
+      } catch (err) {
+        logger.error(
+          { err, storeId, customerKey: row.customerId },
+          'rfm-rollup: failed to write snapshot row'
+        );
       }
-      rowsWritten++;
-    } catch (err) {
-      logger.error(
-        { err, storeId, customerKey: m.key },
-        'rfm-rollup: failed to write snapshot row'
-      );
     }
   }
 

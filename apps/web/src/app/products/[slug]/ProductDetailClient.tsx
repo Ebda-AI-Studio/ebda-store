@@ -149,7 +149,6 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const [selectedImage, setSelectedImage] = useState(0);
   const [isAdding, setIsAdding] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   // Selected variant from VariantSelector (null = no variant chosen or invalid combo)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
@@ -341,21 +340,22 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
 
   const handleToggleWishlist = async () => {
     if (!product) return;
-    setIsTogglingWishlist(true);
+    // Optimistic toggle (mirrors CartContext.addItem) — flip immediately,
+    // fire the API call, roll back on failure. No blocking gate: the UI
+    // must never wait on the network round-trip to reflect the toggle.
+    const wasWishlisted = isWishlisted;
+    setIsWishlisted(!wasWishlisted);
     try {
-      if (isWishlisted) {
+      if (wasWishlisted) {
         await api.delete(`/wishlist/product/${product.id}`);
-        setIsWishlisted(false);
         toastSuccess('Removed from wishlist', `${product.name} removed from your wishlist`);
       } else {
         await api.post('/wishlist', { productId: product.id });
-        setIsWishlisted(true);
         toastSuccess('Added to wishlist', `${product.name} added to your wishlist`);
       }
     } catch {
+      setIsWishlisted(wasWishlisted);
       toastError('Error', 'Failed to update wishlist. Please try again.');
-    } finally {
-      setIsTogglingWishlist(false);
     }
   };
 
@@ -370,7 +370,6 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     }
 
     setIsAdding(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
     addItem(
       {
         id: product.id,
@@ -802,7 +801,6 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
                     size="lg"
                     variant="outline"
                     onClick={handleToggleWishlist}
-                    disabled={isTogglingWishlist}
                     aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                   >
                     <svg
