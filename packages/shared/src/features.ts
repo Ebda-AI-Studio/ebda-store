@@ -24,6 +24,7 @@ export const FEATURE_KEYS_ARRAY = [
   'abandoned_cart',
   'affiliate',
   'marketing_pixels',
+  'agent_feed',
   'shipping_carriers',
   'staff_accounts',
   'pwa',
@@ -255,6 +256,17 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'بكسلات التسويق (Meta/Facebook وGoogle وTikTok) مع واجهة برمجة تحويلات من جانب الخادم (CAPI) لـ Meta وTikTok — تُطلَق مع كل طلب حتى عند حجب البكسل من قِبل أدوات منع الإعلانات.',
     category: 'marketing',
     tier: 'core',
+  },
+  agent_feed: {
+    key: 'agent_feed',
+    name: 'AI Product Feed',
+    nameAr: 'خلاصة المنتجات للذكاء الاصطناعي',
+    description:
+      'Publishes a machine-readable product feed at /feeds/products.json so AI assistants and shopping agents (ChatGPT, Perplexity, and agent crawlers) can read, cite, and recommend the store’s products. Follows the OpenAI Product Feed field conventions.',
+    descriptionAr:
+      'ينشر خلاصة منتجات قابلة للقراءة آليًا على /feeds/products.json حتى تتمكن مساعدات الذكاء الاصطناعي ووكلاء التسوق (ChatGPT وPerplexity وزواحف الوكلاء) من قراءة منتجات المتجر والاستشهاد بها والتوصية بها. تتبع اصطلاحات حقول خلاصة منتجات OpenAI.',
+    category: 'marketing',
+    tier: 'addon',
   },
   shipping_carriers: {
     key: 'shipping_carriers',

@@ -40,6 +40,12 @@ interface PublicStore {
   // Set by the bulk-ai-llms-txt sweep (or hand-edited by the merchant).
   // When non-empty, served verbatim — overrides the auto-generated body.
   llmsTxt?: string | null;
+  // Threaded on by fetchStore/fetchStoreByHost from the sibling
+  // `data.enabledFeatures` array the /public/stores/<slug> and
+  // /public/store/resolve endpoints return (same shape store-resolver.ts
+  // reads client-side). Used to conditionally advertise the agent_feed
+  // add-on below.
+  enabledFeatures?: string[];
 }
 
 interface PublicCategory {
@@ -93,7 +99,12 @@ async function fetchStore(slug: string): Promise<PublicStore | null> {
     });
     if (!res.ok) return null;
     const json = await res.json();
-    return json?.data?.store ?? null;
+    const store = json?.data?.store ?? null;
+    if (!store) return null;
+    const enabledFeatures = Array.isArray(json?.data?.enabledFeatures)
+      ? json.data.enabledFeatures
+      : undefined;
+    return { ...store, enabledFeatures };
   } catch {
     return null;
   }
@@ -115,7 +126,12 @@ async function fetchStoreByHost(host: string): Promise<PublicStore | null> {
     });
     if (!res.ok) return null;
     const json = await res.json();
-    return json?.data?.store ?? null;
+    const store = json?.data?.store ?? null;
+    if (!store) return null;
+    const enabledFeatures = Array.isArray(json?.data?.enabledFeatures)
+      ? json.data.enabledFeatures
+      : undefined;
+    return { ...store, enabledFeatures };
   } catch {
     return null;
   }
@@ -254,6 +270,12 @@ function buildPerStoreBody(
   const storeTitle = store.nameAr ? `${store.name} (${store.nameAr})` : store.name;
   const storeDesc = store.description || `${store.name} on Force AI Store — Kuwait-based merchant.`;
 
+  // agent_feed is an individually-priced add-on (not in any plan baseline) —
+  // only advertise the machine-readable feed when the store has bought it.
+  const feedSection = store.enabledFeatures?.includes('agent_feed')
+    ? `\n\n## Product Feed\n\n- [Machine-readable product feed (JSON)](${base}/feeds/products.json)`
+    : '';
+
   return `# ${storeTitle}
 
 > ${storeDesc}
@@ -268,7 +290,7 @@ ${catLines || '_No active categories._'}
 
 ## Products (${totalProducts} total, showing ${products.length})
 
-${prodLines || '_No active products._'}
+${prodLines || '_No active products._'}${feedSection}
 
 ## For AI agents
 

@@ -245,6 +245,17 @@ Probably. The full feature catalog is in [02-feature-catalog.md](02-feature-cata
 - ⚠️ **Multi-vendor marketplace** — not yet (each Force AI Store tenant is a single merchant)
 - ⚠️ **Dropshipping integration** — not on roadmap
 
+### What is the AI Product Feed?
+
+An individually-priced add-on (`agent_feed`) available to any plan tier — it's not bundled into
+Starter, Professional, or Enterprise by default; a super-admin turns it on per store once it's
+sold. Once enabled, your store publishes a machine-readable product feed at
+`/feeds/products.json` (e.g. `yourstore.com/feeds/products.json`) so AI assistants and shopping
+agents — ChatGPT, Perplexity, and other agent crawlers — can read your catalog and cite or
+recommend your products directly, following the OpenAI Product Feed field conventions (title,
+price, availability, image, category). Stores that haven't purchased the add-on get a 404 on that
+URL — the feed's existence isn't revealed until it's activated.
+
 ### Can I customize the design?
 
 Yes, deeply. All design controls live in **Admin → Page Builder**, which is the single destination

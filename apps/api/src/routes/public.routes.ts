@@ -22,6 +22,8 @@ import { featureService } from '../services/feature.service';
 import { getCached } from '../lib/public-cache';
 import { redis } from '../services/redis.service';
 import { setEdgeCache } from '../lib/edge-cache';
+import { AppError } from '../middleware/error-handler';
+import { buildProductFeed } from '../lib/product-feed';
 import { stripMarketingPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { verifyReviewToken } from '../lib/review-token';
 import { inngest } from '../lib/inngest/client';
@@ -265,6 +267,52 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
     });
   } catch (error) {
     next(error);
+  }
+});
+
+/**
+ * GET /public/feed/products.json — AI Product Feed (agent_feed add-on).
+ * Fail-closed: 404 when the feature is not enabled for the store, so the
+ * URL does not reveal the add-on's existence on stores that didn't buy it.
+ * Response is the raw feed JSON (no {success,data} envelope) — this is a
+ * public, machine-readable document consumed directly by AI shopping
+ * agents, not an internal API response.
+ */
+router.get('/feed/products.json', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const storeId = await getStoreIdFromRequest(req);
+    const enabled = await featureService.isFeatureEnabled(storeId, 'agent_feed');
+    if (!enabled) {
+      throw new AppError(404, 'NOT_FOUND', 'Not found');
+    }
+    const store = await prisma.store.findUniqueOrThrow({
+      where: { id: storeId },
+      select: { id: true, name: true, slug: true, currency: true, domain: true },
+    });
+    const baseUrl = store.domain
+      ? `https://${store.domain}`
+      : `https://${req.get('x-original-host') ?? req.get('host')}`;
+    // Cache key under public:products:<storeId>:* so invalidateStoreProductCaches busts it on product writes.
+    const feed = await getCached(`public:products:${storeId}:feed:v1`, 600, async () => {
+      // listPublic() internally caps limit at 100 (Math.min(100, ...)) — the
+      // feed is bounded to a store's first 100 active products until a
+      // dedicated paginated/full-catalog feed path is built.
+      //
+      // Deliberately omit `sort` here: passing sort: 'newest' would filter
+      // to where.isNew = true (the "New Arrivals" carousel flag), silently
+      // excluding the rest of the catalog from the feed. No `sort` uses the
+      // service default (createdAt desc across ALL active products), which
+      // is what an AI product feed needs.
+      const { products } = await ProductService.listPublic(storeId, {
+        status: 'active',
+        limit: 100,
+      });
+      return buildProductFeed(store, products, baseUrl);
+    });
+    setEdgeCache(res, { sMaxAge: 600, staleWhileRevalidate: 86400 });
+    res.json(feed);
+  } catch (err) {
+    next(err);
   }
 });
 

@@ -451,6 +451,10 @@ Send promotional email campaigns to your subscriber list directly from **Admin �
 
 The affiliate program is available as a premium add-on. Affiliates, influencers, or loyal customers each get a unique referral link. Every completed order through their link earns the affiliate their configured commission. Invite new affiliates directly from the admin with the **Invite** button — sends a branded onboarding email automatically.
 
+### AI Product Feed (خلاصة المنتجات للذكاء الاصطناعي)
+
+Available as an individually-priced add-on, sold separately from any plan tier. Publishes a machine-readable product feed at `/feeds/products.json` so AI assistants and shopping agents (ChatGPT, Perplexity, and agent crawlers) can read, cite, and recommend the store's products — following the OpenAI Product Feed field conventions (title, price, availability, image, and category per product). The feed URL returns a 404 for any store that hasn't purchased the add-on, so its existence is never revealed to stores without it. Once enabled, the store's `llms.txt` index also links to the feed for AI crawlers.
+
 ---
 
 ## 11. Plan-Gated Features — What Each Tier Unlocks
