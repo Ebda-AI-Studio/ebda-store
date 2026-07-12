@@ -347,6 +347,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
               textColor={store.announcementBar.textColor}
               dismissible={store.announcementBar.dismissible}
               isRtl={isRtl}
+              urlPrefix={storeUrl('')}
             />
           </div>
         )}

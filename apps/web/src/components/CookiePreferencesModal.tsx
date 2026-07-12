@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useConsent } from '../contexts/ConsentContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useStoreUrl } from '../contexts/StoreContext';
 
 /**
  * Cookie preferences modal — granular consent toggles. Triggered from:
@@ -23,6 +24,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 export function CookiePreferencesModal() {
   const { isPreferencesOpen, closePreferences, consent, setConsent } = useConsent();
   const { t, isRtl } = useLanguage();
+  const storeUrl = useStoreUrl();
   // Local draft state — only commits to the cookie when the user clicks Save.
   const [marketingDraft, setMarketingDraft] = useState(consent?.marketing ?? false);
 
@@ -93,7 +95,11 @@ export function CookiePreferencesModal() {
             'Control which cookies this site can use. Essential cookies are always on so the store works correctly.',
             'تحكم بملفات تعريف الارتباط التي يستخدمها هذا الموقع. الملفات الأساسية مفعّلة دائماً لضمان عمل المتجر بشكل صحيح.'
           )}{' '}
-          <Link href="/privacy" prefetch={false} className="underline hover:text-foreground">
+          <Link
+            href={storeUrl('/privacy')}
+            prefetch={false}
+            className="underline hover:text-foreground"
+          >
             {t('Read privacy policy', 'اقرأ سياسة الخصوصية')}
           </Link>
         </p>

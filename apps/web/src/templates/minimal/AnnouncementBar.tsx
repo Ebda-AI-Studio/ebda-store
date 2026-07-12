@@ -10,12 +10,18 @@ export default function MinimalAnnouncementBar({
   textAr,
   link,
   isRtl: isRtlProp,
+  urlPrefix,
 }: AnnouncementBarProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayText = isRtl && textAr ? textAr : text;
 
   if (!displayText) return null;
+
+  // Store-slug prefix on relative internal links only — see urlPrefix doc
+  // on HeroBannerProps.
+  const safeLink = sanitizeUrl(link);
+  const resolvedLink = urlPrefix && safeLink.startsWith('/') ? `${urlPrefix}${safeLink}` : safeLink;
 
   const content = (
     <span className="text-[10px] tracking-[0.28em] uppercase font-light text-foreground/80">
@@ -29,7 +35,7 @@ export default function MinimalAnnouncementBar({
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {link ? (
-        <Link href={sanitizeUrl(link)} className="hover:opacity-70 transition-opacity">
+        <Link href={resolvedLink} className="hover:opacity-70 transition-opacity">
           {content}
         </Link>
       ) : (

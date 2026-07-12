@@ -16,6 +16,7 @@ export default function ClassicHero({
   ctaTextAr,
   ctaLink = '/products',
   isRtl: isRtlProp,
+  urlPrefix = '',
 }: HeroProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -29,6 +30,8 @@ export default function ClassicHero({
   // Defensive XSS guard: reject `javascript:`/`data:` schemes before the link
   // reaches an `<a href>`.
   const safeCtaLink = sanitizeUrl(ctaLink, '/products');
+  const resolvedCtaLink =
+    safeCtaLink.startsWith('/') && urlPrefix ? `${urlPrefix}${safeCtaLink}` : safeCtaLink;
 
   return (
     <section className="bg-white dark:bg-background overflow-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -76,7 +79,7 @@ export default function ClassicHero({
             {/* CTA — outlined button with classic serif treatment */}
             <div className={image ? (isRtl ? 'text-right' : 'text-left') : 'text-center'}>
               <Link
-                href={safeCtaLink}
+                href={resolvedCtaLink}
                 data-cta="button"
                 className="group inline-flex min-h-[44px] items-center gap-3 border border-foreground px-9 py-3.5 font-serif text-sm tracking-[0.22em] uppercase text-foreground hover:bg-foreground hover:text-background transition-colors duration-500 ease-out cursor-pointer"
               >

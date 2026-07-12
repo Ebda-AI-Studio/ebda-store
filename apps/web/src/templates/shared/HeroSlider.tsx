@@ -27,6 +27,7 @@ export function HeroSlider({
   pack,
   presentation = 'full-bleed',
   headingZone,
+  urlPrefix,
 }: HeroSliderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const pausedRef = useRef(false);
@@ -80,6 +81,7 @@ export function HeroSlider({
         priority
         presentation={presentation}
         headingZone={headingZone}
+        urlPrefix={urlPrefix}
       />
     );
   }
@@ -150,6 +152,7 @@ export function HeroSlider({
               priority={i === 0}
               presentation={presentation}
               headingZone={headingZone}
+              urlPrefix={urlPrefix}
             />
           </div>
         ))}

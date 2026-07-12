@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@force/ui';
-import { useStore } from '../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { API_URL } from '../lib/api';
 import { formatDate as formatStoreDate } from '../lib/format-date';
@@ -140,6 +140,7 @@ function getReviewerName(review: Review): string {
 export default function ReviewSection({ storeId, productId }: Props) {
   const { store } = useStore();
   const { t, language } = useLanguage();
+  const storeUrl = useStoreUrl();
 
   // Tenant-aware date formatter for review timestamps. Uses the store's
   // timezone so a 23:30 UTC review from a Kuwait store reads "Jan 5"
@@ -491,7 +492,10 @@ export default function ReviewSection({ storeId, productId }: Props) {
       <div className="mt-10">
         {!isLoggedIn ? (
           <p className="text-muted-foreground">
-            <Link href="/auth/login" className="font-medium text-primary hover:underline">
+            <Link
+              href={storeUrl('/auth/login')}
+              className="font-medium text-primary hover:underline"
+            >
               {t('Log in', 'تسجيل الدخول')}
             </Link>{' '}
             {t('to write a review.', 'لكتابة مراجعة.')}

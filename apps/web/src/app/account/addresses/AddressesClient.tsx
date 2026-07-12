@@ -6,6 +6,7 @@ import { Button, Input, Modal, Select, useToast } from '@force/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useStoreUrl } from '../../../contexts/StoreContext';
 
 interface Address {
   id: string;
@@ -41,6 +42,7 @@ export default function AddressesClient() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { success, error: toastError } = useToast();
   const { t } = useLanguage();
+  const storeUrl = useStoreUrl();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +55,7 @@ export default function AddressesClient() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/auth/login?redirect=/account/addresses');
+      router.push(storeUrl('/auth/login?redirect=/account/addresses'));
     }
   }, [isAuthenticated, authLoading, router]);
 

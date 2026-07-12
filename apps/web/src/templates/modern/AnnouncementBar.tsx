@@ -17,6 +17,7 @@ export default function ModernAnnouncementBar({
   dismissible = true,
   isRtl: isRtlProp,
   onDismiss,
+  urlPrefix,
 }: AnnouncementBarProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -31,6 +32,11 @@ export default function ModernAnnouncementBar({
 
   const displayText = isRtl && textAr ? textAr : text;
   const displayLinkText = isRtl && linkTextAr ? linkTextAr : linkText;
+
+  // Store-slug prefix on relative internal links only — see urlPrefix doc
+  // on HeroBannerProps.
+  const safeLink = sanitizeUrl(link);
+  const resolvedLink = urlPrefix && safeLink.startsWith('/') ? `${urlPrefix}${safeLink}` : safeLink;
 
   const handleDismiss = () => {
     setIsVisible(false);
@@ -61,7 +67,7 @@ export default function ModernAnnouncementBar({
             </span>
             {link && (
               <Link
-                href={sanitizeUrl(link)}
+                href={resolvedLink}
                 className="inline-flex items-center gap-1 text-sm font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity shrink-0"
               >
                 {displayLinkText || (isRtl ? 'تسوق الآن' : 'Shop Now')}

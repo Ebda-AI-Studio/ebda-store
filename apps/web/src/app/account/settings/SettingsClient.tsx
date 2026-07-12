@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Input, useToast } from '@force/ui';
 import { api } from '@/lib/api';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useStoreUrl } from '../../../contexts/StoreContext';
 
 interface User {
   id: string;
@@ -17,6 +18,7 @@ interface User {
 export default function SettingsClient() {
   const router = useRouter();
   const { t } = useLanguage();
+  const storeUrl = useStoreUrl();
   const [, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -214,7 +216,7 @@ export default function SettingsClient() {
           t('Your account data has been anonymized.', 'تم إخفاء بيانات حسابك.')
         );
         // Redirect to home after account deletion
-        router.push('/');
+        router.push(storeUrl('/'));
       } else {
         toastError(
           t('Delete failed', 'فشل الحذف'),

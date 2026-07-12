@@ -403,6 +403,13 @@ export interface HeroBannerProps {
    * identified in the 2026-05-20 page-builder audit.
    */
   headingZone?: ResolvedZone;
+  /**
+   * Store-slug URL prefix (from `useStoreUrl('')`) — prefixed onto relative
+   * internal `ctaHref`/`link` values so they keep store context on a
+   * platform host (`store.force-ai.co/<slug>/...`). Absolute/external
+   * links are left untouched. Empty string on custom domains.
+   */
+  urlPrefix?: string;
 }
 
 /**
@@ -424,6 +431,8 @@ export interface HeroSliderProps {
    * in the 2026-05-20 page-builder audit.
    */
   headingZone?: ResolvedZone;
+  /** See HeroBannerProps.urlPrefix — forwarded to each slide. */
+  urlPrefix?: string;
 }
 
 /**
@@ -939,6 +948,8 @@ export interface AnnouncementBarProps {
   dismissible?: boolean;
   isRtl?: boolean;
   onDismiss?: () => void;
+  /** See HeroBannerProps.urlPrefix — prefixed onto a relative `link`. */
+  urlPrefix?: string;
 }
 
 /**

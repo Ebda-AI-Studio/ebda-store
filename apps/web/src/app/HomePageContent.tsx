@@ -360,6 +360,7 @@ export function HomePageContent({
                 pack={templateId}
                 presentation={layout.hero.presentation}
                 headingZone={heroHeadingZone}
+                urlPrefix={storeUrl('')}
               />
             )}
             {layout.hero.enabled && bannerEligible && T.HeroBanner && (
@@ -369,6 +370,7 @@ export function HomePageContent({
                 pack={templateId}
                 presentation={layout.hero.presentation}
                 headingZone={heroHeadingZone}
+                urlPrefix={storeUrl('')}
               />
             )}
             {layout.hero.enabled && !sliderEligible && !bannerEligible && legacyHeroHasContent && (
@@ -382,6 +384,7 @@ export function HomePageContent({
                 ctaTextAr={heroCtaArVal}
                 ctaLink={heroCtaLink}
                 isRtl={isRtl}
+                urlPrefix={storeUrl('')}
               />
             )}
           </div>

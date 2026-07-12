@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useConsent } from '../contexts/ConsentContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useStoreUrl } from '../contexts/StoreContext';
 
 /**
  * Bottom-anchored cookie consent banner. Only renders when the visitor
@@ -23,6 +24,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 export function CookieConsentBanner() {
   const { hasDecided, setConsent, openPreferences } = useConsent();
   const { t, isRtl } = useLanguage();
+  const storeUrl = useStoreUrl();
 
   // Don't render once the user has decided. The footer "Cookie preferences"
   // link is how they get back to change their mind later.
@@ -66,7 +68,11 @@ export function CookieConsentBanner() {
                 'We use essential cookies to run the store and optional marketing cookies to measure ads. You can accept, reject, or choose what to allow.',
                 'نستخدم ملفات أساسية لتشغيل المتجر وملفات تسويقية اختيارية لقياس الإعلانات. يمكنك القبول أو الرفض أو اختيار ما تسمح به.'
               )}{' '}
-              <Link href="/privacy" prefetch={false} className="underline hover:text-foreground">
+              <Link
+                href={storeUrl('/privacy')}
+                prefetch={false}
+                className="underline hover:text-foreground"
+              >
                 {t('Learn more', 'اعرف المزيد')}
               </Link>
             </p>

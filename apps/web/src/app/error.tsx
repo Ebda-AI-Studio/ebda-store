@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useStoreUrl } from '../contexts/StoreContext';
 
 export default function Error({
   error: _error,
@@ -12,6 +13,7 @@ export default function Error({
   const lang =
     typeof document !== 'undefined' && document.documentElement.lang === 'ar' ? 'ar' : 'en';
   const t = (en: string, ar: string) => (lang === 'ar' ? ar : en);
+  const storeUrl = useStoreUrl();
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
@@ -47,7 +49,7 @@ export default function Error({
           {t('Try Again', 'حاول مرة أخرى')}
         </button>
         <Link
-          href="/"
+          href={storeUrl('/')}
           className="rounded-lg border border-border px-6 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
         >
           {t('Go Home', 'العودة للرئيسية')}

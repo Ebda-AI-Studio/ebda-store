@@ -9,6 +9,8 @@ export interface HeroBannerLinkProps {
   link?: string;
   /** Accessible label for the stretched anchor — slide headline or alt text. */
   label?: string;
+  /** See HeroBannerProps.urlPrefix — prefixed onto relative `link` values. */
+  urlPrefix?: string;
   children: ReactNode;
 }
 
@@ -38,8 +40,8 @@ export { resolveBannerLink };
  * consumer's container class includes `relative`) for `absolute inset-0`
  * to cover exactly the slide.
  */
-export function HeroBannerLink({ link, label, children }: HeroBannerLinkProps) {
-  const safeLink = resolveBannerLink(link);
+export function HeroBannerLink({ link, label, urlPrefix, children }: HeroBannerLinkProps) {
+  const safeLink = resolveBannerLink(link, urlPrefix);
 
   if (!safeLink) {
     return <>{children}</>;

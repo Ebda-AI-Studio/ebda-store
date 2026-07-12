@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useStore } from '../../contexts/StoreContext';
+import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { ShopChrome } from '../../components';
 
 interface StoreHowtoStep {
@@ -29,6 +29,7 @@ interface HowToGuidesClientProps {
 export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClientProps) {
   const { t, language } = useLanguage();
   const { store } = useStore();
+  const storeUrl = useStoreUrl();
   const isAr = language === 'ar';
   const [openIndex, setOpenIndex] = useState<number | null>(0); // first guide open by default
 
@@ -132,7 +133,7 @@ export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClien
               )}
             </p>
             <Link
-              href="/faq"
+              href={storeUrl('/faq')}
               prefetch={false}
               className="mt-4 inline-flex items-center min-h-11 text-sm font-medium text-primary hover:underline"
             >
@@ -149,7 +150,7 @@ export default function HowToGuidesClient({ storeHowtos = [] }: HowToGuidesClien
               {t('Looking for quick answers?', 'تبحث عن إجابات سريعة؟')}
             </p>
             <Link
-              href="/faq"
+              href={storeUrl('/faq')}
               prefetch={false}
               className="mt-2 inline-flex items-center min-h-11 text-sm font-medium text-primary hover:underline"
             >

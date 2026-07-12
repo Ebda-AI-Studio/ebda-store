@@ -16,6 +16,7 @@ export default function MinimalHero({
   ctaTextAr,
   ctaLink = '/products',
   isRtl: isRtlProp,
+  urlPrefix = '',
 }: HeroProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
@@ -26,6 +27,8 @@ export default function MinimalHero({
   // Defensive XSS guard: reject `javascript:`/`data:` schemes before the link
   // reaches an `<a href>`.
   const safeCtaLink = sanitizeUrl(ctaLink, '/products');
+  const resolvedCtaLink =
+    safeCtaLink.startsWith('/') && urlPrefix ? `${urlPrefix}${safeCtaLink}` : safeCtaLink;
 
   return (
     <section className="bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -42,7 +45,7 @@ export default function MinimalHero({
         {/* Minimal CTA — text link with arrow. min-h-11 keeps the tap target
             touch-friendly without violating the typographic minimalism. */}
         <Link
-          href={safeCtaLink}
+          href={resolvedCtaLink}
           data-cta="link"
           className="group inline-flex min-h-[44px] items-center gap-2.5 px-3 py-3 text-sm tracking-[0.22em] uppercase text-foreground hover:text-primary transition-colors duration-500 ease-out cursor-pointer"
         >

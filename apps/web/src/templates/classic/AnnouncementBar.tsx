@@ -10,12 +10,18 @@ export default function ClassicAnnouncementBar({
   textAr,
   link,
   isRtl: isRtlProp,
+  urlPrefix,
 }: AnnouncementBarProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayText = isRtl && textAr ? textAr : text;
 
   if (!displayText) return null;
+
+  // Store-slug prefix on relative internal links only — see urlPrefix doc
+  // on HeroBannerProps.
+  const safeLink = sanitizeUrl(link);
+  const resolvedLink = urlPrefix && safeLink.startsWith('/') ? `${urlPrefix}${safeLink}` : safeLink;
 
   const content = (
     <div className="flex items-center justify-center gap-3 text-sm font-serif">
@@ -50,7 +56,7 @@ export default function ClassicAnnouncementBar({
     <div className="bg-foreground text-background py-3 px-4" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="container mx-auto">
         {link ? (
-          <Link href={sanitizeUrl(link)} className="block hover:opacity-80 transition-opacity">
+          <Link href={resolvedLink} className="block hover:opacity-80 transition-opacity">
             {content}
           </Link>
         ) : (

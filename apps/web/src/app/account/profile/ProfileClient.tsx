@@ -6,12 +6,14 @@ import { Button, Input, useToast } from '@force/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useStoreUrl } from '../../../contexts/StoreContext';
 
 export default function ProfileClient() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading, refreshUser } = useAuth();
   const { t } = useLanguage();
   const { success, error: toastError } = useToast();
+  const storeUrl = useStoreUrl();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -32,7 +34,7 @@ export default function ProfileClient() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/auth/login?redirect=/account/profile');
+      router.push(storeUrl('/auth/login?redirect=/account/profile'));
       return;
     }
 

@@ -10,12 +10,18 @@ export default function ElegantAnnouncementBar({
   textAr,
   link,
   isRtl: isRtlProp,
+  urlPrefix,
 }: AnnouncementBarProps) {
   const { isRtl: ctxIsRtl } = useLanguage();
   const isRtl = isRtlProp ?? ctxIsRtl;
   const displayText = isRtl && textAr ? textAr : text;
 
   if (!displayText) return null;
+
+  // Store-slug prefix on relative internal links only — see urlPrefix doc
+  // on HeroBannerProps.
+  const safeLink = sanitizeUrl(link);
+  const resolvedLink = urlPrefix && safeLink.startsWith('/') ? `${urlPrefix}${safeLink}` : safeLink;
 
   const content = (
     <span className="text-[10px] tracking-[0.3em] uppercase font-extralight text-foreground/70">
@@ -30,7 +36,7 @@ export default function ElegantAnnouncementBar({
     >
       {link ? (
         <Link
-          href={sanitizeUrl(link)}
+          href={resolvedLink}
           className="hover:opacity-70 transition-opacity inline-flex items-center gap-3"
         >
           {content}

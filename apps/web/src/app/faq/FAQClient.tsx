@@ -192,7 +192,7 @@ export default function FAQClient({ storeFaqs = [], storeHowtos = [] }: FAQClien
                 {t('How-To Guides', 'أدلة إرشادية')}
               </h2>
               <Link
-                href="/how-to-guides"
+                href={storeUrl('/how-to-guides')}
                 prefetch={false}
                 className="inline-flex items-center min-h-11 text-sm font-medium text-primary hover:underline"
               >

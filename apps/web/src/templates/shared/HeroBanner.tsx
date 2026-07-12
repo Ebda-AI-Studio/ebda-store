@@ -44,6 +44,7 @@ export function HeroBanner({
   priority = true,
   presentation = 'full-bleed',
   headingZone,
+  urlPrefix,
 }: HeroBannerProps) {
   const isFramed = presentation === 'framed';
   const desktopSrc = (isRtl && imageAr) || image;
@@ -75,6 +76,12 @@ export function HeroBanner({
   const cta = isRtl ? (ctaTextAr ?? ctaText) : (ctaText ?? ctaTextAr);
   const showOverlay = !!(text || subtitleText || cta);
   const styles = getPackStyles(pack);
+
+  // Store-slug prefix (relative internal links only — see urlPrefix doc on
+  // HeroBannerProps) so the CTA keeps store context on a platform host.
+  const safeCtaHref = sanitizeUrl(ctaHref);
+  const resolvedCtaHref =
+    urlPrefix && safeCtaHref.startsWith('/') ? `${urlPrefix}${safeCtaHref}` : safeCtaHref;
 
   // Resolve hero headline color at runtime so it is never hardcoded to white.
   // Priority order:
@@ -115,7 +122,7 @@ export function HeroBanner({
     // both are classes now, so the later sm: utility wins (no inline-style override
     // trap). sm:max-h-none removes the mobile ceiling. overflow-hidden clips both.
     <section className={containerBaseClass} style={mobileAspectStyle} dir={isRtl ? 'rtl' : 'ltr'}>
-      <HeroBannerLink link={link} label={bannerLabel}>
+      <HeroBannerLink link={link} label={bannerLabel} urlPrefix={urlPrefix}>
         {desktopSrc && (
           <picture>
             <source media="(max-width: 639px)" srcSet={mobileSrc} />
@@ -175,7 +182,7 @@ export function HeroBanner({
                 // z-0` stretched anchor (when `link` is set) so the CTA's own
                 // destination wins the click, per the stretched-link pattern.
                 <Link
-                  href={sanitizeUrl(ctaHref)}
+                  href={resolvedCtaHref}
                   className={cn(
                     'relative z-10 mt-6 inline-flex items-center justify-center',
                     styles.heroCta
