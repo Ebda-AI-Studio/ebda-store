@@ -36,20 +36,12 @@ const ZONES = [
   'filters',
 ] as const;
 
-const TRUSTED_ADMIN_HOSTS = [
-  'app.forcemediakw.com',
-  'force-admin-seven.vercel.app',
-  'localhost',
-  '127.0.0.1',
-];
+const TRUSTED_ADMIN_HOSTS = ['app.forcemediakw.com', 'admin.force-ai.co', 'localhost', '127.0.0.1'];
 
 function isTrustedParentOrigin(origin: string): boolean {
   try {
     const u = new URL(origin);
-    if (TRUSTED_ADMIN_HOSTS.includes(u.hostname)) return true;
-    // Vercel preview deploys: force-admin-*.vercel.app
-    if (/^force-admin(?:-[a-z0-9]+)?\.vercel\.app$/.test(u.hostname)) return true;
-    return false;
+    return TRUSTED_ADMIN_HOSTS.includes(u.hostname);
   } catch {
     return false;
   }

@@ -32,14 +32,10 @@ export const PLATFORM_HOSTS = new Set<string>([
  * Hosting-provider suffixes — ANY subdomain is a platform preview host (preview
  * deploys, tunnels). Production custom merchant domains never end with these.
  * `workers.dev` is the Cloudflare Workers / OpenNext preview target.
+ * (Vercel cancelled 2026-07 — `vercel.app` removed; the platform runs solely
+ * on Cloudflare Workers now.)
  */
-export const PLATFORM_SUFFIXES = [
-  'vercel.app',
-  'netlify.app',
-  'ngrok.io',
-  'ngrok-free.app',
-  'workers.dev',
-];
+export const PLATFORM_SUFFIXES = ['netlify.app', 'ngrok.io', 'ngrok-free.app', 'workers.dev'];
 
 /**
  * True when `hostname` is a platform domain (not a merchant custom domain).
