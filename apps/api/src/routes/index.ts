@@ -312,10 +312,17 @@ router.use('/stores/:storeId/staff', tenantContext, staffRoutes);
 // Payment-gateway abandonment retargeting (Enterprise — payment_abandonment)
 router.use('/stores/:storeId/payment-abandonments', tenantContext, paymentAbandonmentsRoutes);
 
-// Wishlist routes (user-scoped, no store context)
+// Wishlist routes (user-scoped; store comes from an x-store-id header, not
+// the URL, so `tenantContext` can't reach it via a mount-path param). RLS
+// cutover Phase 1c: the router itself applies `authenticate` +
+// `userContext(customerUserId, getStoreIdFromHeader)` — see
+// wishlist.routes.ts for the wiring + why. Inert on the current bypass role.
 router.use('/wishlist', wishlistRoutes);
 
-// Address routes (user-scoped, no store context)
+// Address routes (user-scoped, no store_id column at all). RLS cutover
+// Phase 1c: the router itself applies `authenticate` +
+// `userContext(req => req.user!.userId)` — see address.routes.ts for the
+// wiring + why. Inert on the current bypass role.
 router.use('/addresses', addressRoutes);
 
 export default router;

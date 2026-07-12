@@ -3,8 +3,37 @@ import { z } from 'zod';
 import { prisma } from '@force/database';
 import { kuwaitAddressSchema } from '@force/shared';
 import { authenticate } from '../middleware/auth';
+import { userContext } from '../middleware/tenant-context';
 
 const router = Router();
+
+// RLS cutover Phase 1c (docs/plans/2026-07-02-rls-cutover.md) — this router
+// is mounted BARE at `/addresses` (routes/index.ts), with no `:storeId`/`:id`
+// in its mount path, so `tenantContext` can never reach it (Express only
+// populates req.params for params declared in the MOUNT path). Addresses are
+// also user-scoped (FK user_id, no store_id column at all), so there's no
+// store context to set even if it could.
+//
+// `router.use(authenticate)` + `router.use(userContext(...))` replace the
+// per-route `authenticate` middleware below: every route in this file
+// already required it individually, so hoisting it here is behavior-neutral
+// and lets `userContext` read `req.user` for every handler. `userContext`
+// sets `app.current_user_id` via `runInTenantContext(undefined, fn, userId)`
+// (storeId undefined — addresses have none), giving the `rls_addresses_user`
+// policy (20260702170000_rls_close_denyall_tables) a real per-user DB
+// backstop once force_app is live. INERT today: `neondb_owner` (BYPASSRLS)
+// skips every policy, so this changes zero request behavior — it only wraps
+// each handler in the same interactive-tx pattern already used by
+// `tenantContext`-wrapped routers.
+//
+// Cutover behavior note (NOT today): the PUT/DELETE ownership checks below
+// (`existing.userId !== userId` → 403) currently 403 a cross-user probe.
+// Once force_app is live, the RLS policy makes another user's address
+// invisible to `findUnique` BEFORE that check ever runs, so the SAME probe
+// will 404 instead of 403 — the DB backstop doing its job (don't reveal
+// existence of another user's row). Expected; do not try to preserve 403.
+router.use(authenticate);
+router.use(userContext(req => req.user!.userId));
 
 // Validation schema for creating/updating an address.
 //
@@ -25,7 +54,7 @@ const addressSchema = kuwaitAddressSchema.extend({
 });
 
 // GET /addresses — list the authenticated user's addresses
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
 
@@ -44,7 +73,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 });
 
 // POST /addresses — create a new address
-router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
     const parsed = addressSchema.safeParse(req.body);
@@ -107,7 +136,7 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 });
 
 // PUT /addresses/:id — update an existing address (ownership check)
-router.put('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
     const { id } = req.params;
@@ -184,7 +213,7 @@ router.put('/:id', authenticate, async (req: Request, res: Response, next: NextF
 });
 
 // DELETE /addresses/:id — delete an address (ownership check)
-router.delete('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
     const { id } = req.params;

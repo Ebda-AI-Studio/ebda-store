@@ -168,6 +168,17 @@ export { withMoneyTx } from './with-money-tx';
  *
  * If the callback throws, the transaction rolls back automatically.
  *
+ * @param storeId RLS cutover Phase 1c (user-scoped routers, see
+ *   apps/api/src/middleware/tenant-context.ts `userContext`): may be
+ *   `undefined` for routers that have no store in scope at all (e.g.
+ *   `address.routes.ts` — addresses are user-scoped, FK `user_id`, no
+ *   `store_id` column exists). When `undefined`, `app.current_store_id` is
+ *   simply never SET LOCAL'd — `current_store_id()` returns NULL and every
+ *   store-scoped hybrid policy allow-contextless, IDENTICAL to calling this
+ *   function today with no context at all. A *defined* storeId still MUST
+ *   be a valid UUID (throws otherwise, same as before) — this only relaxes
+ *   the "must pass something" requirement, it does not relax validation of
+ *   a value that IS passed.
  * @param userId Optional — additionally sets `app.current_user_id` via SET
  *   LOCAL, for the user-scoped RLS policies added in the RLS cutover Phase
  *   1b (e.g. `addresses`, see 20260702170000_rls_close_denyall_tables).
@@ -184,22 +195,31 @@ export { withMoneyTx } from './with-money-tx';
  *     // are scoped to this storeId via RLS
  *     await handler(req, res);
  *   }, req.user?.userId);
+ *
+ * @example
+ *   // User-scoped router with no store in scope (address.routes.ts):
+ *   await runInTenantContext(undefined, async () => {
+ *     // app.current_store_id stays unset; app.current_user_id is set.
+ *     await handler(req, res);
+ *   }, req.user!.userId);
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function runInTenantContext<T>(
-  storeId: string,
+  storeId: string | undefined,
   fn: () => Promise<T>,
   userId?: string
 ): Promise<T> {
-  if (!UUID_RE.test(storeId)) {
+  if (storeId !== undefined && !UUID_RE.test(storeId)) {
     throw new Error('Invalid store ID format');
   }
   return basePrisma.$transaction(
     async tx => {
-      await tx.$executeRawUnsafe(
-        `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
-      );
+      if (storeId) {
+        await tx.$executeRawUnsafe(
+          `SET LOCAL app.current_store_id = '${storeId.replace(/'/g, "''")}'`
+        );
+      }
       if (userId) {
         await tx.$executeRawUnsafe(
           `SET LOCAL app.current_user_id = '${userId.replace(/'/g, "''")}'`

@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '@force/database';
 import { authenticate, customerUserId } from '../middleware/auth';
+import { userContext } from '../middleware/tenant-context';
 
 const router = Router();
 
@@ -8,6 +9,37 @@ const router = Router();
 function getStoreIdFromHeader(req: Request): string | null {
   return (req.headers['x-store-id'] as string) || null;
 }
+
+// RLS cutover Phase 1c (docs/plans/2026-07-02-rls-cutover.md) — this router
+// is mounted BARE at `/wishlist` (routes/index.ts) with no `:storeId` in its
+// mount path — wishlist's store comes from the `x-store-id` HEADER, not the
+// URL — so `tenantContext` could never reach it. `wishlists` /
+// `wishlist_items` already carry a STORE-scoped RLS policy (from
+// 20260404000000_add_rls_policies / 20260609000000_complete_force_rls_coverage
+// — `store_id = current_store_id()`, allow-contextless), but nothing ever
+// set `app.current_store_id` for this router's traffic, so that policy has
+// been fail-open (no DB backstop) for every wishlist request.
+//
+// `router.use(authenticate)` + `router.use(userContext(...))` replace the
+// per-route `authenticate` middleware below (every route already required it
+// individually — behavior-neutral hoist). `userContext` is passed
+// `customerUserId`, NOT a bare `req.user?.userId` — see the comment below on
+// why every wishlist handler uses that resolver — plus `getStoreIdFromHeader`
+// so `app.current_store_id` (the field the existing policies actually check)
+// gets set from the same header the handlers already read, alongside
+// `app.current_user_id` for defense-in-depth against any future user-scoped
+// policy on these tables. INERT today (bypass role skips every policy);
+// wraps handlers in the same interactive-tx pattern already used by
+// `tenantContext`-wrapped routers.
+//
+// Known gap (not a regression): the two routes below that don't read the
+// `x-store-id` header (`DELETE /product/:productId`, `DELETE /:itemId`)
+// still get `app.current_user_id` set, but no store context — same
+// allow-contextless fail-open as today for just those two calls. Tightening
+// that needs the frontend to always send the header on those calls too
+// (follow-up, out of scope here).
+router.use(authenticate);
+router.use(userContext(customerUserId, req => getStoreIdFromHeader(req)));
 
 // Get user's wishlist items
 //
@@ -17,7 +49,7 @@ function getStoreIdFromHeader(req: Request): string | null {
 // wishlist row keyed on their userId — the next customer who happens to share
 // that userId on the storefront would then see the merchant's wishlist. The
 // helper returns undefined for any non-customer role, which we 401 here.
-router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = customerUserId(req);
     if (!userId) {
@@ -101,7 +133,7 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 });
 
 // Add item to wishlist
-router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = customerUserId(req);
     if (!userId) {
@@ -217,31 +249,27 @@ router.post('/', authenticate, async (req: Request, res: Response, next: NextFun
 // productId, not the wishlist-item id). Idempotent: deletes any of the user's
 // wishlist items for this product. Defined before /:itemId (different segment
 // count, but explicit ordering avoids ambiguity).
-router.delete(
-  '/product/:productId',
-  authenticate,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const userId = customerUserId(req);
-      if (!userId) {
-        res.status(401).json({
-          success: false,
-          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
-        });
-        return;
-      }
-      const { productId } = req.params;
-      await prisma.wishlistItem.deleteMany({
-        where: { productId, wishlist: { userId } },
+router.delete('/product/:productId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = customerUserId(req);
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
       });
-      res.json({ success: true });
-    } catch (error) {
-      next(error);
+      return;
     }
+    const { productId } = req.params;
+    await prisma.wishlistItem.deleteMany({
+      where: { productId, wishlist: { userId } },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
   }
-);
+});
 
-router.delete('/:itemId', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:itemId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = customerUserId(req);
     if (!userId) {
@@ -293,7 +321,7 @@ router.delete('/:itemId', authenticate, async (req: Request, res: Response, next
 });
 
 // Toggle wishlist visibility (public/private)
-router.put('/visibility', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/visibility', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = customerUserId(req);
     if (!userId) {
@@ -348,7 +376,7 @@ router.put('/visibility', authenticate, async (req: Request, res: Response, next
 });
 
 // Clear all items from wishlist
-router.delete('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = customerUserId(req);
     if (!userId) {

@@ -32,6 +32,13 @@
  *                     here under a REAL force_app login for the first time).
  *  - `return_items` — child-via-return (same as payments).
  *  - `system_settings` — platform-global, intentionally permissive.
+ *  - RLS-3 (this PR): `userContext` middleware call surface — proves
+ *    `runInTenantContext(undefined, fn, userId)` (addresses, no store) and
+ *    `runInTenantContext(storeId, fn, userId)` from a header-derived storeId
+ *    (wishlist) behave identically to the raw-SQL / direct-storeId
+ *    equivalents above, under a REAL force_app login — see
+ *    apps/api/src/middleware/tenant-context.ts `userContext` +
+ *    apps/api/src/routes/address.routes.ts / wishlist.routes.ts.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -48,6 +55,7 @@ let paymentB = '';
 let returnItemB = '';
 let addressA = '';
 let addressB = '';
+let wishlistItemB = '';
 
 async function makeStoreWithOwner(slug: string): Promise<{ storeId: string; userId: string }> {
   return withRlsBypass(async tx => {
@@ -90,6 +98,10 @@ async function cleanup(): Promise<void> {
     await tx.$executeRawUnsafe(
       `DELETE FROM public.addresses WHERE address1 LIKE '${TEST_PREFIX}%'`
     );
+    await tx.$executeRawUnsafe(
+      `DELETE FROM public.wishlist_items WHERE wishlist_id IN (SELECT id FROM public.wishlists WHERE name LIKE '${TEST_PREFIX}%')`
+    );
+    await tx.$executeRawUnsafe(`DELETE FROM public.wishlists WHERE name LIKE '${TEST_PREFIX}%'`);
     await tx.$executeRawUnsafe(`DELETE FROM public.stores WHERE slug LIKE '${TEST_PREFIX}%'`);
     await tx.$executeRawUnsafe(`DELETE FROM public.users WHERE email LIKE '${TEST_PREFIX}%'`);
   });
@@ -197,6 +209,19 @@ beforeAll(async () => {
       },
     });
     returnItemB = retItem.id;
+
+    // ── wishlist: store-scoped sample (RLS-3, userContext middleware path) ──
+    // wishlists/wishlist_items already carry a STORE-scoped policy from
+    // 20260404000000/20260609000000 — this proves the header-derived
+    // storeId `userContext` passes through `runInTenantContext` sees the
+    // same enforcement as the direct-storeId calls used above.
+    const wishlistB = await tx.wishlist.create({
+      data: { userId: userB, storeId: storeB, name: `${TEST_PREFIX}wishlist-b` },
+    });
+    const wishlistItem = await tx.wishlistItem.create({
+      data: { wishlistId: wishlistB.id, productId: prodB.id },
+    });
+    wishlistItemB = wishlistItem.id;
   });
 });
 
@@ -312,5 +337,77 @@ describe('force_app real-login: system_settings (platform-global, intentionally 
       prisma.systemSetting.findUnique({ where: { key } })
     );
     expect(row?.key).toBe(key);
+  });
+});
+
+describe('RLS-3: userContext middleware call surface — addresses (storeId undefined)', () => {
+  // address.routes.ts has no store in scope at all, so `userContext` calls
+  // `runInTenantContext(undefined, fn, userId)`. This proves that exact call
+  // shape — not the raw `SET LOCAL` used in the "addresses" describe block
+  // above — behaves identically under a REAL force_app login: storeId
+  // undefined means `app.current_store_id` is simply never SET LOCAL'd (no
+  // store column exists on `addresses` to filter by anyway), while
+  // `app.current_user_id` IS set and the `rls_addresses_user` policy
+  // enforces on it.
+  it('runInTenantContext(undefined, fn, userA) cannot see user B address', async () => {
+    const row = await runInTenantContext(
+      undefined,
+      () => prisma.address.findUnique({ where: { id: addressB } }),
+      userA
+    );
+    expect(row).toBeNull();
+  });
+
+  it('runInTenantContext(undefined, fn, userA) CAN see user A own address (control)', async () => {
+    const row = await runInTenantContext(
+      undefined,
+      () => prisma.address.findUnique({ where: { id: addressA } }),
+      userA
+    );
+    expect(row?.id).toBe(addressA);
+  });
+
+  it('runInTenantContext(undefined, fn) with no userId — allow-contextless (matches today)', async () => {
+    const row = await runInTenantContext(undefined, () =>
+      prisma.address.findUnique({ where: { id: addressB } })
+    );
+    expect(row?.id).toBe(addressB);
+  });
+});
+
+describe('RLS-3: userContext middleware call surface — wishlist (header-derived storeId)', () => {
+  // wishlist.routes.ts derives storeId from the `x-store-id` header (not the
+  // URL) and passes it straight through to `runInTenantContext(storeId, fn,
+  // userId)` — identical call shape to the store-scoped routers, just with
+  // the storeId sourced differently. Proves the existing STORE-scoped
+  // `rls_wishlists_tenant` / `rls_wishlist_items_tenant` policies (there is
+  // no user_id predicate on these tables) enforce correctly through that
+  // path under a REAL force_app login.
+  it('store A context cannot see store B wishlist item', async () => {
+    const row = await runInTenantContext(
+      storeA,
+      () => prisma.wishlistItem.findUnique({ where: { id: wishlistItemB } }),
+      userA
+    );
+    expect(row).toBeNull();
+  });
+
+  it('store B context CAN see its own wishlist item (control)', async () => {
+    const row = await runInTenantContext(
+      storeB,
+      () => prisma.wishlistItem.findUnique({ where: { id: wishlistItemB } }),
+      userB
+    );
+    expect(row?.id).toBe(wishlistItemB);
+  });
+
+  it('no store context (header omitted) — allow-contextless (matches today, the documented known gap)', async () => {
+    // Mirrors the "known gap" comment in wishlist.routes.ts: DELETE
+    // /product/:productId and DELETE /:itemId don't read the store header,
+    // so storeId stays undefined and app.current_store_id is never set —
+    // identical to calling runInTenantContext(undefined, fn, userId) or,
+    // as here, not opening a tenant context at all.
+    const row = await prisma.wishlistItem.findUnique({ where: { id: wishlistItemB } });
+    expect(row?.id).toBe(wishlistItemB);
   });
 });
