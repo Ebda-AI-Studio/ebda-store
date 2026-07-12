@@ -24,8 +24,15 @@ function deepEqual(a, b) {
 }
 
 const stores = await prisma.store.findMany({
-  where: { slug: { in: ['wady-aljuz', 'palora'] } },
-  select: { slug: true, template: true, layoutSettings: true },
+  // wady-aljuz + pecannbee (id-pinned; slug may change at domain cutover) are
+  // LIVE CLIENT STORES — their resolved layout must never drift (2026-07-12).
+  where: {
+    OR: [
+      { slug: { in: ['wady-aljuz', 'palora'] } },
+      { id: '359afc1f-ea5b-4f8d-b372-c038c6c057f7' },
+    ],
+  },
+  select: { id: true, slug: true, template: true, layoutSettings: true },
 });
 
 let failed = false;
