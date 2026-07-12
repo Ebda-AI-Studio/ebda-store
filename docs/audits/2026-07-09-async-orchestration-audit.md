@@ -5,20 +5,6 @@
 **Base:** `main` HEAD `9d67b97525887c8297afed48660b3c1ad404e6d1`.
 **Method:** Read actual source (`order.service.ts`, `order.routes.ts`, `webhook.routes.ts`, `payment.factory.ts`, every Inngest function touching the order/payment lifecycle, `alerts-failure-watch.ts`, `queue-depth-watch.ts`, `payment-webhook-stuck-sweep.ts`). Cross-checked against `docs/audits/2026-07-02-reliability.md`, `2026-07-02-observability-dr-cicd.md`, `2026-07-09-builder-reality-audit.md`, and scoped memory (`feedback-inngest-mark-running-first.md`, `feedback-fwb-webhook-event-multiplexing.md`). This is a delta audit — it does not re-litigate F5 (email/SMS queue throughput) or L2 (no queue-depth alert on in-process queues) from `2026-07-02-reliability.md` except to sharpen them with new evidence.
 
-> **Remediation status (2026-07-09):** the Critical + the contained Highs fixed on branch
-> `fix/async-orchestration-lens-e`. **E2-1** (Critical): new `order-created-stuck-sweep` Inngest cron
-> re-sends `order/created` for paid-but-unnotified orders (recovers email/push/WhatsApp/CAPI/journal)
->
-> - P1-alerts if re-send isn't landing — also closes **E3-3**. **E3-2** (High): `order-created-fanout`
->   now re-throws on any `Promise.allSettled` rejection so the dead-letter P1/P0 fires. **E2-2** (High):
->   `applyRefundEffects` in the webhook processor no longer swallows failures (retries + dead-letters a
->   money-adjacent reversal). **E2-3** (Med): payment-failure push failure now surfaces a throttled
->   `info` alert instead of a silent log. Verify: 1134/1134 unit tests, new sweep unit test.
->   **Deferred as strategic follow-ups** (the audit's own "multi-day" bucket): **E2-4** (migrate
->   `updateStatus()`'s 13 fire-and-forget side-effects to an `order/status-changed` Inngest fanout),
->   **E2-5** (wire order-lifecycle email through the orphaned retry queue), **E3-4** (super-admin
->   WebhookEvent list + replay UI).
-
 **Lens (from the source reel, 3 principles):**
 
 - **E1** — fast response, work deferred (no synchronous chaining on the critical path).
