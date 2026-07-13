@@ -1,8 +1,23 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 import { BulkService } from '../../../services/bulk.service';
+import { invalidateStoreProductCaches } from '../../public-cache';
 import logger from '../../logger';
 import { inngest } from '../client';
+
+/**
+ * True when a bulk import actually wrote/changed products and the public
+ * product caches (list/detail/suggest) should be busted. Extracted as a
+ * pure function so the gating logic is unit-testable without standing up
+ * the full Inngest handler's `$transaction`/RLS-context machinery (matches
+ * the `webhook-offload.guard.ts` pattern elsewhere in this directory).
+ */
+export function shouldInvalidateAfterBulkImport(result: {
+  created: number;
+  updated: number;
+}): boolean {
+  return result.created > 0 || result.updated > 0;
+}
 
 /**
  * Long-running bulk product import. Picks up the BulkImportJob row,
@@ -63,6 +78,19 @@ export const bulkImportProducts: InngestFunction.Any = inngest.createFunction(
           { updateExisting: job.updateExisting },
           job.userId ?? undefined
         );
+
+        // Bust the public product-facing caches ONCE after the whole batch
+        // finishes (not per-row — `importProducts` writes in 50-row batches
+        // and a sweep per batch would be a needless invalidation storm).
+        // Without this, `BulkService.importProducts()` writes products via
+        // raw Prisma calls with no cache awareness, so a merchant who just
+        // imported/updated their whole catalog would keep seeing the
+        // pre-import product list/detail/suggest cache for up to the full
+        // 120s TTL regardless of import size (M2, see
+        // docs/audits/2026-07-13-cache-stampede.md).
+        if (shouldInvalidateAfterBulkImport(result)) {
+          await invalidateStoreProductCaches(job.storeId);
+        }
 
         await prisma.bulkImportJob.update({
           where: { id: jobId },

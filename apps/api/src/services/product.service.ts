@@ -101,6 +101,26 @@ function stampManualProvenance(
   return next;
 }
 
+/**
+ * Availability fields computed by `enrichStockFlags`. Declared explicitly so
+ * the function's return type is `P & StockFlags` rather than the input type
+ * erased down to its constraint — consumers (e.g. the AI product feed's
+ * `buildProductFeed`, which reads `inStock`/`acceptsBackorder`) get compile-
+ * time visibility of these fields instead of relying on `listPublic`
+ * accidentally returning `any` (which the pre-2026-07-13 inner-cache
+ * `JSON.parse` early-return used to cause — see the H1 note in
+ * `docs/audits/2026-07-13-cache-stampede.md`).
+ */
+interface StockFlags {
+  /** Variant-aware aggregate (sum of variant inventory for variant products). */
+  inventory: number;
+  inStock: boolean;
+  lowStock: boolean;
+  acceptsBackorder: boolean;
+  /** Exact qty when (lowStock || acceptsBackorder); null otherwise. */
+  availableQty: number | null;
+}
+
 function enrichStockFlags<
   P extends {
     inventory: number;
@@ -113,7 +133,7 @@ function enrichStockFlags<
     }>;
     [key: string]: unknown;
   },
->(product: P): P {
+>(product: P): P & StockFlags {
   const variants = product.variants ?? [];
   const hasVariants = variants.length > 0;
 
@@ -1071,33 +1091,19 @@ export class ProductService {
     const skip = cursor ? 0 : Math.min(requestedSkip, MAX_SKIP);
     const skipCapped = requestedSkip > MAX_SKIP;
 
-    // Build a stable cache key from params (best-effort cache, 30s TTL)
-    const cacheParams = JSON.stringify({
-      status,
-      category,
-      search,
-      featured,
-      minPrice,
-      maxPrice,
-      sort,
-      page,
-      limit,
-      cursor,
-      optionFilters,
-    });
-    const cacheKey = `products:store:${storeId}:${cacheParams}`;
-    try {
-      const cached = await redis.get<string>(cacheKey);
-      if (cached) {
-        return typeof cached === 'string' ? JSON.parse(cached) : cached;
-      }
-    } catch (err) {
-      logger.warn(
-        { err: err instanceof Error ? err.message : 'unknown' },
-        '[PRODUCT] Redis cache read failed for listPublic'
-      );
-    }
-
+    // NOTE: no per-call Redis cache here. `listPublic`'s only caller
+    // (`/public/products` in `public.routes.ts`) already wraps this whole
+    // method in `getCached()` under `public:products:<storeId>:...`, which
+    // is single-flight-safe AND correctly swept by `invalidateStoreProductCaches`
+    // on every product/price/stock mutation. A second, redundant cache layer
+    // used to live here under a DIFFERENT key prefix (`products:store:*`) that
+    // `invalidateStoreProductCaches` never touched — so a merchant's price/stock
+    // edit would correctly bust the outer cache, then the very next request would
+    // read this inner cache's stale value and write it straight back into the
+    // freshly-busted outer cache, silently resurrecting stale data for another
+    // TTL window. Removed rather than added to the invalidation sweep: it was
+    // pure double-caching with no caller that needed the extra layer. See
+    // `docs/audits/2026-07-13-cache-stampede.md` (H1).
     const where: Prisma.ProductWhereInput = {
       storeId,
       status: status as ProductStatus,
@@ -1274,9 +1280,10 @@ export class ProductService {
         : allSorted.slice(effectiveSkip, effectiveSkip + limit);
 
       const result = {
-        products: page_products.map(p =>
-          enrichStockFlags(p as Parameters<typeof enrichStockFlags>[0])
-        ),
+        // No type-erasing cast here: keeping the precise Prisma payload type
+        // means `listPublic`'s return carries id/name/slug/images/categories
+        // etc. for consumers like the AI product feed to typecheck against.
+        products: page_products.map(p => enrichStockFlags(p)),
         facets,
         meta: {
           page: cursor ? undefined : page,
@@ -1287,12 +1294,6 @@ export class ProductService {
           skipCapped: skipCapped || undefined,
         },
       };
-
-      try {
-        await redis.set(cacheKey, JSON.stringify(result), 120);
-      } catch {
-        // non-critical
-      }
 
       return result;
     }
@@ -1352,7 +1353,8 @@ export class ProductService {
       cursor && productsRaw.length > limit ? (productsRaw[limit] as { id: string }).id : undefined;
 
     const result = {
-      products: products.map(p => enrichStockFlags(p as Parameters<typeof enrichStockFlags>[0])),
+      // No type-erasing cast (see the position-ordered path above).
+      products: products.map(p => enrichStockFlags(p)),
       facets,
       meta: {
         page: cursor ? undefined : page,
@@ -1363,17 +1365,6 @@ export class ProductService {
         skipCapped: skipCapped || undefined,
       },
     };
-
-    // Write to cache (best-effort, 120s TTL — invalidated on product
-    // mutations via `invalidateCachedPrefix('public:products:<storeId>:')`).
-    try {
-      await redis.set(cacheKey, JSON.stringify(result), 120);
-    } catch (err) {
-      logger.warn(
-        { err: err instanceof Error ? err.message : 'unknown' },
-        '[PRODUCT] Redis cache write failed for listPublic'
-      );
-    }
 
     return result;
   }

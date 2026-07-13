@@ -7,6 +7,20 @@ const CACHE_PREFIX = 'features:store:';
 const CACHE_TTL = 300; // 5 minutes
 
 class FeatureService {
+  /**
+   * In-process single-flight registry, keyed by storeId. When a store's
+   * feature map is a cold miss on both the Redis cache AND this map, the
+   * FIRST caller's `readFromDb()` + `writeToCache()` runs while every
+   * concurrent caller for the SAME store awaits the same promise instead
+   * of each issuing its own `Store` + `StoreFeature` DB read. Mirrors the
+   * `inFlight` pattern in `lib/public-cache.ts` — this service predates
+   * that helper and didn't reuse it, which left the one genuinely hot,
+   * uncoalesced call site (`cart.service.ts`'s add-to-cart backorder
+   * check) exposed to a TTL-boundary herd (M1, see
+   * docs/audits/2026-07-13-cache-stampede.md).
+   */
+  private inFlight = new Map<string, Promise<Record<FeatureKey, boolean>>>();
+
   // ==========================================
   // Cache Helpers
   // ==========================================
@@ -143,14 +157,30 @@ class FeatureService {
       return cached;
     }
 
-    // 2. Cache miss — read from DB
-    logger.debug({ storeId }, '[FeatureService] Cache miss, reading from DB');
-    const features = await this.readFromDb(storeId);
+    // 2. Cache miss — single-flight the DB read + cache populate so
+    // concurrent callers for the SAME store share one `readFromDb()` call
+    // (2 queries) instead of each running their own. A late waiter that
+    // arrives after the fetch resolved re-reads the now-warm cache on its
+    // next call.
+    const existing = this.inFlight.get(storeId);
+    if (existing) return existing;
 
-    // 3. Populate cache (best-effort)
-    await this.writeToCache(storeId, features);
+    const pending = (async () => {
+      logger.debug({ storeId }, '[FeatureService] Cache miss, reading from DB');
+      const features = await this.readFromDb(storeId);
 
-    return features;
+      // 3. Populate cache (best-effort)
+      await this.writeToCache(storeId, features);
+
+      return features;
+    })();
+
+    this.inFlight.set(storeId, pending);
+    try {
+      return await pending;
+    } finally {
+      this.inFlight.delete(storeId);
+    }
   }
 
   /**

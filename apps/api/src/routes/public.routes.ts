@@ -6,6 +6,7 @@ import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
 import { prisma } from '@force/database';
+import { AppError } from '../middleware/error-handler';
 import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import {
   publicLimiter,
@@ -20,9 +21,7 @@ import { getStoreIdFromRequest } from '../utils/store-helpers';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { getCached } from '../lib/public-cache';
-import { redis } from '../services/redis.service';
 import { setEdgeCache } from '../lib/edge-cache';
-import { AppError } from '../middleware/error-handler';
 import { buildProductFeed } from '../lib/product-feed';
 import { stripMarketingPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { verifyReviewToken } from '../lib/review-token';
@@ -1261,55 +1260,31 @@ router.get('/stores/:slugOrId', async (req: Request, res: Response, next: NextFu
 // GET /store - Get default store info
 router.get('/store', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    // Try Redis cache first (best-effort)
-    const cacheKey = 'store:default';
-    try {
-      const cached = await redis.get<string>(cacheKey);
-      if (cached) {
-        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
-        res.json({
-          success: true,
-          data: { store: parsed },
-        });
-        return;
-      }
-    } catch (err) {
-      logger.warn(
-        { err: err instanceof Error ? err.message : 'unknown' },
-        '[PUBLIC] Redis cache read failed for default store'
-      );
-    }
-
-    const store = await prisma.store.findFirst({
-      orderBy: { createdAt: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logo: true,
-        settings: true,
-      },
-    });
-
-    if (!store) {
-      res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Store not found' },
+    // Legacy "default store" lookup — single caller (`apps/web/src/lib/api.ts`),
+    // no invalidation hook (default store rarely changes; the 300s TTL keeps
+    // merchant edits visible without one — accepted staleness, not a bug).
+    // Reuses the shared `getCached()` helper (Redis L1 → in-memory L2 →
+    // in-process single-flight on a double-miss) for consistency with every
+    // other public-route cache instead of hand-rolling raw redis.get/set,
+    // which had neither single-flight nor the in-memory fallback (L1, see
+    // docs/audits/2026-07-13-cache-stampede.md). A 404 (no store yet) is
+    // never cached — the fetcher throws instead of returning a sentinel.
+    const store = await getCached('public:store:default', 300, async () => {
+      const s = await prisma.store.findFirst({
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logo: true,
+          settings: true,
+        },
       });
-      return;
-    }
-
-    // Write to cache (best-effort, 5min TTL — default store rarely
-    // changes; even longer would be fine but 5 min keeps merchant
-    // edits visible without an explicit invalidate hook).
-    try {
-      await redis.set(cacheKey, JSON.stringify(store), 300);
-    } catch (err) {
-      logger.warn(
-        { err: err instanceof Error ? err.message : 'unknown' },
-        '[PUBLIC] Redis cache write failed for default store'
-      );
-    }
+      if (!s) {
+        throw new AppError(404, 'NOT_FOUND', 'Store not found');
+      }
+      return s;
+    });
 
     setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
     res.json({
