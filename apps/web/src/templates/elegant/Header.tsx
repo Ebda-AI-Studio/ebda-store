@@ -302,8 +302,8 @@ export default function ElegantHeader({
             ? ({ inert: '' } as unknown as React.HTMLAttributes<HTMLDivElement>)
             : {})}
         >
-          <nav className="min-h-0 overflow-hidden py-6">
-            <ul className="space-y-5 text-center">
+          <nav className="min-h-0 overflow-hidden">
+            <ul className="space-y-5 py-6 text-center">
               {navigation.map(item => (
                 <li key={item.href}>
                   <Link

@@ -283,8 +283,8 @@ export default function MinimalHeader({
             ? ({ inert: '' } as unknown as React.HTMLAttributes<HTMLDivElement>)
             : {})}
         >
-          <nav className="min-h-0 overflow-hidden pb-6">
-            <ul className="space-y-5 text-center">
+          <nav className="min-h-0 overflow-hidden">
+            <ul className="space-y-5 pb-6 text-center">
               {navigation.map(item => (
                 <li key={item.href}>
                   <Link
