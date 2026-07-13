@@ -351,7 +351,7 @@ export function ProductCarousel({
                   // shadow around each card so they read as contained tiles.
                   // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
                   // motion-safe only — no layout shift (opacity/transform only).
-                  className={`motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100 snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
+                  className={`snap-start shrink-0 w-[44vw] sm:w-[28vw] md:w-[22vw] lg:w-[19vw] xl:w-[17vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
                   style={
                     {
                       ['--i' as string]: i,
@@ -381,7 +381,7 @@ export function ProductCarousel({
                       className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       <div
-                        className={`group/img relative ${effectiveAspectCls} ${imgRadiusCls || shape.radius} overflow-hidden bg-muted shimmer`}
+                        className={`group/img relative ${effectiveAspectCls} ${imgRadiusCls || shape.radius} overflow-hidden bg-muted`}
                       >
                         {/* Task 3 B4: OOS badge customization via productCardDefaults. */}
                         <OutOfStockRibbon

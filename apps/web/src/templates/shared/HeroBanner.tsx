@@ -112,8 +112,8 @@ export function HeroBanner({
   // Full-bleed mode (default, pre-existing behavior): edge-to-edge,
   // object-cover. Both modes share the same aspect ratio wrappers.
   const containerBaseClass = isFramed
-    ? 'relative w-full overflow-hidden rounded-2xl bg-muted shimmer aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none'
-    : 'relative w-full overflow-hidden bg-muted shimmer aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none';
+    ? 'relative w-full overflow-hidden rounded-2xl bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none'
+    : 'relative w-full overflow-hidden bg-muted aspect-[var(--hero-m-aspect)] max-h-[45vh] sm:aspect-[1920/700] sm:max-h-none';
   const imageObjectClass = isFramed ? 'object-contain' : 'object-cover';
 
   const heroSection = (

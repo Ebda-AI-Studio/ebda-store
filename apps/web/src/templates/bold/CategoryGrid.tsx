@@ -109,8 +109,7 @@ export default function BoldCategoryGrid({
             // Item 3 (2026-07-12): first-render stagger FADE (distinct from
             // the `stagger` layout offset above), 40ms step, motion-safe
             // only — no layout shift (opacity/transform only).
-            const enterStaggerCls =
-              'motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100';
+            const enterStaggerCls = '';
             return (
               <div
                 key={category.id}

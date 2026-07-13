@@ -110,7 +110,7 @@ export function CategoryStrip({
                 key={cat.id}
                 // Item 3 (2026-07-12): first-render stagger fade, 40ms step,
                 // motion-safe only — no layout shift (opacity/transform only).
-                className={`motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100 snap-start shrink-0 w-[60vw] sm:w-[36vw] md:w-[30vw] lg:w-[26vw] xl:w-[22vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
+                className={`snap-start shrink-0 w-[60vw] sm:w-[36vw] md:w-[30vw] lg:w-[26vw] xl:w-[22vw] ${sizeCap} ${cardFrameClass(showCardFrame, cardFrameStyle)} ${showCardFrame ? cardFrameWidthClass(cardFrameWidth) : ''} ${showCardFrame ? cardFrameSizeClass(cardFrameSize) : ''}`}
                 style={
                   {
                     ['--i' as string]: i,
@@ -126,7 +126,7 @@ export function CategoryStrip({
                   className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-2xl"
                 >
                   <div
-                    className={`relative ${aspectCls} ${shape.radius} overflow-hidden shimmer ${showHover ? 'transition-transform duration-[var(--duration-slower)] ease-[var(--ease-out)] group-hover:scale-[1.015]' : ''} ${dedupInnerFrame ? '' : styles.categoryFrame}`}
+                    className={`relative ${aspectCls} ${shape.radius} overflow-hidden ${showHover ? 'transition-transform duration-[var(--duration-slower)] ease-[var(--ease-out)] group-hover:scale-[1.015]' : ''} ${dedupInnerFrame ? '' : styles.categoryFrame}`}
                   >
                     {cat.image ? (
                       <Image

@@ -72,7 +72,7 @@ export default function ModernProductGrid({
         <div
           key={product.id}
           role="listitem"
-          className="motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*60ms)_both] motion-reduce:opacity-100"
+          className=""
           style={{ ['--i' as string]: index } as React.CSSProperties}
         >
           <ProductCard

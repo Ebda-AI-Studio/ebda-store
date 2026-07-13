@@ -53,7 +53,7 @@ export default function ClassicProductGrid({
             // motion-safe only — no layout shift (opacity/transform only).
             <div
               key={product.id}
-              className="motion-safe:[animation:fadeUp_0.5s_ease-out_calc(var(--i)*40ms)_both] motion-reduce:opacity-100"
+              className=""
               style={{ ['--i' as string]: i } as React.CSSProperties}
             >
               <ProductCard

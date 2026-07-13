@@ -40,7 +40,7 @@ export default function ClassicCategoryCard({
           keeps the smallest radius of the 5 themes — restraint is its
           identity, so rounded-sm rather than rounded-md or larger). */}
       <div
-        className={`relative ${aspectClass} mb-3 overflow-hidden ${radiusClass} border border-border/60 bg-muted shimmer group-hover:border-foreground/35 transition-colors duration-700 ease-out`}
+        className={`relative ${aspectClass} mb-3 overflow-hidden ${radiusClass} border border-border/60 bg-muted group-hover:border-foreground/35 transition-colors duration-700 ease-out`}
       >
         {category.image ? (
           <img

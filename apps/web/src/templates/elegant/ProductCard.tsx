@@ -209,7 +209,7 @@ function ElegantProductCard({
             PC-3: aspect driven by cardShape/cardAspect; falls back to
             mobile-square / desktop-portrait theme default. */}
         <div
-          className={`relative overflow-hidden bg-gray-50 shimmer mb-3 ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
+          className={`relative overflow-hidden bg-gray-50 mb-3 ${imgRadiusCls || shape.radius} ${imgAspectCls || aspectOverride || 'aspect-square sm:aspect-[3/4]'}`}
         >
           {/* Platform-level OOS ribbon (red, prominent) — same visual
               across every theme, see templates/shared/ProductCardCta.tsx.
