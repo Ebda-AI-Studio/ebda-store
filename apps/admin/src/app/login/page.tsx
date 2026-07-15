@@ -52,7 +52,8 @@ export default function LoginPage() {
           }
         }
       }
-      // If result is void the login succeeded and router.push('/') was called inside login()
+      // If result is void the login succeeded and login() navigated to the
+      // ?returnTo= destination (or '/') via postLoginDestination()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('loginFailed'));
     } finally {
@@ -68,7 +69,7 @@ export default function LoginPage() {
 
     try {
       await completeMfaLogin(mfaChallenge.challengeToken, mfaCode.trim());
-      // completeMfaLogin calls router.push('/') on success
+      // completeMfaLogin navigates to the ?returnTo= destination (or '/') on success
     } catch (err) {
       setError(err instanceof Error ? err.message : t('mfaInvalid'));
       setMfaCode('');

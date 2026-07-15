@@ -158,12 +158,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated. Carry the current location as ?returnTo=
+  // so re-authenticating lands the user back on the page (and query) they
+  // were kicked from, not the dashboard. Intentional logout() pushes a bare
+  // /login — only the unauthenticated kick preserves location.
   useEffect(() => {
     if (!isLoading && !user && pathname !== '/login') {
-      router.push('/login');
+      const here =
+        typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search}`
+          : pathname;
+      const returnTo = here && here !== '/' ? `?returnTo=${encodeURIComponent(here)}` : '';
+      router.push(`/login${returnTo}`);
     }
   }, [isLoading, user, pathname, router]);
+
+  /**
+   * Post-login destination: honor a validated internal ?returnTo= (set by the
+   * session-kick redirect above) so a re-authenticating user lands back where
+   * they were. Internal paths only — rejects protocol-relative (`//`) and
+   * /login itself to prevent open redirects and loops.
+   */
+  function postLoginDestination(): string {
+    if (typeof window === 'undefined') return '/';
+    const raw = new URLSearchParams(window.location.search).get('returnTo');
+    if (raw && raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/login')) {
+      return raw;
+    }
+    return '/';
+  }
 
   /** Shared token-storage logic used by both normal login and MFA completion. */
   function storeSession(data: {
@@ -231,7 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // doesn't survive PWA backgrounding. lib/api.ts sends this token
     // as `Authorization: Bearer` on every request.
     storeSession(data.data);
-    router.push('/');
+    router.push(postLoginDestination());
   }
 
   async function completeMfaLogin(challengeToken: string, code: string): Promise<void> {
@@ -259,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     storeSession(data.data);
-    router.push('/');
+    router.push(postLoginDestination());
   }
 
   async function logout() {

@@ -229,7 +229,10 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
           {t('Request a Return', '\u0637\u0644\u0628 \u0625\u0631\u062c\u0627\u0639')}
         </h2>
         <p className="mt-3 text-muted-foreground">
-          <Link href={storeUrl('/auth/login')} className="font-medium text-primary hover:underline">
+          <Link
+            href={`${storeUrl('/auth/login')}?redirect=${encodeURIComponent('/returns')}`}
+            className="font-medium text-primary hover:underline"
+          >
             {t('Log in', '\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644')}
           </Link>{' '}
           {t(

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Button } from '@force/ui';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -141,6 +142,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
   const { store } = useStore();
   const { t, language } = useLanguage();
   const storeUrl = useStoreUrl();
+  const pathname = usePathname();
 
   // Tenant-aware date formatter for review timestamps. Uses the store's
   // timezone so a 23:30 UTC review from a Kuwait store reads "Jan 5"
@@ -493,7 +495,7 @@ export default function ReviewSection({ storeId, productId }: Props) {
         {!isLoggedIn ? (
           <p className="text-muted-foreground">
             <Link
-              href={storeUrl('/auth/login')}
+              href={`${storeUrl('/auth/login')}?redirect=${encodeURIComponent(pathname || '/')}`}
               className="font-medium text-primary hover:underline"
             >
               {t('Log in', 'تسجيل الدخول')}
