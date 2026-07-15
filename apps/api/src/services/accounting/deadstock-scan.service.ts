@@ -22,6 +22,7 @@
 import { prisma, withRlsBypass, Prisma } from '@force/database';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
+import { AppError } from '../../middleware/error-handler';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -362,16 +363,21 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
  * set by middleware) — plain prisma calls are fine here; no bypass needed.
  */
 export async function createClearanceCouponFromFlag(
-  flagId: string
+  flagId: string,
+  storeId: string
 ): Promise<{ couponCode: string }> {
-  const flag = await prisma.deadStockFlag.findUnique({
-    where: { id: flagId },
+  const flag = await prisma.deadStockFlag.findFirst({
+    where: { id: flagId, storeId },
     include: { product: { select: { sku: true, id: true } } },
   });
 
-  if (!flag) throw new Error(`DeadStockFlag ${flagId} not found`);
+  if (!flag) throw new AppError(404, 'FLAG_NOT_FOUND', `DeadStockFlag ${flagId} not found`);
   if (flag.status !== 'open')
-    throw new Error(`DeadStockFlag ${flagId} is not open (status: ${flag.status})`);
+    throw new AppError(
+      409,
+      'FLAG_ALREADY_PROCESSED',
+      `DeadStockFlag ${flagId} is not open (status: ${flag.status})`
+    );
 
   const skuSlug = flag.product.sku
     ? flag.product.sku

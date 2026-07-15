@@ -1005,6 +1005,9 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
+  // Refund flows flip Payment.status server-side (via provider status) — same
+  // 'orders:refund' gate as refund-via-provider. staff lacks this permission.
+  requirePermission('orders:refund'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1180,6 +1183,10 @@ router.post(
   authenticate,
   authorize('store_admin', 'super_admin', 'staff'),
   requireStoreAccess,
+  // Triggers a real provider refund + flips Payment.status — staff lacks
+  // 'orders:refund' (see rolePermissions in middleware/rbac.ts), so only
+  // store_admin/super_admin may call this despite passing authorize() above.
+  requirePermission('orders:refund'),
   writeLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {

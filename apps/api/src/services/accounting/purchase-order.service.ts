@@ -327,10 +327,11 @@ export async function cancelPurchaseOrder(storeId: string, id: string) {
  */
 export async function createPoFromSuggestion(
   suggestionId: string,
+  storeId: string,
   createdBy?: string
 ): Promise<PurchaseOrder & { items: PurchaseOrderItem[] }> {
-  const sug = await prisma.reorderSuggestion.findUnique({
-    where: { id: suggestionId },
+  const sug = await prisma.reorderSuggestion.findFirst({
+    where: { id: suggestionId, storeId },
     include: { product: { select: { costPrice: true, name: true } } },
   });
   if (!sug) throw new AppError(404, 'SUGGESTION_NOT_FOUND', 'Reorder suggestion not found.');

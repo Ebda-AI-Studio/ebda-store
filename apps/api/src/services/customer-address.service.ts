@@ -20,15 +20,28 @@ export type CreateAddressInput = {
 export class CustomerAddressService {
   constructor(private prisma: PrismaClient) {}
 
-  async listForCustomer(customerId: string) {
+  /**
+   * `storeId` MUST come from the authenticated tenant context (e.g.
+   * `req.bridgeStore.id`), never from a request body/query field. Addresses
+   * have no direct storeId column — scope via the owning customer's storeId
+   * so a customerId from another tenant returns nothing instead of leaking
+   * cross-tenant delivery-address PII.
+   */
+  async listForCustomer(customerId: string, storeId: string) {
     return this.prisma.customerAddress.findMany({
-      where: { customerId },
+      where: { customerId, customer: { storeId } },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
     });
   }
 
-  async createForCustomer(customerId: string, input: CreateAddressInput) {
-    const existing = await this.listForCustomer(customerId);
+  async createForCustomer(customerId: string, storeId: string, input: CreateAddressInput) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, storeId },
+      select: { id: true },
+    });
+    if (!customer) return null;
+
+    const existing = await this.listForCustomer(customerId, storeId);
     // First address → mark default so the bot has a sensible pre-selection
     const isDefault = existing.length === 0;
     return this.prisma.customerAddress.create({

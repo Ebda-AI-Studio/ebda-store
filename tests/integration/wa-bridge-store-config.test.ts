@@ -62,11 +62,19 @@ app.use('/api/v1/wa-bridge', wabridge);
 describe('GET /wa-bridge/store/service-menu', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('returns 400 when storeId missing', async () => {
+  it('ignores any query storeId and scopes to the authenticated bridge store (IDOR fix)', async () => {
+    // A connected merchant passing another tenant's storeId in the query must
+    // NOT read that store — the route now derives the tenant from the
+    // authenticated req.bridgeStore.id (store-test-123 in the mock middleware).
+    (prisma.store.findUnique as any).mockResolvedValue(mockStore);
     const res = await request(app)
-      .get('/api/v1/wa-bridge/store/service-menu')
+      .get('/api/v1/wa-bridge/store/service-menu?storeId=store-owned-by-another-tenant')
       .set('X-WBS-API-KEY', 'test-key');
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    expect(prisma.store.findUnique).toHaveBeenCalledWith({
+      where: { id: 'store-test-123' },
+      select: { botServiceMenu: true },
+    });
   });
 
   it('returns 200 + service menu config', async () => {
@@ -137,5 +145,26 @@ describe('POST /wa-bridge/store/meta-catalog-config', () => {
         }),
       })
     );
+    // The store actually written is the AUTHENTICATED bridge store, not a
+    // trusted echo of the body field.
+    expect(prisma.store.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'store-test-123' } })
+    );
+  });
+
+  it('returns 403 and does NOT write when the body storeId targets another tenant (cross-tenant IDOR)', async () => {
+    (prisma.store.update as any).mockResolvedValue({});
+    const res = await request(app)
+      .post('/api/v1/wa-bridge/store/meta-catalog-config')
+      .set('X-WBS-API-KEY', 'test-key')
+      .send({
+        storeId: 'store-owned-by-another-tenant',
+        catalogId: 'cat-abc',
+        businessId: 'biz-abc',
+        accessToken: 'my-token',
+      });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('STORE_MISMATCH');
+    expect(prisma.store.update).not.toHaveBeenCalled();
   });
 });

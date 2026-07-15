@@ -1041,11 +1041,9 @@ router.post('/templates/status', waBridgeAuth, async (req: Request, res: Respons
 // WBS reads this on every 5-min catalog refresh + caches in Redis.
 router.get('/store/service-menu', waBridgeAuth, async (req: Request, res: Response) => {
   try {
-    const storeId = req.query.storeId as string | undefined;
-    if (!storeId) {
-      res.status(400).json({ success: false, error: { code: 'STORE_ID_REQUIRED' } });
-      return;
-    }
+    // IDOR fix: scope to the AUTHENTICATED bridge store, never a query storeId
+    // (a connected merchant could otherwise read any store's service menu).
+    const storeId = req.bridgeStore!.id;
     const store = await prisma.store.findUnique({
       where: { id: storeId },
       select: { botServiceMenu: true },
@@ -1066,11 +1064,9 @@ router.get('/store/service-menu', waBridgeAuth, async (req: Request, res: Respon
 // Returns catalogId + businessId + hasToken (boolean). NEVER returns the token plain.
 router.get('/store/meta-catalog-config', waBridgeAuth, async (req: Request, res: Response) => {
   try {
-    const storeId = req.query.storeId as string | undefined;
-    if (!storeId) {
-      res.status(400).json({ success: false, error: { code: 'STORE_ID_REQUIRED' } });
-      return;
-    }
+    // IDOR fix: scope to the AUTHENTICATED bridge store, never a query storeId
+    // (a connected merchant could otherwise read any store's catalog config).
+    const storeId = req.bridgeStore!.id;
     const store = await prisma.store.findUnique({
       where: { id: storeId },
       select: { metaCatalogId: true, metaBusinessId: true, metaAccessToken: true },
@@ -1115,7 +1111,14 @@ router.post('/store/meta-catalog-config', waBridgeAuth, async (req: Request, res
       res.status(400).json({ success: false, error: { code: 'INVALID_BODY' } });
       return;
     }
-    const { storeId, catalogId, businessId, accessToken } = parse.data;
+    const { storeId: bodyStoreId, catalogId, businessId, accessToken } = parse.data;
+    // The tenant is the authenticated bridge store, never the body — a body
+    // storeId for a different tenant is rejected outright (no silent override).
+    const storeId = req.bridgeStore!.id;
+    if (bodyStoreId !== storeId) {
+      res.status(403).json({ success: false, error: { code: 'STORE_MISMATCH' } });
+      return;
+    }
 
     const updateData: Record<string, unknown> = {};
     if (catalogId !== undefined) updateData.metaCatalogId = catalogId;
@@ -1154,7 +1157,7 @@ router.get('/customer-addresses', waBridgeAuth, async (req: Request, res: Respon
       res.status(400).json({ success: false, error: { code: 'CUSTOMER_ID_REQUIRED' } });
       return;
     }
-    const addresses = await addressSvc.listForCustomer(customerId);
+    const addresses = await addressSvc.listForCustomer(customerId, req.bridgeStore!.id);
     res.status(200).json({ success: true, data: { addresses } });
   } catch (err) {
     logger.error({ err: (err as Error).message }, '[wa-bridge] customer-addresses GET failed');
@@ -1174,7 +1177,7 @@ router.post('/customer-addresses', waBridgeAuth, async (req: Request, res: Respo
       res.status(400).json({ success: false, error: { code: 'MISSING_FIELDS' } });
       return;
     }
-    const address = await addressSvc.createForCustomer(customerId, {
+    const address = await addressSvc.createForCustomer(customerId, req.bridgeStore!.id, {
       street,
       area,
       block,
@@ -1183,6 +1186,10 @@ router.post('/customer-addresses', waBridgeAuth, async (req: Request, res: Respo
       label,
       notes,
     });
+    if (!address) {
+      res.status(404).json({ success: false, error: { code: 'CUSTOMER_NOT_FOUND' } });
+      return;
+    }
     res.status(201).json({ success: true, data: { address } });
   } catch (err) {
     logger.error({ err: (err as Error).message }, '[wa-bridge] customer-addresses POST failed');

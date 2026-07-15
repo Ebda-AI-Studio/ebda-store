@@ -17,6 +17,9 @@ vi.mock('@force/database', () => ({
       findMany: vi.fn(),
       create: vi.fn(),
     },
+    customer: {
+      findFirst: vi.fn(),
+    },
   },
 }));
 
@@ -55,6 +58,29 @@ describe('GET /wa-bridge/customer-addresses', () => {
       .set('X-WBS-API-KEY', 'test-key');
     expect(res.status).toBe(200);
     expect(res.body.data.addresses).toEqual([]);
+    // Scoped to the authenticated bridge store — never the raw customerId alone.
+    expect(prisma.customerAddress.findMany).toHaveBeenCalledWith({
+      where: { customerId: 'cust-abc', customer: { storeId: 'store-test-123' } },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
+  });
+
+  it('returns 200 + empty list for a customerId owned by another store (cross-tenant)', async () => {
+    // The scoped where clause means Prisma returns [] rather than another
+    // tenant's saved delivery addresses — verifying no PII leak.
+    (prisma.customerAddress.findMany as any).mockResolvedValue([]);
+    const res = await request(app)
+      .get('/api/v1/wa-bridge/customer-addresses?customerId=cust-owned-by-other-store')
+      .set('X-WBS-API-KEY', 'test-key');
+    expect(res.status).toBe(200);
+    expect(res.body.data.addresses).toEqual([]);
+    expect(prisma.customerAddress.findMany).toHaveBeenCalledWith({
+      where: {
+        customerId: 'cust-owned-by-other-store',
+        customer: { storeId: 'store-test-123' },
+      },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
   });
 });
 
@@ -71,6 +97,7 @@ describe('POST /wa-bridge/customer-addresses', () => {
   });
 
   it('returns 201 + created address with isDefault=true (first address)', async () => {
+    (prisma.customer.findFirst as any).mockResolvedValue({ id: 'cust-abc' });
     (prisma.customerAddress.findMany as any).mockResolvedValue([]);
     (prisma.customerAddress.create as any).mockResolvedValue({
       id: 'addr-1',
@@ -93,5 +120,26 @@ describe('POST /wa-bridge/customer-addresses', () => {
       area: 'Salmiya',
       isDefault: true,
     });
+    expect(prisma.customer.findFirst).toHaveBeenCalledWith({
+      where: { id: 'cust-abc', storeId: 'store-test-123' },
+      select: { id: true },
+    });
+  });
+
+  it('returns 404 when creating an address for a customerId owned by another store (cross-tenant)', async () => {
+    (prisma.customer.findFirst as any).mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/v1/wa-bridge/customer-addresses')
+      .set('X-WBS-API-KEY', 'test-key')
+      .send({
+        customerId: 'cust-owned-by-other-store',
+        street: 'Block 3, House 14',
+        area: 'Salmiya',
+      });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('CUSTOMER_NOT_FOUND');
+    expect(prisma.customerAddress.create).not.toHaveBeenCalled();
   });
 });

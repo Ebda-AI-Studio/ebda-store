@@ -98,7 +98,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const po = await runInTenantContext(req.params.storeId, () =>
-        createPoFromSuggestion(req.params.id, (req as any).user?.id)
+        createPoFromSuggestion(req.params.id, req.params.storeId, (req as any).user?.id)
       );
       res.json({ data: { poId: po.id } });
     } catch (err) {
@@ -190,7 +190,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await runInTenantContext(req.params.storeId, () =>
-        createClearanceCouponFromFlag(req.params.id)
+        createClearanceCouponFromFlag(req.params.id, req.params.storeId)
       );
       res.json({ data: { couponCode: result.couponCode } });
     } catch (err) {

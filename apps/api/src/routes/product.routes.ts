@@ -834,6 +834,12 @@ router.get(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const product = await prisma.product.findFirst({
+        where: { id: req.params.id, storeId: req.params.storeId },
+        select: { id: true },
+      });
+      if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
+
       const faqs = await prisma.productFaq.findMany({
         where: { productId: req.params.id },
         orderBy: { createdAt: 'asc' },
@@ -852,6 +858,12 @@ router.post(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const product = await prisma.product.findFirst({
+        where: { id: req.params.id, storeId: req.params.storeId },
+        select: { id: true },
+      });
+      if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
+
       const body = productFaqSchema.parse(req.body);
       const faq = await prisma.productFaq.create({
         data: {
@@ -878,6 +890,12 @@ router.put(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const product = await prisma.product.findFirst({
+        where: { id: req.params.id, storeId: req.params.storeId },
+        select: { id: true },
+      });
+      if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
+
       const body = productFaqSchema.partial().parse(req.body);
       const result = await prisma.productFaq.updateMany({
         where: { id: req.params.faqId, productId: req.params.id },
@@ -907,6 +925,12 @@ router.delete(
   requireStoreAccess,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const product = await prisma.product.findFirst({
+        where: { id: req.params.id, storeId: req.params.storeId },
+        select: { id: true },
+      });
+      if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');
+
       const deleted = await prisma.productFaq.deleteMany({
         where: { id: req.params.faqId, productId: req.params.id },
       });
