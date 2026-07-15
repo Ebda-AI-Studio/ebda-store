@@ -10,6 +10,8 @@ const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAG
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // ZAP 10037: don't advertise the framework (x-powered-by: Next.js).
+  poweredByHeader: false,
 
   // `sharp` is a native module. On Vercel/Node we mark it external so Next keeps
   // it as a runtime require from node_modules (unchanged behavior). On the
@@ -109,6 +111,13 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
+              // ZAP 10055 (directives with no default-src fallback): base-uri,
+              // form-action and object-src must be explicit. Checkout reaches
+              // payment gateways via window.location redirects (never form
+              // POSTs), so form-action 'self' is safe.
+              "base-uri 'self'",
+              "object-src 'none'",
+              "form-action 'self'",
               // OneSignal v16 SDK loads from cdn.onesignal.com and at runtime
               // pulls additional scripts (jsonp sync) from api.onesignal.com.
               // 'unsafe-eval' is required by the v16 page SDK's runtime

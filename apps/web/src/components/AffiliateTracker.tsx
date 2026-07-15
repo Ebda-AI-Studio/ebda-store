@@ -39,7 +39,8 @@ export function AffiliateTracker() {
     // Persist the referral code for 30 days
     const expires = new Date();
     expires.setDate(expires.getDate() + 30);
-    document.cookie = `${cookieName}=${encodeURIComponent(ref)}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+    const secure = window.location.protocol === 'https:' ? '; Secure' : ''; // ZAP 10011
+    document.cookie = `${cookieName}=${encodeURIComponent(ref)}; expires=${expires.toUTCString()}; path=/; SameSite=Lax${secure}`;
 
     // Register the click server-side (fire-and-forget)
     fetch(`${API_URL}/public/${store.id}/affiliates/track?ref=${encodeURIComponent(ref)}`, {

@@ -57,9 +57,12 @@ function writeCookie(value: ConsentState): void {
   if (typeof document === 'undefined') return;
   // 1 year, path=/, SameSite=Lax so it persists across navigation +
   // store-domain redirects and is included on first-party reads.
+  // Secure only on https (Safari treats localhost as untrustworthy for
+  // Secure cookies). ZAP 10011.
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
   document.cookie =
     `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(value))}; ` +
-    `path=/; max-age=31536000; SameSite=Lax`;
+    `path=/; max-age=31536000; SameSite=Lax${secure}`;
 }
 
 interface ConsentProviderProps {

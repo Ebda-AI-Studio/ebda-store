@@ -41,7 +41,10 @@ function writeCookie(name: string, value: string): void {
   if (typeof document === 'undefined') return;
   // 1 year, path=/, SameSite=Lax so the value persists across navigation
   // (incl. cross-store-domain redirects from the platform).
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=31536000; SameSite=Lax`;
+  // Secure only on https so Safari localhost dev (not a trustworthy origin
+  // for Secure cookies) keeps working. ZAP 10011.
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=31536000; SameSite=Lax${secure}`;
 }
 
 interface LanguageProviderProps {

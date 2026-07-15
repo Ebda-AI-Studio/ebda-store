@@ -1,0 +1,6 @@
+# Security headers for Workers-asset-layer responses (favicon, security.txt,
+# icons...) which bypass next.config headers(). ZAP 10035/10021. The _headers
+# file itself is never served (Workers Static Assets convention).
+/*
+  X-Content-Type-Options: nosniff
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload

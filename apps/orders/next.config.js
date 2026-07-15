@@ -9,6 +9,8 @@ const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAG
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // ZAP 10037: don't advertise the framework (x-powered-by: Next.js).
+  poweredByHeader: false,
 
   // Standalone output for containerized / Vercel deployment, matching apps/admin.
   output: 'standalone',
@@ -75,7 +77,7 @@ const nextConfig = {
             //   manifest-src 'self' → PWA install
             key: 'Content-Security-Policy',
             value:
-              "default-src 'self'; " +
+              "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; " +
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://static.cloudflareinsights.com; " +
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://*.onesignal.com; " +
               "font-src 'self' data: https://fonts.gstatic.com; " +
