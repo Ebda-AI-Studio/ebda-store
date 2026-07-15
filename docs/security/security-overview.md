@@ -77,12 +77,12 @@ deps) — dated reports live in `docs/audits/`.
 
 ## Evidence log
 
-| Artifact                                    | Date                    | Result                                                                   |
-| ------------------------------------------- | ----------------------- | ------------------------------------------------------------------------ |
-| ZAP baseline DAST — first activated run     | 2026-07-15 (dispatched) | pending — recorded here once complete                                    |
-| Manual Burp pass                            | —                       | no recorded run yet; first scheduled pass Q3 2026                        |
-| 13-dimension internal audit sweep           | 2026-07-02              | 0 critical / 0 high open (`docs/audits/2026-07-02-MASTER-deep-audit.md`) |
-| Security-readiness (procurement lens) audit | 2026-07-15              | `docs/audits/2026-07-15-security-readiness-enterprise-procurement.md`    |
+| Artifact                                    | Date       | Result                                                                                               |
+| ------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| ZAP baseline DAST — first activated run     | 2026-07-15 | 0 fail / 15 warn / 54 pass vs `https://store.force-ai.co` (run 29426193025); warns queued for triage |
+| Manual Burp pass                            | —          | no recorded run yet; first scheduled pass Q3 2026                                                    |
+| 13-dimension internal audit sweep           | 2026-07-02 | 0 critical / 0 high open (`docs/audits/2026-07-02-MASTER-deep-audit.md`)                             |
+| Security-readiness (procurement lens) audit | 2026-07-15 | `docs/audits/2026-07-15-security-readiness-enterprise-procurement.md`                                |
 
 Append a row per pentest/DAST/audit run — this table is the "can we see it?"
 answer.
