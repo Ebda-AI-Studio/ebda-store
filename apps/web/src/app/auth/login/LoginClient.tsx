@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
 import { MinimalChrome } from '../../../components';
+import { safeInternalPath } from '@force/shared';
 import { useCart } from '../../../contexts/CartContext';
 import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -39,10 +40,10 @@ export default function LoginClient() {
       // Sync local cart to backend after login
       await syncCartToBackend();
 
-      // Redirect to the original page or home (validate to prevent open redirect)
-      const rawRedirect = searchParams.get('redirect') || '/';
-      const redirectTo =
-        rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/';
+      // Redirect to the original page or home. safeInternalPath rejects
+      // offsite targets — absolute, protocol-relative (//host), AND backslash
+      // tricks (/\host) that the old startsWith('//') check let through.
+      const redirectTo = safeInternalPath(searchParams.get('redirect'), '/');
       router.push(storeUrl(redirectTo));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login');

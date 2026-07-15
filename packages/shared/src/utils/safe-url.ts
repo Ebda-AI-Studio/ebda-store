@@ -64,3 +64,33 @@ export function isSafeUrl(url: unknown): url is string {
 export function sanitizeUrl(url: unknown, fallback = '#'): string {
   return isSafeUrl(url) ? url.trim() : fallback;
 }
+
+/**
+ * Validate a post-login `returnTo` / `redirect` target: **internal, same-origin
+ * paths only**. Distinct from {@link isSafeUrl} (which allows absolute
+ * http/https for merchant link fields) — a redirect target must NEVER leave the
+ * site, so absolute URLs, protocol-relative (`//host`), and backslash tricks
+ * are all rejected. Returns the cleaned `pathname+search+hash`, or `fallback`.
+ *
+ * The backslash cases are the subtle ones the naive `startsWith('//')` guard
+ * misses: browsers (WHATWG URL) treat `\` as `/` when resolving, so both
+ * `//evil.com` and `/\evil.com` resolve to `https://evil.com/`. We reject any
+ * backslash outright, then resolve against a throwaway origin as a final belt —
+ * anything that changes origin is rejected.
+ */
+export function safeInternalPath(candidate: unknown, fallback = '/'): string {
+  if (typeof candidate !== 'string') return fallback;
+  const raw = candidate.trim();
+  if (!raw) return fallback;
+  if (hasControlChar(raw)) return fallback;
+  if (raw[0] !== '/') return fallback; // must be root-relative
+  if (raw[1] === '/' || raw[1] === '\\') return fallback; // //host or /\host → offsite
+  if (raw.includes('\\')) return fallback; // any backslash → reject
+  try {
+    const u = new URL(raw, 'https://internal.invalid');
+    if (u.origin !== 'https://internal.invalid') return fallback;
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return fallback;
+  }
+}

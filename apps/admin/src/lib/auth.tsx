@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getApiUrl, refreshAccessToken } from './api';
-import { isIosWebkit } from '@force/shared';
+import { isIosWebkit, safeInternalPath } from '@force/shared';
 
 interface User {
   id: string;
@@ -176,16 +176,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * Post-login destination: honor a validated internal ?returnTo= (set by the
    * session-kick redirect above) so a re-authenticating user lands back where
-   * they were. Internal paths only — rejects protocol-relative (`//`) and
-   * /login itself to prevent open redirects and loops.
+   * they were. `safeInternalPath` rejects offsite targets (absolute,
+   * protocol-relative `//host`, AND backslash tricks `/\host` that a naive
+   * `startsWith('//')` guard misses); we additionally reject the /login page
+   * itself to avoid a redirect loop.
    */
   function postLoginDestination(): string {
     if (typeof window === 'undefined') return '/';
     const raw = new URLSearchParams(window.location.search).get('returnTo');
-    if (raw && raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/login')) {
-      return raw;
+    const dest = safeInternalPath(raw, '/');
+    if (dest === '/login' || dest.startsWith('/login/') || dest.startsWith('/login?')) {
+      return '/';
     }
-    return '/';
+    return dest;
   }
 
   /** Shared token-storage logic used by both normal login and MFA completion. */

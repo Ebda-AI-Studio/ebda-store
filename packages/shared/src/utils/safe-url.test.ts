@@ -1,6 +1,6 @@
 // packages/shared/src/utils/safe-url.test.ts
 import { describe, it, expect } from 'vitest';
-import { isSafeUrl, sanitizeUrl } from './safe-url';
+import { isSafeUrl, sanitizeUrl, safeInternalPath } from './safe-url';
 
 describe('isSafeUrl', () => {
   it('accepts site-relative paths', () => {
@@ -58,5 +58,35 @@ describe('sanitizeUrl', () => {
     expect(sanitizeUrl('data:text/html,x')).toBe('#');
     expect(sanitizeUrl('javascript:alert(1)', '/products')).toBe('/products');
     expect(sanitizeUrl('', '/home')).toBe('/home');
+  });
+});
+
+describe('safeInternalPath', () => {
+  it('allows genuine internal paths (with query + hash)', () => {
+    expect(safeInternalPath('/orders')).toBe('/orders');
+    expect(safeInternalPath('/stores/abc/orders?tab=open#top')).toBe(
+      '/stores/abc/orders?tab=open#top'
+    );
+  });
+
+  it('rejects protocol-relative and absolute URLs', () => {
+    expect(safeInternalPath('//evil.com')).toBe('/');
+    expect(safeInternalPath('https://evil.com')).toBe('/');
+    expect(safeInternalPath('http://evil.com/x', '/home')).toBe('/home');
+  });
+
+  it('rejects the backslash open-redirect bypass (the regression this fixes)', () => {
+    // Browsers resolve `\` as `/`, so these otherwise resolve off-site.
+    expect(safeInternalPath('/\\evil.com')).toBe('/');
+    expect(safeInternalPath('/\\\\evil.com')).toBe('/');
+    expect(safeInternalPath('/path\\to\\x')).toBe('/');
+  });
+
+  it('rejects control-char and non-string / empty inputs', () => {
+    expect(safeInternalPath('/a\tb')).toBe('/');
+    expect(safeInternalPath(null)).toBe('/');
+    expect(safeInternalPath(undefined, '/home')).toBe('/home');
+    expect(safeInternalPath('')).toBe('/');
+    expect(safeInternalPath('relative/no/slash')).toBe('/');
   });
 });
