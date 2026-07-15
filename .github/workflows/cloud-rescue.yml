@@ -1,24 +1,15 @@
 name: Cloud rescue (self-hosted infra-flake failover)
 
-# Auto-falls-back to ubuntu-latest cloud ONLY when a self-hosted run failed for an
-# INFRA reason (runner offline, DNS drop, Docker hiccup, missing tool) — never for a
-# real test failure (it would fail on cloud too). Default stays self-hosted to save
-# GitHub-Pro cloud minutes; this is the safety net. Must run on ubuntu-latest itself.
-# Policy set 2026-06-01 (Ahmad). force_cloud=true re-dispatch prevents rescue loops.
+# OBSOLETE under the Umbra-only CI policy (2026-07-15, Ahmad): GitHub-hosted
+# runners are billing-blocked permanently, so a "re-dispatch on cloud" rescue can
+# never succeed — the rescue itself needs ubuntu-latest. The automatic
+# workflow_run trigger is removed; the file is kept dispatch-only for reference
+# (and would work again if org billing were ever restored). Runner-infra flakes
+# are now the local OS medic's job (runner-offline watch + Umbra guest restart).
+# Original policy 2026-06-01; superseded 2026-07-15.
 
 on:
-  workflow_run:
-    workflows:
-      - "CI"
-      - "gitleaks"
-      - "Neon snapshot"
-      - "Preview env isolation (rule 13)"
-      - "Lighthouse storefront audit"
-      - "Load Test (Nightly)"
-      - "Deploy"
-      - "Auto-fix watchdog"
-    types:
-      - completed
+  workflow_dispatch:
 
 permissions:
   actions: write

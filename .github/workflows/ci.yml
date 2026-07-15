@@ -651,12 +651,12 @@ jobs:
           extra_args: --only-verified
 
   notify-failure:
-    # FAIL-OPEN EXCEPTION: notify-failure intentionally stays on ubuntu-latest.
-    # Its sole purpose is to alert when OTHER jobs fail — including when the
-    # self-hosted runner is offline. Putting it on self-hosted would mean no
-    # alert when the runner dies, defeating the entire purpose.
+    # Umbra-only CI policy (2026-07-15): GitHub-hosted runners are billing-
+    # blocked permanently, so the old fail-open-on-cloud design can never fire.
+    # This job now rides the self-hosted runner; the runner-is-dead case is
+    # alerted by the local OS medic (:7717 runner-offline watch), not by CI.
     name: Notify on failure (main only)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     needs:
       [lint, typecheck, security, build, test-unit, test-integration, test-rls-force-app, test-e2e]

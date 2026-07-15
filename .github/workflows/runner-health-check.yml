@@ -26,7 +26,9 @@ permissions:
 jobs:
   check:
     name: Ping self-hosted runners on the GitHub Actions API
-    runs-on: ubuntu-latest
+    # Umbra-only CI policy (2026-07-15): the GitHub API ping works from any
+    # runner; cloud is billing-blocked so it rides self-hosted.
+    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 3
     steps:
       - name: Resolve runner status + alert on offline / missing

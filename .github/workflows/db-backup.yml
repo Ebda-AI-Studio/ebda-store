@@ -12,7 +12,11 @@ permissions:
   contents: read
 jobs:
   backup:
-    runs-on: ubuntu-latest
+    # Umbra-only CI policy (2026-07-15): GitHub-hosted runners are billing-
+    # blocked permanently; this backup MUST run, so it rides the self-hosted
+    # runner like every other job. Docker (postgres:17) + apt are available
+    # in the Umbra guest.
+    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 15
     steps:
       - name: dump -> gzip -> encrypt -> upload to R2 (rclone, verified path)

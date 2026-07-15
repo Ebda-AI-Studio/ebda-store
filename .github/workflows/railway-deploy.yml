@@ -98,7 +98,9 @@ jobs:
     name: Notify on failure
     needs: deploy
     if: failure() && github.event_name == 'push'
-    runs-on: ubuntu-latest
+    # Umbra-only CI policy (2026-07-15): billing-blocked cloud runners can
+    # never fire; ride the self-hosted runner (runner-death alerting = OS medic).
+    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     steps:
       - name: Telegram alert

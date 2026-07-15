@@ -57,7 +57,9 @@ jobs:
 
   notify-failure:
     name: Notify on failure
-    runs-on: ubuntu-latest
+    # Umbra-only CI policy (2026-07-15): billing-blocked cloud runners can
+    # never fire; ride the self-hosted runner (runner-death alerting = OS medic).
+    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
     needs: [ai-eval]
     if: always() && failure()
