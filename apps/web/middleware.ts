@@ -455,6 +455,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - manifest.webmanifest / sw.js
      * - public folder
+     * - .well-known/ (RFC 9116 security.txt etc. — must serve the static file
+     *   on every host, incl. custom domains, without tenant rewrites)
      * - api routes (handled separately, EXCEPT /api/store-favicon which the
      *   favicon.ico rewrite below targets — matcher excludes `api/` broadly,
      *   but the rewrite target itself never re-enters this matcher since
@@ -470,6 +472,6 @@ export const config = {
      * NextResponse.next() with no rewrite, and Next serves the static
      * /public/favicon.ico exactly as before.
      */
-    '/((?!_next/static|_next/image|manifest\\.webmanifest|sw\\.js|api/|public/).*)',
+    '/((?!_next/static|_next/image|manifest\\.webmanifest|sw\\.js|api/|public/|\\.well-known/).*)',
   ],
 };

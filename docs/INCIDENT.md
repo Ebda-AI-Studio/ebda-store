@@ -19,7 +19,7 @@ In rough order of how an incident usually surfaces:
 1. **UptimeRobot / BetterUptime monitor** — `/health` endpoint check every 5 min → Telegram alert on 2 consecutive failures. **Configure this first; without it everything below is reactive.**
 2. **Sentry** — new error cluster or rate spike on existing cluster. Alert rules: >10 new errors/hr OR any new issue type. Telegram integration.
 3. **Merchant report** — WhatsApp / email from Ahmad's contacts. Treat as P1 minimum until ruled out — merchants don't ping for cosmetic issues.
-4. **Vercel deployment failure email** — build failed, no auto-rollback. P1 if production, P2 if preview.
+4. **`cf-deploy.yml` workflow failure (GitHub Actions)** — a red `cf-deploy` run on `main` means Cloudflare Workers (web/admin/orders) are still serving the OLD build even though the merge shows green. P1; rerun with `gh run rerun <id> --failed` after fixing the cause.
 5. **Railway deployment failure** — same, P0 if production health check failed.
 6. **Customer-facing site error message** — explicit user complaint, often surfaces P1-P2 issues that don't trigger alerts.
 
@@ -83,7 +83,7 @@ Once you've identified the failure mode:
 | ---------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------- |
 | Bad deploy, no migrations                | `git revert HEAD && git push`                                                            | `scripts/rollback.sh`                         |
 | Bad deploy WITH a migration              | Neon branch restore → `prod-<previous-sha>`                                              | `docs/ROLLBACK.md`                            |
-| Vercel admin/web down                    | Vercel dashboard → previous deployment → "Promote to Production" (~30s)                  | `docs/ROLLBACK.md`                            |
+| Worker (web/admin/orders) down           | `wrangler rollback` to the previous version, or rerun the last green `cf-deploy` run     | `docs/ROLLBACK.md`                            |
 | Railway service stuck                    | Railway dashboard → API service → Deployments → previous → "Redeploy"                    | `docs/ROLLBACK.md`                            |
 | Inngest functions not firing             | `curl -X PUT $API_URL/api/v1/inngest` to force manifest re-sync                          | `feedback-inngest-deploy-sync-trap.md`        |
 | Rate-limit false positives               | Bump `publicLimiter` cap temporarily OR add path-specific skip                           | `feedback-status-polling-rate-limiter.md`     |

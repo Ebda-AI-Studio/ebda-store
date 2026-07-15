@@ -1,0 +1,5 @@
+# Force AI security contact (RFC 9116)
+Contact: mailto:security@force-ai.co
+Expires: 2027-07-15T00:00:00.000Z
+Preferred-Languages: en, ar
+Canonical: https://store.force-ai.co/.well-known/security.txt
