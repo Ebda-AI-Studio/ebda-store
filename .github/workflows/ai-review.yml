@@ -15,6 +15,9 @@ permissions:
 jobs:
   ai-review:
     name: Claude PR review
+    # Skip the remediation bot's own PRs — the remediation GATE's review-score IS the review,
+    # so re-running AI Review here would double-review bot fixes (branches: remediate/*).
+    if: ${{ !startsWith(github.head_ref, 'remediate/') }}
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 20
     steps:
