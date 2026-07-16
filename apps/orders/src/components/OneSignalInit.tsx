@@ -26,6 +26,57 @@ import { useAuth } from '@/lib/auth';
 import { useStore } from '@/contexts/StoreContext';
 import { onesignalAppId, syncStoreTag } from '@/lib/push';
 
+/**
+ * OneSignal Web SDK v16 `click` event — only the URL-bearing fields we read.
+ * The event fires in the TARGETED tab after the default click action completes.
+ */
+interface OneSignalClickEvent {
+  notification?: {
+    launchURL?: string | null;
+    url?: string | null;
+    additionalData?: { url?: string | null } | null;
+  } | null;
+  result?: { url?: string | null } | null;
+}
+
+/**
+ * Deep-link a tapped push to its target page, even when the PWA is ALREADY
+ * OPEN. OneSignal's default web behaviour then only FOCUSES the existing
+ * window without navigating it, so a tapped order push just refocused whatever
+ * page was open. This listener runs in the targeted tab after that focus and
+ * navigates to the notification's launch URL. App-closed clicks already open
+ * the URL via the service worker; the current-URL guard avoids a redundant
+ * reload then. Registered once, after init.
+ */
+function registerNotificationClickNavigation(): void {
+  try {
+    (
+      OneSignal.Notifications as unknown as {
+        addEventListener: (event: 'click', cb: (e: OneSignalClickEvent) => void) => void;
+      }
+    ).addEventListener('click', event => {
+      try {
+        const n = event?.notification ?? undefined;
+        const raw = n?.launchURL || n?.url || n?.additionalData?.url || event?.result?.url || null;
+        if (!raw) return;
+        const target = new URL(raw, window.location.origin);
+        // Defence-in-depth: only ever navigate to our own http(s) origin, so a
+        // malformed / hostile launch URL (javascript:, data:, another host)
+        // can never execute script or redirect off-site.
+        if (target.protocol !== 'https:' && target.protocol !== 'http:') return;
+        if (target.origin !== window.location.origin) return;
+        if (target.href !== window.location.href) {
+          window.location.assign(target.href);
+        }
+      } catch {
+        // Best-effort — never let a notification click throw.
+      }
+    });
+  } catch {
+    // addEventListener unavailable on this SDK build — ignore.
+  }
+}
+
 export function OneSignalInit() {
   const { user } = useAuth();
   const { selectedStoreId } = useStore();
@@ -62,6 +113,9 @@ export function OneSignalInit() {
           serviceWorkerPath: '/OneSignalSDKWorker.js',
           allowLocalhostAsSecureOrigin: true,
         });
+        // Navigate to the notification's deep link on click (fixes the
+        // already-open PWA focus-but-don't-navigate behaviour).
+        registerNotificationClickNavigation();
         // iOS 16.4+ / Chrome web push: granting permission alone does NOT
         // create a deliverable subscription. Explicitly request permission +
         // opt in so the device reaches a SUBSCRIBED state — otherwise it

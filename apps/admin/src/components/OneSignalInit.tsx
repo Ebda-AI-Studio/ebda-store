@@ -24,6 +24,58 @@ import { useAuth } from '../lib/auth';
 import { useStore } from '../contexts/StoreContext';
 import { apiGet, apiPost } from '../lib/api';
 
+/**
+ * OneSignal Web SDK v16 `click` event — only the URL-bearing fields we read.
+ * The event fires in the TARGETED tab after the default click action completes.
+ */
+interface OneSignalClickEvent {
+  notification?: {
+    launchURL?: string | null;
+    url?: string | null;
+    additionalData?: { url?: string | null } | null;
+  } | null;
+  result?: { url?: string | null } | null;
+}
+
+/**
+ * Deep-link a tapped push to its target page, even when the PWA is ALREADY
+ * OPEN. OneSignal's default web behaviour then only FOCUSES the existing
+ * window — it does not navigate it — so an order alert tapped while the app sat
+ * on (say) the Abandoned Carts page just refocused that page instead of opening
+ * the order. This listener runs in the targeted tab after that focus and
+ * navigates to the notification's launch URL. App-closed clicks already open
+ * the URL via the service worker; the current-URL guard avoids a redundant
+ * reload in that case. Registered once, after init.
+ */
+function registerNotificationClickNavigation(): void {
+  try {
+    (
+      OneSignal.Notifications as unknown as {
+        addEventListener: (event: 'click', cb: (e: OneSignalClickEvent) => void) => void;
+      }
+    ).addEventListener('click', event => {
+      try {
+        const n = event?.notification ?? undefined;
+        const raw = n?.launchURL || n?.url || n?.additionalData?.url || event?.result?.url || null;
+        if (!raw) return;
+        const target = new URL(raw, window.location.origin);
+        // Defence-in-depth: only ever navigate to our own http(s) origin, so a
+        // malformed / hostile launch URL (javascript:, data:, another host)
+        // can never execute script or redirect off-site.
+        if (target.protocol !== 'https:' && target.protocol !== 'http:') return;
+        if (target.origin !== window.location.origin) return;
+        if (target.href !== window.location.href) {
+          window.location.assign(target.href);
+        }
+      } catch {
+        // Best-effort — never let a notification click throw.
+      }
+    });
+  } catch {
+    // addEventListener unavailable on this SDK build — ignore.
+  }
+}
+
 function describeDevice(): string {
   if (typeof navigator === 'undefined') return 'Unknown';
   const ua = navigator.userAgent;
@@ -67,6 +119,9 @@ export function OneSignalInit() {
           serviceWorkerPath: '/OneSignalSDKWorker.js',
           allowLocalhostAsSecureOrigin: true,
         });
+        // Navigate to the notification's deep link on click (fixes the
+        // already-open PWA focus-but-don't-navigate behaviour).
+        registerNotificationClickNavigation();
         if (cancelled) return;
 
         // iOS 16.4+ / Chrome web push: granting notification permission alone
