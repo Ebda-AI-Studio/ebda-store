@@ -910,7 +910,12 @@ describe('OrderService', () => {
     });
 
     describe('inventory restoration', () => {
-      it('should trigger inventory restore transaction on cancellation', async () => {
+      // Money-integrity redesign (2026-07-16, Task 1): inventory restore no
+      // longer runs inline inside updateStatus/applyRefundEffects — it moves
+      // into the `order-refunded` Inngest fanout as an idempotent step
+      // (Tasks 2-3). `applyRefundEffects` now just fires `order/refunded`
+      // with `restoreInventory` so the fanout knows whether to restore.
+      it('should fire order/refunded with restoreInventory:true on cancellation', async () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,
           status: 'pending',
@@ -921,12 +926,15 @@ describe('OrderService', () => {
 
         await OrderService.updateStatus(mockStoreId, 'order-123', 'cancelled');
 
-        // Cancel/refund now wraps inventory restore in a separate $transaction
-        // The first call is from updateStatus itself (if applicable), second from inventory restore
-        expect(prisma.$transaction).toHaveBeenCalled();
+        expect(inngest.send).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'order/refunded',
+            data: expect.objectContaining({ restoreInventory: true, notify: true }),
+          })
+        );
       });
 
-      it('should trigger inventory restore transaction on refund', async () => {
+      it('should fire order/refunded with restoreInventory:true on refund', async () => {
         vi.mocked(prisma.order.findFirst).mockResolvedValue({
           ...mockOrder,
           status: 'delivered',
@@ -935,7 +943,12 @@ describe('OrderService', () => {
 
         await OrderService.updateStatus(mockStoreId, 'order-123', 'refunded');
 
-        expect(prisma.$transaction).toHaveBeenCalled();
+        expect(inngest.send).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'order/refunded',
+            data: expect.objectContaining({ restoreInventory: true, notify: true }),
+          })
+        );
       });
     });
 
@@ -1034,51 +1047,26 @@ describe('OrderService', () => {
     });
   });
 
-  describe('applyRefundEffects — F2 idempotency rework', () => {
-    // Fresh stateful markers per test — a single shared `tx` object whose
-    // inventoryHistory/orderEvent mocks persist state across multiple
-    // applyRefundEffects invocations within ONE test, so cross-call
-    // idempotency can actually be exercised (mirrors the real durable
-    // markers living in the DB across calls).
-    function makeStatefulTx() {
-      let stockMarker: { id: string } | null = null;
-      let effectsMarker: { id: string } | null = null;
-      return {
-        $queryRaw: vi
-          .fn()
-          .mockResolvedValue([{ id: 'prod-123', inventory: 50, track_inventory: true }]),
-        product: { update: vi.fn().mockResolvedValue({}) },
-        productVariant: { update: vi.fn().mockResolvedValue({}) },
-        inventoryHistory: {
-          findFirst: vi.fn(async () => stockMarker),
-          create: vi.fn(async () => {
-            stockMarker = { id: 'ih-1' };
-            return stockMarker;
-          }),
-        },
-        orderEvent: {
-          findFirst: vi.fn(async () => effectsMarker),
-          create: vi.fn(async () => {
-            effectsMarker = { id: 'oe-1' };
-            return effectsMarker;
-          }),
-        },
-      };
-    }
-
+  // Money-integrity redesign (2026-07-16, Task 1): `applyRefundEffects` is no
+  // longer where inventory/coupon/affiliate/loyalty/backorder reversals run,
+  // or where their idempotency is decided — it is a thin dispatcher that
+  // fires `order/refunded` with `{ restoreInventory, notify }` flags. The
+  // reversals (and their idempotent markers) move into the `order-refunded`
+  // Inngest fanout as retriable `step.run`s in Tasks 2-3 of the plan
+  // (`docs/superpowers/plans/2026-07-16-refund-money-integrity.md`) — their
+  // idempotency is covered by `tests/unit/order-refunded-reversals.test.ts`
+  // once that lands, not here. This block only covers the event-firing
+  // contract; more direct-call coverage lives in
+  // `apps/api/src/services/__tests__/order-refund-gating.test.ts`.
+  describe('applyRefundEffects — fires order/refunded, no inline reversals', () => {
     beforeEach(() => {
       vi.mocked(prisma.order.update).mockResolvedValue(mockOrder as any);
     });
 
-    it('(a) delivered→refunded via updateStatus: inventory restored once, coupon decremented once, notification fired once', async () => {
-      const tx = makeStatefulTx();
-      vi.mocked(prisma.$transaction).mockImplementation((fn: any) => fn(tx));
-
+    it('delivered→refunded via updateStatus: fires order/refunded once with restoreInventory:true, notify:true; no inline reversal', async () => {
       // A GENUINE new refund of a paid, coupon-bearing order. `refunded` is
       // terminal (validTransitions), so the previously-considered
-      // refunded→cancelled second hop can't happen through updateStatus —
-      // this asserts the single-pass wiring: exactly one inventory restore,
-      // one coupon decrement, one `order/refunded` notification.
+      // refunded→cancelled second hop can't happen through updateStatus.
       vi.mocked(prisma.order.findFirst).mockResolvedValue({
         ...mockOrder,
         status: 'delivered',
@@ -1092,8 +1080,6 @@ describe('OrderService', () => {
 
       await OrderService.updateStatus(mockStoreId, 'order-123', 'refunded');
 
-      expect(tx.inventoryHistory.create).toHaveBeenCalledTimes(1);
-      expect(prisma.coupon.updateMany).toHaveBeenCalledTimes(1);
       // applyRefundEffects fires order/refunded exactly once; updateStatus now
       // ALSO fires order/status-changed (Lens E, E2-4) → two sends total.
       expect(inngest.send).toHaveBeenCalledTimes(2);
@@ -1101,17 +1087,17 @@ describe('OrderService', () => {
         .mocked(inngest.send)
         .mock.calls.filter(c => (c[0] as { name?: string })?.name === 'order/refunded');
       expect(refundedCalls).toHaveLength(1);
-      expect(refundedCalls[0][0]).toEqual(
-        expect.objectContaining({
-          name: 'order/refunded',
-          data: expect.objectContaining({ orderId: 'order-123' }),
-        })
-      );
+      expect(refundedCalls[0][0]).toEqual({
+        name: 'order/refunded',
+        data: { orderId: 'order-123', storeId: mockStoreId, restoreInventory: true, notify: true },
+      });
+
+      // No inline reversal — that now happens in the order-refunded fanout.
+      expect(prisma.coupon.updateMany).not.toHaveBeenCalled();
+      expect(prisma.inventoryHistory.create).not.toHaveBeenCalled();
     });
 
-    it('(b) two separate returns on the same order: each fires the notification, but coupon decrements only once', async () => {
-      const tx = makeStatefulTx();
-      vi.mocked(prisma.$transaction).mockImplementation((fn: any) => fn(tx));
+    it('two separate returns on the same order: applyRefundEffects fires order/refunded each time (dedup now lives in the fanout)', async () => {
       vi.mocked(prisma.order.findFirst).mockResolvedValue({
         ...mockOrder,
         status: 'delivered',
@@ -1124,18 +1110,11 @@ describe('OrderService', () => {
       await OrderService.applyRefundEffects(mockStoreId, 'order-123');
       await OrderService.applyRefundEffects(mockStoreId, 'order-123');
 
-      // Inventory restore is order-level coarse (pre-existing, unchanged) —
-      // once is correct/acceptable even for two returns.
-      expect(tx.inventoryHistory.create).toHaveBeenCalledTimes(1);
-      // Coupon must decrement only once for the order, not once per return.
-      expect(prisma.coupon.updateMany).toHaveBeenCalledTimes(1);
-      // BOTH returns are genuinely separate refund events — each notifies.
       expect(inngest.send).toHaveBeenCalledTimes(2);
+      expect(prisma.coupon.updateMany).not.toHaveBeenCalled();
     });
 
-    it('(c) restoreInventory:false calls (backorder-line cancels) decrement the coupon at most once per order, never once per line', async () => {
-      const tx = makeStatefulTx();
-      vi.mocked(prisma.$transaction).mockImplementation((fn: any) => fn(tx));
+    it('restoreInventory:false calls (backorder-line cancels) carry the flag through on every call', async () => {
       vi.mocked(prisma.order.findFirst).mockResolvedValue({
         ...mockOrder,
         status: 'delivered',
@@ -1150,14 +1129,17 @@ describe('OrderService', () => {
       await OrderService.applyRefundEffects(mockStoreId, 'order-123', { restoreInventory: false });
       await OrderService.applyRefundEffects(mockStoreId, 'order-123', { restoreInventory: false });
 
-      // Never restores inventory (restoreInventory:false on every call).
-      expect(tx.inventoryHistory.create).not.toHaveBeenCalled();
-      // Coupon decremented exactly once despite 3 calls — the OLD guard
-      // (return_stock-marker-only) never wrote ANY marker on a
-      // restoreInventory:false call, so it would have decremented the
-      // coupon on EVERY line. The new `refund_effects_applied` marker
-      // fixes this.
-      expect(prisma.coupon.updateMany).toHaveBeenCalledTimes(1);
+      expect(inngest.send).toHaveBeenCalledTimes(3);
+      for (const call of vi.mocked(inngest.send).mock.calls) {
+        expect(call[0]).toEqual(
+          expect.objectContaining({
+            name: 'order/refunded',
+            data: expect.objectContaining({ restoreInventory: false }),
+          })
+        );
+      }
+      expect(prisma.inventoryHistory.create).not.toHaveBeenCalled();
+      expect(prisma.coupon.updateMany).not.toHaveBeenCalled();
     });
   });
 

@@ -5,7 +5,7 @@
  *  1. Golden path: OrderService.create with pointsToRedeem decrements the
  *     balance, folds the discount into the order total, and logs a
  *     `redeem_discount` transaction — all atomic with the order.
- *  2. Refund re-credit: applyRefundEffects re-credits the redeemed points
+ *  2. Refund re-credit: the order/refunded fanout re-credits the redeemed points
  *     exactly once (idempotent across repeat refund calls).
  *  3. Guest checkout ignores pointsToRedeem entirely (no customer, no burn).
  *  4. Concurrent double-redeem race: two redeemPoints calls for the same
@@ -20,6 +20,12 @@ import { prisma } from '@force/database';
 import { OrderService } from '@api/services/order.service';
 import { LoyaltyService } from '@api/services/loyalty.service';
 import { CartService } from '@api/services/cart.service';
+import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
+
+// Passthrough Inngest step (runs each step.run body inline) so integration
+// tests can drive the order/refunded fanout synchronously — post-redesign the
+// loyalty re-credit lives in the fanout, not inline in applyRefundEffects.
+const stepStub = { run: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn() };
 
 const TAG = `loyalty-redeem-${Date.now()}`;
 
@@ -217,7 +223,7 @@ describe('loyalty redemption — integration', () => {
     expect(balance?.points).toBe(500);
 
     // First refund → re-credit 1500.
-    await OrderService.applyRefundEffects(storeId, order.id, { restoreInventory: false });
+    await handleOrderRefunded(order.id, storeId, false, false, stepStub);
     balance = await prisma.loyaltyPoints.findUnique({
       where: { storeId_customerId: { storeId, customerId } },
     });
@@ -225,7 +231,7 @@ describe('loyalty redemption — integration', () => {
     expect(balance?.totalRedeemed).toBe(0); // unwound
 
     // Second refund (partial→full scenario) → no double credit.
-    await OrderService.applyRefundEffects(storeId, order.id, { restoreInventory: false });
+    await handleOrderRefunded(order.id, storeId, false, false, stepStub);
     balance = await prisma.loyaltyPoints.findUnique({
       where: { storeId_customerId: { storeId, customerId } },
     });

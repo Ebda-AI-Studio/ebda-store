@@ -21,7 +21,7 @@ const orderUpdate = vi.fn().mockResolvedValue({});
 const txn = vi.fn().mockResolvedValue([{}, {}]);
 // Returns the order detail the "Payment received" push reads; null is fine for
 // the reconciliation tests (the push is best-effort and never affects the result).
-const orderFindUnique = vi.fn().mockResolvedValue(null);
+const orderFindUnique = vi.fn().mockResolvedValue({ status: 'pending' });
 // The amount-mismatch alert path resolves the store name for the Telegram
 // header — mock a store row so the alert-building code has something to read.
 const storeFindUnique = vi.fn().mockResolvedValue({ name: 'Test Store' });
@@ -114,6 +114,23 @@ describe('confirmPaymentFromProviderStatus', () => {
         locale: 'ar',
       },
     });
+  });
+
+  it('PAID + a STALE confirmation on a REFUNDED order → rejected, no status regression', async () => {
+    // The current order status is terminal (refunded); a late provider
+    // "completed" must NOT flip it back to confirmed. assertValidTransition
+    // guards the write. orderFindUnique returns the CURRENT status.
+    orderFindUnique.mockResolvedValueOnce({ status: 'refunded' });
+    await expect(
+      confirmPaymentFromProviderStatus({
+        payment: basePayment,
+        order: { id: 'ord_1', storeId: 'store_1', paymentStatus: 'unpaid', locale: 'ar' },
+        providerStatus: statusResponse('completed'),
+        source: 'guest_verify',
+      })
+    ).rejects.toThrow(/transition|INVALID_STATUS/i);
+    // The order-status write transaction never ran.
+    expect(txn).not.toHaveBeenCalled();
   });
 
   it('PAID + order ALREADY paid → idempotent no-op (no write, no double fanout)', async () => {

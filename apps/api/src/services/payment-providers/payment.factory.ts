@@ -3,7 +3,7 @@ import { config } from '../../config';
 import { AppError } from '../../middleware/error-handler';
 import logger from '../../lib/logger';
 import { encryption } from '../encryption.service';
-import { OrderService } from '../order.service';
+import { OrderService, assertValidTransition } from '../order.service';
 import { socketService } from '../socket.service';
 import { inngest } from '../../lib/inngest/client';
 import { OneSignalService } from '../onesignal.service';
@@ -646,6 +646,20 @@ export class PaymentService {
       throw new AppError(404, 'NOT_FOUND', 'Payment not found');
     }
 
+    const isFullRefund = !request.amount || request.amount >= payment.amount;
+
+    // Reject a stale/invalid order state BEFORE any money moves. A full
+    // refund flips `Order.status` to 'refunded' below (bypassing
+    // `updateStatus`) — guard it with the same state machine so a refund
+    // request against an order some OTHER path already moved to a terminal
+    // state (e.g. `cancelled`) can't silently regress it. Deliberately
+    // checked here, before the payment claim and the provider call, not at
+    // the DB-write site further down — an invalid transition must never
+    // reach the gateway (money-integrity: no undo API for a real refund).
+    if (isFullRefund && payment.order) {
+      assertValidTransition(payment.order.status, 'refunded');
+    }
+
     // Atomically CLAIM the payment before touching the provider. A plain
     // `status === 'completed'` read-check is a TOCTOU race: two concurrent
     // refund requests (admin double-click, client retry, two staff on one
@@ -656,7 +670,6 @@ export class PaymentService {
     // (PaymentStatus is a Prisma enum with no transient 'refunding' value, so
     // we claim with the final status and revert to 'completed' if the provider
     // call throws — avoids an enum migration.)
-    const isFullRefund = !request.amount || request.amount >= payment.amount;
     const claimedStatus = isFullRefund ? 'refunded' : 'partially_refunded';
     const claim = await prisma.payment.updateMany({
       where: { id: payment.id, status: 'completed' },
@@ -756,21 +769,19 @@ export class PaymentService {
         select: { storeId: true },
       });
       if (order) {
-        try {
-          await OrderService.applyRefundEffects(order.storeId, payment.orderId);
-        } catch (effectsError) {
-          // Non-fatal: provider refund already succeeded and the order
-          // is marked refunded. Log loud so finance can reconcile any
-          // inventory / commission drift manually.
-          logger.error(
-            {
-              err: effectsError,
-              orderId: payment.orderId,
-              refundId: response.refundId,
-            },
-            '[PAYMENT] applyRefundEffects failed after refund — inventory/coupon/commission may be inconsistent'
-          );
-        }
+        // Let a failure here PROPAGATE. `applyRefundEffects` is now a thin
+        // dispatcher (`inngest.send('order/refunded', ...)`) — it's the
+        // ONLY signal that fires inventory restore, coupon/affiliate/
+        // loyalty reversal, and the customer refund email/admin push. The
+        // provider money movement + Payment/Order status flip above are
+        // already committed and are NOT undone by this failing — but
+        // silently swallowing it here (as this used to, back when
+        // applyRefundEffects did heavy inline work and this really was
+        // non-fatal reconciliation debt) would drop that fanout with zero
+        // signal to the caller, leaving the admin `refund-via-provider`
+        // route free to report HTTP 200 for a refund whose reversal chain
+        // never ran (money-integrity audit F2). The caller must see this.
+        await OrderService.applyRefundEffects(order.storeId, payment.orderId);
       }
     }
 
@@ -972,6 +983,14 @@ export class PaymentService {
       const wasAlreadyHandled =
         payment.status === 'refunded' || payment.status === 'partially_refunded';
       if (newStatus === 'completed' && !wasAlreadyHandled && payment.order) {
+        // Reject a stale/invalid order state before running ANY reversal
+        // side-effects. A provider refund executed out-of-band for an
+        // order some OTHER path already moved to a terminal state (e.g.
+        // `cancelled`) must not regress it — and must not run
+        // applyRefundEffects first, which would leave the reversal applied
+        // but the status write rejected.
+        assertValidTransition(payment.order.status, 'refunded');
+
         logger.info(
           { paymentId: payment.id, orderId: payment.orderId },
           '[PAYMENT WEBHOOK] out-of-band refund detected — running applyRefundEffects fresh'
@@ -1156,6 +1175,14 @@ export class PaymentService {
 
     // Update order
     if (webhookData.status !== 'pending' && webhookData.status !== 'processing') {
+      // Reject a stale/out-of-order webhook before it can regress the
+      // order's status — e.g. a delayed "payment failed"/"expired"
+      // notification (which maps to `orderStatus:'pending'` below)
+      // arriving after the order already confirmed/shipped/delivered
+      // through a later, more-authoritative event.
+      if (payment.order) {
+        assertValidTransition(payment.order.status, orderStatus);
+      }
       await prisma.order.update({
         where: { id: payment.orderId },
         data: {

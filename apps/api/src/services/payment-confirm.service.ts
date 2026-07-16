@@ -37,6 +37,7 @@ import { OneSignalService } from './onesignal.service';
 import { recordPaymentEvent } from './payment-event.service';
 import type { PaymentStatusResponse } from './payment-providers/types';
 import { invalidateCustomersCache } from '../lib/public-cache';
+import { assertValidTransition } from './order-status-machine';
 
 export type ConfirmSource = 'admin_refresh' | 'guest_verify';
 
@@ -199,6 +200,18 @@ export async function confirmPaymentFromProviderStatus(
         statusChanged: false,
       };
     }
+
+    // Guard the order-status flip: a STALE provider confirmation on an order
+    // that has since moved to a terminal state (refunded/cancelled) must not
+    // regress it to 'confirmed'. Re-read the CURRENT status (the passed-in
+    // `order` snapshot may be stale by the time we settle). pending→confirmed
+    // (normal) and confirmed→confirmed (no-op) pass; refunded/cancelled throw.
+    const currentOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+      select: { status: true },
+    });
+    if (!currentOrder) throw new Error(`Order ${order.id} not found during confirmation`);
+    assertValidTransition(currentOrder.status, 'confirmed');
 
     await prisma.$transaction([
       prisma.payment.update({

@@ -1099,23 +1099,23 @@ router.post(
       // If this is the first time we see the refund as executed AND no
       // applyRefundEffects ever ran (Payment.status was still completed),
       // fire it now — inventory restore + customer email + admin push.
+      //
+      // Both calls below used to be wrapped in a `.catch(logger.error)` that
+      // swallowed the failure and let the route fall through to its normal
+      // 200 response — the SAME money-integrity-audit-F2 pattern Task 5
+      // fixed on `refund-via-provider`: a failed reversal-event dispatch (or
+      // a failed order-status flip) was silent, and an admin refreshing the
+      // refund status had no way to know the reversal chain never ran. Let
+      // both propagate to the route's `catch (error) { next(error); }` below
+      // instead.
       const needsSideEffects =
         status.status === 'completed' && statusChanged && payment.status === 'completed';
       if (needsSideEffects) {
-        await OrderService.applyRefundEffects(storeId, orderId).catch((err: unknown) =>
-          logger.error(
-            { err, orderId, storeId },
-            '[refresh-refund-status] applyRefundEffects failed'
-          )
-        );
-        await prisma.order
-          .update({
-            where: { id: orderId },
-            data: { status: 'refunded', paymentStatus: 'refunded' },
-          })
-          .catch((err: unknown) =>
-            logger.error({ err, orderId }, '[refresh-refund-status] order status update failed')
-          );
+        await OrderService.applyRefundEffects(storeId, orderId);
+        await prisma.order.update({
+          where: { id: orderId },
+          data: { status: 'refunded', paymentStatus: 'refunded' },
+        });
       }
 
       await auditLog({
@@ -1236,10 +1236,20 @@ router.post(
         return;
       }
 
-      // Capture provider errors specifically so the admin sees what the
-      // gateway actually said instead of a generic 500. MyFatoorah refunds
-      // need explicit "Refund" permission enabled on the merchant account
-      // in the provider portal — first attempt commonly fails with that.
+      // `PaymentService.refund` covers the whole money-moving chain: the
+      // provider refund call, the Payment/Order status flip, and firing
+      // `applyRefundEffects` (which enqueues `order/refunded` — the sole
+      // trigger for inventory/coupon/affiliate/loyalty reversal + the
+      // customer refund email/admin push). A failure ANYWHERE in that
+      // chain must surface as a non-2xx — this used to catch only the
+      // provider-call error and swallow everything else into an HTTP 200
+      // (money-integrity audit F2: operator gets no signal a refund
+      // broke). We still enrich the message with a MyFatoorah-specific
+      // hint (the #1 first-time failure mode is the "Refund" API
+      // permission not being enabled on the merchant account) and forward
+      // to `next(err)` instead of writing the response ourselves, so every
+      // failure mode in the chain — not just the provider call — reaches
+      // the client as a real error.
       let result;
       try {
         result = await runInTenantContext(storeId, async () =>
@@ -1249,36 +1259,25 @@ router.post(
             reason: data.reason,
           })
         );
-      } catch (providerError) {
-        const providerMessage =
-          providerError instanceof Error ? providerError.message : 'Unknown provider error';
+      } catch (refundError) {
+        const refundMessage =
+          refundError instanceof Error ? refundError.message : 'Unknown refund error';
         logger.error(
           {
-            err: providerError,
+            err: refundError,
             orderId,
             orderNumber: order.orderNumber,
             transactionId: payment.transactionId,
             provider: payment.provider,
             amount: data.amount,
           },
-          '[Refund] provider refund call failed'
+          '[Refund] admin-initiated provider refund failed'
         );
-        // Surface the provider's own message in the customer-visible
-        // error string so the admin doesn't have to dig through Railway
-        // logs to know what went wrong. Append a hint for the common
-        // "permission not enabled" case which is the #1 first-time
-        // failure mode on MyFatoorah accounts.
         const hint =
           payment.provider === 'myfatoorah'
             ? ' (verify Refund permission is enabled on this account in the MyFatoorah portal: Settings → API Permissions → MakeRefund)'
             : '';
-        res.status(502).json({
-          success: false,
-          error: {
-            code: 'REFUND_PROVIDER_ERROR',
-            message: `${providerMessage}${hint}`,
-          },
-        });
+        next(new AppError(502, 'REFUND_FAILED', `${refundMessage}${hint}`));
         return;
       }
 

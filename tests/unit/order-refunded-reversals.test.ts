@@ -1,0 +1,415 @@
+/**
+ * order-refunded fanout — reversal steps (money-integrity redesign, Task 2).
+ *
+ * Task 1 slimmed `OrderService.applyRefundEffects` to a thin dispatcher that
+ * fires `order/refunded` with `{orderId, storeId, restoreInventory, notify}`
+ * and DELETED the inline reversals. This test verifies the inventory-restore
+ * reversal was rebuilt here as an idempotent `step.run`, guarded by the
+ * per-order `return_stock` InventoryHistory marker written verbatim from the
+ * old `applyRefundEffects` inner tx — moved (not just gated) into the fanout
+ * so it survives past the request's 30s transaction window.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const h = vi.hoisted(() => ({
+  orderFindUnique: vi.fn(),
+  storeFindUnique: vi.fn(),
+  inventoryHistoryFindFirst: vi.fn(),
+  inventoryHistoryCreate: vi.fn(),
+  productUpdate: vi.fn(),
+  productVariantUpdate: vi.fn(),
+  queryRaw: vi.fn(),
+  orderEventFindFirst: vi.fn(),
+  orderEventCreate: vi.fn(),
+  couponUpdateMany: vi.fn(),
+  backorderLineUpdateMany: vi.fn(),
+  reverseCommission: vi.fn(),
+  reverseEarnedPointsFromOrder: vi.fn(),
+  reverseRedeemedPointsFromOrder: vi.fn(),
+  sendOrderRefunded: vi.fn(),
+  dispatch: vi.fn(),
+  notifyAdminsOfRefund: vi.fn(),
+  // Spy (not an inline passthrough) so tests can assert the FORCE-RLS side
+  // effects actually run INSIDE a tenant context — the whole point of the fix.
+  runInTenant: vi.fn((_s: string, fn: () => unknown) => fn()),
+}));
+
+const txClient = {
+  inventoryHistory: { findFirst: h.inventoryHistoryFindFirst, create: h.inventoryHistoryCreate },
+  product: { update: h.productUpdate },
+  productVariant: { update: h.productVariantUpdate },
+  orderEvent: { findFirst: h.orderEventFindFirst, create: h.orderEventCreate },
+  coupon: { updateMany: h.couponUpdateMany },
+  $queryRaw: h.queryRaw,
+};
+
+vi.mock('@force/database', () => ({
+  prisma: {
+    order: { findUnique: h.orderFindUnique },
+    store: { findUnique: h.storeFindUnique },
+    backorderLine: { updateMany: h.backorderLineUpdateMany },
+  },
+  runInTenantContext: h.runInTenant,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  withMoneyTx: (_client: any, fn: (tx: typeof txClient) => unknown) => fn(txClient),
+}));
+
+vi.mock('@api/services/email.service', () => ({
+  EmailService: { sendOrderRefunded: h.sendOrderRefunded },
+}));
+vi.mock('@api/services/notification-dispatcher.service', () => ({
+  notificationDispatcher: { dispatch: h.dispatch },
+}));
+vi.mock('@api/services/onesignal.service', () => ({
+  OneSignalService: { notifyAdminsOfRefund: h.notifyAdminsOfRefund },
+}));
+vi.mock('@api/services/affiliate.service', () => ({
+  affiliateService: { reverseCommission: h.reverseCommission },
+}));
+vi.mock('@api/services/loyalty.service', () => ({
+  LoyaltyService: {
+    reverseEarnedPointsFromOrder: h.reverseEarnedPointsFromOrder,
+    reverseRedeemedPointsFromOrder: h.reverseRedeemedPointsFromOrder,
+  },
+}));
+vi.mock('@api/lib/inngest/client', () => ({ inngest: { createFunction: vi.fn(() => ({})) } }));
+vi.mock('@api/lib/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+
+import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
+
+const stepStub = { run: async <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn() };
+
+const ORDER = {
+  id: 'o1',
+  storeId: 's1',
+  orderNumber: 'ORD-1',
+  total: 5000,
+  currency: 'KWD',
+  locale: 'en',
+  customer: { email: 'buyer@test.com', firstName: 'Sam', lastName: 'B' },
+  payments: [],
+  items: [
+    { productId: 'p1', variantId: null, quantity: 2 },
+    { productId: 'p2', variantId: 'v2', quantity: 1 },
+  ],
+  shippingAddress: {
+    firstName: 'Sam',
+    lastName: 'B',
+    email: 'buyer@test.com',
+    phone: '+96500000000',
+  },
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  h.orderFindUnique.mockResolvedValue(ORDER);
+  h.storeFindUnique.mockResolvedValue({ name: 'Test Store' });
+  h.queryRaw.mockImplementation(
+    (strings: TemplateStringsArray, productId: string) =>
+      Promise.resolve([{ id: productId, inventory: 10, track_inventory: true }])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) as any;
+  h.orderEventFindFirst.mockResolvedValue(null);
+  h.reverseCommission.mockResolvedValue(null);
+  h.reverseEarnedPointsFromOrder.mockResolvedValue(null);
+  h.reverseRedeemedPointsFromOrder.mockResolvedValue(null);
+  h.backorderLineUpdateMany.mockResolvedValue({ count: 0 });
+  for (const fn of [
+    h.sendOrderRefunded,
+    h.dispatch,
+    h.notifyAdminsOfRefund,
+    h.productUpdate,
+    h.productVariantUpdate,
+    h.orderEventCreate,
+    h.couponUpdateMany,
+    h.inventoryHistoryCreate,
+  ])
+    fn.mockResolvedValue(undefined);
+});
+
+describe('order-refunded fanout — restore-inventory step', () => {
+  it('restores inventory for both tracked items + writes 2 return_stock history rows', async () => {
+    h.inventoryHistoryFindFirst.mockResolvedValue(null); // no marker yet
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.productUpdate).toHaveBeenCalledTimes(2);
+    expect(h.productUpdate).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      data: { inventory: { increment: 2 } },
+    });
+    expect(h.productUpdate).toHaveBeenCalledWith({
+      where: { id: 'p2' },
+      data: { inventory: { increment: 1 } },
+    });
+    expect(h.productVariantUpdate).toHaveBeenCalledTimes(1);
+    expect(h.productVariantUpdate).toHaveBeenCalledWith({
+      where: { id: 'v2' },
+      data: { inventory: { increment: 1 } },
+    });
+
+    expect(h.inventoryHistoryCreate).toHaveBeenCalledTimes(2);
+    expect(h.inventoryHistoryCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        productId: 'p1',
+        storeId: 's1',
+        type: 'return_stock',
+        quantity: 2,
+        reference: 'o1',
+      }),
+    });
+    expect(h.inventoryHistoryCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        productId: 'p2',
+        storeId: 's1',
+        type: 'return_stock',
+        quantity: 1,
+        reference: 'o1',
+      }),
+    });
+
+    // The marker check ran INSIDE runInTenantContext(storeId).
+    expect(h.runInTenant.mock.calls.some(c => c[0] === 's1')).toBe(true);
+  });
+
+  it('is idempotent — firing again with the return_stock marker present does NOT double-increment', async () => {
+    h.inventoryHistoryFindFirst.mockResolvedValue({ id: 'marker-1' }); // marker already exists
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.productUpdate).not.toHaveBeenCalled();
+    expect(h.productVariantUpdate).not.toHaveBeenCalled();
+    expect(h.inventoryHistoryCreate).not.toHaveBeenCalled();
+  });
+
+  it('skips the restore entirely when restoreInventory is false (e.g. backorder-line cancel)', async () => {
+    h.inventoryHistoryFindFirst.mockResolvedValue(null);
+
+    await handleOrderRefunded('o1', 's1', false, true, stepStub);
+
+    expect(h.inventoryHistoryFindFirst).not.toHaveBeenCalled();
+    expect(h.productUpdate).not.toHaveBeenCalled();
+    expect(h.inventoryHistoryCreate).not.toHaveBeenCalled();
+  });
+
+  it('skips a non-tracked-inventory item but still restores the tracked one', async () => {
+    h.inventoryHistoryFindFirst.mockResolvedValue(null);
+    h.queryRaw.mockImplementation((_s: TemplateStringsArray, productId: string) =>
+      Promise.resolve([{ id: productId, inventory: 10, track_inventory: productId === 'p1' }])
+    ) as unknown as typeof h.queryRaw;
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.productUpdate).toHaveBeenCalledTimes(1);
+    expect(h.productUpdate).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      data: { inventory: { increment: 2 } },
+    });
+    expect(h.inventoryHistoryCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Task 3 — coupon + affiliate + loyalty + backorder reversal steps. The
+ * coupon reversal gets its OWN `coupon_reversed` orderEvent marker (NOT the
+ * inventory `return_stock` marker) written atomically with the decrement in
+ * the SAME `withMoneyTx`, so it also fires for restoreInventory:false /
+ * no-tracked-inventory orders that never touch the stock marker.
+ */
+describe('order-refunded fanout — reverse-coupon step', () => {
+  beforeEach(() => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: 'SAVE10', customerId: 'c1' });
+    h.inventoryHistoryFindFirst.mockResolvedValue({ id: 'marker-1' }); // inventory already restored — irrelevant here
+  });
+
+  it('decrements coupon usageCount exactly once across two fires and writes the coupon_reversed marker', async () => {
+    h.orderEventFindFirst.mockResolvedValueOnce(null); // first fire: no marker yet
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.couponUpdateMany).toHaveBeenCalledTimes(1);
+    expect(h.couponUpdateMany).toHaveBeenCalledWith({
+      where: { storeId: 's1', code: 'SAVE10', usageCount: { gt: 0 } },
+      data: { usageCount: { decrement: 1 } },
+    });
+    expect(h.orderEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        storeId: 's1',
+        orderId: 'o1',
+        toStatus: 'coupon_reversed',
+      }),
+    });
+
+    h.orderEventFindFirst.mockResolvedValueOnce({ id: 'marker-coupon' }); // second fire: marker exists
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.couponUpdateMany).toHaveBeenCalledTimes(1); // still 1 — no double-decrement
+    expect(h.orderEventCreate).toHaveBeenCalledTimes(1); // marker written once
+  });
+
+  it('skips coupon reversal entirely when the order has no couponCode', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: null, customerId: null });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.couponUpdateMany).not.toHaveBeenCalled();
+    expect(h.orderEventCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe('order-refunded fanout — affiliate/loyalty/backorder reversal steps', () => {
+  beforeEach(() => {
+    h.inventoryHistoryFindFirst.mockResolvedValue({ id: 'marker-1' });
+  });
+
+  it('calls affiliateService.reverseCommission in-context', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: null, customerId: null });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.reverseCommission).toHaveBeenCalledWith('s1', 'o1');
+    expect(h.runInTenant.mock.calls.some(c => c[0] === 's1')).toBe(true);
+  });
+
+  it('calls both loyalty reversal methods in-context when order.customerId is set', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: null, customerId: 'c1' });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.reverseEarnedPointsFromOrder).toHaveBeenCalledWith('s1', 'o1');
+    expect(h.reverseRedeemedPointsFromOrder).toHaveBeenCalledWith('s1', 'o1');
+  });
+
+  it('skips loyalty reversal for guest orders (no customerId)', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: null, customerId: null });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.reverseEarnedPointsFromOrder).not.toHaveBeenCalled();
+    expect(h.reverseRedeemedPointsFromOrder).not.toHaveBeenCalled();
+  });
+
+  it('cancels open backorder lines for the order', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: null, customerId: null });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.backorderLineUpdateMany).toHaveBeenCalledWith({
+      where: { orderItem: { orderId: 'o1' }, fulfilledAt: null, cancelledAt: null },
+      data: expect.objectContaining({ cancelledReason: 'Order refunded' }),
+    });
+  });
+});
+
+/**
+ * Task-2 carry-forward fix (from Task 3 review): both money txns (inventory
+ * restore + coupon reversal) must lock the order row FIRST — before either
+ * reads its own marker — so two concurrent `order/refunded` deliveries for
+ * the same order serialize instead of both passing the marker check before
+ * either commits (double-apply).
+ */
+describe('order-refunded fanout — order-level FOR UPDATE lock ordering', () => {
+  it('issues the order-level FOR UPDATE lock before the return_stock marker read in restore-inventory', async () => {
+    const callOrder: string[] = [];
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: null, customerId: null });
+    h.queryRaw.mockImplementation((strings: TemplateStringsArray, ...args: unknown[]) => {
+      const sql = strings.join('');
+      if (sql.includes('public.orders')) {
+        callOrder.push('order-lock');
+        return Promise.resolve([{ id: args[0] }]);
+      }
+      return Promise.resolve([{ id: args[0], inventory: 10, track_inventory: true }]);
+    });
+    h.inventoryHistoryFindFirst.mockImplementation(() => {
+      callOrder.push('stock-marker-read');
+      return Promise.resolve(null);
+    });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(callOrder[0]).toBe('order-lock');
+    expect(callOrder.indexOf('order-lock')).toBeLessThan(callOrder.indexOf('stock-marker-read'));
+  });
+
+  it('issues the order-level FOR UPDATE lock before the coupon_reversed marker read in reverse-coupon', async () => {
+    const callOrder: string[] = [];
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: 'SAVE10', customerId: null });
+    h.inventoryHistoryFindFirst.mockResolvedValue({ id: 'marker-1' }); // restore-inventory skips its work, but still locks first
+    h.queryRaw.mockImplementation((strings: TemplateStringsArray, ...args: unknown[]) => {
+      const sql = strings.join('');
+      if (sql.includes('public.orders')) {
+        callOrder.push('order-lock');
+      }
+      return Promise.resolve([{ id: args[0] }]);
+    });
+    h.orderEventFindFirst.mockImplementation(() => {
+      callOrder.push('coupon-marker-read');
+      return Promise.resolve(null);
+    });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    // One order-lock per withMoneyTx (restore-inventory + reverse-coupon) = 2.
+    expect(callOrder.filter(c => c === 'order-lock').length).toBe(2);
+    // The LAST order-lock belongs to reverse-coupon's tx and must precede
+    // its own marker read.
+    const lastOrderLockIdx = callOrder.lastIndexOf('order-lock');
+    expect(lastOrderLockIdx).toBeLessThan(callOrder.indexOf('coupon-marker-read'));
+  });
+});
+
+/**
+ * Task 4 — two-tier failure policy. Reversals ALWAYS run and THROW (Inngest
+ * retries → dead-letters via alerts-failure-watch on exhaustion). The
+ * notification block (email/dispatcher/push) is gated on `notify` AND stays
+ * inside the swallowing Promise.allSettled. Without the `notify` gate, every
+ * unpaid cancel (notify:false, restoreInventory:true) would still email/push
+ * a "Refund issued" notification — re-introducing the spurious-notification
+ * bug `order.service.ts` comments say was previously fixed.
+ */
+describe('order-refunded fanout — two-tier failure policy (Task 4)', () => {
+  beforeEach(() => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: null, customerId: null });
+    h.inventoryHistoryFindFirst.mockResolvedValue({ id: 'marker-1' }); // reversals no-op/skip cheaply
+  });
+
+  it('notify:false (unpaid cancel) — reversals run but NONE of the 3 notification steps fire', async () => {
+    await handleOrderRefunded('o1', 's1', true, false, stepStub);
+
+    // Reversals still ran.
+    expect(h.reverseCommission).toHaveBeenCalledWith('s1', 'o1');
+    expect(h.backorderLineUpdateMany).toHaveBeenCalled();
+
+    // Notifications did NOT run.
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.notifyAdminsOfRefund).not.toHaveBeenCalled();
+  });
+
+  it('notify:true — notifications run', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.sendOrderRefunded).toHaveBeenCalledTimes(1);
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    expect(h.notifyAdminsOfRefund).toHaveBeenCalledTimes(1);
+  });
+
+  it('a reversal step throwing — handler REJECTS and notifications did NOT run', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: 'SAVE10', customerId: null });
+    h.couponUpdateMany.mockRejectedValue(new Error('db down'));
+
+    await expect(handleOrderRefunded('o1', 's1', true, true, stepStub)).rejects.toThrow('db down');
+
+    expect(h.sendOrderRefunded).not.toHaveBeenCalled();
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.notifyAdminsOfRefund).not.toHaveBeenCalled();
+  });
+
+  it('a notification throwing — handler RESOLVES (swallowed)', async () => {
+    h.sendOrderRefunded.mockRejectedValue(new Error('smtp outage'));
+
+    await expect(handleOrderRefunded('o1', 's1', true, true, stepStub)).resolves.not.toThrow();
+
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    expect(h.notifyAdminsOfRefund).toHaveBeenCalledTimes(1);
+  });
+});
