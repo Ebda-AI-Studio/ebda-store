@@ -17,6 +17,20 @@ import { inngest } from '../client';
  * cuts checkout p95 by ~600ms in production and lets us retry on
  * provider hiccups without losing notifications.
  */
+/**
+ * Resolves the opt-in per-store owner-invoice recipient from a store's
+ * `settings` JSON. Returns the trimmed `orderInvoiceEmail` when it's a
+ * non-empty string, else null (no owner invoice is sent). Kept pure +
+ * exported so the opt-in behaviour is unit-testable without the full fanout.
+ */
+export function resolveOrderInvoiceRecipient(settings: unknown): string | null {
+  if (!settings || typeof settings !== 'object') return null;
+  const value = (settings as { orderInvoiceEmail?: unknown }).orderInvoiceEmail;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export const orderCreated: InngestFunction.Any = inngest.createFunction(
   {
     id: 'order-created-fanout',
@@ -138,7 +152,7 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
         prisma.store
           .findUnique({
             where: { id: storeId },
-            select: { name: true, wbsTemplates: true },
+            select: { name: true, wbsTemplates: true, settings: true },
           })
           .catch(() => null)
       )
@@ -190,6 +204,20 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           : EmailService.sendOrderConfirmation(storeId, emailData, emailLocale)
       ),
       step.run('send-admin-new-order', () => EmailService.sendAdminNewOrder(emailData)),
+      // Opt-in per-store owner invoice: when the store configured
+      // `settings.orderInvoiceEmail`, auto-email the rendered invoice to that
+      // address (e.g. the store owner) on every order. Stores that didn't
+      // configure it get nothing (this is an option, not a default). Reuses
+      // the existing `order/invoice.email-requested` → invoice-email pipeline
+      // (renders the PDF invoice + queued/retried send).
+      step.run('send-owner-invoice', async () => {
+        const to = resolveOrderInvoiceRecipient(store?.settings);
+        if (!to) return;
+        await inngest.send({
+          name: 'order/invoice.email-requested',
+          data: { orderId: order.id, storeId, to },
+        });
+      }),
       step.run('dispatch-notification-channels', async () => {
         await notificationDispatcher.dispatch(storeId, 'order_confirmed', {
           customerName,

@@ -100,6 +100,13 @@ export interface StoreSettings {
   timezone: string;
   locale: string;
   theme: string;
+  /**
+   * Optional, opt-in: when set to a valid email, every order placed in this
+   * store auto-emails the rendered invoice to this address (e.g. the store
+   * owner). Empty/unset = no owner invoice email is sent. Per-store — only
+   * stores that configure it receive it.
+   */
+  orderInvoiceEmail?: string;
 }
 
 // Category Types

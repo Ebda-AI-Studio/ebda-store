@@ -42,6 +42,7 @@ export interface StoreSettings {
   timezone: string;
   locale: string;
   theme: string;
+  orderInvoiceEmail?: string;
 }
 export interface Product {
   id: string;
