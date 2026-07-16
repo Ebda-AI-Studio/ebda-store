@@ -23,7 +23,11 @@ import {
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
 import { DeliverySection } from './_components/DeliverySection';
 import { saveCheckoutInfo, loadCheckoutInfo, clearCheckoutInfo } from './_lib/savedCheckout';
-import { resolveDeliverySelection, getNowMinutesInTimezone } from './_lib/deliveryWindows';
+import {
+  resolveDeliverySelection,
+  getNowMinutesInTimezone,
+  formatWindowTime,
+} from './_lib/deliveryWindows';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import {
   resolveSectionZone,
@@ -937,7 +941,10 @@ export default function CheckoutClient() {
       const notesWithDelivery = selectedDeliveryWindow
         ? `${t('Delivery', 'التوصيل')}: ${deliveryDayLabel}, ${
             language === 'ar' ? selectedDeliveryWindow.labelAr : selectedDeliveryWindow.label
-          } (${selectedDeliveryWindow.start}–${selectedDeliveryWindow.end})\n${formData.notes}`
+          } (${formatWindowTime(selectedDeliveryWindow.start, language)}–${formatWindowTime(
+            selectedDeliveryWindow.end,
+            language
+          )})\n${formData.notes}`
         : formData.notes;
 
       const orderResult = await api.createOrder({

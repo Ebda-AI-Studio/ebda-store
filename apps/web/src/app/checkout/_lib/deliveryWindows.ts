@@ -53,6 +53,24 @@ export function parseTimeToMinutes(time: string): number {
 }
 
 /**
+ * Formats a stored `"HH:mm"` 24h time as a customer-friendly 12-hour string
+ * for the storefront — merchants enter 24h in the admin, customers read 12h.
+ * `en` → "2:00 PM", `ar` → "2:00 م". Returns the raw input unchanged if it
+ * isn't a parseable time, so a bad value never breaks the picker/label.
+ */
+export function formatWindowTime(time: string, locale: string): string {
+  const match = /^(\d{1,2}):(\d{2})$/.exec((time ?? '').trim());
+  if (!match) return time;
+  const hours = Number(match[1]);
+  const minutes = match[2];
+  if (!Number.isFinite(hours) || hours > 23 || Number(minutes) > 59) return time;
+  const isAr = locale === 'ar';
+  const period = hours < 12 ? (isAr ? 'ص' : 'AM') : isAr ? 'م' : 'PM';
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${hour12}:${minutes} ${period}`;
+}
+
+/**
  * Resolves a window's effective order-by cutoff, in minutes-since-midnight.
  * Uses `orderBy` when the merchant set one; falls back to `start` otherwise
  * (treating an empty string the same as unset, since a cleared <input

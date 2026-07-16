@@ -1,7 +1,7 @@
 'use client';
 
 import { useLanguage } from '../../../contexts/LanguageContext';
-import type { DeliverySelection } from '../_lib/deliveryWindows';
+import { formatWindowTime, type DeliverySelection } from '../_lib/deliveryWindows';
 import type { CheckoutDeliverySettings } from '@force/shared';
 
 interface DeliverySectionProps {
@@ -85,7 +85,7 @@ export function DeliverySection({
                   >
                     <span className="font-medium">{language === 'ar' ? w.labelAr : w.label}</span>
                     <span className="ms-1.5 text-xs text-muted-foreground">
-                      {w.start}–{w.end}
+                      {formatWindowTime(w.start, language)}–{formatWindowTime(w.end, language)}
                     </span>
                   </button>
                 );

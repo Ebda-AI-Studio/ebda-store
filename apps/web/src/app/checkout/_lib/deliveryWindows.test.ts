@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeWindowAvailability,
+  formatWindowTime,
   getNowMinutesInTimezone,
   orderByMinutes,
   parseTimeToMinutes,
@@ -55,6 +56,27 @@ describe('parseTimeToMinutes', () => {
   it('falls back to 0 for malformed input', () => {
     expect(parseTimeToMinutes('')).toBe(0);
     expect(parseTimeToMinutes('nonsense')).toBe(0);
+  });
+});
+
+describe('formatWindowTime', () => {
+  it('formats 24h times as customer-friendly 12h (en)', () => {
+    expect(formatWindowTime('13:00', 'en')).toBe('1:00 PM');
+    expect(formatWindowTime('17:30', 'en')).toBe('5:30 PM');
+    expect(formatWindowTime('09:05', 'en')).toBe('9:05 AM');
+    expect(formatWindowTime('00:00', 'en')).toBe('12:00 AM');
+    expect(formatWindowTime('12:00', 'en')).toBe('12:00 PM');
+  });
+
+  it('uses Arabic AM/PM markers for the ar locale', () => {
+    expect(formatWindowTime('09:05', 'ar')).toBe('9:05 ص');
+    expect(formatWindowTime('17:30', 'ar')).toBe('5:30 م');
+  });
+
+  it('returns the raw input unchanged when unparseable', () => {
+    expect(formatWindowTime('', 'en')).toBe('');
+    expect(formatWindowTime('nonsense', 'en')).toBe('nonsense');
+    expect(formatWindowTime('25:00', 'en')).toBe('25:00');
   });
 });
 
