@@ -12,6 +12,7 @@ Required in production (app crashes without these):
 - `ENCRYPTION_KEY` — min 32 chars
 - `PORT` — set automatically by Railway
 - `NODE_ENV=production`
+- `ALLOW_BYPASSRLS_ROLE` — **load-bearing today, remove after the RLS cutover.** Prod's `DATABASE_URL` currently connects as `neondb_owner`, a BYPASSRLS role — the boot guard (`apps/api/src/index.ts:438-479`) queries `pg_roles.rolbypassrls` on every boot and, in production, `process.exit(1)`s unless this is set to the literal string `"true"` (any other value, including unset, is fatal). This is an explicit escape hatch, not a bug: cutting `DATABASE_URL` over to the non-bypass `force_app` role is the tracked RLS-cutover follow-up (`docs/plans/2026-07-02-rls-cutover.md`), not a same-day fix, and a routine redeploy must not crash-loop the whole platform in the meantime (verified 2026-06-27). Once the cutover flips `DATABASE_URL` to `force_app`, `rolbypassrls` reads `false` and this var becomes a no-op — delete it from Railway then.
 
 Optional (feature degrades gracefully if missing):
 

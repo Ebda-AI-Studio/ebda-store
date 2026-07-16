@@ -302,9 +302,18 @@ async function processWebhookInline(args: {
       PaymentService.handleWebhook(provider, payload, signature, storeId, rawBody)
     );
   } else {
-    result = await withRlsBypass(_tx =>
-      PaymentService.handleWebhook(provider, payload, signature, storeId, rawBody)
-    );
+    // No storeId (platform-level path): call handleWebhook directly rather
+    // than through withRlsBypass. withRlsBypass opens its OWN
+    // basePrisma.$transaction and calls fn(tx) directly — it never runs fn
+    // inside tenantStorage.run(tx, ...), so a discarded `_tx` param (as this
+    // call previously had) means the SET LOCAL app.bypass_rls='true' it
+    // issues is scoped to a transaction handleWebhook's ambient
+    // ALS-proxied `prisma` export never touches — a no-op. This mirrors the
+    // documented OLD-idiom escape (20260609000000_complete_force_rls_coverage):
+    // orders/payments policies already allow-contextless when
+    // current_store_id() IS NULL, which is exactly this branch's state, so
+    // no wrapper is needed at all.
+    result = await PaymentService.handleWebhook(provider, payload, signature, storeId, rawBody);
   }
   if (result.orderId) {
     await markWebhookProcessed(result.orderId, idempotencyKey, storeId);
@@ -515,8 +524,9 @@ router.post(
       // FORCE RLS: resolveStoreIdFromWebhookPayload runs in withRlsBypass
       // (cross-tenant). Once storeId is known, handleWebhook + markWebhookProcessed
       // run in runInTenantContext(storeId) so all their payment/order writes are
-      // correctly scoped. When storeId is undefined (platform-level path) we
-      // fall back to withRlsBypass for the handleWebhook call.
+      // correctly scoped. When storeId is undefined (platform-level path)
+      // handleWebhook is called directly with no wrapper — see
+      // processWebhookInline's no-storeId branch for why.
       const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
 
       // Offload the heavy PaymentService.handleWebhook mutation off this request:
@@ -670,7 +680,8 @@ router.post('/payment', async (req: Request, res: Response, next: NextFunction) 
     // FORCE RLS: resolveStoreIdFromWebhookPayload runs in withRlsBypass
     // (cross-tenant). Once storeId is known, handleWebhook + markWebhookProcessed
     // run in runInTenantContext(storeId) so all their payment/order writes are
-    // correctly scoped. When storeId is undefined we fall back to withRlsBypass.
+    // correctly scoped. When storeId is undefined handleWebhook is called
+    // directly with no wrapper — see processWebhookInline's no-storeId branch.
     const storeIdForWebhook = await resolveStoreIdFromWebhookPayload(provider, payload);
 
     // Same offload path as the explicit /payment/:provider handler: persist to

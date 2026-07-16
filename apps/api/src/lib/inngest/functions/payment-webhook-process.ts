@@ -31,8 +31,13 @@ import { AppError } from '../../../middleware/error-handler';
  *
  * Tenant context: handleWebhook + the markWebhookProcessed write run inside
  * runInTenantContext(storeId) so RLS scopes their payment/order writes —
- * exactly as the route did. The platform-only path (no storeId) uses
- * withRlsBypass, also matching the route.
+ * exactly as the route did. The platform-only path (no storeId) calls
+ * `apply()` directly with no wrapper, also matching the route (see
+ * webhook.routes.ts's processWebhookInline no-storeId branch — withRlsBypass
+ * never threads its `tx` through AsyncLocalStorage, so wrapping `apply`
+ * (which reads/writes via the ambient `prisma` export) in it was a no-op;
+ * the OLD-idiom null-context escape on orders/payments RLS policies already
+ * covers this branch).
  */
 export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction(
   {
@@ -166,11 +171,12 @@ export const paymentWebhookProcess: InngestFunction.Any = inngest.createFunction
         };
 
         // Same tenant-context branching the route used: scoped when storeId is
-        // known, RLS-bypass for the platform-only path.
+        // known; called directly (no wrapper) for the platform-only path — see
+        // the docstring above for why withRlsBypass here was a no-op.
         if (storeId) {
           return runInTenantContext(storeId, apply);
         }
-        return withRlsBypass(_tx => apply());
+        return apply();
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

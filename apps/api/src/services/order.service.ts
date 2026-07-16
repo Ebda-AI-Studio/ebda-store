@@ -733,9 +733,14 @@ export class OrderService {
       return newOrder;
     });
 
-    // Link order to affiliate referral (fire-and-forget)
+    // Link order to affiliate referral. Must be awaited (not fire-and-forget):
+    // the per-request tenant tx (held by tenantContext until res.finish) can
+    // commit before a detached promise's bare prisma.* calls run, silently
+    // dropping commission attribution with no reconciliation sweep. Awaiting
+    // keeps it inside the same request flow/tx, mirroring reverseCommission's
+    // await+catch pattern below (refund path).
     if (referralCode) {
-      affiliateService
+      await affiliateService
         .linkOrderToReferral(storeId, order.id, referralCode)
         .catch(err => logger.error({ err }, 'Affiliate referral link failed'));
     }

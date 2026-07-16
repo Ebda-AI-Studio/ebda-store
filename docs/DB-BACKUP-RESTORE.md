@@ -132,9 +132,16 @@ URL=$(neonctl connection-string restore-candidate --project-id "$PID" --org-id "
 psql "$URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 zcat < "$DUMP" | psql "$URL" --single-transaction -v ON_ERROR_STOP=1
 
-# 4. Verify, then re-apply RLS (dump restore does NOT preserve the runtime role/policy wiring):
+# 4. Verify, then re-apply RLS (dump restore does NOT preserve the runtime role/policy wiring).
+#    There is no standalone `db:rls` script — RLS policies + force_app grants ship as
+#    ordinary Prisma migrations, so replaying the full migration history against the
+#    restored branch's DIRECT_URL re-creates every policy (idempotent DROP POLICY IF
+#    EXISTS + CREATE) and re-issues the force_app grants from 20260404000000:
 psql "$URL" -c "select 'orders='||count(*) from orders;"
-npm run db:rls        # or the project's RLS-apply script — REQUIRED after a dump restore
+DIRECT_URL="$URL" npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma  # REQUIRED after a dump restore
+# webhook_events has RLS intentionally never enabled (all access via withRlsBypass) — nothing
+# to re-apply for that table specifically; see the RLS matrix in
+# docs/audits/2026-07-16-rls-cutover-readiness-map.md §1.
 
 # 5. Cut over (repoint the app, or promote the branch in the console), then delete scratch branches.
 neonctl branches delete restore-candidate --project-id "$PID" --org-id "$ORG"

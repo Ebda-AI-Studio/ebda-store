@@ -8,8 +8,20 @@ import { encryption } from '../services/encryption.service';
 import { auditLog } from '../middleware/security';
 import { PaymentService } from '../services/payment.service';
 import { getAuthUser } from '../utils/store-helpers';
+import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
+
+// Mounted bare at '/payment-settings' in routes/index.ts — the global
+// (super-admin, storeId-less) routes above stay outside tenant context by
+// design. Every '/store/:storeId/...' route below sets RLS tenant context
+// once Express resolves :storeId, matching coupon.routes.ts /
+// shipping.routes.ts. Closes the one F2-GAP router with zero DB backstop
+// over PaymentConfig (encrypted provider secrets) — see
+// docs/audits/2026-07-16-rls-cutover-readiness-map.md §2/§6#3. Confirmed no
+// external I/O in these handlers (no fetch/3rd-party calls; that only
+// happens in the storeId-less /:provider/test route above).
+router.param('storeId', tenantContext);
 
 // ==========================================
 // Validation Schemas
