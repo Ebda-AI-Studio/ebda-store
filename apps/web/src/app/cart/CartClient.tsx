@@ -22,7 +22,7 @@ import {
 } from '../../templates/shared/section-typography';
 import { useLastListing } from '../../hooks/useLastListing';
 import { useNumerals } from '../../hooks/useNumerals';
-import { resolveColor } from '@force/shared';
+import { resolveColor, checkMinimumOrder } from '@force/shared';
 
 export default function CartClient() {
   const {
@@ -304,6 +304,21 @@ export default function CartClient() {
   const total = subtotal - discount + shipping;
   const cartCount = itemCount;
   const { components: T } = useTemplateComponents();
+
+  // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
+  // fils; 0/unset = no minimum). This is a UX guard only — the API's
+  // OrderService.create is the real, hard-blocking check. store.settings is
+  // a loose Record — cast the one key we read, same pattern as
+  // checkoutDelivery in CheckoutClient.tsx.
+  const minimumOrderFils = store?.settings?.minimumOrderFils as number | undefined;
+  const minimumOrderCheck = checkMinimumOrder(subtotal, minimumOrderFils);
+  const belowMinimumOrder = !minimumOrderCheck.met;
+  const minimumOrderMessage = belowMinimumOrder
+    ? t(
+        `Minimum order is ${formatPrice(minimumOrderFils as number)} — add ${formatPrice(minimumOrderCheck.shortfallFils)} more`,
+        `الحد الأدنى للطلب ${formatPrice(minimumOrderFils as number)} — أضف ${formatPrice(minimumOrderCheck.shortfallFils)} أخرى`
+      )
+    : undefined;
 
   return (
     <ShopChrome>
@@ -646,6 +661,8 @@ export default function CartClient() {
                         ctaLabel="Proceed to Checkout"
                         ctaLabelAr="المتابعة للدفع"
                         ctaHref={storeUrl('/checkout')}
+                        ctaDisabled={belowMinimumOrder}
+                        ctaBlockedMessage={minimumOrderMessage}
                         typography={cartTypography}
                         summaryColors={{
                           labelColor: summaryLabelColorResolved,
@@ -882,31 +899,52 @@ export default function CartClient() {
                             </div>
                           </div>
 
+                          {/* Below-minimum notice */}
+                          {belowMinimumOrder && minimumOrderMessage && (
+                            <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+                              {minimumOrderMessage}
+                            </p>
+                          )}
+
                           {/* Checkout Button */}
-                          <Link href={storeUrl('/checkout')} className="mt-6 block">
+                          {belowMinimumOrder ? (
                             <Button
-                              className="w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
+                              type="button"
+                              disabled
+                              className="mt-6 w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
                               size="lg"
                             >
                               {t(
                                 'Proceed to Checkout',
                                 '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
                               )}
-                              <svg
-                                className="h-5 w-5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M14 5l7 7m0 0l-7 7m7-7H3"
-                                />
-                              </svg>
                             </Button>
-                          </Link>
+                          ) : (
+                            <Link href={storeUrl('/checkout')} className="mt-6 block">
+                              <Button
+                                className="w-full gap-2 rounded-xl shadow-lg shadow-primary/25"
+                                size="lg"
+                              >
+                                {t(
+                                  'Proceed to Checkout',
+                                  '\u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629 \u0644\u0644\u062f\u0641\u0639'
+                                )}
+                                <svg
+                                  className="h-5 w-5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M14 5l7 7m0 0l-7 7m7-7H3"
+                                  />
+                                </svg>
+                              </Button>
+                            </Link>
+                          )}
 
                           {/* Security Badge */}
                           <div className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-muted/50 py-3 text-xs text-muted-foreground">

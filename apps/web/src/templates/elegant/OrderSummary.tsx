@@ -22,6 +22,7 @@ export default function ElegantOrderSummary({
   onCtaClick,
   ctaDisabled,
   ctaLoading,
+  ctaBlockedMessage,
   typography,
   summaryColors,
 }: OrderSummaryProps) {
@@ -109,13 +110,17 @@ export default function ElegantOrderSummary({
         </div>
       </dl>
       {children && <div className="mt-8">{children}</div>}
+      {ctaDisabled && ctaBlockedMessage && (
+        <p className="mt-6 border border-warning/30 bg-warning/10 px-3 py-2 text-xs font-light tracking-wide text-warning">
+          {ctaBlockedMessage}
+        </p>
+      )}
       {ctaText &&
-        (ctaHref ? (
+        (ctaHref && !ctaDisabled ? (
           <Link
             href={ctaHref}
             data-cta="button"
             className="mt-8 flex h-12 w-full items-center justify-center border border-foreground bg-foreground px-4 text-xs font-medium uppercase tracking-[0.3em] text-background hover:bg-foreground/85 transition-colors duration-700 ease-out focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-            aria-disabled={ctaDisabled}
             style={typography?.cta}
           >
             {ctaText}

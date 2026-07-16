@@ -36,6 +36,13 @@ interface PaymentStepProps {
    * enabled either part.
    */
   deliverySection?: React.ReactNode;
+  /**
+   * Defense-in-depth: true when the store's minimum order value isn't met
+   * (the cart page / checkout step 1 guards should already have kept the
+   * customer from reaching this step, but a direct navigation or stale tab
+   * could). Disables the Pay button; `checkoutError` carries the message.
+   */
+  belowMinimumOrder?: boolean;
 }
 
 export default function PaymentStep({
@@ -50,6 +57,7 @@ export default function PaymentStep({
   total,
   formatPrice,
   deliverySection,
+  belowMinimumOrder = false,
 }: PaymentStepProps) {
   const { language, t } = useLanguage();
 
@@ -221,7 +229,7 @@ export default function PaymentStep({
           type="submit"
           size="lg"
           isLoading={isProcessing}
-          disabled={!selectedProvider || isProcessing}
+          disabled={!selectedProvider || isProcessing || belowMinimumOrder}
         >
           {isProcessing
             ? t('Processing...', 'جاري المعالجة...')

@@ -1,4 +1,5 @@
 import { prisma, Prisma, OrderStatus, withMoneyTx } from '@force/database';
+import { checkMinimumOrder } from '@force/shared';
 import { generateOrderNumber } from '../utils/order-number';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
@@ -267,6 +268,31 @@ export class OrderService {
 
     // Calculate totals (done before the transaction — no locks needed here)
     const subtotal = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+
+    // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
+    // fils; 0/unset = no minimum). Platform-level — any store can configure
+    // it, never a hardcoded slug. This is the REAL guard for the customer
+    // checkout path; the storefront cart/checkout mirror it for UX only.
+    // Deliberately NOT applied to OrderService.createAdminOrder — merchants
+    // must be able to override the minimum for phone/manual orders.
+    const storeForMinOrder = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { settings: true },
+    });
+    const minimumOrderFilsRaw = (storeForMinOrder?.settings as Record<string, unknown> | null)?.[
+      'minimumOrderFils'
+    ];
+    const minimumOrderFils =
+      typeof minimumOrderFilsRaw === 'number' ? minimumOrderFilsRaw : undefined;
+    const minimumOrderCheck = checkMinimumOrder(subtotal, minimumOrderFils);
+    if (!minimumOrderCheck.met) {
+      throw new AppError(
+        400,
+        'MINIMUM_ORDER_NOT_MET',
+        `Minimum order value of ${((minimumOrderFils as number) / 1000).toFixed(3)} KWD required`
+      );
+    }
+
     // Calculate tax using store's configured tax rates
     const taxRates = await prisma.taxRate.findMany({ where: { storeId, isActive: true } });
     const taxRate = taxRates.length > 0 ? Number(taxRates[0].rate) / 100 : 0;

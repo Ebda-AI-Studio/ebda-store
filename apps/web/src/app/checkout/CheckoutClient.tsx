@@ -17,6 +17,7 @@ import {
   KUWAIT_GOVERNORATES,
   findGovernorateByArea,
   resolveColor,
+  checkMinimumOrder,
   type CheckoutDeliverySettings,
 } from '@force/shared';
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
@@ -798,9 +799,35 @@ export default function CheckoutClient() {
   const shipping = freeShipping ? 0 : shippingCost;
   const total = Math.max(0, subtotal - discount + shipping);
 
+  // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
+  // fils; 0/unset = no minimum). Defense-in-depth for direct navigation to
+  // /checkout that bypasses the cart page's guard — the API's
+  // OrderService.create is the real, hard-blocking check. store.settings is
+  // a loose Record — cast the one key we read, same pattern as
+  // checkoutDelivery above.
+  const minimumOrderFils = store?.settings?.minimumOrderFils as number | undefined;
+  const minimumOrderCheck = checkMinimumOrder(subtotal, minimumOrderFils);
+  const belowMinimumOrder = !minimumOrderCheck.met;
+  const minimumOrderMessage = belowMinimumOrder
+    ? t(
+        `Minimum order is ${formatPrice(minimumOrderFils as number)} — add ${formatPrice(minimumOrderCheck.shortfallFils)} more`,
+        `الحد الأدنى للطلب ${formatPrice(minimumOrderFils as number)} — أضف ${formatPrice(minimumOrderCheck.shortfallFils)} أخرى`
+      )
+    : undefined;
+
   // Submit order
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Defense-in-depth: the cart page already blocks reaching /checkout at
+    // all when the subtotal is below the store's minimum order value, but a
+    // customer can land here directly (bookmark, back button, stale tab).
+    // Block BOTH the step-1 -> step-2 advance and the final order submission
+    // — the API's OrderService.create is the real, hard-blocking check.
+    if (belowMinimumOrder) {
+      setCheckoutError(minimumOrderMessage ?? null);
+      return;
+    }
 
     if (step === 1) {
       // Validate before proceeding to payment
@@ -1103,6 +1130,18 @@ export default function CheckoutClient() {
             'Your order does not meet the minimum amount required for this coupon.',
             'طلبك لا يستوفي الحد الأدنى للمبلغ المطلوب لهذا الكوبون.'
           );
+          break;
+        case 'MINIMUM_ORDER_NOT_MET':
+          // The client-side guard should already have blocked this before
+          // the API call — reached only on stale cart data or a direct
+          // request. Send the customer back to review their cart.
+          friendly =
+            minimumOrderMessage ??
+            t(
+              'Your cart does not meet this store’s minimum order value.',
+              'سلتك لا تستوفي الحد الأدنى لقيمة الطلب لهذا المتجر.'
+            );
+          setStep(1);
           break;
         case 'INSUFFICIENT_INVENTORY':
           friendly = t(
@@ -1597,6 +1636,16 @@ export default function CheckoutClient() {
                       )}
                     </div>
 
+                    {/* Below-minimum notice (desktop) */}
+                    {belowMinimumOrder && minimumOrderMessage && (
+                      <p
+                        role="alert"
+                        className="hidden lg:block mt-4 rounded-lg bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
+                      >
+                        {minimumOrderMessage}
+                      </p>
+                    )}
+
                     {/* Desktop-only button row \u2014 on mobile the button renders
                         AFTER <OrderSummary> so the order is:
                         address \u2192 discount/summary \u2192 Continue to Payment.
@@ -1614,7 +1663,7 @@ export default function CheckoutClient() {
                         type="submit"
                         className="w-full sm:w-auto"
                         size="lg"
-                        disabled={shippingUnavailable}
+                        disabled={shippingUnavailable || belowMinimumOrder}
                       >
                         {t(
                           'Continue to Payment',
@@ -1637,6 +1686,7 @@ export default function CheckoutClient() {
                     isProcessing={isProcessing}
                     total={total}
                     formatPrice={formatPrice}
+                    belowMinimumOrder={belowMinimumOrder}
                     deliverySection={
                       checkoutDelivery ? (
                         <div data-error={!!deliveryWindowError}>
@@ -1697,6 +1747,14 @@ export default function CheckoutClient() {
                 even though this button lives outside the <form> element.
                 Hidden on lg+ because the desktop button row inside the form
                 is visible there. Only rendered on shipping step (step === 1). */}
+            {step === 1 && belowMinimumOrder && minimumOrderMessage && (
+              <p
+                role="alert"
+                className="order-2 lg:hidden mt-4 rounded-lg bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
+              >
+                {minimumOrderMessage}
+              </p>
+            )}
             {step === 1 && (
               <div className="order-3 lg:hidden mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <Link
@@ -1710,7 +1768,7 @@ export default function CheckoutClient() {
                   form="checkout-shipping-form"
                   className="w-full sm:w-auto"
                   size="lg"
-                  disabled={shippingUnavailable}
+                  disabled={shippingUnavailable || belowMinimumOrder}
                 >
                   {t('Continue to Payment', 'المتابعة للدفع')}
                 </Button>

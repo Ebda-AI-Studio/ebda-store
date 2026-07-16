@@ -47,7 +47,7 @@ for app in "${APPS[@]}"; do
   # NOTE: each branch is ONE $'...' literal (zone hardcoded) so every \n expands.
   # Interpolating a $VAR mid-string would re-quote the tail and emit literal \n.
   case "$app" in
-    web)    ROUTES_JSON=$'  "routes": [\n    { "pattern": "store.force-ai.co", "custom_domain": true },\n    { "pattern": "cf.force-ai.co", "custom_domain": true },\n    { "pattern": "*/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
+    web)    ROUTES_JSON=$'  "routes": [\n    { "pattern": "store.force-ai.co", "custom_domain": true },\n    { "pattern": "cf.force-ai.co", "custom_domain": true },\n    { "pattern": "pecannbee.com.kw/*", "zone_name": "pecannbee.com.kw" },\n    { "pattern": "www.pecannbee.com.kw/*", "zone_name": "pecannbee.com.kw" },\n    { "pattern": "*/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
     admin)  ROUTES_JSON=$'  "routes": [\n    { "pattern": "admin.force-ai.co", "custom_domain": true },\n    { "pattern": "admin.force-ai.co/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
     orders) ROUTES_JSON=$'  "routes": [\n    { "pattern": "orders.force-ai.co", "custom_domain": true },\n    { "pattern": "orders.force-ai.co/*", "zone_name": "force-ai.co" }\n  ],\n' ;;
     *)      ROUTES_JSON='' ;;

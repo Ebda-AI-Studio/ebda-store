@@ -892,6 +892,13 @@ export interface OrderSummaryProps {
   onCtaClick?: () => void;
   ctaDisabled?: boolean;
   ctaLoading?: boolean;
+  /**
+   * Already-localized message shown just above the CTA when `ctaDisabled`
+   * is true because the store's minimum order value isn't met yet (e.g.
+   * "Minimum order is 5.000 KWD — add 2.000 KWD more"). Only rendered
+   * while `ctaDisabled` is true.
+   */
+  ctaBlockedMessage?: string;
   /** Per-store cart typography (page-builder → Cart page). Optional. */
   typography?: CartTypography;
   /** Per-store summary-label color + bold overrides from StoreTheme. Optional. */

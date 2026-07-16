@@ -3,6 +3,7 @@
 // Export utility modules
 export * from './platform';
 export * from './discount';
+export * from './minimum-order';
 export * from './accounting';
 export * from './image';
 export * from './csv';

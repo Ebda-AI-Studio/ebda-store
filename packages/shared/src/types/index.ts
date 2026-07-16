@@ -114,6 +114,17 @@ export interface StoreSettings {
    * — any store can enable it via this config, never a hardcoded slug.
    */
   checkoutDelivery?: CheckoutDeliverySettings;
+  /**
+   * Optional, opt-in per-store minimum order value in FILS (1 KWD = 1000
+   * fils). When set to a positive number, a customer cannot place an order
+   * whose items subtotal (before shipping/tax) falls below it. `0` or
+   * unset = no minimum. Platform-level — any store can enable it via this
+   * config, never a hardcoded slug. Enforced server-side in
+   * `OrderService.create`; the storefront cart/checkout surfaces mirror
+   * the same rule for UX (disable the checkout CTA) but the API check is
+   * the real guard.
+   */
+  minimumOrderFils?: number;
 }
 
 /**

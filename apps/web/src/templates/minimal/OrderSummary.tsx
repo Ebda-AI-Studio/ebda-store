@@ -22,6 +22,7 @@ export default function MinimalOrderSummary({
   onCtaClick,
   ctaDisabled,
   ctaLoading,
+  ctaBlockedMessage,
   typography,
   summaryColors,
 }: OrderSummaryProps) {
@@ -95,13 +96,15 @@ export default function MinimalOrderSummary({
         </div>
       </dl>
       {children && <div className="mt-6">{children}</div>}
+      {ctaDisabled && ctaBlockedMessage && (
+        <p className="mt-6 text-xs font-light text-warning">{ctaBlockedMessage}</p>
+      )}
       {ctaText &&
-        (ctaHref ? (
+        (ctaHref && !ctaDisabled ? (
           <Link
             href={ctaHref}
             data-cta="link"
             className="mt-8 block border-b border-foreground pb-1 text-sm text-foreground hover:border-primary hover:text-primary transition-colors duration-500 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
-            aria-disabled={ctaDisabled}
             style={typography?.cta}
           >
             {ctaText} {isRtl ? '←' : '→'}

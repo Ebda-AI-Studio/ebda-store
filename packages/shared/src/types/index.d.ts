@@ -44,6 +44,7 @@ export interface StoreSettings {
   theme: string;
   orderInvoiceEmail?: string;
   checkoutDelivery?: CheckoutDeliverySettings;
+  minimumOrderFils?: number;
 }
 export interface CheckoutDeliverySettings {
   note: {

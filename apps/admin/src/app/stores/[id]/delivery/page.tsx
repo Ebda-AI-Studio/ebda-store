@@ -14,6 +14,15 @@ const DEFAULT_CONFIG: CheckoutDeliverySettings = {
   windows: { enabled: false, items: [] },
 };
 
+/** Round a KWD string input to integer fils. Empty/invalid/non-positive
+ *  input resolves to 0 (= no minimum), matching the platform's opt-in
+ *  convention for this field. */
+function kwdInputToFils(kwd: string): number {
+  const parsed = parseFloat(kwd);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.round(parsed * 1000);
+}
+
 function genId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -34,6 +43,13 @@ export default function CheckoutDeliveryPage() {
 
   const [existingSettings, setExistingSettings] = useState<Record<string, unknown>>({});
   const [config, setConfig] = useState<CheckoutDeliverySettings>(DEFAULT_CONFIG);
+  // Per-store, opt-in minimum order value. Held as the raw KWD string the
+  // merchant types (e.g. "5.000") — converted to integer fils only on save.
+  // Empty/0 = disabled.
+  const [minimumOrderKwd, setMinimumOrderKwd] = useState('');
+  // Per-store, opt-in owner order-invoice email. Every order in this store
+  // auto-emails the rendered invoice to this address. Empty = disabled.
+  const [orderInvoiceEmail, setOrderInvoiceEmail] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -55,6 +71,15 @@ export default function CheckoutDeliveryPage() {
           items: existing?.windows?.items ?? [],
         },
       });
+      const existingMinFils = settings.minimumOrderFils;
+      setMinimumOrderKwd(
+        typeof existingMinFils === 'number' && existingMinFils > 0
+          ? (existingMinFils / 1000).toFixed(3)
+          : ''
+      );
+      setOrderInvoiceEmail(
+        typeof settings.orderInvoiceEmail === 'string' ? settings.orderInvoiceEmail : ''
+      );
     } catch (err) {
       console.error('Failed to fetch checkout delivery settings:', err);
     } finally {
@@ -71,7 +96,12 @@ export default function CheckoutDeliveryPage() {
     setMessage(null);
     try {
       const { error } = await apiPut(`/api/v1/stores/${storeId}`, {
-        settings: { ...existingSettings, checkoutDelivery: config },
+        settings: {
+          ...existingSettings,
+          checkoutDelivery: config,
+          minimumOrderFils: kwdInputToFils(minimumOrderKwd),
+          orderInvoiceEmail: orderInvoiceEmail.trim() || undefined,
+        },
       });
       if (!error) {
         setMessage({ type: 'success', text: t('successMessage') });
@@ -83,7 +113,7 @@ export default function CheckoutDeliveryPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [storeId, existingSettings, config, t]);
+  }, [storeId, existingSettings, config, minimumOrderKwd, orderInvoiceEmail, t]);
 
   const patchNote = (next: Partial<CheckoutDeliverySettings['note']>) =>
     setConfig(prev => ({ ...prev, note: { ...prev.note, ...next } }));
@@ -277,6 +307,52 @@ export default function CheckoutDeliveryPage() {
           >
             {t('addWindow')}
           </button>
+        </section>
+
+        {/* Minimum order value — opt-in per-store floor on the items
+            subtotal. Platform-level: works for any store via this config,
+            never hardcoded to a slug. Empty/0 = disabled. */}
+        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">{t('minOrderSectionTitle')}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('minOrderSectionHint')}</p>
+          </div>
+          <label className="flex max-w-[200px] flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">{t('minOrderLabel')}</span>
+            <input
+              type="number"
+              min={0}
+              step="0.001"
+              value={minimumOrderKwd}
+              onChange={e => setMinimumOrderKwd(e.target.value)}
+              placeholder={t('minOrderPlaceholder')}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            />
+          </label>
+        </section>
+
+        {/* Owner order-invoice email — opt-in per-store. Every order in this
+            store auto-emails the rendered invoice to this address (e.g. the
+            store owner). Empty = disabled. Platform-level, not slug-hardcoded. */}
+        <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">
+              {t('invoiceEmailSectionTitle')}
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('invoiceEmailSectionHint')}</p>
+          </div>
+          <label className="flex max-w-[320px] flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              {t('invoiceEmailLabel')}
+            </span>
+            <input
+              type="email"
+              value={orderInvoiceEmail}
+              onChange={e => setOrderInvoiceEmail(e.target.value)}
+              placeholder={t('invoiceEmailPlaceholder')}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            />
+          </label>
         </section>
 
         {message && (

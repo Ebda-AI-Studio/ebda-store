@@ -5852,7 +5852,7 @@
   "checkoutDelivery": {
     "page": {
       "title": "Checkout Delivery",
-      "subtitle": "Delivery info note and time-window picker shown above the Pay button",
+      "subtitle": "Delivery info note, time-window picker, and minimum order value for checkout",
       "loading": "Loading...",
       "backToSettings": "Back to Settings",
       "save": "Save Changes",
@@ -5874,7 +5874,15 @@
       "startTime": "Start time",
       "endTime": "End time",
       "remove": "Remove",
-      "noWindowsYet": "No delivery windows yet — add one above."
+      "noWindowsYet": "No delivery windows yet — add one above.",
+      "minOrderSectionTitle": "Minimum order value",
+      "minOrderSectionHint": "Customers can't check out with an items subtotal below this amount. Leave empty or 0 to disable.",
+      "minOrderLabel": "Minimum order (KWD)",
+      "minOrderPlaceholder": "e.g. 5.000",
+      "invoiceEmailSectionTitle": "Order invoice email",
+      "invoiceEmailSectionHint": "Every order in this store also emails the invoice to this address (e.g. the store owner). Leave empty to disable.",
+      "invoiceEmailLabel": "Invoice recipient email",
+      "invoiceEmailPlaceholder": "owner@example.com"
     }
   }
 }
