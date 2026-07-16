@@ -684,7 +684,11 @@ router.post(
         return;
       }
 
-      // Update payment and order status atomically
+      // Update payment and order status atomically. Only advance a still-pending
+      // order to `confirmed`; leave a further-along order (processing/shipped/
+      // delivered) untouched. COD cash is collected AT delivery, so marking paid
+      // typically happens after fulfilment — forcing `confirmed` there regressed
+      // the order's status and lost fulfilment progress.
       await prisma.$transaction([
         prisma.payment.update({
           where: { id: codPayment.id },
@@ -692,7 +696,10 @@ router.post(
         }),
         prisma.order.update({
           where: { id: orderId },
-          data: { paymentStatus: 'paid', status: 'confirmed' },
+          data: {
+            paymentStatus: 'paid',
+            ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
+          },
         }),
       ]);
 
@@ -785,7 +792,9 @@ router.post(
         return;
       }
 
-      // Build update operations
+      // Build update operations. As in single mark-paid: only advance a
+      // still-pending order to `confirmed`; never regress a further-along
+      // (processing/shipped/delivered) order that's being paid after fulfilment.
       const updates = codOrders.flatMap(order => [
         prisma.payment.update({
           where: { id: order.payments[0].id },
@@ -793,7 +802,10 @@ router.post(
         }),
         prisma.order.update({
           where: { id: order.id },
-          data: { paymentStatus: 'paid', status: 'confirmed' },
+          data: {
+            paymentStatus: 'paid',
+            ...(order.status === 'pending' ? { status: 'confirmed' } : {}),
+          },
         }),
       ]);
 
