@@ -129,6 +129,8 @@ export default function CheckoutDeliveryPage() {
       start: '09:00',
       end: '17:00',
     };
+    // orderBy intentionally omitted — unset falls back to `start`, matching
+    // the pre-existing "closes at start" behavior until the merchant opts in.
     patchWindows({ items: [...config.windows.items, newWindow] });
   };
 
@@ -241,7 +243,7 @@ export default function CheckoutDeliveryPage() {
             <ul className="space-y-2">
               {config.windows.items.map(w => (
                 <li key={w.id} className="rounded-lg border border-border bg-background p-3">
-                  <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto_auto_auto] md:items-end">
+                  <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto_auto_auto_auto] md:items-end">
                     <label className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-muted-foreground">
                         {t('labelEn')}
@@ -284,6 +286,17 @@ export default function CheckoutDeliveryPage() {
                         type="time"
                         value={w.end}
                         onChange={e => updateWindow(w.id, { end: e.target.value })}
+                        className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {t('orderByTime')}
+                      </span>
+                      <input
+                        type="time"
+                        value={w.orderBy ?? ''}
+                        onChange={e => updateWindow(w.id, { orderBy: e.target.value || undefined })}
                         className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm"
                       />
                     </label>

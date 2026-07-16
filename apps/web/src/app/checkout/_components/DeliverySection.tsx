@@ -1,12 +1,13 @@
 'use client';
 
 import { useLanguage } from '../../../contexts/LanguageContext';
-import type { DeliveryWindowAvailability } from '../_lib/deliveryWindows';
+import type { DeliverySelection } from '../_lib/deliveryWindows';
 import type { CheckoutDeliverySettings } from '@force/shared';
 
 interface DeliverySectionProps {
   settings: CheckoutDeliverySettings;
-  availability: DeliveryWindowAvailability[];
+  /** Resolved today/tomorrow day + per-window availability (see resolveDeliverySelection). */
+  selection: DeliverySelection;
   selectedWindowId: string | null;
   onSelectWindow: (id: string) => void;
   /** Validation message when windows are enabled + available but none picked. */
@@ -23,7 +24,7 @@ interface DeliverySectionProps {
  */
 export function DeliverySection({
   settings,
-  availability,
+  selection,
   selectedWindowId,
   onSelectWindow,
   error,
@@ -32,7 +33,8 @@ export function DeliverySection({
 
   const showNote = settings.note?.enabled && (settings.note.text || settings.note.textAr);
   const showWindows = settings.windows?.enabled;
-  const anyAvailable = availability.some(w => w.available);
+  const { day, windows } = selection;
+  const anyAvailable = windows.some(w => w.available);
 
   if (!showNote && !showWindows) return null;
 
@@ -46,9 +48,16 @@ export function DeliverySection({
 
       {showWindows && (
         <div className={showNote ? 'pt-1' : undefined}>
-          <h3 className="text-sm font-medium text-foreground">
-            {t('Delivery window', 'موعد التوصيل')}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-foreground">
+              {t('Delivery window', 'موعد التوصيل')}
+            </h3>
+            {windows.length > 0 && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {day === 'tomorrow' ? t('Tomorrow', 'غدًا') : t('Today', 'اليوم')}
+              </span>
+            )}
+          </div>
 
           {anyAvailable ? (
             <div
@@ -56,7 +65,7 @@ export function DeliverySection({
               role="radiogroup"
               aria-label={t('Delivery window', 'موعد التوصيل')}
             >
-              {availability.map(w => {
+              {windows.map(w => {
                 const selected = selectedWindowId === w.id;
                 return (
                   <button

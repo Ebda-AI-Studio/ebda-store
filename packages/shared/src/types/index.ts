@@ -157,6 +157,12 @@ export interface CheckoutDeliveryWindow {
   start: string;
   /** 24h "HH:mm", store-local time. */
   end: string;
+  /**
+   * Optional 24h "HH:mm", store-local time — the last moment a customer can
+   * order for this window today. Falls back to `start` when unset/empty,
+   * preserving the platform's original "window closes at start" behavior.
+   */
+  orderBy?: string;
 }
 
 // Category Types

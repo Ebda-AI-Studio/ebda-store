@@ -23,7 +23,7 @@ import {
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
 import { DeliverySection } from './_components/DeliverySection';
 import { saveCheckoutInfo, loadCheckoutInfo, clearCheckoutInfo } from './_lib/savedCheckout';
-import { computeWindowAvailability, getNowMinutesInTimezone } from './_lib/deliveryWindows';
+import { resolveDeliverySelection, getNowMinutesInTimezone } from './_lib/deliveryWindows';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import {
   resolveSectionZone,
@@ -153,20 +153,22 @@ export default function CheckoutClient() {
   const [selectedDeliveryWindowId, setSelectedDeliveryWindowId] = useState<string | null>(null);
   const [deliveryWindowError, setDeliveryWindowError] = useState<string | null>(null);
   // "Now" in the store's local timezone, computed once per mount/timezone
-  // change — not a ticking clock. Availability derives from this via the
-  // pure computeWindowAvailability helper (unit-tested separately).
+  // change — not a ticking clock. Today/tomorrow + availability derive from
+  // this via the pure resolveDeliverySelection helper (unit-tested
+  // separately), which also rolls over to tomorrow once every window's
+  // order-by time has passed for today.
   const nowMinutes = useMemo(
     () => getNowMinutesInTimezone(store?.timezone || 'Asia/Kuwait'),
     [store?.timezone]
   );
-  const deliveryWindowAvailability = useMemo(
+  const deliverySelection = useMemo(
     () =>
       checkoutDelivery?.windows?.enabled
-        ? computeWindowAvailability(checkoutDelivery.windows.items, nowMinutes)
-        : [],
+        ? resolveDeliverySelection(checkoutDelivery.windows.items, nowMinutes)
+        : { day: 'today' as const, windows: [] },
     [checkoutDelivery, nowMinutes]
   );
-  const anyDeliveryWindowAvailable = deliveryWindowAvailability.some(w => w.available);
+  const anyDeliveryWindowAvailable = deliverySelection.windows.some(w => w.available);
 
   // Fire InitiateCheckout pixel event once the cart has hydrated from the
   // server and we know it isn't empty. Firing on mount (before hydration)
@@ -921,15 +923,19 @@ export default function CheckoutClient() {
       ].filter(Boolean);
       const composedAddress1 = address1Parts.join(', ') || formData.address;
 
-      // Persist the chosen delivery window on the order via `notes` — there's
-      // no dedicated column for it. Prepended so it's the first thing the
-      // merchant sees; localized to the label the customer actually picked
-      // from (not necessarily their current UI language at read time).
-      const selectedDeliveryWindow = deliveryWindowAvailability.find(
+      // Persist the chosen delivery window (+ day) on the order via `notes`
+      // — there's no dedicated column for it. Prepended so it's the first
+      // thing the merchant sees; localized to the label/day the customer
+      // actually picked from (not necessarily their current UI language at
+      // read time). The day matters once rollover is in play: a window
+      // picked after today's cutoff is for TOMORROW, not today.
+      const selectedDeliveryWindow = deliverySelection.windows.find(
         w => w.id === selectedDeliveryWindowId
       );
+      const deliveryDayLabel =
+        deliverySelection.day === 'tomorrow' ? t('Tomorrow', 'غدًا') : t('Today', 'اليوم');
       const notesWithDelivery = selectedDeliveryWindow
-        ? `${t('Delivery window', 'موعد التوصيل')}: ${
+        ? `${t('Delivery', 'التوصيل')}: ${deliveryDayLabel}, ${
             language === 'ar' ? selectedDeliveryWindow.labelAr : selectedDeliveryWindow.label
           } (${selectedDeliveryWindow.start}–${selectedDeliveryWindow.end})\n${formData.notes}`
         : formData.notes;
@@ -1692,7 +1698,7 @@ export default function CheckoutClient() {
                         <div data-error={!!deliveryWindowError}>
                           <DeliverySection
                             settings={checkoutDelivery}
-                            availability={deliveryWindowAvailability}
+                            selection={deliverySelection}
                             selectedWindowId={selectedDeliveryWindowId}
                             onSelectWindow={id => {
                               setSelectedDeliveryWindowId(id);

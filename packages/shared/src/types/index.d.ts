@@ -63,6 +63,7 @@ export interface CheckoutDeliveryWindow {
   labelAr: string;
   start: string;
   end: string;
+  orderBy?: string;
 }
 export interface Product {
   id: string;

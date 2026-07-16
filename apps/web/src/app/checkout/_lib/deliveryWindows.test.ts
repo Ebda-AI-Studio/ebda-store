@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   computeWindowAvailability,
   getNowMinutesInTimezone,
+  orderByMinutes,
   parseTimeToMinutes,
+  resolveDeliverySelection,
   type DeliveryWindowItem,
 } from './deliveryWindows';
 
@@ -22,6 +24,26 @@ const WINDOW_6PM_9PM: DeliveryWindowItem = {
   end: '21:00',
 };
 
+// The merchant's own example: window A closes for ordering at 14:00 (well
+// before its own 6pm end), window B closes at 19:00.
+const WINDOW_A_2PM_6PM_ORDERBY_1400: DeliveryWindowItem = {
+  id: 'a',
+  label: 'Window A',
+  labelAr: 'الموعد أ',
+  start: '14:00',
+  end: '18:00',
+  orderBy: '14:00',
+};
+
+const WINDOW_B_6PM_9PM_ORDERBY_1900: DeliveryWindowItem = {
+  id: 'b',
+  label: 'Window B',
+  labelAr: 'الموعد ب',
+  start: '18:00',
+  end: '21:00',
+  orderBy: '19:00',
+};
+
 describe('parseTimeToMinutes', () => {
   it('parses HH:mm into minutes-since-midnight', () => {
     expect(parseTimeToMinutes('13:00')).toBe(780);
@@ -36,18 +58,34 @@ describe('parseTimeToMinutes', () => {
   });
 });
 
+describe('orderByMinutes', () => {
+  it('uses the explicit orderBy time when set', () => {
+    expect(orderByMinutes(WINDOW_A_2PM_6PM_ORDERBY_1400)).toBe(14 * 60);
+  });
+
+  it('falls back to start when orderBy is unset', () => {
+    expect(orderByMinutes(WINDOW_1PM_5PM)).toBe(parseTimeToMinutes(WINDOW_1PM_5PM.start));
+  });
+
+  it('falls back to start when orderBy is an empty string', () => {
+    expect(orderByMinutes({ ...WINDOW_1PM_5PM, orderBy: '' })).toBe(
+      parseTimeToMinutes(WINDOW_1PM_5PM.start)
+    );
+  });
+});
+
 describe('computeWindowAvailability', () => {
-  it('disables a 13:00 window when now is 14:00 (past start)', () => {
+  it('disables a 13:00 window (no orderBy) when now is 14:00 (past start)', () => {
     const [result] = computeWindowAvailability([WINDOW_1PM_5PM], 14 * 60);
     expect(result.available).toBe(false);
   });
 
-  it('enables a 13:00 window when now is 12:00 (before start)', () => {
+  it('enables a 13:00 window (no orderBy) when now is 12:00 (before start)', () => {
     const [result] = computeWindowAvailability([WINDOW_1PM_5PM], 12 * 60);
     expect(result.available).toBe(true);
   });
 
-  it('disables a window exactly at its start time (at/past start rule)', () => {
+  it('disables a window exactly at its start time when orderBy is unset', () => {
     const [result] = computeWindowAvailability([WINDOW_1PM_5PM], 13 * 60);
     expect(result.available).toBe(false);
   });
@@ -67,6 +105,66 @@ describe('computeWindowAvailability', () => {
 
   it('returns an empty array for an empty window list', () => {
     expect(computeWindowAvailability([], 12 * 60)).toEqual([]);
+  });
+
+  it('honors a per-window orderBy independently of start/end', () => {
+    // Window closes at 14:00 for ordering even though its slot runs to 18:00.
+    const [available] = computeWindowAvailability([WINDOW_A_2PM_6PM_ORDERBY_1400], 13 * 60 + 30);
+    expect(available.available).toBe(true);
+    const [closed] = computeWindowAvailability([WINDOW_A_2PM_6PM_ORDERBY_1400], 14 * 60 + 1);
+    expect(closed.available).toBe(false);
+  });
+});
+
+describe('resolveDeliverySelection', () => {
+  const WINDOWS = [WINDOW_A_2PM_6PM_ORDERBY_1400, WINDOW_B_6PM_9PM_ORDERBY_1900];
+
+  // The merchant's exact scenario: A order-by 14:00, B order-by 19:00.
+  it('at 13:59, stays on today with both A and B available', () => {
+    const result = resolveDeliverySelection(WINDOWS, 13 * 60 + 59);
+    expect(result.day).toBe('today');
+    expect(result.windows.map(w => ({ id: w.id, available: w.available }))).toEqual([
+      { id: 'a', available: true },
+      { id: 'b', available: true },
+    ]);
+  });
+
+  it('at 14:01, stays on today with only B available', () => {
+    const result = resolveDeliverySelection(WINDOWS, 14 * 60 + 1);
+    expect(result.day).toBe('today');
+    expect(result.windows.map(w => ({ id: w.id, available: w.available }))).toEqual([
+      { id: 'a', available: false },
+      { id: 'b', available: true },
+    ]);
+  });
+
+  it('at 18:59, stays on today with only B available', () => {
+    const result = resolveDeliverySelection(WINDOWS, 18 * 60 + 59);
+    expect(result.day).toBe('today');
+    expect(result.windows.map(w => ({ id: w.id, available: w.available }))).toEqual([
+      { id: 'a', available: false },
+      { id: 'b', available: true },
+    ]);
+  });
+
+  it('at 19:01, rolls over to tomorrow with both A and B available again', () => {
+    const result = resolveDeliverySelection(WINDOWS, 19 * 60 + 1);
+    expect(result.day).toBe('tomorrow');
+    expect(result.windows.map(w => ({ id: w.id, available: w.available }))).toEqual([
+      { id: 'a', available: true },
+      { id: 'b', available: true },
+    ]);
+  });
+
+  it('stays on today with an empty list when no windows are configured', () => {
+    const result = resolveDeliverySelection([], 12 * 60);
+    expect(result).toEqual({ day: 'today', windows: [] });
+  });
+
+  it('rolls over even for a single window once its orderBy has passed', () => {
+    const result = resolveDeliverySelection([WINDOW_1PM_5PM], 13 * 60);
+    expect(result.day).toBe('tomorrow');
+    expect(result.windows).toEqual([{ ...WINDOW_1PM_5PM, available: true }]);
   });
 });
 
