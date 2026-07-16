@@ -204,6 +204,15 @@ export function MassEditModal({
   // ── handlers ────────────────────────────────────────────────────────────
 
   async function handleApplyFields() {
+    // Guard: "Add to category" is checked but no category was picked. Silently
+    // dropping `addCategoryId` here would let the other checked fields save
+    // while still showing a success toast — hiding the fact the category
+    // change never happened.
+    if (changeCat && !addCategoryId) {
+      toastError(t('massEdit.toast.errorTitle'), t('massEdit.toast.categoryRequired'));
+      return;
+    }
+
     const fields: Record<string, unknown> = {};
 
     if (changeStatus) fields.status = status;
@@ -230,7 +239,10 @@ export function MassEditModal({
       }
     }
 
-    if (Object.keys(fields).length === 0) return;
+    if (Object.keys(fields).length === 0) {
+      toastError(t('massEdit.toast.errorTitle'), t('massEdit.toast.noChangesSelected'));
+      return;
+    }
 
     setApplying(true);
     try {

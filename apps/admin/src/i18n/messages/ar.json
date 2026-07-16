@@ -523,6 +523,8 @@
           "skippedDescription": " تم تخطي {skipped} منتج بمتغيرات للسعر/المخزون (عدِّلها من تبويب المتغيرات).",
           "errorTitle": "فشل التعديل الجماعي",
           "errorDescription": "تعذّر تطبيق التغييرات. يرجى المحاولة مرة أخرى.",
+          "categoryRequired": "اختر فئة لإضافتها قبل التطبيق.",
+          "noChangesSelected": "اختر تغييراً واحداً على الأقل لتطبيقه.",
           "variantSuccessTitle": "تم حفظ المتغيرات",
           "variantSuccessDescription": "تم حفظ تغييرات المتغيرات بنجاح.",
           "variantErrorTitle": "فشل حفظ المتغيرات",
@@ -2151,7 +2153,8 @@
       "addCustomLocation": "إضافة موقع مخصص",
       "addCustomLocationHint": "أضف دولة ومحافظة ومنطقة غير موجودة في القائمة أعلاه.",
       "remove": "حذف",
-      "deleteFailed": "تعذّر حذف المنطقة"
+      "deleteFailed": "تعذّر حذف المنطقة",
+      "incompleteRowsError": "هذه المناطق الجديدة تحتاج إلى رسوم توصيل (أو تفعيلها) قبل أن يمكن حفظها: {areas}"
     }
   },
   "tax": {

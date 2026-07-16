@@ -5,6 +5,7 @@ import { useToast } from '@force/ui';
 import { KUWAIT_GOVERNORATES } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPut, apiDelete, apiFetch } from '../../../../../lib/api';
+import { kwdToFils, getIncompleteNewRows } from './areaRateValidation';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,12 +52,6 @@ interface Props {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function kwdToFils(kwd: string): number {
-  const n = parseFloat(kwd);
-  if (isNaN(n) || n < 0) return 0;
-  return Math.round(n * 1000);
-}
 
 function filsToKwd(fils: number): string {
   return (fils / 1000).toFixed(3);
@@ -459,6 +454,17 @@ export function AreaRateEditor({ storeId }: Props) {
   // ── Save ──────────────────────────────────────────────────────────────────
 
   async function handleSave() {
+    // Guard against silently dropping brand-new zones/areas the merchant just
+    // added but left inactive with no fee. These rows would otherwise be
+    // filtered out of the bulk payload below while `handleSave` still shows a
+    // success toast — telling the merchant it saved when it didn't.
+    const incompleteNewRows = getIncompleteNewRows(customRows);
+    if (incompleteNewRows.length > 0) {
+      const names = incompleteNewRows.map(r => r.area).join(', ');
+      toastError(t('errorTitle'), t('incompleteRowsError', { areas: names }));
+      return;
+    }
+
     setSaving(true);
     try {
       const rates: Array<{

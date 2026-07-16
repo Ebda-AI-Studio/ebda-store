@@ -523,6 +523,8 @@
           "skippedDescription": " {skipped} variant products skipped for price/inventory (edit via Variants tab).",
           "errorTitle": "Mass edit failed",
           "errorDescription": "Failed to apply changes. Please try again.",
+          "categoryRequired": "Select a category to add before applying.",
+          "noChangesSelected": "Select at least one change to apply.",
           "variantSuccessTitle": "Variants saved",
           "variantSuccessDescription": "Variant changes saved successfully.",
           "variantErrorTitle": "Variant save failed",
@@ -2151,7 +2153,8 @@
       "addCustomLocation": "Add custom location",
       "addCustomLocationHint": "Add a country, province and area that aren't in the list above.",
       "remove": "Remove",
-      "deleteFailed": "Couldn't delete the area"
+      "deleteFailed": "Couldn't delete the area",
+      "incompleteRowsError": "These new zones need a delivery fee (or set them active) before they can be saved: {areas}"
     }
   },
   "tax": {
