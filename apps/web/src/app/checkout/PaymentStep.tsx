@@ -28,6 +28,14 @@ interface PaymentStepProps {
   isProcessing: boolean;
   total: number;
   formatPrice: (fils: number) => string;
+  /**
+   * Per-store opt-in delivery block (info note + delivery-window picker).
+   * Rendered immediately above the Pay button in every state — passed in as
+   * a node rather than built here so CheckoutClient owns the availability
+   * computation + selection state. Undefined/null when the store hasn't
+   * enabled either part.
+   */
+  deliverySection?: React.ReactNode;
 }
 
 export default function PaymentStep({
@@ -41,6 +49,7 @@ export default function PaymentStep({
   isProcessing,
   total,
   formatPrice,
+  deliverySection,
 }: PaymentStepProps) {
   const { language, t } = useLanguage();
 
@@ -195,6 +204,10 @@ export default function PaymentStep({
           })}
         </div>
       </div>
+
+      {/* Delivery block (info note + window picker) — always immediately
+          above the Pay button, in every state. */}
+      {deliverySection}
 
       <div className="flex justify-between">
         <button

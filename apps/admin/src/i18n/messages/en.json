@@ -1507,6 +1507,10 @@
       "waBotConfig": {
         "title": "WhatsApp Bot Config",
         "description": "Bot mode · service menu · Meta Commerce catalog credentials"
+      },
+      "checkoutDelivery": {
+        "title": "Delivery",
+        "description": "Delivery info note and time-window selector shown at checkout"
       }
     },
     "metaCatalogCard": {
@@ -5843,6 +5847,34 @@
       "createPost": "Create post",
       "saveChanges": "Save changes",
       "saving": "Saving…"
+    }
+  },
+  "checkoutDelivery": {
+    "page": {
+      "title": "Checkout Delivery",
+      "subtitle": "Delivery info note and time-window picker shown above the Pay button",
+      "loading": "Loading...",
+      "backToSettings": "Back to Settings",
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "successMessage": "Delivery settings saved successfully",
+      "failedMessage": "Failed to save delivery settings",
+      "connectionError": "Unable to connect to the server",
+      "noteSectionTitle": "Delivery info note",
+      "noteSectionHint": "Shown to the customer at checkout, above the Pay button.",
+      "noteEnable": "Show delivery note",
+      "noteTextEn": "Note (English)",
+      "noteTextAr": "Note (Arabic)",
+      "windowsSectionTitle": "Delivery windows",
+      "windowsSectionHint": "Customer picks one window at checkout. A window disables automatically once its start time passes for the day.",
+      "windowsEnable": "Show delivery window selector",
+      "addWindow": "+ Add window",
+      "labelEn": "Label (English)",
+      "labelAr": "Label (Arabic)",
+      "startTime": "Start time",
+      "endTime": "End time",
+      "remove": "Remove",
+      "noWindowsYet": "No delivery windows yet — add one above."
     }
   }
 }

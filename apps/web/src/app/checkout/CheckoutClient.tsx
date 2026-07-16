@@ -17,9 +17,12 @@ import {
   KUWAIT_GOVERNORATES,
   findGovernorateByArea,
   resolveColor,
+  type CheckoutDeliverySettings,
 } from '@force/shared';
 import { GovernorateAreaSelect } from './_components/GovernorateAreaSelect';
+import { DeliverySection } from './_components/DeliverySection';
 import { saveCheckoutInfo, loadCheckoutInfo, clearCheckoutInfo } from './_lib/savedCheckout';
+import { computeWindowAvailability, getNowMinutesInTimezone } from './_lib/deliveryWindows';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import {
   resolveSectionZone,
@@ -139,6 +142,30 @@ export default function CheckoutClient() {
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Per-store opt-in checkout delivery block (info note + window picker).
+  // store.settings is a loose Record — cast the one key we read, same
+  // pattern as checkoutLabel/checkoutLabelAr above.
+  const checkoutDelivery = store?.settings?.checkoutDelivery as
+    | CheckoutDeliverySettings
+    | undefined;
+  const [selectedDeliveryWindowId, setSelectedDeliveryWindowId] = useState<string | null>(null);
+  const [deliveryWindowError, setDeliveryWindowError] = useState<string | null>(null);
+  // "Now" in the store's local timezone, computed once per mount/timezone
+  // change — not a ticking clock. Availability derives from this via the
+  // pure computeWindowAvailability helper (unit-tested separately).
+  const nowMinutes = useMemo(
+    () => getNowMinutesInTimezone(store?.timezone || 'Asia/Kuwait'),
+    [store?.timezone]
+  );
+  const deliveryWindowAvailability = useMemo(
+    () =>
+      checkoutDelivery?.windows?.enabled
+        ? computeWindowAvailability(checkoutDelivery.windows.items, nowMinutes)
+        : [],
+    [checkoutDelivery, nowMinutes]
+  );
+  const anyDeliveryWindowAvailable = deliveryWindowAvailability.some(w => w.available);
 
   // Fire InitiateCheckout pixel event once the cart has hydrated from the
   // server and we know it isn't empty. Firing on mount (before hydration)
@@ -793,6 +820,22 @@ export default function CheckoutClient() {
       return;
     }
 
+    // Delivery window is required only when the store enabled windows AND at
+    // least one is actually available today — when none are available the
+    // "no windows today" message shows and the order proceeds unselected
+    // (per the platform rule: never hard-block checkout on this).
+    if (
+      checkoutDelivery?.windows?.enabled &&
+      anyDeliveryWindowAvailable &&
+      !selectedDeliveryWindowId
+    ) {
+      setDeliveryWindowError(t('Please select a delivery window', 'يرجى اختيار موعد التوصيل'));
+      const firstError = document.querySelector('[data-error="true"]');
+      firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setDeliveryWindowError(null);
+
     setIsProcessing(true);
     setCheckoutError(null);
 
@@ -851,6 +894,19 @@ export default function CheckoutClient() {
       ].filter(Boolean);
       const composedAddress1 = address1Parts.join(', ') || formData.address;
 
+      // Persist the chosen delivery window on the order via `notes` — there's
+      // no dedicated column for it. Prepended so it's the first thing the
+      // merchant sees; localized to the label the customer actually picked
+      // from (not necessarily their current UI language at read time).
+      const selectedDeliveryWindow = deliveryWindowAvailability.find(
+        w => w.id === selectedDeliveryWindowId
+      );
+      const notesWithDelivery = selectedDeliveryWindow
+        ? `${t('Delivery window', 'موعد التوصيل')}: ${
+            language === 'ar' ? selectedDeliveryWindow.labelAr : selectedDeliveryWindow.label
+          } (${selectedDeliveryWindow.start}–${selectedDeliveryWindow.end})\n${formData.notes}`
+        : formData.notes;
+
       const orderResult = await api.createOrder({
         shippingAddress: {
           firstName: formData.firstName,
@@ -877,7 +933,7 @@ export default function CheckoutClient() {
           email: formData.email,
         },
         paymentMethod: selectedProvider,
-        notes: formData.notes,
+        notes: notesWithDelivery,
         couponCode: appliedCoupon?.code,
         // Only send a redemption request when the customer opted in AND the
         // amount clears the store minimum. The server re-validates against the
@@ -1581,6 +1637,22 @@ export default function CheckoutClient() {
                     isProcessing={isProcessing}
                     total={total}
                     formatPrice={formatPrice}
+                    deliverySection={
+                      checkoutDelivery ? (
+                        <div data-error={!!deliveryWindowError}>
+                          <DeliverySection
+                            settings={checkoutDelivery}
+                            availability={deliveryWindowAvailability}
+                            selectedWindowId={selectedDeliveryWindowId}
+                            onSelectWindow={id => {
+                              setSelectedDeliveryWindowId(id);
+                              setDeliveryWindowError(null);
+                            }}
+                            error={deliveryWindowError}
+                          />
+                        </div>
+                      ) : undefined
+                    }
                   />
                 )}
               </form>

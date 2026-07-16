@@ -107,6 +107,45 @@ export interface StoreSettings {
    * stores that configure it receive it.
    */
   orderInvoiceEmail?: string;
+  /**
+   * Optional, opt-in per-store checkout "delivery" block: a merchant-written
+   * bilingual note plus a set of merchant-configured delivery time windows
+   * the customer picks from. Both parts toggle independently. Platform-level
+   * — any store can enable it via this config, never a hardcoded slug.
+   */
+  checkoutDelivery?: CheckoutDeliverySettings;
+}
+
+/**
+ * Per-store checkout delivery block config (`Store.settings.checkoutDelivery`).
+ * Storefront shows this immediately above the checkout Pay button; the
+ * customer's window choice is persisted onto the order's `notes` field
+ * (no dedicated DB column). See apps/web checkout + apps/admin
+ * /stores/[id]/delivery for the two surfaces that read/write this.
+ */
+export interface CheckoutDeliverySettings {
+  /** Merchant-written informational note shown to the customer. */
+  note: {
+    enabled: boolean;
+    text: string;
+    textAr: string;
+  };
+  /** Merchant-configured delivery time windows the customer picks one from. */
+  windows: {
+    enabled: boolean;
+    items: CheckoutDeliveryWindow[];
+  };
+}
+
+/** A single merchant-configured delivery time window. */
+export interface CheckoutDeliveryWindow {
+  id: string;
+  label: string;
+  labelAr: string;
+  /** 24h "HH:mm", store-local time. */
+  start: string;
+  /** 24h "HH:mm", store-local time. */
+  end: string;
 }
 
 // Category Types

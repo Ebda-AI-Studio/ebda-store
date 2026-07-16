@@ -43,6 +43,25 @@ export interface StoreSettings {
   locale: string;
   theme: string;
   orderInvoiceEmail?: string;
+  checkoutDelivery?: CheckoutDeliverySettings;
+}
+export interface CheckoutDeliverySettings {
+  note: {
+    enabled: boolean;
+    text: string;
+    textAr: string;
+  };
+  windows: {
+    enabled: boolean;
+    items: CheckoutDeliveryWindow[];
+  };
+}
+export interface CheckoutDeliveryWindow {
+  id: string;
+  label: string;
+  labelAr: string;
+  start: string;
+  end: string;
 }
 export interface Product {
   id: string;
