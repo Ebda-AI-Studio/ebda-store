@@ -2,6 +2,7 @@ import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
+import { cartLineUnitPrice } from '../lib/cart-pricing';
 
 export class CartService {
   static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
@@ -12,7 +13,7 @@ export class CartService {
           product: {
             include: { images: { take: 1, orderBy: { position: 'asc' } } },
           },
-          variant: { select: { id: true, title: true, titleAr: true } },
+          variant: { select: { id: true, title: true, titleAr: true, price: true } },
         },
       },
     } as const;
@@ -68,8 +69,14 @@ export class CartService {
       }
     }
 
-    // Calculate totals
-    const subtotal = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+    // Calculate totals — a line is priced at its chosen VARIANT's price when
+    // one is selected (variant products), falling back to the parent product's
+    // price for variant-less products. Using product.price for a variant line
+    // charged every variant at the parent's (lowest) price — a real undercharge.
+    const subtotal = cart.items.reduce(
+      (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
+      0
+    );
 
     return { ...cart, subtotal };
   }

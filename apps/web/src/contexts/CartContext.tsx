@@ -40,7 +40,7 @@ interface ServerCartItem {
     images?: Array<{ id: string; url: string; alt?: string | null }>;
     categories?: Array<{ category: { name?: string; nameAr?: string } }>;
   };
-  variant?: { id: string; title: string; titleAr?: string | null } | null;
+  variant?: { id: string; title: string; titleAr?: string | null; price?: number } | null;
 }
 
 interface CartContextType {
@@ -76,7 +76,9 @@ function mapServerItem(item: ServerCartItem): CartItem {
     productId: item.productId,
     name: item.product.name,
     nameAr: item.product.nameAr ?? undefined,
-    price: item.product.price,
+    // Show the chosen variant's price (fall back to the parent product for
+    // variant-less products) — matches what the server charges.
+    price: item.variant?.price ?? item.product.price,
     quantity: item.quantity,
     image: item.product.images?.[0]?.url,
     slug: item.product.slug,

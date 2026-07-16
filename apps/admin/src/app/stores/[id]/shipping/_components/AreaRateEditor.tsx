@@ -409,7 +409,11 @@ export function AreaRateEditor({ storeId }: Props) {
       governorateAr,
       area: form.area.trim(),
       areaAr: form.areaAr.trim(),
-      isActive: form.feeKwd !== '',
+      // A zone the merchant explicitly adds is meant to be USED — default it
+      // active so it saves + applies at checkout, even with a 0 / blank fee
+      // (a legitimate FREE-delivery zone). Defaulting to `feeKwd !== ''` made
+      // free zones inactive → silently dropped / blocked on save.
+      isActive: true,
       feeKwd: form.feeKwd,
       thresholdKwd: '',
     };
@@ -433,7 +437,10 @@ export function AreaRateEditor({ storeId }: Props) {
       governorateAr: addLocForm.governorateAr.trim(),
       area: addLocForm.area.trim(),
       areaAr: addLocForm.areaAr.trim(),
-      isActive: addLocForm.feeKwd !== '',
+      // Explicitly-added location → default active so a free (0 / blank fee)
+      // zone actually saves + applies, instead of being created inactive and
+      // dropped. See submitAddArea for the full rationale.
+      isActive: true,
       feeKwd: addLocForm.feeKwd,
       thresholdKwd: '',
     };

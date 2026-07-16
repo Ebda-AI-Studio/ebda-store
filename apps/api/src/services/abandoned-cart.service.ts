@@ -11,6 +11,7 @@
  */
 
 import { prisma, withRlsBypass } from '@force/database';
+import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { wbsBridgeService, WbsUnauthorizedError, type AbandonedWaCart } from './wbs-bridge.service';
@@ -211,6 +212,7 @@ class AbandonedCartService {
               product: {
                 include: { images: { take: 1, orderBy: { position: 'asc' } } },
               },
+              variant: { select: { price: true } },
             },
           },
         },
@@ -231,13 +233,14 @@ class AbandonedCartService {
           const itemSnapshot: CartItemSnapshot[] = cart.items.map(item => ({
             productName: item.product.name,
             productImage: item.product.images[0]?.url ?? null,
-            price: item.product.price,
+            price: cartLineUnitPrice(item),
             quantity: item.quantity,
           }));
 
-          // Calculate total from snapshot (price is in fils / integer cents)
+          // Calculate total from snapshot (price is in fils / integer cents) —
+          // per chosen variant price, matching cart/checkout.
           const cartTotal = cart.items.reduce(
-            (sum, item) => sum + item.product.price * item.quantity,
+            (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
             0
           );
 

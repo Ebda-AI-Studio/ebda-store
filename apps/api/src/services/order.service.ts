@@ -1,6 +1,7 @@
 import { prisma, Prisma, OrderStatus, withMoneyTx } from '@force/database';
 import { checkMinimumOrder } from '@force/shared';
 import { generateOrderNumber } from '../utils/order-number';
+import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
 import { CouponService } from './coupon.service';
@@ -266,8 +267,15 @@ export class OrderService {
       throw new AppError(400, 'EMPTY_CART', 'Cart is empty');
     }
 
-    // Calculate totals (done before the transaction — no locks needed here)
-    const subtotal = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+    // Calculate totals (done before the transaction — no locks needed here).
+    // Price each line at its chosen VARIANT's price when one is selected,
+    // falling back to the parent product price for variant-less products —
+    // matches CartService and prevents charging every variant the parent
+    // (lowest) price.
+    const subtotal = cart.items.reduce(
+      (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
+      0
+    );
 
     // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
     // fils; 0/unset = no minimum). Platform-level — any store can configure
@@ -638,11 +646,14 @@ export class OrderService {
               productName: item.product.name,
               sku: item.product.sku,
               quantity: item.quantity,
-              price: item.product.price,
+              // Charge the chosen variant's price (fall back to the parent
+              // product for variant-less products). Persisting product.price
+              // here undercharged every variant at the parent (lowest) price.
+              price: cartLineUnitPrice(item),
               // Snapshot cost-of-goods at sale time so profit reports
               // stay correct even if the product's cost changes later.
               costPrice: item.product.costPrice ?? null,
-              total: item.product.price * item.quantity,
+              total: cartLineUnitPrice(item) * item.quantity,
             })),
           },
         },
