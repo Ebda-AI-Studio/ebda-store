@@ -42,7 +42,18 @@ export const accountingPeriodReconciliation: InngestFunction.Any = inngest.creat
         // WHERE clause preserves application-level scoping as defense-in-depth.
         withRlsBypass(async tx => {
           const result = await tx.order.aggregate({
-            where: { storeId: store.id, paymentStatus: 'paid', createdAt: { gte: since } },
+            // Exclude cancelled/refunded orders: their revenue was intentionally
+            // REVERSED in the GL (net-zero credits), so counting their total on
+            // the ops side produces phantom drift. A paid-then-cancelled order
+            // stays paymentStatus='paid' (only a provider refund flips that),
+            // so without this filter every paid-order cancellation fires a
+            // false P0 GL-drift alert.
+            where: {
+              storeId: store.id,
+              paymentStatus: 'paid',
+              status: { notIn: ['cancelled', 'refunded'] },
+              createdAt: { gte: since },
+            },
             _sum: { total: true },
           });
           return result;

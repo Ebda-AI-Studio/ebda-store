@@ -48,6 +48,27 @@ if (dsn) {
       'Failed to fetch',
       // user-cancelled fetch requests (route navigation aborts)
       'AbortError',
+      'The server took too long to respond',
+      // EXPECTED business rejections surfaced from the API — these are 4xx
+      // outcomes the customer sees inline (out of stock, rate limit, stale
+      // cart line), NOT bugs. Logging them as Sentry errors floods alert
+      // triage with non-actionable noise and buries real regressions.
+      'Not enough inventory',
+      'INSUFFICIENT_INVENTORY',
+      'Too many cart operations',
+      'Cart item not found',
+      // In-app browser (Instagram/Facebook/Android WebView) bridge noise —
+      // injected by the host app, not our code (we have no window.webkit /
+      // JS-bridge usage). Non-actionable.
+      'window.webkit',
+      'messageHandlers',
+      'Java object is gone',
+      'Error invoking postMessage',
+      // Third-party marketing-pixel bootstrap snippets (fbq/tiktok/snap/etc.)
+      // do `getElementsByTagName('script')[0].parentNode.insertBefore(...)`,
+      // which throws in host environments with no/parentless script tags.
+      // Vendor code we can't patch; not our bug.
+      "reading 'parentNode'",
     ],
     environment: process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV || 'development',
   });
