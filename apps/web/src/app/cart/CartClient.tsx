@@ -135,15 +135,29 @@ export default function CartClient() {
   const [shippingLoaded, setShippingLoaded] = useState(false);
   const { info, success, error: errorToast } = useToast();
 
-  const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
+  // Cart mutations optimistically update, reconcile via refetch, then re-throw
+  // on API failure. Without this catch the user saw a "removed"/"updated"
+  // success toast while the item silently reappeared on reconcile — the exact
+  // silent/misleading-failure trap. Surface a specific error instead.
+  const cartErrorToast = () =>
+    errorToast(
+      t('Unable to update cart', 'تعذّر تحديث السلة'),
+      t('Please check your connection and try again.', 'يرجى التحقق من اتصالك والمحاولة مرة أخرى.')
+    );
+
+  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
     const item = cartItems.find(i => i.id === itemId);
     if (newQuantity < 1) {
-      removeCartItem(itemId);
-      if (item) {
-        info(
-          t('Item removed', 'تمت الإزالة'),
-          t(`${item.name} removed from cart`, `تمت إزالة ${item.name} من السلة`)
-        );
+      try {
+        await removeCartItem(itemId);
+        if (item) {
+          info(
+            t('Item removed', 'تمت الإزالة'),
+            t(`${item.name} removed from cart`, `تمت إزالة ${item.name} من السلة`)
+          );
+        }
+      } catch {
+        cartErrorToast();
       }
     } else if (newQuantity > 10) {
       info(
@@ -151,18 +165,26 @@ export default function CartClient() {
         t('Maximum 10 items per product', 'الحد الأقصى 10 قطع لكل منتج')
       );
     } else {
-      updateCartQuantity(itemId, newQuantity);
+      try {
+        await updateCartQuantity(itemId, newQuantity);
+      } catch {
+        cartErrorToast();
+      }
     }
   };
 
-  const handleRemoveItem = (itemId: string) => {
+  const handleRemoveItem = async (itemId: string) => {
     const item = cartItems.find(i => i.id === itemId);
-    removeCartItem(itemId);
-    if (item) {
-      success(
-        t('Item removed', 'تمت الإزالة'),
-        t(`${item.name} has been removed from your cart`, `تمت إزالة ${item.name} من سلة التسوق`)
-      );
+    try {
+      await removeCartItem(itemId);
+      if (item) {
+        success(
+          t('Item removed', 'تمت الإزالة'),
+          t(`${item.name} has been removed from your cart`, `تمت إزالة ${item.name} من سلة التسوق`)
+        );
+      }
+    } catch {
+      cartErrorToast();
     }
   };
 

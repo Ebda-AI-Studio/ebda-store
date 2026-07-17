@@ -46,7 +46,7 @@ interface ServerCartItem {
 interface CartContextType {
   items: CartItem[];
   isReady: boolean;
-  addItem: (item: Omit<CartItem, 'quantity' | 'productId'>, quantity?: number) => Promise<void>;
+  addItem: (item: Omit<CartItem, 'quantity' | 'productId'>, quantity?: number) => Promise<boolean>;
   removeItem: (id: string) => Promise<void>;
   updateQuantity: (id: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -214,7 +214,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items, isReady, cartStorageKey]);
 
   const addItem = useCallback(
-    async (item: Omit<CartItem, 'quantity' | 'productId'>, quantity: number = 1) => {
+    async (
+      item: Omit<CartItem, 'quantity' | 'productId'>,
+      quantity: number = 1
+    ): Promise<boolean> => {
       const productId = item.id;
 
       // Optimistic update so the cart badge + drawer update immediately.
@@ -261,9 +264,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         // the cart drawer/page never reach this branch.
         const localizedName = language === 'ar' && item.nameAr ? item.nameAr : item.name;
         toast.success(t('Added to cart', 'تمت الإضافة للسلة'), localizedName);
-      } catch (err) {
+        return true;
+      } catch {
         await refetchCart().catch(() => {});
-        throw err;
+        // Centralized failure feedback: every storefront add-to-cart call site is
+        // fire-and-forget, so a silent throw meant the user got NO signal an add
+        // failed (the item just never appeared). Mirror the success toast here and
+        // return false instead of throwing — so no call site can leak an unhandled
+        // rejection, and a caller that cares (e.g. the PDP conversion pixel) can
+        // branch on the result.
+        toast.error(
+          t('Unable to add to cart', 'تعذّرت الإضافة للسلة'),
+          t('Please try again.', 'يرجى المحاولة مرة أخرى.')
+        );
+        return false;
       }
     },
     [refetchCart, toast, t, language]

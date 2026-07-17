@@ -370,7 +370,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     }
 
     setIsAdding(true);
-    addItem(
+    const added = await addItem(
       {
         id: product.id,
         name: product.name,
@@ -385,7 +385,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       },
       quantity
     );
-    // Fire AddToCart pixel event
+    setIsAdding(false);
+
+    // addItem toasts success/failure centrally. Only after a CONFIRMED add do we
+    // fire the AddToCart pixel (else a failed add reports a false conversion) and
+    // record the focus target for "Continue Shopping".
+    if (!added) return;
+
     trackAddToCart({
       contentId: product.id,
       contentName: product.name,
@@ -393,10 +399,6 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
       value: (selectedVariant ? selectedVariant.price : product.price) / 1000,
       currency: 'KWD',
     });
-
-    setIsAdding(false);
-    // Add-to-cart toast is fired centrally by CartContext.addItem so we
-    // don't double-toast on the PDP. Same elsewhere — see Group E.
 
     // Record the focus target so "Continue Shopping" lands the shopper
     // ON this product's card in the PLP and highlights it briefly.

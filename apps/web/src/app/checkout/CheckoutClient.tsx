@@ -222,6 +222,11 @@ export default function CheckoutClient() {
   }, [cartContextItems, cartContextTotal]);
   const [, setShippingZones] = useState<ShippingZone[]>([]);
   const [paymentProviders, setPaymentProviders] = useState<PaymentProvider[]>([]);
+  // A FAILED payment-config load must not masquerade as "no payment methods
+  // configured" (a transient network error is not a merchant misconfiguration).
+  // Track the load failure separately and offer a retry.
+  const [paymentConfigError, setPaymentConfigError] = useState(false);
+  const [checkoutReloadKey, setCheckoutReloadKey] = useState(0);
 
   // Area-rate data fetched once on mount from the public endpoint
   const [ratedAreas, setRatedAreas] = useState<Set<string>>(new Set());
@@ -230,6 +235,10 @@ export default function CheckoutClient() {
   // Full rates array — passed to GovernorateAreaSelect for custom-area support
   const [allAreaRates, setAllAreaRates] = useState<AreaRate[]>([]);
   const [shippingUnavailable, setShippingUnavailable] = useState(false);
+  // Distinguish "shipping fee couldn't be calculated" (transient failure) from
+  // "area not covered" (shippingUnavailable) — a silent catch left a stale/zero
+  // fee on screen with no signal.
+  const [shippingError, setShippingError] = useState(false);
   // Whether the store configured per-area shipping rates at all. When false,
   // the store has no shipping config → legacy free-shipping behavior (cost 0),
   // NOT "unavailable". A `matched:false` result only means "not available"
@@ -419,6 +428,7 @@ export default function CheckoutClient() {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
+      setPaymentConfigError(false);
       try {
         // Fetch shipping zones and payment config in parallel
         const [shippingResult, paymentResult] = await Promise.all([
@@ -486,22 +496,28 @@ export default function CheckoutClient() {
           if (paymentResult.data.defaultProvider) {
             setSelectedProvider(paymentResult.data.defaultProvider);
           }
+        } else {
+          // Payment config genuinely failed to load (network/5xx) — surface it
+          // as a retryable error rather than "no methods configured".
+          setPaymentConfigError(true);
         }
       } catch (error) {
         console.error('Failed to fetch checkout data:', error);
+        setPaymentConfigError(true);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, [store?.id]);
+  }, [store?.id, checkoutReloadKey]);
 
   // Calculate shipping when area changes
   const calculateShipping = useCallback(async () => {
     if (!selectedArea || !store?.id || !cart?.subtotal) return;
 
     setShippingUnavailable(false);
+    setShippingError(false);
     try {
       const result = await api.post<{
         shippingCost: number;
@@ -529,9 +545,12 @@ export default function CheckoutClient() {
           setShippingCost(result.data.shippingCost || 0);
           setFreeShipping(result.data.freeShipping || false);
         }
+      } else {
+        setShippingError(true);
       }
     } catch (error) {
       console.error('Failed to calculate shipping:', error);
+      setShippingError(true);
     }
   }, [selectedArea, store?.id, cart?.subtotal, formData.governorate]);
 
@@ -1464,6 +1483,25 @@ export default function CheckoutClient() {
                               '\u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u0644\u0644\u062a\u0648\u0635\u064a\u0644 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u0646\u0637\u0642\u0629'
                             )}
                           </p>
+                        ) : shippingError ? (
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm text-destructive">
+                              {t(
+                                "Couldn't calculate shipping. Please retry.",
+                                '\u062a\u0639\u0630\u0651\u0631 \u062d\u0633\u0627\u0628 \u0627\u0644\u0634\u062d\u0646. \u064a\u0631\u062c\u0649 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.'
+                              )}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => calculateShipping()}
+                              className="text-sm font-medium text-primary underline"
+                            >
+                              {t(
+                                'Retry',
+                                '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'
+                              )}
+                            </button>
+                          </div>
                         ) : (
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-foreground">
@@ -1694,6 +1732,8 @@ export default function CheckoutClient() {
                     formData={formData}
                     onEditShipping={() => setStep(1)}
                     paymentProviders={paymentProviders}
+                    paymentConfigError={paymentConfigError}
+                    onRetryPaymentConfig={() => setCheckoutReloadKey(k => k + 1)}
                     selectedProvider={selectedProvider}
                     onSelectProvider={setSelectedProvider}
                     isProcessing={isProcessing}

@@ -23,6 +23,10 @@ interface PaymentStepProps {
   formData: FormData;
   onEditShipping: () => void;
   paymentProviders: PaymentProvider[];
+  /** True when the payment-config request FAILED (vs. genuinely returned none). */
+  paymentConfigError?: boolean;
+  /** Re-run the checkout data load. */
+  onRetryPaymentConfig?: () => void;
   selectedProvider: string;
   onSelectProvider: (provider: string) => void;
   isProcessing: boolean;
@@ -51,6 +55,8 @@ export default function PaymentStep({
   formData,
   onEditShipping,
   paymentProviders,
+  paymentConfigError = false,
+  onRetryPaymentConfig,
   selectedProvider,
   onSelectProvider,
   isProcessing,
@@ -144,16 +150,39 @@ export default function PaymentStep({
         </p>
 
         <div className="mt-6 space-y-3">
-          {paymentProviders.length === 0 && (
+          {paymentConfigError ? (
             <div
               role="alert"
-              className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground"
+              className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-foreground"
             >
-              {t(
-                'No payment methods are configured for this store. Please contact the store owner.',
-                'لا توجد طرق دفع مُعدّة لهذا المتجر. يرجى التواصل مع صاحب المتجر.'
+              <span>
+                {t(
+                  "Couldn't load payment methods. Please check your connection and retry.",
+                  'تعذّر تحميل طرق الدفع. يرجى التحقق من اتصالك وإعادة المحاولة.'
+                )}
+              </span>
+              {onRetryPaymentConfig && (
+                <button
+                  type="button"
+                  onClick={onRetryPaymentConfig}
+                  className="flex-shrink-0 font-medium text-primary underline"
+                >
+                  {t('Retry', 'إعادة المحاولة')}
+                </button>
               )}
             </div>
+          ) : (
+            paymentProviders.length === 0 && (
+              <div
+                role="alert"
+                className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground"
+              >
+                {t(
+                  'No payment methods are configured for this store. Please contact the store owner.',
+                  'لا توجد طرق دفع مُعدّة لهذا المتجر. يرجى التواصل مع صاحب المتجر.'
+                )}
+              </div>
+            )
           )}
           {/* Render payment providers dynamically. We never fall back to
               DEFAULT_PAYMENT_PROVIDERS here — that list was a visual mock
