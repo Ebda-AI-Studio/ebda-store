@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth';
 import { checkStoreAccess } from '../middleware/store-access';
@@ -291,15 +292,21 @@ router.post(
   requirePermission('products:write'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { filename, contentType, folder } = req.body;
-
-      if (!filename || !contentType) {
+      const parsed = z
+        .object({
+          filename: z.string().min(1),
+          contentType: z.string().min(1),
+          folder: z.string().optional(),
+        })
+        .safeParse(req.body);
+      if (!parsed.success) {
         res.status(400).json({
           success: false,
           error: { code: 'MISSING_PARAMS', message: 'filename and contentType are required' },
         });
         return;
       }
+      const { filename, contentType, folder } = parsed.data;
 
       // Validate content type against allowed types
       const allowedContentTypes = [

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
+import { toCsv } from '@/lib/csv';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiFetch } from '@/lib/api';
 import { filsToKwd } from '@/lib/format';
@@ -86,9 +87,7 @@ function firstOfMonth(): string {
 }
 
 function downloadCsv(filename: string, rows: string[][]): void {
-  const csv = rows
-    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    .join('\n');
+  const csv = toCsv(rows);
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

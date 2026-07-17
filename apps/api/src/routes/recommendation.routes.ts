@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -7,6 +8,18 @@ import { recommendationService } from '../services/recommendation.service';
 import logger from '../lib/logger';
 
 const router = Router();
+
+// Matches the shape recommendationService.setProductRelations requires, so a
+// malformed body is rejected at the edge instead of failing deep in the service.
+const setRelationsSchema = z.object({
+  relations: z.array(
+    z.object({
+      targetProductId: z.string().min(1),
+      type: z.string().min(1),
+      position: z.number().int().optional(),
+    })
+  ),
+});
 
 // ==========================================
 // Admin Routes
@@ -41,15 +54,19 @@ router.put(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId, productId } = req.params;
-      const { relations } = req.body;
 
-      if (!Array.isArray(relations)) {
+      const parsed = setRelationsSchema.safeParse(req.body);
+      if (!parsed.success) {
         res.status(400).json({
           success: false,
-          error: { code: 'INVALID_BODY', message: 'relations must be an array' },
+          error: {
+            code: 'INVALID_BODY',
+            message: parsed.error.issues[0]?.message ?? 'relations must be an array of relations',
+          },
         });
         return;
       }
+      const { relations } = parsed.data;
 
       await recommendationService.setProductRelations(storeId, productId, relations);
       const updated = await recommendationService.getRelations(storeId, productId);

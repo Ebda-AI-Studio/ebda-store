@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { prisma } from '@force/database';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { userContext } from '../middleware/tenant-context';
@@ -153,14 +154,15 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
-    const { productId } = req.body;
-    if (!productId) {
+    const parsed = z.object({ productId: z.string().min(1) }).safeParse(req.body);
+    if (!parsed.success) {
       res.status(400).json({
         success: false,
         error: { code: 'VALIDATION_ERROR', message: 'Product ID is required' },
       });
       return;
     }
+    const { productId } = parsed.data;
 
     // Verify product exists and belongs to this store
     const product = await prisma.product.findFirst({
