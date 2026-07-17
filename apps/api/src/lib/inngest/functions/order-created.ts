@@ -228,8 +228,21 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           storeName: store?.name ?? storeId,
         });
       }),
-      step.run('onesignal-admin-push', () =>
-        OneSignalService.notifyAdminsOfOrder({
+      step.run('onesignal-admin-push', () => {
+        // De-dupe the admin push. For an ONLINE-paid order this fanout runs at
+        // payment confirmation, which ALSO fires the "Payment received" admin
+        // push (notifyAdminsOfPaymentSuccess) — so a "New order" push here is a
+        // duplicate: the merchant gets 2 pushes seconds apart for 1 order.
+        // Fire "New order" only when NO payment-received push will follow: a
+        // cash/COD order (paid on delivery) or a not-yet-paid order. Online-paid
+        // is fully covered by "Payment received".
+        const isCash = ['cod', 'cash', 'cash_on_delivery'].includes(
+          (paymentMethod || '').toLowerCase()
+        );
+        if (order.paymentStatus === 'paid' && !isCash) {
+          return Promise.resolve({ skipped: 'online-paid: covered by payment-received push' });
+        }
+        return OneSignalService.notifyAdminsOfOrder({
           orderId: order.id,
           orderNumber: order.orderNumber,
           storeId,
@@ -238,8 +251,8 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
           total: order.total,
           currency: order.currency,
           paymentMethod,
-        })
-      ),
+        });
+      }),
       // Orders-PWA (orders.forcemediakw.com) staff push via OneSignal.
       // Targets ONLY the Orders OneSignal app — a different device set + a
       // different origin from the OneSignal admin app (app.forcemediakw.com),
