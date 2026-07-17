@@ -228,6 +228,12 @@ export class HesabePaymentProvider implements IPaymentProvider {
       .update(payloadString)
       .digest('hex');
 
+    // Same-length guard (parity with Tap) — timingSafeEqual THROWS a RangeError
+    // on unequal-length buffers, so a malformed/probe/rotated-secret signature
+    // would 500 the webhook instead of cleanly returning false.
+    if (signature.length !== expectedSignature.length) {
+      return false;
+    }
     return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
   }
 

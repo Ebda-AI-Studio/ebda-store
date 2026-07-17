@@ -168,6 +168,11 @@ function runXhr<T>({ t, url, formData, onProgress, parse }: RunXhrOptions<T>): P
 
     xhr.addEventListener('error', () => reject(new Error(t('errors.networkError'))));
     xhr.addEventListener('abort', () => reject(new Error(t('errors.cancelled'))));
+    // A stalled upload on a flaky mobile connection can hang forever without
+    // firing `error` — cap it so the UI surfaces a real failure instead of a
+    // permanent "Uploading…%" spinner.
+    xhr.timeout = 60_000;
+    xhr.addEventListener('timeout', () => reject(new Error(t('errors.networkError'))));
 
     xhr.open('POST', url);
     xhr.withCredentials = true;
