@@ -2,7 +2,7 @@ import { prisma, Prisma, ProductStatus, OrderStatus, withMoneyTx } from '@force/
 import { AppError } from '../middleware/error-handler';
 import { slugify, AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import { redis } from './redis.service';
-import { invalidateCached, invalidateStoreProductCaches } from '../lib/public-cache';
+import { invalidateStoreProductCaches, invalidateStoreCategoriesCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { inngest } from '../lib/inngest/client';
@@ -168,8 +168,17 @@ function enrichStockFlags<
     };
   });
 
+  // lowStockThreshold is only needed above to compute the `lowStock` flag —
+  // the raw threshold number itself is never rendered by the storefront, so
+  // it's dropped here rather than leaked through the `...product` spread.
+  // (Return type stays `P & StockFlags`, not `Omit<P, 'lowStockThreshold'>`:
+  // P carries a `[key: string]: unknown` index signature, so TS can't prove
+  // Omit actually narrows it — the runtime strip below is what matters.)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructure-to-discard
+  const { lowStockThreshold: _lowStockThreshold, ...productWithoutThreshold } = product;
+
   return {
-    ...product,
+    ...productWithoutThreshold,
     // Surface the variant-aware aggregate as `inventory` so storefront cards,
     // structured data, and the PDP fallback all read the correct stock.
     inventory: effectiveInventory,
@@ -178,7 +187,11 @@ function enrichStockFlags<
     acceptsBackorder,
     availableQty,
     variants: enrichedVariants,
-  };
+    // `unknown` first: TS can't prove Omit<P, 'lowStockThreshold'> overlaps
+    // with the generic P & StockFlags target since P is arbitrary at the
+    // call site — the runtime shape is correct (verified by the callers'
+    // usage), this is a generic-cast limitation, not a real mismatch.
+  } as unknown as P & StockFlags;
 }
 
 interface CreateProductData {
@@ -368,6 +381,51 @@ interface AdvancedSearchOptions {
     | 'rating';
 }
 
+/**
+ * Storefront-safe scalar fields for Product — the shape unauthenticated
+ * visitors (public product endpoints, guest cart, and the customer's own
+ * order view) are allowed to see. Deliberately excludes: `costPrice` /
+ * `lastCostUpdateAt` (wholesale cost — competitive intel), `aiFieldSources` /
+ * `aiBalanceBackup` (internal AI provenance), `barcode` (internal SKU
+ * lookup), and merchant-internal fields the storefront never renders
+ * (`lowStockThreshold`, `trackInventory`, `weight`, `dimensions`, `featured`,
+ * `viewCount`, `isBestSeller`, `newArrivalPosition`, `bestSellerPosition`,
+ * `hasVariants`, `metaTitle(Ar)`, `citationCopy(Ar)`, `deletedAt`;
+ * `discountType`/`discountValue` are the exception — kept because the
+ * storefront discount badge reads them directly). `updatedAt` IS kept —
+ * `sitemap.ts`'s `lastModified` and `product-feed.ts`'s `FeedProductInput`
+ * both read it from the public products list. Reused by `listPublic`,
+ * `getPublicBySlug`/`getPublicById`, `CartService`, and `OrderService` so
+ * every surface that serializes a Product to an unauthenticated or
+ * customer-facing response narrows the same way.
+ */
+export const STOREFRONT_PRODUCT_SELECT = {
+  id: true,
+  storeId: true,
+  name: true,
+  nameAr: true,
+  slug: true,
+  description: true,
+  descriptionAr: true,
+  excerpt: true,
+  excerptAr: true,
+  price: true,
+  compareAtPrice: true,
+  discountType: true,
+  discountValue: true,
+  sku: true,
+  inventory: true,
+  allowBackorder: true,
+  status: true,
+  metaDescription: true,
+  metaDescriptionAr: true,
+  metaDescriptionAeo: true,
+  metaDescriptionAeoAr: true,
+  isNew: true,
+  updatedAt: true,
+  createdAt: true,
+} as const satisfies Prisma.ProductSelect;
+
 export class ProductService {
   static async list(storeId: string, options: ListProductsOptions = {}) {
     const { status, category, search, featured, ids, withSalesQuantity } = options;
@@ -540,11 +598,11 @@ export class ProductService {
         '[PRODUCT] Redis cache invalidation failed'
       );
     }
-    // Clear product list / detail / suggest caches (both Redis + in-memory).
-    // Shared with OrderService's checkout-driven inventory paths so the key
-    // definition lives in exactly one place.
+    // Clear product list / detail / suggest caches (both Redis + in-memory,
+    // public AND admin). Shared with OrderService's checkout-driven
+    // inventory paths so the key definition lives in exactly one place.
     await invalidateStoreProductCaches(storeId);
-    await invalidateCached(`public:categories:${storeId}`);
+    await invalidateStoreCategoriesCaches(storeId);
   }
 
   static async create(storeId: string, data: CreateProductData) {
@@ -854,10 +912,14 @@ export class ProductService {
   static async updateInventory(storeId: string, productId: string, quantity: number) {
     await this.getById(storeId, productId);
 
-    return prisma.product.update({
+    const updated = await prisma.product.update({
       where: { id: productId, storeId },
       data: { inventory: quantity },
     });
+
+    await this.invalidateStoreProductCache(storeId);
+
+    return updated;
   }
 
   /**
@@ -1240,7 +1302,12 @@ export class ProductService {
       // Override the baseFindManyArgs below to re-sort by position after fetch.
       const positionFindArgs = {
         where,
-        include: {
+        // Explicit select (not include) — storefront-safe scalars only, plus
+        // lowStockThreshold which enrichStockFlags needs for its lowStock
+        // computation but strips before the row is returned. See T-H1.
+        select: {
+          ...STOREFRONT_PRODUCT_SELECT,
+          lowStockThreshold: true,
           images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
           categories: { include: { category: true } },
           store: { select: { id: true, name: true, slug: true } },
@@ -1311,7 +1378,12 @@ export class ProductService {
     const baseFindManyArgs = {
       where,
       take: limit + 1, // fetch one extra to know if there's a next page
-      include: {
+      // Explicit select (not include) — storefront-safe scalars only, plus
+      // lowStockThreshold which enrichStockFlags needs for its lowStock
+      // computation but strips before the row is returned. See T-H1.
+      select: {
+        ...STOREFRONT_PRODUCT_SELECT,
+        lowStockThreshold: true,
         images: { orderBy: { position: 'asc' } as const, take: 2 }, // 2 images: primary + hover-reveal second on cards
         categories: { include: { category: true } },
         store: { select: { id: true, name: true, slug: true } },
@@ -1370,13 +1442,20 @@ export class ProductService {
   }
 
   /**
-   * Shared include shape for the public product detail endpoints. Pulls the
+   * Shared select shape for the public product detail endpoints. Pulls the
    * options + variants graph alongside the base product so the storefront's
    * VariantSelector + per-variant image swap have everything they need in
    * one round trip. Variants/options are ordered by their stored `position`
    * so admin reordering is preserved on the storefront.
+   *
+   * Explicit `select` (not `include`) at both the product AND variant level —
+   * ProductVariant carries the same wholesale-cost/margin fields as Product
+   * (`costPrice`, `barcode`); an `include` there would leak them exactly like
+   * the top-level Product row (see STOREFRONT_PRODUCT_SELECT above).
    */
-  private static readonly PUBLIC_PRODUCT_DETAIL_INCLUDE = {
+  private static readonly PUBLIC_PRODUCT_DETAIL_SELECT = {
+    ...STOREFRONT_PRODUCT_SELECT,
+    lowStockThreshold: true,
     images: { orderBy: { position: 'asc' } },
     categories: { include: { category: true } },
     store: { select: { id: true, name: true, slug: true } },
@@ -1398,7 +1477,16 @@ export class ProductService {
     variants: {
       orderBy: { position: 'asc' },
       where: { isActive: true },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        titleAr: true,
+        sku: true,
+        price: true,
+        compareAtPrice: true,
+        inventory: true,
+        allowBackorder: true,
+        imageUrl: true,
         options: {
           include: {
             value: {
@@ -1429,7 +1517,7 @@ export class ProductService {
         customer: { select: { firstName: true, lastName: true } },
       },
     },
-  } as const satisfies Prisma.ProductInclude;
+  } as const satisfies Prisma.ProductSelect;
 
   /**
    * Reshape a Prisma product (with the include above) into the storefront
@@ -1533,7 +1621,7 @@ export class ProductService {
   static async getPublicBySlug(storeId: string, slug: string) {
     const product = await prisma.product.findFirst({
       where: { storeId, slug, status: 'active', deletedAt: null },
-      include: this.PUBLIC_PRODUCT_DETAIL_INCLUDE,
+      select: this.PUBLIC_PRODUCT_DETAIL_SELECT,
     });
 
     if (!product) {
@@ -1563,7 +1651,7 @@ export class ProductService {
   static async getPublicById(storeId: string, productId: string) {
     const product = await prisma.product.findFirst({
       where: { storeId, id: productId, status: 'active', deletedAt: null },
-      include: this.PUBLIC_PRODUCT_DETAIL_INCLUDE,
+      select: this.PUBLIC_PRODUCT_DETAIL_SELECT,
     });
 
     if (!product) {

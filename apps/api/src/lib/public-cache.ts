@@ -113,18 +113,49 @@ export async function invalidateCachedPrefix(prefix: string): Promise<void> {
 }
 
 /**
- * Bust every public product-facing cache for a store (both layers).
- * The product LIST, per-product DETAIL, and search SUGGEST caches all carry
- * `price` and `inventory`/`inStock`, so ANY write that changes a product's
- * price or stock MUST call this — admin edits (via `ProductService`) AND
- * checkout-driven inventory decrement/restore (via `OrderService`). Kept here
- * in the shared lib so both services reuse one key definition without a
- * circular import.
+ * Bust the public AND admin category-list caches for a store (both cache
+ * layers). Mirrors `invalidateStoreProductCaches`'s reasoning: folding the
+ * admin prefix into the same call means every existing `public:categories`
+ * invalidation call site (category.routes.ts, store.service.ts,
+ * product.service.ts, the bulk-import/bulk-AI Inngest functions) covers the
+ * admin category-list cache too, with no second call site to thread through.
+ */
+export async function invalidateStoreCategoriesCaches(storeId: string): Promise<void> {
+  await invalidateCached(`public:categories:${storeId}`);
+  await invalidateCached(`admin:categories:${storeId}`);
+}
+
+/**
+ * Bust every product-facing cache for a store (both layers) — public
+ * (storefront) AND admin. The product LIST, per-product DETAIL, and search
+ * SUGGEST caches all carry `price` and `inventory`/`inStock`, so ANY write
+ * that changes a product's price or stock MUST call this — admin edits (via
+ * `ProductService`) AND checkout-driven inventory decrement/restore (via
+ * `OrderService`). Kept here in the shared lib so both services reuse one
+ * key definition without a circular import.
+ *
+ * `admin:products:${storeId}:` was added alongside the admin product-list
+ * cache (`product.routes.ts` GET /) — every one of the many call sites below
+ * already busts the public prefixes on every Product write, so folding the
+ * admin prefix into this SAME function means the admin list cache is
+ * automatically covered by every existing (and future) call site instead of
+ * requiring a second invalidation call to be threaded through the whole
+ * Product write surface a second time.
+ *
+ * Also busts the category caches: the admin category list's `_count.products`
+ * (category.routes.ts GET /) is derived from live Product rows (status,
+ * deletedAt), so ANY product write that changes those — including a bulk
+ * delete/status update that doesn't touch a single Category row — can make
+ * the cached category counts stale. Folding it in here (rather than auditing
+ * every product-write call site a second time for this dependency) is the
+ * safe default: it costs two extra single-key deletes, not a scan.
  */
 export async function invalidateStoreProductCaches(storeId: string): Promise<void> {
   await invalidateCachedPrefix(`public:products:${storeId}:`);
   await invalidateCachedPrefix(`public:product:${storeId}:`);
   await invalidateCachedPrefix(`public:suggest:${storeId}:`);
+  await invalidateCachedPrefix(`admin:products:${storeId}:`);
+  await invalidateStoreCategoriesCaches(storeId);
 }
 
 /** Cache key for the admin aggregated-customers snapshot (`customers.routes.ts`). */

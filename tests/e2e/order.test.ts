@@ -12,6 +12,7 @@ import webhookRoutes from '@api/routes/webhook.routes';
 import authRoutes from '@api/routes/auth.routes';
 import mfaRoutes from '@api/routes/mfa.routes';
 import { CartService } from '@api/services/cart.service';
+import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
 import { errorHandler } from '@api/middleware/error-handler';
 import { createSuperAdminWithMfa, loginAsSuperAdmin } from './helpers/mfa-login';
 
@@ -390,6 +391,25 @@ describe('Order Flow', () => {
 
       expect(cancelRes.status).toBe(200);
       expect(cancelRes.body.data.order.status).toBe('cancelled');
+
+      // Inventory restoration is NOT synchronous with the request. Since #758
+      // ("reversals off the request tx, retriable + idempotent") the cancel
+      // path only ENQUEUES `order/refunded`; the restore runs in the Inngest
+      // fanout. In tests `inngest.send` is a no-op — client.ts replaces it
+      // whenever INNGEST_DRY_RUN=true or NODE_ENV=test, and CI sets both —
+      // so nothing consumes the event and the restore would never happen.
+      //
+      // Asserting inventory straight after the response therefore tested a
+      // contract the API stopped honouring on 2026-07-16, and this test had
+      // been failing ever since (masked by a CI outage, not by passing runs).
+      //
+      // Rather than weaken the assertion, drive the fanout the same way
+      // order.service.ts's own inline fallback does — a stub `step` that runs
+      // each step immediately — so the end-to-end intent (cancelling an order
+      // returns its stock) is still genuinely verified, deterministically.
+      await handleOrderRefunded(cancelOrderId, testStoreId, true, false, {
+        run: <T>(_id: string, fn: () => Promise<T>): Promise<T> => fn(),
+      });
 
       // Verify inventory was restored
       const productAfter = await prisma.product.findUnique({

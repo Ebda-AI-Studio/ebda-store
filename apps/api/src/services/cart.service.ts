@@ -3,15 +3,22 @@ import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 
 export class CartService {
   static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
-    // Shared include fragment to avoid repetition
+    // Shared include fragment to avoid repetition. `product` uses the
+    // storefront-safe select (T-H2) — this is a PUBLIC guest-cart surface
+    // (cart.routes.ts has no `authenticate`), so an `include` here would
+    // leak costPrice/aiFieldSources/barcode/etc. straight into the response.
     const cartInclude = {
       items: {
         include: {
           product: {
-            include: { images: { take: 1, orderBy: { position: 'asc' } } },
+            select: {
+              ...STOREFRONT_PRODUCT_SELECT,
+              images: { take: 1, orderBy: { position: 'asc' } },
+            },
           },
           variant: { select: { id: true, title: true, titleAr: true, price: true } },
         },
@@ -475,7 +482,10 @@ export class CartService {
         items: {
           include: {
             product: {
-              include: { images: { take: 1, orderBy: { position: 'asc' } } },
+              select: {
+                ...STOREFRONT_PRODUCT_SELECT,
+                images: { take: 1, orderBy: { position: 'asc' } },
+              },
             },
           },
         },

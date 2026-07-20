@@ -81,6 +81,19 @@ export class BlogService {
     const slug = normalizeSlug(slugRaw);
     const post = await prisma.blogPost.findFirst({
       where: { storeId, slug, isPublished: true },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        titleAr: true,
+        excerpt: true,
+        excerptAr: true,
+        content: true,
+        contentAr: true,
+        coverImage: true,
+        publishedAt: true,
+        createdAt: true,
+      },
     });
     return post;
   }

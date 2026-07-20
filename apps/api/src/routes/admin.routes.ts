@@ -1048,7 +1048,15 @@ router.get(
             skip,
             take: limit,
             orderBy: { createdAt: 'desc' },
-            include: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              totalOrders: true,
+              totalSpent: true,
+              createdAt: true,
               store: { select: { id: true, name: true } },
             },
           }),

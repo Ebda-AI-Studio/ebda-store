@@ -25,7 +25,7 @@
  * the API level with a clear error code.
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '@force/database';
 import { config } from '../config';
@@ -78,7 +78,7 @@ router.post(
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
   writeLimiter,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     const storeId = req.params.id;
     let draftOrderId: string | null = null;
 
@@ -458,9 +458,7 @@ router.post(
         await prisma.order.delete({ where: { id: draftOrderId } }).catch(() => {});
       }
       logger.error({ err: (err as Error).message }, '[payment-links] create failed');
-      res
-        .status(500)
-        .json({ success: false, error: 'CREATE_FAILED', message: (err as Error).message });
+      next(err);
     }
   }
 );

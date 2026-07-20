@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import crypto from 'crypto';
 import logger from '../lib/logger';
 import { sendAlert } from '../services/alerts.service';
 
@@ -21,7 +22,11 @@ if (!ALERTS_TOKEN && process.env.NODE_ENV === 'production') {
 function requireToken(req: Request, res: Response): boolean {
   if (!ALERTS_TOKEN) return true;
   const token = (req.query.token as string) || req.header('x-alerts-token') || '';
-  if (token !== ALERTS_TOKEN) {
+  if (!token || token.length !== ALERTS_TOKEN.length) {
+    res.status(401).json({ ok: false, error: 'invalid_token' });
+    return false;
+  }
+  if (!crypto.timingSafeEqual(Buffer.from(token), Buffer.from(ALERTS_TOKEN))) {
     res.status(401).json({ ok: false, error: 'invalid_token' });
     return false;
   }
@@ -182,7 +187,7 @@ router.post('/generic', async (req, res) => {
 });
 
 router.get('/healthcheck', (_req, res) => {
-  res.json({ ok: true, tokenRequired: !!ALERTS_TOKEN });
+  res.json({ ok: true });
 });
 
 export default router;

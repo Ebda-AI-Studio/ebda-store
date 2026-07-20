@@ -4,6 +4,7 @@ import { generateOrderNumber } from '../utils/order-number';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
+import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { CouponService } from './coupon.service';
 import { socketService } from './socket.service';
 import { featureService } from './feature.service';
@@ -47,6 +48,30 @@ async function bustProductCaches(storeId: string): Promise<void> {
 // service graph. Re-exported here for the existing import sites.
 import { assertValidTransition, VALID_ORDER_TRANSITIONS } from './order-status-machine';
 export { assertValidTransition, VALID_ORDER_TRANSITIONS };
+
+/**
+ * Payment fields safe to return on `getById`/`getByOrderNumber` — this route
+ * is reachable by the owning CUSTOMER (order.routes.ts:439), not just store
+ * staff, so `payments: true` would leak gateway internals (`refundId`,
+ * `failureReason`, raw `metadata` JSON) to the customer. Verified against
+ * every consumer: apps/web's customer order view (transactionId, invoiceId),
+ * apps/admin's + apps/orders' PaymentCard/ActionFooter (transactionId,
+ * paymentUrl) — none read refundId/failureReason/metadata/refundedAmount
+ * from this endpoint (refund results come back from the separate
+ * POST /refund-via-provider response instead).
+ */
+const ORDER_PAYMENT_SELECT = {
+  id: true,
+  provider: true,
+  method: true,
+  status: true,
+  amount: true,
+  transactionId: true,
+  invoiceId: true,
+  paymentUrl: true,
+  paidAt: true,
+  createdAt: true,
+} as const satisfies Prisma.PaymentSelect;
 
 interface CreateOrderData {
   shippingAddress: {
@@ -213,11 +238,14 @@ export class OrderService {
         items: {
           include: {
             product: {
-              include: { images: { take: 1, orderBy: { position: 'asc' } } },
+              select: {
+                ...STOREFRONT_PRODUCT_SELECT,
+                images: { take: 1, orderBy: { position: 'asc' } },
+              },
             },
           },
         },
-        payments: true,
+        payments: { select: ORDER_PAYMENT_SELECT },
       },
     });
 
@@ -238,11 +266,14 @@ export class OrderService {
         items: {
           include: {
             product: {
-              include: { images: { take: 1, orderBy: { position: 'asc' } } },
+              select: {
+                ...STOREFRONT_PRODUCT_SELECT,
+                images: { take: 1, orderBy: { position: 'asc' } },
+              },
             },
           },
         },
-        payments: true,
+        payments: { select: ORDER_PAYMENT_SELECT },
       },
     });
 
@@ -266,6 +297,18 @@ export class OrderService {
     if (cart.items.length === 0) {
       throw new AppError(400, 'EMPTY_CART', 'Cart is empty');
     }
+
+    // CartService's product select is storefront-safe (T-H2) and omits
+    // trackInventory/costPrice on purpose — fetch them separately here since
+    // order creation needs both internally: trackInventory gates the
+    // inventory-decrement guard below, costPrice is snapshotted onto each
+    // OrderItem for profit reporting. Neither is ever serialized in the
+    // order response.
+    const productInternals = await prisma.product.findMany({
+      where: { id: { in: cart.items.map(i => i.productId) } },
+      select: { id: true, trackInventory: true, costPrice: true },
+    });
+    const productInternalsById = new Map(productInternals.map(p => [p.id, p]));
 
     // Calculate totals (done before the transaction — no locks needed here).
     // Price each line at its chosen VARIANT's price when one is selected,
@@ -474,7 +517,7 @@ export class OrderService {
       // capture the accurate product pre/post stock per line for the ledger.
       const stockChanges = new Map<string, { previousStock: number; newStock: number }>();
       for (const item of cart.items) {
-        if (!item.product.trackInventory) continue;
+        if (!(productInternalsById.get(item.productId)?.trackInventory ?? true)) continue;
         const qty = item.quantity;
         const variantId = (item as { variantId?: string }).variantId;
         const lineKey = `${item.productId}::${variantId ?? ''}`;
@@ -652,7 +695,7 @@ export class OrderService {
               price: cartLineUnitPrice(item),
               // Snapshot cost-of-goods at sale time so profit reports
               // stay correct even if the product's cost changes later.
-              costPrice: item.product.costPrice ?? null,
+              costPrice: productInternalsById.get(item.productId)?.costPrice ?? null,
               total: cartLineUnitPrice(item) * item.quantity,
             })),
           },
@@ -671,7 +714,7 @@ export class OrderService {
       // same transaction, using newOrder.id as the reference (DB-010). Collected
       // and written as a single createMany instead of one create() per line item.
       const inventoryHistoryRows = cart.items.flatMap(item => {
-        if (!item.product.trackInventory) return [];
+        if (!(productInternalsById.get(item.productId)?.trackInventory ?? true)) return [];
         const variantId = (item as { variantId?: string }).variantId;
         const sc = stockChanges.get(`${item.productId}::${variantId ?? ''}`);
         if (!sc) return [];

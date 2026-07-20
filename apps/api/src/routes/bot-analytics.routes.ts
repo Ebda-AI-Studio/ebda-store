@@ -100,7 +100,10 @@ router.get(
 
       if (!wbsOk) {
         logger.warn({ storeId, status: wbsStatus, body }, '[BOT-ANALYTICS] WBS returned error');
-        res.status(wbsStatus).json(body);
+        res.status(wbsStatus).json({
+          success: false,
+          error: { code: 'WBS_ERROR', message: 'WBS request failed' },
+        });
         return;
       }
 

@@ -42,6 +42,19 @@ vi.mock('@force/database', () => ({
       Serializable: 'Serializable',
     },
   },
+  // CartService now imports STOREFRONT_PRODUCT_SELECT from product.service,
+  // which evaluates `const SOLD_ORDER_STATUSES: OrderStatus[]` at MODULE load.
+  // Without OrderStatus on this mock the whole suite fails to import — the
+  // tests themselves never run. Mirrors enum OrderStatus in schema.prisma.
+  OrderStatus: {
+    pending: 'pending',
+    confirmed: 'confirmed',
+    processing: 'processing',
+    shipped: 'shipped',
+    delivered: 'delivered',
+    cancelled: 'cancelled',
+    refunded: 'refunded',
+  },
 }));
 
 // CartService now resolves the inventory.backorder feature flag before
