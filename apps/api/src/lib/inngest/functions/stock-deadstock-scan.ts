@@ -3,6 +3,7 @@ import { withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runDeadstockScan } from '../../../services/accounting/deadstock-scan.service';
+import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../ai-plan-eligibility';
 import { featureService } from '../../../services/feature.service';
 
 /**
@@ -34,7 +35,13 @@ export const stockDeadstockScanCron: InngestFunction.Any = inngest.createFunctio
     const stores = await step.run('list-stores', () =>
       withRlsBypass(tx =>
         tx.store.findMany({
-          where: { accountingEnabled: true, aiFeaturesEnabled: true, deletedAt: null },
+          where: {
+            accountingEnabled: true,
+            aiFeaturesEnabled: true,
+            deletedAt: null,
+            // free (lapsed-payment / demo) plans are excluded from AI spend.
+            ...aiEligiblePlanFilter,
+          },
           select: { id: true },
         })
       )
@@ -95,6 +102,19 @@ export const stockDeadstockScanOnDemand: InngestFunction.Any = inngest.createFun
         'stock-deadstock-scan-on-demand: inventory.basic disabled, skipping'
       );
       return { skipped: true, reason: 'feature_disabled', feature: 'inventory.basic' };
+    }
+
+    // Plan gate — inventory.basic is in the `free` baseline so a lapsed
+    // merchant can still see their stock; it must not buy them AI spend.
+    const store = await withRlsBypass(tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+    );
+    if (!store || !isAiEligiblePlan(store.plan)) {
+      logger.info(
+        { storeId, plan: store?.plan },
+        'stock-deadstock-scan-on-demand: plan ineligible for AI, skipping'
+      );
+      return { skipped: true, reason: 'plan_ineligible', plan: store?.plan ?? null };
     }
 
     const result = await step.run(`scan-${storeId}`, () => runDeadstockScan(storeId));

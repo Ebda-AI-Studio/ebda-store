@@ -270,7 +270,7 @@ router.get('/products/:slugOrId', async (req: Request, res: Response, next: Next
 });
 
 /**
- * GET /public/feed/products.json — AI Product Feed (agent_feed add-on).
+ * GET /public/feed/products.json — AI Product Feed (agent_feed; all paid plans).
  * Fail-closed: 404 when the feature is not enabled for the store, so the
  * URL does not reveal the add-on's existence on stores that didn't buy it.
  * Response is the raw feed JSON (no {success,data} envelope) — this is a

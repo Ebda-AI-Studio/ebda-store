@@ -239,10 +239,12 @@ router.get(
   requireMfaEnrolled,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  // accounting.profit_anomaly is Enterprise-only. The daily-sweep Inngest job
-  // already gates the write side (accounting-profit-anomaly.ts); without this
-  // gate a downgraded/never-Enterprise store retained unrestricted read access
-  // to historical rows forever — the two layers of the same feature disagreed.
+  // accounting.profit_anomaly is on every paid plan (AI-first policy,
+  // 2026-07-21); `free` and per-store overrides can still disable it. The
+  // daily-sweep Inngest job already gates the write side
+  // (accounting-profit-anomaly.ts); without this gate a store with the feature
+  // disabled retained unrestricted read access to historical rows forever —
+  // the two layers of the same feature disagreed.
   requireFeature('accounting.profit_anomaly'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

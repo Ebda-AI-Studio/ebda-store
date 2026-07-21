@@ -3,6 +3,7 @@ import { prisma, withRlsBypass } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { runReorderScan } from '../../../services/accounting/reorder-scan.service';
+import { aiEligiblePlanFilter, isAiEligiblePlan } from '../../ai-plan-eligibility';
 import { featureService } from '../../../services/feature.service';
 
 /**
@@ -32,7 +33,13 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
     const stores = await step.run('list-stores', () =>
       withRlsBypass(tx =>
         tx.store.findMany({
-          where: { accountingEnabled: true, aiFeaturesEnabled: true, deletedAt: null },
+          where: {
+            accountingEnabled: true,
+            aiFeaturesEnabled: true,
+            deletedAt: null,
+            // free (lapsed-payment / demo) plans are excluded from AI spend.
+            ...aiEligiblePlanFilter,
+          },
           select: { id: true },
         })
       )
@@ -43,15 +50,17 @@ export const stockReorderScanCron: InngestFunction.Any = inngest.createFunction(
 
     for (const store of stores) {
       const result = await step.run(`scan-${store.id}`, async () => {
-        // Feature gate — reorder suggestions require inventory.purchase_orders.
-        const enabled = await featureService.isFeatureEnabled(
-          store.id,
-          'inventory.purchase_orders'
-        );
+        // Feature gate — inventory.basic, NOT inventory.purchase_orders
+        // (2026-07-21). Reorder suggestions are an AI feature and fall under
+        // the AI-first policy, but inventory.purchase_orders gates the whole
+        // ERP purchase-order module — freeing the AI through that key would
+        // hand over the module with it. Matches stock-deadstock-scan.ts, the
+        // sibling AI suggestion engine, which already gates on inventory.basic.
+        const enabled = await featureService.isFeatureEnabled(store.id, 'inventory.basic');
         if (!enabled) {
           logger.info(
             { storeId: store.id },
-            'stock-reorder-scan: inventory.purchase_orders disabled, skipping'
+            'stock-reorder-scan: inventory.basic disabled, skipping'
           );
           return { suggested: 0, expiredCount: 0, skipped: true };
         }
@@ -88,14 +97,25 @@ export const stockReorderScanOnDemand: InngestFunction.Any = inngest.createFunct
 
     logger.info({ storeId, requestedBy }, 'stock-reorder-scan-on-demand: starting');
 
-    // Feature gate — skip when inventory.purchase_orders is disabled.
-    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.purchase_orders');
+    // Feature gate — inventory.basic (see the cron handler above for why this
+    // is not inventory.purchase_orders).
+    const enabled = await featureService.isFeatureEnabled(storeId, 'inventory.basic');
     if (!enabled) {
+      logger.info({ storeId }, 'stock-reorder-scan-on-demand: inventory.basic disabled, skipping');
+      return { skipped: true, reason: 'feature_disabled', feature: 'inventory.basic' };
+    }
+
+    // Plan gate — inventory.basic is in the `free` baseline so a lapsed
+    // merchant can still see their stock; it must not buy them AI spend.
+    const store = await withRlsBypass(tx =>
+      tx.store.findUnique({ where: { id: storeId }, select: { plan: true } })
+    );
+    if (!store || !isAiEligiblePlan(store.plan)) {
       logger.info(
-        { storeId },
-        'stock-reorder-scan-on-demand: inventory.purchase_orders disabled, skipping'
+        { storeId, plan: store?.plan },
+        'stock-reorder-scan-on-demand: plan ineligible for AI, skipping'
       );
-      return { skipped: true, reason: 'feature_disabled', feature: 'inventory.purchase_orders' };
+      return { skipped: true, reason: 'plan_ineligible', plan: store?.plan ?? null };
     }
 
     const result = await step.run(`scan-${storeId}`, () => runReorderScan(storeId));

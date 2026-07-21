@@ -63,6 +63,16 @@ const STARTER_CORE: FeatureKey[] = [
   // restrict a specific client via a StoreFeature override. To sell staff seats
   // as a paid tier later, move this into the appropriate ADDITIONS array.
   'staff_accounts',
+  // AI-first policy (2026-07-21, Ahmad): every AI capability is available on
+  // every paid plan. AI is the product's core differentiator and the only
+  // uncontested one — tiering it made the "AI-first product" positioning untrue
+  // and left the flagship AI Product Feed disabled on every single store
+  // (a live storefront returned 404 for /feeds/products.json). Revenue comes
+  // from the platform, not from gating the differentiator. Restrict a specific
+  // client via a StoreFeature override, as with `whatsapp` and `staff_accounts`.
+  'agent_feed',
+  'upsell_crosssell',
+  'accounting.profit_anomaly',
 ];
 
 const PROFESSIONAL_ADDITIONS: FeatureKey[] = [
@@ -76,7 +86,7 @@ const PROFESSIONAL_ADDITIONS: FeatureKey[] = [
   // Marketing + retention
   'loyalty',
   'push_notifications',
-  'upsell_crosssell',
+  // 'upsell_crosssell' moved to STARTER_CORE (AI-first policy, 2026-07-21).
 ];
 
 const ENTERPRISE_ADDITIONS: FeatureKey[] = [
@@ -88,7 +98,7 @@ const ENTERPRISE_ADDITIONS: FeatureKey[] = [
   // Full accounting suite
   'accounting.tax_reports',
   'accounting.multi_currency',
-  'accounting.profit_anomaly',
+  // 'accounting.profit_anomaly' moved to STARTER_CORE (AI-first policy, 2026-07-21).
   'accounting.bank_reconcile',
   // Extras
   'affiliate',

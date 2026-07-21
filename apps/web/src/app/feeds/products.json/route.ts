@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { API_URL } from '../../../lib/api';
 
 /**
- * Public AI product feed passthrough (agent_feed add-on).
+ * Public AI product feed passthrough (agent_feed; all paid plans).
  *
  * Tenant comes from middleware headers exactly like `llms.txt/route.ts`:
  * `x-store-slug` on the platform path (store.force-ai.co/<slug>/feeds/...)

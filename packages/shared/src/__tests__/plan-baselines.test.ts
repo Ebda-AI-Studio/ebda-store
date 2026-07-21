@@ -65,9 +65,41 @@ describe('PLAN_BASELINE', () => {
     expect(PLAN_BASELINE.professional).toContain('loyalty');
   });
 
-  it('professional does NOT include multi-warehouse or profit anomaly (enterprise-only)', () => {
+  it('professional does NOT include multi-warehouse (enterprise-only)', () => {
     expect(PLAN_BASELINE.professional).not.toContain('inventory.multi_warehouse');
-    expect(PLAN_BASELINE.professional).not.toContain('accounting.profit_anomaly');
+  });
+
+  // AI-first policy (2026-07-21): every AI capability is available on every paid
+  // plan. AI is the product's core differentiator — tiering it made the
+  // "AI-first product" positioning untrue and left the flagship AI Product Feed
+  // disabled on every store. `free` is excluded: it is the lapsed-payment grace
+  // state, not a plan anyone buys.
+  it('every paid plan includes every AI feature', () => {
+    const AI_FEATURES = [
+      'agent_feed',
+      'upsell_crosssell',
+      'accounting.profit_anomaly',
+      'bulk_operations',
+      'inventory.basic',
+    ] as const;
+
+    for (const plan of ['starter', 'professional', 'enterprise'] as const) {
+      for (const key of AI_FEATURES) {
+        expect(PLAN_BASELINE[plan]).toContain(key);
+      }
+    }
+  });
+
+  it('free does not get AI features (lapsed-payment grace state)', () => {
+    expect(PLAN_BASELINE.free).not.toContain('agent_feed');
+    expect(PLAN_BASELINE.free).not.toContain('accounting.profit_anomaly');
+  });
+
+  it('no baseline array contains duplicate keys', () => {
+    for (const plan of STORE_PLANS) {
+      const arr = PLAN_BASELINE[plan];
+      expect(new Set(arr).size).toBe(arr.length);
+    }
   });
 
   it('enterprise includes full inventory + accounting suites + affiliate + sms', () => {

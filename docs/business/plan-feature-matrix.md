@@ -4,7 +4,9 @@
 > (the code that actually gates features at runtime). If this table and the code disagree, the code
 > wins — regenerate this doc.**
 >
-> **Last synced: 2026-07-02.** Multi-currency, bank reconciliation, barcode scanning, and
+> **Last synced: 2026-07-21.** 🤖 marks an AI capability — all AI is available on every paid plan (AI-first policy).
+>
+> **Prior sync 2026-07-02.** Multi-currency, bank reconciliation, barcode scanning, and
 > multi-warehouse are shipped Enterprise features (not roadmap). Tax reports (XLSX export),
 > profit anomaly watch, loyalty redemption, low-stock alerts, backorders, and server-side CAPI
 > pixels are also real and confirmed against code. The 2026-06 shipping/orders/payment-lifecycle
@@ -22,41 +24,42 @@ self-serve signup and no free trial). Super-admin can override any feature per s
 
 ## Matrix
 
-| Feature (key)                                               | Free | Starter | Professional | Enterprise |
-| ----------------------------------------------------------- | :--: | :-----: | :----------: | :--------: |
-| Coupons (`coupons`)                                         |  ✅  |   ✅    |      ✅      |     ✅     |
-| Reviews (`reviews`)                                         |  ✅  |   ✅    |      ✅      |     ✅     |
-| Inventory — basic (`inventory.basic`)                       |  ✅  |   ✅    |      ✅      |     ✅     |
-| Returns (`returns`)                                         |  —   |   ✅    |      ✅      |     ✅     |
-| Tax (`tax`)                                                 |  —   |   ✅    |      ✅      |     ✅     |
-| PWA (`pwa`)                                                 |  —   |   ✅    |      ✅      |     ✅     |
-| SEO (`seo`)                                                 |  —   |   ✅    |      ✅      |     ✅     |
-| Search autocomplete (`search_autocomplete`)                 |  —   |   ✅    |      ✅      |     ✅     |
-| Marketing pixels (`marketing_pixels`)                       |  —   |   ✅    |      ✅      |     ✅     |
-| Shipping carriers (`shipping_carriers`)                     |  —   |   ✅    |      ✅      |     ✅     |
-| Bulk operations (`bulk_operations`)                         |  —   |   ✅    |      ✅      |     ✅     |
-| Abandoned cart (`abandoned_cart`)                           |  —   |   ✅    |      ✅      |     ✅     |
-| Staff accounts (`staff_accounts`)                           |  —   |   ✅    |      ✅      |     ✅     |
-| Inventory — stock alerts (`inventory.stock_alerts`)         |  —   |    —    |      ✅      |     ✅     |
-| Inventory — backorder (`inventory.backorder`)               |  —   |    —    |      ✅      |     ✅     |
-| Accounting — basic / CoA + journals (`accounting.basic`)    |  —   |    —    |      ✅      |     ✅     |
-| Accounting — expenses (`accounting.expenses`)               |  —   |    —    |      ✅      |     ✅     |
-| Accounting — invoicing (`accounting.invoicing`)             |  —   |    —    |      ✅      |     ✅     |
-| Loyalty (`loyalty`)                                         |  —   |    —    |      ✅      |     ✅     |
-| Push notifications (`push_notifications`)                   |  —   |    —    |      ✅      |     ✅     |
-| Upsell / cross-sell (`upsell_crosssell`)                    |  —   |    —    |      ✅      |     ✅     |
-| Inventory — multi-warehouse (`inventory.multi_warehouse`)   |  —   |    —    |      —       |     ✅     |
-| Inventory — barcode (`inventory.barcode`)                   |  —   |    —    |      —       |     ✅     |
-| Inventory — purchase orders (`inventory.purchase_orders`)   |  —   |    —    |      —       |     ✅     |
-| Inventory — bulk adjustments (`inventory.bulk_adjustments`) |  —   |    —    |      —       |     ✅     |
-| Accounting — tax reports (`accounting.tax_reports`)         |  —   |    —    |      —       |     ✅     |
-| Accounting — multi-currency (`accounting.multi_currency`)   |  —   |    —    |      —       |     ✅     |
-| Accounting — profit anomaly (`accounting.profit_anomaly`)   |  —   |    —    |      —       |     ✅     |
-| Accounting — bank reconcile (`accounting.bank_reconcile`)   |  —   |    —    |      —       |     ✅     |
-| Affiliate program (`affiliate`)                             |  —   |    —    |      —       |     ✅     |
-| SMS (`sms`)                                                 |  —   |    —    |      —       |     ✅     |
-| Floating widget (`floating_widget`)                         |  —   |    —    |      —       |     ✅     |
-| Payment-gateway abandonment capture (`payment_abandonment`) |  —   |    —    |      —       |     ✅     |
+| Feature (key)                                                | Free | Starter | Professional | Enterprise |
+| ------------------------------------------------------------ | :--: | :-----: | :----------: | :--------: |
+| Coupons (`coupons`)                                          |  ✅  |   ✅    |      ✅      |     ✅     |
+| Reviews (`reviews`)                                          |  ✅  |   ✅    |      ✅      |     ✅     |
+| Inventory — basic (`inventory.basic`)                        |  ✅  |   ✅    |      ✅      |     ✅     |
+| Returns (`returns`)                                          |  —   |   ✅    |      ✅      |     ✅     |
+| Tax (`tax`)                                                  |  —   |   ✅    |      ✅      |     ✅     |
+| PWA (`pwa`)                                                  |  —   |   ✅    |      ✅      |     ✅     |
+| SEO (`seo`)                                                  |  —   |   ✅    |      ✅      |     ✅     |
+| Search autocomplete (`search_autocomplete`)                  |  —   |   ✅    |      ✅      |     ✅     |
+| Marketing pixels (`marketing_pixels`)                        |  —   |   ✅    |      ✅      |     ✅     |
+| Shipping carriers (`shipping_carriers`)                      |  —   |   ✅    |      ✅      |     ✅     |
+| Bulk operations (`bulk_operations`)                          |  —   |   ✅    |      ✅      |     ✅     |
+| Abandoned cart (`abandoned_cart`)                            |  —   |   ✅    |      ✅      |     ✅     |
+| Staff accounts (`staff_accounts`)                            |  —   |   ✅    |      ✅      |     ✅     |
+| AI Product Feed (`agent_feed`) 🤖                            |  —   |   ✅    |      ✅      |     ✅     |
+| Upsell / cross-sell (`upsell_crosssell`) 🤖                  |  —   |   ✅    |      ✅      |     ✅     |
+| Accounting — profit anomaly (`accounting.profit_anomaly`) 🤖 |  —   |   ✅    |      ✅      |     ✅     |
+| Inventory — stock alerts (`inventory.stock_alerts`)          |  —   |    —    |      ✅      |     ✅     |
+| Inventory — backorder (`inventory.backorder`)                |  —   |    —    |      ✅      |     ✅     |
+| Accounting — basic / CoA + journals (`accounting.basic`)     |  —   |    —    |      ✅      |     ✅     |
+| Accounting — expenses (`accounting.expenses`)                |  —   |    —    |      ✅      |     ✅     |
+| Accounting — invoicing (`accounting.invoicing`)              |  —   |    —    |      ✅      |     ✅     |
+| Loyalty (`loyalty`)                                          |  —   |    —    |      ✅      |     ✅     |
+| Push notifications (`push_notifications`)                    |  —   |    —    |      ✅      |     ✅     |
+| Inventory — multi-warehouse (`inventory.multi_warehouse`)    |  —   |    —    |      —       |     ✅     |
+| Inventory — barcode (`inventory.barcode`)                    |  —   |    —    |      —       |     ✅     |
+| Inventory — purchase orders (`inventory.purchase_orders`)    |  —   |    —    |      —       |     ✅     |
+| Inventory — bulk adjustments (`inventory.bulk_adjustments`)  |  —   |    —    |      —       |     ✅     |
+| Accounting — tax reports (`accounting.tax_reports`)          |  —   |    —    |      —       |     ✅     |
+| Accounting — multi-currency (`accounting.multi_currency`)    |  —   |    —    |      —       |     ✅     |
+| Accounting — bank reconcile (`accounting.bank_reconcile`)    |  —   |    —    |      —       |     ✅     |
+| Affiliate program (`affiliate`)                              |  —   |    —    |      —       |     ✅     |
+| SMS (`sms`)                                                  |  —   |    —    |      —       |     ✅     |
+| Floating widget (`floating_widget`)                          |  —   |    —    |      —       |     ✅     |
+| Payment-gateway abandonment capture (`payment_abandonment`)  |  —   |    —    |      —       |     ✅     |
 
 ## Not plan-gated by baseline (add-on or always-on)
 
@@ -64,7 +67,16 @@ self-serve signup and no free trial). Super-admin can override any feature per s
 - **WhatsApp Business Platform integration** (`whatsapp`) — **universal by default (managed-agency).** As of 2026-06-09 (#94) `whatsapp` is in `STARTER_CORE` and the `free` grace baseline, so the `/whatsapp` admin pages are accessible to **every** store out of the box (Ahmad onboards each client and WhatsApp is a core offering). It is still feature-gated, but the gate **defaults open** — access is restricted only by exception, when a super-admin sets a `StoreFeature` `whatsapp` override with `enabled=false` (e.g. a limited deal). This is the managed-agency default-everything/restrict-by-exception model, not a sold per-plan tier.
 - **AI Tools** — the admin AI-bulk-sweep hub (`/stores/:id/ai-tools`) is feature-gated as of 2026-06-09. There is no standalone `ai_tools` `FeatureKey`; the page gates on **`bulk_operations`** (`useRequireFeature('bulk_operations')`, Starter+ — same row already in the matrix). This prevents unbounded Gemini API usage from stores below Starter.
 - **Email campaigns** (`email_campaigns`), **customer wallet** (`customer_wallet`) — present in the registry; enable per-store via override when sold. Not in baselines as of this sync. (**`staff_accounts`** moved from this list into `STARTER_CORE` on 2026-07-02 — it's now a real matrix row above, universal by default like `whatsapp`. The `/staff` admin page now renders the `FeatureUpgradeGate` for a store without it; API-side `staff.routes` enforcement is tracked separately.)
-- **AI Product Feed** (`agent_feed`) — individually-priced add-on, in no plan baseline (Free/Starter/Professional/Enterprise all default to disabled). Enable per-store via a `StoreFeature` override from the FeatureMatrix admin grid when sold. Fail-closed at the API: a store without the override gets a **404** (not 403) on `GET /api/v1/public/feed/products.json` and the storefront's `/feeds/products.json`, so the public URL never reveals the add-on's existence to stores that haven't bought it.
+- **AI Product Feed** (`agent_feed`) — **in every paid plan baseline** (Starter/Professional/Enterprise) since 2026-07-21 under the AI-first policy. `free` (lapsed-payment / demo grace) still excludes it. Still fail-closed at the API: a store without the feature gets a **404** (not 403) on `GET /api/v1/public/feed/products.json` and the storefront's `/feeds/products.json`, so a disabled store never reveals the endpoint's existence. Disable for a specific client via a `StoreFeature` override from the FeatureMatrix admin grid.
+
+### 2026-07-21 — AI-first baseline
+
+Every AI capability is now available on every paid plan. `agent_feed`, `upsell_crosssell` and `accounting.profit_anomaly` moved into `STARTER_CORE`; the AI reorder-suggestion scan was re-gated from `inventory.purchase_orders` to `inventory.basic` so an AI feature is no longer gated behind an ERP module (purchase orders themselves stay Enterprise).
+
+Rationale: FWB is an AI-first product and AI is its only uncontested differentiator against OSOSS. Tiering it made the positioning untrue — and left the flagship AI Product Feed disabled on **every** store, with a live storefront returning 404 for `/feeds/products.json`. Revenue comes from the platform, not from gating the differentiator.
+
+`accounting.profit_anomaly` moves independently of `accounting.basic`: `profit-anomaly.service.ts` reads only coupon, inventory-history, payment and store data — never journal entries — so it functions on Starter without the accounting suite.
+
 - The legacy parent `inventory` flag is **intentionally not in any baseline** — code reads the granular `inventory.*` sub-keys.
 - **Delivery areas & fees** (governorate → area cascade, per-area fee, bulk xlsx/csv import + xlsx export, hide-unpriced) — **core shipping, ungated.** Part of the checkout + Settings → Shipping for every plan; not a `FeatureKey`. The legacy `ShippingZone` API stays as a fallback when a store has no area rates.
 - **Orders + Orders PWA CRUD** (status, mark-paid, payment link, refund, refresh payment/refund, bulk mark-paid, activity timeline, staff order permissions) — **core, ungated.** There is no `orders` feature key; order management is universal. Staff visibility is governed by the staff/role system, not a plan baseline. Exception: the **invoice viewer** (`/orders/:orderId/invoice`) admin page gates on **`accounting.invoicing`** (Professional+, same row already in the matrix) via `FeatureUpgradeGate` — the underlying API route itself has no plan check yet.

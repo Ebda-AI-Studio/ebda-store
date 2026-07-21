@@ -270,8 +270,10 @@ function buildPerStoreBody(
   const storeTitle = store.nameAr ? `${store.name} (${store.nameAr})` : store.name;
   const storeDesc = store.description || `${store.name} on Force AI Store — Kuwait-based merchant.`;
 
-  // agent_feed is an individually-priced add-on (not in any plan baseline) —
-  // only advertise the machine-readable feed when the store has bought it.
+  // agent_feed is in every paid plan baseline (AI-first policy, 2026-07-21),
+  // so this now advertises the feed on essentially every storefront. Still
+  // conditional: a super-admin StoreFeature override can disable it for a
+  // specific client, and the `free` (lapsed-payment grace) plan excludes it.
   const feedSection = store.enabledFeatures?.includes('agent_feed')
     ? `\n\n## Product Feed\n\n- [Machine-readable product feed (JSON)](${base}/feeds/products.json)`
     : '';

@@ -88,7 +88,7 @@ const KNOWN_APP_ROUTES = new Set([
   // `social-icons` as a store slug and 404s the footer/widget brand icons (they
   // worked on custom domains but broke on store.forcemediakw.com/<slug>).
   'social-icons',
-  // /feeds/products.json — the agent_feed add-on's storefront route. The file
+  // /feeds/products.json — the agent_feed storefront route. The file
   // extension is on the 2nd segment (products.json), so the
   // `firstSegment.includes('.')` check below doesn't catch `feeds` — without
   // this the platform domain reads `feeds` as a store slug and 404s.

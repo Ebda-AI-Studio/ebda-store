@@ -7,9 +7,13 @@
  * tests/integration/feature-flag-enforcement.test.ts.
  *
  * Tests:
- *  1. Feature disabled (no StoreFeature row, key in no plan baseline) → 404.
- *  2. Feature enabled via StoreFeature upsert → 200, feed shape correct.
- *  3. Draft products excluded from the feed.
+ *  1. No StoreFeature row → 200: `agent_feed` is in STARTER_CORE, so every paid
+ *     plan grants it by baseline (changed 2026-07-21 — it previously sat in no
+ *     baseline at all, which 404'd the feed for every merchant).
+ *  2. Explicit `enabled: false` override → 404. The gate must still fail closed;
+ *     a universal baseline must not mean "unblockable".
+ *  3. Feature enabled via StoreFeature upsert → 200, feed shape correct.
+ *  4. Draft products excluded from the feed.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -30,6 +34,14 @@ async function enableAgentFeed(): Promise<void> {
     where: { storeId_featureKey: { storeId, featureKey: 'agent_feed' } },
     create: { storeId, featureKey: 'agent_feed', enabled: true },
     update: { enabled: true },
+  });
+}
+
+async function disableAgentFeed(): Promise<void> {
+  await prisma.storeFeature.upsert({
+    where: { storeId_featureKey: { storeId, featureKey: 'agent_feed' } },
+    create: { storeId, featureKey: 'agent_feed', enabled: false },
+    update: { enabled: false },
   });
 }
 
@@ -59,8 +71,10 @@ beforeAll(async () => {
       name: 'Agent Feed Test Store',
       slug: TEST_STORE_SLUG,
       ownerId,
-      // No plan baseline includes agent_feed, so start on any plan — the
-      // feature stays disabled until explicitly enabled via StoreFeature.
+      // `starter` is deliberate: agent_feed lives in STARTER_CORE, so this is
+      // the LOWEST paid plan that must grant the feed by baseline. Testing on
+      // professional/enterprise would pass even if the key regressed to a
+      // higher tier.
       plan: 'starter',
       status: 'active',
       currency: 'KWD',
@@ -107,11 +121,30 @@ afterAll(async () => {
 });
 
 describe('GET /public/feed/products.json — agent_feed add-on', () => {
-  it('returns 404 when agent_feed is disabled (no StoreFeature row)', async () => {
+  it('returns 200 with no StoreFeature row — STARTER_CORE grants agent_feed', async () => {
+    // Was asserted as 404 until 2026-07-21, when agent_feed moved into
+    // STARTER_CORE. The old expectation encoded the bug this PR fixes: the key
+    // sat in NO plan baseline, so the flagship feed 404'd for every merchant.
+    await clearAgentFeedOverride();
+
+    const res = await fetch(`${API_URL}/public/feed/products.json`, {
+      headers: { 'X-Store-ID': storeId },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 404 when agent_feed is EXPLICITLY disabled (fail-closed)', async () => {
+    // The baseline grants the feature; an explicit override must still be able
+    // to revoke it. Without this, "universal baseline" would silently mean
+    // "unblockable" — and nothing else in this suite covers the deny path.
+    await disableAgentFeed();
+
     const res = await fetch(`${API_URL}/public/feed/products.json`, {
       headers: { 'X-Store-ID': storeId },
     });
     expect(res.status).toBe(404);
+
+    await clearAgentFeedOverride();
   });
 
   it('returns 200 with the feed once agent_feed is enabled via StoreFeature', async () => {
