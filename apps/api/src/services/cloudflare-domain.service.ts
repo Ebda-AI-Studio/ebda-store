@@ -4,6 +4,13 @@ import type { DomainProvider, DomainStatus } from './domain-provider';
 
 const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
 
+// Every CF Custom-Hostnames call is made in-request from the admin GET /domain
+// handler. Without a timeout a slow/unreachable Cloudflare API stalls the whole
+// request, and the admin domain page spins forever ("Check DNS" never settles).
+// Fail fast: getDomain()/addHostname() already catch and degrade to the
+// fallback CNAME, so a timeout surfaces as "provider unreachable", not a hang.
+const CF_FETCH_TIMEOUT_MS = 8000;
+
 interface CfCustomHostname {
   id: string;
   hostname: string;
@@ -45,6 +52,7 @@ export class CloudflareDomainService {
           hostname,
           ssl: { method: 'http', type: 'dv', settings: { min_tls_version: '1.2' } },
         }),
+        signal: AbortSignal.timeout(CF_FETCH_TIMEOUT_MS),
       });
       const json = (await res.json()) as {
         success: boolean;
@@ -90,6 +98,7 @@ export class CloudflareDomainService {
   private static async findByHostname(domain: string): Promise<CfCustomHostname | null> {
     const res = await fetch(`${this.base()}?hostname=${encodeURIComponent(domain)}`, {
       headers: this.headers(),
+      signal: AbortSignal.timeout(CF_FETCH_TIMEOUT_MS),
     });
     const json = (await res.json()) as { success: boolean; result?: CfCustomHostname[] };
     if (!res.ok || !json.success || !json.result?.length) return null;
@@ -122,6 +131,7 @@ export class CloudflareDomainService {
     const res = await fetch(`${this.base()}/${ch.id}`, {
       method: 'DELETE',
       headers: this.headers(),
+      signal: AbortSignal.timeout(CF_FETCH_TIMEOUT_MS),
     });
     const json = (await res.json()) as { success: boolean };
     return res.ok && json.success;

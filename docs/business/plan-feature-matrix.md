@@ -8,7 +8,7 @@
 > multi-warehouse are shipped Enterprise features (not roadmap). Tax reports (XLSX export),
 > profit anomaly watch, loyalty redemption, low-stock alerts, backorders, and server-side CAPI
 > pixels are also real and confirmed against code. The 2026-06 shipping/orders/payment-lifecycle
-> work (delivery-area rates + bulk import/export, Orders-PWA CRUD, payment-received / stuck-payment
+> work (delivery-area rates + bulk import/export, Orders-PWA CRUD, payment-received
 > alerts, auto-cancel-unpaid, variant stock totals, Stock → Scan) is **not** a new plan tier — see
 > the "Not plan-gated" section below for where each piece sits. The barcode **Scan** UI is gated by
 > the existing `inventory.barcode` Enterprise key (row already in the matrix); everything else is
@@ -68,7 +68,7 @@ self-serve signup and no free trial). Super-admin can override any feature per s
 - The legacy parent `inventory` flag is **intentionally not in any baseline** — code reads the granular `inventory.*` sub-keys.
 - **Delivery areas & fees** (governorate → area cascade, per-area fee, bulk xlsx/csv import + xlsx export, hide-unpriced) — **core shipping, ungated.** Part of the checkout + Settings → Shipping for every plan; not a `FeatureKey`. The legacy `ShippingZone` API stays as a fallback when a store has no area rates.
 - **Orders + Orders PWA CRUD** (status, mark-paid, payment link, refund, refresh payment/refund, bulk mark-paid, activity timeline, staff order permissions) — **core, ungated.** There is no `orders` feature key; order management is universal. Staff visibility is governed by the staff/role system, not a plan baseline. Exception: the **invoice viewer** (`/orders/:orderId/invoice`) admin page gates on **`accounting.invoicing`** (Professional+, same row already in the matrix) via `FeatureUpgradeGate` — the underlying API route itself has no plan check yet.
-- **Order payment-lifecycle alerts** ("Payment received", "Payment pending — follow up" via `STUCK_PAYMENT_MINUTES`, auto-cancel-unpaid via `AUTO_CANCEL_UNPAID_DAYS`, no-false-refund-on-unpaid-cancel) — **platform-level, ungated.** Background Inngest jobs that run for every store; tuned by env, not by plan.
+- **Order payment-lifecycle alerts** ("Payment received", auto-cancel-unpaid via `AUTO_CANCEL_UNPAID_DAYS`, no-false-refund-on-unpaid-cancel) — **platform-level, ungated.** Background Inngest jobs that run for every store; tuned by env, not by plan. Note: the unpaid-online-order "Checkout abandoned" merchant push is NOT ungated — it belongs to the Enterprise `payment_abandonment` feature (`PAYMENT_ABANDON_MINUTES`), the sole such alert since the always-on "Payment pending — follow up" nudge was removed 2026-07-18.
 - **Inventory variant stock totals + paginated inventory page + per-type adjustment explanations** — **part of `inventory.basic` (Starter+)**, the same row already in the matrix. The barcode **Scan** modes (Receive / Pick / Count) are gated by `inventory.barcode` (**Enterprise**, already in the matrix).
 - **Storefront Locations page** (Google Maps embed, Page-Builder-editable, nav + mobile "Menu" drawer link) — **core storefront, ungated.**
 

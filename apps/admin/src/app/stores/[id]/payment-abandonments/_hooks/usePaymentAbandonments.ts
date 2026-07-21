@@ -68,22 +68,25 @@ export function usePaymentAbandonments({ storeId, enabled }: UsePaymentAbandonme
   const [loading, setLoading] = useState(true);
 
   const fetchStats = useCallback(async () => {
-    const { data } = await apiGet<{ data: AbandonmentStats }>(
+    // apiGet already unwraps the { success, data } envelope, so `data` IS the
+    // stats payload — do not unwrap a second time (the double-unwrap silently
+    // dropped real rows; see fwb-apiget-double-unwrap).
+    const { data } = await apiGet<AbandonmentStats>(
       `/api/v1/stores/${storeId}/payment-abandonments/stats`
     );
-    if (data?.data) setStats(data.data);
+    if (data) setStats(data);
   }, [storeId]);
 
   const fetchList = useCallback(async () => {
     const qs = new URLSearchParams({ page: String(page), limit: '25' });
     if (dateFrom) qs.set('from', dateFrom);
     if (dateTo) qs.set('to', dateTo);
-    const { data } = await apiGet<{ data: { abandoners: AbandonmentRecord[]; meta: ListMeta } }>(
+    const { data } = await apiGet<{ abandoners: AbandonmentRecord[]; meta: ListMeta }>(
       `/api/v1/stores/${storeId}/payment-abandonments?${qs}`
     );
-    if (data?.data) {
-      setRecords(data.data.abandoners ?? []);
-      setMeta(data.data.meta ?? { total: 0, page: 1, limit: 25, totalPages: 1 });
+    if (data) {
+      setRecords(data.abandoners ?? []);
+      setMeta(data.meta ?? { total: 0, page: 1, limit: 25, totalPages: 1 });
     }
   }, [storeId, page, dateFrom, dateTo]);
 

@@ -197,7 +197,21 @@ export class ResendService {
       throw new Error('Store email sender not provisioned yet — call provisionStoreDomain first');
     }
 
-    const { data, error } = await ensureClient().domains.get(store.emailDomainId);
+    // Bound the Resend SDK call: it takes no AbortSignal, and refreshDomainStatus
+    // runs in-request from the admin GET /domain handler. Without this, a slow
+    // Resend API stalls the whole request and hangs the admin domain page. The
+    // caller wraps this in try/catch and degrades to the stored status on throw.
+    // The timer is always cleared so a resolved call can't leak an unhandled
+    // rejection 8s later.
+    let resendTimer: ReturnType<typeof setTimeout> | undefined;
+    const { data, error } = await Promise.race([
+      ensureClient().domains.get(store.emailDomainId),
+      new Promise<never>((_, reject) => {
+        resendTimer = setTimeout(() => reject(new Error('Resend get-domain timed out')), 8000);
+      }),
+    ]).finally(() => {
+      if (resendTimer) clearTimeout(resendTimer);
+    });
     if (error || !data) {
       // The Resend domain no longer exists (deleted/revoked in the dashboard).
       // Clear our dangling reference instead of throwing, so the admin badge

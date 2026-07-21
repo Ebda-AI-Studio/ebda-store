@@ -502,101 +502,6 @@ export class OneSignalService {
   }
 
   /**
-   * Push a "Payment pending — follow up" notification to admins of the store +
-   * super_admins. Fired from the stuck-payment Inngest sweep when an online
-   * order has sat status=pending / paymentStatus=unpaid past
-   * STUCK_PAYMENT_MINUTES so the merchant can contact the customer before the
-   * (2-day) payment link expires. Deduped via Order.stuckPaymentAlertedAt so it
-   * fires at most ONCE per order.
-   *
-   * Fire-and-forget at the call-site; the sweep marks the order alerted only
-   * after this resolves so a thrown send is retried on the next sweep tick.
-   */
-  static async notifyAdminsOfStuckPayment(input: NotifyOrderInput): Promise<void> {
-    if (!isAdminConfigured()) {
-      logger.warn(
-        {
-          hasAppId: !!config.onesignalAdminAppId,
-          hasRestKey: !!config.onesignalAdminRestApiKey,
-        },
-        'Admin OneSignal not configured — skipping stuck-payment notification'
-      );
-      return;
-    }
-
-    const url = adminOrderUrl(input.storeId, input.orderId);
-    const dataPayload = {
-      type: 'order.payment_stuck',
-      orderId: input.orderId,
-      storeId: input.storeId,
-      storeName: input.storeName,
-    };
-    const sharedFields = {
-      app_id: config.onesignalAdminAppId,
-      url,
-      web_buttons: [{ id: 'view-order', text: 'View order', url }],
-      data: dataPayload,
-    };
-
-    const moneyText = formatMoney(input.total, input.currency);
-
-    const [storeAdminPlayerIds, superAdminPlayerIds] = await Promise.all([
-      this.getAdminPlayerIds({ role: 'store_admin', ownsStoreId: input.storeId }),
-      this.getAdminPlayerIds({ role: 'super_admin' }),
-    ]);
-
-    const storeAdminBody = {
-      ...sharedFields,
-      headings: { en: 'Payment pending — follow up', ar: 'دفعة معلّقة — تواصل مع العميل' },
-      contents: {
-        en: `Order ${input.orderNumber} placed but not paid — contact the customer`,
-        ar: `الطلب ${input.orderNumber} تم تقديمه ولم يُدفع — تواصل مع العميل`,
-      },
-      ...(storeAdminPlayerIds.length > 0
-        ? { include_player_ids: storeAdminPlayerIds }
-        : { filters: [{ field: 'tag', key: 'store_id', relation: '=', value: input.storeId }] }),
-    };
-
-    const superAdminBody = {
-      ...sharedFields,
-      headings: { en: 'Payment pending — follow up', ar: 'دفعة معلّقة — تواصل مع العميل' },
-      contents: {
-        en: `${input.storeName} — Order ${input.orderNumber} (${moneyText}) placed but not paid — contact the customer`,
-        ar: `${input.storeName} — الطلب ${input.orderNumber} (${moneyText}) تم تقديمه ولم يُدفع — تواصل مع العميل`,
-      },
-      ...(superAdminPlayerIds.length > 0
-        ? { include_player_ids: superAdminPlayerIds }
-        : { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'super_admin' }] }),
-    };
-
-    const send = async (body: unknown, audience: 'store_admin' | 'super_admin') => {
-      try {
-        const res = await fetch(ENDPOINT, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Key ${config.onesignalAdminRestApiKey}`,
-          },
-          body: JSON.stringify(body),
-        });
-        const responseText = await res.text().catch(() => '');
-        if (!res.ok) {
-          logger.error(
-            { status: res.status, body: responseText, audience },
-            'OneSignal stuck-payment push failed'
-          );
-          return;
-        }
-        logger.info({ audience }, 'OneSignal stuck-payment push sent');
-      } catch (err) {
-        logger.error({ err, audience }, 'OneSignal stuck-payment push threw');
-      }
-    };
-
-    await Promise.all([send(storeAdminBody, 'store_admin'), send(superAdminBody, 'super_admin')]);
-  }
-
-  /**
    * Push a "checkout abandoned" recovery alert to the store's admins +
    * super_admins. Fired from the payment-abandonment sweep the instant an order
    * is stamped as a high-intent gateway abandoner (the customer reached the
@@ -604,10 +509,9 @@ export class OneSignalService {
    * feature is checked by the sweep before this is called, and the sweep's
    * `paymentGatewayAbandonedAt` stamp dedupes it to exactly once per order.
    *
-   * Distinct from `notifyAdminsOfStuckPayment` (the always-on "Payment pending —
-   * follow up" nudge): this is the recovery/retargeting angle and deep-links to
-   * the Payment Abandonments page (where the merchant re-sends the link / calls
-   * the customer), not the order detail. Fire-and-forget — never throws to the
+   * This is the ONLY unpaid-online-order merchant alert: it deep-links to the
+   * Payment Abandonments page (where the merchant re-sends the link / calls the
+   * customer), not the order detail. Fire-and-forget — never throws to the
    * caller so a push glitch can't abort the sweep.
    */
   static async notifyAdminsOfAbandonedCheckout(input: NotifyOrderInput): Promise<void> {

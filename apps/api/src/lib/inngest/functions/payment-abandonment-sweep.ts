@@ -18,8 +18,7 @@ import { OneSignalService } from '../../../services/onesignal.service';
  *
  * These are "high-intent abandoners": shoppers who got all the way to the
  * gateway checkout page but did not complete payment. Very different from
- * cart abandoners (never reached checkout) and from stuck-payment orders
- * (which may still convert — the merchant is just waiting).
+ * cart abandoners (never reached checkout).
  *
  * The sweep stamps paymentGatewayAbandonedAt AND fires a one-time "Checkout
  * abandoned" recovery push to the store admins + super_admins (deep-linking to
@@ -30,10 +29,10 @@ import { OneSignalService } from '../../../services/onesignal.service';
  * The auto-cancel-unpaid cron still handles cancellation after
  * AUTO_CANCEL_UNPAID_DAYS (default 2 days).
  *
- * Overlap note: `order-stuck-payment-sweep` also alerts on unpaid online orders
- * ("Payment pending — follow up", always-on, 60 min default). This alert is the
- * Enterprise recovery/retargeting angle (30 min default), so an Enterprise store
- * with both may get two escalating pings per order — intentional.
+ * This is the single unpaid-online-order merchant alert (Enterprise
+ * recovery/retargeting angle, 30 min default). It is gated by the
+ * `payment_abandonment` feature, so a merchant who disables the feature gets no
+ * abandonment pings at all.
  *
  * Capped at 500 orders/run (oldest first); the next tick picks up the rest.
  * Each stamp is wrapped in its own step.run so a single failure doesn't abort

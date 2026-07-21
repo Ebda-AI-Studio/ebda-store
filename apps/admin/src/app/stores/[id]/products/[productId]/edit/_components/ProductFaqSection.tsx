@@ -85,14 +85,14 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
     const fetchFaqs = useCallback(async () => {
       try {
         setLoadError(false);
-        const { data, error } = await apiGet<{ data: ProductFaq[] }>(
+        const { data, error } = await apiGet<ProductFaq[]>(
           `/api/v1/stores/${storeId}/products/${productId}/faqs`
         );
         if (error) {
           setLoadError(true);
           return;
         }
-        setFaqs(data?.data ?? []);
+        setFaqs(data ?? []);
       } catch {
         setLoadError(true);
       } finally {
@@ -131,25 +131,25 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
       setSaving(true);
       try {
         if (editingId === 'new') {
-          const { data, error } = await apiPost<{ data: ProductFaq }>(
+          const { data, error } = await apiPost<ProductFaq>(
             `/api/v1/stores/${storeId}/products/${productId}/faqs`,
             editState
           );
-          if (error || !data?.data) {
+          if (error || !data) {
             toastError(t('saveError'), '');
             return;
           }
-          setFaqs(prev => [...prev, data.data]);
+          setFaqs(prev => [...prev, data]);
         } else {
-          const { data, error } = await apiPut<{ data: ProductFaq }>(
+          const { data, error } = await apiPut<ProductFaq>(
             `/api/v1/stores/${storeId}/products/${productId}/faqs/${editingId}`,
             editState
           );
-          if (error || !data?.data) {
+          if (error || !data) {
             toastError(t('saveError'), '');
             return;
           }
-          setFaqs(prev => prev.map(f => (f.id === editingId ? data.data : f)));
+          setFaqs(prev => prev.map(f => (f.id === editingId ? data : f)));
         }
         cancelEdit();
       } catch {
@@ -179,20 +179,18 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
       setAiGenerating(true);
       try {
         const { data, error } = await apiPost<{
-          data: {
-            faqs: Array<{
-              question: string;
-              questionAr?: string;
-              answer: string;
-              answerAr?: string;
-            }>;
-          };
+          faqs: Array<{
+            question: string;
+            questionAr?: string;
+            answer: string;
+            answerAr?: string;
+          }>;
         }>(`/api/v1/stores/${storeId}/ai/product-faqs/draft`, { productId, count: 5 });
-        if (error || !data?.data?.faqs?.length) {
+        if (error || !data?.faqs?.length) {
           toastError(t('aiError'), '');
           return false;
         }
-        const drafts: AiDraftFaq[] = data.data.faqs.map(f => ({ ...f, isDraft: true as const }));
+        const drafts: AiDraftFaq[] = data.faqs.map(f => ({ ...f, isDraft: true as const }));
         setAiDrafts(drafts);
         toastSuccess(t('aiSuccess', { count: String(drafts.length) }), '');
         return true;
@@ -211,7 +209,7 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
       if (!draft) return;
       setSavingDraftIndex(index);
       try {
-        const { data, error } = await apiPost<{ data: ProductFaq }>(
+        const { data, error } = await apiPost<ProductFaq>(
           `/api/v1/stores/${storeId}/products/${productId}/faqs`,
           {
             question: draft.question,
@@ -220,11 +218,11 @@ export const ProductFaqSection = forwardRef<ProductFaqSectionHandle, Props>(
             answerAr: draft.answerAr ?? null,
           }
         );
-        if (error || !data?.data) {
+        if (error || !data) {
           toastError(t('saveError'), '');
           return;
         }
-        setFaqs(prev => [...prev, data.data]);
+        setFaqs(prev => [...prev, data]);
         setAiDrafts(prev => prev.filter((_, i) => i !== index));
       } catch {
         toastError(t('saveError'), '');

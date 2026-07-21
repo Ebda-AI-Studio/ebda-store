@@ -1120,11 +1120,11 @@ model Order {
   idempotencyKey     String?   @unique @map("idempotency_key")
   webhookProcessedAt DateTime? @map("webhook_processed_at")
 
-  // Stuck-payment merchant alert dedupe. Set when the stuck-payment sweep
-  // (Inngest cron) has pushed the merchant a "payment pending — follow up"
-  // alert for this order so it never fires twice. NULL = not yet alerted.
-  // Only relevant to online-payment orders left status=pending /
-  // paymentStatus=unpaid past STUCK_PAYMENT_MINUTES.
+  // LEGACY (retained, unused since 2026-07-18). Formerly the dedupe stamp for
+  // the always-on "Payment pending — follow up" stuck-payment sweep, which was
+  // removed as a redundant duplicate of the `payment_abandonment` "Checkout
+  // abandoned" alert. Column kept to avoid a data-dropping migration; no code
+  // reads or writes it. Safe to drop in a future cleanup migration.
   stuckPaymentAlertedAt DateTime? @map("stuck_payment_alerted_at")
 
   // order/created fanout dedupe. The order/created event can be enqueued by
