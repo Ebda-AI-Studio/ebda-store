@@ -23,6 +23,23 @@ fi
 
 echo "-> FWB pre-push CI gate: lint + typecheck + unit tests"
 
+# Worktrees created by new-task-worktree.sh have no node_modules of their own, so
+# every command below exits 127 ("command not found") and husky aborts the push
+# with no usable explanation. That silently stranded 8 agent worktrees / 16 real
+# commits for ~4 weeks (audit 2026-07-20) — the work wasn't abandoned, it was
+# unpushable. Fail loudly with the fix on main; skip advisorily off main, where
+# CI is still the real gate.
+if [ ! -d node_modules ]; then
+  if [ "$current_branch" = "main" ]; then
+    echo "! pre-push: node_modules missing — cannot run the gate on main."
+    echo "  Run 'npm ci' here, or push from a checkout that has dependencies installed."
+    exit 1
+  fi
+  echo "! pre-push: node_modules missing (likely a fresh worktree) — SKIPPING the local gate."
+  echo "  CI still gates this branch on the PR. To run it locally: npm ci"
+  exit 0
+fi
+
 # Catch lockfile drift before Railway hits the same trap on `npm ci`.
 # Standing emnapi trap — see feedback-emnapi-lockfile-desync-after-add.md.
 npm ci --dry-run 2>&1 | grep -E "^npm error" && exit 1 || true
