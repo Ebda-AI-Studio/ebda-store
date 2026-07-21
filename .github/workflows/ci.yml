@@ -610,12 +610,12 @@ jobs:
         # Re-evaluate when @lhci/cli ships a refresh.
         run: |
           set -e
-          echo "::group::production deps (zero tolerance at low)"
-          npm audit --audit-level=low --omit=dev
-          echo "::endgroup::"
-          echo "::group::production deps (zero tolerance at high — omit dev)"
-          npm audit --audit-level=high --omit=dev
-          echo "::endgroup::"
+          # Zero-tolerance for production deps, with a NARROW documented
+          # allowlist for advisories that have no upstream fix AND are
+          # unreachable by npm overrides (workspace-hoisted). The allowlist and
+          # its justification live in .github/scripts/audit-gate.mjs — it fails
+          # on anything not explicitly waived, and the list must only shrink.
+          node .github/scripts/audit-gate.mjs
 
       - name: Ensure jq (trufflehog needs it; self-hosted runner may lack it + can't sudo)
         run: |
