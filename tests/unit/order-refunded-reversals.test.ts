@@ -13,6 +13,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
+  // Spy for the final claim-reversed step (stamps Order.refundReversedAt).
+  orderUpdateMany: vi.fn().mockResolvedValue({ count: 1 }),
   storeFindUnique: vi.fn(),
   inventoryHistoryFindFirst: vi.fn(),
   inventoryHistoryCreate: vi.fn(),
@@ -45,7 +47,7 @@ const txClient = {
 
 vi.mock('@force/database', () => ({
   prisma: {
-    order: { findUnique: h.orderFindUnique },
+    order: { findUnique: h.orderFindUnique, updateMany: h.orderUpdateMany },
     store: { findUnique: h.storeFindUnique },
     backorderLine: { updateMany: h.backorderLineUpdateMany },
   },
@@ -110,6 +112,10 @@ beforeEach(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ) as any;
   h.orderEventFindFirst.mockResolvedValue(null);
+  // vi.clearAllMocks() clears CALLS but not IMPLEMENTATIONS, so the
+  // marker-present mock from the idempotency test leaks into every test that
+  // runs after it and silently skips restore-inventory. Reset it explicitly.
+  h.inventoryHistoryFindFirst.mockResolvedValue(null);
   h.reverseCommission.mockResolvedValue(null);
   h.reverseEarnedPointsFromOrder.mockResolvedValue(null);
   h.reverseRedeemedPointsFromOrder.mockResolvedValue(null);
@@ -411,5 +417,66 @@ describe('order-refunded fanout — two-tier failure policy (Task 4)', () => {
 
     expect(h.dispatch).toHaveBeenCalledTimes(1);
     expect(h.notifyAdminsOfRefund).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('order-refunded fanout — claim-reversed step', () => {
+  // These two cases are the entire reason Order.refundReversedAt exists rather
+  // than the sweep keying on InventoryHistory marker-absence. Both legitimately
+  // restore no stock and write no marker, so a marker-based sweep would re-fire
+  // them every 5 minutes forever — and for the backorder case that would invent
+  // stock that was never reserved.
+  it('stamps the claim even when restoreInventory is false (backorder-line cancel)', async () => {
+    await handleOrderRefunded('o1', 's1', false, false, stepStub);
+    expect(h.orderUpdateMany).toHaveBeenCalledTimes(1);
+    expect(h.orderUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'o1', refundReversedAt: null }),
+      })
+    );
+    // and no stock moved
+    expect(h.productUpdate).not.toHaveBeenCalled();
+  });
+
+  it('stamps the claim when every product is untracked (no history row written)', async () => {
+    h.queryRaw.mockImplementation(
+      (_s: TemplateStringsArray, productId: string) =>
+        Promise.resolve([{ id: productId, inventory: 10, track_inventory: false }])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ) as any;
+    await handleOrderRefunded('o1', 's1', true, false, stepStub);
+    expect(h.inventoryHistoryCreate).not.toHaveBeenCalled();
+    expect(h.orderUpdateMany).toHaveBeenCalledTimes(1);
+  });
+
+  // The claim must be LAST. If it were stamped before the reversals, a failing
+  // reversal would leave a half-reversed order marked done — permanently hidden
+  // from refund-reversal-stuck-sweep, which is the only thing that would catch it.
+  it('does NOT stamp the claim when a reversal step throws', async () => {
+    h.productUpdate.mockRejectedValue(new Error('db down'));
+    let threw: unknown = null;
+    try {
+      await handleOrderRefunded('o1', 's1', true, false, stepStub);
+    } catch (e) {
+      threw = e;
+    }
+    // The reversal must propagate so Inngest retries the event.
+    expect(threw).toBeInstanceOf(Error);
+    expect((threw as Error).message).toBe('db down');
+    // And the order must stay unclaimed, so the sweep can still see it.
+    expect(h.orderUpdateMany).not.toHaveBeenCalled();
+    expect(h.orderUpdateMany).not.toHaveBeenCalled();
+  });
+
+  // Guards the re-fire path the sweep depends on: a swept re-send must not
+  // overwrite the original completion timestamp.
+  it('is idempotent — the claim is scoped to refundReversedAt: null', async () => {
+    h.orderUpdateMany.mockResolvedValue({ count: 0 });
+    await handleOrderRefunded('o1', 's1', true, false, stepStub);
+    expect(h.orderUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ refundReversedAt: null }),
+      })
+    );
   });
 });

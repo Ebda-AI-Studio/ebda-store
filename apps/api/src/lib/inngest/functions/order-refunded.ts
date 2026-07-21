@@ -302,6 +302,30 @@ export async function handleOrderRefunded(
       });
     });
   }
+
+  // FINAL step, deliberately last. Stamps the completion claim only after every
+  // reversal above has succeeded — those steps throw on failure, so a failed
+  // reversal never reaches this line and Inngest retries the event while the
+  // order stays visible to refund-reversal-stuck-sweep. Stamping any earlier
+  // would mark an order done while one of its reversals was still failing,
+  // permanently hiding a half-reversed order from the only thing that catches it.
+  //
+  // Stamped regardless of whether any stock actually MOVED: a backorder-line
+  // cancel (restoreInventory:false) and an order whose products are all
+  // track_inventory=false both legitimately restore nothing and write no
+  // InventoryHistory row. That is exactly why the sweep keys on this claim
+  // rather than on marker-absence, which cannot tell those apart from "never ran".
+  //
+  // updateMany + `refundReversedAt: null` keeps it idempotent: a re-delivered or
+  // swept re-fire matches 0 rows and leaves the original timestamp intact.
+  await step.run('claim-reversed', () =>
+    runInTenantContext(storeId, () =>
+      prisma.order.updateMany({
+        where: { id: orderId, storeId, refundReversedAt: null },
+        data: { refundReversedAt: new Date() },
+      })
+    )
+  );
 }
 
 export const orderRefunded: InngestFunction.Any = inngest.createFunction(

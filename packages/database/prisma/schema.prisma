@@ -1135,6 +1135,15 @@ model Order {
   // OneSignal push fire EXACTLY once per order regardless of how many times the
   // event is enqueued. NULL = not yet notified.
   orderCreatedNotifiedAt DateTime? @map("order_created_notified_at")
+  /// Stamped by the order/refunded fanout once ALL reversal steps have
+  /// completed — deliberately regardless of whether any stock actually moved.
+  /// A backorder-line cancel (restoreInventory:false) and an order whose
+  /// products all have trackInventory=false both legitimately restore nothing
+  /// and write no InventoryHistory row, so marker-absence cannot distinguish
+  /// "the fanout never ran" from "it ran and correctly did nothing". This
+  /// claim can. NULL past the staleness window is what
+  /// refund-reversal-stuck-sweep recovers.
+  refundReversedAt DateTime? @map("refund_reversed_at")
 
   // Enterprise: payment-gateway abandonment capture. Set by the Inngest
   // payment-abandonment-sweep cron when the order has a Payment row with a
