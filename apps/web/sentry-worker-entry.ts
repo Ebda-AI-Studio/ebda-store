@@ -40,6 +40,7 @@
 // repo or in a plain `tsc` typecheck, only inside an actual CF build.
 import { default as nextHandler } from './.open-next/worker.js';
 import * as Sentry from '@sentry/cloudflare';
+import { companyHostRoute } from './company-host-route';
 
 interface WorkerEnv {
   /** Server-side Sentry DSN for this Worker. Set via `wrangler deploy --var
@@ -62,24 +63,29 @@ interface WorkerEnv {
  * custom hostname), and Worker routes take priority over Pages custom domains —
  * so the apex would otherwise render the storefront platform landing.
  *
- * Fix: intercept the two apex hosts here, BEFORE the Next handler, and reverse-
- * proxy them to the Pages company site (URL stays `force-ai.co`; content comes
- * from Pages, including its `/api/demo-request` Function). Everything else —
+ * Fix: intercept the company hosts here, BEFORE the Next handler. The `www`
+ * variant 301-redirects to the bare apex so there is a single canonical host
+ * (no duplicate-content across `force-ai.co` + `www.force-ai.co`); the apex
+ * reverse-proxies to the Pages company site (URL stays `force-ai.co`; content
+ * comes from Pages, including its `/api/demo-request` Function). Everything else —
  * `store.force-ai.co`, merchant domains, `/<slug>` — falls through to Next
  * completely unchanged. The Pages origin is a different zone, so the proxied
  * subrequest never re-enters this Worker (no loop).
  */
-const COMPANY_HOSTS = new Set(['force-ai.co', 'www.force-ai.co']);
-const COMPANY_ORIGIN = 'https://force-ai-landing-preview.pages.dev';
-
 const baseHandler = {
   async fetch(request: Request, env: WorkerEnv, ctx: unknown): Promise<Response> {
     const { hostname, pathname, search } = new URL(request.url);
-    if (COMPANY_HOSTS.has(hostname)) {
-      // `new Request(url, request)` copies method/headers/body; the outbound
-      // Host is derived from COMPANY_ORIGIN so Pages serves the company site.
-      return fetch(new Request(COMPANY_ORIGIN + pathname + search, request));
+    const route = companyHostRoute(hostname, pathname, search);
+    if (route.kind === 'redirect') {
+      return Response.redirect(route.location, route.status);
     }
+    if (route.kind === 'proxy') {
+      // `new Request(url, request)` copies method/headers/body; the outbound
+      // Host is derived from the proxy origin so Pages serves the company site.
+      return fetch(new Request(route.origin + pathname + search, request));
+    }
+    // route.kind === 'next' — all merchant domains + platform subdomains,
+    // routed to the Next storefront exactly as before this carve-out.
     return nextHandler.fetch(request, env, ctx);
   },
 };
