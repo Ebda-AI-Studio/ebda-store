@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ============================================================
+# OBSOLETE - DO NOT RUN.
+# The Windows/WSL2 runners this script manages were ALL deleted.
+# Every repo now runs CI on umbra guests (fwb-ci5-*).
+# Verified 2026-07-21: gh api repos/ForceAI-KW/<repo>/actions/runners
+# See wsl-runner-maintenance.md for the current runner table.
+# ============================================================
 # fix-wsl-runner.sh — heal the recurring WSL self-hosted runner flakes.
 # Idempotent; safe to re-run. Run INSIDE WSL Ubuntu on the runner box:
 #     bash fix-wsl-runner.sh

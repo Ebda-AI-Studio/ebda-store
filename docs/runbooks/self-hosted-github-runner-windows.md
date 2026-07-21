@@ -1,5 +1,16 @@
 # Self-hosted GitHub Actions runner on Windows
 
+> # ⛔ OBSOLETE — DO NOT FOLLOW
+>
+> The Windows/WSL2 runners this document sets up were **all deleted**. Every
+> repo now runs CI on umbra guests (`fwb-ci5-*`). Verified 2026-07-21 via
+> `gh api repos/ForceAI-KW/<repo>/actions/runners`.
+> See `wsl-runner-maintenance.md` for the current runner table.
+>
+> Kept as historical context only.
+
+---
+
 > One-time setup. Goal: run CI on Ahmad's Windows PC instead of GitHub-cloud, so we never burn cloud minutes again when the monthly cap exhausts. Three Force AI repos use this: FWB, WBS, Force-Media-CRM.
 
 ## Two paths — pick one

@@ -1,23 +1,46 @@
 name: Runner health check
 
-# Every 15 min, query the GitHub Actions API for THIS repo's self-hosted runner
-# (the Mac/OrbStack Linux runner) and fire a Telegram alert if it is offline.
-# Runs on ubuntu-latest by design — a check on the self-hosted box can't detect
-# that box being down.
+# ⚠️ THE SCHEDULE IS DISABLED. This workflow does NOT own runner-offline
+# alerting any more — `~/.claude/scripts/ci-runner-guard.sh` does, on the Mac,
+# under launchd (com.forceai.ci-runner-guard, every 30 min). Kept here as a
+# manual `workflow_dispatch` fallback only.
 #
-# NOTE (2026-06-15): FWB's Windows/WSL2 runners (windows-wsl-fwb[-2]) were
-# physically removed; FWB now runs solely on the Mac OrbStack Linux runner
-# (mac-orbstack-fwb). WBS + CRM keep their Windows runners. This check therefore
-# monitors only the single Mac runner — checking the dead Windows names was
-# false-alerting offline every 15 min.
+# WHY (2026-07-21). Runner-offline detection needs a runner that is NOT the one
+# being monitored. On this repo BOTH options are dead ends:
+#
+#   * self-hosted — a check that rides the runner it monitors cannot report that
+#     runner being down. It also fails outright: the umbra guest has no `gh`.
+#   * ubuntu-latest — GitHub Actions cloud minutes are billing-blocked for this
+#     org. Signature: runner_name="", 0 steps, ~3s failure. Verified 2026-07-21;
+#     no ubuntu-latest job has executed in recent history.
+#
+# So there is no correct answer INSIDE GitHub Actions, and a scheduled job here
+# could only fail every 15 min while alerting nobody — the exact silent failure
+# this file previously had. The check belongs outside both failure domains,
+# which is the Mac: ci-runner-guard.sh probes the systemd unit directly, heals a
+# dead service, hard-reboots a hung guest, and alerts on Telegram.
+#
+# Re-enable the schedule ONLY if cloud billing is restored (`runs-on:` must then
+# stay ubuntu-latest, never USE_SELF_HOSTED) AND you have decided you want this
+# duplicating the local guard.
+#
+# RUNNER HISTORY (keep current — a stale name here fails SILENTLY, reporting
+# "not-registered", which is indistinguishable from a genuine outage):
+#   2026-06-15  windows-wsl-fwb[-2] physically removed (WBS + CRM keep theirs)
+#   2026-07     mac-orbstack-fwb replaced by the umbra guest fwb-ci5
+#   now         fwb-ci5-force-website-builder-1  ← the only FWB runner
+# Re-verify after any guest rebuild:
+#   gh api repos/ForceAI-KW/force-website-builder/actions/runners
 #
 # REQUIRES a PAT: GITHUB_TOKEN CANNOT list self-hosted runners (`administration`
 # is not a GITHUB_TOKEN scope). Mint a fine-grained PAT with **administration:
 # read** on this repo and add it as the repo secret RUNNER_HEALTH_PAT, then
 # `gh workflow enable runner-health-check.yml`.
 on:
-  schedule:
-    - cron: '*/15 * * * *'
+  # schedule: DISABLED 2026-07-21 — see the header. Owned by ci-runner-guard.sh
+  # on the Mac. Do not re-enable without restoring cloud billing first; on
+  # blocked billing this fails in ~3s every 15 min and alerts nobody.
+  #   - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -26,9 +49,14 @@ permissions:
 jobs:
   check:
     name: Ping self-hosted runners on the GitHub Actions API
-    # Umbra-only CI policy (2026-07-15): the GitHub API ping works from any
-    # runner; cloud is billing-blocked so it rides self-hosted.
-    runs-on: ${{ vars.USE_SELF_HOSTED != 'true' && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    # PINNED to ubuntu-latest — do NOT route this through USE_SELF_HOSTED.
+    # A 2026-07-15 "Umbra-only CI policy" change made this ride the self-hosted
+    # runner during the billing lockout, which broke the invariant in the header:
+    # a check whose job is to detect the self-hosted runner being offline cannot
+    # run when that runner is offline. It also fails on the umbra guest, which
+    # has no `gh` CLI. This job is a pure GitHub API call and must stay on
+    # infrastructure independent of the thing it monitors.
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - name: Resolve runner status + alert on offline / missing
@@ -38,9 +66,13 @@ jobs:
           TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
           # Identity via env (never interpolate ${{ github.* }} into run: bodies).
           GH_REPO: ${{ github.repository }}
-          # FWB's sole self-hosted runner (Mac OrbStack Linux VM). The old
-          # windows-wsl-fwb[-2] runners were removed 2026-06-15.
-          RUNNER_NAME: mac-orbstack-fwb
+          # FWB's sole self-hosted runner, on the umbra guest fwb-ci5.
+          # History: windows-wsl-fwb[-2] removed 2026-06-15; mac-orbstack-fwb
+          # replaced by umbra 2026-07. A stale name here does NOT fail loudly —
+          # the jq lookup yields "not-registered", which reads identically to a
+          # genuine outage, so this must be re-checked whenever the guest is
+          # rebuilt: `gh api repos/<owner>/<repo>/actions/runners`.
+          RUNNER_NAME: fwb-ci5-force-website-builder-1
         run: |
           set -euo pipefail
 
@@ -49,8 +81,18 @@ jobs:
             exit 1
           fi
 
+          # `gh` must exist before we can blame anything else. The old message
+          # asserted "PAT not scoped administration:read" for EVERY failure,
+          # which sent a real diagnosis after a scope problem that did not exist
+          # — the actual cause was `gh: command not found` on the self-hosted
+          # guest. Report the observed failure, do not guess a cause.
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "::error::gh CLI not found on this runner ($(uname -s)). This job must run on ubuntu-latest, which ships gh."
+            exit 1
+          fi
+
           response=$(gh api "repos/${GH_REPO}/actions/runners" --paginate 2>&1) || {
-            echo "::error::could not query /actions/runners — is RUNNER_HEALTH_PAT scoped administration:read on ${GH_REPO}?"
+            echo "::error::could not query /actions/runners for ${GH_REPO}. Response below; if it is 403/404 check that RUNNER_HEALTH_PAT is scoped administration:read on this repo."
             echo "$response"
             exit 1
           }

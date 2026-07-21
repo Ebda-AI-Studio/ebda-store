@@ -1,14 +1,31 @@
 # WSL self-hosted GitHub runner — maintenance & parallelism
 
-Everything you run **on the Windows PC, inside a WSL terminal**, to keep the
-Force AI self-hosted CI runners healthy and fast. The runners live on the PC
-(WSL2, advertised as `[self-hosted, linux, wsl2]`) and serve the 3 repos:
-
-| Repo (GitHub `ForceAI-KW/…`) | Runner name       |
-| ---------------------------- | ----------------- |
-| `force-website-builder`      | `windows-wsl-fwb` |
-| `whatsapp-broadcaster`       | `windows-wsl-wbs` |
-| `Force-Media-CRM`            | `windows-wsl-crm` |
+> # ⛔ OBSOLETE — DO NOT FOLLOW
+>
+> **There are no Windows/WSL2 runners any more.** All three `windows-wsl-*`
+> runners were deleted; every repo now runs CI on **umbra guests** (Apple
+> Virtualization.framework VMs on the Mac), not on a Windows PC.
+>
+> Verified 2026-07-21 — the complete, current set:
+>
+> | Repo (`ForceAI-KW/…`)   | Runner                            | Host          |
+> | ----------------------- | --------------------------------- | ------------- |
+> | `force-website-builder` | `fwb-ci5-force-website-builder-1` | umbra fwb-ci5 |
+> | `whatsapp-broadcaster`  | `fwb-ci5-whatsapp-broadcaster-1`  | umbra fwb-ci5 |
+> | `Force-Media-CRM`       | `fwb-ci5-crm-1`                   | umbra fwb-ci5 |
+>
+> **The `wsl2` label is vestigial.** These guests still advertise
+> `[self-hosted, Linux, ARM64, wsl2, umbra-ci]` purely so existing
+> `runs-on: [self-hosted, linux, wsl2]` selectors keep matching. Seeing `wsl2`
+> in a workflow does **not** mean a Windows machine is involved.
+>
+> Re-check the live truth with:
+> `gh api repos/ForceAI-KW/<repo>/actions/runners`
+>
+> Everything below describes decommissioned hardware and is kept only as
+> historical context. The sibling scripts in this directory
+> (`fix-wsl-runner.sh`, `setup-parallel-runners.sh`) and
+> `self-hosted-github-runner-windows.md` are obsolete for the same reason.
 
 ---
 

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ============================================================
+# OBSOLETE - DO NOT RUN.
+# The Windows/WSL2 runners this script manages were ALL deleted.
+# Every repo now runs CI on umbra guests (fwb-ci5-*).
+# Verified 2026-07-21: gh api repos/ForceAI-KW/<repo>/actions/runners
+# See wsl-runner-maintenance.md for the current runner table.
+# ============================================================
 # setup-parallel-runners.sh — N self-hosted runners per repo for parallel CI.
 # RAM REALITY: ~11 GiB VM (not 16). Heaviest job ~5.4 GiB. So runner #1/repo keeps
 # 8G/10G; extras get 3G/6G/2-core; DEFAULT 2/repo (3x3=9 would thrash). Run in WSL.
