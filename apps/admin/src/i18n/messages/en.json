@@ -931,7 +931,8 @@
         "date": "Date",
         "actions": "Actions",
         "totalValue": "{amount} KWD",
-        "moreItems": "+{count} more"
+        "moreItems": "+{count} more",
+        "agentBadge": "Agent"
       },
       "actions": {
         "updateStatusLabel": "Update order status",
@@ -1033,6 +1034,7 @@
       "web": "Web",
       "mobile": "Mobile",
       "pos": "POS",
+      "agent": "Agent",
       "customer": "Customer",
       "phone": "Phone",
       "email": "Email",

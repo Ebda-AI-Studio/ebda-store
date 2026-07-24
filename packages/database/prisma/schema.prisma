@@ -1206,6 +1206,8 @@ model Order {
   // payment_abandonment). See migration 20260622130000.
   paymentGatewayAbandonedAt DateTime? @map("payment_gateway_abandoned_at")
 
+  source        String?   @default("web") // provenance: 'web' | 'agent' — audit only
+
   // Relations
   store               Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
   customer            User?                @relation(fields: [customerId], references: [id], onDelete: SetNull)

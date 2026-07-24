@@ -193,7 +193,20 @@ export default function OrderDetailPage() {
           <>
             {/* Status pill row */}
             <div className="mb-5 flex items-center justify-between">
-              <OrderStatusBadge status={order.status} />
+              <div className="flex items-center gap-2">
+                <OrderStatusBadge status={order.status} />
+                {order.source === 'agent' && (
+                  // Reuses OrderStatusBadge's colorMap override (same
+                  // pattern the returns/shipments/notifications surfaces
+                  // use) rather than inventing a new chip style —
+                  // every-data-needs-a-UI surface for Order.source.
+                  <OrderStatusBadge
+                    status="agent"
+                    label={`🤖 ${t('agent')}`}
+                    colorMap={{ agent: { className: 'bg-violet-50 text-violet-700' } }}
+                  />
+                )}
+              </div>
               <span className="text-xs text-muted-foreground">
                 {new Date(order.createdAt).toLocaleString(locale, {
                   dateStyle: 'medium',
@@ -212,7 +225,7 @@ export default function OrderDetailPage() {
               <div className="space-y-4">
                 <ItemsCard order={order} previewLimit={5} />
                 <SummaryCard order={order} />
-                <PlatformCard />
+                <PlatformCard order={order} />
               </div>
             </div>
 

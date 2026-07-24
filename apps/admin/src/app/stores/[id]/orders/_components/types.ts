@@ -35,6 +35,12 @@ export interface Order {
   total: number;
   status: string;
   paymentStatus: string;
+  /**
+   * Order provenance — 'web' (default) | 'agent' (placed by an AI agent via
+   * the MCP `place_order` tool). Optional/nullable: treat missing as 'web'.
+   * Rendered as a small badge in the status column — every-data-needs-a-UI.
+   */
+  source?: string | null;
   createdAt: string;
   payments?: OrderPayment[];
   /**

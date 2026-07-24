@@ -65,6 +65,14 @@ export interface OrderDetail {
   orderNumber: string;
   status: string;
   paymentStatus: string;
+  /**
+   * Order provenance — 'web' (human checkout, default) | 'agent' (placed by
+   * an AI agent via the MCP `place_order` tool). Nullable/optional because
+   * pre-migration rows and any consumer that doesn't select it may omit it;
+   * treat missing as 'web'. Surfaced on this page via PlatformCard + the
+   * status pill row (agent badge) — every-data-needs-a-UI.
+   */
+  source?: string | null;
   subtotal: number;
   tax: number;
   shipping: number;

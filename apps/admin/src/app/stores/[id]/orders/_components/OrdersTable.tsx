@@ -144,10 +144,31 @@ export function OrdersTable({
       cell: order => {
         const transitions = VALID_TRANSITIONS[order.status] ?? [];
         const isUpdating = updatingId === order.id;
-        if (transitions.length === 0) return <OrderStatusBadge status={order.status} />;
+        // Reuses OrderStatusBadge's colorMap override (same pattern the
+        // returns/shipments/notifications surfaces use) instead of a new
+        // chip style — every-data-needs-a-UI surface for Order.source.
+        const agentBadge = order.source === 'agent' && (
+          <OrderStatusBadge
+            status="agent"
+            label={`🤖 ${t('agentBadge')}`}
+            // Uses the `orders.list` namespace's own `agentBadge` key
+            // (added alongside `orders.detail.agent`) so this list-row
+            // badge doesn't depend on the detail page's translations.
+            colorMap={{ agent: { className: 'bg-violet-50 text-violet-700' } }}
+          />
+        );
+        if (transitions.length === 0) {
+          return (
+            <div className="flex items-center gap-2">
+              <OrderStatusBadge status={order.status} />
+              {agentBadge}
+            </div>
+          );
+        }
         return (
           <div className="flex items-center gap-2">
             <OrderStatusBadge status={order.status} />
+            {agentBadge}
             <select
               aria-label={t('actions.updateStatusLabel')}
               className="rounded-lg border border-border px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"

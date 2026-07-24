@@ -43,8 +43,8 @@ interface PublicStore {
   // Threaded on by fetchStore/fetchStoreByHost from the sibling
   // `data.enabledFeatures` array the /public/stores/<slug> and
   // /public/store/resolve endpoints return (same shape store-resolver.ts
-  // reads client-side). Used to conditionally advertise the agent_feed
-  // add-on below.
+  // reads client-side). Used to conditionally advertise the agent_feed and
+  // agent_checkout add-ons below.
   enabledFeatures?: string[];
 }
 
@@ -244,7 +244,7 @@ https://store.force-ai.co/sitemap.xml
 `;
 }
 
-function buildPerStoreBody(
+export function buildPerStoreBody(
   store: PublicStore,
   categories: PublicCategory[],
   products: PublicProduct[],
@@ -278,6 +278,17 @@ function buildPerStoreBody(
     ? `\n\n## Product Feed\n\n- [Machine-readable product feed (JSON)](${base}/feeds/products.json)`
     : '';
 
+  // agent_checkout is in every paid plan baseline (AI-first policy,
+  // 2026-07-21), same rollout as agent_feed above. Advertises the MCP
+  // (Model Context Protocol) endpoint an agentic shopping client can call
+  // directly to search, cart, and place an order for this store — the
+  // ONLY discovery surface for that endpoint (it's not linked from any
+  // storefront page). Served by apps/api, not this web app, so the URL is
+  // rooted at API_URL (the API's own origin), not `base`.
+  const mcpSection = store.enabledFeatures?.includes('agent_checkout')
+    ? `\n\n## Agentic checkout (MCP)\n\nThis store accepts orders from AI agents via the Model Context Protocol (MCP):\n\n- MCP endpoint: ${API_URL}/mcp/${store.slug}\n- Transport: Streamable HTTP (stateless, POST only)\n- Tools: search_products, get_product, get_store_info, add_to_cart, view_cart, place_order, get_order_status`
+    : '';
+
   return `# ${storeTitle}
 
 > ${storeDesc}
@@ -292,7 +303,7 @@ ${catLines || '_No active categories._'}
 
 ## Products (${totalProducts} total, showing ${products.length})
 
-${prodLines || '_No active products._'}${feedSection}
+${prodLines || '_No active products._'}${feedSection}${mcpSection}
 
 ## For AI agents
 

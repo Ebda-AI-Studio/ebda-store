@@ -118,6 +118,14 @@ interface CreateOrderData {
    * delivered, cancelled, refunded) are always allowed regardless of this flag.
    */
   smsOptIn?: boolean;
+  /**
+   * Order provenance — 'web' (human checkout, default) | 'agent' (MCP
+   * place_order tool). Audit-only: never grants/restricts anything, only
+   * stamped onto Order.source for reporting. Existing callers (public
+   * checkout, authenticated storefront checkout) never pass this, so they
+   * keep getting the 'web' default — no behavior change.
+   */
+  source?: string;
 }
 
 export class OrderService {
@@ -775,6 +783,7 @@ export class OrderService {
           total,
           locale: data.locale ?? null,
           smsOptIn: data.smsOptIn ?? false,
+          source: data.source ?? 'web',
           shippingAddress: data.shippingAddress,
           billingAddress: data.billingAddress || data.shippingAddress,
           notes: data.notes,

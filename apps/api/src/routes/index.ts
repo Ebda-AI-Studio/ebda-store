@@ -59,6 +59,7 @@ import backordersRoutes from './backorders.routes';
 import botAnalyticsRoutes from './bot-analytics.routes';
 import staffRoutes from './staff.routes';
 import paymentAbandonmentsRoutes from './payment-abandonments.routes';
+import mcpRoutes from './mcp.routes';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -66,6 +67,12 @@ const router = Router();
 // Public routes (no auth required)
 router.use('/public', publicRoutes);
 router.use('/public', publicStoreLayoutRoutes);
+
+// Store-scoped MCP endpoint (agent checkout) — POST /api/v1/mcp/:storeSlug.
+// Resolves the store by slug + checks the `agent_checkout` feature gate
+// itself (see mcp.routes.ts); no auth middleware or tenantContext here —
+// it is a public, feature-gated, per-slug surface for MCP clients.
+router.use('/mcp', mcpRoutes);
 router.use('/auth', authRoutes);
 // MFA sub-routes: enroll/begin, enroll/verify, verify (challenge), disable.
 // Mounted under /auth/mfa so the full path is /api/v1/auth/mfa/*.

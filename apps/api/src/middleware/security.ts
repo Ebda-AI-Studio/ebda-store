@@ -94,6 +94,17 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
+  // Skip for the store-scoped MCP endpoint. MCP clients (Claude, other
+  // agents) call `POST /mcp/:storeSlug` as machine-to-machine JSON-RPC —
+  // no browser, no cookies, no session to ride. CSRF exists to stop a
+  // malicious page silently using a victim's browser session; an MCP
+  // client has no session cookie for the attack to hijack. The endpoint
+  // is store-resolved + feature-gated (fail-closed 404) in mcp.routes.ts
+  // instead. Same class of exemption as the Bearer-token skip below.
+  if (req.path.includes('/mcp/')) {
+    return next();
+  }
+
   // Skip for public routes. These are unauthenticated endpoints (affiliate
   // apply, contact form, cart operations, etc.) that don't use cookies or
   // sessions, so they are not vulnerable to CSRF. They have their own

@@ -931,7 +931,8 @@
         "date": "التاريخ",
         "actions": "الإجراءات",
         "totalValue": "{amount} د.ك",
-        "moreItems": "+{count} أخرى"
+        "moreItems": "+{count} أخرى",
+        "agentBadge": "وكيل ذكاء اصطناعي"
       },
       "actions": {
         "updateStatusLabel": "تحديث حالة الطلب",
@@ -1033,6 +1034,7 @@
       "web": "الموقع",
       "mobile": "تطبيق",
       "pos": "نقطة بيع",
+      "agent": "وكيل ذكاء اصطناعي",
       "customer": "العميل",
       "phone": "الهاتف",
       "email": "البريد الإلكتروني",
