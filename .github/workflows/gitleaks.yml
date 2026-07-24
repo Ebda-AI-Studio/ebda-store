@@ -18,6 +18,7 @@ jobs:
   scan:
     name: Scan for leaked secrets
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,3 +41,21 @@ jobs:
 
       - name: Run gitleaks
         run: gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1
+
+  notify-failure:
+    name: Notify on failure (main only)
+    needs: [scan]
+    if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Telegram alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+        # Inert (skips) when secrets are absent — never a hard failure.
+        run: |
+          [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_ALERT_CHAT_ID:-}" ] || { echo "no telegram secrets — skip"; exit 0; }
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_ALERT_CHAT_ID}" -d parse_mode=Markdown \
+            -d text="🔴 [GITLEAKS] ${{ github.repository }} on \`${{ github.sha }}\` — https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
