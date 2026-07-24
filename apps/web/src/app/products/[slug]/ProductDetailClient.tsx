@@ -16,6 +16,7 @@ import {
 } from '../../../templates/shared/section-typography';
 import { api, type Product, type ProductVariant } from '@/lib/api';
 import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
+import { smoothScrollLeftTo } from '@/lib/smooth-scroll';
 import { useCart } from '../../../contexts/CartContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../../../contexts/StoreContext';
 import { useFeatures } from '../../../contexts/FeatureContext';
@@ -171,7 +172,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
     if (!el) return;
     const target = el.clientWidth * selectedImage;
     if (Math.abs(el.scrollLeft - target) > 8) {
-      el.scrollTo({ left: target, behavior: 'smooth' });
+      smoothScrollLeftTo(el, target);
     }
   }, [selectedImage]);
   const handleGalleryScroll = () => {

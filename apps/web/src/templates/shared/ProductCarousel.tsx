@@ -21,6 +21,7 @@ import {
 } from './card-size';
 import type { CtaShape, CtaSize } from './card-size';
 import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
+import { smoothScrollLeftTo, smoothScrollLeftBy } from '@/lib/smooth-scroll';
 import { BrandPill } from './BrandPill';
 import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
@@ -201,9 +202,9 @@ export function ProductCarousel({
       const nearEnd = pos >= max - 4;
       const direction = isRtl ? -1 : 1;
       if (nearEnd) {
-        el.scrollTo({ left: 0, behavior: 'smooth' });
+        smoothScrollLeftTo(el, 0);
       } else {
-        el.scrollBy({ left: direction * el.clientWidth * 0.9, behavior: 'smooth' });
+        smoothScrollLeftBy(el, direction * el.clientWidth * 0.9);
       }
     }, 4000);
     return () => window.clearInterval(id);
@@ -218,7 +219,7 @@ export function ProductCarousel({
     const firstCard = el.querySelector('li');
     const step = firstCard ? firstCard.clientWidth + 24 : el.clientWidth * 0.45;
     const sign = (direction === 'next' ? 1 : -1) * (isRtl ? -1 : 1);
-    el.scrollBy({ left: sign * step, behavior: 'smooth' });
+    smoothScrollLeftBy(el, sign * step);
   };
 
   if (products.length === 0) return null;
