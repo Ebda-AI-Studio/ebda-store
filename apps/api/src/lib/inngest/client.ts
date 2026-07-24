@@ -144,6 +144,16 @@ type StockLowStockScanRequestedEvent = EventPayload & {
   };
 };
 
+// On-demand twin of the daily warehouse-reconcile-sweep cron (Task 5's admin
+// "Reconcile now" button). See warehouse-reconcile-sweep.ts.
+type WarehouseReconcileRequestedEvent = EventPayload & {
+  name: 'warehouse/reconcile-requested';
+  data: {
+    storeId: string;
+    requestedBy?: string;
+  };
+};
+
 type AccountingExpenseOcrProcessEvent = EventPayload & {
   name: 'accounting/expense-ocr-process';
   data: {
@@ -278,6 +288,7 @@ export type AppEvent =
   | StockReorderScanRequestedEvent
   | StockDeadstockScanRequestedEvent
   | StockLowStockScanRequestedEvent
+  | WarehouseReconcileRequestedEvent
   | AccountingExpenseOcrProcessEvent
   | InsightsRollupRequestedEvent
   | PaymentWebhookReceivedEvent

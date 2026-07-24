@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { SearchInput } from '@/components/SearchInput';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
+import { useFeatures } from '@/hooks/useFeatures';
 import { Button, useToast } from '@force/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -47,6 +48,8 @@ export default function WarehouseStockPage() {
   const t = useT('stock.warehouseStock');
   const tc = useT('common');
   const { success: toastSuccess, error: toastError } = useToast();
+  const { isEnabled } = useFeatures();
+  const multiWarehouseEnabled = isEnabled('inventory.multi_warehouse');
 
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [rows, setRows] = useState<StockRow[]>([]);
@@ -63,6 +66,9 @@ export default function WarehouseStockPage() {
   // Adjust modal
   const [adjustModal, setAdjustModal] = useState<AdjustModal | null>(null);
   const [adjustSaving, setAdjustSaving] = useState(false);
+
+  // Reconcile-to-aggregate action
+  const [reconciling, setReconciling] = useState(false);
 
   const LIMIT = 50;
 
@@ -164,6 +170,30 @@ export default function WarehouseStockPage() {
     }
   }
 
+  async function handleReconcile() {
+    setReconciling(true);
+    try {
+      // Fixed 2026-07-23: the endpoint is now async — it enqueues an
+      // Inngest job (`warehouse/reconcile-requested`) and returns
+      // `{ accepted: true }` immediately rather than the old synchronous
+      // {skusReconciled, skusFailed} counts. Counts arrive later via the
+      // async job + the daily completeness sweep, not this response.
+      const { error: apiError } = await apiPost<{ accepted: boolean }>(
+        `/api/v1/stores/${storeId}/warehouses/reconcile-all`
+      );
+      if (apiError) {
+        toastError(apiError.message);
+      } else {
+        toastSuccess(t('reconcileStarted'));
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Reconcile failed';
+      toastError(msg);
+    } finally {
+      setReconciling(false);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -175,19 +205,36 @@ export default function WarehouseStockPage() {
         warehouse ? t('subtitle', { code: warehouse.code, units: warehouse.totalUnits }) : undefined
       }
       actions={
-        <Button
-          variant="ghost"
-          onClick={() => router.push(`/stores/${storeId}/stock/warehouses`)}
-          className="min-h-[44px]"
-        >
-          ← {t('backToWarehouses')}
-        </Button>
+        <div className="flex items-center gap-2">
+          {multiWarehouseEnabled && (
+            <Button
+              variant="outline"
+              onClick={handleReconcile}
+              disabled={reconciling}
+              className="min-h-[44px]"
+            >
+              {reconciling ? t('reconciling') : t('reconcileAction')}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            onClick={() => router.push(`/stores/${storeId}/stock/warehouses`)}
+            className="min-h-[44px]"
+          >
+            ← {t('backToWarehouses')}
+          </Button>
+        </div>
       }
     >
       {/* Search */}
       <div className="mb-4">
         <SearchInput value={search} onSearch={setSearch} placeholder={t('searchPlaceholder')} />
       </div>
+
+      {/* Reconcile helper note */}
+      {multiWarehouseEnabled && (
+        <p className="mb-4 text-xs text-muted-foreground">{t('reconcileHint')}</p>
+      )}
 
       {/* Error */}
       {err && (

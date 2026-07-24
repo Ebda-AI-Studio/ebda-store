@@ -5079,7 +5079,12 @@
       "newQtyPreview": "New quantity: {new}",
       "showing": "Showing {from}–{to} of {total}",
       "empty": "No stock rows yet. Add products and set quantities to get started.",
-      "noResults": "No results for that search."
+      "noResults": "No results for that search.",
+      "reconcileAction": "Reconcile to aggregate",
+      "reconciling": "Reconciling…",
+      "reconcileHint": "Per-warehouse counts are reconciled from your authoritative product stock.",
+      "reconcileDone": "Reconciled {reconciled} SKU(s), {failed} failed",
+      "reconcileStarted": "Reconciliation started — per-warehouse counts will update shortly"
     }
   },
   "insights": {

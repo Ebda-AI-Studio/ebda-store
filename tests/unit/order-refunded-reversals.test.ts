@@ -28,6 +28,13 @@ const h = vi.hoisted(() => ({
   reverseCommission: vi.fn(),
   reverseEarnedPointsFromOrder: vi.fn(),
   reverseRedeemedPointsFromOrder: vi.fn(),
+  // Task 4: order-refunded's new reconcile-warehouse-stock step calls this
+  // for every order item. Mocked here (real impl is covered by
+  // tests/integration/warehouse/reconcile-orders.test.ts against a real DB)
+  // so this file stays a pure-unit, no-DB test of the fanout's own control
+  // flow.
+  reconcileWarehouseStockToAggregate: vi.fn().mockResolvedValue({ reconciled: false, diff: 0 }),
+  loggerError: vi.fn(),
   sendOrderRefunded: vi.fn(),
   dispatch: vi.fn(),
   notifyAdminsOfRefund: vi.fn(),
@@ -68,6 +75,9 @@ vi.mock('@api/services/onesignal.service', () => ({
 vi.mock('@api/services/affiliate.service', () => ({
   affiliateService: { reverseCommission: h.reverseCommission },
 }));
+vi.mock('@api/services/warehouse.service', () => ({
+  WarehouseService: { reconcileWarehouseStockToAggregate: h.reconcileWarehouseStockToAggregate },
+}));
 vi.mock('@api/services/loyalty.service', () => ({
   LoyaltyService: {
     reverseEarnedPointsFromOrder: h.reverseEarnedPointsFromOrder,
@@ -75,7 +85,9 @@ vi.mock('@api/services/loyalty.service', () => ({
   },
 }));
 vi.mock('@api/lib/inngest/client', () => ({ inngest: { createFunction: vi.fn(() => ({})) } }));
-vi.mock('@api/lib/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock('@api/lib/logger', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: h.loggerError },
+}));
 
 import { handleOrderRefunded } from '@api/lib/inngest/functions/order-refunded';
 
@@ -364,6 +376,72 @@ describe('order-refunded fanout — order-level FOR UPDATE lock ordering', () =>
 });
 
 /**
+ * Item 5 data-integrity, Task 4 — the reconcile-warehouse-stock step. Reconciles
+ * every order item's SKU so `SUM(WarehouseStock)` catches up with the
+ * just-restored aggregate; the real DB-backed proof lives in
+ * tests/integration/warehouse/reconcile-orders.test.ts — this file only
+ * proves the fanout's own control flow (called for every item, runs even
+ * when nothing was restored).
+ *
+ * Fix wave 1 (money-integrity gate): this step was moved from right after
+ * restore-inventory to right after the LAST money reversal (cancel-backorders)
+ * and immediately before claim-reversed, and made best-effort — it now
+ * SWALLOWS a failure instead of propagating it, because `WarehouseStock` is
+ * an admin-view-only shadow already backstopped by the daily
+ * `backfillReconcileAll` sweep, and must never gate a money reversal or the
+ * `refundReversedAt` completion stamp. See the two tests below (in the
+ * claim-reversed describe block) proving the refund still completes and
+ * stamps `refundReversedAt` even when every reconcile call rejects.
+ */
+describe('order-refunded fanout — reconcile-warehouse-stock step (Task 4)', () => {
+  it('reconciles every order item under runInTenantContext(storeId)', async () => {
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    expect(h.reconcileWarehouseStockToAggregate).toHaveBeenCalledWith('s1', 'p1', null);
+    expect(h.reconcileWarehouseStockToAggregate).toHaveBeenCalledWith('s1', 'p2', 'v2');
+    expect(h.runInTenant.mock.calls.some(c => c[0] === 's1')).toBe(true);
+  });
+
+  it('still reconciles even when restoreInventory is false (unconditional, not gated on the restore)', async () => {
+    await handleOrderRefunded('o1', 's1', false, true, stepStub);
+
+    expect(h.reconcileWarehouseStockToAggregate).toHaveBeenCalledWith('s1', 'p1', null);
+    expect(h.reconcileWarehouseStockToAggregate).toHaveBeenCalledWith('s1', 'p2', 'v2');
+  });
+
+  it('a reconcile rejection is swallowed (logged, NOT propagated) — the refund resolves', async () => {
+    h.reconcileWarehouseStockToAggregate.mockRejectedValueOnce(new Error('reconcile down'));
+
+    await expect(handleOrderRefunded('o1', 's1', true, true, stepStub)).resolves.not.toThrow();
+
+    expect(h.loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'o1',
+        storeId: 's1',
+        productId: 'p1',
+        variantId: null,
+        err: expect.any(Error),
+      }),
+      expect.stringContaining('reconcile-warehouse-stock')
+    );
+  });
+
+  it('one bad SKU does not abort reconcile for the rest of the order (per-SKU isolation)', async () => {
+    h.reconcileWarehouseStockToAggregate.mockImplementation((_s: string, productId: string) => {
+      if (productId === 'p1') return Promise.reject(new Error('p1 reconcile boom'));
+      return Promise.resolve({ reconciled: false, diff: 0 });
+    });
+
+    await handleOrderRefunded('o1', 's1', true, true, stepStub);
+
+    // p1 failed, but p2 was still attempted — proving the loop's per-SKU
+    // try/catch didn't bail out after the first failure.
+    expect(h.reconcileWarehouseStockToAggregate).toHaveBeenCalledWith('s1', 'p1', null);
+    expect(h.reconcileWarehouseStockToAggregate).toHaveBeenCalledWith('s1', 'p2', 'v2');
+  });
+});
+
+/**
  * Task 4 — two-tier failure policy. Reversals ALWAYS run and THROW (Inngest
  * retries → dead-letters via alerts-failure-watch on exhaustion). The
  * notification block (email/dispatcher/push) is gated on `notify` AND stays
@@ -466,6 +544,46 @@ describe('order-refunded fanout — claim-reversed step', () => {
     // And the order must stay unclaimed, so the sweep can still see it.
     expect(h.orderUpdateMany).not.toHaveBeenCalled();
     expect(h.orderUpdateMany).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Fix wave 1 (money-integrity gate) — THE core invariant this fix restores.
+   * reconcile-warehouse-stock is a non-money, admin-view-only shadow sync
+   * backstopped by the daily sweep; a PERSISTENT failure there (e.g. an
+   * exhausted internal retry, a withMoneyTx P2028 timeout) must never abort
+   * the run before the money reversals or the completion stamp. Before this
+   * fix, this step sat BEFORE the reversals and threw on failure — a
+   * persistent failure here would have aborted the function, left every
+   * money reversal below it un-run, and left refundReversedAt permanently
+   * null (causing refund-reversal-stuck-sweep to re-fire this event forever).
+   */
+  it('a reconcile failure does NOT block money reversals or the claim-reversed stamp', async () => {
+    h.orderFindUnique.mockResolvedValue({ ...ORDER, couponCode: 'SAVE10', customerId: 'c1' });
+    h.reconcileWarehouseStockToAggregate.mockRejectedValue(new Error('reconcile permanently down'));
+
+    await expect(handleOrderRefunded('o1', 's1', true, true, stepStub)).resolves.not.toThrow();
+
+    // Every money reversal ran to completion.
+    expect(h.couponUpdateMany).toHaveBeenCalledTimes(1);
+    expect(h.reverseCommission).toHaveBeenCalledWith('s1', 'o1');
+    expect(h.reverseEarnedPointsFromOrder).toHaveBeenCalledWith('s1', 'o1');
+    expect(h.reverseRedeemedPointsFromOrder).toHaveBeenCalledWith('s1', 'o1');
+    expect(h.backorderLineUpdateMany).toHaveBeenCalled();
+
+    // The completion claim was still stamped despite reconcile failing.
+    expect(h.orderUpdateMany).toHaveBeenCalledTimes(1);
+    expect(h.orderUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'o1', refundReversedAt: null }),
+        data: expect.objectContaining({ refundReversedAt: expect.any(Date) }),
+      })
+    );
+
+    // The failure was logged, not swallowed silently.
+    expect(h.loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: 'o1', storeId: 's1' }),
+      expect.stringContaining('reconcile-warehouse-stock')
+    );
   });
 
   // Guards the re-fire path the sweep depends on: a swept re-send must not

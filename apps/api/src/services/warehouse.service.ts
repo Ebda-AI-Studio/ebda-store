@@ -12,10 +12,12 @@
  * tenantContext middleware.
  */
 
-import { prisma, Prisma, withRlsBypass } from '@force/database';
+import { randomUUID } from 'node:crypto';
+import { prisma, Prisma, withRlsBypass, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { haversineKm } from '../lib/haversine';
+import { retryOnWriteConflict } from '../lib/db-retry';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -465,6 +467,10 @@ export class WarehouseService {
   /**
    * Set (upsert) stock quantity for a product/variant in a specific warehouse.
    * Updates the aggregate Product.inventory / ProductVariant.inventory afterward.
+   *
+   * Atomic: the WarehouseStock upsert + the aggregate resync run inside ONE
+   * transaction (`withMoneyTx`) as a single logical unit — see the race-fix
+   * docstring on `syncAggregateInventory` below.
    */
   static async setStock(storeId: string, warehouseId: string, input: StockSetInput): Promise<void> {
     if (input.quantity < 0) {
@@ -483,37 +489,29 @@ export class WarehouseService {
     });
     if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
-    // Upsert warehouse_stock — use findFirst+update/create because Prisma's
-    // composite-unique WHERE requires a non-nullable variantId (SQL NULL != NULL),
-    // but variantId is intentionally null for base-product stock rows.
-    const existingStock = await prisma.warehouseStock.findFirst({
-      where: { warehouseId, productId: input.productId, variantId: input.variantId ?? null },
-      select: { id: true },
-    });
-    if (existingStock) {
-      await prisma.warehouseStock.update({
-        where: { id: existingStock.id },
-        data: { quantity: input.quantity },
-      });
-    } else {
-      await prisma.warehouseStock.create({
-        data: {
-          warehouseId,
-          productId: input.productId,
-          variantId: input.variantId ?? null,
-          quantity: input.quantity,
-          storeId,
-        },
-      });
-    }
+    const variantId = input.variantId ?? null;
 
-    // Sync aggregate
-    await WarehouseService.syncAggregateInventory(input.productId, input.variantId ?? null);
+    await withMoneyTx(prisma, async tx => {
+      await WarehouseService.upsertWarehouseStock(tx, {
+        warehouseId,
+        productId: input.productId,
+        variantId,
+        storeId,
+        setExpr: Prisma.sql`${input.quantity}`,
+        initialQty: input.quantity,
+      });
+
+      await WarehouseService.syncAggregateInventory(input.productId, variantId, tx);
+    });
   }
 
   /**
    * Adjust stock by a delta (positive = add, negative = remove).
    * Floors at 0 — never goes negative.
+   *
+   * Atomic: the WarehouseStock upsert + the aggregate resync run inside ONE
+   * transaction (`withMoneyTx`) as a single logical unit — see the race-fix
+   * docstring on `syncAggregateInventory` below.
    */
   static async adjustStock(
     storeId: string,
@@ -532,59 +530,52 @@ export class WarehouseService {
     });
     if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
-    // Get current stock (or 0 if no row yet)
-    const current = await prisma.warehouseStock.findFirst({
-      where: {
+    const variantId = input.variantId ?? null;
+
+    const newQty = await withMoneyTx(prisma, async tx => {
+      // Best-effort snapshot for the InventoryHistory audit row only. The
+      // actual new quantity below is computed atomically INSIDE Postgres from
+      // the row's value at UPDATE time (`warehouse_stock.quantity` in the SET
+      // clause of upsertWarehouseStock refers to the pre-update row, read
+      // under the row's own write lock) — never from this read. A very tight
+      // concurrent race could make this logged "previousStock" one write
+      // stale; it never affects the persisted quantity itself (that's the
+      // actual bug this task fixes).
+      const before = await tx.warehouseStock.findFirst({
+        where: { warehouseId, productId: input.productId, variantId },
+        select: { quantity: true },
+      });
+      const previousQty = before?.quantity ?? 0;
+
+      const newQty = await WarehouseService.upsertWarehouseStock(tx, {
         warehouseId,
         productId: input.productId,
-        variantId: input.variantId ?? null,
-      },
-      select: { quantity: true },
-    });
-
-    const currentQty = current?.quantity ?? 0;
-    const newQty = Math.max(0, currentQty + input.delta);
-
-    // Same findFirst+update/create pattern — composite-unique WHERE can't match null variantId.
-    const existingStockAdj = await prisma.warehouseStock.findFirst({
-      where: { warehouseId, productId: input.productId, variantId: input.variantId ?? null },
-      select: { id: true },
-    });
-    if (existingStockAdj) {
-      await prisma.warehouseStock.update({
-        where: { id: existingStockAdj.id },
-        data: { quantity: newQty },
+        variantId,
+        storeId,
+        setExpr: Prisma.sql`GREATEST(0, "warehouse_stock"."quantity" + ${input.delta})`,
+        initialQty: Math.max(0, input.delta),
       });
-    } else {
-      await prisma.warehouseStock.create({
+
+      await WarehouseService.syncAggregateInventory(input.productId, variantId, tx);
+
+      // Record in InventoryHistory for audit trail
+      const changeType = input.delta >= 0 ? 'manual_add' : 'manual_remove';
+      await tx.inventoryHistory.create({
         data: {
-          warehouseId,
           productId: input.productId,
-          variantId: input.variantId ?? null,
-          quantity: newQty,
           storeId,
+          type: changeType,
+          quantity: input.delta,
+          previousStock: previousQty,
+          newStock: newQty,
+          reason: input.reason
+            ? `[Warehouse: ${warehouse.code}] ${input.reason}`
+            : `[Warehouse: ${warehouse.code}] delta adjustment`,
+          reference: warehouseId,
         },
       });
-    }
 
-    // Sync aggregate
-    await WarehouseService.syncAggregateInventory(input.productId, input.variantId ?? null);
-
-    // Record in InventoryHistory for audit trail
-    const changeType = input.delta >= 0 ? 'manual_add' : 'manual_remove';
-    await prisma.inventoryHistory.create({
-      data: {
-        productId: input.productId,
-        storeId,
-        type: changeType,
-        quantity: input.delta,
-        previousStock: currentQty,
-        newStock: newQty,
-        reason: input.reason
-          ? `[Warehouse: ${warehouse.code}] ${input.reason}`
-          : `[Warehouse: ${warehouse.code}] delta adjustment`,
-        reference: warehouseId,
-      },
+      return newQty;
     });
 
     logger.info(
@@ -596,49 +587,412 @@ export class WarehouseService {
   }
 
   /**
-   * Re-aggregate Product.inventory / ProductVariant.inventory from the SUM of
-   * all warehouse_stock rows. Called after every WarehouseStock mutation.
+   * Atomic upsert of a single warehouse_stock row — the core race fix.
    *
-   * Uses withRlsBypass because this is a cross-warehouse aggregate write —
-   * not a single-tenant read, but the product IS the current tenant's.
-   * We need the bypass because the tenantContext tx and withRlsBypass cannot
-   * nest — the service is called from within a tenant tx, so we use a raw
-   * aggregation query and a direct update.
+   * `@@unique([warehouseId, productId, variantId])` does NOT enforce
+   * uniqueness when variantId IS NULL (Postgres treats NULL <> NULL for both
+   * unique-index matching and ON CONFLICT inference), so base-product rows
+   * (variantId null) rely on a separate PARTIAL unique index instead:
+   * `warehouse_stock_warehouse_id_product_id_base_key` ON
+   * (warehouse_id, product_id) WHERE variant_id IS NULL — added in migration
+   * 20260615000000_multi_warehouse specifically for this. ON CONFLICT must
+   * target whichever index actually covers the row being written, so the two
+   * branches below use different conflict targets.
+   *
+   * The single `INSERT … ON CONFLICT … DO UPDATE … RETURNING` statement is
+   * what makes this race-free: Postgres resolves the conflict and applies
+   * `setExpr` (which reads the pre-update row via the unqualified
+   * `"warehouse_stock"."quantity"` reference) under the row's own write lock,
+   * so concurrent writers to the SAME row serialize correctly with no
+   * lost updates — verified empirically under 20-way concurrency (see
+   * task-1-report.md).
    */
-  static async syncAggregateInventory(productId: string, variantId: string | null): Promise<void> {
-    if (variantId) {
-      // Aggregate for this specific variant
-      const agg = await prisma.warehouseStock.aggregate({
-        where: { productId, variantId },
-        _sum: { quantity: true },
-      });
-      const total = agg._sum.quantity ?? 0;
-      await prisma.productVariant.update({
-        where: { id: variantId },
-        data: { inventory: total },
-      });
+  private static async upsertWarehouseStock(
+    tx: Prisma.TransactionClient,
+    args: {
+      warehouseId: string;
+      productId: string;
+      variantId: string | null;
+      storeId: string;
+      setExpr: Prisma.Sql;
+      initialQty: number;
+    }
+  ): Promise<number> {
+    const id = randomUUID();
+    const rows =
+      args.variantId === null
+        ? await tx.$queryRaw<Array<{ quantity: number }>>`
+            INSERT INTO "warehouse_stock"
+              ("id", "warehouse_id", "product_id", "variant_id", "quantity", "store_id", "created_at", "updated_at")
+            VALUES (${id}, ${args.warehouseId}, ${args.productId}, NULL, ${args.initialQty}, ${args.storeId}, now(), now())
+            ON CONFLICT ("warehouse_id", "product_id") WHERE "variant_id" IS NULL
+            DO UPDATE SET quantity = ${args.setExpr}, updated_at = now()
+            RETURNING quantity
+          `
+        : await tx.$queryRaw<Array<{ quantity: number }>>`
+            INSERT INTO "warehouse_stock"
+              ("id", "warehouse_id", "product_id", "variant_id", "quantity", "store_id", "created_at", "updated_at")
+            VALUES (${id}, ${args.warehouseId}, ${args.productId}, ${args.variantId}, ${args.initialQty}, ${args.storeId}, now(), now())
+            ON CONFLICT ("warehouse_id", "product_id", "variant_id")
+            DO UPDATE SET quantity = ${args.setExpr}, updated_at = now()
+            RETURNING quantity
+          `;
 
-      // Also re-aggregate the parent product from all its variants
-      const variantAgg = await prisma.productVariant.aggregate({
-        where: { productId },
-        _sum: { inventory: true },
-      });
-      await prisma.product.update({
-        where: { id: productId },
-        data: { inventory: variantAgg._sum.inventory ?? 0 },
-      });
+    return rows[0].quantity;
+  }
+
+  /**
+   * Re-aggregate Product.inventory / ProductVariant.inventory from the SUM of
+   * all warehouse_stock rows. Called after every WarehouseStock mutation,
+   * INSIDE the same transaction as that mutation (`tx` is mandatory — this is
+   * no longer safe to call standalone against the ALS-proxied `prisma`).
+   *
+   * Race-safety (cross-warehouse / cross-variant aggregate race): a single
+   * `UPDATE … SET col = (SELECT SUM …) WHERE id = …` statement is NOT
+   * race-safe on its own, despite Postgres locking the target row as part of
+   * the UPDATE. Per the Postgres docs ("Read Committed Isolation Level"):
+   * when this UPDATE blocks on a concurrent writer holding the SAME target
+   * row and later unblocks, only the WHERE-clause row is re-checked against
+   * the newly committed version (EvalPlanQual) — "it does not see effects of
+   * [the concurrent transaction] on any other rows in the database". The
+   * correlated SUM subquery scans a DIFFERENT table (`warehouse_stock` /
+   * `product_variants`) using the ORIGINAL per-statement snapshot taken
+   * before the block, so it can still miss the other transaction's just-
+   * committed rows. Two DIFFERENT warehouses (or two DIFFERENT variants)
+   * writing the SAME product never collide on the per-row upsert (different
+   * rows), so both can reach this resync concurrently and one's SUM can be
+   * computed from a stale snapshot — a lost update in the aggregate even
+   * though every underlying warehouse_stock row is correct.
+   *
+   * Fix: take an explicit `SELECT … FOR UPDATE` row lock on the aggregate
+   * target as its OWN statement, BEFORE the SUM-recompute UPDATE. Acquiring
+   * the lock forces this transaction to wait for any concurrent syncer of
+   * the same product/variant to commit; the FOLLOWING statement (the SUM
+   * UPDATE) then gets a FRESH READ COMMITTED snapshot that includes that
+   * transaction's committed warehouse_stock writes. This serializes
+   * concurrent syncs of the same aggregate target and lets each SUM see the
+   * others' contributions. Verified against real concurrency in
+   * `tests/integration/warehouse/stock-race.test.ts` (cross-warehouse and
+   * cross-variant-rollup cases) — RED before this lock, GREEN after.
+   */
+  static async syncAggregateInventory(
+    productId: string,
+    variantId: string | null,
+    tx: Prisma.TransactionClient
+  ): Promise<void> {
+    if (variantId) {
+      // Lock the variant row first — separate statement so the following
+      // SUM-update runs against a fresh snapshot once the lock is granted.
+      await tx.$queryRaw`SELECT "id" FROM "product_variants" WHERE "id" = ${variantId} FOR UPDATE`;
+
+      await tx.$executeRaw`
+        UPDATE "product_variants"
+        SET inventory = (
+          SELECT COALESCE(SUM("quantity"), 0) FROM "warehouse_stock"
+          WHERE "product_id" = ${productId} AND "variant_id" = ${variantId}
+        )
+        WHERE "id" = ${variantId}
+      `;
+
+      // Also re-aggregate the parent product from all its variants — same
+      // lock-then-recompute pattern, one level up.
+      await tx.$queryRaw`SELECT "id" FROM "products" WHERE "id" = ${productId} FOR UPDATE`;
+
+      await tx.$executeRaw`
+        UPDATE "products"
+        SET inventory = (
+          SELECT COALESCE(SUM("inventory"), 0) FROM "product_variants"
+          WHERE "product_id" = ${productId}
+        )
+        WHERE "id" = ${productId}
+      `;
     } else {
       // Base-product stock (no variant)
-      const agg = await prisma.warehouseStock.aggregate({
-        where: { productId, variantId: null },
-        _sum: { quantity: true },
-      });
-      const total = agg._sum.quantity ?? 0;
-      await prisma.product.update({
-        where: { id: productId },
-        data: { inventory: total },
-      });
+      await tx.$queryRaw`SELECT "id" FROM "products" WHERE "id" = ${productId} FOR UPDATE`;
+
+      await tx.$executeRaw`
+        UPDATE "products"
+        SET inventory = (
+          SELECT COALESCE(SUM("quantity"), 0) FROM "warehouse_stock"
+          WHERE "product_id" = ${productId} AND "variant_id" IS NULL
+        )
+        WHERE "id" = ${productId}
+      `;
     }
+  }
+
+  // ─── Reconciliation (shadow WarehouseStock → authoritative aggregate) ───────
+
+  /**
+   * Resolve the "default" warehouse for a store — the one that absorbs the
+   * reconciliation residual in `reconcileWarehouseStockToAggregate`.
+   *
+   * Selection order:
+   *   1. `isDefault === true` wins outright, regardless of priority/active.
+   *   2. Else the HIGHEST-`priority` warehouse among `isActive === true` ones.
+   *   3. Else the first warehouse (createdAt asc) — even if inactive.
+   *   4. `null` if the store has zero warehouses.
+   *
+   * Fix wave 1 (2026-07): the Task 2 brief specified "lowest priority" for
+   * fallback #2 — that was wrong. The schema documents
+   * `priority Int // Higher = preferred` with
+   * `@@index([storeId, priority(sort: Desc)])`, and `routeOrder` (above)
+   * already sorts `priority: 'desc'` (higher = preferred for order
+   * fulfillment routing). Flipped to match: HIGHEST priority wins the
+   * fallback, consistent with the schema + routeOrder's convention.
+   */
+  static async resolveDefaultWarehouse(
+    storeId: string
+  ): Promise<{ id: string; isDefault: boolean; priority: number; isActive: boolean } | null> {
+    const warehouses = await prisma.warehouse.findMany({
+      where: { storeId },
+      select: { id: true, isDefault: true, priority: true, isActive: true },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+
+    if (warehouses.length === 0) return null;
+
+    const explicitDefault = warehouses.find(w => w.isDefault);
+    if (explicitDefault) return explicitDefault;
+
+    const activeByHighestPriority = [...warehouses]
+      .filter(w => w.isActive)
+      .sort((a, b) => b.priority - a.priority)[0];
+    if (activeByHighestPriority) return activeByHighestPriority;
+
+    return warehouses[0];
+  }
+
+  /**
+   * Reconcile the WarehouseStock shadow for one SKU (productId + optional
+   * variantId) back to the authoritative `Product.inventory` /
+   * `ProductVariant.inventory`.
+   *
+   * THE BUG this fixes: `Product.inventory`/`ProductVariant.inventory` has 4
+   * writers, but only `setStock`/`adjustStock` (via `syncAggregateInventory`)
+   * touch `WarehouseStock`. Any OTHER writer (e.g. order placement
+   * decrementing the aggregate directly) moves the authoritative value
+   * WITHOUT moving the shadow, so `SUM(WarehouseStock) != Product.inventory`
+   * drifts. This method reconciles the shadow TO the aggregate — it never
+   * writes `Product.inventory`/`ProductVariant.inventory` itself.
+   *
+   * Fast path: stores with zero warehouses (the common case) are a pure
+   * no-op — `WarehouseStock` isn't in play for them at all.
+   *
+   * Locking discipline mirrors `syncAggregateInventory` (Task 1): take a
+   * `SELECT … FOR UPDATE` lock on the aggregate row (Product or
+   * ProductVariant — guaranteed to exist, unlike a possibly-absent
+   * WarehouseStock row) BEFORE reading the SUM, inside one `withMoneyTx`
+   * transaction. This serializes concurrent reconciles/adjustStock calls for
+   * the same SKU exactly the way Task 1 serializes concurrent aggregate
+   * syncs. The actual write reuses `upsertWarehouseStock` — the SAME atomic
+   * `INSERT … ON CONFLICT … RETURNING` helper Task 1 built — applying the
+   * diff as a relative delta to the default warehouse's row.
+   *
+   * Clamp-vs-negative decision (documented + tested, see
+   * task-2-report.md): the default warehouse's row is allowed to go
+   * NEGATIVE. This is deliberate — the invariant this helper exists to
+   * restore is `SUM(WarehouseStock for this SKU) === authoritative
+   * aggregate`, always, exactly. Clamping the default's absorption at 0
+   * would silently re-introduce drift whenever the default warehouse cannot
+   * absorb the full diff on its own (e.g. default holds 2 units, diff is
+   * -9): clamping leaves SUM off by the unabsorbed residual, which is
+   * exactly the bug this task fixes, just smaller. Allow-negative keeps the
+   * invariant exact in every case. A negative per-warehouse row is a
+   * reconciliation signal (this warehouse's shadow has never legitimately
+   * gone negative from `adjustStock`, which still floors at 0) — a
+   * follow-up could surface/alert on it, but that's out of this task's
+   * scope (helper + backfill only, no wiring).
+   *
+   * Deadlock-safety (fix wave 1, 2026-07): `setStock`/`adjustStock` lock
+   * WarehouseStock (via `upsertWarehouseStock`'s own row lock/upsert) FIRST,
+   * then the aggregate `FOR UPDATE` (inside `syncAggregateInventory`) SECOND.
+   * This method acquires the aggregate `FOR UPDATE` first, then the
+   * WarehouseStock upsert — the OPPOSITE order. A concurrent `adjustStock` +
+   * `reconcile` on the same SKU/default-warehouse row can therefore deadlock
+   * (Postgres 40P01). Rather than restructure the lock order here (which
+   * would touch the Task-1-reviewed `adjustStock`/`setStock` code, or invert
+   * this method's own two-lock sequence in a way that's easy to get subtly
+   * wrong), this method is wrapped in `retryOnWriteConflict` at the call
+   * site: reconcile is read-then-diff-then-write and idempotent (re-running
+   * converges to the same `SUM == aggregate`), so retrying the whole
+   * transaction on a deadlock/serialization failure is safe.
+   *
+   * Verified empirically against real docker Postgres: the raw
+   * `$queryRaw`/`$executeRaw` calls this method and `upsertWarehouseStock`
+   * use surface a genuine deadlock as the RAW Postgres error code `40P01`
+   * on `err.code` directly (`PrismaClientKnownRequestError` passes the raw
+   * DB error code through for a failed raw query) — NOT translated to
+   * Prisma's `P2034` the way an ORM-level interactive-transaction conflict
+   * is. `retryOnWriteConflict`'s default `RETRYABLE_CODES` only contains
+   * `P2034`, so `40P01` (and, for the same reason, `40001`
+   * serialization_failure) is passed via `extraRetryCodes` — the extension
+   * point the helper already exposes for exactly this ("Only pass codes
+   * that a transaction RE-RUN can actually resolve", which a
+   * deadlock/serialization failure is). This is additive — it does not
+   * touch the shared `RETRYABLE_CODES` set, so every other caller of
+   * `retryOnWriteConflict` (cart.service, etc.) is unaffected.
+   */
+  static async reconcileWarehouseStockToAggregate(
+    storeId: string,
+    productId: string,
+    variantId: string | null = null
+  ): Promise<{ reconciled: boolean; diff: number }> {
+    // Fast path: single-/no-warehouse stores (the majority of merchants)
+    // have no WarehouseStock rows to drift — nothing to reconcile.
+    const warehouseCount = await prisma.warehouse.count({ where: { storeId } });
+    if (warehouseCount === 0) {
+      return { reconciled: false, diff: 0 };
+    }
+
+    const defaultWarehouse = await WarehouseService.resolveDefaultWarehouse(storeId);
+    if (!defaultWarehouse) {
+      // Unreachable given warehouseCount > 0 above, but keep the null-safe
+      // contract explicit rather than assuming resolveDefaultWarehouse's
+      // internals.
+      return { reconciled: false, diff: 0 };
+    }
+
+    return retryOnWriteConflict(
+      () =>
+        withMoneyTx(prisma, async tx => {
+          let authoritative: number;
+
+          if (variantId) {
+            const rows = await tx.$queryRaw<Array<{ inventory: number }>>`
+              SELECT "inventory" FROM "product_variants" WHERE "id" = ${variantId} FOR UPDATE
+            `;
+            if (rows.length === 0) {
+              throw new AppError(404, 'VARIANT_NOT_FOUND', 'Variant not found');
+            }
+            authoritative = rows[0].inventory;
+          } else {
+            const rows = await tx.$queryRaw<Array<{ inventory: number }>>`
+              SELECT "inventory" FROM "products" WHERE "id" = ${productId} AND "store_id" = ${storeId} FOR UPDATE
+            `;
+            if (rows.length === 0) {
+              throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+            }
+            authoritative = rows[0].inventory;
+          }
+
+          const sumRows = variantId
+            ? await tx.$queryRaw<Array<{ sum: number }>>`
+                SELECT COALESCE(SUM("quantity"), 0)::int AS sum FROM "warehouse_stock"
+                WHERE "product_id" = ${productId} AND "variant_id" = ${variantId}
+              `
+            : await tx.$queryRaw<Array<{ sum: number }>>`
+                SELECT COALESCE(SUM("quantity"), 0)::int AS sum FROM "warehouse_stock"
+                WHERE "product_id" = ${productId} AND "variant_id" IS NULL
+              `;
+          const currentSum = sumRows[0]?.sum ?? 0;
+          const diff = authoritative - currentSum;
+
+          if (diff === 0) {
+            return { reconciled: false, diff: 0 };
+          }
+
+          // Apply the diff as a relative delta to the default warehouse's row
+          // — works identically whether or not that row existed before
+          // (initialQty covers the INSERT branch). No GREATEST(0, …) clamp:
+          // see docstring.
+          await WarehouseService.upsertWarehouseStock(tx, {
+            warehouseId: defaultWarehouse.id,
+            productId,
+            variantId,
+            storeId,
+            setExpr: Prisma.sql`"warehouse_stock"."quantity" + ${diff}`,
+            initialQty: diff,
+          });
+
+          return { reconciled: true, diff };
+        }),
+      {
+        retries: 3,
+        label: 'reconcileWarehouseStockToAggregate',
+        // Raw deadlock (40P01) / serialization-failure (40001) codes — see
+        // docstring above for why these don't come through as P2034 here.
+        extraRetryCodes: ['40P01', '40001'],
+      }
+    );
+  }
+
+  /**
+   * Backfill: reconcile every SKU (productId + optional variantId) that has
+   * ANY WarehouseStock row for the store. Batched to avoid loading the whole
+   * store's stock table at once. Idempotent — a SKU that's already
+   * consistent (or was just fixed) reconciles to `{ reconciled: false }` on
+   * the next pass and is not counted again.
+   *
+   * Per-SKU isolation (fix wave 1, 2026-07): `reconcileWarehouseStockToAggregate`
+   * throws `AppError(404)` if the product/variant row isn't found under lock
+   * — e.g. a SOFT-deleted product (the reconcile lookup intentionally has no
+   * `deletedAt: null` filter, since a soft-deleted product's aggregate is
+   * still a real row to reconcile against if it exists) or a genuine
+   * TOCTOU hard-delete race between listing the SKU and locking it. Without
+   * a per-SKU try/catch, ONE bad SKU aborted the entire unattended admin
+   * sweep. Each SKU's reconcile is now isolated: on any thrown error
+   * (business AppError or otherwise) it's logged with productId/variantId
+   * and counted as failed, and the loop continues — it never re-throws.
+   * Soft-deleted / hard-deleted SKUs are handled this way (skip-via-catch)
+   * rather than pre-filtered at the listing query, because the catch is the
+   * single source of truth for "un-reconcilable" and also covers the TOCTOU
+   * race a `deletedAt: null` pre-filter can't defend against.
+   */
+  static async backfillReconcileAll(
+    storeId: string
+  ): Promise<{ skusReconciled: number; skusFailed: number }> {
+    const warehouseCount = await prisma.warehouse.count({ where: { storeId } });
+    if (warehouseCount === 0) {
+      return { skusReconciled: 0, skusFailed: 0 };
+    }
+
+    const BATCH_SIZE = 100;
+    let skip = 0;
+    let skusReconciled = 0;
+    let skusFailed = 0;
+
+    for (;;) {
+      const skus = await prisma.warehouseStock.findMany({
+        where: { storeId },
+        select: { productId: true, variantId: true },
+        distinct: ['productId', 'variantId'],
+        orderBy: [{ productId: 'asc' }, { variantId: 'asc' }],
+        skip,
+        take: BATCH_SIZE,
+      });
+
+      if (skus.length === 0) break;
+
+      for (const sku of skus) {
+        try {
+          const result = await WarehouseService.reconcileWarehouseStockToAggregate(
+            storeId,
+            sku.productId,
+            sku.variantId
+          );
+          if (result.reconciled) skusReconciled++;
+        } catch (err) {
+          skusFailed++;
+          logger.error(
+            {
+              storeId,
+              productId: sku.productId,
+              variantId: sku.variantId,
+              err: err instanceof Error ? err.message : String(err),
+            },
+            '[Warehouse] backfill reconcile: SKU failed, skipping'
+          );
+        }
+      }
+
+      if (skus.length < BATCH_SIZE) break;
+      skip += BATCH_SIZE;
+    }
+
+    logger.info({ storeId, skusReconciled, skusFailed }, '[Warehouse] backfill reconcile complete');
+
+    return { skusReconciled, skusFailed };
   }
 
   // ─── Order routing ─────────────────────────────────────────────────────────

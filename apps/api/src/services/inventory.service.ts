@@ -1,6 +1,7 @@
 import { prisma, Prisma, InventoryChangeType } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { notificationDispatcher } from './notification-dispatcher.service';
+import { WarehouseService } from './warehouse.service';
 import logger from '../lib/logger';
 
 interface InventoryAdjustment {
@@ -376,6 +377,26 @@ export class InventoryService {
       );
     }
 
+    // Re-sync the WarehouseStock shadow to the aggregate we just committed.
+    // This service is product-level only (no variantId concept), so the
+    // SKU is always (productId, variantId=null) — the SKU THIS call
+    // actually touched, never admin-supplied. Best-effort: the aggregate
+    // write above already committed, so a reconcile failure must not fail
+    // this already-successful admin request — log and swallow. The
+    // no-op fast path makes this ~free for single-/no-warehouse stores.
+    try {
+      await WarehouseService.reconcileWarehouseStockToAggregate(
+        storeId,
+        adjustment.productId,
+        null
+      );
+    } catch (err) {
+      logger.error(
+        { err, storeId, productId: adjustment.productId, variantId: null },
+        '[InventoryService] adjustInventory: warehouse stock reconcile failed (best-effort)'
+      );
+    }
+
     return result;
   }
 
@@ -567,6 +588,19 @@ export class InventoryService {
           { err, storeId, productId },
           '[InventoryService] Back-in-stock notification failed'
         )
+      );
+    }
+
+    // Re-sync the WarehouseStock shadow to the aggregate we just committed —
+    // same best-effort contract as adjustInventory above (log + swallow,
+    // never fail this already-successful admin request over a shadow
+    // resync). Product-level only, so variantId is always null here.
+    try {
+      await WarehouseService.reconcileWarehouseStockToAggregate(storeId, productId, null);
+    } catch (err) {
+      logger.error(
+        { err, storeId, productId, variantId: null },
+        '[InventoryService] setInventory: warehouse stock reconcile failed (best-effort)'
       );
     }
 

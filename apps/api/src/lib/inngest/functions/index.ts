@@ -57,6 +57,10 @@ import { bulkAiExcerpt } from './bulk-ai-excerpt';
 import { bulkAiTags } from './bulk-ai-tags';
 import { accountErasedPropagation } from './account-erased-propagation';
 import {
+  warehouseReconcileSweepCron,
+  warehouseReconcileOnDemand,
+} from './warehouse-reconcile-sweep';
+import {
   answerEngineCitationScanCron,
   answerEngineScanOnDemand,
 } from './answer-engine-citation-scan';
@@ -161,6 +165,15 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // Right-to-erasure third-party propagation: OneSignal player deletion +
   // PostHog person deletion, fired after AuthService.eraseAccount commits.
   accountErasedPropagation,
+  // Item 5 data-integrity Task 4: daily completeness sweep that reconciles
+  // WarehouseStock to the authoritative Product/ProductVariant.inventory
+  // aggregate for every store with a warehouse, regardless of which writer
+  // last drifted it (the class-fix, not a per-writer hook) + its on-demand
+  // twin for the admin "Reconcile now" button. NOTE: like every new
+  // cron/event here, this is invisible to Inngest until a real deploy bumps
+  // INNGEST_DEPLOY_ID (see client.ts) — a hot-reload alone won't register it.
+  warehouseReconcileSweepCron,
+  warehouseReconcileOnDemand,
   // Answer-Engine Insights (Task 6): weekly citation scan across every
   // enabled provider (Gemini + opt-in paid engines) + its on-demand twin.
   answerEngineCitationScanCron,

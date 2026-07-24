@@ -5079,7 +5079,12 @@
       "newQtyPreview": "الكمية الجديدة: {new}",
       "showing": "عرض {from}–{to} من {total}",
       "empty": "لا مخزون بعد. أضف منتجات وحدد الكميات للبدء.",
-      "noResults": "لا نتائج لهذا البحث."
+      "noResults": "لا نتائج لهذا البحث.",
+      "reconcileAction": "مطابقة مع الإجمالي",
+      "reconciling": "جارٍ المطابقة…",
+      "reconcileHint": "يتم مطابقة أعداد كل مستودع مع مخزون المنتج المعتمد لديك.",
+      "reconcileDone": "تمت مطابقة {reconciled} منتج (فشل {failed})",
+      "reconcileStarted": "بدأت عملية المطابقة — ستُحدَّث أعداد المستودعات قريباً"
     }
   },
   "insights": {

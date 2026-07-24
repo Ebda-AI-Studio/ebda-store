@@ -22,6 +22,31 @@ interface RetryOpts {
 }
 
 /**
+ * Extracts a Prisma/Postgres error code to duck-type against.
+ *
+ * A raw `$queryRaw`/`$executeRaw` failure (e.g. `reconcileWarehouseStockToAggregate`'s
+ * `FOR UPDATE` + `INSERT … ON CONFLICT` statements) is wrapped by Prisma as
+ * `P2010` ("Raw query failed") with the ACTUAL Postgres error code (e.g.
+ * `40P01` deadlock_detected, `40001` serialization_failure) nested at
+ * `err.meta.code`, NOT at `err.code` — unlike an ORM-level interactive
+ * `$transaction` conflict, which Prisma surfaces directly as `P2034` on
+ * `err.code`. Verified empirically against real Postgres (see
+ * `.superpowers/sdd/task-2-report.md` fix wave 1). Callers that pass raw
+ * Postgres codes (`40P01`, `40001`) via `extraRetryCodes` need BOTH `err.code`
+ * and `err.meta.code` checked; callers only using Prisma's own codes (like
+ * `P2002`) are unaffected since `err.code` already matches for them.
+ */
+function extractRetryCodes(err: unknown): string[] {
+  if (typeof err !== 'object' || err === null) return [];
+  const codes: string[] = [];
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === 'string') codes.push(code);
+  const metaCode = (err as { meta?: { code?: unknown } }).meta?.code;
+  if (typeof metaCode === 'string') codes.push(metaCode);
+  return codes;
+}
+
+/**
  * Run `fn` (typically a `prisma.$transaction(...)` with Serializable isolation)
  * and retry on a write-conflict/deadlock (P2034) with exponential backoff +
  * jitter. Non-retryable errors (including AppError thrown inside the
@@ -40,19 +65,18 @@ export async function retryOnWriteConflict<T>(
     try {
       return await fn();
     } catch (err) {
-      // Duck-type on `.code` rather than `instanceof PrismaClientKnownRequestError`:
-      // P2034 is Prisma-specific, and instanceof breaks when `@force/database` is
-      // mocked in unit tests (PrismaClientKnownRequestError is undefined there →
-      // "Right-hand side of 'instanceof' is not an object", which would mask the
-      // real error). Business errors (AppError) carry codes like NOT_FOUND, never
-      // P2034, so they still propagate immediately.
-      const code =
-        typeof err === 'object' && err !== null && 'code' in err
-          ? (err as { code?: unknown }).code
-          : undefined;
-      const retryable =
-        typeof code === 'string' &&
-        (RETRYABLE_CODES.has(code) || (opts.extraRetryCodes?.includes(code) ?? false));
+      // Duck-type on `.code`/`.meta.code` rather than `instanceof
+      // PrismaClientKnownRequestError`: P2034 is Prisma-specific, and
+      // instanceof breaks when `@force/database` is mocked in unit tests
+      // (PrismaClientKnownRequestError is undefined there → "Right-hand side
+      // of 'instanceof' is not an object", which would mask the real error).
+      // Business errors (AppError) carry codes like NOT_FOUND, never P2034
+      // or a Postgres SQLSTATE, so they still propagate immediately.
+      const codes = extractRetryCodes(err);
+      const retryable = codes.some(
+        code => RETRYABLE_CODES.has(code) || (opts.extraRetryCodes?.includes(code) ?? false)
+      );
+      const code = codes[0];
       if (retryable && attempt < retries) {
         attempt++;
         // Exponential backoff with jitter so concurrent retriers de-synchronise

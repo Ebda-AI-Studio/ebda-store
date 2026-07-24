@@ -2,6 +2,7 @@ import { prisma, Prisma, withMoneyTx } from '@force/database';
 import type { StockAdjustment, StockAdjustmentItem, StockAdjustmentType } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
 import { inngest } from '../../lib/inngest/client';
+import { WarehouseService } from '../warehouse.service';
 import logger from '../../lib/logger';
 
 // InventoryChangeType mapping for StockAdjustmentType values
@@ -167,6 +168,30 @@ export async function postAdjustment(
       },
     });
   });
+
+  // Re-sync the WarehouseStock shadow for every SKU this adjustment touched
+  // — POST-COMMIT, after the money tx above has already committed. Reconcile
+  // is best-effort + internally retriable (see WarehouseService docstring),
+  // so a reconcile failure must NEVER roll back or fail this already-posted
+  // accounting adjustment: each SKU is isolated in its own try/catch that
+  // logs (structured, per-SKU) and swallows, exactly like the Inngest event
+  // fire below it. One adjustment can touch many line items/SKUs, so every
+  // item's own (productId, variantId) — never admin-supplied — is reconciled
+  // independently; one bad SKU doesn't block its siblings.
+  for (const item of adjustment.items) {
+    try {
+      await WarehouseService.reconcileWarehouseStockToAggregate(
+        storeId,
+        item.productId,
+        item.variantId
+      );
+    } catch (err) {
+      logger.error(
+        { err, storeId, adjustmentId: id, productId: item.productId, variantId: item.variantId },
+        'postAdjustment: warehouse stock reconcile failed (best-effort)'
+      );
+    }
+  }
 
   // Fire the Inngest event so the GL journal posts asynchronously
   try {

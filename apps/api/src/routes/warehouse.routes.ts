@@ -23,6 +23,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { WarehouseService } from '../services/warehouse.service';
 import { tenantContext } from '../middleware/tenant-context';
+import { inngest } from '../lib/inngest/client';
 
 const router = Router();
 
@@ -256,6 +257,47 @@ router.post(
       const body = adjustStockSchema.parse(req.body);
       const result = await WarehouseService.adjustStock(storeId, warehouseId, body);
       res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── Reconciliation (Task 5, item 5 data-integrity) ───────────────────────────
+
+// POST /stores/:storeId/warehouses/reconcile-all
+// Merchant-facing "Reconcile to aggregate" action. Resyncs every SKU's
+// WarehouseStock shadow (SUM across warehouses) to match the authoritative
+// Product.inventory / ProductVariant.inventory for this store — repairs any
+// drift left by a writer that doesn't call reconcileWarehouseStockToAggregate
+// directly (Task 2's helper; Task 3 wires the 3 admin writers, Task 4 wires
+// the refund fanout + a daily cron sweep). This is the on-demand, admin-
+// triggered fourth path.
+//
+// ASYNC (fixed 2026-07-23, Important fix wave 1): this used to call
+// `WarehouseService.backfillReconcileAll` SYNCHRONOUSLY inside the request's
+// tenant-context transaction. `backfillReconcileAll` iterates EVERY
+// WarehouseStock SKU for the store (not just drifted ones), each opening its
+// own nested `withMoneyTx` + `FOR UPDATE` serially — a large Enterprise
+// multi-warehouse catalog can blow the 30s Prisma transaction budget
+// (P2028 500), violating the project's >300ms→Inngest rule. The endpoint
+// now just emits the `warehouse/reconcile-requested` event (already wired by
+// Task 4 for exactly this — `warehouseReconcileOnDemand` in
+// `warehouse-reconcile-sweep.ts` runs `backfillReconcileAll` inside an
+// Inngest step) and returns `202 { accepted: true }` immediately. The admin
+// UI counts arrive via the async job + the daily completeness sweep, not in
+// this response.
+router.post(
+  '/:storeId/warehouses/reconcile-all',
+  ...mw,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      await inngest.send({
+        name: 'warehouse/reconcile-requested',
+        data: { storeId, requestedBy: req.user!.userId },
+      });
+      res.status(202).json({ success: true, accepted: true });
     } catch (err) {
       next(err);
     }

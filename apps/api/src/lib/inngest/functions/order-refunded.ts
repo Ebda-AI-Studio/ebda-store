@@ -5,6 +5,7 @@ import { notificationDispatcher } from '../../../services/notification-dispatche
 import { OneSignalService } from '../../../services/onesignal.service';
 import { affiliateService } from '../../../services/affiliate.service';
 import { LoyaltyService } from '../../../services/loyalty.service';
+import { WarehouseService } from '../../../services/warehouse.service';
 import logger from '../../logger';
 import { inngest } from '../client';
 
@@ -50,6 +51,11 @@ interface FanoutStep {
  * would still email "Refund issued" + WhatsApp/SMS + push the merchant,
  * re-introducing the exact spurious-notification bug `order.service.ts`
  * comments say was previously fixed.
+ *
+ * `reconcile-warehouse-stock` (added after the reversals, right before
+ * `claim-reversed`) is a THIRD, admin-view-only tier: it always runs but
+ * never throws — see the fix-wave-1 comment on that step for why a
+ * non-money shadow must never gate a money reversal or the completion stamp.
  */
 export async function handleOrderRefunded(
   orderId: string,
@@ -303,12 +309,79 @@ export async function handleOrderRefunded(
     });
   }
 
+  // Item 5 data-integrity Task 4: re-sync the WarehouseStock shadow for
+  // every SKU this order touched, now that restore-inventory (above) has
+  // committed the authoritative Product/ProductVariant.inventory restore.
+  // This is the near-immediate half of the fix (Order sale reconcile relies
+  // on the daily warehouse-reconcile-sweep instead — order-created.ts is a
+  // pure notification fanout with no natural inventory-touching step, and
+  // the checkout decrement itself is synchronous, not part of any fanout —
+  // see task-4-report.md). The refund/cancel path is different: this fanout
+  // ALREADY performs the inventory-touching restore above, so adding
+  // reconcile here is a direct continuation of its existing job list, not a
+  // new concern.
+  //
+  // Runs unconditionally (not gated on `restoreInventory`) — reconciling a
+  // SKU that had nothing to restore is a cheap no-op (see
+  // `reconcileWarehouseStockToAggregate`'s warehouse-count fast path) and
+  // this also mops up any OTHER drift the SKU may have accumulated from an
+  // unrelated writer, which is exactly the completeness goal of this task.
+  //
+  // Fix wave 1 (money-integrity gate): moved from immediately-after
+  // restore-inventory to HERE — after every money reversal (coupon,
+  // affiliate, loyalty, backorder-cancel) and the notification block, and
+  // immediately BEFORE the claim-reversed completion stamp. `WarehouseStock`
+  // is an ADMIN-VIEW-ONLY shadow with zero storefront/money read path, and
+  // `backfillReconcileAll`'s daily sweep already backstops it — it must
+  // never sit ahead of a money reversal or the completion stamp in the step
+  // order. Also made best-effort here (log + swallow, no throw), unlike the
+  // original version of this step: a persistent reconcile failure (exhausted
+  // internal `retryOnWriteConflict` retries, a `withMoneyTx` P2028 timeout,
+  // etc.) must not abort the run before the reversals/claim-reversed land —
+  // doing so would leave `refundReversedAt` permanently null and cause
+  // `refund-reversal-stuck-sweep` (which keys on `refundReversedAt IS NULL`)
+  // to re-fire `order/refunded` every tick forever, i.e. perpetual
+  // dead-letter churn driven entirely by a non-money shadow that tomorrow's
+  // sweep already covers. Mirrors the swallow-and-log precedent at the
+  // synchronous admin-writer call sites (`inventory.service.ts`
+  // adjustInventory/setInventory — Task 3). Per-SKU try/catch (mirroring
+  // `backfillReconcileAll`'s per-SKU guard in `warehouse.service.ts`) so one
+  // bad SKU can't abort reconcile for the rest of the order's items either.
+  await step.run('reconcile-warehouse-stock', () =>
+    runInTenantContext(storeId, async () => {
+      for (const item of order.items) {
+        try {
+          await WarehouseService.reconcileWarehouseStockToAggregate(
+            storeId,
+            item.productId,
+            item.variantId
+          );
+        } catch (err) {
+          logger.error(
+            {
+              err,
+              orderId,
+              storeId,
+              productId: item.productId,
+              variantId: item.variantId,
+            },
+            '[order-refunded] reconcile-warehouse-stock: SKU failed, skipping (best-effort)'
+          );
+        }
+      }
+    })
+  );
+
   // FINAL step, deliberately last. Stamps the completion claim only after every
   // reversal above has succeeded — those steps throw on failure, so a failed
   // reversal never reaches this line and Inngest retries the event while the
   // order stays visible to refund-reversal-stuck-sweep. Stamping any earlier
   // would mark an order done while one of its reversals was still failing,
   // permanently hiding a half-reversed order from the only thing that catches it.
+  //
+  // reconcile-warehouse-stock above is deliberately excluded from this
+  // guarantee — it is best-effort by design and runs immediately before this
+  // stamp specifically so a reconcile failure can never prevent it.
   //
   // Stamped regardless of whether any stock actually MOVED: a backorder-line
   // cancel (restoreInventory:false) and an order whose products are all
