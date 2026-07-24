@@ -56,6 +56,11 @@ import { bulkAiImageAlt } from './bulk-ai-image-alt';
 import { bulkAiExcerpt } from './bulk-ai-excerpt';
 import { bulkAiTags } from './bulk-ai-tags';
 import { accountErasedPropagation } from './account-erased-propagation';
+import {
+  answerEngineCitationScanCron,
+  answerEngineScanOnDemand,
+} from './answer-engine-citation-scan';
+import { gscIngestCron, gscIngestOnDemand } from './gsc-ingest';
 
 /**
  * Registry of every Inngest function the API exposes. The serve
@@ -156,4 +161,13 @@ export const inngestFunctions: InngestFunction.Any[] = [
   // Right-to-erasure third-party propagation: OneSignal player deletion +
   // PostHog person deletion, fired after AuthService.eraseAccount commits.
   accountErasedPropagation,
+  // Answer-Engine Insights (Task 6): weekly citation scan across every
+  // enabled provider (Gemini + opt-in paid engines) + its on-demand twin.
+  answerEngineCitationScanCron,
+  answerEngineScanOnDemand,
+  // Answer-Engine Insights (Plan 8B, Task 3): daily force-managed GSC Search
+  // Analytics ingestion (dormant until GSC_SERVICE_ACCOUNT_JSON is set) +
+  // its on-demand twin.
+  gscIngestCron,
+  gscIngestOnDemand,
 ];

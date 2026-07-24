@@ -10,12 +10,14 @@ import orderRoutes from './order.routes';
 import customersRoutes from './customers.routes';
 import reviewRoutes from './review.routes';
 import analyticsRoutes from './analytics.routes';
+import answerEngineRoutes from './answer-engine.routes';
 import returnRoutes from './return.routes';
 import publicRoutes from './public.routes';
 import paymentRoutes from './payment.routes';
 import paymentSettingsRoutes from './payment-settings.routes';
 import uploadRoutes from './upload.routes';
 import adminRoutes from './admin.routes';
+import adminAnswerEngineRoutes from './admin-answer-engine.routes';
 import couponRoutes from './coupon.routes';
 import shippingRoutes from './shipping.routes';
 import taxRoutes from './tax.routes';
@@ -76,6 +78,23 @@ router.use('/payment-settings', paymentSettingsRoutes);
 
 // Upload routes
 router.use('/uploads', uploadRoutes);
+
+// Answer-engine provider config (super_admin) — encrypted Perplexity/OpenAI
+// API keys + enabled toggles. AnswerEngineProviderConfig is a platform table
+// with no store_id, so tenantContext here is a no-op (same as adminRoutes
+// below) — kept only for mount-shape consistency with the other /admin routers.
+//
+// MUST be mounted BEFORE adminRoutes: admin.routes.ts applies an
+// unconditional `router.use(requireMfaEnrolled)` that gates EVERY request
+// under '/admin' (super_admin without MFA enrolled → 403), including paths
+// that don't match any of its own routes — `next(err)` from that guard
+// short-circuits straight to the app's error handler and never falls
+// through to a router mounted after it. Mounting this router first is purely
+// for REACHABILITY past that catch-all gate — the answer-engine router now
+// carries its own `authenticate → requireMfaEnrolled → requireRole(['super_admin'])`
+// chain per route (matching feature.routes.ts / insights.routes.ts), so MFA
+// enforcement is self-contained here regardless of mount order.
+router.use('/admin', tenantContext, adminAnswerEngineRoutes);
 
 // Admin routes (super_admin only).
 //
@@ -142,6 +161,7 @@ router.use('/stores/:storeId/orders', tenantContext, orderRoutes);
 router.use('/stores/:storeId', tenantContext, customersRoutes);
 router.use('/stores/:storeId/reviews', tenantContext, reviewRoutes);
 router.use('/stores/:storeId/analytics', tenantContext, analyticsRoutes);
+router.use('/stores/:storeId/answer-engine', tenantContext, answerEngineRoutes);
 router.use('/stores/:storeId/returns', tenantContext, returnRoutes);
 
 // Store-scoped routes mounted under /stores (storeId in sub-route params).

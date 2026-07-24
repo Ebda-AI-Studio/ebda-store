@@ -25,8 +25,16 @@ regexes = [
   '''EAAB1234567890abcdef''',
   '''EAAB_NEW_TOKEN_xyz''',
   '''tt_secret_abc''',
-  # Fake AI-provider API-key fixture (pplx-secret-123 in answer-engine integration test) — not real.
+  # Fake answer-engine (Perplexity/OpenAI) provider-key fixtures — CI-only, not real creds.
+  '''pplx-test-key''',
   '''pplx-secret-123''',
+  '''pplx-super-secret-key''',
+  '''sk-test-key''',
+  '''sk-good-key''',
+  '''sk-super-secret-key''',
+  # Throwaway RSA key generated for the GSC service-account client test (8B) — CI-only,
+  # never a real credential (distinctive middle-of-body substring).
+  '''ItsSCX8UKLL5pB6IGJ0EOrC6PNjAEw0q''',
 ]
 
 paths = [

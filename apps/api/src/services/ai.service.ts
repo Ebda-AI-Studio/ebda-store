@@ -65,7 +65,10 @@ type Feature =
   | 'recommendations'
   | 'tags'
   | 'image-alt'
-  | 'excerpt';
+  | 'excerpt'
+  | 'answer_engine_gemini'
+  | 'answer_engine_perplexity'
+  | 'answer_engine_openai';
 type Lang = 'en' | 'ar';
 
 export type TranslationKind =

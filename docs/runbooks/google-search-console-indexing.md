@@ -10,6 +10,21 @@ Submit `sitemap.xml` to GSC for wadyaljuz.com and verify `robots.txt` is reachab
 
 ---
 
+## Answer-Engine Insights: GSC metrics ingestion (Plan 8B, added 2026-07-23)
+
+Separate from the manual sitemap/robots.txt actions above, the platform now has an **automated daily GSC ingestion cron** (`gscIngestCron`, 04:00 UTC) that pulls each active store's Search Analytics (impressions, clicks, CTR, average position, top queries) into `GscDailyMetric` rows, surfaced on the merchant-facing `/stores/:id/answer-engine` dashboard's GSC section alongside the AEO/GEO citation-check data.
+
+This is **force-managed, not a per-merchant credential** — a single Google Cloud service account is granted read access to every Force-owned GSC property, not a client's own Search Console login. It is **dormant** (cron no-ops, zero rows, dashboard shows "Google Search Console not connected") until go-live:
+
+1. Create a Force Google Cloud service account (Google Cloud Console → IAM & Admin → Service Accounts), download its JSON key.
+2. In each merchant's GSC property → **Settings → Users and permissions → Add user**, add the service account's `client_email` as a **Restricted** (read-only) user. Repeat per property — the ingestion cron tries both the `sc-domain:` and `https://.../` property URL forms per store domain (see `gsc-client.ts`).
+3. Set `GSC_SERVICE_ACCOUNT_JSON` (the full downloaded key JSON, one line) in the API's production env — see `docs/ENVIRONMENT.md` for the exact var and dormancy behavior.
+4. Live-smoke ONE real property first (check `GscDailyMetric` rows land with non-zero impressions on a known-indexed domain) before relying on the data platform-wide — GSC data typically lags 2-3 days, so a freshly-added property may read thin for the first few days.
+
+No changes to the sitemap/robots.txt/structured-data guidance above are needed for this — it is a read-only Search Analytics pull, not an indexing action.
+
+---
+
 ## Per-file GSC action table
 
 | File / URL                         | GSC action needed?            | What to do                                                                                                                                                                                                                                                                                                                                                                                                                                                              |

@@ -25,6 +25,7 @@ export const FEATURE_KEYS_ARRAY = [
   'affiliate',
   'marketing_pixels',
   'agent_feed',
+  'answer_engine_insights',
   'shipping_carriers',
   'staff_accounts',
   'pwa',
@@ -265,6 +266,17 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'Publishes a machine-readable product feed at /feeds/products.json so AI assistants and shopping agents (ChatGPT, Perplexity, and agent crawlers) can read, cite, and recommend the store’s products. Follows the OpenAI Product Feed field conventions.',
     descriptionAr:
       'ينشر خلاصة منتجات قابلة للقراءة آليًا على /feeds/products.json حتى تتمكن مساعدات الذكاء الاصطناعي ووكلاء التسوق (ChatGPT وPerplexity وزواحف الوكلاء) من قراءة منتجات المتجر والاستشهاد بها والتوصية بها. تتبع اصطلاحات حقول خلاصة منتجات OpenAI.',
+    category: 'marketing',
+    tier: 'addon',
+  },
+  answer_engine_insights: {
+    key: 'answer_engine_insights',
+    name: 'Answer-Engine Insights',
+    nameAr: 'رؤى محركات الإجابة',
+    description:
+      'Measures whether AI answer engines (ChatGPT, Perplexity, Google AI Overviews) surface and cite the store when shoppers ask about its products — tracking answer-engine visibility alongside traditional search.',
+    descriptionAr:
+      'يقيس ما إذا كانت محركات الإجابة بالذكاء الاصطناعي (ChatGPT وPerplexity ونظرة Google العامة بالذكاء الاصطناعي) تعرض المتجر وتستشهد به عندما يسأل المتسوقون عن منتجاته — لتتبع ظهور المتجر في محركات الإجابة إلى جانب البحث التقليدي.',
     category: 'marketing',
     tier: 'addon',
   },

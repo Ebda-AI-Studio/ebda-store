@@ -71,6 +71,9 @@ const STARTER_CORE: FeatureKey[] = [
   // from the platform, not from gating the differentiator. Restrict a specific
   // client via a StoreFeature override, as with `whatsapp` and `staff_accounts`.
   'agent_feed',
+  // Answer-Engine Insights (Task 1, 2026-07-22): same AI-first rationale as
+  // agent_feed above — default-ON for every paid plan, off on free.
+  'answer_engine_insights',
   'upsell_crosssell',
   'accounting.profit_anomaly',
 ];

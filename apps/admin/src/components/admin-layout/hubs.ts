@@ -70,6 +70,7 @@ export type HubLabels = {
   affiliates: string;
   abandonedCarts: string;
   paymentAbandonments: string;
+  answerEngine: string;
 };
 
 export const HUBS: HubDefinition[] = [
@@ -172,10 +173,12 @@ export const HUBS: HubDefinition[] = [
       '/affiliates',
       '/abandoned-carts',
       '/payment-abandonments',
+      '/answer-engine',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.aiTools, href: `/stores/${storeId}/ai-tools` },
       { label: labels.aiUsage, href: `/stores/${storeId}/ai-usage` },
+      { label: labels.answerEngine, href: `/stores/${storeId}/answer-engine` },
       { label: labels.notifications, href: `/stores/${storeId}/notifications` },
       { label: labels.newsletter, href: `/stores/${storeId}/newsletter` },
       { label: labels.abandonedCarts, href: `/stores/${storeId}/abandoned-carts` },

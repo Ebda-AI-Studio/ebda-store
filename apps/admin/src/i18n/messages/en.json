@@ -4281,6 +4281,7 @@
         "insightsProducts": "Products",
         "aiTools": "AI Tools",
         "aiUsage": "Usage",
+        "answerEngine": "Answer-Engine Insights",
         "whatsapp": "WhatsApp",
         "marketingPixels": "Pixels",
         "notifications": "Notifications",
@@ -5422,6 +5423,33 @@
       "errorDisable": "Invalid code. Please try again.",
       "successEnabled": "2FA has been enabled for your account.",
       "successDisabled": "2FA has been disabled."
+    }
+  },
+  "answerEngine": {
+    "page": {
+      "title": "Answer-Engine Insights",
+      "subtitle": "See whether ChatGPT, Perplexity, and Google AI Overviews cite your store — and fix the prompts that don't.",
+      "noData": "No citation checks yet — the weekly scan will populate this once it runs.",
+      "citedRate": "{rate} cited rate",
+      "groundedCaveat": "Based on model knowledge — no live citations found in the latest run. Treat this signal as unverified.",
+      "trendTitle": "Cited rate — recent runs",
+      "promptsTitle": "Prompts checked (latest run)",
+      "citedInstead": "Cited instead:",
+      "recCta": "Run AI citation fix",
+      "lastRunAt": "Last checked {date}"
+    },
+    "gsc": {
+      "sectionTitle": "Google Search Console",
+      "impressions": "Impressions",
+      "clicks": "Clicks",
+      "ctr": "CTR",
+      "avgPosition": "Avg. position",
+      "trendTitle": "Impressions & clicks — recent days",
+      "noTrend": "No search performance data yet.",
+      "topQueriesTitle": "Top queries (latest day)",
+      "noTopQueries": "No query data yet.",
+      "notConnectedTitle": "Google Search Console not connected",
+      "notConnectedBody": "Once Force AI's Search Console access is set up for your store's domain, search impressions, clicks, and top queries will appear here automatically — no action needed on your end."
     }
   },
   "paymentAbandonments": {

@@ -8,7 +8,7 @@ import {
   lowestPlanForFeature,
   type StorePlan,
 } from '../plan-baselines';
-import { FEATURE_REGISTRY, type FeatureKey } from '../features';
+import { FEATURE_KEYS_ARRAY, FEATURE_REGISTRY, type FeatureKey } from '../features';
 
 describe('PLAN_BASELINE', () => {
   it('every plan in STORE_PLANS has a baseline array', () => {
@@ -93,6 +93,15 @@ describe('PLAN_BASELINE', () => {
   it('free does not get AI features (lapsed-payment grace state)', () => {
     expect(PLAN_BASELINE.free).not.toContain('agent_feed');
     expect(PLAN_BASELINE.free).not.toContain('accounting.profit_anomaly');
+  });
+
+  // Answer-Engine Insights (Task 1, 2026-07-22): default-ON for all paid
+  // plans, off on free — mirrors the agent_feed AI-first baseline above.
+  it('answer_engine_insights is registered and default-ON for all paid plans, off on free', () => {
+    expect(FEATURE_KEYS_ARRAY).toContain('answer_engine_insights');
+    expect(FEATURE_REGISTRY.answer_engine_insights.key).toBe('answer_engine_insights');
+    expect(PLAN_BASELINE.starter).toContain('answer_engine_insights');
+    expect(PLAN_BASELINE.free).not.toContain('answer_engine_insights');
   });
 
   it('no baseline array contains duplicate keys', () => {

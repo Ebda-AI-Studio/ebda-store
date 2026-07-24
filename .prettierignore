@@ -7,3 +7,6 @@ coverage
 *.min.css
 package-lock.json
 pnpm-lock.yaml
+
+# superpowers SDD scratch workspace
+.superpowers/

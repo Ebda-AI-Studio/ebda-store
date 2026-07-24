@@ -246,6 +246,22 @@ type AccountErasedEvent = EventPayload & {
   };
 };
 
+type AnswerEngineScanRequestedEvent = EventPayload & {
+  name: 'answer-engine/scan-requested';
+  data: {
+    storeId: string;
+  };
+};
+
+// Plan 8B, Task 3: force-managed GSC Search Analytics daily ingestion —
+// on-demand twin of gscIngestCron (see functions/gsc-ingest.ts).
+type GscIngestRequestedEvent = EventPayload & {
+  name: 'gsc/ingest-requested';
+  data: {
+    storeId: string;
+  };
+};
+
 export type AppEvent =
   | OrderCreatedEvent
   | BulkImportStartedEvent
@@ -271,7 +287,9 @@ export type AppEvent =
   | BulkAiImageAltEvent
   | BulkAiExcerptEvent
   | BulkAiTagsEvent
-  | AccountErasedEvent;
+  | AccountErasedEvent
+  | AnswerEngineScanRequestedEvent
+  | GscIngestRequestedEvent;
 
 // Inngest re-registers the function manifest only when it detects a
 // deploy-version change. Without an explicit deploy id, Railway boots

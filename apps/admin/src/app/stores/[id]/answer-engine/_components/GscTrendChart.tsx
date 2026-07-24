@@ -1,0 +1,62 @@
+'use client';
+
+import { useT } from '@/i18n/useT';
+import { formatPercent, formatPosition, type GscTrendPoint } from './types';
+
+interface GscTrendChartProps {
+  trend: GscTrendPoint[];
+}
+
+/**
+ * Minimal pure-CSS bar chart, no chart library — clones `TrendChart`'s
+ * zero-dep approach exactly (native `title` tooltip, SSR-safe). Bars are
+ * scaled to impressions (the larger-magnitude metric); clicks render as an
+ * overlaid inner bar so both are visible at a glance, tooltip carries the
+ * full day's numbers including CTR and position.
+ */
+export function GscTrendChart({ trend }: GscTrendChartProps) {
+  const t = useT('answerEngine.gsc');
+
+  if (trend.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t('noTrend')}</p>;
+  }
+
+  const maxImpressions = Math.max(...trend.map(p => p.impressions), 1);
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground mb-4">{t('trendTitle')}</h2>
+      <div className="flex items-end gap-2 h-32">
+        {trend.map(point => {
+          const impressionsHeight = (point.impressions / maxImpressions) * 100;
+          const clicksHeight = point.impressions > 0 ? (point.clicks / maxImpressions) * 100 : 0;
+          return (
+            <div key={point.date} className="flex-1 flex flex-col items-center gap-1 group">
+              <div
+                className="relative w-full bg-primary/20 rounded-t transition-all"
+                style={{ height: `${Math.max(impressionsHeight, 2)}%` }}
+                title={`${point.date}: ${point.impressions.toLocaleString()} ${t('impressions')}, ${point.clicks.toLocaleString()} ${t('clicks')}, ${formatPercent(point.ctr)} ${t('ctr')}, ${t('avgPosition')} ${formatPosition(point.position)}`}
+              >
+                <div
+                  className="absolute bottom-0 w-full bg-primary rounded-t group-hover:bg-primary/90"
+                  style={{ height: `${Math.max(clicksHeight, clicksHeight > 0 ? 2 : 0)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-muted-foreground -rotate-45 origin-top-left rtl:origin-top-right whitespace-nowrap">
+                {point.date.slice(5)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-sm bg-primary/20" /> {t('impressions')}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-sm bg-primary" /> {t('clicks')}
+        </span>
+      </div>
+    </div>
+  );
+}

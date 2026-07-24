@@ -44,8 +44,9 @@ describe('Feature Registry', () => {
     //   for the 3-tier plan system — see packages/shared/src/plan-baselines.ts).
     // 2026-06-22: 37 keys (added payment_abandonment Enterprise feature).
     // 2026-07-13: 38 keys (added agent_feed add-on feature).
-    it('has exactly 38 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(38);
+    // 2026-07-22: 39 keys (added answer_engine_insights add-on feature).
+    it('has exactly 39 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(39);
     });
   });
 

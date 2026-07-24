@@ -428,6 +428,8 @@ model Store {
   warehouseStock           WarehouseStock[]
   countSessions            CountSession[]
   staffMembers             StoreStaff[]               @relation("StoreStaffMembers")
+  answerEngineChecks       AnswerEngineCheck[]
+  gscDailyMetrics          GscDailyMetric[]
 
   @@index([ownerId])
   @@index([status])
@@ -3307,6 +3309,28 @@ model ProductDailyView {
   @@map("product_daily_views")
 }
 
+// Answer Engine Insights (AEO) — Google Search Console daily metrics.
+// Aggregate-not-event (mirrors ProductDailyView): one row per store/date,
+// upserted idempotently by the GSC ingestion cron.
+model GscDailyMetric {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  date        DateTime @db.Date
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  ctr         Float    @default(0)
+  position    Float    @default(0) @map("avg_position")
+  topQueries  Json     @default("[]") @map("top_queries")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, date])
+  @@index([storeId, date(sort: Desc)])
+  @@map("gsc_daily_metrics")
+}
+
 // ==========================================
 // Barcode Scanning — Cycle-count Sessions
 // ==========================================
@@ -3524,4 +3548,48 @@ model WarehouseStock {
   @@index([variantId])
   @@index([storeId])
   @@map("warehouse_stock")
+}
+
+// ==========================================
+// Answer Engine Insights (AEO)
+// 2026-07: feat/answer-engine-insights
+// ==========================================
+//
+// Append-only rows recording whether an AI answer engine (Gemini/Perplexity/
+// OpenAI) cited a store when asked a representative prompt. Written by a
+// scheduled check job, read by an admin insights dashboard. No updates —
+// each run inserts a new row (immutable audit trail, mirrors order_events).
+//
+// AnswerEngineProviderConfig is a PLATFORM-level table (no store_id) holding
+// the encrypted API key + enabled toggle for Perplexity/OpenAI; Gemini uses
+// the platform default key and needs no row here. Not tenant data — no RLS.
+
+model AnswerEngineCheck {
+  id             String   @id @default(uuid())
+  storeId        String   @map("store_id")
+  engine         String // 'gemini' | 'perplexity' | 'openai'
+  promptText     String   @map("prompt_text")
+  locale         String   @default("en")
+  cited          Boolean  @default(false)
+  rank           Int?
+  snippet        String?
+  citedUrls      Json     @default("[]") @map("cited_urls")
+  competitorUrls Json     @default("[]") @map("competitor_urls")
+  runAt          DateTime @default(now()) @map("run_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, runAt(sort: Desc)])
+  @@index([storeId, engine, runAt(sort: Desc)])
+  @@map("answer_engine_checks")
+}
+
+model AnswerEngineProviderConfig {
+  id        String   @id @default(uuid())
+  engine    String   @unique // 'perplexity' | 'openai' (gemini needs no row — uses platform key)
+  apiKey    String?  @map("api_key") // encrypted
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("answer_engine_provider_configs")
 }

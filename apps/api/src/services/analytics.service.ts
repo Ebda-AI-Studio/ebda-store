@@ -9,7 +9,11 @@ import { profitAndLoss } from './accounting/reports.service';
 
 const analyticsMemCache = new Map<string, { data: unknown; expiresAt: number }>();
 
-async function getCachedAnalytics<T>(
+// Exported (2026-07-22, answer-engine dashboard) so other read-only,
+// tenant-scoped aggregation services can reuse the same Redis-then-memory
+// cache-aside helper instead of re-implementing it — see
+// `services/answer-engine/dashboard.service.ts`.
+export async function getCachedAnalytics<T>(
   key: string,
   ttl: number,
   fetchFn: () => Promise<T>
