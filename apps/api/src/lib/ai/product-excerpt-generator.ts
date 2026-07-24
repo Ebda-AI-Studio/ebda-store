@@ -31,7 +31,7 @@ export interface GeneratedProductExcerpt {
   excerptAr: string;
 }
 
-function buildExcerptPrompt(input: GenerateProductExcerptInput): string {
+export function buildExcerptPrompt(input: GenerateProductExcerptInput): string {
   const { storeName, product } = input;
   return `You write short product excerpts for a Kuwait-based e-commerce store called ${storeName}.
 

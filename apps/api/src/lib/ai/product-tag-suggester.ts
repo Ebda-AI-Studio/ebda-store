@@ -25,7 +25,7 @@ export interface SuggestProductTagsInput {
   existingTagNames: string[];
 }
 
-function buildTagsPrompt(input: SuggestProductTagsInput): string {
+export function buildTagsPrompt(input: SuggestProductTagsInput): string {
   const { storeName, product, existingTagNames } = input;
   const existingList =
     existingTagNames.length > 0 ? existingTagNames.join(', ') : '(no tags yet in this store)';

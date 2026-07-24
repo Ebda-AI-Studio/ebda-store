@@ -1,0 +1,5 @@
+{
+  "maxDeltaPct": 0.25,
+  "maxTotalUsdPerDay": 5.0,
+  "_note": "Fail if any feature's estimated $/day rises > maxDeltaPct vs cost-baseline.json, or total > maxTotalUsdPerDay. Regenerate the baseline (npm run ai:cost:baseline) and commit it in the same PR when an increase is intentional."
+}
