@@ -14,6 +14,8 @@ import { reviewSpamStatusMismatch } from './review-spam-status-mismatch';
 import { reviewSummaryThemeTooLong } from './review-summary-theme-too-long';
 import { descriptionBalanceWrongLanguageSlot } from './description-balance-wrong-language-slot';
 import { translationWrongTargetScript } from './translation-wrong-target-script';
+import { expenseOcrTotalMismatch } from './expense-ocr-total-mismatch';
+import { expenseOcrBadCurrencyAndLineItem } from './expense-ocr-bad-currency-and-lineitem';
 
 /**
  * Every known real-or-realistic regression case, across every AI output
@@ -38,4 +40,6 @@ export const KNOWN_FAILURE_CASES: KnownFailureCase[] = [
   reviewSummaryThemeTooLong,
   descriptionBalanceWrongLanguageSlot,
   translationWrongTargetScript,
+  expenseOcrTotalMismatch,
+  expenseOcrBadCurrencyAndLineItem,
 ];

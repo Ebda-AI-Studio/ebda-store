@@ -38,7 +38,8 @@ export type AiOutputType =
   | 'review-translation'
   | 'review-spam-detection'
   | 'review-summary'
-  | 'review-owner-response';
+  | 'review-owner-response'
+  | 'expense-ocr';
 
 /** Result of a single check (deterministic or model-judge). */
 export interface CheckResult {

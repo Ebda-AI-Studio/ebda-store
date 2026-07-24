@@ -1415,6 +1415,172 @@ const reviewOwnerResponse: CriteriaSpec<ReviewOwnerResponseEvalInput, OwnerRespo
 };
 
 // ---------------------------------------------------------------------------
+// 22. expense-ocr — apps/api/src/services/accounting/expense-ocr.service.ts
+// Vision extraction of a receipt/invoice into structured accounting data. This
+// is the one AI feature that touches money end-to-end, so its deterministic
+// layer enforces arithmetic + format integrity (a wrong total / invented line
+// item / bad currency is caught offline, without the source image); the judge
+// layer covers image-grounded hallucination (nightly).
+// ---------------------------------------------------------------------------
+
+/** Structural shape of expense-ocr output (mirrors OcrReceiptResult in the service). */
+interface OcrEvalOutput {
+  vendor: string | null;
+  vendorAr: string | null;
+  invoiceDate: string | null;
+  currency: string;
+  subtotal: number | null;
+  taxAmount: number | null;
+  total: number | null;
+  lineItems: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number }>;
+  category: string;
+  confidence: number;
+}
+
+/** Money-tolerant equality: absolute 0.05 OR 1% of the larger magnitude (receipt rounding). */
+function moneyApproxEqual(a: number, b: number): boolean {
+  return Math.abs(a - b) <= Math.max(0.05, 0.01 * Math.max(Math.abs(a), Math.abs(b)));
+}
+const isFiniteNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+const expenseOcr: CriteriaSpec<{ receiptUrl?: string }, OcrEvalOutput> = {
+  type: 'expense-ocr',
+  description: 'Vision OCR of a receipt/invoice into structured accounting fields',
+  deterministic: [
+    {
+      name: 'shape-valid',
+      run: (_input, output) => ({
+        pass:
+          isNonEmptyString(output?.currency) &&
+          isFiniteNum(output?.confidence) &&
+          Array.isArray(output?.lineItems),
+        reason: 'currency (string), confidence (number) and lineItems (array) are required',
+      }),
+    },
+    {
+      name: 'currency-iso-code',
+      run: (_input, output) => ({
+        pass: typeof output?.currency === 'string' && /^[A-Z]{3}$/.test(output.currency),
+        reason: 'currency must be a 3-letter uppercase ISO code (e.g. KWD)',
+      }),
+    },
+    {
+      name: 'confidence-in-range',
+      run: (_input, output) => ({
+        pass: isFiniteNum(output?.confidence) && output.confidence >= 0 && output.confidence <= 1,
+        reason: 'confidence must be a number in [0, 1]',
+      }),
+    },
+    {
+      name: 'amounts-non-negative',
+      run: (_input, output) => {
+        const vals = [output?.subtotal, output?.taxAmount, output?.total];
+        const bad = vals.some(v => v != null && (!isFiniteNum(v) || v < 0));
+        return {
+          pass: !bad,
+          reason: 'subtotal/taxAmount/total, when present, must be finite and >= 0',
+        };
+      },
+    },
+    {
+      name: 'total-reconciles',
+      run: (_input, output) => {
+        // Only assert when all three are present; a receipt missing a field can't be reconciled.
+        if (
+          !isFiniteNum(output?.subtotal) ||
+          !isFiniteNum(output?.taxAmount) ||
+          !isFiniteNum(output?.total)
+        ) {
+          return {
+            pass: true,
+            reason: 'not all of subtotal/tax/total present — reconciliation skipped',
+          };
+        }
+        const ok = moneyApproxEqual(
+          output.total,
+          (output.subtotal as number) + (output.taxAmount as number)
+        );
+        return {
+          pass: ok,
+          reason: 'total must equal subtotal + taxAmount (within rounding tolerance)',
+        };
+      },
+    },
+    {
+      name: 'line-items-reconcile',
+      run: (_input, output) => {
+        const items = output?.lineItems ?? [];
+        if (items.length === 0)
+          return { pass: true, reason: 'no line items — reconciliation skipped' };
+        const target = isFiniteNum(output?.subtotal)
+          ? (output.subtotal as number)
+          : isFiniteNum(output?.total)
+            ? (output.total as number)
+            : null;
+        if (target == null) return { pass: true, reason: 'no subtotal/total to reconcile against' };
+        const sum = items.reduce((s, li) => s + (isFiniteNum(li?.lineTotal) ? li.lineTotal : 0), 0);
+        return {
+          pass: moneyApproxEqual(sum, target),
+          reason: 'sum of line-item lineTotals must match subtotal (or total) within tolerance',
+        };
+      },
+    },
+    {
+      name: 'line-item-internal-consistency',
+      run: (_input, output) => {
+        const items = output?.lineItems ?? [];
+        const bad = items.find(
+          li =>
+            isFiniteNum(li?.quantity) &&
+            isFiniteNum(li?.unitPrice) &&
+            isFiniteNum(li?.lineTotal) &&
+            !moneyApproxEqual(li.lineTotal, li.quantity * li.unitPrice)
+        );
+        return {
+          pass: !bad,
+          reason: 'each line item lineTotal must equal quantity x unitPrice (within tolerance)',
+        };
+      },
+    },
+    {
+      name: 'vendor-not-placeholder',
+      run: (_input, output) => ({
+        // null vendor is allowed (genuinely not visible); a present vendor must be real content.
+        pass: output?.vendor == null || !isPlaceholder(output.vendor),
+        reason: 'a present vendor must not be placeholder/degenerate text',
+      }),
+    },
+    {
+      name: 'invoice-date-valid',
+      run: (_input, output) => {
+        if (output?.invoiceDate == null) return { pass: true, reason: 'no invoice date — skipped' };
+        const ok =
+          /^\d{4}-\d{2}-\d{2}/.test(output.invoiceDate) &&
+          !Number.isNaN(Date.parse(output.invoiceDate));
+        return { pass: ok, reason: 'invoiceDate, when present, must be a valid ISO 8601 date' };
+      },
+    },
+  ],
+  modelJudgeDimensions: [
+    {
+      name: 'vendor-grounded',
+      instruction:
+        'The extracted vendor name must actually appear on the receipt image — FAIL if the vendor was invented or guessed.',
+    },
+    {
+      name: 'amounts-grounded',
+      instruction:
+        'The total, subtotal and tax must match the figures printed on the receipt — FAIL if any amount was misread or fabricated.',
+    },
+    {
+      name: 'no-fabricated-line-items',
+      instruction:
+        'Every line item must correspond to an item printed on the receipt — FAIL if any line item is not on the receipt.',
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -1440,6 +1606,7 @@ export const AI_OUTPUT_CRITERIA: Record<AiOutputType, CriteriaSpec<any, any>> = 
   'review-spam-detection': reviewSpamDetection,
   'review-summary': reviewSummary,
   'review-owner-response': reviewOwnerResponse,
+  'expense-ocr': expenseOcr,
 };
 
 export function getCriteria(type: AiOutputType): CriteriaSpec<any, any> {
