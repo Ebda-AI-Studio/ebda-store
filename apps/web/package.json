@@ -28,7 +28,7 @@
     "posthog-js": "^1.373.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.3",
     "three": "^0.184.0"
   },
   "devDependencies": {

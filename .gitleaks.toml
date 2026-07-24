@@ -25,4 +25,15 @@ regexes = [
   '''EAAB1234567890abcdef''',
   '''EAAB_NEW_TOKEN_xyz''',
   '''tt_secret_abc''',
+  # Fake AI-provider API-key fixture (pplx-secret-123 in answer-engine integration test) — not real.
+  '''pplx-secret-123''',
 ]
+
+paths = [
+  # Test files carry FAKE fixtures (pplx-secret-123, dummy PEMs) beside test passwords —
+  # never real creds. Repo already flags every test-file hit as a false positive; this
+  # consolidates so gitleaks stops re-flagging fixtures one at a time.
+  '''.*\.test\.(ts|tsx|js)$''',
+  '''.*/__tests__/.*''',
+]
+
