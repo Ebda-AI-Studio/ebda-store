@@ -59,6 +59,10 @@ export function PostHogProvider({ children }: Props) {
       // analytics, not session replay (which has bigger consent
       // implications).
       disable_session_recording: true,
+      // Error Tracking autocapture: emit a $exception event for every
+      // unhandled JS error + promise rejection. Was off — client-side
+      // errors were invisible in PostHog (0 $exception events ever).
+      capture_exceptions: true,
       // Respect Do Not Track + Global Privacy Control.
       respect_dnt: true,
       // Persistence type: cookie + localStorage. Cookie alone won't

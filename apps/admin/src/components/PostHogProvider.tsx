@@ -50,6 +50,10 @@ export function PostHogProvider({ children }: Props) {
         disable_session_recording: true,
         respect_dnt: true,
         persistence: 'localStorage+cookie',
+        // Error Tracking autocapture: emit a $exception event for every
+        // unhandled JS error + promise rejection. Was off — operator-side
+        // client errors were invisible in PostHog (0 $exception events ever).
+        capture_exceptions: true,
       });
       // Session-replay is off, so link PostHog ↔ Sentry by distinct_id: a Sentry
       // error carries the id to look up that operator's PostHog events without
