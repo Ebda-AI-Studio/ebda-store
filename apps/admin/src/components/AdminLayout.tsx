@@ -118,9 +118,11 @@ export function AdminLayout({
     // Sales tabs
     orders: t('hubTabs.orders'),
     customers: t('hubTabs.customers'),
+    customerGroups: t('hubTabs.customerGroups'),
     reviews: t('hubTabs.reviews'),
     returns: t('hubTabs.returns'),
     coupons: t('hubTabs.coupons'),
+    promotions: t('hubTabs.promotions'),
     loyalty: t('hubTabs.loyalty'),
     // Stock tabs
     stockDashboard: t('hubTabs.stockDashboard'),

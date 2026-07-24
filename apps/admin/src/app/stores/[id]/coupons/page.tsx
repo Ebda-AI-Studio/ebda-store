@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
+import { apiGet } from '../../../../lib/api';
 import { CouponFormModal } from './_components/CouponFormModal';
 import { CouponsFilters } from './_components/CouponsFilters';
 import { CouponsTable } from './_components/CouponsTable';
@@ -12,6 +13,12 @@ import type { Coupon, CouponFormData } from './_components/types';
 import { INITIAL_FORM_DATA } from './_components/types';
 import { useCoupons } from './_hooks/useCoupons';
 import { useRequireFeature } from '../../../../hooks/useRequireFeature';
+
+interface CustomerGroupOption {
+  id: string;
+  name: string;
+  nameAr: string | null;
+}
 
 export default function CouponsPage() {
   const { gate } = useRequireFeature('coupons');
@@ -21,6 +28,15 @@ export default function CouponsPage() {
 
   const tPage = useT('coupons.page');
   const tActions = useT('coupons.actions');
+
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroupOption[]>([]);
+
+  useEffect(() => {
+    if (!storeId) return;
+    apiGet<{ groups: CustomerGroupOption[] }>(`/api/v1/stores/${storeId}/customer-groups`).then(
+      ({ data }) => setCustomerGroups(data?.groups ?? [])
+    );
+  }, [storeId]);
 
   const {
     coupons,
@@ -68,6 +84,11 @@ export default function CouponsPage() {
       isActive: coupon.isActive,
       startsAt: coupon.startsAt ? coupon.startsAt.slice(0, 16) : '',
       expiresAt: coupon.expiresAt ? coupon.expiresAt.slice(0, 16) : '',
+      customerGroupId: coupon.customerGroupId ?? '',
+      firstOrderOnly: coupon.firstOrderOnly ?? false,
+      minQuantity: coupon.minQuantity != null ? String(coupon.minQuantity) : '',
+      scopeProductIds: coupon.scopeProductIds ?? [],
+      scopeCategoryIds: coupon.scopeCategoryIds ?? [],
     });
     setShowModal(true);
   }
@@ -145,6 +166,8 @@ export default function CouponsPage() {
             onChange={setFormData}
             onSubmit={handleSubmit}
             onClose={closeModal}
+            storeId={storeId}
+            customerGroups={customerGroups}
           />
         )}
       </div>

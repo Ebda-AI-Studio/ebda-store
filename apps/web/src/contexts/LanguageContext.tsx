@@ -148,6 +148,9 @@ export const translations = {
   'Order Summary': 'ملخص الطلب',
   'Promo Code': 'كود الخصم',
   Apply: 'تطبيق',
+  // Automatic-promotion discount line at checkout — distinct from the
+  // generic "Discount" label used for coupon-code discounts.
+  Promotion: 'عرض ترويجي',
 
   // Checkout
   Checkout: 'الدفع',

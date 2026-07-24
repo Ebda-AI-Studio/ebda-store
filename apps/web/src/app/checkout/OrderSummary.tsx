@@ -43,6 +43,11 @@ interface OrderSummaryProps {
   items: CheckoutCartItem[];
   subtotal: number;
   discount: number;
+  /** The automatic-promotion portion of `discount` (0 when no promotion is
+   *  currently the winning lever vs. an applied coupon) — rendered as its
+   *  own labelled line, display-only; the server recomputes authoritatively
+   *  at order creation. */
+  promotionDiscount?: number;
   shipping: number;
   total: number;
   freeShipping: boolean;
@@ -64,6 +69,7 @@ export function OrderSummary({
   items,
   subtotal,
   discount,
+  promotionDiscount = 0,
   shipping,
   total,
   freeShipping,
@@ -290,11 +296,12 @@ export function OrderSummary({
             </span>
           </div>
           {(() => {
-            // `discount` is coupon + loyalty combined. Show the coupon portion
-            // and the loyalty portion as separate lines so the customer sees
-            // exactly what each saved them.
+            // `discount` is coupon + promotion (best-of, never both \u2014 see
+            // CheckoutClient's primaryDiscount) + loyalty combined. Show each
+            // portion as its own line so the customer sees exactly what
+            // saved them what.
             const loyaltyDiscount = loyalty?.loyaltyDiscount ?? 0;
-            const couponPortion = Math.max(0, discount - loyaltyDiscount);
+            const couponPortion = Math.max(0, discount - loyaltyDiscount - promotionDiscount);
             return (
               <>
                 {couponPortion > 0 && (
@@ -307,6 +314,19 @@ export function OrderSummary({
                       style={typography?.price}
                     >
                       -{formatPrice(couponPortion)}
+                    </span>
+                  </div>
+                )}
+                {promotionDiscount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[hsl(var(--success))]" style={typography?.label}>
+                      {t('Promotion', translations['Promotion'])}
+                    </span>
+                    <span
+                      className="font-medium text-[hsl(var(--success))] tabular-nums"
+                      style={typography?.price}
+                    >
+                      -{formatPrice(promotionDiscount)}
                     </span>
                   </div>
                 )}

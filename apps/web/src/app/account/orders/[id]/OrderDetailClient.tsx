@@ -27,6 +27,11 @@ interface OrderDetail {
   currency: string;
   couponCode?: string;
   couponDiscount: number;
+  /** The automatic-promotion portion of `discount` (0 when a coupon — not a
+   *  promotion — was the winning lever, or when no discount applied). */
+  promotionDiscount?: number;
+  /** The promotion that discounted this order, when `promotionDiscount` > 0. */
+  appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
   notes?: string;
   customerNotes?: string;
   /** Carrier tracking number, populated when the order is shipped */
@@ -541,24 +546,58 @@ export default function OrderDetailClient() {
                 <span className="text-foreground">{formatPrice(order.shipping)}</span>
               </div>
             )}
-            {order.discount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
-                </span>
-                <span className="text-[hsl(var(--success))]">-{formatPrice(order.discount)}</span>
-              </div>
-            )}
-            {order.couponCode && order.couponDiscount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {t('Coupon', '\u0643\u0648\u0628\u0648\u0646')} ({order.couponCode})
-                </span>
-                <span className="text-[hsl(var(--success))]">
-                  -{formatPrice(order.couponDiscount)}
-                </span>
-              </div>
-            )}
+            {(() => {
+              // Break the total discount into its levers \u2014 coupon, automatic
+              // promotion, and everything else (loyalty redemption etc.) \u2014
+              // instead of an aggregate "Discount" line alongside a
+              // coupon-only sub-line, which used to double-count the coupon
+              // portion visually. couponDiscount + promotionDiscount +
+              // "other" always reconciles to `discount` (order.service.ts).
+              const couponPortion = order.couponDiscount ?? 0;
+              const promotionPortion = order.promotionDiscount ?? 0;
+              const otherDiscount = Math.max(0, order.discount - couponPortion - promotionPortion);
+              const promotionName = order.appliedPromotion
+                ? language === 'ar' && order.appliedPromotion.nameAr
+                  ? order.appliedPromotion.nameAr
+                  : order.appliedPromotion.name
+                : null;
+              return (
+                <>
+                  {couponPortion > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {t('Coupon', '\u0643\u0648\u0628\u0648\u0646')}
+                        {order.couponCode ? ` (${order.couponCode})` : ''}
+                      </span>
+                      <span className="text-[hsl(var(--success))]">
+                        -{formatPrice(couponPortion)}
+                      </span>
+                    </div>
+                  )}
+                  {promotionPortion > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {t('Promotion', '\u0639\u0631\u0636 \u062a\u0631\u0648\u064a\u062c\u064a')}
+                        {promotionName ? ` (${promotionName})` : ''}
+                      </span>
+                      <span className="text-[hsl(var(--success))]">
+                        -{formatPrice(promotionPortion)}
+                      </span>
+                    </div>
+                  )}
+                  {otherDiscount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {t('Discount', '\u0627\u0644\u062e\u0635\u0645')}
+                      </span>
+                      <span className="text-[hsl(var(--success))]">
+                        -{formatPrice(otherDiscount)}
+                      </span>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
             <div className="border-t pt-3 flex justify-between">
               <span className="font-semibold text-foreground">
                 {t('Total', '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a')}

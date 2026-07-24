@@ -49,6 +49,7 @@ const PAGE_KEYWORDS: Record<string, string> = {
   reviews: 'ratings feedback stars مراجعات تقييمات نجوم',
   returns: 'refunds exchanges rma إرجاع استرجاع استبدال',
   coupons: 'discounts promo codes vouchers كوبونات خصومات أكواد قسائم',
+  promotions: 'automatic discounts sale deals عروض ترويجية خصومات تلقائية عروض',
   loyalty: 'points rewards tiers نقاط مكافآت ولاء',
   inventory: 'stock quantity warehouse مخزون كمية مستودع جرد',
   warehouses: 'locations stores depot مستودعات مخازن مواقع',

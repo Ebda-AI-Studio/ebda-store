@@ -271,6 +271,12 @@ export interface OrderEmailData {
   shipping: number;
   discount?: number;
   couponCode?: string;
+  /** Name of the automatic promotion that discounted this order, when a
+   *  promotion (rather than a coupon code) was the winning lever. Mutually
+   *  exclusive with couponCode in practice — OrderService only ever persists
+   *  one non-zero lever per order. */
+  promotionName?: string;
+  promotionNameAr?: string | null;
   total: number;
   shippingAddress: {
     firstName: string;

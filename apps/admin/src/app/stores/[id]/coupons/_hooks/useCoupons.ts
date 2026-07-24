@@ -78,6 +78,14 @@ export function useCoupons(storeId: string): UseCouponsResult {
           isActive: formData.isActive,
           startsAt: formData.startsAt ? new Date(formData.startsAt).toISOString() : undefined,
           expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : undefined,
+          // Targeting — shared shape with Promotion (see
+          // promotion.routes.ts's createSchema). Empty group/scope = "everyone,
+          // whole cart".
+          customerGroupId: formData.customerGroupId || null,
+          firstOrderOnly: formData.firstOrderOnly,
+          minQuantity: formData.minQuantity ? parseInt(formData.minQuantity, 10) : null,
+          scopeProductIds: formData.scopeProductIds,
+          scopeCategoryIds: formData.scopeCategoryIds,
         };
 
         const { error } = editingId ? await apiPut(endpoint, body) : await apiPost(endpoint, body);

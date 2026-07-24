@@ -307,6 +307,38 @@ describe('orderConfirmationTemplate', () => {
     // 3650 fils = 3.650 KWD
     expect(html).toContain('3.650');
   });
+
+  it('discount row shows the coupon code when a coupon applied (en)', () => {
+    const d = { ...orderData, discount: 300, couponCode: 'SAVE10' };
+    const html = orderConfirmationTemplate.en(d, STORE);
+    expect(html).toContain('Discount (SAVE10)');
+    expect(html).toContain('0.300');
+  });
+
+  it('discount row names the promotion when no coupon code is set (en)', () => {
+    const d = { ...orderData, discount: 300, promotionName: 'Summer Sale' };
+    const html = orderConfirmationTemplate.en(d, STORE);
+    expect(html).toContain('Discount (Summer Sale)');
+  });
+
+  it('discount row names the promotion when no coupon code is set (ar, prefers nameAr)', () => {
+    const d = {
+      ...orderData,
+      discount: 300,
+      promotionName: 'Summer Sale',
+      promotionNameAr: 'تخفيضات الصيف',
+    };
+    const html = orderConfirmationTemplate.ar(d, STORE);
+    expect(html).toContain('تخفيضات الصيف');
+    expect(html).not.toContain('Summer Sale');
+  });
+
+  it('coupon code takes priority over promotionName when both are set', () => {
+    const d = { ...orderData, discount: 300, couponCode: 'SAVE10', promotionName: 'Summer Sale' };
+    const html = orderConfirmationTemplate.en(d, STORE);
+    expect(html).toContain('Discount (SAVE10)');
+    expect(html).not.toContain('Summer Sale');
+  });
 });
 
 // ---------------------------------------------------------------------------

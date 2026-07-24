@@ -60,6 +60,23 @@ vi.mock('@force/database', () => ({
       findFirst: vi.fn(),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    // customer + promotion back the checkout targeting resolver
+    // (resolveCustomerContext / resolveBestPromotion) invoked before the order
+    // transaction. Defaults: no matching customer (guest, first order) and no
+    // active automatic promotions, so the coupon-only paths are unchanged.
+    customer: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    // resolveCustomerContext looks up the account contact (phone/email) by
+    // customerId when the checkout is for a registered customer (Fix B).
+    // Default: no matching user row → falls back to the passed shipping
+    // phone/email, same targeting behavior as before Fix B.
+    user: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+    promotion: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     backorderLine: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
@@ -492,6 +509,14 @@ describe('OrderService', () => {
         isActive: true,
         startsAt: new Date(Date.now() - 86400000),
         expiresAt: new Date(Date.now() + 86400000),
+        // Targeting facets (shared with promotions). All empty = "everyone,
+        // whole cart" so CouponService.evaluateForCart applies the discount to
+        // the full subtotal, matching the legacy calculateDiscount behaviour.
+        customerGroupId: null,
+        firstOrderOnly: false,
+        minQuantity: null,
+        scopeProductIds: [],
+        scopeCategoryIds: [],
       };
 
       const couponOrderData = { ...createOrderData, couponCode: 'SAVE10' };
@@ -589,6 +614,215 @@ describe('OrderService', () => {
 
         expect(result.orderNumber).toBeDefined();
         expect(txOrderCount).not.toHaveBeenCalled();
+      });
+    });
+
+    // Regression: exact-tie double-count bug. When a discount coupon and an
+    // automatic promotion produce the SAME non-zero discount, the promotion
+    // is recorded (appliedPromotionId is set on ties — see
+    // resolveBestPromotion/promotionDiscount >= couponDiscount), so the
+    // coupon must NOT also be recorded/consumed. Before the fix, `discount`
+    // stayed correct (via primaryDiscount) but the persisted breakdown
+    // double-counted: couponDiscount === promotionDiscount === D.
+    describe('exact-tie coupon vs promotion (no double-count)', () => {
+      const mockCoupon = {
+        id: 'coupon-tie',
+        storeId: mockStoreId,
+        code: 'TIE10',
+        type: 'fixed',
+        value: 1000,
+        minOrderAmount: null,
+        maxDiscount: null,
+        usageLimit: null,
+        usageCount: 0,
+        usageLimitPerUser: null,
+        isActive: true,
+        startsAt: new Date(Date.now() - 86400000),
+        expiresAt: new Date(Date.now() + 86400000),
+        customerGroupId: null,
+        firstOrderOnly: false,
+        minQuantity: null,
+        scopeProductIds: [],
+        scopeCategoryIds: [],
+      };
+
+      const mockPromotion = {
+        id: 'promo-tie',
+        storeId: mockStoreId,
+        type: 'fixed',
+        value: 1000,
+        maxDiscount: null,
+        priority: 0,
+        isActive: true,
+        startsAt: null,
+        expiresAt: null,
+        createdAt: new Date(),
+        customerGroupId: null,
+        firstOrderOnly: false,
+        minOrderAmount: null,
+        minQuantity: null,
+        scopeProductIds: [],
+        scopeCategoryIds: [],
+      };
+
+      it('coupon and promotion tie on discount → promotion is recorded once, coupon is not double-counted', async () => {
+        vi.mocked(prisma.coupon.findFirst).mockResolvedValue(mockCoupon as any);
+        vi.mocked(prisma.promotion.findMany).mockResolvedValue([mockPromotion] as any);
+
+        // Cart subtotal is 10000 fils (2 * 5000). Both levers discount
+        // exactly 1000 fils — a genuine tie, not just an equal-looking input.
+        let capturedOrderData: Record<string, unknown> | undefined;
+        vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+          if (typeof fn === 'function') {
+            return fn({
+              order: {
+                create: vi.fn().mockImplementation((args: any) => {
+                  capturedOrderData = args.data;
+                  return Promise.resolve({ ...mockOrder, ...args.data });
+                }),
+                count: txOrderCount,
+              },
+              coupon: { updateMany: txCouponUpdateMany },
+              product: { update: vi.fn().mockResolvedValue({}) },
+              productVariant: { update: vi.fn().mockResolvedValue({}) },
+              cartItem: { deleteMany: vi.fn().mockResolvedValue({}) },
+              inventoryHistory: {
+                findFirst: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue({}),
+                createMany: vi.fn().mockResolvedValue({ count: 0 }),
+              },
+              orderEvent: {
+                findFirst: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue({}),
+              },
+              $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+            } as any);
+          }
+          return fn;
+        });
+
+        const result = await OrderService.create(mockStoreId, mockCustomerId, mockSessionId, {
+          ...createOrderData,
+          couponCode: 'TIE10',
+        });
+
+        expect(result).toBeDefined();
+        expect(capturedOrderData).toBeDefined();
+        // The authoritative discount counts the tie once, not twice.
+        expect(capturedOrderData!.discount).toBe(1000);
+        // The promotion is the recorded lever (ties resolve to the promotion).
+        expect(capturedOrderData!.promotionDiscount).toBe(1000);
+        expect(capturedOrderData!.appliedPromotionId).toBe('promo-tie');
+        // The coupon must NOT also be recorded — this is the bug this test
+        // guards against: without the fix both fields would read 1000.
+        expect(capturedOrderData!.couponDiscount).toBe(0);
+        expect(capturedOrderData!.couponCode).toBeNull();
+        // And it must not have been consumed (no usage-count reservation).
+        expect(txCouponUpdateMany).not.toHaveBeenCalled();
+      });
+    });
+
+    // Regression (Task 5 review, Fix C): the highest-risk money path — an
+    // automatic promotion's discount STRICTLY exceeds an entered coupon's
+    // discount. The promotion must win outright: it is the sole discount
+    // recorded, the coupon must not be treated as applied, and critically
+    // its usage must NOT be reserved/incremented (a coupon that lost the
+    // best-of comparison was never actually redeemed).
+    describe('promotion strictly beats coupon (best-of, no coupon usage reserved)', () => {
+      const mockCoupon = {
+        id: 'coupon-loses',
+        storeId: mockStoreId,
+        code: 'SMALL10',
+        type: 'fixed',
+        value: 1000,
+        minOrderAmount: null,
+        maxDiscount: null,
+        usageLimit: null,
+        usageCount: 0,
+        usageLimitPerUser: null,
+        isActive: true,
+        startsAt: new Date(Date.now() - 86400000),
+        expiresAt: new Date(Date.now() + 86400000),
+        customerGroupId: null,
+        firstOrderOnly: false,
+        minQuantity: null,
+        scopeProductIds: [],
+        scopeCategoryIds: [],
+      };
+
+      const mockPromotion = {
+        id: 'promo-wins',
+        storeId: mockStoreId,
+        type: 'fixed',
+        value: 3000,
+        maxDiscount: null,
+        priority: 0,
+        isActive: true,
+        startsAt: null,
+        expiresAt: null,
+        createdAt: new Date(),
+        customerGroupId: null,
+        firstOrderOnly: false,
+        minOrderAmount: null,
+        minQuantity: null,
+        scopeProductIds: [],
+        scopeCategoryIds: [],
+      };
+
+      it('promotion (3000 fils) strictly beats coupon (1000 fils) → promotion wins, coupon unused', async () => {
+        vi.mocked(prisma.coupon.findFirst).mockResolvedValue(mockCoupon as any);
+        vi.mocked(prisma.promotion.findMany).mockResolvedValue([mockPromotion] as any);
+
+        // Cart subtotal is 10000 fils (2 * 5000). Coupon discounts 1000 fils,
+        // promotion discounts 3000 fils — a genuine, non-tied strict win.
+        let capturedOrderData: Record<string, unknown> | undefined;
+        vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+          if (typeof fn === 'function') {
+            return fn({
+              order: {
+                create: vi.fn().mockImplementation((args: any) => {
+                  capturedOrderData = args.data;
+                  return Promise.resolve({ ...mockOrder, ...args.data });
+                }),
+                count: txOrderCount,
+              },
+              coupon: { updateMany: txCouponUpdateMany },
+              product: { update: vi.fn().mockResolvedValue({}) },
+              productVariant: { update: vi.fn().mockResolvedValue({}) },
+              cartItem: { deleteMany: vi.fn().mockResolvedValue({}) },
+              inventoryHistory: {
+                findFirst: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue({}),
+                createMany: vi.fn().mockResolvedValue({ count: 0 }),
+              },
+              orderEvent: {
+                findFirst: vi.fn().mockResolvedValue(null),
+                create: vi.fn().mockResolvedValue({}),
+              },
+              $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+            } as any);
+          }
+          return fn;
+        });
+
+        const result = await OrderService.create(mockStoreId, mockCustomerId, mockSessionId, {
+          ...createOrderData,
+          couponCode: 'SMALL10',
+        });
+
+        expect(result).toBeDefined();
+        expect(capturedOrderData).toBeDefined();
+        // The promotion's larger discount is the one actually applied.
+        expect(capturedOrderData!.discount).toBe(3000);
+        expect(capturedOrderData!.promotionDiscount).toBe(3000);
+        expect(capturedOrderData!.appliedPromotionId).toBe('promo-wins');
+        // The coupon lost the best-of comparison — it must not be recorded
+        // as applied at all.
+        expect(capturedOrderData!.couponDiscount).toBe(0);
+        expect(capturedOrderData!.couponCode).toBeNull();
+        // And, critically, its usage must not be reserved/incremented — a
+        // losing coupon was never actually redeemed.
+        expect(txCouponUpdateMany).not.toHaveBeenCalled();
       });
     });
   });

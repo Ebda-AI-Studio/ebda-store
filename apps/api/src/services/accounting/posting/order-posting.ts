@@ -54,6 +54,10 @@ export async function postOrderPaymentJournal(args: {
       items: true,
       payments: { where: { status: 'completed' } },
       store: { select: { id: true, accountingEnabled: true } },
+      // Audit trail: names which lever (coupon code vs. automatic promotion)
+      // produced the discount netted out of revenue below, so the GL memo
+      // isn't a bare "net of discount" with no way to trace it back.
+      appliedPromotion: { select: { name: true } },
     },
   });
   if (!order) {
@@ -88,6 +92,15 @@ export async function postOrderPaymentJournal(args: {
 
   // --- Cash / revenue entry ---
   const netRevenue = order.subtotal - order.discount;
+  // Discount lever, for the revenue lineMemo below. `order.discount` (used
+  // for netRevenue above) already reconciles couponDiscount + promotionDiscount
+  // + loyaltyDiscount — this only labels WHICH lever fired, it doesn't change
+  // any amount.
+  const discountLever = order.couponCode
+    ? `coupon ${order.couponCode}`
+    : order.appliedPromotion
+      ? `promotion "${order.appliedPromotion.name}"`
+      : null;
   const cashLines: Array<{
     accountId: string;
     debit: number;
@@ -110,7 +123,10 @@ export async function postOrderPaymentJournal(args: {
       accountId: revenueAccountId,
       debit: 0,
       credit: netRevenue,
-      lineMemo: 'Sales revenue (net of discount)',
+      lineMemo:
+        order.discount > 0 && discountLever
+          ? `Sales revenue (net of discount — ${discountLever})`
+          : 'Sales revenue (net of discount)',
       refTable: 'orders',
       refId: order.id,
     });

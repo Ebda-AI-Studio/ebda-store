@@ -86,6 +86,8 @@ export interface Messages {
     shipping: string;
     deliveryFee: string;
     discount: string;
+    coupon: string;
+    promotion: string;
     total: string;
     notes: string;
     customerNotes: string;
@@ -294,6 +296,8 @@ export const MESSAGES: Record<Locale, Messages> = {
       shipping: 'Shipping',
       deliveryFee: 'Delivery fee',
       discount: 'Discount',
+      coupon: 'Coupon',
+      promotion: 'Promotion',
       total: 'Total',
       notes: 'Internal notes',
       customerNotes: 'Customer notes',
@@ -504,6 +508,8 @@ export const MESSAGES: Record<Locale, Messages> = {
       shipping: 'الشحن',
       deliveryFee: 'رسوم التوصيل',
       discount: 'الخصم',
+      coupon: 'كوبون',
+      promotion: 'عرض ترويجي',
       total: 'الإجمالي',
       notes: 'ملاحظات داخلية',
       customerNotes: 'ملاحظات العميل',

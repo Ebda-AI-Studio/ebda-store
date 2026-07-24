@@ -7,6 +7,6 @@ coverage
 *.min.css
 package-lock.json
 pnpm-lock.yaml
-
-# superpowers SDD scratch workspace
+# superpowers SDD scratch workspace + session-local handoff artifacts (untracked)
 .superpowers/
+handoff.md

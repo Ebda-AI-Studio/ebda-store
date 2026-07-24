@@ -102,9 +102,11 @@ router.get(
           shipping: true,
           discount: true,
           couponDiscount: true,
+          promotionDiscount: true,
           total: true,
           currency: true,
           couponCode: true,
+          appliedPromotion: { select: { name: true } },
           customerNotes: true,
           shippingAddress: true,
           createdAt: true,
@@ -165,6 +167,7 @@ router.get(
         { header: 'Subtotal (KWD)', key: 'subtotal', width: 16 },
         { header: 'Discount (KWD)', key: 'discount', width: 16 },
         { header: 'Coupon', key: 'coupon', width: 14 },
+        { header: 'Promotion', key: 'promotion', width: 18 },
         { header: 'Shipping (KWD)', key: 'shipping', width: 16 },
         { header: 'Tax (KWD)', key: 'tax', width: 12 },
         { header: 'Total (KWD)', key: 'total', width: 14 },
@@ -231,8 +234,14 @@ router.get(
             payMethod: payment?.method ?? '',
             itemCount: order.items?.length ?? 0,
             subtotal: Number((order.subtotal / 1000).toFixed(3)),
-            discount: Number(((order.discount + order.couponDiscount) / 1000).toFixed(3)),
+            // `order.discount` is already the AUTHORITATIVE total (coupon/
+            // promotion + loyalty combined) — adding couponDiscount on top
+            // double-counted it. See order.service.ts's create() comment on
+            // couponDiscount + promotionDiscount + loyaltyDiscount reconciling
+            // to `discount`.
+            discount: Number((order.discount / 1000).toFixed(3)),
             coupon: order.couponCode ?? '',
+            promotion: order.appliedPromotion?.name ?? '',
             shipping: Number((order.shipping / 1000).toFixed(3)),
             tax: Number((order.tax / 1000).toFixed(3)),
             total: Number((order.total / 1000).toFixed(3)),

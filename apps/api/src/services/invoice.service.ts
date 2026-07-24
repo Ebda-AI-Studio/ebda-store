@@ -127,6 +127,9 @@ export class InvoiceService {
           },
         },
         payments: { where: { status: 'completed' }, take: 1 },
+        // Names the promotion behind the discount line when an automatic
+        // promotion (not a coupon code) was the applied lever.
+        appliedPromotion: { select: { name: true, nameAr: true } },
       },
     });
 
@@ -152,6 +155,21 @@ export class InvoiceService {
     const billingAddr = (order.billingAddress as Record<string, string> | null) ?? shippingAddr;
     const payment = order.payments?.[0];
     const brand = readBrandColor(order.store.theme);
+
+    // Discount line annotation — a coupon code takes priority (matches the
+    // persisted couponCode/couponDiscount gating in OrderService.create);
+    // otherwise, when an automatic promotion was the winning lever, name it
+    // so the invoice doesn't show an unexplained discount.
+    const promotionLabel = order.appliedPromotion
+      ? ar && order.appliedPromotion.nameAr
+        ? order.appliedPromotion.nameAr
+        : order.appliedPromotion.name
+      : null;
+    const discountAnnotation = order.couponCode
+      ? ` (${escapeHtml(order.couponCode)})`
+      : promotionLabel
+        ? ` (${escapeHtml(promotionLabel)})`
+        : '';
 
     const isPaid = order.paymentStatus === 'paid';
     const isCancelled = order.status === 'cancelled';
@@ -540,7 +558,7 @@ export class InvoiceService {
           <div class="row"><span class="label">${escapeHtml(labels.subtotal)}</span><span class="val">${formatPrice(order.subtotal)}</span></div>
           ${
             order.discount > 0
-              ? `<div class="row discount"><span class="label">${escapeHtml(labels.discount)}${order.couponCode ? ` (${escapeHtml(order.couponCode)})` : ''}</span><span class="val">−${formatPrice(order.discount)}</span></div>`
+              ? `<div class="row discount"><span class="label">${escapeHtml(labels.discount)}${discountAnnotation}</span><span class="val">−${formatPrice(order.discount)}</span></div>`
               : ''
           }
           ${

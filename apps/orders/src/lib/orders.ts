@@ -95,6 +95,13 @@ export interface OrderDetail extends Order {
   tax: number;
   shipping: number;
   discount: number;
+  couponCode?: string | null;
+  couponDiscount?: number;
+  /** The automatic-promotion portion of `discount` (0 when a coupon — not a
+   *  promotion — was the winning lever, or when no discount applied). */
+  promotionDiscount?: number;
+  /** The promotion that discounted this order, when `promotionDiscount` > 0. */
+  appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
   notes: string | null;
   customerNotes: string | null;
   shippingAddress: AddressJson | null;

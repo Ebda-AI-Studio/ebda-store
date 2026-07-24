@@ -362,8 +362,10 @@ model Store {
   orders                   Order[]
   carts                    Cart[]
   customers                Customer[]
+  customerGroups           CustomerGroup[]
   paymentConfigs           PaymentConfig[]
   coupons                  Coupon[]
+  promotions               Promotion[]
   shippingZones            ShippingZone[]
   shippingAreaRates        ShippingAreaRate[]
   taxRates                 TaxRate[]
@@ -570,7 +572,10 @@ model StorePage {
 model Customer {
   id               String    @id @default(uuid())
   storeId          String    @map("store_id")
-  email            String
+  /// Nullable: most GCC shoppers identify by phone only. A customer needs
+  /// phone OR email, not both — the group-assignment bridge upserts on
+  /// whichever is present. NULL emails are distinct under the unique index.
+  email            String?
   firstName        String    @map("first_name")
   lastName         String    @map("last_name")
   phone            String?
@@ -586,14 +591,57 @@ model Customer {
   /// skip the language picker on return visits within 30 days.
   lastLocaleChoice DateTime? @map("last_locale_choice")
 
+  /// Optional segment this customer belongs to. Drives group-scoped pricing
+  /// and promotion/coupon targeting. SetNull on group delete — removing a
+  /// group must never delete customers.
+  groupId          String?   @map("group_id")
+
   store     Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
   addresses CustomerAddress[]
+  group     CustomerGroup?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@unique([storeId, email])
+  // Phone is the primary shopper identity in the GCC — the group-assignment
+  // bridge matches/upserts on it. NULL phones are distinct in Postgres, so
+  // phone-less rows are unconstrained.
+  @@unique([storeId, phone])
   @@index([storeId])
   @@index([email])
   @@index([createdAt])
+  @@index([storeId, groupId])
   @@map("customers")
+}
+
+/// Merchant-defined customer segment (e.g. "Wholesale", "VIP").
+///
+/// Exists to unblock group-scoped pricing and promotion/coupon targeting —
+/// OSOSS gates both on customer groups and FWB had no equivalent. Distinct
+/// from `CustomerRfmSnapshot`, which is *computed* analytics: this is a
+/// manual, merchant-controlled assignment.
+///
+/// `isDefault` marks the group new customers fall into. At most one per
+/// store, enforced by a partial unique index in the migration (Prisma cannot
+/// express a filtered unique index).
+model CustomerGroup {
+  id        String   @id @default(uuid())
+  storeId   String   @map("store_id")
+  name      String
+  nameAr    String?  @map("name_ar")
+  /// Inactive groups keep their members but are hidden from pickers and
+  /// skipped by targeting rules.
+  isActive  Boolean  @default(true) @map("is_active")
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customers Customer[]
+  coupons     Coupon[]
+  promotions  Promotion[]
+
+  @@unique([storeId, name])
+  @@index([storeId, isActive])
+  @@map("customer_groups")
 }
 
 /// Saved delivery addresses for a customer. Created during the WhatsApp
@@ -1086,6 +1134,8 @@ model Order {
   currency              String             @default("KWD")
   couponCode            String?            @map("coupon_code")
   couponDiscount        Int                @default(0) @map("coupon_discount")
+  promotionDiscount     Int                @default(0) @map("promotion_discount")
+  appliedPromotionId    String?            @map("applied_promotion_id")
   // Loyalty redemption applied at checkout. loyaltyPointsRedeemed is the
   // number of points the customer spent on this order (NULL = none redeemed
   // / pre-feature order); loyaltyDiscount is the resulting discount amount in
@@ -1167,6 +1217,7 @@ model Order {
   shipment            Shipment?
   affiliateReferrals  AffiliateReferral[]
   events              OrderEvent[]
+  appliedPromotion    Promotion?           @relation("OrderAppliedPromotion", fields: [appliedPromotionId], references: [id], onDelete: SetNull)
 
   @@index([storeId])
   @@index([customerId])
@@ -2183,6 +2234,13 @@ model Coupon {
   usageLimit        Int?       @map("usage_limit")
   usageCount        Int        @default(0) @map("usage_count")
   usageLimitPerUser Int?       @map("usage_limit_per_user")
+  // Targeting (shared shape with Promotion). All optional/empty = "everyone,
+  // whole cart" so existing coupons are unchanged.
+  customerGroupId   String?    @map("customer_group_id")
+  firstOrderOnly    Boolean    @default(false) @map("first_order_only")
+  minQuantity       Int?       @map("min_quantity")
+  scopeProductIds   String[]   @map("scope_product_ids")
+  scopeCategoryIds  String[]   @map("scope_category_ids")
   isActive          Boolean    @default(true) @map("is_active")
   startsAt          DateTime?  @map("starts_at")
   expiresAt         DateTime?  @map("expires_at")
@@ -2191,11 +2249,51 @@ model Coupon {
 
   store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   abandonedCarts AbandonedCart[]
+  customerGroup  CustomerGroup?  @relation(fields: [customerGroupId], references: [id], onDelete: SetNull)
 
   @@unique([storeId, code])
   @@index([code])
   @@index([isActive])
+  @@index([storeId, customerGroupId])
   @@map("coupons")
+}
+
+/// Automatic, code-less discount applied when its targeting matches the cart +
+/// customer. Shares the targeting field set with Coupon; the difference is
+/// coupons need a code, promotions apply automatically. Types reuse CouponType.
+model Promotion {
+  id               String     @id @default(uuid())
+  storeId          String     @map("store_id")
+  name             String
+  nameAr           String?    @map("name_ar")
+  description      String?
+  descriptionAr    String?    @map("description_ar")
+  type             CouponType @default(percentage)
+  value            Int // percentage (0-100) or fixed amount in fils
+  maxDiscount      Int?       @map("max_discount")
+  priority         Int        @default(0) // higher wins when several are eligible
+  isActive         Boolean    @default(true) @map("is_active")
+  startsAt         DateTime?  @map("starts_at")
+  expiresAt        DateTime?  @map("expires_at")
+
+  // Targeting (shared shape with Coupon)
+  customerGroupId  String?    @map("customer_group_id")
+  firstOrderOnly   Boolean    @default(false) @map("first_order_only")
+  minOrderAmount   Int?       @map("min_order_amount")
+  minQuantity      Int?       @map("min_quantity")
+  scopeProductIds  String[]   @map("scope_product_ids")
+  scopeCategoryIds String[]   @map("scope_category_ids")
+
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customerGroup  CustomerGroup? @relation(fields: [customerGroupId], references: [id], onDelete: SetNull)
+  orders         Order[]        @relation("OrderAppliedPromotion")
+
+  @@index([storeId, isActive])
+  @@index([storeId, customerGroupId])
+  @@map("promotions")
 }
 
 enum CouponType {

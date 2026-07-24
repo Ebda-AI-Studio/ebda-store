@@ -1078,9 +1078,33 @@ router.get(
         statuses: Array.from(statusSet),
       };
 
+      // Resolve the assigned group. Groups live on the `customers` table — a
+      // separate, phone/email-keyed identity from the order's `users` row —
+      // so we look it up by identifier (phone first, the primary GCC
+      // identifier; email as fallback) rather than by the User id.
+      const identityOr: Prisma.CustomerWhereInput[] = [];
+      if (customer.phone) identityOr.push({ phone: customer.phone });
+      if (customer.email)
+        identityOr.push({ email: { equals: customer.email, mode: 'insensitive' } });
+      let groupId: string | null = null;
+      let group: { id: string; name: string; nameAr: string | null } | null = null;
+      if (identityOr.length > 0) {
+        const grouped = await prisma.customer.findFirst({
+          where: { storeId, OR: identityOr },
+          select: {
+            groupId: true,
+            group: { select: { id: true, name: true, nameAr: true } },
+          },
+        });
+        if (grouped) {
+          groupId = grouped.groupId;
+          group = grouped.group;
+        }
+      }
+
       res.json({
         success: true,
-        data: { customer, orders, truncated },
+        data: { customer: { ...customer, groupId, group }, orders, truncated },
       });
     } catch (error) {
       next(error);

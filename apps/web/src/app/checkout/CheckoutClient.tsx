@@ -797,14 +797,62 @@ export default function CheckoutClient() {
     };
   }, [isAuthenticated, store?.id]);
 
+  // Automatic promotion preview (no code required). Server-resolved from
+  // the cart's product ids + the shopper's typed phone/email — the
+  // storefront cart never carries category ids, so this can't be computed
+  // client-side (mirrors couponDiscount's shape: { id, discount } | null).
+  const [promotion, setPromotion] = useState<{ id: string; discount: number } | null>(null);
+  // Tracks the last signature we actually sent, so an unrelated re-render
+  // with the same items/phone/email doesn't refire the request.
+  const promotionSignatureRef = useRef<string>('');
+  useEffect(() => {
+    if (!store?.id || !cart || cart.items.length === 0) {
+      setPromotion(null);
+      promotionSignatureRef.current = '';
+      return;
+    }
+    const items = cart.items.map(item => ({ productId: item.productId, quantity: item.quantity }));
+    const phone = formData.phone.trim() || undefined;
+    const email = formData.email.trim() || undefined;
+    const signature = JSON.stringify({ storeId: store.id, items, phone, email });
+    if (signature === promotionSignatureRef.current) return;
+
+    // Debounce so typing a phone/email doesn't fire a request per keystroke
+    // (the endpoint is also rate-limited at 20/min/IP).
+    const timeoutId = setTimeout(() => {
+      promotionSignatureRef.current = signature;
+      api
+        .post<{ promotion: { id: string; discount: number } | null }>(
+          `/stores/public/${store.id}/promotions/preview`,
+          { items, phone, email }
+        )
+        .then(result => setPromotion(result.success ? (result.data?.promotion ?? null) : null))
+        .catch(() => setPromotion(null));
+    }, 400);
+    return () => clearTimeout(timeoutId);
+  }, [store?.id, cart, formData.phone, formData.email]);
+
   // Calculate totals
   const subtotal = cart?.subtotal || 0;
+
+  // Automatic promotions don't stack with a coupon — mirrors
+  // OrderService.create's `primaryDiscount = Math.max(couponDiscount,
+  // promotionDiscount)` so this display-only total matches what the server
+  // will actually charge. `promotionAppliedDiscount` is the amount OrderSummary
+  // should render as its own "Promotion" line — only when the promotion is
+  // the winning lever (matches the server's `appliedPromotionId` gate: the
+  // promotion wins ties), so we never show a promotion line for a discount
+  // that wouldn't actually be the one applied.
+  const promotionDiscount = promotion?.discount ?? 0;
+  const primaryDiscount = Math.max(couponDiscount, promotionDiscount);
+  const promotionAppliedDiscount = promotionDiscount >= couponDiscount ? promotionDiscount : 0;
 
   // Loyalty discount estimate. Mirrors the server's computeRedemption so the
   // order summary matches what the API will actually apply: clamp points to
   // balance, gate at the minimum, cap the discount at the goods value
-  // remaining after the coupon. The server re-validates; this is display-only.
-  const redeemableAfterCoupon = Math.max(0, subtotal - couponDiscount);
+  // remaining after the primary (coupon-or-promotion) discount. The server
+  // re-validates; this is display-only.
+  const redeemableAfterCoupon = Math.max(0, subtotal - primaryDiscount);
   const effectiveRedeemPoints =
     redeemEnabled && loyalty
       ? Math.min(Math.max(0, Math.floor(pointsToRedeem)), loyalty.points)
@@ -820,7 +868,7 @@ export default function CheckoutClient() {
       ? Math.min(effectiveRedeemPoints, Math.floor(loyaltyDiscount / loyalty.pointsValue))
       : 0;
 
-  const discount = couponDiscount + loyaltyDiscount;
+  const discount = primaryDiscount + loyaltyDiscount;
   const shipping = freeShipping ? 0 : shippingCost;
   const total = Math.max(0, subtotal - discount + shipping);
 
@@ -1766,6 +1814,7 @@ export default function CheckoutClient() {
               items={cart.items}
               subtotal={subtotal}
               discount={discount}
+              promotionDiscount={promotionAppliedDiscount}
               shipping={shipping}
               total={total}
               freeShipping={freeShipping}

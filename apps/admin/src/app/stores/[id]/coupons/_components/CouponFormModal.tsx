@@ -3,7 +3,14 @@
 import type { FormEvent } from 'react';
 import { useT } from '@/i18n/useT';
 import { BottomSheet } from '@/components/mobile/BottomSheet';
+import { ScopePicker } from '../../_components/ScopePicker';
 import type { CouponFormData, CouponType } from './types';
+
+interface CustomerGroupOption {
+  id: string;
+  name: string;
+  nameAr: string | null;
+}
 
 interface CouponFormModalProps {
   isEditing: boolean;
@@ -11,6 +18,8 @@ interface CouponFormModalProps {
   onChange: (formData: CouponFormData) => void;
   onSubmit: (e: FormEvent) => void;
   onClose: () => void;
+  storeId: string;
+  customerGroups: CustomerGroupOption[];
 }
 
 /**
@@ -25,11 +34,14 @@ export function CouponFormModal({
   onChange,
   onSubmit,
   onClose,
+  storeId,
+  customerGroups,
 }: CouponFormModalProps) {
   const tModal = useT('coupons.modal');
   const tForm = useT('coupons.form');
   const tType = useT('coupons.type');
   const tActions = useT('coupons.actions');
+  const tTargeting = useT('coupons.targeting');
 
   // Form id lets the sticky footer Submit button live OUTSIDE the
   // <form> element (inside BottomSheet's footer slot) and still
@@ -271,6 +283,82 @@ export function CouponFormModal({
           <label htmlFor="isActive" className="text-sm font-medium text-foreground">
             {tForm('isActiveLabel')}
           </label>
+        </div>
+
+        {/* Targeting — same shape shared with Promotion (see
+            promotion.routes.ts's createSchema). Empty group/scope = "everyone,
+            whole cart". */}
+        <div className="border-t border-border pt-4">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">{tTargeting('heading')}</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                {tTargeting('customerGroup')}
+              </label>
+              <select
+                value={formData.customerGroupId}
+                onChange={e => onChange({ ...formData, customerGroupId: e.target.value })}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                <option value="">{tTargeting('allCustomers')}</option>
+                {customerGroups.map(g => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                {tTargeting('minQuantity')}
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={formData.minQuantity}
+                onChange={e => onChange({ ...formData, minQuantity: e.target.value })}
+                placeholder={tTargeting('minQuantityPlaceholder')}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <label className="mt-4 flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="firstOrderOnly"
+              checked={formData.firstOrderOnly}
+              onChange={e => onChange({ ...formData, firstOrderOnly: e.target.checked })}
+              className="w-4 h-4 text-primary border-border rounded focus:ring-primary"
+            />
+            <span className="text-sm font-medium text-foreground">
+              {tTargeting('firstOrderOnlyLabel')}
+            </span>
+          </label>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ScopePicker
+              storeId={storeId}
+              kind="products"
+              value={formData.scopeProductIds}
+              onChange={ids => onChange({ ...formData, scopeProductIds: ids })}
+              label={tTargeting('scopeProducts')}
+              searchPlaceholder={tTargeting('scopeProductsPlaceholder')}
+              emptyHint={tTargeting('scopeEmptyHint')}
+              removeLabel={tTargeting('scopeRemove')}
+            />
+            <ScopePicker
+              storeId={storeId}
+              kind="categories"
+              value={formData.scopeCategoryIds}
+              onChange={ids => onChange({ ...formData, scopeCategoryIds: ids })}
+              label={tTargeting('scopeCategories')}
+              searchPlaceholder={tTargeting('scopeCategoriesPlaceholder')}
+              emptyHint={tTargeting('scopeEmptyHint')}
+              removeLabel={tTargeting('scopeRemove')}
+            />
+          </div>
         </div>
       </form>
     </BottomSheet>

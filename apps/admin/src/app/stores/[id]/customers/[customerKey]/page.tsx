@@ -5,11 +5,20 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../../components/AdminLayout';
-import { apiGet } from '../../../../../lib/api';
+import { apiGet, apiPut } from '../../../../../lib/api';
+
+interface CustomerGroupOption {
+  id: string;
+  name: string;
+  nameAr: string | null;
+  isActive: boolean;
+}
 
 interface CustomerDetail {
   id: string;
   isGuest: boolean;
+  groupId: string | null;
+  group: { id: string; name: string; nameAr: string | null } | null;
   firstName: string;
   lastName: string;
   email: string;
@@ -101,6 +110,9 @@ export default function CustomerDetailPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [groups, setGroups] = useState<CustomerGroupOption[]>([]);
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
   const t = useT('customers.detail');
 
   const fetchDetail = useCallback(async () => {
@@ -129,10 +141,73 @@ export default function CustomerDetailPage() {
     fetchDetail();
   }, [fetchDetail]);
 
+  // Grouping keys on contact identity (phone-first, email fallback), so any
+  // customer with a phone or email can be grouped — registered or a guest with
+  // contact details. A fully anonymous guest (neither) has nothing to key on.
+  const canGroup = Boolean(customer && (customer.phone || customer.email));
+
+  useEffect(() => {
+    if (!storeId || !canGroup) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await apiGet<{ groups: CustomerGroupOption[] }>(
+        `/api/v1/stores/${storeId}/customer-groups`
+      );
+      if (!cancelled && data) setGroups(data.groups);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId, canGroup]);
+
+  const assignGroup = useCallback(
+    async (groupId: string | null) => {
+      if (!customer || !(customer.phone || customer.email)) return;
+      setSavingGroup(true);
+      setGroupError(null);
+      // Optimistic: reflect the pick immediately, roll back on failure.
+      const prev = { groupId: customer.groupId, group: customer.group };
+      const nextGroup = groups.find(g => g.id === groupId) ?? null;
+      setCustomer({
+        ...customer,
+        groupId,
+        group: nextGroup
+          ? { id: nextGroup.id, name: nextGroup.name, nameAr: nextGroup.nameAr }
+          : null,
+      });
+      // Assign by contact identity — the detail page holds a User id, not a
+      // Customer id, so the id-based endpoint can't be used here.
+      const { error: apiError } = await apiPut(
+        `/api/v1/stores/${storeId}/customers/group-assignment`,
+        {
+          phone: customer.phone || null,
+          email: customer.email || null,
+          firstName: customer.firstName || null,
+          lastName: customer.lastName || null,
+          groupId,
+        }
+      );
+      if (apiError) {
+        setCustomer(c => (c ? { ...c, ...prev } : c));
+        setGroupError(apiError.message || t('groupAssignFailed'));
+      }
+      setSavingGroup(false);
+    },
+    [customer, groups, storeId, t]
+  );
+
   const displayName =
     customer && (customer.firstName || customer.lastName)
       ? `${customer.firstName} ${customer.lastName}`.trim()
       : customer?.email || customer?.phone || t('displayFallback');
+
+  // Inactive groups are hidden from the picker (schema convention) — but if
+  // this customer is already in one, keep it selectable so it still displays.
+  const activeGroups = groups.filter(g => g.isActive);
+  const groupOptions =
+    customer?.group && !activeGroups.some(g => g.id === customer.group!.id)
+      ? [...activeGroups, { ...customer.group, isActive: false }]
+      : activeGroups;
 
   return (
     <AdminLayout
@@ -214,6 +289,33 @@ export default function CustomerDetailPage() {
                         {formatDate(customer.accountCreatedAt ?? customer.firstOrderDate)}
                       </dd>
                     </div>
+                    {/* Group assignment — any customer with a phone or email
+                        (grouping keys on contact identity, not account status). */}
+                    {canGroup && (
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="text-muted-foreground">{t('fieldGroup')}</dt>
+                        <dd className="text-end">
+                          <select
+                            value={customer.groupId ?? ''}
+                            disabled={savingGroup}
+                            onChange={e => assignGroup(e.target.value || null)}
+                            className="rounded-md border bg-background px-2 py-1 text-sm font-medium text-foreground disabled:opacity-50"
+                          >
+                            <option value="">{t('groupNone')}</option>
+                            {groupOptions.map(g => (
+                              <option key={g.id} value={g.id}>
+                                {g.name}
+                                {g.nameAr ? ` · ${g.nameAr}` : ''}
+                                {!g.isActive ? ` (${t('groupInactive')})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </dd>
+                      </div>
+                    )}
+                    {groupError && (
+                      <p className="text-end text-xs text-destructive">{groupError}</p>
+                    )}
                   </dl>
                 </div>
 

@@ -1,5 +1,6 @@
 import { prisma, Prisma } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-targeting';
 
 interface CreateCouponData {
   code: string;
@@ -16,6 +17,16 @@ interface CreateCouponData {
   isActive?: boolean;
   startsAt?: Date;
   expiresAt?: Date;
+  // Targeting — shared shape with Promotion (see PromotionService's
+  // CreatePromotionData). All optional/empty = "everyone, whole cart" so
+  // existing coupons are unchanged. Nullable (not just optional) since the
+  // route's Zod schema uses `.nullish()` for these fields, matching
+  // promotion.routes.ts's createSchema.
+  customerGroupId?: string | null;
+  firstOrderOnly?: boolean;
+  minQuantity?: number | null;
+  scopeProductIds?: string[];
+  scopeCategoryIds?: string[];
 }
 
 type UpdateCouponData = Partial<CreateCouponData>;
@@ -139,6 +150,11 @@ export class CouponService {
         isActive: data.isActive ?? true,
         startsAt: data.startsAt,
         expiresAt: data.expiresAt,
+        customerGroupId: data.customerGroupId,
+        firstOrderOnly: data.firstOrderOnly ?? false,
+        minQuantity: data.minQuantity,
+        scopeProductIds: data.scopeProductIds ?? [],
+        scopeCategoryIds: data.scopeCategoryIds ?? [],
       },
     });
 
@@ -180,6 +196,11 @@ export class CouponService {
         isActive: data.isActive,
         startsAt: data.startsAt,
         expiresAt: data.expiresAt,
+        customerGroupId: data.customerGroupId,
+        firstOrderOnly: data.firstOrderOnly,
+        minQuantity: data.minQuantity,
+        scopeProductIds: data.scopeProductIds,
+        scopeCategoryIds: data.scopeCategoryIds,
       },
     });
 
@@ -239,5 +260,35 @@ export class CouponService {
     // free_shipping is handled separately
 
     return discount;
+  }
+
+  /**
+   * Evaluate a coupon's targeting (customer group, first-order, min
+   * qty/amount, product/category scope) against a resolved cart context and
+   * compute the discount over the matching subtotal. Pure — no DB access.
+   */
+  static evaluateForCart(
+    coupon: {
+      type: 'percentage' | 'fixed' | 'free_shipping';
+      value: number;
+      maxDiscount: number | null;
+      customerGroupId: string | null;
+      firstOrderOnly: boolean;
+      minOrderAmount: number | null;
+      minQuantity: number | null;
+      scopeProductIds: string[];
+      scopeCategoryIds: string[];
+    },
+    ctx: TargetingCtx
+  ): { eligible: boolean; discount: number; reason?: string } {
+    const r = matchesTargeting(coupon, ctx);
+    if (!r.eligible) return { eligible: false, discount: 0, reason: 'COUPON_NOT_ELIGIBLE' };
+    const discount = computeDiscount(
+      coupon.type,
+      coupon.value,
+      coupon.maxDiscount,
+      r.matchingSubtotal
+    );
+    return { eligible: true, discount };
   }
 }

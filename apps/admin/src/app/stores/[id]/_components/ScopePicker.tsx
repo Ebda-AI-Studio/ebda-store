@@ -1,0 +1,197 @@
+'use client';
+
+/**
+ * Minimal searchable multi-select for promotion/coupon targeting scope
+ * (`scopeProductIds` / `scopeCategoryIds`) — shared between the promotions
+ * page and the coupon form so both use the identical picker. Empty
+ * selection = whole cart (see promotion.routes.ts's createSchema comment);
+ * a picker with both a product and a category selected means the two lists
+ * UNION at evaluation time, not intersect.
+ *
+ * Categories are typically few, so the full list is fetched once and
+ * filtered client-side. Products search the admin product list endpoint
+ * (debounced) since a store's catalog can be large.
+ */
+
+import { useEffect, useState } from 'react';
+import { useLocale } from 'next-intl';
+import { apiGet } from '../../../../lib/api';
+
+interface ScopeEntity {
+  id: string;
+  name: string;
+  nameAr?: string | null;
+}
+
+interface ScopePickerProps {
+  storeId: string;
+  kind: 'products' | 'categories';
+  value: string[];
+  onChange: (ids: string[]) => void;
+  label: string;
+  searchPlaceholder: string;
+  emptyHint: string;
+  removeLabel: string;
+}
+
+export function ScopePicker({
+  storeId,
+  kind,
+  value,
+  onChange,
+  label,
+  searchPlaceholder,
+  emptyHint,
+  removeLabel,
+}: ScopePickerProps) {
+  const locale = useLocale();
+  const [query, setQuery] = useState('');
+  const [categoryList, setCategoryList] = useState<ScopeEntity[]>([]);
+  const [productResults, setProductResults] = useState<ScopeEntity[]>([]);
+  const [selectedDetails, setSelectedDetails] = useState<Record<string, ScopeEntity>>({});
+  const [searching, setSearching] = useState(false);
+
+  const labelFor = (e: ScopeEntity) => (locale === 'ar' && e.nameAr ? e.nameAr : e.name);
+
+  // Categories: fetch the full list once per store — used both for the
+  // dropdown and to hydrate labels for already-selected ids.
+  useEffect(() => {
+    if (kind !== 'categories') return;
+    (async () => {
+      const { data } = await apiGet<{ categories: ScopeEntity[] }>(
+        `/api/v1/stores/${storeId}/categories`
+      );
+      const list = data?.categories ?? [];
+      setCategoryList(list);
+      setSelectedDetails(prev => {
+        const next = { ...prev };
+        for (const c of list) next[c.id] = c;
+        return next;
+      });
+    })();
+  }, [kind, storeId]);
+
+  // Products: hydrate labels for already-selected ids not yet known (e.g.
+  // when editing an existing promotion/coupon).
+  useEffect(() => {
+    if (kind !== 'products') return;
+    const missing = value.filter(id => !selectedDetails[id]);
+    if (missing.length === 0) return;
+    (async () => {
+      const { data } = await apiGet<{ products: ScopeEntity[] }>(
+        `/api/v1/stores/${storeId}/products?ids=${missing.join(',')}&limit=50`
+      );
+      const list = data?.products ?? [];
+      if (list.length === 0) return;
+      setSelectedDetails(prev => {
+        const next = { ...prev };
+        for (const p of list) next[p.id] = p;
+        return next;
+      });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, storeId, value.join(',')]);
+
+  // Products: debounced search-as-you-type.
+  useEffect(() => {
+    if (kind !== 'products') return;
+    const q = query.trim();
+    if (!q) {
+      setProductResults([]);
+      return;
+    }
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await apiGet<{ products: ScopeEntity[] }>(
+          `/api/v1/stores/${storeId}/products?search=${encodeURIComponent(q)}&limit=10`
+        );
+        setProductResults(data?.products ?? []);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [kind, query, storeId]);
+
+  function add(entity: ScopeEntity) {
+    if (value.includes(entity.id)) return;
+    setSelectedDetails(prev => ({ ...prev, [entity.id]: entity }));
+    onChange([...value, entity.id]);
+    setQuery('');
+  }
+
+  function remove(id: string) {
+    onChange(value.filter(v => v !== id));
+  }
+
+  const dropdownOptions =
+    kind === 'categories'
+      ? categoryList.filter(
+          o =>
+            !value.includes(o.id) &&
+            (!query.trim() || labelFor(o).toLowerCase().includes(query.trim().toLowerCase()))
+        )
+      : productResults.filter(o => !value.includes(o.id));
+
+  // Categories: browsable without typing (short list). Products: only after
+  // the merchant types something, since results come from a server search.
+  const showDropdown = kind === 'categories' ? dropdownOptions.length > 0 : query.trim().length > 0;
+
+  return (
+    <div className="space-y-2">
+      <span className="mb-1 block text-sm font-medium text-foreground">{label}</span>
+
+      {value.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5">
+          {value.map(id => (
+            <li
+              key={id}
+              className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-xs"
+            >
+              {selectedDetails[id] ? labelFor(selectedDetails[id]) : id}
+              <button
+                type="button"
+                onClick={() => remove(id)}
+                aria-label={removeLabel}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <input
+        type="text"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder={searchPlaceholder}
+        className="w-full rounded-md border border-border px-3 py-2 text-sm"
+      />
+
+      {showDropdown && (
+        <ul className="max-h-40 overflow-y-auto rounded-md border border-border text-sm">
+          {kind === 'products' && searching && (
+            <li className="px-3 py-2 text-muted-foreground">…</li>
+          )}
+          {dropdownOptions.map(o => (
+            <li key={o.id}>
+              <button
+                type="button"
+                onClick={() => add(o)}
+                className="block w-full px-3 py-2 text-start hover:bg-muted"
+              >
+                {labelFor(o)}
+              </button>
+            </li>
+          ))}
+          {!searching && dropdownOptions.length === 0 && (
+            <li className="px-3 py-2 text-muted-foreground">{emptyHint}</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}

@@ -96,6 +96,9 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
             // email can localize line items (order_items only snapshots the
             // English productName). Falls back to productName when absent.
             items: { include: { product: { select: { nameAr: true } } } },
+            // Names the promotion behind the discount line when an automatic
+            // promotion (not a coupon code) was the applied lever.
+            appliedPromotion: { select: { name: true, nameAr: true } },
           },
         });
         if (!row) throw new Error(`Order ${orderId} not found`);
@@ -143,6 +146,8 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       shipping: order.shipping,
       discount: order.discount,
       couponCode: order.couponCode ?? undefined,
+      promotionName: order.appliedPromotion?.name ?? undefined,
+      promotionNameAr: order.appliedPromotion?.nameAr ?? undefined,
       total: order.total,
       shippingAddress: shippingAddress as OrderEmailData['shippingAddress'],
     };

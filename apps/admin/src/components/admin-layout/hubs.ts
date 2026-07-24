@@ -26,9 +26,11 @@ export type HubLabels = {
   // Sales tabs
   orders: string;
   customers: string;
+  customerGroups: string;
   reviews: string;
   returns: string;
   coupons: string;
+  promotions: string;
   loyalty: string;
   // Stock tabs
   stockDashboard: string;
@@ -102,15 +104,18 @@ export const HUBS: HubDefinition[] = [
     urlPrefixes: [
       '/orders',
       '/customers',
+      '/customer-groups',
       '/sales',
       '/reviews',
       '/returns',
       '/coupons',
+      '/promotions',
       '/loyalty',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.orders, href: `/stores/${storeId}/orders` },
       { label: labels.customers, href: `/stores/${storeId}/customers` },
+      { label: labels.customerGroups, href: `/stores/${storeId}/customer-groups` },
       { label: labels.reviews, href: `/stores/${storeId}/reviews` },
       { label: labels.returns, href: `/stores/${storeId}/returns` },
       // Coupons and loyalty are feature-gated at the page level via
@@ -118,6 +123,9 @@ export const HUBS: HubDefinition[] = [
       // per-tab featureKey mechanism so the tab always renders; the page
       // itself redirects/blocks when the feature is disabled.
       { label: labels.coupons, href: `/stores/${storeId}/coupons` },
+      // Promotions are automatic discounts (no code) — ungated, same
+      // reasoning as customer-groups (dependency root for targeting).
+      { label: labels.promotions, href: `/stores/${storeId}/promotions` },
       { label: labels.loyalty, href: `/stores/${storeId}/loyalty` },
     ],
   },

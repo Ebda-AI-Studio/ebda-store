@@ -18,6 +18,13 @@ export interface Coupon {
   startsAt?: string;
   expiresAt?: string;
   createdAt: string;
+  // Targeting — shared shape with Promotion (see promotion.routes.ts's
+  // createSchema). All empty/null = "everyone, whole cart".
+  customerGroupId?: string | null;
+  firstOrderOnly?: boolean;
+  minQuantity?: number | null;
+  scopeProductIds?: string[];
+  scopeCategoryIds?: string[];
 }
 
 export interface CouponFormData {
@@ -35,6 +42,11 @@ export interface CouponFormData {
   isActive: boolean;
   startsAt: string;
   expiresAt: string;
+  customerGroupId: string;
+  firstOrderOnly: boolean;
+  minQuantity: string;
+  scopeProductIds: string[];
+  scopeCategoryIds: string[];
 }
 
 export type CouponStatusFilter = 'all' | 'active' | 'inactive';
@@ -54,4 +66,9 @@ export const INITIAL_FORM_DATA: CouponFormData = {
   isActive: true,
   startsAt: '',
   expiresAt: '',
+  customerGroupId: '',
+  firstOrderOnly: false,
+  minQuantity: '',
+  scopeProductIds: [],
+  scopeCategoryIds: [],
 };

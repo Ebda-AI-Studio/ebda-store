@@ -5,6 +5,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { couponValidateLimiter, writeLimiter } from '../middleware/security';
 import { CouponService } from '../services/coupon.service';
+import { resolveCustomerContext } from '../services/promotion-resolver';
 import { tenantContext } from '../middleware/tenant-context';
 
 const router = Router();
@@ -44,9 +45,41 @@ const createCouponSchema = z.object({
     .datetime()
     .optional()
     .transform(s => (s ? new Date(s) : undefined)),
+  // Targeting — shared shape with Promotion (see promotion.routes.ts's
+  // createSchema). All optional/empty = "everyone, whole cart" so existing
+  // coupons are unchanged. CouponService.create/update already accepts
+  // these; this schema previously stripped them before they got there.
+  customerGroupId: z.string().uuid().nullish(),
+  firstOrderOnly: z.boolean().optional(),
+  minQuantity: z.number().int().min(1).nullish(),
+  scopeProductIds: z.array(z.string().uuid()).max(500).optional(),
+  scopeCategoryIds: z.array(z.string().uuid()).max(200).optional(),
 });
 
 const updateCouponSchema = createCouponSchema.partial();
+
+// Same cart-item shape as promotion.routes.ts's preview endpoint — kept
+// local (not imported) since each router already owns its own validation
+// schemas in this codebase (see createCouponSchema above vs. promotion
+// .routes.ts's createSchema).
+const cartItemSchema = z.object({
+  productId: z.string(),
+  categoryIds: z.array(z.string()),
+  quantity: z.number().int().min(0),
+  lineTotal: z.number().int().min(0),
+});
+const cartItemsSchema = z.array(cartItemSchema).max(500);
+
+// Targeting inputs on the public validate endpoint below (cartItems/phone/
+// email) — validated up front so a malformed value (object/array instead of
+// a string) is rejected with a clean 400 instead of reaching Prisma as an
+// uncontrolled 500. `cartItems` stays optional here: its absence must leave
+// the existing whole-cart `orderTotal` behavior byte-for-byte unchanged.
+const validateTargetingSchema = z.object({
+  cartItems: cartItemsSchema.optional(),
+  phone: z.string().nullish(),
+  email: z.string().nullish(),
+});
 
 // GET /stores/:storeId/coupons - List all coupons
 router.get(
@@ -212,6 +245,11 @@ router.post(
     try {
       const { storeId } = req.params;
       const { code, orderTotal } = req.body;
+      // Validated separately from code/orderTotal (left untouched below) so
+      // a malformed cartItems/phone/email (e.g. an object or array instead
+      // of a string) fails with a clean 400 here rather than reaching
+      // Prisma inside resolveCustomerContext as an uncontrolled 500.
+      const { cartItems, phone, email } = validateTargetingSchema.parse(req.body);
 
       if (!code) {
         res.status(400).json({
@@ -246,9 +284,38 @@ router.post(
         return;
       }
 
-      // Calculate discount if order total provided
+      // Calculate discount. Callers that pass cartItems get fine-grained
+      // targeting (customer group, first-order, product/category scope)
+      // evaluated against the matching subtotal; callers that only send
+      // orderTotal (no cartItems) keep the original whole-cart calculation
+      // — this branch is intentionally untouched so existing callers are
+      // unaffected. free_shipping coupons have no cart-targeted discount
+      // math (see CouponService.calculateDiscount), so they always fall
+      // through to the orderTotal branch.
       let discount = 0;
-      if (orderTotal) {
+      if (Array.isArray(cartItems) && cartItems.length > 0 && coupon.type !== 'free_shipping') {
+        // This route is unauthenticated (public storefront), so identity is
+        // resolved from phone/email only — NOT a client-supplied customerId.
+        // Accepting a body customerId here would let an attacker probe any
+        // other customer's segment/first-order status without proving they
+        // are that customer.
+        const ctx = {
+          ...(await resolveCustomerContext(storeId, { phone, email })),
+          cartItems,
+        };
+        const evalResult = CouponService.evaluateForCart(coupon, ctx);
+        if (!evalResult.eligible) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'COUPON_NOT_ELIGIBLE',
+              message: 'This coupon does not apply to your cart.',
+            },
+          });
+          return;
+        }
+        discount = evalResult.discount;
+      } else if (orderTotal) {
         discount = CouponService.calculateDiscount(coupon, orderTotal);
       }
 

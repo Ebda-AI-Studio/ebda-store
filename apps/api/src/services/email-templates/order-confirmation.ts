@@ -51,7 +51,7 @@ export const orderConfirmationTemplate = {
         ${
           d.discount && d.discount > 0
             ? `<tr>
-          <td colspan="2">Discount${d.couponCode ? ` (${escapeHtml(d.couponCode)})` : ''}</td>
+          <td colspan="2">Discount${d.couponCode ? ` (${escapeHtml(d.couponCode)})` : d.promotionName ? ` (${escapeHtml(d.promotionName)})` : ''}</td>
           <td style="text-align: right;">-${(d.discount / 1000).toFixed(3)} KWD</td>
         </tr>`
             : ''
@@ -118,7 +118,7 @@ export const orderConfirmationTemplate = {
         ${
           d.discount && d.discount > 0
             ? `<tr>
-          <td colspan="2">الخصم${d.couponCode ? ` (${escapeHtml(d.couponCode)})` : ''}</td>
+          <td colspan="2">الخصم${d.couponCode ? ` (${escapeHtml(d.couponCode)})` : d.promotionNameAr || d.promotionName ? ` (${escapeHtml(d.promotionNameAr || d.promotionName || '')})` : ''}</td>
           <td style="text-align: right;">-${(d.discount / 1000).toFixed(3)} د.ك</td>
         </tr>`
             : ''

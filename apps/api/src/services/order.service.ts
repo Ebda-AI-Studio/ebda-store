@@ -6,6 +6,7 @@ import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { CouponService } from './coupon.service';
+import { resolveCustomerContext, resolveBestPromotion } from './promotion-resolver';
 import { socketService } from './socket.service';
 import { featureService } from './feature.service';
 import {
@@ -246,6 +247,11 @@ export class OrderService {
           },
         },
         payments: { select: ORDER_PAYMENT_SELECT },
+        // Surfaces WHICH promotion discounted the order alongside
+        // couponCode/couponDiscount/promotionDiscount (all plain scalar
+        // columns already returned by `include`) so admin/customer order
+        // views can show the promotion's name, not just its opaque id.
+        appliedPromotion: { select: { id: true, name: true, nameAr: true } },
       },
     });
 
@@ -274,6 +280,7 @@ export class OrderService {
           },
         },
         payments: { select: ORDER_PAYMENT_SELECT },
+        appliedPromotion: { select: { id: true, name: true, nameAr: true } },
       },
     });
 
@@ -306,7 +313,12 @@ export class OrderService {
     // order response.
     const productInternals = await prisma.product.findMany({
       where: { id: { in: cart.items.map(i => i.productId) } },
-      select: { id: true, trackInventory: true, costPrice: true },
+      select: {
+        id: true,
+        trackInventory: true,
+        costPrice: true,
+        categories: { select: { categoryId: true } },
+      },
     });
     const productInternalsById = new Map(productInternals.map(p => [p.id, p]));
 
@@ -319,6 +331,19 @@ export class OrderService {
       (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
       0
     );
+
+    // Build the targeting cart snapshot (product + category ids, per-line
+    // totals) shared by coupon targeting and automatic promotion resolution.
+    // Prices each line the same way as `subtotal` so scoped discounts compute
+    // against the exact fils the customer is charged.
+    const cartItems = cart.items.map(item => ({
+      productId: item.productId,
+      categoryIds: (productInternalsById.get(item.productId)?.categories ?? []).map(
+        c => c.categoryId
+      ),
+      quantity: item.quantity,
+      lineTotal: cartLineUnitPrice(item) * item.quantity,
+    }));
 
     // Per-store, opt-in minimum order value (Store.settings.minimumOrderFils,
     // fils; 0/unset = no minimum). Platform-level — any store can configure
@@ -412,6 +437,22 @@ export class OrderService {
     // and order creation. CouponService.getByCode enforces active/starts/expires/
     // usage-limit at read time; the atomic usage-count increment inside the
     // transaction below closes the remaining concurrency gap.
+    // Resolve the customer targeting context (group + first-order) from the
+    // checkout identity. The guest identity vars used elsewhere for the
+    // per-user usage check are derived later (~line 600); resolve the same
+    // identity directly here so coupon targeting and promotion resolution see
+    // the customer's real group/first-order status.
+    const idPhone =
+      typeof data.shippingAddress.phone === 'string' ? data.shippingAddress.phone : null;
+    const idEmail =
+      typeof data.shippingAddress.email === 'string' ? data.shippingAddress.email : null;
+    const custCtx = await resolveCustomerContext(storeId, {
+      phone: idPhone,
+      email: idEmail,
+      customerId: customerId ?? null,
+    });
+    const targetingCtx = { ...custCtx, cartItems };
+
     let appliedCoupon: Awaited<ReturnType<typeof CouponService.getByCode>> | null = null;
     let couponDiscount = 0;
     if (data.couponCode) {
@@ -425,23 +466,64 @@ export class OrderService {
           )} KWD required for this coupon`
         );
       }
-      if (appliedCoupon.type !== 'free_shipping') {
-        couponDiscount = CouponService.calculateDiscount(
-          {
-            type: appliedCoupon.type,
-            value: appliedCoupon.value,
-            maxDiscount: appliedCoupon.maxDiscount,
-          },
-          subtotal
-        );
-      } else {
+      if (appliedCoupon.type === 'free_shipping') {
         // Free-shipping coupon — zero out the shipping line we just
         // resolved above. Stacks naturally with the store's own
         // free-shipping threshold (whichever zeros first wins; both
         // mean the customer pays no delivery fee).
         shipping = 0;
+      } else {
+        // Evaluate the coupon's targeting (customer group, first-order,
+        // product/category scope, min qty) against the resolved cart. A coupon
+        // that doesn't apply to this cart is rejected outright — we never
+        // silently fall back to a whole-cart discount.
+        const evalResult = CouponService.evaluateForCart(appliedCoupon, targetingCtx);
+        if (!evalResult.eligible) {
+          throw new AppError(
+            400,
+            'COUPON_NOT_ELIGIBLE',
+            'This coupon does not apply to your cart.'
+          );
+        }
+        couponDiscount = evalResult.discount;
       }
     }
+
+    // Automatic promotions apply without a code. Resolve the single best one
+    // (largest eligible discount, priority-broken ties) and pit it against the
+    // coupon: the larger single discount wins ("best-of", they don't stack).
+    // free_shipping is not an accepted promotion type (rejected at the admin
+    // schema boundary) — only value-bearing percentage/fixed promotions are
+    // ever resolved here. free_shipping COUPONS are unrelated and still work.
+    const bestPromo = await resolveBestPromotion(storeId, targetingCtx);
+    const promotionDiscount = bestPromo ? bestPromo.discount : 0;
+
+    const primaryDiscount = Math.max(couponDiscount, promotionDiscount);
+    // Record the promotion whenever it matches-or-beats the coupon (and is
+    // non-zero). The discount amount itself is only ever counted once via
+    // `primaryDiscount`, so this is a record of which lever applied.
+    const appliedPromotionId =
+      bestPromo && promotionDiscount >= couponDiscount && promotionDiscount > 0
+        ? bestPromo.promotionId
+        : null;
+    // The coupon was actually applied (→ consume its usage) when it is a
+    // free-shipping coupon (always acts on the shipping line) OR its discount
+    // matched-or-beat any competing promotion. If a promotion strictly
+    // out-discounted the coupon, the coupon was NOT applied and must neither
+    // block on its per-user limit nor consume a redemption.
+    // Exact-tie guard: when couponDiscount === promotionDiscount (both > 0),
+    // appliedPromotionId is already set above (promotion wins ties), so the
+    // promotion is the recorded lever. Without the `!appliedPromotionId`
+    // check here, couponDiscount === primaryDiscount would ALSO be true on
+    // that tie, and both couponDiscount and promotionDiscount would persist
+    // as D — double-counting a single D-sized discount in the breakdown
+    // (though `discount` itself, via primaryDiscount, stays correct at D).
+    // free_shipping coupons are unaffected — they act on the shipping line
+    // and always apply alongside any promotion.
+    const couponApplied =
+      !!appliedCoupon &&
+      (appliedCoupon.type === 'free_shipping' ||
+        (couponDiscount === primaryDiscount && couponDiscount > 0 && !appliedPromotionId));
 
     // Resolve loyalty redemption on the SERVER. data.pointsToRedeem is a
     // request, never a trusted discount. Guests (no customerId) can't redeem.
@@ -456,8 +538,9 @@ export class OrderService {
     if (customerId && typeof data.pointsToRedeem === 'number' && data.pointsToRedeem > 0) {
       const ctx = await LoyaltyService.getRedeemableContext(storeId, customerId);
       if (ctx) {
-        // Cap against the goods value still payable after the coupon discount.
-        const redeemableSubtotal = Math.max(0, subtotal - couponDiscount);
+        // Cap against the goods value still payable after the primary discount
+        // (the winning coupon-or-promotion). Loyalty stacks on the remainder.
+        const redeemableSubtotal = Math.max(0, subtotal - primaryDiscount);
         const quote = computeRedemption(
           ctx.settings,
           data.pointsToRedeem,
@@ -471,7 +554,7 @@ export class OrderService {
       }
     }
 
-    const discount = couponDiscount + loyaltyDiscount;
+    const discount = primaryDiscount + loyaltyDiscount;
     const total = Math.max(0, subtotal + tax + shipping - discount);
 
     // Generate order number
@@ -596,7 +679,12 @@ export class OrderService {
       // reliable identity to check — we deliberately do NOT block in that
       // case (a false block on an unidentifiable guest is worse than the
       // narrow loophole; the store-wide usageLimit still caps total abuse).
-      if (appliedCoupon && appliedCoupon.usageLimitPerUser && appliedCoupon.usageLimitPerUser > 0) {
+      if (
+        appliedCoupon &&
+        couponApplied &&
+        appliedCoupon.usageLimitPerUser &&
+        appliedCoupon.usageLimitPerUser > 0
+      ) {
         const guestEmail =
           typeof data.shippingAddress.email === 'string' && data.shippingAddress.email
             ? data.shippingAddress.email
@@ -641,7 +729,7 @@ export class OrderService {
       // reading the same stale count. updateMany with a usageCount < limit
       // guard updates zero rows when the limit is reached, which we detect
       // via `count === 0` and roll back by throwing.
-      if (appliedCoupon) {
+      if (appliedCoupon && couponApplied) {
         const reserve = await tx.coupon.updateMany({
           where: {
             id: appliedCoupon.id,
@@ -666,8 +754,22 @@ export class OrderService {
           tax,
           shipping,
           discount,
-          couponCode: appliedCoupon?.code ?? null,
-          couponDiscount,
+          // Persist the coupon fields ONLY when the coupon actually applied.
+          // If a promotion out-discounted the coupon it was not consumed (no
+          // usageCount increment above); leaving its code/discount on the order
+          // would make the per-user usage count over-count and the
+          // payment-failure rollback decrement a redemption that was never
+          // reserved. free_shipping coupons keep their code with a 0 discount,
+          // exactly as before.
+          couponCode: couponApplied ? (appliedCoupon?.code ?? null) : null,
+          couponDiscount: couponApplied ? couponDiscount : 0,
+          // Store the promotion discount that actually applied (mirrors the
+          // coupon gating). When the coupon out-discounted the promotion,
+          // `appliedPromotionId` is null and no promotion discount is recorded,
+          // so the persisted couponDiscount + promotionDiscount + loyaltyDiscount
+          // reconciles to `discount` in every non-tie case.
+          promotionDiscount: appliedPromotionId ? promotionDiscount : 0,
+          appliedPromotionId,
           loyaltyPointsRedeemed: loyaltyPointsRedeemed > 0 ? loyaltyPointsRedeemed : null,
           loyaltyDiscount,
           total,

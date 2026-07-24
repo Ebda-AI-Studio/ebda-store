@@ -431,6 +431,25 @@ export const couponValidateLimiter = rateLimit({
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
 
+// Promotion preview limiter — public storefront targeting-preview endpoint.
+// Same posture as couponValidateLimiter (20/min per IP): generous for a
+// legitimate checkout flow (recomputed on every cart mutation) while
+// bounding scrape/enumeration volume against the targeting resolver.
+// ipKeyGenerator() collapses IPv6 /128 → /64 (ERR_ERL_KEY_GEN_IPV6).
+export const promotionPreviewLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'promotion-preview'),
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipForLoadTest,
+  keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+});
+
 // View ingest limiter — public PDP beacon, high-traffic, unauthenticated.
 // 60 requests per minute per IP. The in-memory session debounce in
 // view-ingest.service.ts provides a second layer: one DB increment per
