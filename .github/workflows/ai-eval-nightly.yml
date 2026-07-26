@@ -43,6 +43,16 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      # The eval imports @force/database + @force/shared, which resolve to their
+      # compiled dist/ — npm ci alone does not build workspace packages, so the
+      # eval crashed with "Cannot find module '@force/database/dist/index.js'".
+      # Build them (Prisma client first) exactly like ci.yml does.
+      - name: Generate Prisma Client
+        run: npm run db:generate
+      - name: Build database package
+        run: npm run build -w packages/database
+      - name: Build shared package
+        run: npm run build -w packages/shared
       - name: Run AI-output eval (deterministic + model-judge)
         env:
           GOOGLE_GENERATIVE_AI_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_KEY }}
