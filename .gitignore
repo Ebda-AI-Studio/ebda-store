@@ -151,3 +151,6 @@ dump.rdb
 # NOTE: apps/*/open-next.config.ts and apps/*/wrangler.jsonc are now COMMITTED
 # (secret-clean — zero vars, routes only) so CF Workers Builds (Git-connected deploys)
 # can read them directly from the repo. Only the build OUTPUT dirs above stay ignored.
+
+# per-session subagent-driven-development scratch
+.superpowers/

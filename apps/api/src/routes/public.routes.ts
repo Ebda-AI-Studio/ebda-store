@@ -5,7 +5,8 @@ import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { EmailService } from '../services/email.service';
-import { prisma } from '@force/database';
+import { prisma, SlugEntityType } from '@force/database';
+import { resolveSlugRedirect } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
 import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import {
@@ -330,6 +331,38 @@ router.get('/categories', async (req: Request, res: Response, next: NextFunction
     });
   } catch (error) {
     next(error);
+  }
+});
+
+// GET /redirects/resolve - Resolve a renamed slug to its current one (301 lookup)
+const SLUG_REDIRECT_TYPE_MAP: Record<string, SlugEntityType> = {
+  product: SlugEntityType.PRODUCT,
+  category: SlugEntityType.CATEGORY,
+  page: SlugEntityType.PAGE,
+  blog: SlugEntityType.BLOG,
+};
+
+// Rate limiting is covered by the router-level `router.use(publicLimiter)` above;
+// no per-route limiter here (an inline publicLimiter would double-count the bucket).
+router.get('/redirects/resolve', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const entityType = SLUG_REDIRECT_TYPE_MAP[String(req.query.type)];
+    const slug = typeof req.query.slug === 'string' ? req.query.slug : '';
+
+    if (!entityType || !slug) {
+      res.status(400).json({ error: 'bad request' });
+      return;
+    }
+
+    const storeId = await getStoreIdFromRequest(req);
+    const toSlug = await resolveSlugRedirect(storeId, entityType, slug);
+    if (!toSlug) {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    res.json({ toSlug });
+  } catch (err) {
+    next(err);
   }
 });
 

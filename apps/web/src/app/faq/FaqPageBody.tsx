@@ -3,7 +3,7 @@ import {
   faqPageJsonLd,
   howToJsonLd,
   breadcrumbJsonLd,
-  getSiteUrl,
+  storeAbsoluteUrl,
 } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import FAQClient from './FAQClient';
@@ -16,8 +16,6 @@ import FAQClient from './FAQClient';
  * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
  */
 export async function FaqPageBody({ store }: { store: ResolvedStore }) {
-  const siteUrl = getSiteUrl(store);
-
   // Build FAQ JSON-LD from store-authored FAQs (both locales included via
   // mainEntityOfPage on each Question; English used as the canonical form
   // here — Google will see AR equivalents via hreflang).
@@ -32,8 +30,8 @@ export async function FaqPageBody({ store }: { store: ResolvedStore }) {
   }));
 
   const faqBreadcrumb = breadcrumbJsonLd([
-    { name: 'Home', url: siteUrl },
-    { name: 'FAQ', url: `${siteUrl}/faq` },
+    { name: 'Home', url: storeAbsoluteUrl(store, '') },
+    { name: 'FAQ', url: storeAbsoluteUrl(store, '/faq') },
   ]);
 
   return (

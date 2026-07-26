@@ -1,5 +1,5 @@
 import type { ResolvedStore } from '../../lib/store-resolver';
-import { howToJsonLd, breadcrumbJsonLd, getSiteUrl } from '../../lib/structured-data';
+import { howToJsonLd, breadcrumbJsonLd, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import HowToGuidesClient from './HowToGuidesClient';
 
@@ -12,12 +12,11 @@ import HowToGuidesClient from './HowToGuidesClient';
  * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
  */
 export async function HowToGuidesPageBody({ store }: { store: ResolvedStore }) {
-  const siteUrl = getSiteUrl(store);
   const storeHowtos = store.howtos ?? [];
 
   const breadcrumb = breadcrumbJsonLd([
-    { name: 'Home', url: siteUrl },
-    { name: 'How-To Guides', url: `${siteUrl}/how-to-guides` },
+    { name: 'Home', url: storeAbsoluteUrl(store, '') },
+    { name: 'How-To Guides', url: storeAbsoluteUrl(store, '/how-to-guides') },
   ]);
 
   return (

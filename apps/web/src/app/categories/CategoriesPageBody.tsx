@@ -2,7 +2,7 @@ import type { ResolvedStore } from '../../lib/store-resolver';
 import { API_URL, type Category } from '@/lib/api';
 import { publicLayoutUrl } from '../../lib/preview-draft';
 import { resolveLayoutSettings, type CategoriesPageSettings } from '@force/shared';
-import { breadcrumbJsonLd, itemList, getSiteUrl } from '../../lib/structured-data';
+import { breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import CategoriesClient from './CategoriesClient';
 
@@ -88,11 +88,9 @@ export async function CategoriesPageBody({
     fetchCategoriesPageSettings(store, draftToken),
   ]);
 
-  const siteUrl = getSiteUrl(store);
-
   const categoriesBreadcrumb = breadcrumbJsonLd([
-    { name: 'Home', url: siteUrl },
-    { name: 'Categories', url: `${siteUrl}/categories` },
+    { name: 'Home', url: storeAbsoluteUrl(store, '') },
+    { name: 'Categories', url: storeAbsoluteUrl(store, '/categories') },
   ]);
 
   // Represent each category as an ItemList entry so AI agents understand
@@ -102,7 +100,7 @@ export async function CategoriesPageBody({
       ? itemList(
           categories.slice(0, 50).map((c: Category) => ({
             name: c.name,
-            url: `${siteUrl}/categories/${c.slug}`,
+            url: storeAbsoluteUrl(store, `/categories/${c.slug}`),
             image: c.image ?? null,
             price: null,
           })),

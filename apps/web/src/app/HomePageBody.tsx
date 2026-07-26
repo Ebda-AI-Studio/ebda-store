@@ -2,7 +2,7 @@ import type { ResolvedStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import type { Product, Category } from '../lib/api';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
-import { storeJsonLd, breadcrumbJsonLd, itemList, getSiteUrl } from '../lib/structured-data';
+import { storeJsonLd, breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../lib/structured-data';
 import { JsonLd } from '../components/JsonLd';
 import { HomePageContent } from './HomePageContent';
 import { EditorialLanding } from '../components/landing/EditorialLanding';
@@ -315,7 +315,7 @@ export async function HomePageBody({
       categories: categoriesPromise,
     });
 
-  const siteUrl = getSiteUrl(store);
+  const siteUrl = storeAbsoluteUrl(store, '');
   const socialUrls = store.socialLinks
     ? (Object.values(store.socialLinks).filter(Boolean) as string[])
     : undefined;
@@ -341,7 +341,7 @@ export async function HomePageBody({
       ? itemList(
           featuredProducts.slice(0, 50).map(p => ({
             name: p.name,
-            url: `${siteUrl}/products/${p.slug}`,
+            url: storeAbsoluteUrl(store, `/products/${p.slug}`),
             image: p.images?.[0]?.url ?? null,
             price: p.price,
             currency: store.currency,

@@ -1,6 +1,7 @@
-import { prisma, Prisma, ProductStatus, withMoneyTx } from '@force/database';
+import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@force/database';
 import { csvField } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
+import { recordSlugRedirect } from './slug-redirect.service';
 
 interface ProductImportRow {
   name: string;
@@ -839,6 +840,21 @@ export class BulkService {
                 });
                 productId = existing.id;
                 result.updated++;
+
+                // The incoming row's slug may differ from the product's current
+                // one (e.g. a re-export from a source system with a different
+                // handle) -- Phase 2 already decided to write it, so this is a
+                // live rename exactly like a manual edit. Record old -> new so
+                // the previously-indexed handle 301s instead of 404ing.
+                if (existing.slug !== slug) {
+                  await recordSlugRedirect(
+                    tx,
+                    storeId,
+                    SlugEntityType.PRODUCT,
+                    existing.slug,
+                    slug
+                  );
+                }
               } else {
                 // Create new product
                 const created = await tx.product.create({

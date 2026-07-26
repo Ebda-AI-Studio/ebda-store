@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { ResolvedStore } from './store-resolver';
-import { getSiteUrl } from './structured-data';
+import { getSiteUrl, storeAbsoluteUrl } from './structured-data';
 import { pickMetaDescription } from './seo/meta-description';
 import { resolveStoreOgImage } from './seo/og-image';
 
@@ -146,7 +146,11 @@ export function buildStorefrontMetadata(store: ResolvedStore, isOnCustomDomain: 
       siteName: localizedStoreName,
       title: titleDefault,
       description,
-      url: siteUrl,
+      // Store-home canonical URL (the default og:url before a page-level
+      // override replaces this whole openGraph object) — must carry the
+      // platform `/<slug>` prefix for stores with no custom domain, same as
+      // every other per-page canonical/JSON-LD `url` builder.
+      url: storeAbsoluteUrl(store, ''),
       // Always include an og:image with explicit dimensions.
       // WhatsApp requires og:image to be an ABSOLUTE https URL with
       // og:image:width + og:image:height — without dimensions WhatsApp

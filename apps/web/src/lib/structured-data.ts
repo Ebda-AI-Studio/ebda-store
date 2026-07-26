@@ -31,7 +31,7 @@ interface ProductForJsonLd {
  * Returns a plain object suitable for JSON.stringify inside a <script type="application/ld+json"> tag.
  */
 export function productJsonLd(product: ProductForJsonLd, store: ResolvedStore) {
-  const siteUrl = getSiteUrl(store);
+  const productUrl = storeAbsoluteUrl(store, `/products/${product.slug}`);
   const image = product.images?.[0]?.url;
   const availability =
     product.inventory === undefined || product.inventory > 0
@@ -45,7 +45,7 @@ export function productJsonLd(product: ProductForJsonLd, store: ResolvedStore) {
     ...(product.description ? { description: product.description } : {}),
     ...(image ? { image } : {}),
     ...(product.sku ? { sku: product.sku } : {}),
-    url: `${siteUrl}/products/${product.slug}`,
+    url: productUrl,
     ...(product.categories?.[0]?.category?.name
       ? { category: product.categories[0].category.name }
       : {}),
@@ -54,7 +54,7 @@ export function productJsonLd(product: ProductForJsonLd, store: ResolvedStore) {
       price: (product.price / 1000).toFixed(3),
       priceCurrency: store.currency || 'KWD',
       availability,
-      url: `${siteUrl}/products/${product.slug}`,
+      url: productUrl,
       seller: {
         '@type': 'Organization',
         name: store.name,
@@ -80,7 +80,7 @@ export function productJsonLd(product: ProductForJsonLd, store: ResolvedStore) {
  * `knowsLanguage`, `contactPoint`, etc.
  */
 export function organizationJsonLd(store: ResolvedStore) {
-  const siteUrl = getSiteUrl(store);
+  const siteUrl = storeAbsoluteUrl(store, '');
 
   // Merge brand-facts from GEO sweep without overriding core fields.
   const aboutOverrides: Record<string, unknown> =
@@ -325,7 +325,7 @@ export function reviewJsonLd(r: {
 /**
  * Resolve the canonical site URL for this store.
  */
-export function getSiteUrl(store?: ResolvedStore): string {
+export function getSiteUrl(store?: Pick<ResolvedStore, 'domain'>): string {
   // Whitespace defense: a stray newline in the Vercel env var silently breaks
   // every URL in robots.txt + sitemap.xml (Google then can't fetch the map).
   if (process.env.NEXT_PUBLIC_SITE_URL) {
@@ -341,4 +341,28 @@ export function getSiteUrl(store?: ResolvedStore): string {
   // after the CF cutover, so sitemap + OG advertised the old domain on
   // store.force-ai.co (regression fixed 2026-06-27).
   return 'https://store.force-ai.co';
+}
+
+/**
+ * Absolute in-store URL that preserves the platform `/<slug>` path prefix.
+ * `getSiteUrl()` only returns the bare custom-domain (or platform-default)
+ * origin — it does NOT include the `/<slug>` path prefix that platform-path
+ * stores (no custom domain, `store.domain` is falsy) need, see
+ * `apps/web/src/app/sitemap.ts`'s "master sitemap" branch for the same
+ * pattern. Every per-page JSON-LD `url`, breadcrumb `item`, and
+ * `rel=canonical` builder MUST route through this (or `getSiteUrl()` for the
+ * bare origin) instead of hand-concatenating `${getSiteUrl(store)}${path}` —
+ * skipping the prefix points crawlers/agents at a URL that resolves to the
+ * wrong store (or the demo store) once it hits middleware.
+ *
+ * `path` may be given with or without a leading slash; '' or '/' both
+ * resolve to the store root.
+ */
+export function storeAbsoluteUrl(
+  store: Pick<ResolvedStore, 'slug' | 'domain'>,
+  path: string
+): string {
+  const prefix = store.domain ? '' : `/${store.slug}`;
+  const normalizedPath = path && !path.startsWith('/') ? `/${path}` : path;
+  return `${getSiteUrl(store)}${prefix}${normalizedPath}`;
 }

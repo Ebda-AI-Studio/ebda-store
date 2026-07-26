@@ -1,7 +1,48 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, type Plugin } from 'vitest/config';
 import path from 'path';
 
+/**
+ * Each app (`apps/api`, `apps/admin`, `apps/web`, `apps/orders`) declares its
+ * OWN `"@/*": ["./src/*"]` path in its own tsconfig.json — `@/lib/x` inside
+ * `apps/web` means `apps/web/src/lib/x`, NOT the same path inside `apps/admin`.
+ * A single flat string alias can't serve every app's `'@/'` convention at
+ * once (it has no way to know which app an import came from), so this
+ * resolves `'@/...'` relative to the nearest `apps/<name>/src/` ancestor of
+ * the IMPORTING file. Previously any transitive `'@/...'` import inside an
+ * app's source tree was unresolvable under the shared root Vitest config —
+ * `apps/web/src/app/products/[slug]/ProductDetailBody.test.tsx` was the
+ * first test to actually import a chain that hit one.
+ */
+function perAppAtAlias(): Plugin {
+  const apps = ['api', 'admin', 'web', 'orders'];
+  return {
+    name: 'per-app-at-alias',
+    async resolveId(source, importer) {
+      if (!importer || !source.startsWith('@/')) return null;
+      const normalizedImporter = importer.replace(/\\/g, '/');
+      for (const app of apps) {
+        const marker = `/apps/${app}/src/`;
+        const idx = normalizedImporter.indexOf(marker);
+        if (idx === -1) continue;
+        const appSrcRoot = normalizedImporter.slice(0, idx + marker.length);
+        const rewritten = path.join(appSrcRoot, source.slice(2));
+        return this.resolve(rewritten, importer, { skipSelf: true });
+      }
+      return null;
+    },
+  };
+}
+
 export default defineConfig({
+  // Every app's tsconfig sets `"jsx": "preserve"` (Next.js/its own bundler
+  // owns the JSX transform at build time) — Vite's oxc transform reads that
+  // same tsconfig for test transforms and, left on "preserve", leaves raw
+  // JSX in the module body for the next pipeline stage to choke on. Force
+  // oxc's own transform for test runs only; production builds are untouched.
+  oxc: {
+    jsx: 'automatic',
+  },
+  plugins: [perAppAtAlias()],
   test: {
     globals: true,
     environment: 'node',
@@ -44,7 +85,13 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './'),
+      // NOTE: no bare `'@'` → repo-root alias here (deliberately removed —
+      // nothing in the repo imports it, and its prefix-match on `'@/...'`
+      // fired ahead of every app's own `'@/'` convention, corrupting them
+      // to a nonexistent repo-root path before `perAppAtAlias()` above ever
+      // saw the original specifier). Vite's `resolve.alias` plugin runs
+      // before ALL user plugins regardless of `enforce`, so the only fix
+      // was removing the colliding key.
       '@api': path.resolve(__dirname, './apps/api/src'),
       '@web': path.resolve(__dirname, './apps/web/src'),
       '@admin': path.resolve(__dirname, './apps/admin/src'),

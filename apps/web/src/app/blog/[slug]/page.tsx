@@ -9,9 +9,15 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const store = await getStore();
-  const post = await fetchPost(store.id, slug);
-  if (!post) return { title: 'Not found' };
-  return buildBlogPostMetadata(post, store, slug);
+  // fetchPost can now throw on a transient (5xx/network) error — metadata
+  // generation must degrade gracefully rather than 500 the whole page.
+  try {
+    const post = await fetchPost(store.id, slug);
+    if (!post) return { title: 'Not found' };
+    return buildBlogPostMetadata(post, store, slug);
+  } catch {
+    return { title: 'Blog' };
+  }
 }
 
 export default async function BlogPostPage({ params }: PageProps) {

@@ -33,7 +33,7 @@ export async function generateMetadata({
     const product = data?.data?.product;
     if (!product) return { title: 'Product Not Found' };
 
-    return buildProductMetadata(product, store.name, store.slug);
+    return buildProductMetadata(product, store);
   } catch {
     return { title: 'Product' };
   }

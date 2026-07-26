@@ -4,9 +4,10 @@ import { authenticate, authorize } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess } from '../middleware/store-access';
-import { prisma } from '@force/database';
+import { prisma, SlugEntityType } from '@force/database';
 import { invalidateCached } from '../lib/public-cache';
 import { deleteR2ObjectIfOrphan } from '../services/r2-cleanup.service';
+import { recordSlugRedirect } from '../services/slug-redirect.service';
 import logger from '../lib/logger';
 
 const router = Router({ mergeParams: true });
@@ -475,6 +476,11 @@ router.put(
 
       const previousImage = existing.image;
 
+      // This route is mounted under `tenantContext` middleware, which already
+      // wraps the whole request in one ambient tenant transaction (RLS GUC
+      // set via `runInTenantContext`). Calling the proxied `prisma` directly
+      // (not a nested `prisma.$transaction`) lets both the update and the
+      // capture ride that ambient tx — atomic, and RLS-enforced.
       const category = await prisma.category.update({
         where: { id: categoryId },
         data: {
@@ -514,6 +520,16 @@ router.put(
           },
         },
       });
+
+      if (data.slug && data.slug !== existing.slug) {
+        await recordSlugRedirect(
+          prisma,
+          storeId,
+          SlugEntityType.CATEGORY,
+          existing.slug,
+          data.slug
+        );
+      }
 
       // If the cover image changed, queue the old object for R2 cleanup.
       // Only fires when `data.image` is in the patch (undefined means

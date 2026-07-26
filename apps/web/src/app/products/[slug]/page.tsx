@@ -48,7 +48,7 @@ export async function generateMetadata({
       return { title: 'Product Not Found' };
     }
 
-    return buildProductMetadata(product, store.name, store.slug);
+    return buildProductMetadata(product, store);
   } catch {
     // On any fetch error, return minimal metadata
     return { title: 'Product' };

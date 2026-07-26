@@ -1,14 +1,16 @@
 import { Suspense } from 'react';
+import { permanentRedirect } from 'next/navigation';
 import type { ResolvedStore } from '../../lib/store-resolver';
 import { API_URL } from '../../lib/api';
 import { publicLayoutUrl } from '../../lib/preview-draft';
+import { fetchSlugRedirect, storeRedirectUrl } from '../../lib/slug-redirect';
 import {
   resolveLayoutSettings,
   type ProductCardDefaults,
   type FilterSidebarSettings,
   type ProductsPageSettings,
 } from '@force/shared';
-import { breadcrumbJsonLd, itemList, getSiteUrl } from '../../lib/structured-data';
+import { breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import ProductsClient from './ProductsClient';
 
@@ -128,11 +130,27 @@ export async function ProductsPageBody({
   ]);
   const { productCardDefaults, filterSidebar, productsPage } = plpLayout;
 
-  const siteUrl = getSiteUrl(store);
+  // Genuine miss on a real store: an unknown `?category=` filter may be a
+  // renamed category slug — try to resolve a 308 before falling through.
+  // Unlike product/blog, an unknown category is NOT a 404 for this page (the
+  // PLP itself is still valid with an empty/ignored filter) — so we only
+  // redirect when a real CATEGORY redirect exists; otherwise do nothing.
+  if (
+    category &&
+    store.id !== 'demo' &&
+    !(initialData.categories ?? []).some((c: { slug: string }) => c.slug === category)
+  ) {
+    const toSlug = await fetchSlugRedirect(store, 'category', category);
+    if (toSlug && toSlug !== category) {
+      permanentRedirect(
+        storeRedirectUrl(store, `/products?category=${encodeURIComponent(toSlug)}`)
+      );
+    }
+  }
 
   const productsBreadcrumb = breadcrumbJsonLd([
-    { name: 'Home', url: siteUrl },
-    { name: 'Products', url: `${siteUrl}/products` },
+    { name: 'Home', url: storeAbsoluteUrl(store, '') },
+    { name: 'Products', url: storeAbsoluteUrl(store, '/products') },
   ]);
 
   // Cap at 50 — remaining products are discoverable via pagination links.
@@ -151,7 +169,7 @@ export async function ProductsPageBody({
             .slice(0, 50)
             .map(p => ({
               name: p.name,
-              url: `${siteUrl}/products/${p.slug}`,
+              url: storeAbsoluteUrl(store, `/products/${p.slug}`),
               image: p.images?.[0]?.url ?? null,
               price: p.price,
               currency: store.currency,

@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
+import { permanentRedirect, notFound } from 'next/navigation';
 import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
+import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
+import { storeAbsoluteUrl } from '../../../lib/structured-data';
 import { BlogPostClient, type BlogDetail } from './BlogPostClient';
 
 /**
@@ -14,23 +17,25 @@ import { BlogPostClient, type BlogDetail } from './BlogPostClient';
  */
 
 /**
- * Fetch a single blog post server-side. Returns null on any failure so the
- * page can render the not-found state. Used for both SSR metadata and the
- * Article JSON-LD (F2 — was previously a client-only 'use client' page with no
- * server-rendered <title>/og:tags, invisible to crawlers).
+ * Fetch a single blog post server-side. Returns null ONLY on a definitive
+ * 404 (real miss) so the page can render the not-found / redirect-resolve
+ * state; a transient error (5xx or network failure) throws so the page 500s
+ * instead of being cached as a false 404 (F2 — was previously a client-only
+ * 'use client' page with no server-rendered <title>/og:tags, invisible to
+ * crawlers). Callers that only need metadata (generateMetadata) must wrap
+ * this in their own try/catch and degrade gracefully — see blog page.tsx.
  */
 export async function fetchPost(storeId: string, slug: string): Promise<BlogDetail | null> {
   if (!storeId || storeId === 'demo') return null;
-  try {
-    const res = await fetch(`${API_URL}/stores/${storeId}/blog/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return (json?.data?.post ?? json?.data ?? null) as BlogDetail | null;
-  } catch {
-    return null;
-  }
+  // NOTE: network errors intentionally propagate (no try/catch) — a transient
+  // fetch failure must 500, not be swallowed into a false 404.
+  const res = await fetch(`${API_URL}/stores/${storeId}/blog/${encodeURIComponent(slug)}`, {
+    next: { revalidate: 60 },
+  });
+  if (res.status === 404) return null; // definitive miss → caller resolves redirect / 404s
+  if (!res.ok) throw new Error(`blog post fetch failed: ${res.status}`); // transient (5xx) → let it 500
+  const json = await res.json();
+  return (json?.data?.post ?? json?.data ?? null) as BlogDetail | null;
 }
 
 export function buildBlogPostMetadata(
@@ -53,6 +58,11 @@ export function buildBlogPostMetadata(
           },
         ]
       : [];
+  // Platform-path stores need the `/<slug>` prefix (see storeAbsoluteUrl doc
+  // comment) — a bare relative `/blog/${slug}` canonical resolves against
+  // metadataBase, which for platform-path stores is the store-less origin.
+  const canonicalUrl = storeAbsoluteUrl(store, `/blog/${slug}`);
+
   return {
     title: post.title,
     description,
@@ -61,13 +71,28 @@ export function buildBlogPostMetadata(
       description: post.excerpt ?? '',
       images: ogImages,
       type: 'article',
+      url: canonicalUrl,
     },
-    alternates: { canonical: `/blog/${slug}` },
+    alternates: { canonical: canonicalUrl },
   };
 }
 
 export async function BlogPostBody({ store, slug }: { store: ResolvedStore; slug: string }) {
   const post = await fetchPost(store.id, slug);
+
+  // Genuine miss on a real store: try to resolve a renamed-slug 308 before
+  // giving up (also fixes blog's soft-404 for real stores — see
+  // ProductDetailBody's equivalent branch for the platform-prefix rationale).
+  if (!post) {
+    if (store.id !== 'demo') {
+      const toSlug = await fetchSlugRedirect(store, 'blog', slug);
+      if (toSlug && toSlug !== slug) {
+        permanentRedirect(storeRedirectUrl(store, `/blog/${toSlug}`));
+      }
+      notFound();
+    }
+    // demo store: fall through to existing behavior (renders with post=null)
+  }
 
   // Article JSON-LD rendered server-side for SEO / AI crawlers (F2). Built
   // from already-fetched data; JSON.stringify makes it injection-safe.
@@ -80,7 +105,7 @@ export async function BlogPostBody({ store, slug }: { store: ResolvedStore; slug
         ...(post.coverImage ? { image: post.coverImage } : {}),
         datePublished: post.publishedAt ?? post.createdAt,
         publisher: { '@type': 'Organization', name: store.name },
-        mainEntityOfPage: { '@type': 'WebPage', '@id': `/blog/${slug}` },
+        mainEntityOfPage: { '@type': 'WebPage', '@id': storeAbsoluteUrl(store, `/blog/${slug}`) },
       }
     : null;
 

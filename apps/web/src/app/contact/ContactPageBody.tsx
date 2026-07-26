@@ -1,5 +1,5 @@
 import type { ResolvedStore } from '../../lib/store-resolver';
-import { breadcrumbJsonLd, getSiteUrl } from '../../lib/structured-data';
+import { breadcrumbJsonLd, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import ContactClient from './ContactClient';
 
@@ -11,11 +11,11 @@ import ContactClient from './ContactClient';
  * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
  */
 export async function ContactPageBody({ store }: { store: ResolvedStore }) {
-  const siteUrl = getSiteUrl(store);
+  const siteUrl = storeAbsoluteUrl(store, '');
 
   const contactBreadcrumb = breadcrumbJsonLd([
     { name: 'Home', url: siteUrl },
-    { name: 'Contact', url: `${siteUrl}/contact` },
+    { name: 'Contact', url: storeAbsoluteUrl(store, '/contact') },
   ]);
 
   // ContactPage schema — declares the page type and embeds a ContactPoint.
@@ -23,7 +23,7 @@ export async function ContactPageBody({ store }: { store: ResolvedStore }) {
     '@context': 'https://schema.org',
     '@type': 'ContactPage',
     name: `Contact ${store.name}`,
-    url: `${siteUrl}/contact`,
+    url: storeAbsoluteUrl(store, '/contact'),
     mainEntity: {
       '@type': 'Organization',
       name: store.name,

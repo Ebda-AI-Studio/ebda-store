@@ -1,5 +1,5 @@
 import type { ResolvedStore } from '../../lib/store-resolver';
-import { breadcrumbJsonLd, storeJsonLd, getSiteUrl } from '../../lib/structured-data';
+import { breadcrumbJsonLd, storeJsonLd, storeAbsoluteUrl } from '../../lib/structured-data';
 import { JsonLd } from '../../components/JsonLd';
 import AboutClient from './AboutClient';
 
@@ -11,11 +11,11 @@ import AboutClient from './AboutClient';
  * docs/plans/2026-07-12-tenant-cacheable-routing.md §3.6/§9.
  */
 export async function AboutPageBody({ store }: { store: ResolvedStore }) {
-  const siteUrl = getSiteUrl(store);
+  const siteUrl = storeAbsoluteUrl(store, '');
 
   const aboutBreadcrumb = breadcrumbJsonLd([
     { name: 'Home', url: siteUrl },
-    { name: 'About', url: `${siteUrl}/about` },
+    { name: 'About', url: storeAbsoluteUrl(store, '/about') },
   ]);
 
   // AboutPage schema — declares the page type and references the store entity.
@@ -23,7 +23,7 @@ export async function AboutPageBody({ store }: { store: ResolvedStore }) {
     '@context': 'https://schema.org',
     '@type': 'AboutPage',
     name: `About ${store.name}`,
-    url: `${siteUrl}/about`,
+    url: storeAbsoluteUrl(store, '/about'),
     mainEntity: storeJsonLd({
       name: store.name,
       url: siteUrl,

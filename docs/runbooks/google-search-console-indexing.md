@@ -136,6 +136,39 @@ After submitting the sitemap, GSC → Indexing → Pages will show:
 
 ---
 
+## Renamed-slug 308 self-redirects (2026-07-22)
+
+Product and blog handle renames no longer produce a soft-404 or a hard miss that
+drops link equity. When a merchant renames a product handle or a blog post slug
+(directly, via bulk/xlsx import, or via the admin), the API records the old →
+new slug in the `SlugRedirect` table (Postgres, FORCE-RLS). The storefront
+resolves a miss on `/products/[slug]` or `/blog/[slug]` against
+`GET /public/redirects/resolve?type=product|blog&slug=<old>` and, on a hit,
+issues a real HTTP **308** (`permanentRedirect`) to the current URL — not a
+client-side bounce, not a 200 with stale content.
+
+The category filter (`/products?category=<slug>`) behaves the same way: a
+renamed category slug in the `?category=` query 308s to the current slug via
+the same resolve endpoint (`type=category`).
+
+**Genuine misses now hard-404.** Before this change, a real store with no
+matching product/blog record silently rendered a null-content page (soft-404 —
+invisible to Search Console as an error, but useless to users and to Google).
+That soft-404 path is removed: a slug with no product/post AND no redirect row
+now returns a real `notFound()` (404), which is what GSC's Coverage report
+should show for those URLs — check "Not found (404)" there, not "Indexed"
+or "Crawled, not indexed", after a rename.
+
+**Pages are excluded.** CMS `StorePage` rows have no rename path today (they're
+looked up by their current slug only, with no update-triggered capture), so
+there is no redirect table entry to check for a renamed CMS page. If a page
+slug does change, treat it as a manual 301 (Cloudflare rule) — the same as
+before this feature shipped.
+
+Architecture + capture points: `docs/architecture/slug-redirects.md`.
+
+---
+
 ## What NOT to do
 
 - Do not submit `llms.txt` to GSC. Google confirmed it doesn't use it for search.

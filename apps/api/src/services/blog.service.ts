@@ -1,7 +1,8 @@
-import { prisma } from '@force/database';
+import { prisma, SlugEntityType } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
+import { recordSlugRedirect } from './slug-redirect.service';
 
 /**
  * Per-store blog service (Bucket E1, 2026-05-17).
@@ -184,10 +185,19 @@ export class BlogService {
       }
     }
 
+    // Blog routes are mounted under `tenantContext` middleware, which already
+    // wraps the whole request in one ambient tenant transaction (RLS GUC set
+    // via `runInTenantContext`). Calling the proxied `prisma` directly (not a
+    // nested `prisma.$transaction`) lets both the update and the capture ride
+    // that ambient tx — atomic, and RLS-enforced.
     const updated = await prisma.blogPost.update({
       where: { id: postId },
       data: updateData,
     });
+
+    if (newSlug !== undefined && newSlug !== existing.slug) {
+      await recordSlugRedirect(prisma, storeId, SlugEntityType.BLOG, existing.slug, newSlug);
+    }
 
     if (
       payload.coverImage !== undefined &&

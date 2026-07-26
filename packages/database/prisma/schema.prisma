@@ -430,6 +430,7 @@ model Store {
   warehouseStock           WarehouseStock[]
   countSessions            CountSession[]
   staffMembers             StoreStaff[]               @relation("StoreStaffMembers")
+  slugRedirects            SlugRedirect[]
   answerEngineChecks       AnswerEngineCheck[]
   gscDailyMetrics          GscDailyMetric[]
 
@@ -462,6 +463,37 @@ model StoreStaff {
   @@index([storeId])
   @@index([userId])
   @@map("store_staff")
+}
+
+// ==========================================
+// Slug Redirects (renamed-handle 301s)
+// ==========================================
+//
+// When a merchant renames a product/category/page/blog slug, the old
+// slug should 301-redirect to the new one instead of 404ing. One row
+// per (store, entityType, fromSlug) — toSlug is looked up and served
+// as a redirect target by the storefront route handlers.
+
+enum SlugEntityType {
+  PRODUCT
+  CATEGORY
+  PAGE
+  BLOG
+}
+
+model SlugRedirect {
+  id         String         @id @default(cuid())
+  storeId    String
+  entityType SlugEntityType
+  fromSlug   String
+  toSlug     String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, entityType, fromSlug])
+  @@index([storeId, entityType, toSlug])
 }
 
 // ==========================================

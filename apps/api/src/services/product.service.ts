@@ -1,4 +1,11 @@
-import { prisma, Prisma, ProductStatus, OrderStatus, withMoneyTx } from '@force/database';
+import {
+  prisma,
+  Prisma,
+  ProductStatus,
+  OrderStatus,
+  withMoneyTx,
+  SlugEntityType,
+} from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify, AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import { redis } from './redis.service';
@@ -7,6 +14,7 @@ import logger from '../lib/logger';
 import { cleanupRemovedImages } from './r2-cleanup.service';
 import { inngest } from '../lib/inngest/client';
 import { stampHumanEdits } from './ai-autofill.service';
+import { recordSlugRedirect } from './slug-redirect.service';
 
 /**
  * Build a Prisma `AND` clause for a free-text product search.
@@ -807,7 +815,7 @@ export class ProductService {
         }
       }
 
-      return tx.product.update({
+      const updated = await tx.product.update({
         where: { id: productId, storeId },
         data: {
           name: data.name,
@@ -861,6 +869,12 @@ export class ProductService {
           categories: { include: { category: true } },
         },
       });
+
+      if (data.slug && finalSlug !== product.slug) {
+        await recordSlugRedirect(tx, storeId, SlugEntityType.PRODUCT, product.slug, finalSlug!);
+      }
+
+      return updated;
     });
 
     await this.invalidateStoreProductCache(storeId);

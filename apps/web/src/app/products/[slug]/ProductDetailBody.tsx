@@ -1,14 +1,16 @@
 import type { Metadata } from 'next';
+import { permanentRedirect, notFound } from 'next/navigation';
 import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
 import { publicLayoutUrl } from '../../../lib/preview-draft';
+import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
 import {
   productJsonLd,
   breadcrumbJsonLd,
   faqPageJsonLd,
-  getSiteUrl,
+  storeAbsoluteUrl,
 } from '../../../lib/structured-data';
 import { JsonLd } from '../../../components/JsonLd';
 import ProductDetailClient from './ProductDetailClient';
@@ -48,6 +50,7 @@ export async function fetchProductDetailLayoutSettings(
 
 interface ProductData {
   name: string;
+  slug: string;
   description?: string;
   descriptionAr?: string;
   metaDescription?: string | null;
@@ -61,9 +64,9 @@ interface ProductData {
 
 export function buildProductMetadata(
   product: ProductData,
-  storeName: string,
-  storeSlug?: string
+  store: Pick<ResolvedStore, 'name' | 'slug' | 'domain'>
 ): Metadata {
+  const { name: storeName, slug: storeSlug, domain: storeDomain } = store;
   const title = product.name;
   // AEO > SEO > plain description (truncated to 160 chars for meta tag).
   const rawDescription = pickMetaDescription(product) || product.description;
@@ -72,6 +75,13 @@ export function buildProductMetadata(
     `Buy ${product.name} at ${storeName}. Fast delivery in Kuwait.`;
   const ogImage = product.images?.[0]?.url;
   const category = product.categories?.[0]?.category?.name;
+  // Platform-path stores need the `/<slug>` prefix (see storeAbsoluteUrl doc
+  // comment) — without it, the canonical/og:url pointed at the wrong
+  // (store-less) URL for every non-custom-domain store.
+  const canonicalUrl = storeAbsoluteUrl(
+    { slug: storeSlug, domain: storeDomain },
+    `/products/${product.slug}`
+  );
 
   // og:image — the product photo when present, else the store-aware OG card
   // (`/og?slug=`, resolved against the layout's metadataBase) so an imageless
@@ -92,10 +102,12 @@ export function buildProductMetadata(
   return {
     title,
     description,
+    alternates: { canonical: canonicalUrl },
     openGraph: {
       title: `${title} | ${storeName}`,
       description,
       type: 'website',
+      url: canonicalUrl,
       ...(ogImages.length ? { images: ogImages } : {}),
     },
     other: {
@@ -107,26 +119,25 @@ export function buildProductMetadata(
 }
 
 export async function fetchInitialProduct(slug: string, store: { id: string; domain?: string }) {
-  try {
-    const storeId = store.id !== 'demo' ? store.id : null;
-    if (!storeId) return null;
+  const storeId = store.id !== 'demo' ? store.id : null;
+  if (!storeId) return null;
 
-    // Public endpoint only — storefront SSR is unauthenticated, so the
-    // /stores/:id/products/:slug call always 401'd before this fallback.
-    const response = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 60 },
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Store-ID': store.id,
-        ...(store.domain ? { 'x-store-domain': store.domain } : {}),
-      },
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data?.data?.product ?? null;
-  } catch {
-    return null;
-  }
+  // Public endpoint only — storefront SSR is unauthenticated, so the
+  // /stores/:id/products/:slug call always 401'd before this fallback.
+  // NOTE: network errors intentionally propagate (no try/catch) — a transient
+  // fetch failure must 500, not be swallowed into a false 404.
+  const response = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
+    next: { revalidate: 60 },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Store-ID': store.id,
+      ...(store.domain ? { 'x-store-domain': store.domain } : {}),
+    },
+  });
+  if (response.status === 404) return null; // definitive miss → caller resolves redirect / 404s
+  if (!response.ok) throw new Error(`product fetch failed: ${response.status}`); // transient (5xx) → let it 500
+  const data = await response.json();
+  return data?.data?.product ?? null;
 }
 
 export async function ProductDetailBody({
@@ -145,7 +156,18 @@ export async function ProductDetailBody({
     fetchProductDetailLayoutSettings(store.id, draftToken),
   ]);
 
-  const siteUrl = getSiteUrl(store);
+  // Genuine miss on a real store: try to resolve a renamed-slug 308 before
+  // giving up. See `storeRedirectUrl`'s doc comment for why the platform
+  // `/<slug>` path prefix must be preserved for platform-path stores.
+  if (!initialProduct && store.id !== 'demo') {
+    const toSlug = await fetchSlugRedirect(store, 'product', slug);
+    if (toSlug && toSlug !== slug) {
+      permanentRedirect(storeRedirectUrl(store, `/products/${toSlug}`));
+    }
+    notFound();
+  }
+  // demo store with no product: falls through to the existing behavior
+  // below, rendering `ProductDetailClient` with `initialProduct={null}`.
 
   // Per-product FAQ JSON-LD (separate FAQPage block alongside the Product block)
   const productFaqItems: Array<{ question: string; answer: string }> =
@@ -198,9 +220,12 @@ export async function ProductDetailBody({
           store
         ),
         breadcrumbJsonLd([
-          { name: 'Home', url: siteUrl },
-          { name: 'Products', url: `${siteUrl}/products` },
-          { name: initialProduct.name, url: `${siteUrl}/products/${initialProduct.slug}` },
+          { name: 'Home', url: storeAbsoluteUrl(store, '') },
+          { name: 'Products', url: storeAbsoluteUrl(store, '/products') },
+          {
+            name: initialProduct.name,
+            url: storeAbsoluteUrl(store, `/products/${initialProduct.slug}`),
+          },
         ]),
         ...(productFaqItems.length > 0 ? [faqPageJsonLd(productFaqItems)] : []),
       ]
