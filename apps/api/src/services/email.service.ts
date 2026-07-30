@@ -182,12 +182,18 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
     }
     .ribbon { height: 6px; background: var(--brand); }
     .header {
-      padding: 40px 28px 32px;
+      padding: 20px 28px 18px;
       text-align: center;
       background: linear-gradient(180deg, var(--brand-soft) 0%, transparent 100%);
       border-bottom: 1px solid var(--line-soft);
     }
-    .store-logo { max-height: 180px; max-width: 420px; display: inline-block; height: auto; width: auto; }
+    /* Email clients show ~350-400px of vertical space before the fold. A 180px
+       logo plus 72px of header padding ate almost all of it, so a merchant
+       opening a new-order alert saw branding and had to scroll to reach the
+       order. 56px is the usual email-header logo height; width is capped only
+       so a very wide wordmark cannot re-inflate the header. height/width auto
+       keeps the aspect ratio for any logo shape. */
+    .store-logo { max-height: 56px; max-width: 220px; display: inline-block; height: auto; width: auto; }
     .store-name { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
     .content { padding: 28px 28px 8px; }
     .content h1, .content h2 { color: var(--ink); margin: 0 0 14px; }
@@ -232,10 +238,10 @@ export function renderBrandedShell(content: string, store: EmailStoreContext): s
     }
     .footer .powered { margin-top: 14px; font-size: 11px; color: var(--ink-mute); }
     @media (max-width: 480px) {
-      .header { padding: 24px 18px 18px; }
+      .header { padding: 16px 18px 14px; }
       .content { padding: 22px 18px 4px; }
       .footer { padding: 18px 18px 22px; }
-      .store-logo { max-height: 140px; max-width: 320px; }
+      .store-logo { max-height: 44px; max-width: 180px; }
     }
   </style>
 </head>
