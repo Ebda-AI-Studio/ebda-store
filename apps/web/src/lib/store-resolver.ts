@@ -9,6 +9,7 @@ import {
   getTemplateTheme,
 } from '@force/shared';
 import { API_URL } from './api';
+import { decodeRouteParam } from './route-params';
 
 /**
  * Lifecycle status of a resolved store. Mirrors the `StoreStatus` enum on
@@ -592,7 +593,12 @@ export async function getStoreOrNotFound(): Promise<ResolvedStore> {
  * domains/slugs so an unknown tenant lands on the branded 404 instead of
  * silently rendering the demo store.
  */
-export async function getStoreByTenantParam(tenant: string): Promise<ResolvedStore> {
+export async function getStoreByTenantParam(rawTenant: string): Promise<ResolvedStore> {
+  // Decoded HERE, once, for every tenant-store route: middleware percent-
+  // encodes the `slug:` colon into the rewrite path, and Next hands the page
+  // component the RAW segment (`slug%3Apecannbee`) even though
+  // `generateMetadata` gets it decoded — see lib/route-params.ts.
+  const tenant = decodeRouteParam(rawTenant);
   const SLUG_PREFIX = 'slug:';
   if (tenant.startsWith(SLUG_PREFIX)) {
     const slug = tenant.slice(SLUG_PREFIX.length);

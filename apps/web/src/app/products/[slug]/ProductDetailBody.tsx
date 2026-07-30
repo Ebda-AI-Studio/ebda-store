@@ -162,7 +162,11 @@ export async function ProductDetailBody({
   if (!initialProduct && store.id !== 'demo') {
     const toSlug = await fetchSlugRedirect(store, 'product', slug);
     if (toSlug && toSlug !== slug) {
-      permanentRedirect(storeRedirectUrl(store, `/products/${toSlug}`));
+      // `encodeURIComponent` — the 308 target becomes a `Location` HEADER, and a
+      // raw non-ASCII (Arabic) handle there throws
+      // `TypeError: Invalid character in header content ["location"]`. The
+      // ?category= redirect below already encoded; these path redirects did not.
+      permanentRedirect(storeRedirectUrl(store, `/products/${encodeURIComponent(toSlug)}`));
     }
     notFound();
   }

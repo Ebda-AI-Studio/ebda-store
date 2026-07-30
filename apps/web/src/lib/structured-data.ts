@@ -326,13 +326,26 @@ export function reviewJsonLd(r: {
  * Resolve the canonical site URL for this store.
  */
 export function getSiteUrl(store?: Pick<ResolvedStore, 'domain'>): string {
-  // Whitespace defense: a stray newline in the Vercel env var silently breaks
+  // A merchant's custom domain IS that store's canonical origin, so it MUST win
+  // over the platform-wide NEXT_PUBLIC_SITE_URL.
+  //
+  // This order used to be reversed, and because NEXT_PUBLIC_SITE_URL is always
+  // set in production (`https://store.force-ai.co`, inlined at build time), the
+  // `store.domain` branch below was DEAD — every custom-domain store advertised
+  // `rel=canonical`, `og:url` and every JSON-LD `url` on the platform host. Worse,
+  // `storeAbsoluteUrl` only adds the `/<slug>` prefix when `domain` is falsy, so
+  // pecannbee.com.kw/products/X claimed a canonical of
+  // store.force-ai.co/products/X — a URL that resolves to the DEMO store
+  // (verified live 2026-07-29). That tells Google every real merchant page is a
+  // duplicate of a demo page. Platform-path stores are unaffected: no domain →
+  // still the env var → still prefixed with `/<slug>`.
+  if (store?.domain) {
+    return `https://${store.domain.trim()}`;
+  }
+  // Whitespace defense: a stray newline in the env var silently breaks
   // every URL in robots.txt + sitemap.xml (Google then can't fetch the map).
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     return process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/$/, '');
-  }
-  if (store?.domain) {
-    return `https://${store.domain.trim()}`;
   }
   // Canonical platform host after the 2026-06 Cloudflare rebrand. Fallback for
   // platform-path stores (no custom domain); drives master sitemap URLs, the

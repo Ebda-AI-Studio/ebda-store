@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
+import { decodeRouteParam } from '../../../lib/route-params';
 import { getPreviewDraftToken } from '../../../lib/preview-draft';
 import { buildProductMetadata, ProductDetailBody } from './ProductDetailBody';
 
@@ -15,7 +16,9 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  // `decodeRouteParam` — Next hands the page component the RAW segment while
+  // generateMetadata gets the decoded one; see lib/route-params.ts.
+  const slug = decodeRouteParam((await params).slug);
   const store = await getStore();
 
   // Fetch product data server-side for meta tags
@@ -62,5 +65,5 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     getPreviewDraftToken(),
   ]);
 
-  return <ProductDetailBody store={store} slug={slug} draftToken={draftToken} />;
+  return <ProductDetailBody store={store} slug={decodeRouteParam(slug)} draftToken={draftToken} />;
 }

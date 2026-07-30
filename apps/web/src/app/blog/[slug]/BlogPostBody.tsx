@@ -87,7 +87,9 @@ export async function BlogPostBody({ store, slug }: { store: ResolvedStore; slug
     if (store.id !== 'demo') {
       const toSlug = await fetchSlugRedirect(store, 'blog', slug);
       if (toSlug && toSlug !== slug) {
-        permanentRedirect(storeRedirectUrl(store, `/blog/${toSlug}`));
+        // encodeURIComponent — see ProductDetailBody: a raw Arabic handle in the
+        // `Location` header throws `Invalid character in header content`.
+        permanentRedirect(storeRedirectUrl(store, `/blog/${encodeURIComponent(toSlug)}`));
       }
       notFound();
     }

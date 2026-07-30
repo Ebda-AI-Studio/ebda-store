@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getStoreByTenantParam } from '@/lib/store-resolver';
 import { API_URL } from '@/lib/api';
+import { decodeRouteParam } from '@/lib/route-params';
 import { buildProductMetadata, ProductDetailBody } from '@/app/products/[slug]/ProductDetailBody';
 
 // NOTE: no `generateStaticParams` here — see the parent layout's
@@ -11,7 +12,11 @@ export async function generateMetadata({
 }: {
   params: Promise<{ tenant: string; slug: string }>;
 }): Promise<Metadata> {
-  const { tenant, slug } = await params;
+  // `decodeRouteParam` — Next hands the page component the RAW segment while
+  // generateMetadata gets the decoded one; see lib/route-params.ts.
+  // (`tenant` is decoded inside `getStoreByTenantParam`.)
+  const { tenant, slug: rawSlug } = await params;
+  const slug = decodeRouteParam(rawSlug);
   const store = await getStoreByTenantParam(tenant);
 
   try {
@@ -44,7 +49,8 @@ export default async function StoreProductDetailPage({
 }: {
   params: Promise<{ tenant: string; slug: string }>;
 }) {
-  const { tenant, slug } = await params;
+  const { tenant, slug: rawSlug } = await params;
+  const slug = decodeRouteParam(rawSlug);
   const store = await getStoreByTenantParam(tenant);
 
   return <ProductDetailBody store={store} slug={slug} draftToken={undefined} />;
