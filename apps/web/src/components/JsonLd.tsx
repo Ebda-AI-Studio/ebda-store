@@ -1,13 +1,17 @@
+import { jsonLdScriptContent } from '../lib/json-ld-script';
+
 /**
  * JsonLd — server component helper for emitting <script type="application/ld+json"> blocks.
  *
  * Usage:
  *   <JsonLd data={breadcrumbJsonLd([...])} />
  *
- * The content is always the result of JSON.stringify on a plain schema.org object
- * produced by our own structured-data helpers — never user-supplied HTML.
- * dangerouslySetInnerHTML is safe here because JSON.stringify escapes every
- * special HTML character that could constitute a script injection vector.
+ * Serialization goes through `jsonLdScriptContent`, NOT bare `JSON.stringify`.
+ * These payloads carry attacker-reachable text (product names, FAQ entries,
+ * customer review bodies and review author names), and `JSON.stringify` does
+ * NOT escape `<`/`>` — a `</script>` inside any string closes this block and
+ * turns the remainder into executable markup. See that helper for the full
+ * rationale and the disproven claim it replaces.
  */
 
 interface JsonLdProps {
@@ -16,8 +20,10 @@ interface JsonLdProps {
 }
 
 export function JsonLd({ data }: JsonLdProps) {
-  /* eslint-disable-next-line react/no-danger */
   return (
-    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: jsonLdScriptContent(data) }}
+    />
   );
 }

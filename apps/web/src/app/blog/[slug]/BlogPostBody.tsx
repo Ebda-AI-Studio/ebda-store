@@ -4,6 +4,7 @@ import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
 import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
 import { storeAbsoluteUrl } from '../../../lib/structured-data';
+import { jsonLdScriptContent } from '../../../lib/json-ld-script';
 import { BlogPostClient, type BlogDetail } from './BlogPostClient';
 
 /**
@@ -116,9 +117,10 @@ export async function BlogPostBody({ store, slug }: { store: ResolvedStore; slug
       {jsonLd && (
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger -- JSON.stringify output of
-          // server-controlled fields only; no user HTML is injected here.
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          // Serialized via jsonLdScriptContent, which escapes `<`/`>` so
+          // merchant-authored blog titles/excerpts cannot break out of this
+          // <script> block. Never switch this back to bare JSON.stringify.
+          dangerouslySetInnerHTML={{ __html: jsonLdScriptContent(jsonLd) }}
         />
       )}
       <BlogPostClient post={post} />

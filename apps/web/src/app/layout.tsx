@@ -27,6 +27,7 @@ import { CookiePreferencesModal } from '../components/CookiePreferencesModal';
 import { CookiePreferencesLink } from '../components/CookiePreferencesLink';
 import { type MarketingPixels } from '@force/shared';
 import { buildThemeStyleTag } from '../lib/theme-css';
+import { jsonLdScriptContent } from '../lib/json-ld-script';
 import '../styles/globals.css';
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -437,7 +438,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdScriptContent(orgJsonLd) }}
         />
         {googleFontUrls.map(url => (
           <link key={url} rel="stylesheet" href={url} />
