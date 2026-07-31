@@ -315,6 +315,19 @@ model Store {
   /// Structured brand facts: { foundedYear?, location?, categories[], certifications?, languages[], contact? }
   aboutJson Json?   @map("about_json")
 
+  /// Merchant return window in days, powering `hasMerchantReturnPolicy` in the
+  /// storefront's Product JSON-LD (AI shopping agents filter on it).
+  ///
+  /// NULL and 0 mean DIFFERENT things and must never be collapsed:
+  ///   NULL = the merchant has not declared a policy  -> the block is omitted
+  ///   0    = the merchant does not accept returns    -> published as such
+  ///
+  /// Deliberately has NO default. Publishing a return window a merchant never
+  /// agreed to is a false public claim about their business.
+  returnWindowDays Int?    @map("return_window_days")
+  /// Who pays return shipping: 'merchant' (free returns) | 'customer'. NULL when unset.
+  returnFeesPaidBy String? @map("return_fees_paid_by")
+
   // Accounting Settings (Batch 1)
   accountingEnabled    Boolean @default(true) @map("accounting_enabled")
   defaultTaxRateBps    Int     @default(0) @map("default_tax_rate_bps")

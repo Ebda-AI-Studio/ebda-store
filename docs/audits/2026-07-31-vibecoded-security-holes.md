@@ -148,3 +148,15 @@ values were validated before being written — not the same defect.
 ## Lens registration
 
 Registered as a reusable lens for the audit fleet so it reruns against the other projects rather than being spent once here — see `reference-builder-reality-audit.md` (extension point) and the memory entry written alongside this audit.
+
+## Lens W follow-up (2026-08-01)
+
+The agentic-commerce lens (W) audit found FWB already strong — `llms.txt` serving live catalogue
+data, AI crawlers allowed in `robots.ts`, an MCP server, and Product JSON-LD carrying
+offers/availability/sku/aggregateRating/reviews. One gap: no `brand`, `shippingDetails` or
+`hasMerchantReturnPolicy`, despite `shippingZones`, `freeShippingThreshold` and `aboutJson` brand
+facts all existing in the schema — data present, agent surface missing.
+
+Closed by `docs/superpowers/plans/2026-08-01-agent-readable-product-jsonld.md`. Brand and shipping
+derive from existing data; return policy needed two new nullable `Store` columns plus their admin
+control, because a return window is a merchant commitment that cannot be derived or defaulted.

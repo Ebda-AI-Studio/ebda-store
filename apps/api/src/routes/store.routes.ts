@@ -69,6 +69,12 @@ const updateStoreSchema = createStoreSchema.partial().extend({
   heroImage: heroNullableStr(1000),
   blogEnabled: z.boolean().optional(),
   locationsEnabled: z.boolean().optional(),
+  // Return policy -> Product JSON-LD hasMerchantReturnPolicy.
+  // `.nullable()` is load-bearing: the admin sends null to CLEAR a declared
+  // policy, and null must persist as "not declared" rather than being dropped.
+  // 0 is a valid, meaningful value ("returns not accepted"), so no .positive().
+  returnWindowDays: z.number().int().min(0).max(3650).nullable().optional(),
+  returnFeesPaidBy: z.enum(['merchant', 'customer']).nullable().optional(),
   // Override `settings` with a version that validates the `contact.addressUrl`
   // sub-field. The field is rendered into `<a href>` on the storefront, so a
   // `javascript:`/`data:` value stored here is stored-XSS. All other keys in

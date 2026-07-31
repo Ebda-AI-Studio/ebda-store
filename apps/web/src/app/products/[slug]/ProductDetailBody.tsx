@@ -4,6 +4,7 @@ import type { ResolvedStore } from '../../../lib/store-resolver';
 import { API_URL } from '../../../lib/api';
 import { publicLayoutUrl } from '../../../lib/preview-draft';
 import { fetchSlugRedirect, storeRedirectUrl } from '../../../lib/slug-redirect';
+import { fetchPublicShippingZones } from '../../../lib/shipping-public';
 import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { pickMetaDescription } from '../../../lib/seo/meta-description';
 import {
@@ -151,9 +152,12 @@ export async function ProductDetailBody({
    *  doc comment for why Track-A never carries a draft token. */
   draftToken?: string;
 }) {
-  const [initialProduct, layout] = await Promise.all([
+  const [initialProduct, layout, shippingZones] = await Promise.all([
     fetchInitialProduct(slug, store),
     fetchProductDetailLayoutSettings(store.id, draftToken),
+    // Feeds `offers.shippingDetails` in the Product JSON-LD below. Resolves to
+    // [] on any failure, so it can never turn a product page into an error.
+    fetchPublicShippingZones(store.id),
   ]);
 
   // Genuine miss on a real store: try to resolve a renamed-slug 308 before
@@ -221,7 +225,8 @@ export async function ProductDetailBody({
             reviews: reviewsForJsonLd.length > 0 ? reviewsForJsonLd : undefined,
             aggregateRating: aggregateRatingForJsonLd,
           },
-          store
+          store,
+          { shippingZones }
         ),
         breadcrumbJsonLd([
           { name: 'Home', url: storeAbsoluteUrl(store, '') },

@@ -98,6 +98,15 @@ export interface ResolvedStore {
   taxEnabled?: boolean;
   taxIncludedInPrice?: boolean;
 
+  // Return policy — powers hasMerchantReturnPolicy in Product JSON-LD.
+  // NULL/undefined means the merchant never declared one, and the storefront
+  // then omits the block rather than publishing a guess; 0 means "returns not
+  // accepted". Keep in lock-step with BOTH store-resolve selects in
+  // apps/api/src/routes/public.routes.ts — missing one silently strips the
+  // field for custom-domain stores only.
+  returnWindowDays?: number | null;
+  returnFeesPaidBy?: string | null;
+
   // Feature flags
   enabledFeatures?: string[];
 
@@ -291,6 +300,10 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
       locationsEnabled:
         typeof storeData.locationsEnabled === 'boolean' ? storeData.locationsEnabled : undefined,
+      returnWindowDays:
+        typeof storeData.returnWindowDays === 'number' ? storeData.returnWindowDays : undefined,
+      returnFeesPaidBy:
+        typeof storeData.returnFeesPaidBy === 'string' ? storeData.returnFeesPaidBy : undefined,
       taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
       taxIncludedInPrice:
         typeof storeData.taxIncludedInPrice === 'boolean'
@@ -429,6 +442,10 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
       locationsEnabled:
         typeof storeData.locationsEnabled === 'boolean' ? storeData.locationsEnabled : undefined,
+      returnWindowDays:
+        typeof storeData.returnWindowDays === 'number' ? storeData.returnWindowDays : undefined,
+      returnFeesPaidBy:
+        typeof storeData.returnFeesPaidBy === 'string' ? storeData.returnFeesPaidBy : undefined,
       taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
       taxIncludedInPrice:
         typeof storeData.taxIncludedInPrice === 'boolean'
@@ -684,6 +701,10 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
       settings: typeof storeData.settings === 'object' ? storeData.settings : undefined,
       locationsEnabled:
         typeof storeData.locationsEnabled === 'boolean' ? storeData.locationsEnabled : undefined,
+      returnWindowDays:
+        typeof storeData.returnWindowDays === 'number' ? storeData.returnWindowDays : undefined,
+      returnFeesPaidBy:
+        typeof storeData.returnFeesPaidBy === 'string' ? storeData.returnFeesPaidBy : undefined,
       taxEnabled: typeof storeData.taxEnabled === 'boolean' ? storeData.taxEnabled : undefined,
       taxIncludedInPrice:
         typeof storeData.taxIncludedInPrice === 'boolean'

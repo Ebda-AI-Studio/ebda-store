@@ -6,6 +6,7 @@ import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { useFeatures } from '../../../../hooks/useFeatures';
 import { AreaRateEditor } from './_components/AreaRateEditor';
+import { ReturnPolicyCard } from './_components/ReturnPolicyCard';
 
 export default function ShippingSettingsPage() {
   const params = useParams();
@@ -69,6 +70,10 @@ export default function ShippingSettingsPage() {
 
         {/* ── Area rates editor (sole shipping CRUD) ────────────────────── */}
         <AreaRateEditor storeId={storeId} />
+
+        {/* Return policy sits with shipping: both are the delivery-and-returns
+            promise a buyer (or their AI agent) evaluates before purchase. */}
+        <ReturnPolicyCard storeId={storeId} />
       </div>
     </AdminLayout>
   );

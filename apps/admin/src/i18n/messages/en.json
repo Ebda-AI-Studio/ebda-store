@@ -2234,6 +2234,19 @@
       "remove": "Remove",
       "deleteFailed": "Couldn't delete the area",
       "incompleteRowsError": "These new zones need a delivery fee (or set them active) before they can be saved: {areas}"
+    },
+    "returnPolicy": {
+      "title": "Return policy",
+      "help": "Published to Google and to AI shopping assistants. Leave the window blank to publish no return policy at all. Enter 0 to publish “returns not accepted”.",
+      "windowLabel": "Return window (days)",
+      "notDeclared": "Not declared",
+      "feesLabel": "Return shipping paid by",
+      "feesCustomer": "Customer",
+      "feesMerchant": "Merchant (free returns)",
+      "save": "Save return policy",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "invalid": "Enter a whole number of days, or leave blank."
     }
   },
   "tax": {

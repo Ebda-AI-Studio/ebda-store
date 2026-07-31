@@ -53,6 +53,10 @@ interface CreateStoreData {
 }
 
 type UpdateStoreData = Partial<CreateStoreData> & {
+  /** Return window in days. null = merchant cleared it ("not declared"); 0 = "no returns". */
+  returnWindowDays?: number | null;
+  /** 'merchant' (free returns) | 'customer'. null when unset. */
+  returnFeesPaidBy?: string | null;
   heroTitle?: string | null;
   heroTitleAr?: string | null;
   heroSubtitle?: string | null;

@@ -30,7 +30,119 @@ interface ProductForJsonLd {
  * Schema.org Product structured data.
  * Returns a plain object suitable for JSON.stringify inside a <script type="application/ld+json"> tag.
  */
-export function productJsonLd(product: ProductForJsonLd, store: ResolvedStore) {
+/**
+ * schema.org Brand.
+ *
+ * Agents use brand to group and compare products across sellers. FWB stores are
+ * single-brand and there is no per-product brand column, so the store name IS
+ * the brand — there is nothing more specific to prefer over it.
+ */
+export function brandJsonLd(store: Pick<ResolvedStore, 'name'>) {
+  return { '@type': 'Brand', name: store.name };
+}
+
+/**
+ * schema.org MerchantReturnPolicy.
+ *
+ * Emitted ONLY when the merchant explicitly declared a window. `null`/undefined
+ * (unset) and `0` mean different things and must not be collapsed:
+ *   unset -> "we have not said"      -> omit the block entirely
+ *   0     -> "we do not take returns" -> a real, publishable policy
+ *
+ * There is no sensible default. Publishing a guessed return window is a false
+ * public claim about the merchant's business, and Google treats merchant return
+ * policy as a commitment, not a hint.
+ */
+export function merchantReturnPolicyJsonLd(
+  store: Pick<ResolvedStore, 'returnWindowDays' | 'returnFeesPaidBy'>
+) {
+  const days = store.returnWindowDays;
+  if (days === null || days === undefined) return null;
+
+  if (days === 0) {
+    return {
+      '@type': 'MerchantReturnPolicy',
+      applicableCountry: 'KW',
+      returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
+    };
+  }
+
+  return {
+    '@type': 'MerchantReturnPolicy',
+    applicableCountry: 'KW',
+    returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+    merchantReturnDays: days,
+    returnMethod: 'https://schema.org/ReturnByMail',
+    returnFees:
+      store.returnFeesPaidBy === 'merchant'
+        ? 'https://schema.org/FreeReturn'
+        : 'https://schema.org/ReturnShippingFees',
+  };
+}
+
+/** Public shape of a ShippingZone row, as served by GET /public/:storeId/shipping. */
+export interface PublicShippingZone {
+  name: string;
+  /** In fils (1 KWD = 1000 fils), like every other money value in this codebase. */
+  deliveryFee: number;
+  freeShippingThreshold: number | null;
+  estimatedDaysMin: number | null;
+  estimatedDaysMax: number | null;
+  estimatedDays: number | null;
+}
+
+/**
+ * schema.org OfferShippingDetails.
+ *
+ * Delivery cost and delivery time are the first things a shopping agent filters
+ * on, so this is the highest-value structured field the storefront was missing.
+ *
+ * We advertise the CHEAPEST active zone. A product page has no delivery address
+ * yet, so any single figure is necessarily a "from" price; the cheapest zone is
+ * the honest reading of "shipping starts at X" and matches how the storefront
+ * already presents it.
+ *
+ * Returns null when the merchant configured no zones. Emitting a 0 rate instead
+ * would advertise free delivery we cannot honour at checkout — omitting the
+ * block is the only correct fallback.
+ */
+export function shippingDetailsJsonLd(zones: PublicShippingZone[], opts: { currency: string }) {
+  if (!zones.length) return null;
+  const cheapest = zones.reduce((a, z) => (z.deliveryFee < a.deliveryFee ? z : a));
+
+  // A flat `estimatedDays` stands in for both bounds when the merchant didn't
+  // give a range. When neither exists we omit deliveryTime rather than invent one.
+  const min = cheapest.estimatedDaysMin ?? cheapest.estimatedDays;
+  const max = cheapest.estimatedDaysMax ?? cheapest.estimatedDays;
+
+  return {
+    '@type': 'OfferShippingDetails',
+    shippingRate: {
+      '@type': 'MonetaryAmount',
+      value: (cheapest.deliveryFee / 1000).toFixed(3),
+      currency: opts.currency || 'KWD',
+    },
+    ...(min !== null && max !== null
+      ? {
+          deliveryTime: {
+            '@type': 'ShippingDeliveryTime',
+            transitTime: {
+              '@type': 'QuantitativeValue',
+              minValue: min,
+              maxValue: max,
+              unitCode: 'DAY',
+            },
+          },
+        }
+      : {}),
+  };
+}
+
+export function productJsonLd(
+  product: ProductForJsonLd,
+  store: ResolvedStore,
+  opts?: { shippingZones?: PublicShippingZone[] }
+) {
   const productUrl = storeAbsoluteUrl(store, `/products/${product.slug}`);
   const image = product.images?.[0]?.url;
   const availability =
@@ -49,6 +161,11 @@ export function productJsonLd(product: ProductForJsonLd, store: ResolvedStore) {
     ...(product.categories?.[0]?.category?.name
       ? { category: product.categories[0].category.name }
       : {}),
+    brand: brandJsonLd(store),
+    ...(() => {
+      const rp = merchantReturnPolicyJsonLd(store);
+      return rp ? { hasMerchantReturnPolicy: rp } : {};
+    })(),
     offers: {
       '@type': 'Offer',
       price: (product.price / 1000).toFixed(3),
@@ -59,6 +176,14 @@ export function productJsonLd(product: ProductForJsonLd, store: ResolvedStore) {
         '@type': 'Organization',
         name: store.name,
       },
+      // Nested inside Offer (not Product) — schema.org scopes shipping to the
+      // offer, and Google's merchant-listing docs require it there.
+      ...(() => {
+        const sd = opts?.shippingZones?.length
+          ? shippingDetailsJsonLd(opts.shippingZones, { currency: store.currency })
+          : null;
+        return sd ? { shippingDetails: sd } : {};
+      })(),
     },
     // Emit aggregateRating only when there are real verified reviews.
     ...(product.aggregateRating && product.aggregateRating.reviewCount > 0
