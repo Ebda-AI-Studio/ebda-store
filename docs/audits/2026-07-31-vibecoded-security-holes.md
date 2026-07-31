@@ -121,13 +121,29 @@ The genuine adjacent risk is **where AI output lands**: SEO paths use `JSON.pars
 
 ---
 
-## Residual (accepted, not fixed in this PR)
+## Residual — both CLOSED in PR #978 (same day)
 
-**L-1 — `POST /stores/:storeId/orders` uses `getAuthUser(req).userId` rather than `customerUserId(req)`.** Every sibling customer route uses the admin-rejecting helper; this one doesn't, so an admin token checking out would create an order attributed to a non-customer user id. Not a security boundary (it's a create, not a cross-tenant read) — an inconsistency worth aligning. This route also relies on the global limiter alone, where the public checkout twin carries `writeLimiter`.
+**L-1 — `POST /stores/:storeId/orders` used `getAuthUser(req).userId`** rather than the
+admin-rejecting `customerUserId(req)` every sibling customer route uses, so an admin token checking
+out produced an order whose `customerId` pointed at a non-customer user row. Now uses
+`customerUserId()` + 403, and gained the `writeLimiter` its public twin already carried. Admin-created
+orders have their own route, `POST .../orders/admin` (`createAdminOrder`), with `authorize()` +
+`requireStoreAccess`. No client broke — the storefront checks out via `/public/orders`.
 
-**L-2 — `JSON.parse(raw) as T` on AI SEO output** (`ai.service.ts:336`, `:449`, `:646`). Runtime shape is unvalidated. Now that the render sink is escaped this is a data-quality issue rather than an injection one, but the palette extractor shows the right pattern (a zod schema per field) and the SEO paths should follow it.
+Worth recording: this turned the order + checkout E2E suites red, because **both were checking out
+with a `super_admin` token** — the tests encoded exactly the mis-attribution L-1 describes. They now
+create a `role: 'customer'` User (store-scoped via `@@unique([storeId, email])`) and log in as that.
 
-Both are logged rather than silently dropped, per Rule B.
+**L-2 — AI output validation.** The wording above ("runtime shape is unvalidated") **overstated the
+gap**, and the correction matters for anyone reading this audit later: the hand-rolled
+`typeof x !== 'string'` chains _did_ check every scalar field. The real gaps were narrower — array
+ELEMENT types (`Array.isArray(keywords)` accepted `[{...}, 42]`, reaching a meta tag as
+`[object Object]`), the `confidence` enum, `matches` not being array-checked (a non-array threw out of
+`.filter`, surfacing as a 500 rather than a clean 502), and the absence of any length bound. All four
+are now covered by zod schemas plus a shared `parseAiJson()` helper, with 10 unit tests pinning each.
+
+The `JSON.parse(hit) as T` calls that remain in `ai.service.ts` are Redis **cache reads**, whose
+values were validated before being written — not the same defect.
 
 ## Lens registration
 
