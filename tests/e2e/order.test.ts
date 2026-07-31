@@ -34,6 +34,8 @@ let testUserId: string | null = null;
 let testProductId: string | null = null;
 let authToken: string | null = null;
 let createdOrderId: string | null = null;
+let customerToken: string | null = null;
+let testCustomerId: string | null = null;
 // Session ID that ties the test cart to the order request
 const TEST_SESSION_ID = `test-session-${Date.now()}`;
 
@@ -76,6 +78,38 @@ describe('Order Flow', () => {
 
     // Login — completes MFA challenge automatically
     authToken = await loginAsSuperAdmin(app, user.email, 'Test123!@#');
+
+    // Separate CUSTOMER identity for checkout. POST /stores/:storeId/orders is
+    // the signed-in customer checkout and now rejects non-customer tokens via
+    // customerUserId() — admin-created orders belong on POST .../orders/admin.
+    // This suite previously checked out with the super_admin token, which is
+    // exactly the mis-attribution that guard exists to stop (the order's
+    // customerId pointed at a non-customer user row).
+    const customerEmail = `order-test-customer-${Date.now()}@example.com`;
+    const customer = await prisma.user.create({
+      data: {
+        // Customer accounts are store-scoped (@@unique([storeId, email]));
+        // admins leave storeId NULL. Login must therefore pass storeId too.
+        storeId: store.id,
+        email: customerEmail,
+        passwordHash: hashedPassword,
+        firstName: 'Order',
+        lastName: 'Customer',
+        role: 'customer',
+        emailVerified: true,
+      },
+    });
+    testCustomerId = customer.id;
+
+    const customerLogin = await request(app)
+      .post('/auth/login')
+      .send({ email: customerEmail, password: 'Test123!@#', storeId: store.id });
+    customerToken = customerLogin.body?.data?.accessToken ?? customerLogin.body?.data?.token;
+    if (!customerToken) {
+      throw new Error(
+        `Customer login failed (${customerLogin.status}): ${JSON.stringify(customerLogin.body)}`
+      );
+    }
   });
 
   afterAll(async () => {
@@ -99,6 +133,9 @@ describe('Order Flow', () => {
     if (testStoreId) {
       await prisma.store.delete({ where: { id: testStoreId } }).catch(() => {});
     }
+    if (testCustomerId) {
+      await prisma.user.delete({ where: { id: testCustomerId } }).catch(() => {});
+    }
     if (testUserId) {
       await prisma.user.delete({ where: { id: testUserId } }).catch(() => {});
     }
@@ -107,7 +144,7 @@ describe('Order Flow', () => {
 
   describe('POST /stores/:storeId/orders', () => {
     it('should create an order with valid data', async () => {
-      if (!authToken || !testStoreId || !testProductId) {
+      if (!customerToken || !testStoreId || !testProductId) {
         throw new Error('Prerequisites not met');
       }
 
@@ -117,7 +154,7 @@ describe('Order Flow', () => {
 
       const res = await request(app)
         .post(`/stores/${testStoreId}/orders`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${customerToken}`)
         .set('x-session-id', TEST_SESSION_ID)
         .send({
           shippingAddress: {
@@ -173,7 +210,7 @@ describe('Order Flow', () => {
     });
 
     it('should reject order when cart is empty', async () => {
-      if (!authToken || !testStoreId) {
+      if (!customerToken || !testStoreId) {
         throw new Error('Prerequisites not met');
       }
 
@@ -182,7 +219,7 @@ describe('Order Flow', () => {
 
       const res = await request(app)
         .post(`/stores/${testStoreId}/orders`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${customerToken}`)
         .set('x-session-id', emptySessionId)
         .send({
           shippingAddress: {
@@ -203,13 +240,13 @@ describe('Order Flow', () => {
     });
 
     it('should reject order without session ID', async () => {
-      if (!authToken || !testStoreId) {
+      if (!customerToken || !authToken || !testStoreId) {
         throw new Error('Prerequisites not met');
       }
 
       const res = await request(app)
         .post(`/stores/${testStoreId}/orders`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${customerToken}`)
         // Intentionally omit x-session-id header
         .send({
           shippingAddress: {
@@ -349,7 +386,7 @@ describe('Order Flow', () => {
     });
 
     it('should cancel order and restore inventory', async () => {
-      if (!authToken || !testStoreId || !cancelProduct) {
+      if (!customerToken || !authToken || !testStoreId || !cancelProduct) {
         throw new Error('Prerequisites not met');
       }
 
@@ -366,7 +403,7 @@ describe('Order Flow', () => {
       // Create a new order to cancel
       const createRes = await request(app)
         .post(`/stores/${testStoreId}/orders`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${customerToken}`)
         .set('x-session-id', cancelSessionId)
         .send({
           shippingAddress: {

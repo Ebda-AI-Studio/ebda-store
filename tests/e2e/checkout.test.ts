@@ -42,6 +42,8 @@ let testUserId: string | null = null;
 let testProductId: string | null = null;
 let testProduct2Id: string | null = null;
 let testCustomerId: string | null = null;
+let customerToken: string | null = null;
+let buyerUserId: string | null = null;
 let authToken: string | null = null;
 
 const TEST_SESSION_ID = `test-session-${Date.now()}`;
@@ -110,10 +112,44 @@ describe('Checkout Flow', () => {
 
     // Login — completes MFA challenge automatically
     authToken = await loginAsSuperAdmin(app, user.email, 'Test123!@#');
+
+    // Signed-in CUSTOMER identity for checkout. The `prisma.customer` row above
+    // is a store customer record, not an authenticatable account — checkout
+    // needs a User with role 'customer', because POST /stores/:storeId/orders
+    // now rejects non-customer tokens (admin-created orders go to .../orders/admin).
+    const buyerEmail = `checkout-buyer-${Date.now()}@example.com`;
+    const buyerPassword = await bcrypt.hash('Test123!@#', 12);
+    const buyer = await prisma.user.create({
+      data: {
+        // Customer accounts are store-scoped (@@unique([storeId, email]));
+        // admins leave storeId NULL. Login must therefore pass storeId too.
+        storeId: store.id,
+        email: buyerEmail,
+        passwordHash: buyerPassword,
+        firstName: 'Checkout',
+        lastName: 'Buyer',
+        role: 'customer',
+        emailVerified: true,
+      },
+    });
+    buyerUserId = buyer.id;
+
+    const buyerLogin = await request(app)
+      .post('/auth/login')
+      .send({ email: buyerEmail, password: 'Test123!@#', storeId: store.id });
+    customerToken = buyerLogin.body?.data?.accessToken ?? buyerLogin.body?.data?.token;
+    if (!customerToken) {
+      throw new Error(
+        `Buyer login failed (${buyerLogin.status}): ${JSON.stringify(buyerLogin.body)}`
+      );
+    }
   });
 
   afterAll(async () => {
     // Cleanup in order
+    if (buyerUserId) {
+      await prisma.user.delete({ where: { id: buyerUserId } }).catch(() => {});
+    }
     await prisma.orderItem.deleteMany({ where: { order: { storeId: testStoreId! } } });
     await prisma.order.deleteMany({ where: { storeId: testStoreId! } });
     await prisma.cartItem.deleteMany({ where: { cart: { storeId: testStoreId! } } });
@@ -240,7 +276,7 @@ describe('Checkout Flow', () => {
 
       const res = await request(app)
         .post(`/stores/${testStoreId}/orders`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${customerToken}`)
         .set('x-session-id', TEST_SESSION_ID)
         .send({
           shippingAddress: {

@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
 import { neutralizeRowObject } from '../lib/exports/xlsx';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, customerUserId } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { OrderService } from '../services/order.service';
@@ -480,35 +480,54 @@ router.get('/:id', authenticate, async (req: Request, res: Response, next: NextF
   }
 });
 
-// POST /stores/:storeId/orders - Create order (checkout)
-router.post('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { storeId } = req.params;
-    const sessionId = getSessionId(req);
-    const data = createOrderSchema.parse(req.body);
+// POST /stores/:storeId/orders - Create order (checkout, signed-in customers)
+//
+// AUTHZ: customer-only, mirroring every other customer-scoped route
+// (returns, reviews, loyalty, /public/orders). `customerUserId()` rejects
+// admin/staff tokens; previously this route passed `getAuthUser(req).userId`
+// straight through, so an admin token created an order whose `customerId`
+// pointed at a non-customer user row. Admin-created orders belong on
+// POST /stores/:storeId/orders (createAdminOrder) below, which carries
+// authorize() + requireStoreAccess and supports `shippingOverride`.
+//
+// `writeLimiter` matches the public twin at /public/orders — without it this
+// path relied solely on the global 200-mutations/IP/15min cap.
+router.post(
+  '/',
+  authenticate,
+  writeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const sessionId = getSessionId(req);
+      const data = createOrderSchema.parse(req.body);
 
-    // Affiliate referral code from body or header
-    const referralCode: string | undefined =
-      (req.body.affiliateRef as string | undefined) ||
-      (req.headers['x-affiliate-ref'] as string | undefined) ||
-      undefined;
+      const customerId = customerUserId(req);
+      if (!customerId) {
+        res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Only customer accounts can place orders' },
+        });
+        return;
+      }
 
-    const order = await OrderService.create(
-      storeId,
-      getAuthUser(req).userId,
-      sessionId,
-      data,
-      referralCode
-    );
+      // Affiliate referral code from body or header
+      const referralCode: string | undefined =
+        (req.body.affiliateRef as string | undefined) ||
+        (req.headers['x-affiliate-ref'] as string | undefined) ||
+        undefined;
 
-    res.status(201).json({
-      success: true,
-      data: { order },
-    });
-  } catch (error) {
-    next(error);
+      const order = await OrderService.create(storeId, customerId, sessionId, data, referralCode);
+
+      res.status(201).json({
+        success: true,
+        data: { order },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // PUT /stores/:storeId/orders/:id/status - Update order status
 router.put(

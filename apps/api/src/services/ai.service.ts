@@ -198,6 +198,65 @@ const paletteExtractionSchema = z.object({
   neutral: z.string().regex(/^#[0-9a-fA-F]{6}$/),
 });
 
+// Model output is untrusted input. The hand-rolled `typeof x !== 'string'`
+// chains these replace checked that scalars were present, but not:
+//   - element types inside arrays (`Array.isArray(keywords)` accepted
+//     `[{...}, 42]`, which reaches a meta tag as "[object Object]")
+//   - the `confidence` enum (any string flowed through to the admin UI)
+//   - `matches` actually being an array (a non-array threw a TypeError
+//     out of `.filter`, surfacing as a 500 instead of a clean 502)
+//   - any length bound (nothing stopped a 50 KB title reaching the DB)
+// Bounds are generous — they exist to stop absurd output, not to trim.
+export const seoSuggestionSchema = z.object({
+  title: z.string().max(300),
+  titleAr: z.string().max(300),
+  description: z.string().max(2000),
+  descriptionAr: z.string().max(2000),
+  keywords: z.array(z.string().max(120)).max(50),
+});
+
+export const sectionContentSchema = z.object({
+  kicker: z.string().max(200),
+  kickerAr: z.string().max(200),
+  subtitle: z.string().max(600),
+  subtitleAr: z.string().max(600),
+});
+
+export const categorizeSchema = z.object({
+  matches: z
+    .array(z.object({ id: z.string(), confidence: z.enum(['high', 'medium', 'low']) }))
+    .max(100),
+});
+
+/**
+ * Parse + validate a Gemini JSON response in one step.
+ *
+ * Both failure modes (non-JSON, and JSON of the wrong shape) become the same
+ * 502 the callers already returned, with the raw payload logged for triage.
+ */
+export function parseAiJson<T>(
+  schema: z.ZodType<T>,
+  raw: string,
+  ctx: { storeId: string; kind: string }
+): T {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch (err) {
+    logger.error({ err, raw, ...ctx }, `Gemini returned non-JSON for ${ctx.kind}`);
+    throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an unexpected response format.');
+  }
+  const result = schema.safeParse(json);
+  if (!result.success) {
+    logger.error(
+      { issues: result.error.issues, raw, ...ctx },
+      `Gemini returned bad shape for ${ctx.kind}`
+    );
+    throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an incomplete response.');
+  }
+  return result.data;
+}
+
 export type ExtractedPalette = z.infer<typeof paletteExtractionSchema>;
 
 export class AIService {
@@ -331,24 +390,10 @@ export class AIService {
     }
     const raw = stripJsonFences(res.response.text());
 
-    let parsed: SeoSuggestion;
-    try {
-      parsed = JSON.parse(raw) as SeoSuggestion;
-    } catch (err) {
-      logger.error({ err, raw, storeId: input.storeId }, 'Gemini returned non-JSON for SEO');
-      throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an unexpected response format.');
-    }
-
-    // Defensive validation — Gemini occasionally drops a field
-    if (
-      typeof parsed.title !== 'string' ||
-      typeof parsed.titleAr !== 'string' ||
-      typeof parsed.description !== 'string' ||
-      typeof parsed.descriptionAr !== 'string' ||
-      !Array.isArray(parsed.keywords)
-    ) {
-      throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an incomplete SEO suggestion.');
-    }
+    const parsed: SeoSuggestion = parseAiJson(seoSuggestionSchema, raw, {
+      storeId: input.storeId,
+      kind: 'SEO',
+    });
 
     const usage = res.response.usageMetadata;
     await recordUsage(
@@ -444,25 +489,10 @@ export class AIService {
     }
     const raw = stripJsonFences(res.response.text());
 
-    let parsed: { kicker: string; kickerAr: string; subtitle: string; subtitleAr: string };
-    try {
-      parsed = JSON.parse(raw) as typeof parsed;
-    } catch (err) {
-      logger.error(
-        { err, raw, storeId: input.storeId },
-        'Gemini returned non-JSON for section content'
-      );
-      throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an unexpected response format.');
-    }
-
-    if (
-      typeof parsed.kicker !== 'string' ||
-      typeof parsed.kickerAr !== 'string' ||
-      typeof parsed.subtitle !== 'string' ||
-      typeof parsed.subtitleAr !== 'string'
-    ) {
-      throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an incomplete section suggestion.');
-    }
+    const parsed = parseAiJson(sectionContentSchema, raw, {
+      storeId: input.storeId,
+      kind: 'section content',
+    });
 
     const usage = res.response.usageMetadata;
     await recordUsage(
@@ -641,16 +671,13 @@ export class AIService {
     }
     const raw = stripJsonFences(res.response.text());
 
-    let parsed: { matches: Array<{ id: string; confidence: 'high' | 'medium' | 'low' }> };
-    try {
-      parsed = JSON.parse(raw);
-    } catch (err) {
-      logger.error({ err, raw, storeId: input.storeId }, 'Gemini returned non-JSON for categorize');
-      throw new AppError(502, 'AI_BAD_RESPONSE', 'AI returned an unexpected response format.');
-    }
+    const parsed = parseAiJson(categorizeSchema, raw, {
+      storeId: input.storeId,
+      kind: 'categorize',
+    });
 
     const idSet = new Set(input.existingCategories.map(c => c.id));
-    const suggestions: CategorySuggestion[] = (parsed.matches || [])
+    const suggestions: CategorySuggestion[] = parsed.matches
       .filter(m => idSet.has(m.id))
       .map(m => {
         const cat = input.existingCategories.find(c => c.id === m.id)!;
