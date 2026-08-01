@@ -66,18 +66,68 @@ Every `:storeId` router is mounted with `tenantContext` and guarded by either th
 
 Guest order access (`GET /public/orders/:id`) uses possession of a v4 UUID as the credential for guest orders and requires `customerId` match for customer-owned ones. Standard, documented, and store-scoped via `getById(storeId, id)`.
 
-### 02 — RLS left open / public DB — PASS (with a caveat)
+### 02 — RLS left open / public DB — VERIFIED LIVE 2026-08-01 (caveat resolved, and it matters)
 
-98 `ENABLE ROW LEVEL SECURITY` and 45 `FORCE ROW LEVEL SECURITY` statements across 10 dedicated RLS migrations. No public/anon database exposure — Neon sits behind the API only.
+The original caveat ("could not verify the live policy state") is now settled. Connected read-only to
+the production Neon branch (`fwb-eu` / `crimson-king-40424588`, branch `main`) via `neonctl` and
+queried the catalog directly. The earlier failure was a stale local `.env` pointing at
+`ap-southeast-1`; production is `eu-central-1`.
 
-**Caveat, stated as a limitation not a finding:** I could not verify the _live_ policy state. The local `.env` credential is stale (`password authentication failed`) and Railway isn't linked in this checkout. Migrations describe intent; `pg_policies` is the truth. **Unblock:** run
+**Provisioned state — good:**
+
+| Metric                                | Value                                                      |
+| ------------------------------------- | ---------------------------------------------------------- |
+| Tables in `public`                    | 103                                                        |
+| RLS enabled                           | 94                                                         |
+| RLS **forced**                        | 93                                                         |
+| RLS off                               | 9                                                          |
+| Tables with RLS but **zero** policies | 0                                                          |
+| Policies with `USING (true)`          | 1 (`system_settings`, a global non-tenant table — correct) |
+
+**But RLS is INERT in production today, by tracked design.** Production connects as `neondb_owner`,
+which has `rolbypassrls = t`. Every tenant policy is written `TO force_app`, and `force_app` has
+`rolcanlogin = f` — it cannot connect at all. So none of the 94 policies apply to the live
+application connection.
+
+This is **not** an undiscovered hole. `apps/api/src/index.ts` carries a boot guard that logs
+`[SECURITY FATAL]` and `process.exit(1)` when the DB role has BYPASSRLS, deliberately escaped via
+`ALLOW_BYPASSRLS_ROLE=true` because the guard crash-looped production on 2026-06-27.
+`middleware/tenant-context.ts` states plainly that app-layer scoping is "the ONLY isolation mechanism
+until the force_app cutover". Lens 01 above independently verified that app-layer control is in fact
+present on every route — which is what makes the current posture defensible rather than dangerous.
+
+**What actually blocks the Phase-3 cutover:** `force_app` already holds SELECT on all 103 tables, so
+grants are done. The single blocker is that the role **cannot log in** — it needs LOGIN plus a
+password before `DATABASE_URL` can point at it.
+
+**Two things to fix before/with the cutover** (harmless today, because RLS is inert):
+
+1. `users` and `webhook_events` both carry `store_id` and have **RLS off**. Post-cutover these would
+   be the only tenant tables without database-level isolation.
+2. `product_daily_views` has RLS enabled but **not forced** — the table owner bypasses it.
+
+`users` needs care rather than a reflexive `ENABLE`: admin accounts deliberately have
+`storeId = NULL`, so a naive `store_id = current_store_id()` policy would hide every admin row and
+break authentication — which is exactly the failure recorded in
+`feedback-rls-force-cutover-breaks-preauth-and-self-service-auth`. Treat it as part of the cutover
+program, not a drive-by migration.
+
+**Verification queries** (read-only, safe to re-run):
 
 ```sql
-SELECT tablename, rowsecurity, forcerowsecurity FROM pg_tables
-  JOIN pg_class ON relname = tablename WHERE schemaname='public' AND NOT rowsecurity;
+-- provisioned state
+SELECT count(*) FILTER (WHERE relrowsecurity) AS enabled,
+       count(*) FILTER (WHERE relforcerowsecurity) AS forced, count(*) AS total
+FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+WHERE n.nspname='public' AND c.relkind='r';
+
+-- is RLS actually in force for the app's role?
+SELECT rolname, rolcanlogin, rolbypassrls FROM pg_roles
+WHERE rolname IN ('neondb_owner','force_app');
 ```
 
-against production. CLAUDE.md already requires re-verifying policy state after any snapshot restore.
+The second query is the one that matters. Counting policies tells you what was _provisioned_; only
+the role's `rolbypassrls` tells you whether any of it _applies_.
 
 ### 03 — Price/permission enforced client-side — PASS
 
