@@ -233,7 +233,9 @@ jobs:
         run: npm run build -w packages/shared
 
       - name: Run unit tests with coverage
-        run: npx vitest run tests/unit --coverage --reporter=verbose
+        run: npx vitest run tests/unit --coverage --reporter=verbose --maxWorkers=2
+        env:
+          NODE_OPTIONS: --max-old-space-size=2048
 
       - name: Upload coverage artifact
         if: always()
