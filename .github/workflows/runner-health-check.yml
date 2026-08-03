@@ -96,7 +96,12 @@ jobs:
           # 2026-07-30 leaving fwb-ci6), and a stale name never fails loudly:
           # the jq lookup yields "not-registered", which reads identically to a
           # genuine outage. The API already knows the truth — ask it.
-          total=$(echo "$response" | jq '[.runners[]] | length')
+          # (.runners // []) — a response without a .runners key (an API error
+          # object, say) makes `.runners[]` error on null, and under
+          # `set -euo pipefail` the step then dies with a bare jq message instead
+          # of a usable one. Default to an empty list and let the total==0 branch
+          # below report it as the outage it is.
+          total=$(echo "$response" | jq '(.runners // []) | length')
           if [ "$total" -eq 0 ]; then
             # Enumeration alone cannot see this: zero registered runners looks
             # like "nothing is offline". Treat it as the outage it is.
@@ -104,9 +109,9 @@ jobs:
             echo "::notice::${GH_REPO} → 0 runners registered"
           else
             offline=$(echo "$response" | jq -r \
-              '[.runners[] | select(.status != "online") | "\(.name)=\(.status)"] | join(", ")')
+              '[(.runners // [])[] | select(.status != "online") | "\(.name)=\(.status)"] | join(", ")')
             echo "$response" | jq -r \
-              '.runners[] | "::notice::runner \(.name) → \(.status)"'
+              '(.runners // [])[] | "::notice::runner \(.name) → \(.status)"'
           fi
 
           [ -z "$offline" ] && exit 0
