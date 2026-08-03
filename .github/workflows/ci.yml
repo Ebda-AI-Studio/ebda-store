@@ -92,7 +92,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           # No 'cache: npm' (removed 2026-07-05): actions/setup-node's built-in
           # npm cache restore hits GitHub's remote Actions Cache backend, and on
-          # our self-hosted runners (now the umbra guests, fwb-ci5-*) that
+          # our self-hosted runners (now the umbra guest fwb-ci6-*) that
           # restore has been
           # intermittently stalling at 0% for 5-8+ minutes before timing out
           # ("Failed to restore: The operation cannot be completed in timeout"),
