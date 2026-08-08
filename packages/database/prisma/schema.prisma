@@ -2723,12 +2723,27 @@ model AiUsage {
   inputTokens  Int      @default(0) @map("input_tokens")
   outputTokens Int      @default(0) @map("output_tokens")
   cachedHit    Boolean  @default(false) @map("cached_hit")
+  /// Which model produced this output. Part of the generation log (EU AI Act
+  /// transparency) — unlike a label, this CANNOT be reconstructed after the
+  /// fact, so it is recorded at write time. NULL = row predates provenance.
+  model        String?
+  /// Cost in MICROS of the store's billing currency (1_000_000 micros = 1 unit).
+  /// Micros not fils: per-call AI spend is routinely a fraction of a fils, and
+  /// integer fils would round every single row to 0. NULL means "no rate was
+  /// configured for this model", which is deliberately distinct from 0 — a
+  /// cached hit genuinely costs nothing. See lib/ai-pricing.ts.
+  costMicros   Int?     @map("cost_micros")
+  /// What the generated output was attached to, e.g. 'product' + its id. Lets
+  /// an audit answer "what did this system generate, and where did it go".
+  subjectType  String?  @map("subject_type")
+  subjectId    String?  @map("subject_id")
   createdAt    DateTime @default(now()) @map("created_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@index([storeId, createdAt(sort: Desc)])
   @@index([feature])
+  @@index([model, createdAt])
   @@map("ai_usage")
 }
 

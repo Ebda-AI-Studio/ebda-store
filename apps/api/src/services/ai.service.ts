@@ -26,6 +26,7 @@ import { redis } from './redis.service';
 import { AppError } from '../middleware/error-handler';
 import { assertAiQuota } from '../lib/ai-quota';
 import logger from '../lib/logger';
+import { computeCostMicros } from '../lib/ai-pricing';
 import { safeFetchImage } from '../lib/safe-fetch';
 import { sanitizeJsonControlChars } from '../lib/ai/parse-ai-json';
 import { rethrowAsAppError } from '../lib/ai/gemini-errors';
@@ -155,16 +156,50 @@ function cacheKey(feature: Feature, payload: unknown): string {
   return `ai:${feature}:${hash}`;
 }
 
+/**
+ * Provenance + costing for one AI call. All optional so the 28 existing
+ * call sites keep working unchanged — they still get `model` and `costMicros`
+ * because both are resolved here rather than at the call site.
+ */
+export interface UsageProvenance {
+  /** Model that produced the output. Defaults to the same env resolution the
+   *  callers use, so cost is still attributed correctly when omitted. */
+  model?: string;
+  /** What the output was attached to, e.g. 'product'. */
+  subjectType?: string;
+  subjectId?: string;
+}
+
 export async function recordUsage(
   storeId: string,
   feature: Feature,
   inputTokens: number,
   outputTokens: number,
-  cachedHit: boolean
+  cachedHit: boolean,
+  provenance: UsageProvenance = {}
 ): Promise<void> {
   try {
+    // Resolved here, not at the call site: every existing caller then records
+    // provenance + cost without being touched, and a new caller cannot forget.
+    const model = provenance.model ?? process.env.GEMINI_MODEL ?? 'gemini-flash-lite-latest';
+
+    // A cached hit consumed no provider tokens, so it genuinely cost 0 —
+    // distinct from `null`, which means "no rate configured for this model".
+    // Collapsing the two would make an unpriced deployment look free.
+    const costMicros = cachedHit ? 0 : computeCostMicros(model, inputTokens, outputTokens);
+
     await prisma.aiUsage.create({
-      data: { storeId, feature, inputTokens, outputTokens, cachedHit },
+      data: {
+        storeId,
+        feature,
+        inputTokens,
+        outputTokens,
+        cachedHit,
+        model,
+        costMicros,
+        subjectType: provenance.subjectType ?? null,
+        subjectId: provenance.subjectId ?? null,
+      },
     });
   } catch (err) {
     // Never fail the user-facing request because we couldn't log usage.
