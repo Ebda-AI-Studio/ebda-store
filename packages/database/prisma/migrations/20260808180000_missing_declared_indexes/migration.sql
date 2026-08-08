@@ -1,0 +1,52 @@
+-- Migration: missing_declared_indexes
+--
+-- Creates the one index that `schema.prisma` DECLARES but that no migration has
+-- ever created. Because production is built exclusively from this migration
+-- folder, a declared-but-unmigrated index does not exist in production at all —
+-- the schema file says it is there, `prisma migrate diff` disagrees, and only
+-- the diff is telling the truth.
+--
+--   verification_tokens (type)  -- token sweeps filter by type
+--
+-- Plain additive index on a column that already exists. No data is read,
+-- rewritten or moved.
+--
+-- `product_variants (product_id, barcode)` was initially included here and then
+-- REMOVED: it already exists, created by 20260615000000_barcode_scanning as a
+-- PARTIAL index (`WHERE barcode IS NOT NULL`). Prisma cannot express a partial
+-- index in `schema.prisma`, so `migrate diff` will report it as missing forever
+-- even though production has it — and has the better, smaller version. Adding a
+-- second full index over the same columns would be pure write-amplification.
+-- See docs/perf/schema-drift-2026-08-08.md.
+--
+-- WHY THIS IS A HAND-WRITTEN MIGRATION AND NOT `prisma migrate dev`
+-- ----------------------------------------------------------------
+-- Running `prisma migrate dev` against the current drift would generate far
+-- more than these two statements. 20260608020427_add_mfa_and_token_version
+-- already documents what happened the last time someone did that: it captured
+-- "dropping `users_email_key` / `users_store_id_idx`, dropping the
+-- `payments.stripe_*` reference columns, adding a `UNIQUE (store_id, sku)` on
+-- products, forcing `tags.store_id` NOT NULL, FK drop/re-adds and index
+-- renames", which was "destructive / boot-failure-prone, so it was removed",
+-- with the instruction that genuinely-intended changes "must ship in their own
+-- dedicated, reviewed migration". This is one of those.
+--
+-- The remaining drift is inventoried in docs/perf/schema-drift-2026-08-08.md.
+-- Deliberately NOT included here:
+--   * UNIQUE (store_id, sku) on products — would FAIL at boot if production
+--     already contains duplicate SKUs, taking the API down with it. Needs the
+--     duplicate check in the doc run against production FIRST.
+--   * dropping payments.stripe_* — destructive, needs sign-off.
+--   * ~23 index renames / type + default alignments — cosmetic, and renaming
+--     an index on a live table takes a lock for no functional gain.
+--
+-- LOCK NOTE (same constraint as 20260720000000_order_refund_reversed_at):
+-- plain, non-CONCURRENTLY CREATE INDEX, because CONCURRENTLY cannot run inside
+-- Prisma's migration transaction, and FWB applies migrations on API boot.
+-- verification_tokens is small (far below the ~106-row orders table measured
+-- 2026-08-08), so this is sub-second. The
+-- statement is IF NOT EXISTS, so pre-building it out-of-band with
+-- CREATE INDEX CONCURRENTLY makes this migration a clean no-op.
+
+CREATE INDEX IF NOT EXISTS "verification_tokens_type_idx"
+  ON "verification_tokens"("type");
