@@ -2,22 +2,23 @@
 /**
  * Production audit gate with a NARROW, documented allowlist.
  *
- * Policy is unchanged: production deps are zero-tolerance at `low`. This gate
- * exists only because two advisories currently have NO upstream fix AND are
- * unreachable by npm overrides.
+ * Policy: production deps are zero-tolerance at `low`. The allowlist exists only
+ * for advisories with NO upstream fix that are ALSO unreachable by npm overrides.
+ * It must only ever shrink — remove an entry the moment its advisory is
+ * resolvable.
  *
- * Why overrides don't work: both arrive through @grpc/proto-loader@0.8.1, which
- * pins protobufjs 8.6.3. npm registers the override and then does not apply it —
- * `npm ls` reports e.g.
- *   protobufjs@8.6.3 invalid: "8.7.1" from node_modules/@grpc/proto-loader overridden
- * This is the same limitation already documented for @lhci/cli in ci.yml
- * (verified 2026-05-25, re-confirmed 2026-07-21).
+ * EMPTY as of 2026-08-08 — the gate currently waives nothing.
  *
- * Why no upgrade: the parent is ALREADY on its latest release —
- *   @grpc/proto-loader@0.8.1 pins protobufjs 8.6.3
- *
- * RE-EVALUATE when @grpc/proto-loader ships a release. Remove an entry the moment
- * its advisory is resolvable — this list must only ever shrink.
+ * Shrunk 2026-08-08: both protobufjs waivers (GHSA-j3f2-48v5-ccww DoS,
+ * GHSA-jfj6-75fj-8934 Text Format map mutation) REMOVED. Their stated premise —
+ * "npm registers the override and then does not apply it" — is no longer true:
+ * protobufjs resolves to 8.7.1 on this branch AND on main (both lockfiles pin
+ * it), and `npm audit --omit=dev` reports the package clean. The gate confirmed
+ * it independently by reporting 0 waivers used before these entries were
+ * deleted. `npm ls` still marks it `invalid: "^7.5.5" from @grpc/proto-loader`,
+ * but that is a declared-range complaint, not an unapplied override, and it is
+ * pre-existing on main. Dead waivers are not free — they would silently absorb
+ * a future protobufjs advisory we would otherwise be forced to look at.
  *
  * Shrunk 2026-07-22: body-parser (GHSA-v422), brace-expansion (GHSA-3jxr) and
  * js-yaml (GHSA-52cp) are RESOLVED and removed. body-parser deduped to 1.20.6;
@@ -31,15 +32,10 @@
  * ^0.35.3 direct + override, propagator-jaeger ^2.9.0 leaf override — no
  * breaking sdk-node major bump). None ever needed a waiver.
  *
- * Accepted 2026-07-21 by Ahmad, explicitly and with the risk stated.
+ * Adding an entry needs Ahmad's explicit acceptance with the risk stated — the
+ * same bar the (now removed) protobufjs pair was held to on 2026-07-21.
  */
-const ALLOW = new Map([
-  ['GHSA-j3f2-48v5-ccww', 'protobufjs DoS (infinite loop) — @grpc/proto-loader@0.8.1 (latest) pins 8.6.3'],
-  // NOT denial-of-service. Prototype-pollution class. Accepted knowingly:
-  // reached only via OpenTelemetry -> gRPC telemetry export, not the payment
-  // or request-handling path. Highest priority to remove when proto-loader ships.
-  ['GHSA-jfj6-75fj-8934', 'protobufjs Text Format map parsing mutation — same unfixable @grpc/proto-loader path'],
-]);
+const ALLOW = new Map([]);
 
 const { execFileSync } = await import('node:child_process');
 let raw;
