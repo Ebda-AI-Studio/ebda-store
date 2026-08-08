@@ -15,8 +15,13 @@
  *      (`POST /public/orders/:orderId/verify-payment`) — the reliable
  *      primary confirmation path, because MyFatoorah's webhook is
  *      configured account-level in their portal and never fires per-invoice.
+ *   4. The auto-cancel sweep (`order-auto-cancel-unpaid`) — the last-resort
+ *      net. Before cancelling a stale unpaid order it asks the provider, and
+ *      a `completed` answer rescues the order instead of cancelling it. This
+ *      is the only path that catches an order where the webhook was lost AND
+ *      the customer never returned to the success page.
  *
- * Callers (2) and (3) both call `confirmPaymentFromProviderStatus`, so the
+ * Callers (2), (3) and (4) all call `confirmPaymentFromProviderStatus`, so the
  * pull-side reconciliation logic lives in ONE place.
  *
  * IDEMPOTENCY (money code — mandatory): the function is safe to call
@@ -39,7 +44,15 @@ import type { PaymentStatusResponse } from './payment-providers/types';
 import { invalidateCustomersCache } from '../lib/public-cache';
 import { assertValidTransition } from './order-status-machine';
 
-export type ConfirmSource = 'admin_refresh' | 'guest_verify';
+/**
+ * Which pull-side path asked the provider for this status.
+ *
+ * Both `eventType` branches below classify anything that isn't `admin_refresh`
+ * as a `reconciliation` (we asked the provider; the provider did not push to
+ * us), so adding a non-human source needs no change at either branch site —
+ * `auto_cancel_sweep` is a reconciliation by exactly that definition.
+ */
+export type ConfirmSource = 'admin_refresh' | 'guest_verify' | 'auto_cancel_sweep';
 
 /** Money-integrity F3 (2026-07-02 audit): reconciliation tolerance for a
  *  provider-reported paid amount vs the expected `Payment.amount`. Both

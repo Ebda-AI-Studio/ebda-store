@@ -3,6 +3,10 @@ import { prisma, withRlsBypass, runInTenantContext } from '@force/database';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { OrderService } from '../../../services/order.service';
+import { PaymentService } from '../../../services/payment-providers/payment.factory';
+import { confirmPaymentFromProviderStatus } from '../../../services/payment-confirm.service';
+import type { PaymentProvider } from '../../../services/payment-providers/types';
+import { sendAlert } from '../../../services/alerts.service';
 
 /**
  * Auto-cancel stale unpaid orders — daily cron (03:00 UTC).
@@ -12,7 +16,42 @@ import { OrderService } from '../../../services/order.service';
  * 2-day validity, after which the link is dead and the order will never be
  * paid) and cancels them.
  *
- * Cancellation goes through `OrderService.updateStatus(storeId, orderId,
+ * RECONCILE BEFORE CANCEL
+ * -----------------------
+ * `paymentStatus='unpaid'` means "we were never TOLD it was paid" — it does not
+ * mean "the money was not captured". Three independent paths normally tell us:
+ * the provider webhook, the guest verify-on-return call on the success page,
+ * and the merchant's manual "Refresh payment" button. All three can miss the
+ * same order at once:
+ *
+ *   customer pays → webhook is lost (dropped, or — for MyFatoorah — never fires
+ *   per-invoice because it is configured account-level) AND the customer never
+ *   lands back on the success page (closed the tab, dead battery, lost signal)
+ *
+ * There is then no inbox row for `payment-webhook-stuck-sweep` to find and no
+ * return for verify-on-return to ride on, so this cron was the next thing to
+ * touch the order — and it cancelled it, released the stock, and emailed the
+ * customer an "order cancelled" notice for an order they had genuinely paid
+ * for. The money stayed captured at the provider.
+ *
+ * So before cancelling, any order carrying an online-gateway payment row is
+ * reconciled against the provider. A `completed` answer routes into
+ * `confirmPaymentFromProviderStatus` — the SAME idempotent single-writer the
+ * webhook, verify-on-return and admin-refresh paths use — which marks the order
+ * paid/confirmed and runs the post-payment fanout exactly once. It is NOT
+ * cancelled.
+ *
+ * FAIL-CLOSED ON AN UNKNOWN ANSWER
+ * --------------------------------
+ * If the provider call throws (network blip, expired credentials, provider
+ * outage), the order is SKIPPED, not cancelled. Cancelling on a
+ * "we couldn't ask" answer is precisely the bug this guard exists to prevent.
+ * The order stays pending and the next daily run retries it; a skip that
+ * persists is surfaced by the P1 alert below rather than being silently
+ * absorbed. Erring toward "leave it pending one more day" is always cheaper
+ * than erring toward "cancel an order the customer paid for".
+ *
+ * Cancellation itself goes through `OrderService.updateStatus(storeId, orderId,
  * 'cancelled')`. After the order-payment-lifecycle FIX, updateStatus only runs
  * applyRefundEffects (refund reversal + "Refund issued" merchant push) when the
  * order had a CAPTURED payment — so cancelling an unpaid order here issues NO
@@ -22,11 +61,66 @@ import { OrderService } from '../../../services/order.service';
  * (inventory release, valid-transition checks, real-time socket ping, etc.).
  *
  * Capped at 500 orders/run (oldest first); the next daily run sweeps the rest.
- * Each cancel is its own step.run so one failure doesn't abort the batch.
+ * Each order is its own step.run so one failure doesn't abort the batch.
  */
 
 const AUTO_CANCEL_UNPAID_DAYS = Number(process.env.AUTO_CANCEL_UNPAID_DAYS) || 2;
 const RUN_CAP = 500;
+
+/**
+ * Sleep-after-success throttle between provider status calls (ms).
+ *
+ * Every order with a gateway payment row costs one outbound provider request,
+ * so a 500-order backlog is a 500-request burst at 4 different providers, all
+ * of which rate-limit. Pace the loop instead of discovering the limit via 429s
+ * (the measured-RPM pattern — throttle on success, don't retry on rejection).
+ * COD / payment-link-less orders never reach the call and are not delayed.
+ */
+const RECONCILE_THROTTLE_MS = Number(process.env.AUTO_CANCEL_RECONCILE_THROTTLE_MS) || 250;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/** Outcome of the pre-cancel reconciliation for a single order. */
+type ReconcileOutcome =
+  /** Provider confirmed payment — order is now paid. Do NOT cancel. */
+  | { action: 'rescued' }
+  /** No gateway payment to check, or provider says not paid. Cancel it. */
+  | { action: 'cancel' }
+  /** Couldn't get a trustworthy answer. Leave it pending; retry tomorrow. */
+  | { action: 'skip'; reason: string };
+
+/** What the sweep should do with one stale unpaid order. */
+export type AutoCancelDecision = 'reconcile_paid' | 'cancel' | 'skip';
+
+/**
+ * The whole rescue-vs-cancel-vs-skip decision, as a pure function.
+ *
+ * Extracted (matching the `webhook-offload.guard.ts` / `bulk-import` pattern in
+ * this directory) so the money-critical branch is unit-testable without
+ * standing up Inngest steps, RLS context, or a provider HTTP client.
+ *
+ * The ordering matters and is the point of the fix:
+ *   1. no gateway payment       → cancel  (COD / no link ever issued; nothing to ask)
+ *   2. provider unreachable     → SKIP    (unknown ≠ unpaid — never cancel on a guess)
+ *   3. provider says 'completed'→ reconcile as paid, do NOT cancel
+ *   4. any other definite answer→ cancel  (failed / expired / cancelled / pending)
+ *
+ * Step 2 preceding step 4 is the entire safety property: an unreachable
+ * provider must never fall through to the cancel branch.
+ */
+export function decideAutoCancelAction(input: {
+  /** Order has a non-COD payment row carrying a transactionId. */
+  hasGatewayPayment: boolean;
+  /** False when the provider status call threw (network/credentials/outage). */
+  providerReachable: boolean;
+  /** Normalised provider status, when we got one. */
+  providerStatus?: string;
+}): AutoCancelDecision {
+  if (!input.hasGatewayPayment) return 'cancel';
+  if (!input.providerReachable) return 'skip';
+  if (input.providerStatus === 'completed') return 'reconcile_paid';
+  return 'cancel';
+}
 
 export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction(
   {
@@ -50,7 +144,30 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
             deletedAt: null,
             createdAt: { lt: threshold },
           },
-          select: { id: true, storeId: true, orderNumber: true },
+          select: {
+            id: true,
+            storeId: true,
+            orderNumber: true,
+            paymentStatus: true,
+            locale: true,
+            // Newest gateway payment for this order. COD rows carry no
+            // transactionId and no online provider, so they fall out here and
+            // the order skips the provider call entirely.
+            payments: {
+              where: { transactionId: { not: null }, provider: { not: 'cod' } },
+              select: {
+                id: true,
+                status: true,
+                provider: true,
+                metadata: true,
+                amount: true,
+                currency: true,
+                transactionId: true,
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
           orderBy: { createdAt: 'asc' },
           take: RUN_CAP,
         })
@@ -59,38 +176,158 @@ export const orderAutoCancelUnpaid: InngestFunction.Any = inngest.createFunction
 
     if (stale.length === 0) {
       logger.info('order-auto-cancel-unpaid: nothing to cancel');
-      return { scanned: 0, cancelled: 0, failed: 0 };
+      return { scanned: 0, cancelled: 0, failed: 0, rescued: 0, skipped: 0 };
     }
 
     let cancelled = 0;
     let failed = 0;
+    let rescued = 0;
+    let skipped = 0;
 
     for (const order of stale) {
-      const ok = await step.run(`cancel-${order.id}`, async () => {
-        try {
-          // updateStatus reads + writes the order via Prisma — run it inside the
-          // order's tenant context so FORCE RLS policies (read + write) are
-          // satisfied on this non-HTTP cron path.
-          await runInTenantContext(order.storeId, () =>
-            OrderService.updateStatus(order.storeId, order.id, 'cancelled')
-          );
-          return true;
-        } catch (err) {
-          logger.error(
-            { err, orderId: order.id, storeId: order.storeId },
-            'order-auto-cancel-unpaid: failed to cancel order'
-          );
-          return false;
+      const outcome: ReconcileOutcome = await step.run(`reconcile-${order.id}`, async () => {
+        const payment = order.payments[0];
+        const hasGatewayPayment = Boolean(payment?.transactionId);
+
+        let providerStatus;
+        let providerReachable = true;
+        let unreachableReason = 'provider_status_unavailable';
+
+        if (hasGatewayPayment) {
+          try {
+            providerStatus = await PaymentService.getPaymentStatus(
+              payment.transactionId as string,
+              payment.provider as PaymentProvider,
+              order.storeId
+            );
+          } catch (err) {
+            // FAIL-CLOSED. We asked and got no trustworthy answer, so we do not
+            // know whether the customer's money was captured. Leave the order
+            // pending — tomorrow's run asks again.
+            providerReachable = false;
+            unreachableReason = err instanceof Error ? err.message : unreachableReason;
+            logger.warn(
+              { err, orderId: order.id, storeId: order.storeId, provider: payment.provider },
+              'order-auto-cancel-unpaid: provider status check failed — skipping cancel'
+            );
+          }
         }
+
+        const decision = decideAutoCancelAction({
+          hasGatewayPayment,
+          providerReachable,
+          providerStatus: providerStatus?.status,
+        });
+
+        if (decision === 'skip') {
+          return { action: 'skip', reason: unreachableReason } as ReconcileOutcome;
+        }
+
+        if (decision === 'reconcile_paid' && providerStatus) {
+          // The money WAS captured and every push path missed it. Route through
+          // the shared single-writer so this transitions identically to a
+          // webhook / verify-on-return confirmation and fans out exactly once.
+          await runInTenantContext(order.storeId, () =>
+            confirmPaymentFromProviderStatus({
+              payment: {
+                id: payment.id,
+                status: payment.status,
+                provider: payment.provider,
+                metadata: payment.metadata,
+                amount: payment.amount,
+                currency: payment.currency,
+              },
+              order: {
+                id: order.id,
+                storeId: order.storeId,
+                paymentStatus: order.paymentStatus,
+                locale: order.locale,
+              },
+              providerStatus,
+              source: 'auto_cancel_sweep',
+              triggeredByUserId: null,
+            })
+          );
+
+          logger.warn(
+            {
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              storeId: order.storeId,
+              provider: payment.provider,
+            },
+            'order-auto-cancel-unpaid: RESCUED — provider reports paid, order was about to be cancelled'
+          );
+          return { action: 'rescued' } as ReconcileOutcome;
+        }
+
+        // Provider gave a definite not-paid answer (failed/expired/cancelled/
+        // pending). The link is dead past the threshold — cancel is correct.
+        return { action: 'cancel' } as ReconcileOutcome;
       });
-      if (ok) cancelled += 1;
-      else failed += 1;
+
+      if (outcome.action === 'rescued') {
+        rescued += 1;
+      } else if (outcome.action === 'skip') {
+        skipped += 1;
+      } else {
+        const ok = await step.run(`cancel-${order.id}`, async () => {
+          try {
+            // updateStatus reads + writes the order via Prisma — run it inside the
+            // order's tenant context so FORCE RLS policies (read + write) are
+            // satisfied on this non-HTTP cron path.
+            await runInTenantContext(order.storeId, () =>
+              OrderService.updateStatus(order.storeId, order.id, 'cancelled')
+            );
+            return true;
+          } catch (err) {
+            logger.error(
+              { err, orderId: order.id, storeId: order.storeId },
+              'order-auto-cancel-unpaid: failed to cancel order'
+            );
+            return false;
+          }
+        });
+        if (ok) cancelled += 1;
+        else failed += 1;
+      }
+
+      // Throttle only after an actual provider call (see RECONCILE_THROTTLE_MS).
+      if (order.payments[0]?.transactionId && RECONCILE_THROTTLE_MS > 0) {
+        await sleep(RECONCILE_THROTTLE_MS);
+      }
+    }
+
+    // A rescue means real money was captured with every push path missed — the
+    // merchant needs to know their fulfilment queue just gained an order, and
+    // repeated rescues point at a broken webhook config rather than bad luck.
+    // A skip means we could not reach a provider at all; one is noise, a
+    // persistent count is an outage holding real orders in limbo.
+    if (rescued > 0 || skipped > 0) {
+      void sendAlert({
+        level: rescued > 0 ? 'p1' : 'info',
+        scope: 'platform',
+        source: 'order.auto_cancel.reconciliation',
+        title: 'order.auto_cancel.reconciliation',
+        body:
+          `Auto-cancel sweep: ${rescued} order(s) were confirmed PAID by the provider and ` +
+          `rescued from cancellation; ${skipped} order(s) were skipped because the provider ` +
+          `could not be reached. Repeated rescues indicate a webhook that is not firing.`,
+        context: { scanned: stale.length, cancelled, failed, rescued, skipped },
+      }).catch(() => undefined);
     }
 
     logger.info(
-      { scanned: stale.length, cancelled, failed, thresholdDays: AUTO_CANCEL_UNPAID_DAYS },
+      {
+        scanned: stale.length,
+        cancelled,
+        failed,
+        rescued,
+        skipped,
+        thresholdDays: AUTO_CANCEL_UNPAID_DAYS,
+      },
       'order-auto-cancel-unpaid completed'
     );
-    return { scanned: stale.length, cancelled, failed };
+    return { scanned: stale.length, cancelled, failed, rescued, skipped };
   }
 );
