@@ -233,7 +233,21 @@ jobs:
         run: npm run build -w packages/shared
 
       - name: Run unit tests with coverage
-        run: npx vitest run tests/unit --coverage --reporter=verbose --maxWorkers=2
+        # Globs BEYOND tests/unit are load-bearing, not tidiness. vitest.config.ts
+        # has a broad `include`, so a colocated `__tests__` file passes locally and
+        # is silently never executed by CI unless its directory is named here.
+        #
+        # The integration job already added `apps/api/src` for exactly this reason
+        # (see its comment). That left the OTHER colocated suites still orphaned:
+        # packages/shared, packages/database, apps/web and apps/admin — 18 files /
+        # 200 tests that had never run in CI, including the JSON-LD script-tag XSS
+        # escaping regression, the money-transaction wrapper, plan baselines and
+        # store-layout resolution. All are pure (no DB, no network), so they belong
+        # in this job rather than integration.
+        #
+        # Adding a colocated test outside these paths = a test that does not run.
+        # Prefer tests/unit; if you must colocate, add the directory here.
+        run: npx vitest run tests/unit packages/shared/src packages/database/src apps/web/src/lib apps/admin/src --coverage --reporter=verbose --maxWorkers=2
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 

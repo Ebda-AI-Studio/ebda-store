@@ -360,25 +360,6 @@ describe('WarehouseService.reconcileWarehouseStockToAggregate', () => {
     // SAME row exercises the actual inverted-lock-order deadlock hazard
     // (Postgres 40P01 / Prisma P2034) fix wave 1 added a retry for — no
     // artificial mocking, real transactions, real locks.
-    const productId = await makeProduct('deadlock', 100); // authoritative aggregate = 100
-    await prisma.warehouseStock.create({
-      // Deliberately drifted (diff = +30) so reconcile's write path is
-      // eligible to reach the warehouse_stock upsert (a diff===0 reconcile
-      // returns before ever touching warehouse_stock, and the deadlock
-      // hazard can't manifest). NOTE: any of the concurrent `adjustStock`
-      // calls below can win the race and re-sync `Product.inventory` down
-      // to the warehouse_stock SUM (70) before reconcile reads it — that's
-      // adjustStock's own correct, pre-existing self-heal behavior, not a
-      // bug — so reconcile may legitimately see diff===0 by the time it
-      // runs. Either outcome (reconcile fixes the drift, or finds it
-      // already gone) is fine; what this test actually locks in is (a) no
-      // unretried throw from EITHER side and (b) the invariant holds
-      // exactly at the end.
-      data: { warehouseId, productId, variantId: null, quantity: 70, storeId },
-    });
-
-    const warnSpy = vi.spyOn(logger, 'warn');
-
     // The deadlock this inverted lock order creates is symmetric — Postgres
     // picks EITHER side as the victim, arbitrarily. `reconcileWarehouseStockToAggregate`
     // now retries itself internally (the actual fix). `adjustStock` is
@@ -390,41 +371,90 @@ describe('WarehouseService.reconcileWarehouseStockToAggregate', () => {
     // uses this helper) — this is caller-side retry, not a change to
     // adjustStock's source.
     const CONCURRENT_ADJUSTS = 40;
-    const [reconcileResult] = await Promise.all([
-      WarehouseService.reconcileWarehouseStockToAggregate(storeId, productId, null),
-      ...Array.from({ length: CONCURRENT_ADJUSTS }, () =>
-        retryOnWriteConflict(
-          () => WarehouseService.adjustStock(storeId, warehouseId, { productId, delta: 0 }),
-          { extraRetryCodes: ['40P01', '40001'], label: 'test-adjustStock-guard' }
-        )
-      ),
-    ]);
 
-    // No unretried throw: Promise.all above would have rejected already if
-    // any call surfaced an unretried deadlock/serialization failure — that
-    // is the primary thing this test proves.
-    expect(reconcileResult).toEqual(expect.objectContaining({ reconciled: expect.any(Boolean) }));
+    // WHY THIS IS A LOOP (2026-08-08 flake fix).
+    //
+    // A single round cannot guarantee the deadlock manifests, and the setup
+    // comment below says so explicitly: any racing `adjustStock` may win and
+    // re-sync `Product.inventory` down to the warehouse_stock SUM first, after
+    // which reconcile legitimately sees diff===0 and returns BEFORE it ever
+    // touches warehouse_stock — no inverted lock order, no deadlock, nothing
+    // to retry. That is correct behaviour, not a bug.
+    //
+    // The previous version asserted `reconcileRetried === true` after ONE round,
+    // which contradicted its own comment and made the test non-deterministic:
+    // observed pass/fail/fail/pass on identical code, costing 3 CI reruns.
+    //
+    // So: the two REAL invariants (no unretried throw, SUM === inventory) are
+    // asserted on EVERY round and are fully deterministic. Only the
+    // "did the retry path actually engage" observation is looped, because that
+    // one is inherently probabilistic. Rounds use a fresh product each time —
+    // once reconcile heals the drift, re-racing the same row proves nothing.
+    const MAX_ROUNDS = 6;
+    let reconcileRetried = false;
+    let roundsRun = 0;
 
-    // Invariant: SUM(WarehouseStock) === Product.inventory, exactly — holds
-    // regardless of whether reconcile or a racing adjustStock's own resync
-    // was the one that last touched it.
-    const stock = await prisma.warehouseStock.findFirst({
-      where: { warehouseId, productId, variantId: null },
-    });
-    const product = await prisma.product.findUnique({ where: { id: productId } });
-    expect(stock?.quantity).toBe(product?.inventory);
+    for (let round = 0; round < MAX_ROUNDS && !reconcileRetried; round++) {
+      roundsRun = round + 1;
+      const productId = await makeProduct(`deadlock-${round}`, 100); // authoritative aggregate = 100
+      await prisma.warehouseStock.create({
+        // Deliberately drifted (diff = +30) so reconcile's write path is
+        // eligible to reach the warehouse_stock upsert (a diff===0 reconcile
+        // returns before ever touching warehouse_stock, and the deadlock
+        // hazard can't manifest).
+        data: { warehouseId, productId, variantId: null, quantity: 70, storeId },
+      });
 
-    // Proves the retry path (not just the matched lock order) actually
-    // engaged: at least one write-conflict retry was logged for reconcile
-    // under this real concurrent load.
-    const reconcileRetried = warnSpy.mock.calls.some(
-      call =>
-        (call[0] as { label?: string } | undefined)?.label === 'reconcileWarehouseStockToAggregate'
-    );
-    expect(reconcileRetried).toBe(true);
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        const [reconcileResult] = await Promise.all([
+          WarehouseService.reconcileWarehouseStockToAggregate(storeId, productId, null),
+          ...Array.from({ length: CONCURRENT_ADJUSTS }, () =>
+            retryOnWriteConflict(
+              () => WarehouseService.adjustStock(storeId, warehouseId, { productId, delta: 0 }),
+              { extraRetryCodes: ['40P01', '40001'], label: 'test-adjustStock-guard' }
+            )
+          ),
+        ]);
 
-    warnSpy.mockRestore();
-  }, 30000);
+        // INVARIANT 1 — no unretried throw: Promise.all would have rejected
+        // already if any call surfaced an unretried deadlock/serialization
+        // failure. This is the primary thing this test proves.
+        expect(reconcileResult).toEqual(
+          expect.objectContaining({ reconciled: expect.any(Boolean) })
+        );
+
+        // INVARIANT 2 — SUM(WarehouseStock) === Product.inventory, exactly.
+        // Holds regardless of whether reconcile or a racing adjustStock's own
+        // resync was the one that last touched it.
+        const stock = await prisma.warehouseStock.findFirst({
+          where: { warehouseId, productId, variantId: null },
+        });
+        const product = await prisma.product.findUnique({ where: { id: productId } });
+        expect(stock?.quantity).toBe(product?.inventory);
+
+        reconcileRetried = warnSpy.mock.calls.some(
+          call =>
+            (call[0] as { label?: string } | undefined)?.label ===
+            'reconcileWarehouseStockToAggregate'
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    }
+
+    // Proves the retry path (not just the matched lock order) actually engaged
+    // at least once across the rounds: a write-conflict retry was logged for
+    // reconcile under real concurrent load. With 40 concurrent adjusts per
+    // round this converges quickly; MAX_ROUNDS exists so a pathologically
+    // serialized runner fails loudly instead of hanging.
+    expect(
+      reconcileRetried,
+      `no reconcile write-conflict retry observed in ${roundsRun} round(s) of ` +
+        `${CONCURRENT_ADJUSTS} concurrent adjustStock calls — the inverted-lock-order ` +
+        `retry path was never exercised, so this run did not cover it`
+    ).toBe(true);
+  }, 120000);
 });
 
 describe('WarehouseService.backfillReconcileAll', () => {
