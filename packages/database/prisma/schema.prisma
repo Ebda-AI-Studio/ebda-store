@@ -654,6 +654,11 @@ model Customer {
   @@index([email])
   @@index([createdAt])
   @@index([storeId, groupId])
+  // FK-only index. `[storeId, groupId]` above serves merchant-facing "customers
+  // in this group" reads, but the CustomerGroup delete RI trigger filters on
+  // `group_id` ALONE — it cannot use a composite whose leading column is absent,
+  // so without this it seq-scans `customers` while holding the delete's lock.
+  @@index([groupId])
   @@map("customers")
 }
 
@@ -1279,6 +1284,10 @@ model Order {
   // Payment-gateway abandoners list (Enterprise).
   // Added 20260622130000.
   @@index([storeId, paymentGatewayAbandonedAt])
+  // FK-only index for the Promotion delete RI trigger, which filters on
+  // `applied_promotion_id` alone. `orders` is the largest table in the schema,
+  // so the unindexed variant of this scan is the worst of the five.
+  @@index([appliedPromotionId])
   @@map("orders")
 }
 
@@ -1310,6 +1319,9 @@ model OrderEvent {
 
   @@index([orderId])
   @@index([storeId])
+  // FK-only index for the User delete RI trigger (actor is SetNull). Deactivating
+  // a staff account otherwise seq-scans the whole append-only event trail.
+  @@index([actorId])
   @@map("order_events")
 }
 
@@ -2302,6 +2314,8 @@ model Coupon {
   @@index([code])
   @@index([isActive])
   @@index([storeId, customerGroupId])
+  // FK-only index for the CustomerGroup delete RI trigger (see `customers`).
+  @@index([customerGroupId])
   @@map("coupons")
 }
 
@@ -2340,6 +2354,8 @@ model Promotion {
 
   @@index([storeId, isActive])
   @@index([storeId, customerGroupId])
+  // FK-only index for the CustomerGroup delete RI trigger (see `customers`).
+  @@index([customerGroupId])
   @@map("promotions")
 }
 
