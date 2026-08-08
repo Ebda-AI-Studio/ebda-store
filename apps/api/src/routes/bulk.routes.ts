@@ -222,12 +222,17 @@ router.get(
   authenticate,
   authorize('store_admin', 'super_admin'),
   requireStoreAccess,
-  async (_req: Request, res: Response) => {
-    const template = BulkService.getImportTemplate();
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const template = BulkService.getImportTemplate();
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=product_import_template.csv');
-    res.send(template);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=product_import_template.csv');
+      res.send(template);
+    } catch (err) {
+      // Express 4 does NOT forward async rejections to errorHandler.
+      next(err);
+    }
   }
 );
 
