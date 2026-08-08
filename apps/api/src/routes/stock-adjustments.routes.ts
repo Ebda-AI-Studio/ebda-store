@@ -186,10 +186,25 @@ router.post(
           let product: { id: string } | null = null;
           let variant: { id: string; productId: string; inventory: number } | null = null;
 
+          // SOFT-DELETE SCOPING (all four lookups below).
+          //
+          // SKU and barcode are only unique among LIVE products — the
+          // products_store_id_sku_key index is partial (`WHERE deleted_at IS
+          // NULL`) precisely so a merchant can reuse the SKU of a product they
+          // deleted, which production already contains a real case of.
+          //
+          // Without `deletedAt: null` here, `findFirst` can therefore match a
+          // SOFT-DELETED product and this import would apply a stock adjustment
+          // to it. There is no orderBy, so which row wins is not even
+          // deterministic — the same CSV could hit the live product one run and
+          // the deleted one the next.
+          //
+          // Variants have no deleted_at of their own; a variant is dead when its
+          // parent product is, so they scope through the relation.
           if (row.sku) {
             // Check variants first (variant SKU is more specific)
             const foundVariant = await prisma.productVariant.findFirst({
-              where: { sku: row.sku, product: { storeId } },
+              where: { sku: row.sku, product: { storeId, deletedAt: null } },
               select: { id: true, productId: true, inventory: true },
             });
             if (foundVariant) {
@@ -197,21 +212,21 @@ router.post(
             } else {
               // Fall back to product SKU
               product = await prisma.product.findFirst({
-                where: { sku: row.sku, storeId },
+                where: { sku: row.sku, storeId, deletedAt: null },
                 select: { id: true },
               });
             }
           } else if (row.barcode) {
             // Check variants first
             const foundVariant = await prisma.productVariant.findFirst({
-              where: { barcode: row.barcode, product: { storeId } },
+              where: { barcode: row.barcode, product: { storeId, deletedAt: null } },
               select: { id: true, productId: true, inventory: true },
             });
             if (foundVariant) {
               variant = foundVariant;
             } else {
               product = await prisma.product.findFirst({
-                where: { barcode: row.barcode, storeId },
+                where: { barcode: row.barcode, storeId, deletedAt: null },
                 select: { id: true },
               });
             }

@@ -46,37 +46,45 @@ would drop production columns.
 | `product_variants (product_id, barcode)` | **FALSE POSITIVE — see below**                         |
 | `products UNIQUE (store_id, sku)`        | **NOT fixed — see below**                              |
 
-### The SKU unique constraint is the one that matters
+### The SKU unique constraint — FIXED, and the naive check was wrong
 
-`schema.prisma` declares:
+`schema.prisma` has always declared:
 
 ```prisma
 @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
 ```
 
-No migration has ever created it. **That constraint does not exist in production**,
-so duplicate SKUs within a store are currently possible, and any code that assumes
-uniqueness (imports, upserts keyed on SKU, barcode/pick flows) is relying on a
-guarantee the database is not enforcing.
+No migration ever created it, so production had **no `products.sku` index of any
+kind** and nothing stopped two live products in a store sharing a SKU.
 
-It was left out of this pass because creating a unique index **fails if duplicates
-already exist**, and FWB applies migrations on API boot — a failure there is an
-outage, not a red CI job.
-
-**Run this against production first:**
+**The check that says it is safe to add must include soft-deleted rows.** The
+obvious query filters `deleted_at IS NULL` and returns 0 — but the plain unique
+index Prisma would generate has **no WHERE clause**, so it also covers
+soft-deleted rows. Against production:
 
 ```sql
-SELECT store_id, sku, COUNT(*) AS n
-FROM products
-WHERE sku IS NOT NULL AND deleted_at IS NULL
-GROUP BY store_id, sku HAVING COUNT(*) > 1
-ORDER BY n DESC;
+-- deleted_at IS NULL  -> 0 rows        (looks safe: WRONG)
+-- no deleted_at filter -> 1 row        (store 0bbf478a…, sku S-0015)
 ```
 
-- **0 rows** → safe to ship `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS
-"products_store_id_sku_key" ON "products"("store_id","sku");` out-of-band, then a
-  matching `IF NOT EXISTS` migration.
-- **any rows** → the data must be reconciled first. Do not add the constraint.
+That row is a merchant who soft-deleted an Arabic-titled product and recreated it
+in English reusing the SKU — normal, correct behaviour. A plain unique index
+would have **failed at CREATE time**, and since FWB applies migrations on API
+boot, that failure is an outage.
+
+**Shipped as a PARTIAL unique index** (`WHERE deleted_at IS NULL`), which is also
+the correct business rule: uniqueness among live products, with SKU reuse allowed
+after deletion. Built out-of-band with `CREATE UNIQUE INDEX CONCURRENTLY` before
+the migration merged; the migration statement is `IF NOT EXISTS` so it is a no-op
+on production and creates it normally on a fresh/CI database.
+
+Verified in production: `indisvalid=true`, and a duplicate insert is rejected
+with `duplicate key value violates unique constraint "products_store_id_sku_key"`
+(tested inside a transaction and rolled back).
+
+**Accepted drift:** Prisma cannot express partial indexes, so `migrate diff` will
+report this as missing forever. The `@@unique` stays in `schema.prisma` so intent
+stays visible, but any `prisma migrate dev` output touching it must be discarded.
 
 ### `product_variants (product_id, barcode)` is a permanent false positive
 

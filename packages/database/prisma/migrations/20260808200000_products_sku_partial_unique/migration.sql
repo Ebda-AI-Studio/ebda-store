@@ -1,0 +1,49 @@
+-- Migration: products_sku_partial_unique
+--
+-- Enforces the SKU uniqueness that `schema.prisma` has DECLARED since forever but
+-- that no migration ever created:
+--
+--   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store
+--
+-- Production has had no `products.sku` index of any kind, so nothing has been
+-- stopping two live products in the same store from sharing a SKU — and every
+-- SKU-keyed lookup has been trusting a guarantee the database was not making.
+--
+-- PARTIAL (`WHERE deleted_at IS NULL`), AND THAT IS DELIBERATE
+-- -----------------------------------------------------------
+-- The plain unique index Prisma would generate CANNOT BE CREATED on production.
+-- It covers soft-deleted rows, and production already contains:
+--
+--   store 0bbf478a…  sku S-0015
+--     "لوحة على هذه الارض ما يستحق الحياه"  deleted_at 2026-02-28 03:30
+--     "Canvas \"On This Earth There Is That Which Deserves Life\""  live
+--
+-- i.e. a merchant soft-deleted a product and recreated it in English reusing the
+-- SKU. That is normal, correct merchant behaviour. A plain unique index would
+-- have FAILED at CREATE time — and since FWB applies migrations on API boot,
+-- that failure is an outage, not a red CI job.
+--
+-- It would also be wrong going forward: it would permanently block a merchant
+-- from reusing the SKU of a product they deleted. Uniqueness belongs among LIVE
+-- products only, which is exactly `WHERE deleted_at IS NULL`.
+--
+-- KNOWN, ACCEPTED DRIFT: Prisma cannot express a partial index, so
+-- `prisma migrate diff` will report `[+] Added unique index on columns
+-- (store_id, sku)` forever even though the constraint exists and is enforced.
+-- This is the same accepted situation as `product_variants_product_id_barcode_idx`
+-- (partial, created by 20260615000000_barcode_scanning). The `@@unique` stays in
+-- schema.prisma so the intent is visible and Prisma Client keeps the compound
+-- key — but ANY `prisma migrate dev` output touching this index must be
+-- DISCARDED, because it will try to create the plain version and fail.
+-- See docs/perf/schema-drift-2026-08-08.md.
+--
+-- CONCURRENTLY: this index was built out-of-band against DIRECT_URL before this
+-- migration merged, precisely because a unique-index build that fails on API
+-- boot takes the API down. The statement below is IF NOT EXISTS, so on
+-- production it is a clean no-op; on a fresh/CI database it creates the index
+-- normally. `products` is small (see docs/perf/schema-drift-2026-08-08.md), so
+-- the non-CONCURRENTLY build here is sub-second.
+
+CREATE UNIQUE INDEX IF NOT EXISTS "products_store_id_sku_key"
+  ON "products"("store_id", "sku")
+  WHERE "deleted_at" IS NULL;
