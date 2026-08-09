@@ -53,10 +53,41 @@ const app = express();
 // this setting, `req.ip` resolves to the proxy's address — which means every
 // IP-keyed rate limiter (authLimiter, paymentLimiter, writeLimiter, etc.) is
 // effectively a single global counter, and brute-force protection is off.
-// `1` = trust the immediate hop only; do NOT raise to `true` (allows clients
-// to spoof X-Forwarded-For). Same value used in production by Vercel /
-// Cloudflare reference docs for single-proxy hops.
-app.set('trust proxy', 1);
+//
+// The value is a HOP COUNT, and it must equal the number of proxies actually
+// in front of this process — no more, no less.
+//
+//   Railway only:            client -> Railway -> here            = 1
+//   Cloudflare + Railway:    client -> Cloudflare -> Railway -> here = 2
+//
+// Too LOW and `req.ip` becomes the nearest proxy's address (all anonymous
+// traffic collapses into one rate-limit bucket, and audit logs record the
+// proxy instead of the client). Too HIGH — or `true` — and a client can spoof
+// X-Forwarded-For to forge its own address and bypass every IP-keyed limiter
+// outright, which is strictly worse than having none.
+//
+// Configurable because the correct value depends on deployment topology, not
+// on code: a preview/staging deploy that is NOT behind Cloudflare still needs
+// 1 while production needs 2. Defaults to 1 so any environment that has not
+// been told otherwise keeps today's (safe, non-spoofable) behaviour.
+//
+// SET TRUST_PROXY_HOPS=2 ONLY ONCE api.force-ai.co IS PROXIED **AND** THE
+// RAILWAY ORIGIN NO LONGER ACCEPTS DIRECT PUBLIC TRAFFIC. Raising it while the
+// naked *.up.railway.app hostname is still reachable is the spoofing hole
+// described above. See docs/ENVIRONMENT.md.
+const TRUST_PROXY_HOPS = (() => {
+  const raw = process.env.TRUST_PROXY_HOPS;
+  if (!raw) return 1;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0 || n > 5) {
+    // Fail SAFE, not open: an unparseable value must not become `true`.
+    logger.warn({ raw }, '[startup] TRUST_PROXY_HOPS is not an integer 0-5 — falling back to 1');
+    return 1;
+  }
+  return n;
+})();
+app.set('trust proxy', TRUST_PROXY_HOPS);
+logger.info({ trustProxyHops: TRUST_PROXY_HOPS }, '[startup] trust proxy hop count');
 
 const httpServer = createServer(app);
 
