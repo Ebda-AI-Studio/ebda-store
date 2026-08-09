@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
+import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
 import { config } from '../config';
@@ -1148,9 +1149,16 @@ router.get(
  * GET /admin/super-admin/ai-usage/summary
  *
  * Returns:
- *   platform: { todayCount, monthCount, totalCached, totalUncached, cacheHitRatio }
+ *   platform: { todayCount, monthCount, totalCached, totalUncached, cacheHitRatio,
+ *               monthCostMicros, monthUnpricedCalls, ratesConfigured }
  *   stores:   [{ storeId, slug, name, plan, today, month, dailyCap, monthlyCap,
- *               dailyPct, monthlyPct, lastCallAt, featureCounts }]
+ *               dailyPct, monthlyPct, lastCallAt, featureCounts,
+ *               monthCostMicros, monthUnpricedCalls }]
+ *
+ * Spend is in MICROS of the billing currency (1_000_000 = 1 unit). `unpriced`
+ * counts billable calls whose model had no configured rate — those contribute
+ * NOTHING to the spend total, so a non-zero unpriced count means the figure is
+ * a floor. Never render the two folded together.
  *
  * Stores sorted by today desc (highest consumer first).
  */
@@ -1190,6 +1198,8 @@ router.get(
             last_call_at: Date | null;
             feature: string;
             feature_count: bigint;
+            month_cost_micros: bigint | null;
+            month_unpriced: bigint;
           }>
         >`
           SELECT
@@ -1198,7 +1208,18 @@ router.get(
             COUNT(*) FILTER (WHERE created_at >= ${startOfMonth} AND cached_hit = false) AS month_count,
             MAX(created_at) AS last_call_at,
             feature,
-            COUNT(*) AS feature_count
+            COUNT(*) AS feature_count,
+            -- Spend this month. SUM ignores NULLs, so unpriced rows do not
+            -- silently contribute 0 - they are counted separately below and
+            -- surfaced in the UI, because "no rate configured" and "free" are
+            -- different facts and folding them together makes an unpriced
+            -- deployment look free. See apps/api/src/lib/ai-pricing.ts.
+            SUM(cost_micros) FILTER (WHERE created_at >= ${startOfMonth}) AS month_cost_micros,
+            COUNT(*) FILTER (
+              WHERE created_at >= ${startOfMonth}
+                AND cached_hit = false
+                AND cost_micros IS NULL
+            ) AS month_unpriced
           FROM ai_usage
           GROUP BY store_id, feature
         `;
@@ -1219,9 +1240,22 @@ router.get(
           month: number;
           lastCallAt: Date | null;
           featureCounts: Record<string, number>;
+          monthCostMicros: number;
+          monthUnpricedCalls: number;
         };
         const byStore = new Map<string, StoreAgg>();
 
+        // NOTE (2026-08-09): today/month are SUMMED across feature rows, not MAX'd.
+        //
+        // The query GROUPs BY (store_id, feature), so every aggregate - including
+        // the FILTERed today/month counts - is scoped to ONE feature. The previous
+        // code took Math.max across a store's feature rows on the stated belief
+        // that "today/month are the same value across feature rows". They are not,
+        // and the effect was that each store reported only its single busiest
+        // FEATURE instead of its total: a store using translate + seo + categorize
+        // showed roughly a third of its real usage, and dailyPct/monthlyPct - the
+        // cap-pressure numbers this page exists to show - were wrong by the same
+        // factor.
         for (const row of storeStats) {
           const existing = byStore.get(row.store_id);
           if (!existing) {
@@ -1231,12 +1265,14 @@ router.get(
               month: Number(row.month_count),
               lastCallAt: row.last_call_at,
               featureCounts: { [row.feature]: Number(row.feature_count) },
+              monthCostMicros: Number(row.month_cost_micros ?? 0),
+              monthUnpricedCalls: Number(row.month_unpriced),
             });
           } else {
-            // today/month are the same value across feature rows for the same store
-            // (the FILTER means they only differ in feature_count). Accumulate max.
-            existing.today = Math.max(existing.today, Number(row.today_count));
-            existing.month = Math.max(existing.month, Number(row.month_count));
+            existing.today += Number(row.today_count);
+            existing.month += Number(row.month_count);
+            existing.monthCostMicros += Number(row.month_cost_micros ?? 0);
+            existing.monthUnpricedCalls += Number(row.month_unpriced);
             if (
               row.last_call_at &&
               (!existing.lastCallAt || row.last_call_at > existing.lastCallAt)
@@ -1265,10 +1301,17 @@ router.get(
               monthlyPct,
               lastCallAt: s.lastCallAt?.toISOString() ?? null,
               featureCounts: s.featureCounts,
+              monthCostMicros: s.monthCostMicros,
+              monthUnpricedCalls: s.monthUnpricedCalls,
             };
           })
           // Sort by today desc, then month desc
           .sort((a, b) => b.today - a.today || b.month - a.month);
+
+        // Platform spend is summed from the per-store rows rather than queried
+        // again, so the header can never disagree with the table beneath it.
+        const platformMonthCostMicros = storeRows.reduce((n, r) => n + r.monthCostMicros, 0);
+        const platformUnpricedCalls = storeRows.reduce((n, r) => n + r.monthUnpricedCalls, 0);
 
         return {
           platform: {
@@ -1277,6 +1320,12 @@ router.get(
             totalCached: platformCached,
             totalUncached: platformUncached,
             cacheHitRatio,
+            monthCostMicros: platformMonthCostMicros,
+            // How many billable calls this month had NO configured rate. If this
+            // is non-zero the spend figure is a FLOOR, not the true total, and
+            // the UI must say so instead of implying the difference was free.
+            monthUnpricedCalls: platformUnpricedCalls,
+            ratesConfigured: hasAnyRateConfigured(),
           },
           stores: storeRows,
         };

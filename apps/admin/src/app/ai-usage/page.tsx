@@ -30,6 +30,15 @@ interface PlatformTotals {
   totalCached: number;
   totalUncached: number;
   cacheHitRatio: number;
+  /** Spend this month in MICROS of the billing currency (1_000_000 = 1 unit). */
+  monthCostMicros: number;
+  /** Billable calls this month whose model had NO configured rate. These
+   *  contribute NOTHING to monthCostMicros, so a non-zero value means the
+   *  spend figure is a FLOOR — never present it as the true total. */
+  monthUnpricedCalls: number;
+  /** False when AI_MODEL_RATES is unset — lets the UI explain an empty column
+   *  instead of showing a confident zero. */
+  ratesConfigured: boolean;
 }
 
 interface StoreUsageRow {
@@ -45,6 +54,8 @@ interface StoreUsageRow {
   monthlyPct: number;
   lastCallAt: string | null;
   featureCounts: Record<string, number>;
+  monthCostMicros: number;
+  monthUnpricedCalls: number;
 }
 
 interface SummaryResponse {
@@ -53,6 +64,17 @@ interface SummaryResponse {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
+
+/** Micros -> a readable amount. Deliberately shows 4 decimals: per-call AI
+ *  spend is routinely a fraction of one currency unit, and 2 decimals would
+ *  render most real months as "0.00" — the exact illusion this surface exists
+ *  to remove. */
+function formatSpend(micros: number): string {
+  const units = micros / 1_000_000;
+  if (units === 0) return '0';
+  if (units < 0.0001) return '<0.0001';
+  return units.toLocaleString('en-GB', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
@@ -237,11 +259,42 @@ function PlatformAiUsagePageInner() {
           value={`${(platform.cacheHitRatio * 100).toFixed(1)}%`}
         />
         <StatCard
+          label="Spend This Month (platform)"
+          labelAr="إنفاق الشهر (المنصة)"
+          value={formatSpend(platform.monthCostMicros)}
+        />
+        <StatCard
           label="Active Stores (filtered)"
           labelAr="المتاجر النشطة (مفلترة)"
           value={filteredStores.length.toLocaleString()}
         />
       </div>
+
+      {/* Spend is only as truthful as the rate table behind it. Say so loudly
+          rather than letting a confident-looking number stand in for one that
+          was never actually priced. */}
+      {!platform.ratesConfigured ? (
+        <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+          <strong>No model rates configured.</strong> Spend shows 0 because
+          <code className="mx-1 rounded bg-amber-100 px-1 dark:bg-amber-900/60">
+            AI_MODEL_RATES
+          </code>
+          is unset — not because AI is free. Set it on the API service to price usage.
+          <span className="block text-xs opacity-80 mt-0.5">
+            لم يتم ضبط أسعار النماذج — الإنفاق يظهر صفرًا لأن الأسعار غير مضبوطة، وليس لأن الاستخدام
+            مجاني.
+          </span>
+        </div>
+      ) : platform.monthUnpricedCalls > 0 ? (
+        <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+          <strong>
+            {platform.monthUnpricedCalls.toLocaleString()} calls this month are unpriced.
+          </strong>{' '}
+          Their model has no entry in{' '}
+          <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">AI_MODEL_RATES</code>, so
+          they contribute nothing to the totals above — treat the spend figure as a floor.
+        </div>
+      ) : null}
 
       {/* ── Filters ─────────────────────────────────────────────────── */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -325,6 +378,7 @@ function PlatformAiUsagePageInner() {
                   <th className="px-4 py-3 font-medium text-end">Month / الشهر</th>
                   <th className="px-4 py-3 font-medium">Daily cap % / اليومي</th>
                   <th className="px-4 py-3 font-medium">Monthly cap % / الشهري</th>
+                  <th className="px-4 py-3 font-medium text-end">Spend (month) / الإنفاق</th>
                   <th className="px-4 py-3 font-medium">Last call / آخر استدعاء</th>
                 </tr>
               </thead>
@@ -352,6 +406,19 @@ function PlatformAiUsagePageInner() {
                     </td>
                     <td className="px-4 py-3">
                       <PctBar pct={store.monthlyPct} warn={store.monthlyPct >= 80} />
+                    </td>
+                    <td className="px-4 py-3 text-end tabular-nums">
+                      <div className="font-medium text-foreground">
+                        {formatSpend(store.monthCostMicros)}
+                      </div>
+                      {store.monthUnpricedCalls > 0 && (
+                        <div
+                          className="text-[11px] text-amber-600 dark:text-amber-500"
+                          title="These calls had no configured rate for their model, so they are NOT included in the amount above. The figure is a floor, not the true spend."
+                        >
+                          +{store.monthUnpricedCalls.toLocaleString()} unpriced
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {formatDate(store.lastCallAt)}
