@@ -50,7 +50,22 @@ export const paymentWebhookStuckSweep: InngestFunction.Any = inngest.createFunct
     id: 'payment-webhook-stuck-sweep',
     name: 'Payment webhook — sweep undelivered / wedged inbox rows',
     retries: 1,
-    triggers: [{ cron: '*/5 * * * *' }], // every 5 minutes
+    // CADENCE NOTE (2026-08-09) — this is a COST control, not a preference.
+    //
+    // Neon suspends a compute after 5 minutes idle. Anything polling the database
+    // every 5 minutes therefore resets the idle timer just before it fires, and the
+    // compute NEVER sleeps. Measured: fwb-eu ran 195 active hours out of 195 and
+    // burned 193 CU-h/month — 76% of the whole account allowance — while the menu
+    // projects, which idle normally, used 7-17.
+    //
+    // payment-webhook-stuck-sweep is threshold-driven: it looks for rows stale by
+    // STUCK_WEBHOOK_MINUTES (10) minutes, so polling every 5 was oversampling it. At */15 the worst-case
+    // detection window moves from 10-15 to 10-25 minutes, and the database gets a
+    // ~10 minute sleep gap every cycle.
+    //
+    // Do NOT tighten this back to */5 without re-checking the Neon bill: the whole
+    // saving comes from leaving a gap LONGER than the 300s suspend timeout.
+    triggers: [{ cron: '*/15 * * * *' }], // every 15 min — see CADENCE NOTE
   },
   async ({ step }) => {
     const cutoff = new Date(Date.now() - STUCK_WEBHOOK_MINUTES * 60_000);

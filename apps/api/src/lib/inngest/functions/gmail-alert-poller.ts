@@ -22,7 +22,22 @@ export const gmailAlertPoller: InngestFunction.Any = inngest.createFunction(
     id: 'gmail-alert-poller',
     name: 'Poll Gmail for external-service alerts → forward to Telegram',
     retries: 1,
-    triggers: [{ cron: '*/5 * * * *' }],
+    // CADENCE NOTE (2026-08-09) — this is a COST control, not a preference.
+    //
+    // Neon suspends a compute after 5 minutes idle. Anything polling the database
+    // every 5 minutes therefore resets the idle timer just before it fires, and the
+    // compute NEVER sleeps. Measured: fwb-eu ran 195 active hours out of 195 and
+    // burned 193 CU-h/month — 76% of the whole account allowance — while the menu
+    // projects, which idle normally, used 7-17.
+    //
+    // gmail-alert-poller is threshold-driven: it looks for rows stale by
+    // inbox-poll (no DB threshold) minutes, so polling every 5 was oversampling it. At */15 the worst-case
+    // detection window moves from 5-5 to 15-15 minutes, and the database gets a
+    // ~10 minute sleep gap every cycle.
+    //
+    // Do NOT tighten this back to */5 without re-checking the Neon bill: the whole
+    // saving comes from leaving a gap LONGER than the 300s suspend timeout.
+    triggers: [{ cron: '*/15 * * * *' }], // every 15 min — see CADENCE NOTE
   },
   async () => {
     try {
