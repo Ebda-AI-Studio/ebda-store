@@ -6,6 +6,7 @@ import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
 import { uploadLimiter, dailyUploadLimiter } from '../middleware/security';
 import { StorageService } from '../services/storage.service';
+import { enforceMaxDimensions } from '../services/image-resize.service';
 import { runInTenantContext } from '@force/database';
 import { inngest } from '../lib/inngest/client';
 import { ALLOWED_CURRENCIES } from '@force/shared';
@@ -259,9 +260,16 @@ router.post(
         return;
       }
 
+      // Same unconditional ceiling as product uploads — a receipt photographed
+      // on a phone is a 10 MB camera original otherwise, and this route accepts
+      // up to exactly that. 2000px on the longest side stays comfortably above
+      // what the downstream OCR job needs to read receipt text (a typical
+      // receipt photo is 3000-4000px), while cutting stored bytes by ~95%.
+      const receiptBuffer = await enforceMaxDimensions(req.file!.buffer);
+
       // Upload to R2 under stores/<storeId>/receipts/
       const uploaded = await runInTenantContext(req.params.storeId, () =>
-        StorageService.upload(req.file!.buffer, req.file!.originalname, {
+        StorageService.upload(receiptBuffer, req.file!.originalname, {
           folder: 'misc', // misc is on the ALLOWED_FOLDERS list in storage.service.ts
           storeId: req.params.storeId,
           contentType: req.file!.mimetype,

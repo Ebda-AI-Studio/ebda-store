@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth';
 import { checkStoreAccess } from '../middleware/store-access';
 import { requirePermission } from '../middleware/rbac';
 import { StorageService } from '../services/storage.service';
-import { resizeToAspect } from '../services/image-resize.service';
+import { resizeToAspect, enforceMaxDimensions } from '../services/image-resize.service';
 import { uploadLimiter, dailyUploadLimiter, auditLog } from '../middleware/security';
 import { runInTenantContext } from '@force/database';
 
@@ -188,7 +188,13 @@ router.post(
         // ImageUpload in admin sends its aspectRatio prop as ?aspect=.
         // Falls back to original buffer when unset / unknown / sharp fails.
         const aspectQuery = (req.query.aspect as string | undefined) ?? undefined;
-        const resizedBuffer = await resizeToAspect(req.file!.buffer, aspectQuery);
+        const aspectResized = await resizeToAspect(req.file!.buffer, aspectQuery);
+        // Unconditional ceiling AFTER the optional aspect crop. resizeToAspect
+        // is opt-in via ?aspect= and no product-image surface sends it, so
+        // without this a 26 MP camera original is stored and served as-is —
+        // which is exactly how palora ended up shipping a 28 MB PNG to mobile
+        // customers for three months.
+        const resizedBuffer = await enforceMaxDimensions(aspectResized);
 
         const uploaded = await StorageService.upload(resizedBuffer, req.file!.originalname, {
           folder: resolved.folder,

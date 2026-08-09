@@ -48,6 +48,89 @@ const ASPECT_TARGETS: Record<string, { w: number; h: number }> = {
  * EXIF metadata is stripped (sharp default) — protects against camera
  * GPS data leaking through merchant uploads.
  */
+/**
+ * Hard ceiling applied to EVERY image upload, aspect or not.
+ *
+ * 2000px on the longest side is generous for storefront product zoom while
+ * keeping a photo around 200-800 KB. Nothing a merchant can do from the admin
+ * should put a multi-megabyte image in front of a mobile customer.
+ */
+const MAX_LONGEST_SIDE = 2000;
+
+/**
+ * Unconditional size ceiling — runs even when no `?aspect=` is supplied.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * `resizeToAspect` is opt-in: it returns the original buffer untouched when
+ * `?aspect=` is absent, and no admin upload surface currently sends that param
+ * for product images. So a 26-megapixel camera original uploaded straight from
+ * a phone was stored, and served, at full size.
+ *
+ * That is not hypothetical. On 2026-05-01 the palora catalog went up as 19
+ * images averaging 8 MB — including a 4160x6240 PNG at 28 MB — and those pages
+ * shipped exactly that to every mobile customer until 2026-08-09. 178 MB of
+ * originals reduced to 7 MB (96%) with no visible quality change, which is the
+ * measure of how much was being wasted.
+ *
+ * Deliberately separate from the aspect crop: aspect is a DESIGN choice about
+ * shape, this is a SAFETY floor about bytes. An upload surface can forget the
+ * former; it must not be able to opt out of the latter.
+ *
+ * Fail-soft like its sibling: if sharp throws, return the original rather than
+ * failing the upload — a large image beats a broken one.
+ */
+export async function enforceMaxDimensions(buffer: Buffer): Promise<Buffer> {
+  try {
+    const metadata = await sharp(buffer).metadata();
+    if (!metadata.width || !metadata.height) return buffer;
+    if (metadata.width <= MAX_LONGEST_SIDE && metadata.height <= MAX_LONGEST_SIDE) {
+      return buffer;
+    }
+
+    // `fit: inside` constrains the LONGEST side. Constraining width alone
+    // leaves a portrait shot at 2000x3000 (6 MP) — still far more than a
+    // storefront needs.
+    const pipeline = sharp(buffer)
+      // Bake in EXIF orientation before stripping metadata, or a phone photo
+      // silently rotates once the orientation tag is gone.
+      .rotate()
+      .resize({
+        width: MAX_LONGEST_SIDE,
+        height: MAX_LONGEST_SIDE,
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
+
+    const format = metadata.format ?? 'jpeg';
+    let out: Buffer;
+    if (format === 'png') {
+      out = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+    } else if (format === 'webp') {
+      out = await pipeline.webp({ quality: 85 }).toBuffer();
+    } else {
+      out = await pipeline.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
+    }
+
+    // Never make a file bigger. Re-encoding an already-optimised image can
+    // do that, and the whole point here is bytes.
+    if (out.length >= buffer.length) return buffer;
+
+    logger.info(
+      {
+        from: `${metadata.width}x${metadata.height}`,
+        bytesBefore: buffer.length,
+        bytesAfter: out.length,
+      },
+      'image-resize: applied max-dimension ceiling'
+    );
+    return out;
+  } catch (err) {
+    logger.warn({ err }, 'image-resize: max-dimension ceiling failed, keeping original');
+    return buffer;
+  }
+}
+
 export async function resizeToAspect(buffer: Buffer, aspect: string | undefined): Promise<Buffer> {
   if (!aspect) return buffer;
   const target = ASPECT_TARGETS[aspect];
