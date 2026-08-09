@@ -5,6 +5,7 @@ import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { cleanupRemovedImages, deleteR2ObjectIfOrphan } from './r2-cleanup.service';
+import { sendAlert } from './alerts.service';
 import { StorageService } from './storage.service';
 import { seedCoaForStore } from './accounting/account.service';
 import { revalidateStorefront } from '../lib/revalidate-storefront';
@@ -488,8 +489,25 @@ export class StoreService {
     // store deletion. Orphaned objects would otherwise sit in the bucket
     // forever (there is no other cleanup path on delete).
     try {
-      const removed = await StorageService.deleteByPrefix(`stores/${storeId}/`);
-      logger.info({ storeId, removed }, '[STORE_DELETE] purged R2 objects');
+      const { deleted, failedKeys, remaining } = await StorageService.deleteByPrefixVerified(
+        `stores/${storeId}/`
+      );
+      logger.info({ storeId, deleted, remaining }, '[STORE_DELETE] purged R2 objects');
+      if (remaining > 0) {
+        // Objects survived the purge, so they are now orphaned: the store row
+        // is gone, nothing references them, and no other code path will ever
+        // reclaim that prefix. Alert instead of logging quietly — this exact
+        // silence left an object from a 2026-06-15 delete in the bucket until
+        // a manual audit found it on 2026-08-09.
+        void sendAlert({
+          level: 'p1',
+          scope: 'platform',
+          source: 'store.delete.r2_orphaned',
+          title: 'R2 purge incomplete after store delete',
+          body: `${remaining} object(s) survived the purge of stores/${storeId}/ and are now orphaned — the store row is gone so nothing will reclaim them. Delete the prefix manually.`,
+          context: { storeId, deleted, remaining, failedKeys: failedKeys.slice(0, 20) },
+        }).catch(() => undefined);
+      }
     } catch (err) {
       logger.warn(
         { err: err instanceof Error ? err.message : 'unknown', storeId },

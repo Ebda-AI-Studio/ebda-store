@@ -223,13 +223,24 @@ export class StorageService {
    * trailing-slash prefix so a prefix can never match a sibling tenant
    * (`stores/abc/` never matches `stores/abcd/`).
    */
-  static async deleteByPrefix(prefix: string): Promise<number> {
+  /**
+   * Delete every object under a prefix and REPORT WHAT SURVIVED.
+   *
+   * `remaining > 0` means objects were orphaned — the caller must treat that as
+   * a failure, not a warning.
+   */
+  static async deleteByPrefixVerified(prefix: string): Promise<{
+    deleted: number;
+    failedKeys: string[];
+    remaining: number;
+  }> {
     if (!prefix || prefix === 'stores/') {
       // Guard: never allow an empty or bucket-wide prefix to wipe everything.
       throw new AppError(400, 'INVALID_PREFIX', 'deleteByPrefix requires a scoped prefix');
     }
     const client = this.getClient();
     let deleted = 0;
+    const failedKeys: string[] = [];
     let continuationToken: string | undefined;
 
     do {
@@ -249,18 +260,74 @@ export class StorageService {
       if (objects.length > 0) {
         // DeleteObjects caps at 1000 keys/request; ListObjectsV2 also caps the
         // page at 1000, so one delete per page stays within the limit.
-        await client.send(
+        // Quiet:false, and the response is actually READ.
+        //
+        // The previous implementation sent Quiet:true (errors only) and then
+        // never inspected the result, incrementing the counter by
+        // objects.length unconditionally. Per-key failures were therefore
+        // invisible and the returned count was fiction — a purge could report
+        // success having deleted nothing.
+        const res = await client.send(
           new DeleteObjectsCommand({
             Bucket: config.storageBucket,
-            Delete: { Objects: objects, Quiet: true },
+            Delete: { Objects: objects, Quiet: false },
           })
         );
-        deleted += objects.length;
+        deleted += (res.Deleted ?? []).length;
+        for (const e of res.Errors ?? []) if (e.Key) failedKeys.push(e.Key);
       }
 
       continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
     } while (continuationToken);
 
+    // One bounded retry for reported failures. R2 delete errors are usually
+    // transient; a single focused re-attempt clears them without turning a
+    // tenant delete into an unbounded loop.
+    if (failedKeys.length > 0) {
+      const retrying = failedKeys.splice(0, failedKeys.length);
+      for (let i = 0; i < retrying.length; i += 1000) {
+        const batch = retrying.slice(i, i + 1000).map(Key => ({ Key }));
+        try {
+          const res = await client.send(
+            new DeleteObjectsCommand({
+              Bucket: config.storageBucket,
+              Delete: { Objects: batch, Quiet: false },
+            })
+          );
+          deleted += (res.Deleted ?? []).length;
+          for (const e of res.Errors ?? []) if (e.Key) failedKeys.push(e.Key);
+        } catch {
+          for (const o of batch) failedKeys.push(o.Key);
+        }
+      }
+    }
+
+    // VERIFY instead of assuming. A delete that reported success but left
+    // objects behind is the exact failure this method exists to rule out.
+    let remaining = 0;
+    let verifyToken: string | undefined;
+    do {
+      const check = await client.send(
+        new ListObjectsV2Command({
+          Bucket: config.storageBucket,
+          Prefix: prefix,
+          ContinuationToken: verifyToken,
+        })
+      );
+      remaining += (check.Contents ?? []).length;
+      verifyToken = check.IsTruncated ? check.NextContinuationToken : undefined;
+    } while (verifyToken);
+
+    return { deleted, failedKeys, remaining };
+  }
+
+  /**
+   * Back-compat wrapper returning just the count. Prefer
+   * `deleteByPrefixVerified` — it reports what SURVIVED, which is the only
+   * thing that distinguishes a real purge from a silent orphan.
+   */
+  static async deleteByPrefix(prefix: string): Promise<number> {
+    const { deleted } = await this.deleteByPrefixVerified(prefix);
     return deleted;
   }
 

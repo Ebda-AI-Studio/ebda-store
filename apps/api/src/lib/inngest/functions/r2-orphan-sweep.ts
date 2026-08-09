@@ -193,12 +193,44 @@ export const r2OrphanSweep: InngestFunction.Any = inngest.createFunction(
       forcePathStyle: true,
     });
 
+    // EVERYTHING RETURNED FROM step.run IS JSON-SERIALIZED.
+    //
+    // Inngest persists each step's result so a replay can resume without
+    // re-running it, and that round-trip is JSON. Rich types do not survive:
+    // a Set becomes `{}`, a Date becomes a string. Both were being returned
+    // directly here, so this function threw `referenced.has is not a function`
+    // on EVERY run since it shipped (d8d27e86) and had never once completed —
+    // which is why an orphaned object from a 2026-06-15 tenant delete sat
+    // undetected until a manual audit on 2026-08-09 found it. The safety net
+    // was dead on arrival.
+    //
+    // So each step returns plain JSON, and the rich type is rebuilt OUTSIDE
+    // the step where it is actually used.
+
     // ── Step 1: list R2 bucket ────────────────────────────────────────────
-    const objects = await step.run('list-r2-objects', () => listAllObjects(client, bucket));
+    // lastModified crosses the boundary as an ISO string, not a Date.
+    const rawObjects = await step.run('list-r2-objects', async () =>
+      (await listAllObjects(client, bucket)).map(o => ({
+        key: o.key,
+        size: o.size,
+        lastModifiedIso: o.lastModified ? o.lastModified.toISOString() : null,
+      }))
+    );
+    const objects = rawObjects.map(
+      (o: { key: string; size: number; lastModifiedIso: string | null }) => ({
+        key: o.key,
+        size: o.size,
+        lastModified: o.lastModifiedIso ? new Date(o.lastModifiedIso) : undefined,
+      })
+    );
     logger.info({ count: objects.length, bucket }, 'r2-orphan-sweep: listed R2 objects');
 
     // ── Step 2: collect DB-referenced keys ───────────────────────────────
-    const referenced = await step.run('collect-referenced-keys', () => collectReferencedKeys());
+    // Array over the wire; Set rebuilt here for the O(1) lookup below.
+    const referencedList = await step.run('collect-referenced-keys', async () =>
+      Array.from(await collectReferencedKeys())
+    );
+    const referenced = new Set(referencedList);
     logger.info({ count: referenced.size }, 'r2-orphan-sweep: collected referenced keys from DB');
 
     // ── Step 3: compute orphans ───────────────────────────────────────────
