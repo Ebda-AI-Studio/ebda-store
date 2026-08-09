@@ -374,8 +374,31 @@ export class StorageService {
       return `stores/${storeId}/${safeFolder}/${id}-${safeName}${ext}`;
     }
 
-    // Legacy / platform key shape (no rename of existing keys).
-    return `${safeFolder || 'uploads'}/${id}${ext}`;
+    // NO TENANT => HARD FAILURE. This used to fall through to a root-level
+    // `<folder>/<id><ext>` key, and that silent fallthrough is what produced the
+    // 9 unattributable objects found on 2026-08-09: `branding/`, `categories/`
+    // and `hero/` files sitting at bucket root, belonging to a real merchant but
+    // provably attributable to none.
+    //
+    // The cost of that is not tidiness. `deleteByPrefix('stores/<storeId>/')` is
+    // how a tenant's storage is reclaimed on offboarding, so a root-level object
+    // survives its owner's deletion FOREVER, and per-client storage cannot be
+    // measured — which is exactly the question that could not be answered when
+    // pricing came up.
+    //
+    // Platform-owned (non-tenant) data does exist — `audit-archive/` — but it
+    // writes its key directly through the S3 client and never reaches this
+    // function. So there is no legitimate caller for a tenant-less key here, and
+    // throwing turns "namespaced by convention" into "namespaced structurally".
+    //
+    // If genuinely platform-scoped uploads ever need this path, add an explicit
+    // PLATFORM_FOLDERS allowlist rather than restoring the silent fallthrough:
+    // the failure mode to avoid is an unattributable object, not a strict check.
+    throw new AppError(
+      400,
+      'MISSING_TENANT',
+      `Refusing to write an un-namespaced R2 key for folder '${safeFolder}': every upload must be scoped to a storeId so it can be attributed and reclaimed on tenant delete.`
+    );
   }
 
   /**
