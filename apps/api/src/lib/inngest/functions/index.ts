@@ -42,6 +42,7 @@ import { aiAutofillCleanup } from './ai-autofill-cleanup';
 import { aiAutofillSweep } from './ai-autofill-sweep';
 import { orderCapiConversion } from './order-capi-conversion';
 import { orderAutoCancelUnpaid } from './order-auto-cancel-unpaid';
+import { storeUsageSnapshot } from './store-usage-snapshot';
 import { r2OrphanSweep } from './r2-orphan-sweep';
 import { paymentAbandonmentSweep } from './payment-abandonment-sweep';
 import { paymentWebhookProcess } from './payment-webhook-process';
@@ -129,6 +130,7 @@ export const inngestFunctions: InngestFunction.Any[] = [
   orderCapiConversion,
   // Auto-cancel stale unpaid orders past AUTO_CANCEL_UNPAID_DAYS (daily cron).
   orderAutoCancelUnpaid,
+  storeUsageSnapshot,
   // Weekly R2 orphan sweep: lists bucket vs DB references and reports
   // orphans via logger + Telegram. Deletion gated on R2_ORPHAN_SWEEP_APPLY=true.
   r2OrphanSweep,

@@ -1,0 +1,210 @@
+import type { InngestFunction } from 'inngest';
+import { withRlsBypass } from '@force/database';
+import logger from '../../logger';
+import { inngest } from '../client';
+import { sendAlert } from '../../../services/alerts.service';
+
+/**
+ * Monthly per-store usage snapshot — 03:00 UTC on the 1st.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * Every usage number in the platform was a POINT IN TIME. You could ask "how
+ * many products does this store have" but never "how fast is it growing", so
+ * plan-tier ceilings and per-client pricing had to be guessed rather than
+ * derived from what merchants actually do. This writes the history that makes
+ * them defensible — one row per store per closed calendar month.
+ *
+ * It captures the PREVIOUS month, never the current one: a snapshot of a month
+ * still in progress would change every time it ran, which defeats the point.
+ *
+ * IDEMPOTENT by (storeId, periodStart) via upsert, so re-running it — or
+ * backfilling a month by hand — overwrites cleanly instead of duplicating.
+ *
+ * TRAFFIC IS SPLIT ON PURPOSE. A cart row is created per storefront session, so
+ * carts with no items approximate unique visitors on a normal browsing store.
+ * But the ratio is wildly store-dependent: measured 2026-08, pecannbee had 2687
+ * empty / 135 with-items (classic browsing) while wady-aljuz had 93 / 1111
+ * (carts arrive pre-filled through a different flow). A single "carts" number
+ * would silently mean two different things, so both are stored and the reader
+ * decides.
+ *
+ * Cross-tenant by nature (it reports on every store), so it runs inside
+ * withRlsBypass — there is no HTTP tenant GUC on a cron.
+ */
+export const storeUsageSnapshot: InngestFunction.Any = inngest.createFunction(
+  {
+    id: 'store-usage-snapshot',
+    name: 'Monthly per-store usage snapshot',
+    retries: 2,
+    concurrency: { limit: 1 },
+    triggers: [{ cron: '0 3 1 * *' }], // 03:00 UTC, 1st of each month
+  },
+  async ({ step, event }) => {
+    // Allow a manual/backfill invocation to name the month explicitly
+    // (`{ data: { periodStart: '2026-07-01' } }`); default to last month.
+    const explicit = (event?.data as { periodStart?: string } | undefined)?.periodStart;
+
+    const { periodStart, periodEnd } = await step.run('resolve-period', async () => {
+      const now = new Date();
+      const start = explicit
+        ? new Date(`${explicit}T00:00:00.000Z`)
+        : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+      if (Number.isNaN(start.getTime())) {
+        throw new Error(`store-usage-snapshot: invalid periodStart "${explicit}"`);
+      }
+      const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+      return { periodStart: start.toISOString(), periodEnd: end.toISOString() };
+    });
+
+    const start = new Date(periodStart);
+    const end = new Date(periodEnd);
+
+    const rows = await step.run('collect', async () =>
+      withRlsBypass(async tx => {
+        // One pass per concern, joined in SQL rather than N queries per store —
+        // this runs over every store on the platform and must not become an
+        // N+1 as the tenant count grows.
+        return tx.$queryRaw<
+          Array<{
+            store_id: string;
+            products: bigint;
+            products_active: bigint;
+            variants: bigint;
+            images: bigint;
+            categories: bigint;
+            orders: bigint;
+            revenue_fils: bigint;
+            customers: bigint;
+            sessions_proxy: bigint;
+            carts_with_items: bigint;
+            product_views: bigint;
+            ai_calls: bigint;
+            ai_billable_calls: bigint;
+            ai_tokens_in: bigint;
+            ai_tokens_out: bigint;
+            ai_cost_micros: bigint;
+            ai_unpriced_calls: bigint;
+          }>
+        >`
+          SELECT
+            s.id AS store_id,
+
+            -- Catalog is CURRENT state, not period state: there is no history
+            -- of "how many products existed in July", and a merchant's catalog
+            -- size is what drives storage + admin effort today.
+            (SELECT COUNT(*) FROM products p
+              WHERE p.store_id = s.id AND p.deleted_at IS NULL) AS products,
+            (SELECT COUNT(*) FROM products p
+              WHERE p.store_id = s.id AND p.deleted_at IS NULL AND p.status = 'active') AS products_active,
+            (SELECT COUNT(*) FROM product_variants v
+              JOIN products p ON p.id = v.product_id
+              WHERE p.store_id = s.id AND p.deleted_at IS NULL) AS variants,
+            (SELECT COUNT(*) FROM product_images pi
+              JOIN products p ON p.id = pi.product_id
+              WHERE p.store_id = s.id AND p.deleted_at IS NULL) AS images,
+            (SELECT COUNT(*) FROM categories c WHERE c.store_id = s.id) AS categories,
+
+            -- Commerce is PERIOD state.
+            (SELECT COUNT(*) FROM orders o
+              WHERE o.store_id = s.id AND o.created_at >= ${start} AND o.created_at < ${end}) AS orders,
+            -- NET revenue: money collected AND kept. payment_status = 'paid'
+            -- alone is not enough — production contains paid+refunded and
+            -- paid+cancelled orders (pecannbee 3, wady-aljuz 2 as of 2026-08),
+            -- and counting those would inflate revenue for exactly the stores
+            -- with the most reversals. Delivered-but-still-unpaid orders are
+            -- excluded too; they are a bookkeeping gap, not revenue.
+            (SELECT COALESCE(SUM(o.total), 0) FROM orders o
+              WHERE o.store_id = s.id AND o.created_at >= ${start} AND o.created_at < ${end}
+                AND o.payment_status = 'paid'
+                AND o.status NOT IN ('cancelled', 'refunded')) AS revenue_fils,
+            (SELECT COUNT(*) FROM customers cu
+              WHERE cu.store_id = s.id AND cu.created_at >= ${start} AND cu.created_at < ${end}) AS customers,
+
+            (SELECT COUNT(*) FROM carts c
+              WHERE c.store_id = s.id AND c.created_at >= ${start} AND c.created_at < ${end}
+                AND NOT EXISTS (SELECT 1 FROM cart_items ci WHERE ci.cart_id = c.id)) AS sessions_proxy,
+            (SELECT COUNT(*) FROM carts c
+              WHERE c.store_id = s.id AND c.created_at >= ${start} AND c.created_at < ${end}
+                AND EXISTS (SELECT 1 FROM cart_items ci WHERE ci.cart_id = c.id)) AS carts_with_items,
+            (SELECT COALESCE(SUM(v.count), 0) FROM product_daily_views v
+              WHERE v.store_id = s.id AND v.date >= ${start} AND v.date < ${end}) AS product_views,
+
+            (SELECT COUNT(*) FROM ai_usage a
+              WHERE a.store_id = s.id AND a.created_at >= ${start} AND a.created_at < ${end}) AS ai_calls,
+            (SELECT COUNT(*) FROM ai_usage a
+              WHERE a.store_id = s.id AND a.created_at >= ${start} AND a.created_at < ${end}
+                AND a.cached_hit = false) AS ai_billable_calls,
+            (SELECT COALESCE(SUM(a.input_tokens), 0) FROM ai_usage a
+              WHERE a.store_id = s.id AND a.created_at >= ${start} AND a.created_at < ${end}) AS ai_tokens_in,
+            (SELECT COALESCE(SUM(a.output_tokens), 0) FROM ai_usage a
+              WHERE a.store_id = s.id AND a.created_at >= ${start} AND a.created_at < ${end}) AS ai_tokens_out,
+            -- COALESCE only the SUM: rows with NULL cost contribute nothing,
+            -- and are counted separately so an unpriced month is not read as free.
+            (SELECT COALESCE(SUM(a.cost_micros), 0) FROM ai_usage a
+              WHERE a.store_id = s.id AND a.created_at >= ${start} AND a.created_at < ${end}) AS ai_cost_micros,
+            (SELECT COUNT(*) FROM ai_usage a
+              WHERE a.store_id = s.id AND a.created_at >= ${start} AND a.created_at < ${end}
+                AND a.cached_hit = false AND a.cost_micros IS NULL) AS ai_unpriced_calls
+
+          FROM stores s
+          WHERE s.deleted_at IS NULL
+        `;
+      })
+    );
+
+    let written = 0;
+    for (const r of rows) {
+      await step.run(`upsert-${r.store_id}`, async () =>
+        withRlsBypass(async tx => {
+          const data = {
+            products: Number(r.products),
+            productsActive: Number(r.products_active),
+            variants: Number(r.variants),
+            images: Number(r.images),
+            categories: Number(r.categories),
+            orders: Number(r.orders),
+            revenueFils: Number(r.revenue_fils),
+            customers: Number(r.customers),
+            sessionsProxy: Number(r.sessions_proxy),
+            cartsWithItems: Number(r.carts_with_items),
+            productViews: Number(r.product_views),
+            aiCalls: Number(r.ai_calls),
+            aiBillableCalls: Number(r.ai_billable_calls),
+            aiTokensIn: Number(r.ai_tokens_in),
+            aiTokensOut: Number(r.ai_tokens_out),
+            aiCostMicros: Number(r.ai_cost_micros),
+            aiUnpricedCalls: Number(r.ai_unpriced_calls),
+            capturedAt: new Date(),
+          };
+          await tx.storeUsageSnapshot.upsert({
+            where: { storeId_periodStart: { storeId: r.store_id, periodStart: start } },
+            create: { storeId: r.store_id, periodStart: start, ...data },
+            update: data,
+          });
+        })
+      );
+      written += 1;
+    }
+
+    // Zero stores is not "nothing to do" — it means the query or the tenant
+    // table is wrong, and silence would hide it until someone needed the data
+    // months later, by which point the history is unrecoverable.
+    if (written === 0) {
+      void sendAlert({
+        level: 'p1',
+        scope: 'platform',
+        source: 'store-usage-snapshot.empty',
+        title: 'store-usage-snapshot wrote 0 rows',
+        body: `No stores were snapshotted for ${periodStart.slice(0, 10)}. Usage history for that month is missing and cannot be reconstructed later.`,
+        context: { periodStart },
+      }).catch(() => undefined);
+    }
+
+    logger.info(
+      { periodStart: periodStart.slice(0, 10), stores: written },
+      'store-usage-snapshot completed'
+    );
+    return { periodStart: periodStart.slice(0, 10), stores: written };
+  }
+);

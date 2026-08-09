@@ -452,6 +452,7 @@ model Store {
   @@index([plan])
   @@index([createdAt])
   @@map("stores")
+  usageSnapshots StoreUsageSnapshot[]
 }
 
 // ==========================================
@@ -3468,6 +3469,67 @@ model CustomerRfmSnapshot {
 // Keeps the table bounded (stores × products × days_retained rows max).
 //
 // RLS: SELECT, INSERT, UPDATE policies in migration 20260622100000_product_daily_views.
+
+/// One row per store per calendar month: what that merchant actually used.
+///
+/// Exists because every usage number was a POINT IN TIME — you could ask "how
+/// many products does this store have" but never "how fast is it growing", so
+/// plan-tier ceilings had to be guessed rather than derived. This is the
+/// history that makes them defensible.
+///
+/// Append-only and idempotent on (storeId, periodStart): the monthly cron
+/// upserts, so a re-run or a manual backfill overwrites cleanly rather than
+/// duplicating. Values are captured for a CLOSED month, so they never move.
+model StoreUsageSnapshot {
+  id          String   @id @default(uuid())
+  storeId     String   @map("store_id")
+  /// First day of the month this snapshot covers, UTC (a closed month).
+  periodStart DateTime @db.Date @map("period_start")
+  capturedAt  DateTime @default(now()) @map("captured_at")
+
+  // ── Catalog (drives storage + admin effort) ───────────────────────────
+  products       Int @default(0)
+  productsActive Int @default(0) @map("products_active")
+  variants       Int @default(0)
+  images         Int @default(0)
+  categories     Int @default(0)
+
+  // ── Commerce (drives value, and support load) ─────────────────────────
+  orders      Int @default(0)
+  /// NET revenue in fils: paid AND not cancelled/refunded. Gross 'paid' alone
+  /// over-counts — production has paid+refunded and paid+cancelled orders.
+  revenueFils Int @default(0) @map("revenue_fils")
+  customers   Int @default(0)
+
+  // ── Traffic ───────────────────────────────────────────────────────────
+  /// Carts with NO items. A cart is created per storefront session, so on a
+  /// normal browsing store this approximates unique visitors. Kept separate
+  /// from cartsWithItems because the ratio differs wildly by store flow —
+  /// 2026-08: pecannbee 2687 empty / 135 with items (classic browsing), while
+  /// wady-aljuz was 93 / 1111 (carts arrive pre-filled via a different flow).
+  /// A single "carts" number would have meant two different things.
+  sessionsProxy  Int @default(0) @map("sessions_proxy")
+  cartsWithItems Int @default(0) @map("carts_with_items")
+  /// Summed product-detail views for the month (product_daily_views).
+  productViews   Int @default(0) @map("product_views")
+
+  // ── AI (the one cost that is already attributed per store) ────────────
+  aiCalls         Int @default(0) @map("ai_calls")
+  /// Calls that actually hit the provider (cached_hit = false).
+  aiBillableCalls Int @default(0) @map("ai_billable_calls")
+  aiTokensIn      Int @default(0) @map("ai_tokens_in")
+  aiTokensOut     Int @default(0) @map("ai_tokens_out")
+  /// Spend in micros. NULL-costed rows contribute 0 here, so aiUnpricedCalls
+  /// must be read alongside it — see lib/ai-pricing.ts.
+  aiCostMicros    Int @default(0) @map("ai_cost_micros")
+  aiUnpricedCalls Int @default(0) @map("ai_unpriced_calls")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, periodStart])
+  @@index([periodStart(sort: Desc)])
+  @@map("store_usage_snapshots")
+}
 
 model ProductDailyView {
   id        String   @id @default(uuid())

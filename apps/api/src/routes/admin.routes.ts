@@ -1338,6 +1338,76 @@ router.get(
   }
 );
 
+/**
+ * GET /admin/super-admin/usage-history?months=12
+ *
+ * The per-store monthly usage history written by the `store-usage-snapshot`
+ * cron. This is the data that turns plan-tier ceilings from a guess into
+ * something derived from what merchants actually do.
+ *
+ * Returns newest period first: [{ periodStart, stores: [{ slug, ...metrics }] }]
+ */
+router.get(
+  '/super-admin/usage-history',
+  requireRole('super_admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const months = Math.min(
+        Math.max(parseInt(String(req.query.months ?? '12'), 10) || 12, 1),
+        36
+      );
+
+      // Cross-tenant by nature — withRlsBypass, same as the ai-usage summary.
+      const rows = await withRlsBypass(tx =>
+        tx.storeUsageSnapshot.findMany({
+          orderBy: [{ periodStart: 'desc' }],
+          take: months * 200, // months x a generous store ceiling
+          include: { store: { select: { slug: true, name: true, plan: true } } },
+        })
+      );
+
+      const byPeriod = new Map<string, Array<Record<string, unknown>>>();
+      for (const r of rows) {
+        const key = r.periodStart.toISOString().slice(0, 10);
+        if (!byPeriod.has(key)) byPeriod.set(key, []);
+        byPeriod.get(key)!.push({
+          storeId: r.storeId,
+          slug: r.store?.slug ?? r.storeId,
+          name: r.store?.name ?? 'Unknown',
+          plan: r.store?.plan ?? 'free',
+          products: r.products,
+          productsActive: r.productsActive,
+          variants: r.variants,
+          images: r.images,
+          categories: r.categories,
+          orders: r.orders,
+          revenueFils: r.revenueFils,
+          customers: r.customers,
+          sessionsProxy: r.sessionsProxy,
+          cartsWithItems: r.cartsWithItems,
+          productViews: r.productViews,
+          aiCalls: r.aiCalls,
+          aiBillableCalls: r.aiBillableCalls,
+          aiCostMicros: r.aiCostMicros,
+          aiUnpricedCalls: r.aiUnpricedCalls,
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          periods: [...byPeriod.entries()]
+            .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+            .slice(0, months)
+            .map(([periodStart, stores]) => ({ periodStart, stores })),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // =====================================================================
 // Endpoint 1: Cross-tenant order export (streaming cursor CSV)
 //
