@@ -138,7 +138,7 @@ jobs:
   typecheck:
     name: Type Check
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 18
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -183,7 +183,21 @@ jobs:
     # build runs on self-hosted by default; force_cloud overrides to ubuntu-latest.
     # inputs.force_cloud is falsy (not set) for push/pull_request triggers — safe.
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 15
+    # 35 (was 15). Every timeout in this file is now budgeted for CONTENTION,
+    # not for a job running alone. The umbra guest is 4 CPU / 4 GiB and a full
+    # FWB run drives it to load ~15, so jobs take roughly 2.5-3x their
+    # measured-alone duration. Build measured 7m46s alone and was killed at 20m
+    # mid-`Build all packages` on main (run 31504612064), which skipped Unit,
+    # Integration, E2E and the RLS proof — main went unvalidated twice in a row.
+    #
+    # Sizing rule if you touch these: take the alone-duration, multiply by 3,
+    # then add headroom. Budgets sized against alone-durations fail
+    # INTERMITTENTLY, which is the worst failure mode — it reads as a flaky test.
+    #
+    # This is a stopgap. The real fix is guest capacity (host is 10 cores/16 GB,
+    # guest gets 4/4). Do NOT "add a second runner" — the guest is CPU-bound, so
+    # another runner adds contention, not throughput.
+    timeout-minutes: 35
     needs: [lint, typecheck, changes]
     steps:
       - uses: actions/checkout@v4
@@ -218,7 +232,7 @@ jobs:
     # the next-tightest job after Lint. It pays the same ~4.5m cold
     # `Install dependencies` that pushed Lint over, so raise it now rather than
     # wait for it to fail the same way.
-    timeout-minutes: 15
+    timeout-minutes: 30
     needs: [build]
     steps:
       - uses: actions/checkout@v4
@@ -274,7 +288,7 @@ jobs:
   test-integration:
     name: Integration Tests
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 15
+    timeout-minutes: 35
     needs: [build]
     services:
       postgres:
@@ -429,7 +443,7 @@ jobs:
   test-rls-force-app:
     name: RLS force_app Cutover Proof
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 10
+    timeout-minutes: 25
     needs: [build]
     services:
       postgres:
@@ -522,7 +536,7 @@ jobs:
   test-e2e:
     name: E2E Tests
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 20
+    timeout-minutes: 35
     needs: [build]
     services:
       postgres:
