@@ -7,6 +7,7 @@ import { isPlatformOrigin } from '../lib/cors-cache';
 import { prisma } from '@force/database';
 import { redis } from './redis.service';
 import logger from '../lib/logger';
+import { AppError } from '../middleware/error-handler';
 // UiRefreshEvent is defined in lib/socket-broadcast and re-exported; we inline
 // the interface here to avoid a circular dependency
 // (socket-broadcast → socket.service → socket-broadcast).
@@ -72,7 +73,14 @@ class SocketService {
             return callback(null, true);
           }
 
-          callback(new Error('Not allowed by CORS'));
+          // Same reasoning as the HTTP CORS handler in index.ts: a handshake
+          // from an unrecognised origin is an expected client condition, not a
+          // server fault. Socket.io does not route this through the Express
+          // errorHandler, so it never reached Sentry from here — but it is the
+          // same defect class, and leaving one call site throwing a bare Error
+          // is how the pattern grows back.
+          logger.debug({ origin }, '[Socket.io] handshake rejected: origin not allowed');
+          callback(new AppError(403, 'CORS_ORIGIN_NOT_ALLOWED', `Origin ${origin} is not allowed`));
         },
         credentials: true,
       },

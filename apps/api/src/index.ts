@@ -9,7 +9,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { config } from './config';
-import { errorHandler } from './middleware/error-handler';
+import { errorHandler, AppError } from './middleware/error-handler';
 import { requestLogger } from './middleware/request-logger';
 import {
   securityHeaders,
@@ -177,6 +177,39 @@ app.use(
 // CORS domain cache shared via module so store.routes.ts can bust it on domain changes
 import { corsDomainCache, CORS_CACHE_TTL_MS, isPlatformOrigin } from './lib/cors-cache';
 
+/**
+ * A cross-origin request from an origin we don't recognise is a CLIENT
+ * condition, not a server fault — the same category as "auth required" or
+ * "validation failed".
+ *
+ * It used to be reported as `new Error('Not allowed by CORS')`, which misses
+ * every branch of `errorHandler` and lands in the final "Unhandled error (5xx)"
+ * case: HTTP 500, `logger.error`, and therefore Sentry. By 2026-08-11 that had
+ * produced the single noisiest signal in the whole platform — three separate
+ * Sentry issues (84 + 35 + 8 events), the #1 and #2 entries in the alert
+ * digest, all of them expected rejections of traffic we never wanted to serve.
+ *
+ * The volume was the smaller problem. The real cost is that a merchant whose
+ * custom domain is genuinely misconfigured produces exactly the same event as a
+ * bot probing with a spoofed Origin, so the one that matters is unfindable.
+ *
+ * `AppError` 4xx is the existing, documented idiom for this (see the log-level
+ * discipline comment in error-handler.ts). Behaviour is unchanged — the request
+ * is still rejected before it reaches any route handler; only the status code
+ * (403, not 500) and the log level (debug, not error) change.
+ */
+// Takes `string | undefined` deliberately: `origin` is a function PARAMETER, so
+// the `if (!origin)` narrowing above is discarded inside the `.then()` closure
+// (TypeScript cannot prove a mutable binding is unchanged across a callback).
+// Widening here beats a non-null assertion at three call sites.
+function corsRejection(origin: string | undefined): AppError {
+  return new AppError(
+    403,
+    'CORS_ORIGIN_NOT_ALLOWED',
+    `Origin ${origin ?? 'unknown'} is not allowed`
+  );
+}
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -210,13 +243,13 @@ app.use(
           // Normalize: lowercase + strip www (domains are stored normalized in DB)
           hostname = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
         } catch {
-          return callback(new Error('Not allowed by CORS'));
+          return callback(corsRejection(origin));
         }
 
         // Return cached result if still fresh
         const cached = corsDomainCache.get(hostname);
         if (cached && cached.expiresAt > Date.now()) {
-          return cached.allowed ? callback(null, true) : callback(new Error('Not allowed by CORS'));
+          return cached.allowed ? callback(null, true) : callback(corsRejection(origin));
         }
 
         // Async DB lookup — only allow if a store with this custom domain exists
@@ -225,13 +258,32 @@ app.use(
           .then(store => {
             const allowed = store !== null;
             corsDomainCache.set(hostname, { allowed, expiresAt: Date.now() + CORS_CACHE_TTL_MS });
-            return allowed ? callback(null, true) : callback(new Error('Not allowed by CORS'));
+            return allowed ? callback(null, true) : callback(corsRejection(origin));
           })
-          .catch(() => callback(new Error('Not allowed by CORS')));
+          // A FAILED LOOKUP IS NOT A REJECTED ORIGIN. If Neon is down or the
+          // pool is starved, every merchant custom domain stops passing CORS —
+          // that is an outage, and collapsing it into the same 403 the bots get
+          // would hide it behind the noise we are removing here. 503 + AppError
+          // 5xx keeps it at `error` level and therefore still in Sentry.
+          .catch(err => {
+            // Yes, this logs and then errorHandler logs the AppError again.
+            // The duplication is intentional and the two lines are NOT
+            // interchangeable: this one carries the ORIGINAL rejection (the
+            // Prisma/connection error, plus the origin that triggered it),
+            // whereas errorHandler only ever sees the AppError we construct
+            // below and would report "CORS_LOOKUP_UNAVAILABLE" with no cause.
+            // AppError has no `cause` slot to thread it through. Deleting this
+            // line as redundant would throw away the only record of WHY the
+            // lookup failed, which is the entire diagnostic value of a 503.
+            logger.error({ err, origin }, 'CORS custom-domain lookup failed');
+            callback(
+              new AppError(503, 'CORS_LOOKUP_UNAVAILABLE', 'Unable to verify origin at this time')
+            );
+          });
         return;
       }
 
-      callback(new Error('Not allowed by CORS'));
+      callback(corsRejection(origin));
     },
     credentials: true,
     exposedHeaders: ['X-Request-Id', 'X-CSRF-Token'],
