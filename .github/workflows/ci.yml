@@ -80,9 +80,17 @@ jobs:
   lint:
     name: Lint
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    # 8 (was 5): eslint+prettier across the monorepo exceeds 5m when the 2
-    # self-hosted runners are saturated by concurrent PRs (timed out 2026-06-10).
-    timeout-minutes: 8
+    # 20 (was 8, was 5). 8 was marginal and finally broke main on 2026-08-11
+    # (run 31492893725, the #1072 merge): the job was killed at exactly 8m22s
+    # with `Check formatting` only 47s in, which skipped Build, Unit,
+    # Integration, E2E and the RLS proof — so main merged without ever being
+    # fully validated. Measured on the umbra guest: install 268s + eslint 165s
+    # left prettier no room, total need ~12-13m.
+    #
+    # It is NOT a constant cost, which is what made it flaky: the same job took
+    # 4m19s on the PR run minutes earlier, because `Install dependencies` is
+    # ~4.5m cold and much faster warm. Budget for the cold case.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -206,7 +214,11 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 10
+    # 15 (was 10): measured 6m51s on the umbra guest — 69% of the old budget,
+    # the next-tightest job after Lint. It pays the same ~4.5m cold
+    # `Install dependencies` that pushed Lint over, so raise it now rather than
+    # wait for it to fail the same way.
+    timeout-minutes: 15
     needs: [build]
     steps:
       - uses: actions/checkout@v4
