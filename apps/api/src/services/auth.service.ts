@@ -410,8 +410,13 @@ export class AuthService {
     }
 
     // Find user inside the requested scope (exclude soft-deleted).
+    // passwordHash + mfaSecret are globally omitted (see packages/database);
+    // login is one of the few places that legitimately needs them, so it asks
+    // for them by name. Dropping this opt-in makes bcrypt.compare below run
+    // against undefined and every login fail.
     const user = await prisma.user.findFirst({
       where: { ...authScope(email, storeId), deletedAt: null },
+      omit: { passwordHash: false, mfaSecret: false },
     });
 
     if (!user) {
@@ -724,7 +729,11 @@ export class AuthService {
   }
 
   static async changePassword(userId: string, currentPassword: string, newPassword: string) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    // Needs the hash to verify the CURRENT password — opt back in by name.
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      omit: { passwordHash: false },
+    });
     if (!user) {
       throw new AppError(404, 'NOT_FOUND', 'User not found');
     }

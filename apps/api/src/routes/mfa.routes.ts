@@ -174,7 +174,13 @@ router.post('/verify', authLimiter, async (req, res, next) => {
       }
     }
 
-    const u = await prisma.user.findUnique({ where: { id: payload.userId } });
+    // MFA verify needs both the TOTP secret and the backup-code list, which are
+    // globally omitted — ask for them by name. Without this, `u.mfaSecret` is
+    // undefined and every verify fails with MFA_NOT_ENABLED.
+    const u = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      omit: { mfaSecret: false, mfaBackupCodes: false },
+    });
     if (!u?.mfaSecret) {
       throw new AppError(400, 'MFA_NOT_ENABLED', 'MFA not enabled for this account');
     }

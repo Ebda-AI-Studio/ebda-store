@@ -1,4 +1,4 @@
-import { prisma, withRlsBypass } from '@force/database';
+import { prisma, withRlsBypass, DbClient } from '@force/database';
 import type { AccountType, Prisma } from '@prisma/client';
 import { COA_TEMPLATE } from './coa-template';
 import { postEntry } from './journal.service';
@@ -146,7 +146,7 @@ async function postOpeningBalanceIfNeeded(
 export async function getSystemAccountIdByCode(
   storeId: string,
   code: string,
-  tx?: Prisma.TransactionClient
+  tx?: DbClient
 ): Promise<string> {
   // 2026-05-21: when no tx is passed, the proxy prisma falls through to
   // basePrisma which has no app.current_store_id GUC. accounts RLS

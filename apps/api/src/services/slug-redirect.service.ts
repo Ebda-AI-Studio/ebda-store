@@ -1,4 +1,4 @@
-import { Prisma, SlugEntityType, prisma } from '@force/database';
+import { DbClient, SlugEntityType, prisma } from '@force/database';
 
 /**
  * Record a slug rename so the old URL 301s to the new one.
@@ -6,7 +6,7 @@ import { Prisma, SlugEntityType, prisma } from '@force/database';
  * reuse-guard, then chain-collapse, then upsert.
  */
 export async function recordSlugRedirect(
-  tx: Prisma.TransactionClient,
+  tx: DbClient,
   storeId: string,
   entityType: SlugEntityType,
   oldSlug: string,

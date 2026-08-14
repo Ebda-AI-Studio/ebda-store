@@ -1,18 +1,59 @@
 // Database Package - Prisma Client Export
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { AsyncLocalStorage } from 'node:async_hooks';
+
+// Options are extracted so the client's TYPE can be derived from them. A global
+// `omit` narrows PrismaClient's generic, so a plain `PrismaClient` annotation on
+// the dev-mode cache below no longer matches what `new PrismaClient(...)`
+// returns. Deriving keeps them in lockstep instead of casting the mismatch away.
+const prismaOptions = {
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  datasourceUrl: appendPoolParams(process.env.DATABASE_URL),
+  // Never let User secrets leave the DB layer unless a caller asks by name.
+  //
+  // Before this, ~46 reads on secret-bearing models ran without an explicit
+  // `select`, and the ONLY thing stopping a leak was each response path
+  // remembering to project its output. That is fail-OPEN: every new endpoint
+  // touching `user` has to independently remember. A global omit fails CLOSED
+  // — a forgotten projection returns nothing instead of a password hash.
+  //
+  // Callers that legitimately need one opt back in per query with
+  // `omit: { passwordHash: false }`, which makes every legitimate use explicit
+  // and greppable. A query-level `select` also still returns the field (naming
+  // it IS asking for it); `select` and `omit` cannot be combined in one query.
+  //
+  // Scope is deliberately User-only. PaymentConfig.{apiKey,secretKey,
+  // webhookSecret} and Store.{wbsApiKey,metaAccessToken} are the same class of
+  // problem, but their call sites guard like `if (!store.wbsApiKey) return;` —
+  // under a global omit those become SILENT no-ops (WhatsApp sends just stop)
+  // instead of a loud failure. They need per-site opt-ins first.
+  omit: {
+    user: {
+      passwordHash: true,
+      mfaSecret: true,
+      mfaBackupCodes: true,
+    },
+  },
+} satisfies Prisma.PrismaClientOptions;
+
+export type AppPrismaClient = PrismaClient<typeof prismaOptions>;
+
+/**
+ * Accepts either the app client or an interactive-transaction client.
+ *
+ * `Prisma.TransactionClient` is generated from the UN-narrowed PrismaClient, so
+ * once a global `omit` narrows our client the two are no longer assignable.
+ * Helpers that take "a client, tx or not" should type that parameter as
+ * `DbClient` rather than casting the mismatch away at each call site.
+ */
+export type DbClient = AppPrismaClient | Prisma.TransactionClient;
 
 // Prevent multiple instances in development
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma: AppPrismaClient | undefined;
 };
 
-const basePrisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    datasourceUrl: appendPoolParams(process.env.DATABASE_URL),
-  });
+const basePrisma: AppPrismaClient = globalForPrisma.prisma ?? new PrismaClient(prismaOptions);
 
 /**
  * Append connection parameters for Neon serverless Postgres.
@@ -110,7 +151,11 @@ export const prisma = new Proxy(basePrisma, {
     }
     return Reflect.get(target, prop, receiver);
   },
-}) as PrismaClient;
+  // Cast to the OMIT-NARROWED type, not bare PrismaClient. With bare
+  // PrismaClient the types would still advertise `passwordHash` while the
+  // runtime omits it — code reading it would compile and silently get
+  // undefined. Narrowing makes a missing per-query opt-in a COMPILE error.
+}) as AppPrismaClient;
 
 // Re-export everything from Prisma client (types, enums, Prisma namespace)
 export * from '@prisma/client';
