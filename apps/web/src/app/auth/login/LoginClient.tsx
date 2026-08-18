@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Input } from '@force/ui';
@@ -12,14 +13,13 @@ import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function LoginClient() {
+  const { isLoading, error, submit } = useAuthFormSubmit();
   const router = useRouter();
   const searchParams = useSearchParams();
   const storeUrl = useStoreUrl();
   const { store } = useStore();
   const { syncCartToBackend } = useCart();
   const { t } = useLanguage();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -27,10 +27,7 @@ export default function LoginClient() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    try {
+    await submit(async () => {
       const result = await api.login(formData.email, formData.password, store?.id);
 
       if (!result.success) {
@@ -45,11 +42,7 @@ export default function LoginClient() {
       // tricks (/\host) that the old startsWith('//') check let through.
       const redirectTo = safeInternalPath(searchParams.get('redirect'), '/');
       router.push(storeUrl(redirectTo));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to login');
-    } finally {
-      setIsLoading(false);
-    }
+    }, 'Failed to login');
   };
 
   return (

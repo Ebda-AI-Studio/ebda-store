@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useLocalePrice } from '../../../../hooks/useLocalePrice';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { api, API_URL } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../../contexts/StoreContext';
 import { useLanguage } from '../../../../contexts/LanguageContext';
-import { formatPrice as formatPriceBase } from '@/lib/format';
 import {
   formatDate as formatStoreDate,
   formatDateTime as formatStoreDateTime,
@@ -95,12 +95,7 @@ export default function OrderDetailClient() {
   const storeUrl = useStoreUrl();
   const { store } = useStore();
   const { t, language } = useLanguage();
-  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
-  // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) =>
-    formatPriceBase(amount, {
-      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
-    });
+  const formatPrice = useLocalePrice();
   // Safe cast: this is a standard [id] route (not catch-all [...id]), so
   // params.id is always a single string in Next.js App Router.
   const orderId = params.id as string;

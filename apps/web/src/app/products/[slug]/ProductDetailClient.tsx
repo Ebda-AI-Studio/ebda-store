@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -33,7 +34,6 @@ import { TaxInclusiveLabel } from '../../../templates/shared/tax-inclusive-label
 import { ShareProductRow } from '../../../templates/shared/ShareProductRow';
 import { SpecTable } from '../../../templates/shared/SpecTable';
 import { OosImageDim, OutOfStockRibbon } from '../../../templates/shared/ProductCardCta';
-import { formatPrice as formatPriceBase } from '@/lib/format';
 
 // Lazy-load heavy below-the-fold components to reduce initial bundle size
 const ReviewSection = dynamic(() => import('../../../components/ReviewSection'), { ssr: false });
@@ -196,12 +196,7 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
   const { isEnabled } = useFeatures();
   const { language, t } = useLanguage();
   const { localize } = useNumerals();
-  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
-  // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) =>
-    formatPriceBase(amount, {
-      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
-    });
+  const formatPrice = useLocalePrice();
   // Prop layout wins (server-side fetch); ctx layout is the lazy-fetched fallback.
   const resolvedLayout = layout ?? ctxLayout ?? undefined;
   // Issue 2: pass productCardDefaults to all card surfaces on this page.

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
+import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Input } from '@force/ui';
@@ -10,13 +11,12 @@ import { useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 function ResetPasswordForm() {
+  const { isLoading, error, setError, submit } = useAuthFormSubmit();
   const searchParams = useSearchParams();
   const token = searchParams?.get('token') || '';
   const storeUrl = useStoreUrl();
   const { t } = useLanguage();
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
     newPassword: '',
@@ -52,31 +52,23 @@ function ResetPasswordForm() {
       return;
     }
 
-    setIsLoading(true);
+    const ok = await submit(
+      async () => {
+        // The API's reset-password endpoint accepts { token, password }
+        const result = await api.resetPassword(token, formData.newPassword);
 
-    try {
-      // The API's reset-password endpoint accepts { token, password }
-      const result = await api.resetPassword(token, formData.newPassword);
-
-      if (!result.success) {
-        throw new Error(
-          result.error?.message || t('Failed to reset password', 'فشلت إعادة تعيين كلمة المرور')
-        );
-      }
-
-      setSuccess(true);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t(
-              'Failed to reset password. Please try again.',
-              'فشلت إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى.'
-            )
-      );
-    } finally {
-      setIsLoading(false);
-    }
+        if (!result.success) {
+          throw new Error(
+            result.error?.message || t('Failed to reset password', 'فشلت إعادة تعيين كلمة المرور')
+          );
+        }
+      },
+      t(
+        'Failed to reset password. Please try again.',
+        'فشلت إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى.'
+      )
+    );
+    if (ok) setSuccess(true);
   };
 
   return (

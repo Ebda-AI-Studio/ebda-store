@@ -1,12 +1,11 @@
 'use client';
 
 import Image from 'next/image';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import { Button, Input } from '@force/ui';
 import type { CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
-import { useStore } from '../../contexts/StoreContext';
 import { useNumerals } from '../../hooks/useNumerals';
-import { formatPrice as formatPriceBase } from '@/lib/format';
 import type { CheckoutCartItem, Coupon } from './types';
 
 /** Loyalty redemption control state, threaded from CheckoutClient. Present
@@ -84,16 +83,8 @@ export function OrderSummary({
   summaryColors,
 }: OrderSummaryProps) {
   const { t, isRtl } = useLanguage();
-  const { store } = useStore();
   const { localize } = useNumerals();
-  // Locale-aware wrapper — only uses Arabic-Indic digits when the merchant
-  // opted in via StoreTheme.arabicNumerals AND the shopper is on the Arabic
-  // locale (formatPriceBase defaults to Western digits when no locale is
-  // passed / locale 'en').
-  const formatPrice = (amount: number) =>
-    formatPriceBase(amount, {
-      locale: isRtl && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
-    });
+  const formatPrice = useLocalePrice();
   const summaryLabelBold = summaryColors?.bold !== false;
   const summaryFontWeight = summaryLabelBold ? 'font-bold' : 'font-normal';
   const labelColorStyle = summaryColors?.labelColor

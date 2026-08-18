@@ -6,6 +6,8 @@ import { api } from '@/lib/api';
 import { useLanguage } from './LanguageContext';
 import { useStore } from './StoreContext';
 
+import { readLocalCart, toSyncPayload } from './cart-hydration';
+
 export interface CartItem {
   // Server cart_item row id once the item is synced. Before the first
   // server round-trip (e.g. on an offline add) this holds the productId
@@ -161,26 +163,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
         // Read localStorage directly instead of the React state `items` so we
         // don't need it in the effect deps (which would re-run the migration).
-        let localItems: CartItem[] = [];
-        try {
-          const saved = localStorage.getItem(cartStorageKey);
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) localItems = parsed as CartItem[];
-          }
-        } catch {
-          // ignore
-        }
+        const localItems = readLocalCart(cartStorageKey);
 
         if (!hasServerItems && localItems.length > 0 && !migratedRef.current) {
           migratedRef.current = true;
-          const syncPayload = localItems
-            .filter(i => (i.productId || i.id) && i.quantity > 0)
-            .map(i => ({
-              productId: (i.productId || i.id) as string,
-              quantity: i.quantity,
-              variantId: i.variantId,
-            }));
+          const syncPayload = toSyncPayload(localItems);
           if (syncPayload.length > 0) {
             await api.syncCart(syncPayload);
           }

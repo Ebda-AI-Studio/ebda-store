@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button, useToast, CartIcon } from '@force/ui';
@@ -11,7 +12,6 @@ import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
-import { formatPrice as formatPriceBase } from '@/lib/format';
 import { CartRecommendations } from '../../components/CartRecommendations';
 import { pageSurfaceStyle } from '@/lib/page-surface';
 import {
@@ -89,12 +89,7 @@ export default function CartClient() {
   };
   const { language, t } = useLanguage();
   const { localize } = useNumerals();
-  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
-  // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) =>
-    formatPriceBase(amount, {
-      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
-    });
+  const formatPrice = useLocalePrice();
   const continuShoppingHref = useLastListing();
 
   // ── Summary-label color + bold (StoreTheme → per-store) ─────────────────

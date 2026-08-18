@@ -145,6 +145,90 @@ function buildHeaderMap(): Record<string, StockAdjustImportKey> {
 }
 
 /**
+ * Validate and parse one stock-adjust data row.
+ *
+ * Pulled out of parseStockAdjustCsv, which the code-health scan flagged at 28
+ * branches: almost all of them were this per-row validation, inlined inside the
+ * loop inside the file-level parser. This is shared PRODUCTION code that decides
+ * what a merchant's stock import does to live inventory, so the validation reads
+ * better as one named unit than as the middle of a 123-line function.
+ *
+ * Returns the parsed row plus any errors. A row is always returned even when
+ * invalid — the importer shows the merchant every row with its own errors, so
+ * dropping bad rows here would lose the feedback.
+ */
+function parseStockAdjustRow(
+  cells: string[],
+  colIndices: Partial<Record<StockAdjustImportKey, number>>,
+  rowNumber: number
+): { row: StockAdjustParsedRow; errors: string[] } {
+  const getValue = (key: StockAdjustImportKey): string => {
+    const idx = colIndices[key];
+    return idx !== undefined ? (cells[idx] ?? '').trim() : '';
+  };
+
+  const errors: string[] = [];
+
+  const rawSku = getValue('sku');
+  const rawBarcode = getValue('barcode');
+  const rawNewQty = getValue('new_quantity');
+  const rawDelta = getValue('delta');
+  const rawReason = getValue('reason');
+
+  // Identifier check — without one of these we cannot say WHICH product to adjust.
+  const sku = rawSku || null;
+  const barcode = rawBarcode || null;
+  if (!sku && !barcode) {
+    errors.push('Row must have a SKU or Barcode to identify the product.');
+  }
+
+  // Quantity mode: absolute ("new quantity") XOR relative ("delta"). Both filled
+  // in is rejected rather than guessed — picking one silently would be the
+  // difference between setting stock to 5 and adding 5.
+  const hasNewQty = rawNewQty !== '';
+  const hasDelta = rawDelta !== '';
+  if (!hasNewQty && !hasDelta) {
+    errors.push('Row must have either "New Quantity" or "Delta" (signed change) column filled in.');
+  }
+  if (hasNewQty && hasDelta) {
+    errors.push('Row has both "New Quantity" and "Delta" filled in — use only one per row.');
+  }
+
+  let newQuantity: number | null = null;
+  let delta: number | null = null;
+
+  if (hasNewQty && !hasDelta) {
+    const parsed = parseFloat(rawNewQty);
+    if (isNaN(parsed) || !Number.isFinite(parsed)) {
+      errors.push(`"New Quantity" value "${rawNewQty}" is not a valid number.`);
+    } else if (!Number.isInteger(parsed)) {
+      errors.push(`"New Quantity" must be a whole number (got ${rawNewQty}).`);
+    } else if (parsed < 0) {
+      errors.push(`"New Quantity" must be ≥ 0 (got ${parsed}).`);
+    } else {
+      newQuantity = parsed;
+    }
+  }
+
+  if (hasDelta && !hasNewQty) {
+    const parsed = parseFloat(rawDelta);
+    if (isNaN(parsed) || !Number.isFinite(parsed)) {
+      errors.push(`"Delta" value "${rawDelta}" is not a valid number.`);
+    } else if (!Number.isInteger(parsed)) {
+      errors.push(`"Delta" must be a whole number (got ${rawDelta}).`);
+    } else {
+      // Negative delta is legitimate — it is a signed change.
+      delta = parsed;
+    }
+  }
+
+  return {
+    row: { rowNumber, sku, barcode, newQuantity, delta, reason: rawReason || null },
+    errors,
+  };
+}
+
+/**
  * Parse a CSV string into stock adjustment rows.
  *
  * Handles:
@@ -211,73 +295,12 @@ export function parseStockAdjustCsv(raw: string): StockAdjustParseResult {
 
   for (let i = 0; i < dataLines.length; i++) {
     const rowNumber = i + 1; // 1-based, skipping header
-    const line = dataLines[i];
-    const cells = splitCsvLine(line).map(c => c.trim().replace(/^["']|["']$/g, ''));
-
-    const getValue = (key: StockAdjustImportKey): string => {
-      const idx = colIndices[key];
-      return idx !== undefined ? (cells[idx] ?? '').trim() : '';
-    };
-
-    const rowErrors: string[] = [];
-
-    const rawSku = getValue('sku');
-    const rawBarcode = getValue('barcode');
-    const rawNewQty = getValue('new_quantity');
-    const rawDelta = getValue('delta');
-    const rawReason = getValue('reason');
-
-    // Identifier check
-    const sku = rawSku || null;
-    const barcode = rawBarcode || null;
-    if (!sku && !barcode) {
-      rowErrors.push('Row must have a SKU or Barcode to identify the product.');
-    }
-
-    // Quantity mode check
-    const hasNewQty = rawNewQty !== '';
-    const hasDelta = rawDelta !== '';
-    if (!hasNewQty && !hasDelta) {
-      rowErrors.push(
-        'Row must have either "New Quantity" or "Delta" (signed change) column filled in.'
-      );
-    }
-    if (hasNewQty && hasDelta) {
-      rowErrors.push('Row has both "New Quantity" and "Delta" filled in — use only one per row.');
-    }
-
-    let newQuantity: number | null = null;
-    let delta: number | null = null;
-
-    if (hasNewQty && !hasDelta) {
-      const parsed = parseFloat(rawNewQty);
-      if (isNaN(parsed) || !Number.isFinite(parsed)) {
-        rowErrors.push(`"New Quantity" value "${rawNewQty}" is not a valid number.`);
-      } else if (!Number.isInteger(parsed)) {
-        rowErrors.push(`"New Quantity" must be a whole number (got ${rawNewQty}).`);
-      } else if (parsed < 0) {
-        rowErrors.push(`"New Quantity" must be ≥ 0 (got ${parsed}).`);
-      } else {
-        newQuantity = parsed;
-      }
-    }
-
-    if (hasDelta && !hasNewQty) {
-      const parsed = parseFloat(rawDelta);
-      if (isNaN(parsed) || !Number.isFinite(parsed)) {
-        rowErrors.push(`"Delta" value "${rawDelta}" is not a valid number.`);
-      } else if (!Number.isInteger(parsed)) {
-        rowErrors.push(`"Delta" must be a whole number (got ${rawDelta}).`);
-      } else {
-        delta = parsed;
-      }
-    }
-
+    const cells = splitCsvLine(dataLines[i]).map(c => c.trim().replace(/^["']|["']$/g, ''));
+    const { row, errors: rowErrors } = parseStockAdjustRow(cells, colIndices, rowNumber);
     if (rowErrors.length > 0) {
       errors[rowNumber] = rowErrors;
     }
-
-    rows.push({ rowNumber, sku, barcode, newQuantity, delta, reason: rawReason || null });
+    rows.push(row);
   }
 
   const hasValidRows = rows.some(r => !errors[r.rowNumber]);

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
 import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useFeatures } from '../../contexts/FeatureContext';
-import { formatPrice as formatPriceBase } from '@/lib/format';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
 
 export default function AccountDashboardClient() {
@@ -14,12 +14,7 @@ export default function AccountDashboardClient() {
   const { store } = useStore();
   const { t, language } = useLanguage();
   const { isEnabled } = useFeatures();
-  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
-  // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) =>
-    formatPriceBase(amount, {
-      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
-    });
+  const formatPrice = useLocalePrice();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);

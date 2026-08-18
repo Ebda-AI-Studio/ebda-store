@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
 import { ShopChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { API_URL } from '../../lib/api';
-import { formatPrice as formatPriceBase } from '../../lib/format';
 
 interface ShippingZone {
   id: string;
@@ -36,12 +36,7 @@ export default function ShippingClient() {
   const { store } = useStore();
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
-  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
-  // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) =>
-    formatPriceBase(amount, {
-      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
-    });
+  const formatPrice = useLocalePrice();
   const [zones, setZones] = useState<ShippingZone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
 import Link from 'next/link';
 import { Button, Input } from '@force/ui';
 import { api } from '@/lib/api';
@@ -9,32 +10,22 @@ import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function ForgotPasswordClient() {
+  const { isLoading, error, submit } = useAuthFormSubmit();
   const storeUrl = useStoreUrl();
   const { store } = useStore();
   const { t } = useLanguage();
-  const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    try {
+    const ok = await submit(async () => {
       const result = await api.forgotPassword(email, store?.id);
-
       if (!result.success) {
         throw new Error(result.error?.message || 'Failed to send reset email');
       }
-
-      setIsSubmitted(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send reset email');
-    } finally {
-      setIsLoading(false);
-    }
+    }, 'Failed to send reset email');
+    if (ok) setIsSubmitted(true);
   };
 
   if (isSubmitted) {

@@ -5,6 +5,8 @@ import type { Category, PaginationMeta, ProductFacet } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useNumerals } from '../../hooks/useNumerals';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+import { buildSidebarVars, countActiveFilters } from './filter-sidebar-state';
 import { localizeOptionName, localizeOptionValue } from '@/lib/option-localization';
 
 interface SortOption {
@@ -91,6 +93,77 @@ interface ProductsFilterSidebarProps {
 
 const SEARCH_DEBOUNCE_MS = 300;
 
+/**
+ * One variant-option facet axis (e.g. "Size") with a checkbox per value.
+ *
+ * Pulled out of ProductsFilterSidebar's render body: nesting facets.map inside
+ * values.map inside the panel JSX was the depth-6 hot spot the code-health scan
+ * flagged. Rendering is unchanged — same markup, same ids, same handlers.
+ *
+ * `surface` distinguishes the desktop sidebar from the mobile bottom-sheet so the
+ * two copies of the panel never collide on checkbox ids / htmlFor pairs.
+ */
+function FacetGroup({
+  facet,
+  selectedValues,
+  isArabic,
+  surface,
+  onOptionToggle,
+}: {
+  facet: ProductFacet;
+  selectedValues: string[];
+  isArabic: boolean;
+  surface: 'm' | 'd';
+  onOptionToggle?: (name: string, value: string) => void;
+}) {
+  const facetLabel = localizeOptionName(
+    facet.name,
+    facet.nameAr,
+    isArabic,
+    facet.values.map(v => v.value)
+  );
+  return (
+    <div>
+      <h3 className="mb-3 text-lg font-medium text-[hsl(var(--primary-foreground))]">
+        {facetLabel}
+      </h3>
+      <div className="space-y-2">
+        {facet.values.map(v => {
+          const isChecked = selectedValues.includes(v.value);
+          const valueLabel = localizeOptionValue(v.value, v.valueAr, isArabic);
+          const checkboxId = `facet-${facet.name}-${v.value}-${surface}`;
+          return (
+            <label
+              key={v.value}
+              htmlFor={checkboxId}
+              className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-base transition-all ${
+                isChecked
+                  ? 'bg-[hsl(var(--primary-foreground)/0.2)] text-[hsl(var(--primary-foreground))] font-semibold'
+                  : 'bg-[hsl(var(--primary-foreground)/0.08)] text-[hsl(var(--primary-foreground)/0.75)] hover:bg-[hsl(var(--primary-foreground)/0.15)] hover:text-[hsl(var(--primary-foreground))]'
+              }`}
+            >
+              <input
+                id={checkboxId}
+                type="checkbox"
+                checked={isChecked}
+                onChange={() => {
+                  // Multi-value facet — do NOT close the mobile sheet on each
+                  // tick (shopper may pick several sizes). The "View results"
+                  // button is the explicit done action.
+                  onOptionToggle?.(facet.name, v.value);
+                }}
+                className="h-4 w-4 shrink-0 accent-[hsl(var(--primary-foreground))] rounded"
+                aria-label={valueLabel}
+              />
+              <span>{valueLabel}</span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
   const {
     search,
@@ -125,20 +198,7 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
   const { t } = useLanguage();
   const { localize } = useNumerals();
 
-  // Override --primary / --primary-foreground LOCALLY on the sidebar root when
-  // the merchant set custom filter colors. Every inner element already paints
-  // from these vars (panel bg, mobile sheet, category chips, price slider,
-  // sort/search) — including the `/alpha` shades — so one override themes the
-  // entire filter UI. CSS custom properties inherit through the DOM, so the
-  // fixed-position mobile sheet (a descendant of <aside>) follows too. Unset →
-  // no override → the store's global tokens apply (existing look preserved).
-  const sidebarVars =
-    bgTriplet || fgTriplet
-      ? ({
-          ...(bgTriplet ? { '--primary': bgTriplet } : {}),
-          ...(fgTriplet ? { '--primary-foreground': fgTriplet } : {}),
-        } as React.CSSProperties)
-      : undefined;
+  const sidebarVars = buildSidebarVars(bgTriplet, fgTriplet);
 
   // Local controlled value for the input. Submitting via Enter still works,
   // but we also fire `onSearchChange` after 300ms of keystroke stillness
@@ -165,28 +225,9 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
   // filterSidebar.defaultOpen setting (defaults to open when unset).
   const [isDesktopExpanded, setIsDesktopExpanded] = useState(defaultOpen !== false);
 
-  // Lock background scroll while the bottom-sheet is open. `overflow: hidden`
-  // alone does NOT stop mobile pull-to-refresh — a downward drag near the top
-  // still reloads the page (the "scroll the whole page and refresh it" bug).
-  // `overscroll-behavior: none` on the root element kills the pull-to-refresh +
-  // scroll-chaining so taps/drags inside the open sheet can't refresh the page.
-  useEffect(() => {
-    if (!isOpen) return;
-    const body = document.body;
-    const root = document.documentElement;
-    const prevOverflow = body.style.overflow;
-    const prevOverscroll = root.style.overscrollBehavior;
-    body.style.overflow = 'hidden';
-    root.style.overscrollBehavior = 'none';
-    return () => {
-      body.style.overflow = prevOverflow;
-      root.style.overscrollBehavior = prevOverscroll;
-    };
-  }, [isOpen]);
+  useBodyScrollLock(isOpen);
 
-  // Count active facets: each option name with at least one selected value = 1.
-  const activeOptionCount = Object.values(optionFilters).filter(v => v.length > 0).length;
-  const activeFilterCount = (search.trim() ? 1 : 0) + (categoryFilter ? 1 : 0) + activeOptionCount;
+  const activeFilterCount = countActiveFilters(search, categoryFilter, optionFilters);
 
   // Close-and-act helpers — when the user picks an option inside the mobile
   // sheet, we close it so they see the filtered results immediately.
@@ -346,58 +387,18 @@ export function ProductsFilterSidebar(props: ProductsFilterSidebarProps) {
         )}
 
       {/* Variant-option facet groups — rendered only when the API returns facets.
-          Zero facets = stores without options: no visual change. One collapsible
-          group per option axis (e.g. "Size"), checkboxes for each value. */}
-      {facets.length > 0 &&
-        facets.map(facet => {
-          const selectedValues = optionFilters[facet.name] ?? [];
-          const facetLabel = localizeOptionName(
-            facet.name,
-            facet.nameAr,
-            language === 'ar',
-            facet.values.map(v => v.value)
-          );
-          return (
-            <div key={facet.name}>
-              <h3 className="mb-3 text-lg font-medium text-[hsl(var(--primary-foreground))]">
-                {facetLabel}
-              </h3>
-              <div className="space-y-2">
-                {facet.values.map(v => {
-                  const isChecked = selectedValues.includes(v.value);
-                  const valueLabel = localizeOptionValue(v.value, v.valueAr, language === 'ar');
-                  const checkboxId = `facet-${facet.name}-${v.value}-${mobile ? 'm' : 'd'}`;
-                  return (
-                    <label
-                      key={v.value}
-                      htmlFor={checkboxId}
-                      className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-base transition-all ${
-                        isChecked
-                          ? 'bg-[hsl(var(--primary-foreground)/0.2)] text-[hsl(var(--primary-foreground))] font-semibold'
-                          : 'bg-[hsl(var(--primary-foreground)/0.08)] text-[hsl(var(--primary-foreground)/0.75)] hover:bg-[hsl(var(--primary-foreground)/0.15)] hover:text-[hsl(var(--primary-foreground))]'
-                      }`}
-                    >
-                      <input
-                        id={checkboxId}
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          // Multi-value facet — do NOT close the mobile sheet on
-                          // each tick (shopper may pick several sizes). The
-                          // "View results" button is the explicit done action.
-                          onOptionToggle?.(facet.name, v.value);
-                        }}
-                        className="h-4 w-4 shrink-0 accent-[hsl(var(--primary-foreground))] rounded"
-                        aria-label={valueLabel}
-                      />
-                      <span>{valueLabel}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+          Zero facets = stores without options: no visual change. One group per
+          option axis (e.g. "Size"), checkboxes for each value. */}
+      {facets.map(facet => (
+        <FacetGroup
+          key={facet.name}
+          facet={facet}
+          selectedValues={optionFilters[facet.name] ?? []}
+          isArabic={language === 'ar'}
+          surface={mobile ? 'm' : 'd'}
+          onOptionToggle={onOptionToggle}
+        />
+      ))}
 
       <form onSubmit={mobile ? closeAfter(onSearchSubmit) : onSearchSubmit}>
         <label

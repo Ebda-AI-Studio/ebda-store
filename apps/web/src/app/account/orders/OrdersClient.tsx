@@ -1,24 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import Link from 'next/link';
 import Image from 'next/image';
 import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { formatPrice as formatPriceBase } from '@/lib/format';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
 
 export default function OrdersClient() {
   const storeUrl = useStoreUrl();
   const { store } = useStore();
   const { t, language } = useLanguage();
-  // Locale-aware wrapper so Arabic-locale shoppers see Arabic-Indic digits
-  // (formatPriceBase defaults to Western digits when no locale is passed).
-  const formatPrice = (amount: number) =>
-    formatPriceBase(amount, {
-      locale: language === 'ar' && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
-    });
+  const formatPrice = useLocalePrice();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

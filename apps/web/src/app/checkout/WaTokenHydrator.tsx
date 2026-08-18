@@ -22,24 +22,13 @@ import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
 import { api, API_URL } from '../../lib/api';
-
-interface WaCartItem {
-  productId: string;
-  quantity: number;
-  priceFils?: number;
-  name?: string;
-  nameAr?: string;
-}
-interface WaCartPayload {
-  storeId: string;
-  storeSlug: string;
-  customerPhone: string;
-  customerName: string | null;
-  locale: string;
-  items: WaCartItem[];
-  totalFils: number;
-  currency: string;
-}
+import {
+  sessionGet,
+  sessionSet,
+  parseWaCartPayload,
+  isRedeemableItem,
+  urlWithoutToken,
+} from './wa-token';
 
 const SESSION_KEY = 'fwb.wa-cart-redeemed';
 
@@ -57,21 +46,10 @@ export default function WaTokenHydrator() {
     const token = params.get('waToken');
     if (!token) return;
 
-    // sessionStorage marker — survive HMR + strict-mode double-mount.
-    const already = (() => {
-      try {
-        return window.sessionStorage.getItem(SESSION_KEY) === token;
-      } catch {
-        return false;
-      }
-    })();
-    if (already) return;
+    // sessionStorage marker — survives HMR + strict-mode double-mount.
+    if (sessionGet(SESSION_KEY) === token) return;
     ranRef.current = true;
-    try {
-      window.sessionStorage.setItem(SESSION_KEY, token);
-    } catch {
-      /* private mode */
-    }
+    sessionSet(SESSION_KEY, token);
 
     (async () => {
       try {
@@ -88,9 +66,8 @@ export default function WaTokenHydrator() {
           console.warn('[wa-token-hydrator] redeem failed', res.status);
           return;
         }
-        const json = await res.json();
-        const data: WaCartPayload | undefined = json?.data;
-        if (!data || !Array.isArray(data.items) || data.items.length === 0) return;
+        const data = parseWaCartPayload(await res.json());
+        if (!data) return;
 
         // Issue 4: call api.addToCart directly (bypassing the addItem
         // optimistic update + toast) and refetch once at the end so the UI
@@ -98,8 +75,8 @@ export default function WaTokenHydrator() {
         // order and avoid duplicate-detection races.
         let anyAdded = false;
         for (const item of data.items) {
-          if (!item.productId || !item.quantity || item.quantity < 1) continue;
-          const addRes = await api.addToCart(item.productId, item.quantity);
+          if (!isRedeemableItem(item)) continue;
+          const addRes = await api.addToCart(item.productId as string, item.quantity as number);
           if (addRes.success) {
             anyAdded = true;
           } else {
@@ -116,17 +93,11 @@ export default function WaTokenHydrator() {
 
         // Stash customer phone for the shipping-step pre-fill.
         if (data.customerPhone) {
-          try {
-            window.sessionStorage.setItem('fwb.wa-customer-phone', data.customerPhone);
-          } catch {
-            /* ignore */
-          }
+          sessionSet('fwb.wa-customer-phone', data.customerPhone);
         }
 
         // Strip the token from the URL so a refresh doesn't re-redeem.
-        const url = new URL(window.location.href);
-        url.searchParams.delete('waToken');
-        router.replace(url.pathname + url.search, { scroll: false });
+        router.replace(urlWithoutToken(window.location.href), { scroll: false });
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn('[wa-token-hydrator] failed', (err as Error).message);

@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Image from 'next/image';
 import type { Product } from '@/lib/api';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
-import { formatPrice as formatPriceBase } from '@/lib/format';
 import { getProductPricing, getDiscountBadgeText } from '@/lib/product-pricing';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { resolveColor } from '@force/shared';
@@ -38,14 +38,7 @@ export function ProductListItem({
   const { t, isRtl } = useLanguage();
   const { store, layout } = useStore();
   const storeUrl = useStoreUrl();
-  // Locale-aware wrapper — only uses Arabic-Indic digits when the merchant
-  // opted in via StoreTheme.arabicNumerals AND the shopper is on the Arabic
-  // locale (formatPriceBase defaults to Western digits when no locale is
-  // passed / locale 'en').
-  const formatPrice = (amount: number) =>
-    formatPriceBase(amount, {
-      locale: isRtl && store?.theme?.arabicNumerals === true ? 'ar' : 'en',
-    });
+  const formatPrice = useLocalePrice();
   const priceVisible = showCardPrice !== false;
   // Localized name for alt text + heading. Falls through to English when
   // the merchant hasn't supplied an Arabic translation.

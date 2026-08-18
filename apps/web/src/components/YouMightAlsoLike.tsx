@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import {
+  useProductRecommendations,
+  selectMergedRecommendations,
+} from '../hooks/useProductRecommendations';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl, useStoreTemplate } from '../contexts/StoreContext';
-import { API_URL } from '@/lib/api';
 import { ProductCarousel } from '../templates/shared/ProductCarousel';
 import { Skeleton } from '@force/ui';
 import { SectionRetryNotice } from './SectionRetryNotice';
@@ -30,29 +32,12 @@ function YouMightAlsoLikeSkeleton({ isRtl }: { isRtl: boolean }) {
   );
 }
 
-interface RecommendedProduct {
-  id: string;
-  name: string;
-  nameAr?: string;
-  slug: string;
-  price: number;
-  compareAtPrice?: number;
-  discountType?: 'percentage' | 'fixed' | null;
-  discountValue?: number | null;
-  images: Array<{ id: string; url: string; alt?: string }>;
-}
-
 interface YouMightAlsoLikeProps {
   storeId: string;
   productId: string;
 }
 
 export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) {
-  const [products, setProducts] = useState<RecommendedProduct[]>([]);
-  // Distinguishes a genuine fetch failure from "nothing to recommend" —
-  // both used to collapse into the same `return null` (Lens M graceful
-  // degradation).
-  const [status, setStatus] = useState<'loading' | 'ok' | 'empty' | 'error'>('loading');
   const { addItem, items: cartItems } = useCart();
   const { language } = useLanguage();
   const { store, layout } = useStore();
@@ -65,64 +50,18 @@ export function YouMightAlsoLike({ storeId, productId }: YouMightAlsoLikeProps) 
   // PecannbeeProductCard (same path as PLP and catalog listings).
   const productCardDefaults = layout?.productCardDefaults;
 
-  const fetchRecommendations = useCallback(async () => {
-    if (!storeId || !productId) return;
-    setStatus('loading');
-    try {
-      const sessionId =
-        typeof window !== 'undefined' ? localStorage.getItem('sessionId') || '' : '';
-      const res = await fetch(
-        `${API_URL}/public/${storeId}/products/${productId}/recommendations`,
-        {
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Session-ID': sessionId,
-            'X-Store-ID': storeId,
-          },
-        }
-      );
-      if (!res.ok) {
-        setStatus('error');
-        return;
-      }
-      const data = await res.json();
-      if (data.success && data.data) {
-        const upsell: RecommendedProduct[] = data.data.upsell || [];
-        const alsoLike: RecommendedProduct[] = data.data.alsoLike || [];
-        // AI recommendations come back in crossSell slot when no manual
-        // cross-sell relations exist (recommendation.service.ts: manual > AI > FBT).
-        const crossSell: RecommendedProduct[] = data.data.crossSell || [];
-        // Merge in priority order and dedupe.
-        const seen = new Set<string>();
-        const merged: RecommendedProduct[] = [];
-        for (const p of [...upsell, ...crossSell, ...alsoLike]) {
-          if (!seen.has(p.id)) {
-            seen.add(p.id);
-            merged.push(p);
-          }
-        }
-        setProducts(merged);
-        setStatus(merged.length > 0 ? 'ok' : 'empty');
-      } else {
-        setProducts([]);
-        setStatus('empty');
-      }
-    } catch {
-      setStatus('error');
-    }
-  }, [storeId, productId]);
-
-  useEffect(() => {
-    fetchRecommendations();
-  }, [fetchRecommendations]);
+  const { products, status, refetch } = useProductRecommendations(
+    storeId,
+    productId,
+    selectMergedRecommendations
+  );
 
   if (status === 'loading') return <YouMightAlsoLikeSkeleton isRtl={isRtl} />;
   if (status === 'error') {
     return (
       <div className="mt-16">
         <SectionRetryNotice
-          onRetry={fetchRecommendations}
+          onRetry={refetch}
           message="Couldn't load You Might Also Like."
           messageAr="تعذّر تحميل قسم قد يعجبك أيضاً."
         />

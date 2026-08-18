@@ -194,11 +194,194 @@ function extractStoreSlug(pathname: string): { slug: string; rewrittenPath: stri
   return { slug: firstSegment, rewrittenPath };
 }
 
+/**
+ * Preview-draft cookie policy, as a response decorator.
+ *
+ * The admin page-builder iframe always carries `?_preview=<tick>`; a normal
+ * visitor never does. That flag — not the presence of `?_layoutDraft` — is what
+ * distinguishes an admin preview from a real visit, so it gates BOTH directions:
+ * inside the iframe the draft token is persisted, outside it any stale draft
+ * cookie is cleared immediately. Without the clear, unsaved admin edits leak to
+ * a real storefront visitor who previewed in the same browser (2026-05-28).
+ *
+ * SameSite=None + Secure so it survives the cross-site iframe context
+ * (admin.forcemediakw.com framing wadyaljuz.com). TTL 1h matches Redis.
+ */
+function applyDraftCookie(
+  request: NextRequest,
+  draftToken: string | null,
+  isPreviewIframe: boolean
+) {
+  return (response: NextResponse): NextResponse => {
+    if (draftToken && isPreviewIframe) {
+      response.cookies.set('force-preview-draft', draftToken, {
+        path: '/',
+        maxAge: 3600,
+        sameSite: 'none',
+        secure: true,
+        httpOnly: true,
+      });
+    } else if (!isPreviewIframe) {
+      const staleDraft = request.cookies.get('force-preview-draft')?.value;
+      if (staleDraft) {
+        response.cookies.set('force-preview-draft', '', {
+          path: '/',
+          maxAge: 0,
+          sameSite: 'none',
+          secure: true,
+          httpOnly: true,
+        });
+      }
+    }
+    return response;
+  };
+}
+
+/**
+ * Propagate the draft token as a REQUEST header so server components in the SAME
+ * request can read it — cookies set on a response are not visible to that
+ * response's own server components.
+ *
+ * Two ways in: the initial iframe load carries `?_layoutDraft`, and subsequent
+ * Link clicks inside the iframe drop it (but keep `?_preview`), so the cookie
+ * carries it from then on. A normal visitor gets neither, so layout.tsx serves
+ * the committed layout.
+ */
+function propagateDraftHeader(
+  requestHeaders: Headers,
+  request: NextRequest,
+  draftToken: string | null,
+  isPreviewIframe: boolean
+): void {
+  if (draftToken && isPreviewIframe) {
+    requestHeaders.set('x-preview-draft', draftToken);
+    return;
+  }
+  if (isPreviewIframe) {
+    const cookieDraft = request.cookies.get('force-preview-draft')?.value;
+    if (cookieDraft) requestHeaders.set('x-preview-draft', cookieDraft);
+  }
+}
+
+/**
+ * The dark-launch gate for tenant-cacheable routing (Phase 1), which was spelled
+ * out identically at three call sites — custom domain, path slug, cookie slug.
+ * Inert unless STOREFRONT_TENANT_ROUTING=true, never applied to the admin preview
+ * iframe, and only for Track-A allowlisted routes.
+ * See docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
+ */
+function isTenantTreeEligible(pathname: string, isPreviewIframe: boolean): boolean {
+  return storefrontTenantRoutingEnabled() && !isPreviewIframe && isCacheableTrackARoute(pathname);
+}
+
+/** Custom-domain requests: the Host itself identifies the store. */
+function handleCustomDomain(
+  request: NextRequest,
+  storeIdentifier: string,
+  requestHeaders: Headers,
+  isPreviewIframe: boolean
+): NextResponse {
+  requestHeaders.set('x-store-domain', storeIdentifier);
+  requestHeaders.set('x-store-identifier', storeIdentifier);
+
+  // Custom-domain /favicon.ico → dynamic per-store favicon (falling back to the
+  // neutral platform default when the store has none). Unreachable on a platform
+  // host, where getStoreIdentifier returns null, so the shared-domain
+  // /favicon.ico keeps serving the static asset. The `sf=1` marker is set by the
+  // route handler's own fallback redirect, so this cannot loop.
+  if (request.nextUrl.pathname === '/favicon.ico' && !request.nextUrl.searchParams.has('sf')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/api/store-favicon';
+    return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+  }
+
+  if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe)) {
+    const storeTreeUrl = buildStoreTreeUrl(request, storeIdentifier, request.nextUrl.pathname);
+    const response = NextResponse.rewrite(storeTreeUrl, {
+      request: { headers: requestHeaders },
+    });
+    response.headers.set('x-store-domain', storeIdentifier);
+    return response;
+  }
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('x-store-domain', storeIdentifier);
+  return response;
+}
+
+/** Platform-domain requests: the store comes from the path slug, or the cookie. */
+function handlePlatformDomain(
+  request: NextRequest,
+  requestHeaders: Headers,
+  isPreviewIframe: boolean
+): NextResponse {
+  requestHeaders.set('x-is-platform', 'true');
+
+  const slugInfo = extractStoreSlug(request.nextUrl.pathname);
+  if (slugInfo) {
+    requestHeaders.set('x-store-slug', slugInfo.slug);
+
+    const storeTreeEligible = isTenantTreeEligible(slugInfo.rewrittenPath, isPreviewIframe);
+    const url = storeTreeEligible
+      ? buildStoreTreeUrl(request, `slug:${slugInfo.slug}`, slugInfo.rewrittenPath)
+      : request.nextUrl.clone();
+    if (!storeTreeEligible) {
+      url.pathname = slugInfo.rewrittenPath;
+    }
+
+    const response = NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+
+    // Only write the cookie when missing or stale. Re-setting it on every request
+    // forces `Cache-Control: no-store`, which hurts storefront crawl budget.
+    if (request.cookies.get('x-store-slug')?.value !== slugInfo.slug) {
+      // maxAge (30d) is REQUIRED. As a session cookie this dies on browser close,
+      // so a next-day refresh of a bare deep route on a platform host has neither
+      // slug nor cookie and falls back to the demo store — "Unable to resolve
+      // store context" (CF-migration regression, fixed 2026-06-27).
+      response.cookies.set('x-store-slug', slugInfo.slug, {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+    return response;
+  }
+
+  // Bare platform root — clear any sticky store cookie so visitors aren't trapped
+  // on the last store they looked at.
+  if (request.nextUrl.pathname === '/') {
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    if (request.cookies.get('x-store-slug')) {
+      response.cookies.delete('x-store-slug');
+    }
+    return response;
+  }
+
+  // Subroute with no slug in the URL — carry store context from the cookie
+  // (e.g. /products or /cart after /palora).
+  const cookieSlug = request.cookies.get('x-store-slug')?.value;
+  if (cookieSlug) {
+    requestHeaders.set('x-store-slug', cookieSlug);
+
+    if (isTenantTreeEligible(request.nextUrl.pathname, isPreviewIframe)) {
+      const storeTreeUrl = buildStoreTreeUrl(
+        request,
+        `slug:${cookieSlug}`,
+        request.nextUrl.pathname
+      );
+      return NextResponse.rewrite(storeTreeUrl, { request: { headers: requestHeaders } });
+    }
+  }
+
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
+
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
 
   // /tenant-store/* is an INTERNAL rewrite target only (rewrites don't re-enter
-  // middleware, so this guard never sees them). A direct external hit here would
+  // middleware, so this guard never sees them). A direct external hit would
   // bypass the Host→tenant binding — any domain could render any tenant's
   // storefront (cross-tenant boundary violation + duplicate-content SEO surface),
   // flag on or off, because the route tree exists in the build regardless.
@@ -222,224 +405,25 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(apexUrl, 301);
   }
 
+  const draftToken = request.nextUrl.searchParams.get('_layoutDraft');
+  const isPreviewIframe = request.nextUrl.searchParams.has('_preview');
+  const withDraftCookie = applyDraftCookie(request, draftToken, isPreviewIframe);
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-original-host', hostname);
+  propagateDraftHeader(requestHeaders, request, draftToken, isPreviewIframe);
+
+  // Bare root on `store.forcemediakw.com` deliberately does NOT redirect to
+  // forcemediakw.com: the homepage serves the Force Store Builder landing page
+  // (apps/web/src/components/PlatformLanding.tsx) and unknown slugs render the
+  // same component via app/not-found.tsx. The old redirect was lossy — visitors
+  // learning about the store builder were dumped on a site pitching another service.
   const storeIdentifier = getStoreIdentifier(hostname);
 
-  // 2026-05-21: Preview-unsaved draft cookie propagation. When the admin
-  // page-builder loads the storefront with ?_layoutDraft=<token>, that
-  // query param only exists on the initial iframe load — Link clicks
-  // inside the iframe drop it, and the root layout (server component)
-  // can't read searchParams to reach the draft. Solution: stash the
-  // token in a same-origin cookie at middleware time so root layout +
-  // every page sees it consistently.
-  //
-  // 2026-05-28 LEAK FIX: The admin iframe ALWAYS includes a ?_preview=<tick>
-  // param (see page-builder iframe src construction). Normal visitors NEVER
-  // have ?_preview= in their URL. We gate draft-cookie propagation on this:
-  //   - ?_preview= present  → admin preview iframe → set/refresh draft cookie
-  //                           AND propagate it as x-preview-draft header.
-  //   - ?_preview= absent   → normal visitor (or same-browser re-visit after
-  //                           previewing) → CLEAR the draft cookie immediately.
-  //
-  // This prevents unsaved admin changes from leaking to real storefront visitors
-  // who happen to open the store in the same browser used for admin previewing.
-  // Cookie is SameSite=None + Secure so it survives cross-site iframe contexts
-  // (admin.forcemediakw.com framing wadyaljuz.com). TTL = 1h matches Redis.
-  const draftToken = request.nextUrl.searchParams.get('_layoutDraft');
-  // _preview=<tick> is injected unconditionally by the admin page-builder iframe
-  // URL (see apps/admin/.../page-builder/page.tsx line ~1667). Its presence
-  // confirms we are inside an admin preview iframe, not a normal storefront visit.
-  const isPreviewIframe = request.nextUrl.searchParams.has('_preview');
-
-  const draftCookie = (response: NextResponse) => {
-    if (draftToken && isPreviewIframe) {
-      // Inside the admin iframe and the initial ?_layoutDraft= load — set cookie.
-      response.cookies.set('force-preview-draft', draftToken, {
-        path: '/',
-        maxAge: 3600,
-        sameSite: 'none',
-        secure: true,
-        httpOnly: true,
-      });
-    } else if (!isPreviewIframe) {
-      // Normal visitor (no ?_preview=) — clear any stale draft cookie so unsaved
-      // admin changes are never visible on the public storefront.
-      const staleDraft = request.cookies.get('force-preview-draft')?.value;
-      if (staleDraft) {
-        response.cookies.set('force-preview-draft', '', {
-          path: '/',
-          maxAge: 0,
-          sameSite: 'none',
-          secure: true,
-          httpOnly: true,
-        });
-      }
-    }
-    return response;
-  };
-
-  // Bare root on `store.forcemediakw.com` no longer redirects to
-  // forcemediakw.com — the homepage now serves a dedicated Force
-  // Store Builder landing page (apps/web/src/components/PlatformLanding.tsx)
-  // and unknown slugs render the same component as a 404 via
-  // app/not-found.tsx. The redirect was lossy: customers learning
-  // about the store-builder platform got dumped onto the parent
-  // marketing site that pitches a different service.
-
-  // Clone the request headers
-  const requestHeaders = new Headers(request.headers);
-
-  // Always set the original host header
-  requestHeaders.set('x-original-host', hostname);
-
-  // Propagate the draft token as a REQUEST header so server components in the
-  // SAME request can read it (cookies set in the response aren't visible to
-  // that response's server components). Only propagate when we are inside the
-  // admin preview iframe (?_preview= guard) to prevent draft cookie from
-  // affecting normal visitors who have a stale draft cookie in the same browser.
-  if (draftToken && isPreviewIframe) {
-    // First ?_layoutDraft= load inside the iframe — token is in the URL.
-    requestHeaders.set('x-preview-draft', draftToken);
-  } else if (isPreviewIframe) {
-    // Subsequent navigation within the iframe (Link click drops ?_layoutDraft
-    // from URL but ?_preview= stays). Read from cookie to keep draft active.
-    const cookieDraft = request.cookies.get('force-preview-draft')?.value;
-    if (cookieDraft) requestHeaders.set('x-preview-draft', cookieDraft);
-  }
-  // Else: normal visitor — no x-preview-draft header → layout.tsx serves committed layout.
-
-  if (storeIdentifier) {
-    // This is a custom domain - set store identification headers
-    requestHeaders.set('x-store-domain', storeIdentifier);
-    requestHeaders.set('x-store-identifier', storeIdentifier);
-
-    // Custom-domain /favicon.ico → dynamic per-store favicon (falls back to
-    // the neutral platform default when the store has none). This branch is
-    // ONLY reachable when storeIdentifier is truthy, i.e. NEVER on a platform
-    // host (store.force-ai.co etc — getStoreIdentifier returns null there),
-    // so the shared-domain /favicon.ico keeps serving the static
-    // /public/favicon.ico exactly as before this change. The `sf=1` marker is
-    // set by the route handler's own fallback redirect so this doesn't loop.
-    if (request.nextUrl.pathname === '/favicon.ico' && !request.nextUrl.searchParams.has('sf')) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/api/store-favicon';
-      const response = NextResponse.rewrite(url, {
-        request: { headers: requestHeaders },
-      });
-      return draftCookie(response);
-    }
-
-    // Dark-launched tenant-cacheable rewrite (Phase 1). Inert unless
-    // STOREFRONT_TENANT_ROUTING=true AND this isn't the admin page-builder
-    // preview iframe AND the route is on the Track-A allowlist — see
-    // docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
-    if (
-      storefrontTenantRoutingEnabled() &&
-      !isPreviewIframe &&
-      isCacheableTrackARoute(request.nextUrl.pathname)
-    ) {
-      const storeTreeUrl = buildStoreTreeUrl(request, storeIdentifier, request.nextUrl.pathname);
-      const response = NextResponse.rewrite(storeTreeUrl, {
-        request: { headers: requestHeaders },
-      });
-      response.headers.set('x-store-domain', storeIdentifier);
-      return draftCookie(response);
-    }
-
-    // Create response with modified headers
-    const response = NextResponse.next({
-      request: { headers: requestHeaders },
-    });
-    response.headers.set('x-store-domain', storeIdentifier);
-    return draftCookie(response);
-  }
-
-  // Platform domain — check for store slug in URL path
-  requestHeaders.set('x-is-platform', 'true');
-
-  const slugInfo = extractStoreSlug(request.nextUrl.pathname);
-
-  if (slugInfo) {
-    // Set slug header and rewrite URL to strip the slug prefix
-    requestHeaders.set('x-store-slug', slugInfo.slug);
-
-    // Dark-launched tenant-cacheable rewrite (Phase 1) — same gate as the
-    // custom-domain branch above, keyed on `slug:<slug>` instead of the
-    // domain. See docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
-    const storeTreeEligible =
-      storefrontTenantRoutingEnabled() &&
-      !isPreviewIframe &&
-      isCacheableTrackARoute(slugInfo.rewrittenPath);
-
-    const url = storeTreeEligible
-      ? buildStoreTreeUrl(request, `slug:${slugInfo.slug}`, slugInfo.rewrittenPath)
-      : request.nextUrl.clone();
-    if (!storeTreeEligible) {
-      url.pathname = slugInfo.rewrittenPath;
-    }
-
-    const response = NextResponse.rewrite(url, {
-      request: { headers: requestHeaders },
-    });
-    // Only set the cookie when it's missing or stale. Re-setting it on every
-    // request forces Next to mark the response uncacheable
-    // (`Cache-Control: no-store`), which hurts crawl budget on the storefront.
-    if (request.cookies.get('x-store-slug')?.value !== slugInfo.slug) {
-      // maxAge (30d) is REQUIRED: without it this is a session cookie that
-      // dies on browser close, so a next-day refresh of a bare deep route on
-      // a platform host (e.g. store.force-ai.co/account) has no slug in the URL
-      // AND no cookie → falls back to the demo store → "Unable to resolve store
-      // context". Persisting it keeps server-side store resolution working
-      // across restarts. (CF-migration regression, fixed 2026-06-27.)
-      response.cookies.set('x-store-slug', slugInfo.slug, {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30,
-      });
-    }
-    return draftCookie(response);
-  }
-
-  // Bare root on platform domain — reset to default. Clear any sticky
-  // store cookie so users aren't trapped on the last store they visited.
-  if (request.nextUrl.pathname === '/') {
-    const response = NextResponse.next({
-      request: { headers: requestHeaders },
-    });
-    if (request.cookies.get('x-store-slug')) {
-      response.cookies.delete('x-store-slug');
-    }
-    return draftCookie(response);
-  }
-
-  // Subroute on platform domain (no slug in URL) — use cookie to maintain
-  // store context across navigation (e.g. /products, /cart after /palora).
-  const cookieSlug = request.cookies.get('x-store-slug')?.value;
-  if (cookieSlug) {
-    requestHeaders.set('x-store-slug', cookieSlug);
-  }
-
-  // Dark-launched tenant-cacheable rewrite (Phase 1) — same gate, keyed on
-  // the cookie-carried slug. See
-  // docs/plans/2026-07-12-tenant-cacheable-routing.md §3.3/§9.
-  if (
-    cookieSlug &&
-    storefrontTenantRoutingEnabled() &&
-    !isPreviewIframe &&
-    isCacheableTrackARoute(request.nextUrl.pathname)
-  ) {
-    const storeTreeUrl = buildStoreTreeUrl(request, `slug:${cookieSlug}`, request.nextUrl.pathname);
-    return draftCookie(
-      NextResponse.rewrite(storeTreeUrl, {
-        request: { headers: requestHeaders },
-      })
-    );
-  }
-
-  return draftCookie(
-    NextResponse.next({
-      request: { headers: requestHeaders },
-    })
+  return withDraftCookie(
+    storeIdentifier
+      ? handleCustomDomain(request, storeIdentifier, requestHeaders, isPreviewIframe)
+      : handlePlatformDomain(request, requestHeaders, isPreviewIframe)
   );
 }
 

@@ -1,24 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { RecommendedProduct } from '../hooks/useProductRecommendations';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
 import { API_URL } from '@/lib/api';
 import type { TemplateProduct } from '../templates/types';
-
-interface RecommendedProduct {
-  id: string;
-  name: string;
-  nameAr?: string;
-  slug: string;
-  price: number;
-  compareAtPrice?: number;
-  discountType?: 'percentage' | 'fixed' | null;
-  discountValue?: number | null;
-  images: Array<{ id: string; url: string; alt?: string }>;
-}
 
 interface CartRecommendationsProps {
   storeId: string;
