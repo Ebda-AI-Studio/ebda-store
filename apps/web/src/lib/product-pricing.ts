@@ -143,6 +143,29 @@ export interface ProductPricing {
 export type PricingSurface = 'card' | 'detail';
 
 /**
+ * Is this product showing a strike-through sale price?
+ *
+ * The expression `!!(product.compareAtPrice && product.compareAtPrice > product.price)`
+ * was written out at four separate call sites (PecannbeeProductCard, ProductCarousel
+ * twice, CompareClient) plus inline in SharedWishlistClient. It is the rule that
+ * decides whether a shopper sees a crossed-out price, so it should have one
+ * definition — a copy that drifts shows a discount that is not real, or hides one
+ * that is.
+ *
+ * Guards against a compareAtPrice EQUAL to price, which is not a sale.
+ *
+ * Declared as a TYPE PREDICATE so callers keep the narrowing the inline
+ * `product.compareAtPrice && product.compareAtPrice > product.price` gave them.
+ * Without it every call site has to re-assert that compareAtPrice is defined
+ * when it renders the strike-through value.
+ */
+export function isOnSale<T extends { price: number; compareAtPrice?: number | null }>(
+  product: T
+): product is T & { compareAtPrice: number } {
+  return !!(product.compareAtPrice && product.compareAtPrice > product.price);
+}
+
+/**
  * Compute the price the storefront should show for a product.
  *
  * Pass `selectedVariant` on the product detail page to lock the price

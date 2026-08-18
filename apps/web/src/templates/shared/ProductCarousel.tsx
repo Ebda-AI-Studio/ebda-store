@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { resolveProductCardDefaults } from './product-card-defaults';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -19,7 +20,6 @@ import {
   ctaShapeClass,
   ctaSizeClass,
 } from './card-size';
-import type { CtaShape, CtaSize } from './card-size';
 import { OosImageDim, OutOfStockRibbon, isProductNew } from './ProductCardCta';
 import { smoothScrollLeftTo, smoothScrollLeftBy } from '@/lib/smooth-scroll';
 import { BrandPill } from './BrandPill';
@@ -29,7 +29,7 @@ import { getProductCardTextSizes, resolveColor } from '@force/shared';
 import { cn } from '@force/ui';
 import type { ProductCarouselProps } from '../types';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
-import { getDiscountBadgeText } from '../../lib/product-pricing';
+import { getDiscountBadgeText, isOnSale } from '../../lib/product-pricing';
 import { getDiscountBadgeColor, getDiscountBadgePosition } from './discount-badge';
 
 /**
@@ -110,23 +110,24 @@ export function ProductCarousel({
 
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const cardDefaults = layout?.productCardDefaults;
-  const resolvedCtaShape = cardDefaults?.ctaShape as CtaShape | undefined;
-  const resolvedCtaSize = cardDefaults?.ctaSize as CtaSize | undefined;
-  const resolvedCtaColor = cardDefaults?.ctaColor;
-  const resolvedCtaTextColor = cardDefaults?.ctaTextColor;
-  const resolvedCtaLabelTextEn = cardDefaults?.ctaLabelTextEn;
-  const resolvedCtaLabelTextAr = cardDefaults?.ctaLabelTextAr;
-  const resolvedOosDimColor = cardDefaults?.oosDimColor;
-  const resolvedOosLabel = cardDefaults?.oosLabel;
-  const resolvedOosLabelTextEn = cardDefaults?.oosLabelTextEn;
-  const resolvedOosLabelTextAr = cardDefaults?.oosLabelTextAr;
-  const resolvedOosLabelShape = cardDefaults?.oosLabelShape as CtaShape | undefined;
-  const resolvedOosLabelPlacement = cardDefaults?.oosLabelPlacement;
-  const resolvedOosLabelColor = cardDefaults?.oosLabelColor;
-  const resolvedOosLabelTextColor = cardDefaults?.oosLabelTextColor;
-  const nameCase = cardDefaults?.productNameCase;
-  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
-  const viewOnly = cardDefaults?.ctaMode === 'viewOnly';
+  const {
+    ctaShape: resolvedCtaShape,
+    ctaSize: resolvedCtaSize,
+    ctaColor: resolvedCtaColor,
+    ctaTextColor: resolvedCtaTextColor,
+    ctaLabelTextEn: resolvedCtaLabelTextEn,
+    ctaLabelTextAr: resolvedCtaLabelTextAr,
+    oosDimColor: resolvedOosDimColor,
+    oosLabel: resolvedOosLabel,
+    oosLabelTextEn: resolvedOosLabelTextEn,
+    oosLabelTextAr: resolvedOosLabelTextAr,
+    oosLabelShape: resolvedOosLabelShape,
+    oosLabelPlacement: resolvedOosLabelPlacement,
+    oosLabelColor: resolvedOosLabelColor,
+    oosLabelTextColor: resolvedOosLabelTextColor,
+    nameCase,
+    viewOnly,
+  } = resolveProductCardDefaults(layout);
   // Discount/sale badge — merchant-configurable corner + color. Unset
   // position defaults to bottom-left (physical, not RTL-mirrored).
   const discountBadgePositionCls = getDiscountBadgePosition(
@@ -326,7 +327,7 @@ export function ProductCarousel({
               const name = isRtl ? (product.nameAr ?? product.name) : product.name;
               const href = `${urlPrefix}/products/${product.slug}`;
               const img = product.images?.[0]?.url;
-              const onSale = !!(product.compareAtPrice && product.compareAtPrice > product.price);
+              const onSale = isOnSale(product);
               const discountBadgeText = getDiscountBadgeText(product, isRtl ?? false);
               // Dual-CTA + OOS state for the carousel cards (platform-level
               // 2026-05-16). Products with variants can't add inline because
@@ -548,10 +549,9 @@ export function ProductCarousel({
                             return {
                               mode: 'single',
                               displayPrice: product.price,
-                              displayCompare:
-                                product.compareAtPrice && product.compareAtPrice > product.price
-                                  ? product.compareAtPrice
-                                  : (null as number | null),
+                              displayCompare: isOnSale(product)
+                                ? product.compareAtPrice
+                                : (null as number | null),
                             };
                           })();
                           return (

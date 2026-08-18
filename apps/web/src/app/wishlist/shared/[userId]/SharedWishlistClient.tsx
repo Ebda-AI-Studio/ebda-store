@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { isOnSale } from '../../../../lib/product-pricing';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -271,16 +272,15 @@ export default function SharedWishlistClient({ userId }: Props) {
                         minimumFractionDigits: 3,
                       }).format(item.product.price / 1000)}
                     </span>
-                    {item.product.compareAtPrice &&
-                      item.product.compareAtPrice > item.product.price && (
-                        <span className="text-muted-foreground/70 line-through text-sm">
-                          {new Intl.NumberFormat('en-KW', {
-                            style: 'currency',
-                            currency: 'KWD',
-                            minimumFractionDigits: 3,
-                          }).format(item.product.compareAtPrice / 1000)}
-                        </span>
-                      )}
+                    {isOnSale(item.product) && (
+                      <span className="text-muted-foreground/70 line-through text-sm">
+                        {new Intl.NumberFormat('en-KW', {
+                          style: 'currency',
+                          currency: 'KWD',
+                          minimumFractionDigits: 3,
+                        }).format(item.product.compareAtPrice / 1000)}
+                      </span>
+                    )}
                   </div>
                   {item.product.status !== 'active' && (
                     <span className="text-destructive text-sm">

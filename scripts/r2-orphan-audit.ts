@@ -222,6 +222,67 @@ function parseArgs() {
   };
 }
 
+/**
+ * Decide which listed objects are deletable orphans.
+ *
+ * Pure and separated from the audit for one reason: the min-age window is a
+ * DATA-LOSS guard, not a tuning knob. It protects the race where a file has been
+ * PUT to R2 but the DB row carrying its URL has not been written yet — without
+ * it, a cleanup running mid-upload wipes a freshly-uploaded image, which is the
+ * failure mode that may have produced Palora's missing covers. A guard that
+ * cannot be tested is a guard nobody can trust.
+ *
+ * An object with NO lastModified is treated as infinitely old, matching the
+ * original behaviour: it is deletable if unreferenced.
+ */
+export function classifyOrphans(
+  objects: R2Object[],
+  referenced: Set<string>,
+  minAgeMs: number,
+  now: number
+): { orphans: string[]; orphanBytes: number; totalBytes: number; skippedRecent: number } {
+  const orphans: string[] = [];
+  let orphanBytes = 0;
+  let totalBytes = 0;
+  let skippedRecent = 0;
+
+  for (const obj of objects) {
+    totalBytes += obj.size;
+    if (referenced.has(obj.key)) continue;
+
+    const ageMs = obj.lastModified ? now - obj.lastModified.getTime() : Infinity;
+    if (ageMs < minAgeMs) {
+      skippedRecent++;
+      continue;
+    }
+
+    orphans.push(obj.key);
+    orphanBytes += obj.size;
+  }
+
+  return { orphans, orphanBytes, totalBytes, skippedRecent };
+}
+
+/** R2's S3-compatible API caps DeleteObjects batches at 1000 keys. */
+export const DELETE_BATCH_SIZE = 1000;
+
+async function deleteKeysInBatches(
+  client: S3Client,
+  bucket: string,
+  keys: string[]
+): Promise<void> {
+  for (let i = 0; i < keys.length; i += DELETE_BATCH_SIZE) {
+    const slice = keys.slice(i, i + DELETE_BATCH_SIZE);
+    await client.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: slice.map(Key => ({ Key })), Quiet: true },
+      })
+    );
+    console.log(`  deleted ${Math.min(i + DELETE_BATCH_SIZE, keys.length)}/${keys.length}`);
+  }
+}
+
 async function audit(): Promise<AuditResult> {
   const endpoint = requireEnv('STORAGE_ENDPOINT');
   const accessKey = requireEnv('STORAGE_ACCESS_KEY');
@@ -250,46 +311,18 @@ async function audit(): Promise<AuditResult> {
     const referenced = await collectReferencedKeys(prisma, publicBase, endpoint, bucket);
     console.log(`Found ${referenced.size} referenced keys in database.`);
 
-    const orphans: string[] = [];
-    let orphanBytes = 0;
-    let totalBytes = 0;
-    let skippedRecent = 0;
-    const now = Date.now();
-    for (const obj of objects) {
-      totalBytes += obj.size;
-      if (referenced.has(obj.key)) continue;
-      // Skip keys that were uploaded more recently than the
-      // min-age window. The window protects against the race where a
-      // file was just PUT to R2 but the DB row carrying its URL
-      // hasn't been written yet (or is in flight). Without this
-      // guard, a cleanup running mid-upload can wipe a freshly-uploaded
-      // image — exactly the failure mode that may have produced
-      // Palora's missing covers.
-      const ageMs = obj.lastModified ? now - obj.lastModified.getTime() : Infinity;
-      if (ageMs < minAgeMs) {
-        skippedRecent++;
-        continue;
-      }
-      orphans.push(obj.key);
-      orphanBytes += obj.size;
-    }
+    const { orphans, orphanBytes, totalBytes, skippedRecent } = classifyOrphans(
+      objects,
+      referenced,
+      minAgeMs,
+      Date.now()
+    );
 
     if (apply && orphans.length > 0) {
       console.log(
         `\n--apply set: deleting ${orphans.length} orphan keys (min-age ${minAgeHours}h)…`
       );
-      // R2's S3-compatible API caps DeleteObjects batches at 1000.
-      const BATCH = 1000;
-      for (let i = 0; i < orphans.length; i += BATCH) {
-        const slice = orphans.slice(i, i + BATCH);
-        await client.send(
-          new DeleteObjectsCommand({
-            Bucket: bucket,
-            Delete: { Objects: slice.map(Key => ({ Key })), Quiet: true },
-          })
-        );
-        console.log(`  deleted ${Math.min(i + BATCH, orphans.length)}/${orphans.length}`);
-      }
+      await deleteKeysInBatches(client, bucket, orphans);
     }
 
     return {
@@ -316,30 +349,42 @@ function formatBytes(n: number): string {
   return `${v.toFixed(2)} ${units[i]}`;
 }
 
-audit()
-  .then(result => {
-    const ts = new Date().toISOString().replace(/[:.]/g, '-');
-    const outPath = path.join('/tmp', `r2-orphans-${ts}.txt`);
-    fs.writeFileSync(outPath, result.orphanKeys.join('\n') + '\n');
+// Only run when invoked directly. Without this guard, importing anything from
+// this file (e.g. classifyOrphans in a unit test) EXECUTES the audit and calls
+// process.exit(1) on the first missing env var — which is why the delete guard
+// had no test until now.
+const isDirectRun =
+  typeof process !== 'undefined' &&
+  Array.isArray(process.argv) &&
+  process.argv[1] !== undefined &&
+  /r2-orphan-audit\.[tj]s$/.test(process.argv[1]);
 
-    const apply = process.argv.includes('--apply');
-    console.log('');
-    console.log('=== R2 Orphan Audit ===');
-    console.log(`Total keys:       ${result.totalKeys}`);
-    console.log(`Total bytes:      ${formatBytes(result.totalBytes)}`);
-    console.log(`Orphan count:     ${result.orphanKeys.length}`);
-    console.log(`Orphan bytes:     ${formatBytes(result.orphanBytes)}`);
-    console.log(`Skipped (fresh):  ${result.skippedRecent}`);
-    console.log(`Orphan list:      ${outPath}`);
-    console.log('');
-    if (apply) {
-      console.log('Applied: orphan objects above were deleted from R2.');
-    } else {
-      console.log('Dry run. Pass --apply to delete the orphans listed above.');
-      console.log('Pass --min-age-hours=N (default 1) to widen the safety window.');
-    }
-  })
-  .catch(err => {
-    console.error('Audit failed:', err);
-    process.exit(1);
-  });
+if (isDirectRun) {
+  audit()
+    .then(result => {
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const outPath = path.join('/tmp', `r2-orphans-${ts}.txt`);
+      fs.writeFileSync(outPath, result.orphanKeys.join('\n') + '\n');
+
+      const apply = process.argv.includes('--apply');
+      console.log('');
+      console.log('=== R2 Orphan Audit ===');
+      console.log(`Total keys:       ${result.totalKeys}`);
+      console.log(`Total bytes:      ${formatBytes(result.totalBytes)}`);
+      console.log(`Orphan count:     ${result.orphanKeys.length}`);
+      console.log(`Orphan bytes:     ${formatBytes(result.orphanBytes)}`);
+      console.log(`Skipped (fresh):  ${result.skippedRecent}`);
+      console.log(`Orphan list:      ${outPath}`);
+      console.log('');
+      if (apply) {
+        console.log('Applied: orphan objects above were deleted from R2.');
+      } else {
+        console.log('Dry run. Pass --apply to delete the orphans listed above.');
+        console.log('Pass --min-age-hours=N (default 1) to widen the safety window.');
+      }
+    })
+    .catch(err => {
+      console.error('Audit failed:', err);
+      process.exit(1);
+    });
+}

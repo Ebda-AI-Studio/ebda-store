@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { resolveProductCardDefaults } from '../../templates/shared/product-card-defaults';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Image from 'next/image';
 import type { Product } from '@/lib/api';
@@ -11,7 +12,6 @@ import { resolveColor } from '@force/shared';
 import { cn, CartIcon } from '@force/ui';
 import { OosImageDim, OutOfStockRibbon } from '../../templates/shared/ProductCardCta';
 import { ctaShapeClass, ctaSizeClass } from '../../templates/shared/card-size';
-import type { CtaShape, CtaSize } from '../../templates/shared/card-size';
 import {
   getDiscountBadgeColor,
   getDiscountBadgePosition,
@@ -60,23 +60,24 @@ export function ProductListItem({
 
   // Task 3 B3/B4: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
-  const resolvedCtaShape = defaults?.ctaShape as CtaShape | undefined;
-  const resolvedCtaSize = defaults?.ctaSize as CtaSize | undefined;
-  const resolvedCtaColor = defaults?.ctaColor;
-  const resolvedCtaTextColor = defaults?.ctaTextColor;
-  const resolvedCtaLabelTextEn = defaults?.ctaLabelTextEn;
-  const resolvedCtaLabelTextAr = defaults?.ctaLabelTextAr;
-  const resolvedOosDimColor = defaults?.oosDimColor;
-  const resolvedOosLabel = defaults?.oosLabel;
-  const resolvedOosLabelTextEn = defaults?.oosLabelTextEn;
-  const resolvedOosLabelTextAr = defaults?.oosLabelTextAr;
-  const resolvedOosLabelShape = defaults?.oosLabelShape as CtaShape | undefined;
-  const resolvedOosLabelPlacement = defaults?.oosLabelPlacement;
-  const resolvedOosLabelColor = defaults?.oosLabelColor;
-  const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
-  const nameCase = defaults?.productNameCase;
-  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
-  const viewOnly = defaults?.ctaMode === 'viewOnly';
+  const {
+    ctaShape: resolvedCtaShape,
+    ctaSize: resolvedCtaSize,
+    ctaColor: resolvedCtaColor,
+    ctaTextColor: resolvedCtaTextColor,
+    ctaLabelTextEn: resolvedCtaLabelTextEn,
+    ctaLabelTextAr: resolvedCtaLabelTextAr,
+    oosDimColor: resolvedOosDimColor,
+    oosLabel: resolvedOosLabel,
+    oosLabelTextEn: resolvedOosLabelTextEn,
+    oosLabelTextAr: resolvedOosLabelTextAr,
+    oosLabelShape: resolvedOosLabelShape,
+    oosLabelPlacement: resolvedOosLabelPlacement,
+    oosLabelColor: resolvedOosLabelColor,
+    oosLabelTextColor: resolvedOosLabelTextColor,
+    nameCase,
+    viewOnly,
+  } = resolveProductCardDefaults(layout);
   // Discount/sale badge — merchant-configurable corner + color. Unset
   // position defaults to bottom-left (physical, not RTL-mirrored).
   const discountBadgePositionCls = getDiscountBadgePosition(

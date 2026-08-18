@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { isOnSale } from '../../lib/product-pricing';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShopChrome } from '../../components';
@@ -238,7 +239,7 @@ export default function CompareClient() {
                     <span className="font-bold text-lg">
                       {localize((product.price / 1000).toFixed(3))} KWD
                     </span>
-                    {product.compareAtPrice && product.compareAtPrice > product.price && (
+                    {isOnSale(product) && (
                       <span className="block text-muted-foreground/70 line-through text-sm">
                         {localize((product.compareAtPrice / 1000).toFixed(3))} KWD
                       </span>

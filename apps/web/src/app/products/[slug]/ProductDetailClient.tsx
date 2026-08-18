@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { firstCategoryId, pickRelated } from '../../../lib/related-products';
 import { useLocalePrice } from '../../../hooks/useLocalePrice';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -300,19 +301,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
             api.beaconProductView(store.id, loadedProduct.id, sessionId);
           }
 
-          // Fetch related products from the same category
-          const categories = response.data.product.categories;
-          if (categories && categories.length > 0) {
-            const catId = categories[0].category.id;
-            if (catId) {
-              const relResponse = await api.getProducts({ category: catId, limit: '3' });
-              if (relResponse.success && relResponse.data) {
-                setRelatedProducts(
-                  relResponse.data.products
-                    .filter((p: Product) => p.id !== response.data!.product.id)
-                    .slice(0, 3)
-                );
-              }
+          // Related products from the same category. Guard-and-return rather
+          // than nesting: no category means nothing to relate to.
+          const catId = firstCategoryId(response.data.product.categories);
+          if (catId) {
+            const relResponse = await api.getProducts({ category: catId, limit: '3' });
+            if (relResponse.success && relResponse.data) {
+              setRelatedProducts(pickRelated(relResponse.data.products, loadedProduct.id));
             }
           }
         } else {

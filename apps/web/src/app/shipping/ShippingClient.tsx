@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useShippingZones } from '../../hooks/useShippingZones';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
 import { ShopChrome } from '../../components';
 import { useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { API_URL } from '../../lib/api';
 
 interface ShippingZone {
   id: string;
@@ -34,32 +33,10 @@ function formatEstimatedDays(zone: ShippingZone): string {
 
 export default function ShippingClient() {
   const { store } = useStore();
+  const { zones, isLoading, fetchError } = useShippingZones<ShippingZone>(store.id);
   const storeUrl = useStoreUrl();
   const { language, t } = useLanguage();
   const formatPrice = useLocalePrice();
-  const [zones, setZones] = useState<ShippingZone[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
-
-  useEffect(() => {
-    // Only fetch once we have a real store id (not the default 'demo' placeholder)
-    if (!store.id || store.id === 'demo') return;
-
-    setIsLoading(true);
-    setFetchError(false);
-
-    fetch(`${API_URL}/stores/public/${store.id}/shipping`)
-      .then(res => res.json())
-      .then(json => {
-        if (json.success && Array.isArray(json.data?.zones)) {
-          setZones(json.data.zones);
-        } else {
-          setFetchError(true);
-        }
-      })
-      .catch(() => setFetchError(true))
-      .finally(() => setIsLoading(false));
-  }, [store.id]);
 
   return (
     <ShopChrome>

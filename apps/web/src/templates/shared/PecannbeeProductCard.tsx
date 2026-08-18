@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { resolveProductCardDefaults } from './product-card-defaults';
 import { memo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -24,7 +25,7 @@ import {
   ctaShapeClass,
   ctaSizeClass,
 } from './card-size';
-import { getProductPricing, getDiscountBadgeText } from '../../lib/product-pricing';
+import { getProductPricing, getDiscountBadgeText, isOnSale } from '../../lib/product-pricing';
 import { productCardPropsEqual } from './product-card-memo';
 import { responsiveFontSize, guardedCtaColor } from './section-typography';
 import { TaxInclusiveLabel } from './tax-inclusive-label';
@@ -131,7 +132,7 @@ function PecannbeeProductCardImpl({
   // Task 13: backorder-aware orderable signal. OOS products with backorder
   // allowed are still orderable — CTA stays pressable, no OOS label shown.
   const orderable = inStock || product.acceptsBackorder === true;
-  const onSale = !!(product.compareAtPrice && product.compareAtPrice > product.price);
+  const onSale = isOnSale(product);
   // BUG 1 fix: use getDiscountBadgeText so fixed-KWD discounts render correctly.
   const discountBadgeText = getDiscountBadgeText(product, isRtl);
 
@@ -166,25 +167,24 @@ function PecannbeeProductCardImpl({
 
   // Task 3 B: read CTA + OOS defaults from productCardDefaults.
   const defaults = layout?.productCardDefaults;
-  const resolvedCtaShape = defaults?.ctaShape as import('./card-size').CtaShape | undefined;
-  const resolvedCtaSize = defaults?.ctaSize as import('./card-size').CtaSize | undefined;
-  const resolvedCtaColor = defaults?.ctaColor;
-  const resolvedCtaTextColor = defaults?.ctaTextColor;
-  const resolvedCtaLabelTextEn = defaults?.ctaLabelTextEn;
-  const resolvedCtaLabelTextAr = defaults?.ctaLabelTextAr;
-  const resolvedOosDimColor = defaults?.oosDimColor;
-  const resolvedOosLabel = defaults?.oosLabel;
-  const resolvedOosLabelTextEn = defaults?.oosLabelTextEn;
-  const resolvedOosLabelTextAr = defaults?.oosLabelTextAr;
-  const resolvedOosLabelShape = defaults?.oosLabelShape as
-    | import('./card-size').CtaShape
-    | undefined;
-  const resolvedOosLabelPlacement = defaults?.oosLabelPlacement;
-  const resolvedOosLabelColor = defaults?.oosLabelColor;
-  const resolvedOosLabelTextColor = defaults?.oosLabelTextColor;
-  const nameCase = defaults?.productNameCase;
-  // ctaMode: 'viewOnly' forces the View link for no-variant in-stock products too.
-  const viewOnly = defaults?.ctaMode === 'viewOnly';
+  const {
+    ctaShape: resolvedCtaShape,
+    ctaSize: resolvedCtaSize,
+    ctaColor: resolvedCtaColor,
+    ctaTextColor: resolvedCtaTextColor,
+    ctaLabelTextEn: resolvedCtaLabelTextEn,
+    ctaLabelTextAr: resolvedCtaLabelTextAr,
+    oosDimColor: resolvedOosDimColor,
+    oosLabel: resolvedOosLabel,
+    oosLabelTextEn: resolvedOosLabelTextEn,
+    oosLabelTextAr: resolvedOosLabelTextAr,
+    oosLabelShape: resolvedOosLabelShape,
+    oosLabelPlacement: resolvedOosLabelPlacement,
+    oosLabelColor: resolvedOosLabelColor,
+    oosLabelTextColor: resolvedOosLabelTextColor,
+    nameCase,
+    viewOnly,
+  } = resolveProductCardDefaults(layout);
   // Discount/sale badge — merchant-configurable corner + color. Unset
   // position defaults to bottom-left (physical, not RTL-mirrored).
   const discountBadgePositionCls = getDiscountBadgePosition(

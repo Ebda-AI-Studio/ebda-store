@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuthFormSubmit } from '../../../hooks/useAuthFormSubmit';
+import { validateRegistration } from './validate-registration';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Input } from '@force/ui';
@@ -10,12 +12,11 @@ import { useStoreUrl, useStore } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function RegisterClient() {
+  const { isLoading, error, setError, submit } = useAuthFormSubmit();
   const router = useRouter();
   const storeUrl = useStoreUrl();
   const { store } = useStore();
   const { t } = useLanguage();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -26,51 +27,38 @@ export default function RegisterClient() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      setError(t('Passwords do not match', 'كلمتا المرور غير متطابقتين'));
-      setIsLoading(false);
+    // Validate before touching the network. Returning a message rather than
+    // setting state keeps the rule testable — see validateRegistration.
+    const validationError = validateRegistration(formData, t);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
-    // Validate password strength
-    if (formData.password.length < 8) {
-      setError(
-        t('Password must be at least 8 characters', 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل')
-      );
-      setIsLoading(false);
-      return;
-    }
+    await submit(
+      async () => {
+        const result = await api.register({
+          email: formData.email,
+          password: formData.password,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          storeId: store?.id,
+        });
 
-    try {
-      const result = await api.register({
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        storeId: store?.id,
-      });
+        if (!result.success) {
+          throw new Error(result.error?.message || t('Failed to register', 'فشل إنشاء الحساب'));
+        }
 
-      if (!result.success) {
-        throw new Error(result.error?.message || t('Failed to register', 'فشل إنشاء الحساب'));
-      }
-
-      // T1-4: register no longer returns tokens. The API responds the
-      // same way for new and existing emails (enumeration close), so
-      // we always send the user to the "verify your email" page —
-      // they get a link in their inbox (real registration) or a
-      // "someone tried to register with this email" notice (existing
-      // account). Either way the next action is in their inbox, not
-      // here.
-      router.push(storeUrl('/auth/check-email'));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('Failed to register', 'فشل إنشاء الحساب'));
-    } finally {
-      setIsLoading(false);
-    }
+        // T1-4: register no longer returns tokens. The API responds the same way
+        // for new and existing emails (enumeration close), so we always send the
+        // user to the "verify your email" page — they get a link in their inbox
+        // (real registration) or a "someone tried to register with this email"
+        // notice (existing account). Either way the next action is in their
+        // inbox, not here.
+        router.push(storeUrl('/auth/check-email'));
+      },
+      t('Failed to register', 'فشل إنشاء الحساب')
+    );
   };
 
   return (
