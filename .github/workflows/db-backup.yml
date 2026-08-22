@@ -42,7 +42,15 @@ jobs:
           [ "${SZ:-0}" -gt 200 ] || { echo "::error::dump empty/too small"; exit 1; }
           # rclone S3 -> R2. NO_CHECK_BUCKET=true is REQUIRED for a bucket-scoped
           # R2 token (else CreateBucket probe 403s). Verified end-to-end 2026-07-01.
-          sudo apt-get update -qq && sudo apt-get install -y rclone
+          command -v rclone >/dev/null || {
+            # 18 runners share one guest, so concurrent jobs race for the dpkg
+            # lock: CRM's db-backup died with "Could not get lock
+            # /var/lib/dpkg/lock-frontend" AFTER dumping, so the backup never
+            # uploaded. Skip apt when the tool is already there, and wait for
+            # the lock rather than failing when it is not.
+            sudo apt-get -o DPkg::Lock::Timeout=600 update -qq
+            sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y rclone
+          }
           export RCLONE_CONFIG_R2_TYPE=s3 RCLONE_CONFIG_R2_PROVIDER=Cloudflare \
             RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
             RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \

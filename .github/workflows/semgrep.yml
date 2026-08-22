@@ -17,7 +17,7 @@ jobs:
   semgrep:
     name: Semgrep SAST
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Semgrep scan (block on ERROR severity)
@@ -26,6 +26,21 @@ jobs:
         # actions/setup-python@v5 cannot provision (no prebuilt 3.12 for 26.04).
         run: |
           set -euo pipefail
+          # Prefer a shared venv on the self-hosted guest. 2026-08-23: with 18
+          # runner instances on a 6-CPU guest, the per-run `pip install semgrep`
+          # pushed this job past its cap and Semgrep failed on FWB and CRM at the
+          # same moment — killed mid-install ("Terminate orphan process: (pip)").
+          # Cloud runners have no /opt venv and fall through to the logic below.
+          if [ -x /opt/semgrep-venv/bin/semgrep ]; then
+            /opt/semgrep-venv/bin/semgrep scan \
+              --config p/default \
+              --config p/owasp-top-ten \
+              --config p/javascript \
+              --config p/typescript \
+              --config p/secrets \
+              --error --severity ERROR
+            exit $?
+          fi
           # A freshly-provisioned self-hosted VM (e.g. the Mac OrbStack Ubuntu
           # 26.04 box) ships python3 WITHOUT the venv module — `python3 -m venv`
           # then fails with "ensurepip is not available". Self-heal it so a VM
@@ -34,8 +49,8 @@ jobs:
           if ! python3 -m venv "$RUNNER_TEMP/semgrep-venv" 2>/dev/null; then
             echo "::notice::python3 venv missing — installing python3-venv on this runner"
             venv_pkg="$(python3 -c 'import sys; print(f"python3.{sys.version_info.minor}-venv")')"
-            sudo apt-get update -qq
-            sudo apt-get install -y python3-venv "$venv_pkg"
+            sudo apt-get -o DPkg::Lock::Timeout=600 update -qq
+            sudo apt-get -o DPkg::Lock::Timeout=600 install -y python3-venv "$venv_pkg"
             rm -rf "$RUNNER_TEMP/semgrep-venv"
             python3 -m venv "$RUNNER_TEMP/semgrep-venv"
           fi
