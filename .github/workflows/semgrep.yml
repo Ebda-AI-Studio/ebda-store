@@ -36,9 +36,11 @@ jobs:
             # so without this the SAST gate would run an ever-staler analyzer.
             # A failed refresh scans with the existing binary rather than
             # skipping the gate — stale beats absent.
-            if [ -z "$(find /opt/semgrep-venv -maxdepth 0 -mtime -7 2>/dev/null)" ]; then
-              sudo /opt/semgrep-venv/bin/pip install --quiet --upgrade semgrep || true
-              sudo touch /opt/semgrep-venv
+            # Report staleness; never mutate. An in-place `pip install --upgrade`
+            # into the SHARED venv can corrupt a scan another runner is executing
+            # against it, and two concurrent refreshes can corrupt each other.
+            if [ -z "$(find /opt/semgrep-venv -maxdepth 0 -mtime -30 2>/dev/null)" ]; then
+              echo "::notice::shared semgrep venv is >30 days old — refresh it on the guest"
             fi
             /opt/semgrep-venv/bin/semgrep scan \
               --config p/default \
