@@ -31,7 +31,15 @@ jobs:
           # pushed this job past its cap and Semgrep failed on FWB and CRM at the
           # same moment — killed mid-install ("Terminate orphan process: (pip)").
           # Cloud runners have no /opt venv and fall through to the logic below.
-          if [ -x /opt/semgrep-venv/bin/semgrep ]; then
+          if /opt/semgrep-venv/bin/semgrep --version >/dev/null 2>&1; then
+            # Refresh at most weekly: the shared venv is provisioned out-of-band,
+            # so without this the SAST gate would run an ever-staler analyzer.
+            # A failed refresh scans with the existing binary rather than
+            # skipping the gate — stale beats absent.
+            if [ -z "$(find /opt/semgrep-venv -maxdepth 0 -mtime -7 2>/dev/null)" ]; then
+              sudo /opt/semgrep-venv/bin/pip install --quiet --upgrade semgrep || true
+              sudo touch /opt/semgrep-venv
+            fi
             /opt/semgrep-venv/bin/semgrep scan \
               --config p/default \
               --config p/owasp-top-ten \
