@@ -40,7 +40,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          # No GitHub Actions npm cache on self-hosted: ~/.npm already persists on
+          # the guest, so the cache buys nothing and only grows — this repo's entry
+          # reached 911MB, restored at ~0.6 MB/s. ci.yml dropped it on 2026-07-05 for
+          # exactly this reason; this workflow was missed.
+          #
+          # Inverted on purpose: `A && '' || 'npm'` is NOT a ternary ('' is falsy in
+          # Actions expressions, so it always yields 'npm' — see foundation #122).
+          cache: ${{ vars.USE_SELF_HOSTED != 'true' && 'npm' || '' }}
       - name: Install dependencies
         run: npm ci
       # The eval imports @force/database + @force/shared, which resolve to their
