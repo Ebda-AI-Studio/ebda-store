@@ -54,6 +54,34 @@ jobs:
               ':(exclude)**/dist/**' ':(exclude)**/.next/**' ':(exclude)**/*.snap' \
               | python3 -c "import sys; d=sys.stdin.buffer.read(200000); i=d.rfind(b'\n'); sys.stdout.buffer.write(d if i<0 else d[:i+1])"
           } > /tmp/review-input.md
+      # REVIEWER ROTATION (lens 26, standard/skill-hygiene.md).
+      #
+      # The review runs on Fable 5 while the code and the auto-fix below run on
+      # Opus 5. The reel's claim is that the shortcuts which create a defect are
+      # the ones that miss it in review — one model grading its own output
+      # measures convention adherence, not correctness. Live evidence: PR #1099
+      # was authored by Claude and passed by this workflow on the same model;
+      # both defects found afterwards (an unrun prettier gate, a revived
+      # TRUNCATE that broke two integration suites) were the author's.
+      #
+      # Two things this buys, and one it does not:
+      #   + Capability asymmetry in the right direction — Fable 5 is the more
+      #     capable model, so the reviewer is strictly stronger than the author.
+      #   + Different failure profile from a different training run.
+      #   − It does NOT fully decorrelate: same vendor means shared training
+      #     lineage, RLHF methodology and tokenizer, so correlated blind spots
+      #     remain. A second vendor would decorrelate further. This is the
+      #     Claude-only approximation, chosen deliberately.
+      #
+      # The larger lever is already in place and worth not breaking: the
+      # reviewer receives ONLY the prompt contract + the unified diff. It never
+      # sees the PR body or the author's rationale, so it cannot inherit the
+      # framing that produced the defect. Do not add PR body to the input.
+      #
+      # The durable answer is neither model: every defect this catches should
+      # become a deterministic gate (lint rule, type, test), because those
+      # share no blind spots with any model. The SSRF lint rule added in #1111
+      # is that pattern.
       - name: Run Claude review (subscription OAuth)
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -73,7 +101,7 @@ jobs:
             command -v claude >/dev/null 2>&1 || npm install -g @anthropic-ai/claude-code
           ) 200>/tmp/.force-claude-code-install.lock
           claude -p --output-format json \
-            --model claude-opus-4-8 \
+            --model claude-fable-5 \
             --allowedTools "Read,Grep,Glob" \
             < /tmp/review-input.md > /tmp/claude-out.json
           cat /tmp/claude-out.json
@@ -102,7 +130,7 @@ jobs:
           claude -p "You are fixing ONLY these critical findings from a pull-request review. Make the minimal, correct change in the named files. Do NOT refactor or touch unrelated code. Do NOT weaken or delete tests to hide the issue. Findings JSON:
           $FINDINGS" \
             --allowedTools "Read,Grep,Glob,Edit,Write" \
-            --model claude-opus-4-8 \
+            --model claude-opus-5 \
             --output-format json > /tmp/fix-out.json || true
           if [ -z "$(git status --porcelain)" ]; then
             echo "Auto-fix produced no changes — leaving the PR red for human review."

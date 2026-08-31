@@ -113,6 +113,8 @@ npm run audit:high | npm run secrets
 
 CI (`ci.yml`): lint → typecheck → build → unit → integration (Postgres 16 + Redis 7 services) → e2e → audit + trufflehog; gitleaks separate workflow. The pre-push hook mirrors CI locally + runs blast-radius + a deduped Opus AI diff review (`SKIP_AI_GATE=1` skips the AI part).
 
+**Reviewer rotation:** the author and auto-fix run on `claude-opus-5`; the PR review runs on `claude-fable-5` — a _different, more capable_ model, so the reviewer is never the author. Same vendor means blind spots stay partly correlated, so the durable answer is turning each caught defect into a deterministic gate (lint/type/test), not adding reviewers. The reviewer sees ONLY the prompt contract + the unified diff — **never** the PR body or the author's rationale, or it inherits the framing that produced the defect. → `standard/skill-hygiene.md` (lens 26).
+
 ## Rollback + backup
 
 `bash scripts/rollback.sh` reverts + pushes → redeploys the CF Workers + Railway in lock-step (never promote one app alone — shared API contracts via `@force/shared`). **Primary DR = Neon PITR (7-day window)** — branch-at-timestamp for bad migrations/deletes; full runbook + drill log: `docs/DB-BACKUP-RESTORE.md` (both paths drilled 2026-07-06). Belt-and-suspenders: daily local pg_dump via launchd (`backup-all-neon.sh`, keeps 30, needs pg_dump ≥ PG17) + daily encrypted copy to R2; per-commit Neon snapshots RETIRED — don't re-enable. Migration rollback: `docs/ROLLBACK.md` (re-verify RLS policy state after restore). Trace what migrated: `git log --diff-filter=A --name-only -- packages/database/prisma/migrations/`.

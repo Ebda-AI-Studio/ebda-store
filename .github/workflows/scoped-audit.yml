@@ -63,7 +63,7 @@ jobs:
             ) 200>/tmp/.force-claude-code-install.lock
             claude -p \
               --output-format json \
-              --model claude-opus-4-8 \
+              --model claude-opus-5 \
               --allowedTools "Read,Grep,Glob" \
               < "$AUDIT_INPUT" > /tmp/scoped-audit-out.json
           fi
