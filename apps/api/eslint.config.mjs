@@ -31,6 +31,38 @@ const cacheTtlSelectors = [
   },
 ];
 
+// Block a server-side fetch() of a NON-LITERAL url in REQUEST-HANDLING code.
+//
+// lib/safe-fetch.ts blocks RFC1918 / CGNAT / loopback / link-local — including
+// 169.254.169.254, the cloud metadata address — but a guard nothing enforces
+// only protects the call sites that remembered it. Audited 2026-08-31
+// (docs/audits/2026-08-31-reel-derived-lenses.md, lens L11): the guard existed
+// with TWO call sites while ~43 other fetch() calls did not use it. None were
+// vulnerable — every one composes a provider endpoint from config — but nothing
+// stopped the next fetch(userSuppliedUrl) from bypassing it, and that failure
+// would be silent.
+//
+// Scoped to `routes/**` on purpose. That is where request data lives, so it is
+// where a user-supplied URL can first reach fetch(). Applying this to every
+// service would flag ~14 provider clients whose URLs come from process.env, and
+// a rule that needs a 14-entry allowlist is one people learn to silence.
+// Services that later accept a URL from a route must use safeFetch* regardless
+// — that is a review point, documented in the audit above.
+const ssrfSelectors = [
+  {
+    // Flags a non-literal URL, EXCEPT a template rooted at `config.*` or
+    // `process.env.*` — those are deployment configuration and cannot be
+    // attacker-controlled. Verified 2026-08-31: the only three route-level
+    // hits were all `${config.wbsBaseUrl}/fixed/path`, so this exclusion takes
+    // the rule to zero false positives today while still catching
+    // `fetch(req.body.url)` / `fetch(userUrl)`.
+    selector:
+      "CallExpression[callee.name='fetch'] > :first-child:matches(Identifier, TemplateLiteral, MemberExpression):not(TemplateLiteral[expressions.0.object.name='config']):not(TemplateLiteral[expressions.0.object.object.name='process'])",
+    message:
+      'fetch() with a non-literal URL inside a route handler. If the URL can come from request input, route it through safeFetchImage/safe-fetch (SSRF — cloud metadata at 169.254.169.254). If it is provider config, move the call into its service client.',
+  },
+];
+
 export default [
   {
     ignores: ['dist/**', 'node_modules/**'],
@@ -55,4 +87,11 @@ export default [
         },
       ]
     : []),
+  // Request-handling code: cache-TTL rules PLUS the SSRF guard.
+  {
+    files: ['**/routes/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...cacheTtlSelectors, ...ssrfSelectors],
+    },
+  },
 ];

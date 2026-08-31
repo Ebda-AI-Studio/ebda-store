@@ -372,9 +372,7 @@ router.post(
         return;
       }
 
-      const wbsBaseUrl = config.wbsBaseUrl;
-      const submitUrl = `${wbsBaseUrl}/api/v1/external/templates/submit`;
-      const response = await fetch(submitUrl, {
+      const response = await fetch(`${config.wbsBaseUrl}/api/v1/external/templates/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

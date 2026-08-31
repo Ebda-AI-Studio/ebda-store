@@ -378,10 +378,9 @@ router.post(
       //   {{5}} payment URL (MyFatoorah hosted checkout)
       const variables = [customerDisplay, totalDisplay, currencyDisplay, storeName, paymentUrl];
 
-      const wbsBaseUrl = config.wbsBaseUrl;
       const idempotencyKey = `pl-${storeId}-${draftOrder.id}-${Date.now()}`;
 
-      const wbsResponse = await fetch(`${wbsBaseUrl}/api/v1/external/send-template`, {
+      const wbsResponse = await fetch(`${config.wbsBaseUrl}/api/v1/external/send-template`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
