@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@force/database';
+import { prisma, Prisma, hasTenantContext } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
@@ -120,81 +120,96 @@ export class CartService {
     // instead of a 500 — without it a load test surfaced ~18% failures on a hot
     // product. Business errors (INSUFFICIENT_INVENTORY, NOT_FOUND) are not P2034
     // so they propagate immediately and are never retried.
-    await retryOnWriteConflict(
-      () =>
-        prisma.$transaction(
-          async tx => {
-            // Verify product exists and is active
-            const product = await tx.product.findFirst({
-              where: { id: productId, storeId, status: 'active' },
-            });
+    // Perform the line write. Extracted so it can run either on the ambient
+    // tenant transaction or in its own — see the branch below.
+    const writeLine = async (tx: Prisma.TransactionClient) => {
+      // Verify product exists and is active
+      const product = await tx.product.findFirst({
+        where: { id: productId, storeId, status: 'active' },
+      });
 
-            if (!product) {
-              throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
-            }
+      if (!product) {
+        throw new AppError(404, 'NOT_FOUND', 'Product not found or unavailable');
+      }
 
-            // Resolve the chosen variant — it must belong to this product and
-            // be active. Variant stock + backorder override the product values,
-            // and the line is keyed by (cartId, productId, variantId) so each
-            // variant is its own row (order.service already reads variantId).
-            let variant: { id: string; inventory: number; allowBackorder: boolean } | null = null;
-            if (variantId) {
-              variant = await tx.productVariant.findFirst({
-                where: { id: variantId, productId, isActive: true },
-                select: { id: true, inventory: true, allowBackorder: true },
-              });
-              if (!variant) {
-                throw new AppError(404, 'NOT_FOUND', 'Variant not found or unavailable');
-              }
-            }
+      // Resolve the chosen variant — it must belong to this product and
+      // be active. Variant stock + backorder override the product values,
+      // and the line is keyed by (cartId, productId, variantId) so each
+      // variant is its own row (order.service already reads variantId).
+      let variant: { id: string; inventory: number; allowBackorder: boolean } | null = null;
+      if (variantId) {
+        variant = await tx.productVariant.findFirst({
+          where: { id: variantId, productId, isActive: true },
+          select: { id: true, inventory: true, allowBackorder: true },
+        });
+        if (!variant) {
+          throw new AppError(404, 'NOT_FOUND', 'Variant not found or unavailable');
+        }
+      }
 
-            const availableInventory = variant ? variant.inventory : product.inventory;
-            const effectiveAllowBackorder =
-              backorderFeatureEnabled &&
-              (variant ? variant.allowBackorder : product.allowBackorder);
+      const availableInventory = variant ? variant.inventory : product.inventory;
+      const effectiveAllowBackorder =
+        backorderFeatureEnabled && (variant ? variant.allowBackorder : product.allowBackorder);
 
-            // Same product+variant line if it already exists (null variantId for
-            // base-product lines merges only with other base-product lines).
-            const existingItem = await tx.cartItem.findFirst({
-              where: { cartId: cart.id, productId, variantId: variantId ?? null },
-            });
+      // Same product+variant line if it already exists (null variantId for
+      // base-product lines merges only with other base-product lines).
+      const existingItem = await tx.cartItem.findFirst({
+        where: { cartId: cart.id, productId, variantId: variantId ?? null },
+      });
 
-            if (existingItem) {
-              const newQuantity = existingItem.quantity + quantity;
+      if (existingItem) {
+        const newQuantity = existingItem.quantity + quantity;
 
-              if (
-                product.trackInventory &&
-                availableInventory < newQuantity &&
-                !effectiveAllowBackorder
-              ) {
-                throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
-              }
+        if (
+          product.trackInventory &&
+          availableInventory < newQuantity &&
+          !effectiveAllowBackorder
+        ) {
+          throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
+        }
 
-              await tx.cartItem.update({
-                where: { id: existingItem.id },
-                data: { quantity: newQuantity },
-              });
-            } else {
-              if (
-                product.trackInventory &&
-                availableInventory < quantity &&
-                !effectiveAllowBackorder
-              ) {
-                throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
-              }
+        await tx.cartItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: newQuantity },
+        });
+      } else {
+        if (product.trackInventory && availableInventory < quantity && !effectiveAllowBackorder) {
+          throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
+        }
 
-              // A concurrent add of the same line to the SAME cart can lose the
-              // (cartId, productId, variantId) unique race → P2002. Under
-              // Serializable that surfaced as P2034 and was retried; under Read
-              // Committed it's P2002, so the retry wrapper below is told to retry
-              // P2002 too — on the re-run findFirst sees the winner's row and the
-              // existing-branch above merges the quantity.
-              await tx.cartItem.create({
-                data: { cartId: cart.id, productId, variantId: variantId ?? null, quantity },
-              });
-            }
-          },
-          {
+        // A concurrent add of the same line to the SAME cart can lose the
+        // (cartId, productId, variantId) unique race → P2002. Under
+        // Serializable that surfaced as P2034 and was retried; under Read
+        // Committed it's P2002, so the retry wrapper below is told to retry
+        // P2002 too — on the re-run findFirst sees the winner's row and the
+        // existing-branch above merges the quantity.
+        await tx.cartItem.create({
+          data: { cartId: cart.id, productId, variantId: variantId ?? null, quantity },
+        });
+      }
+    };
+
+    if (hasTenantContext()) {
+      // Already inside the request-scoped tenant transaction opened by
+      // `tenantContext` middleware. Opening a nested $transaction here would
+      // run on a DIFFERENT connection that cannot see the cart this request
+      // just created — `getOrCreate` writes through the tenant proxy, and that
+      // outer transaction does not commit until the response finishes. The FK
+      // on cart_items.cart_id then pointed at an invisible row → P2003, a 500
+      // on the FIRST add-to-cart of a session (a GET /cart first masked it by
+      // committing the cart in an earlier request). Prisma has no nested
+      // interactive transactions in any case.
+      //
+      // The outer transaction supplies atomicity here. The isolation level
+      // below is not applied on this path, which is acceptable for the same
+      // reason the comment there gives: this check is advisory and the
+      // authoritative oversell guard is the atomic decrement in order.service.
+      await writeLine(prisma as unknown as Prisma.TransactionClient);
+    } else {
+      // No tenant context (crons, scripts, tests) — own transaction as before.
+      await retryOnWriteConflict(
+        () =>
+          prisma.$transaction(writeLine, {
             // Advisory cart-level check only — the authoritative inventory lock
             // is the atomic decrement at order creation (order.service). Read
             // Committed avoids the spurious P2034 storm where concurrent adds of
@@ -208,10 +223,10 @@ export class CartService {
             // set its maxWait/timeout inline and keep Read Committed.)
             maxWait: 10000,
             timeout: 30000,
-          }
-        ),
-      { label: 'cart.addItem', extraRetryCodes: ['P2002'] }
-    );
+          }),
+        { label: 'cart.addItem', extraRetryCodes: ['P2002'] }
+      );
+    }
 
     // Track activity for abandonment detection
     await prisma.cart.update({

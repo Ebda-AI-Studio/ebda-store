@@ -134,6 +134,30 @@ function isProxiedProp(prop: string | symbol): boolean {
 }
 
 /**
+ * Whether an ambient tenant transaction (from `runInTenantContext`) is active
+ * on this async context.
+ *
+ * Exists because `$transaction` is NOT proxied to the tenant transaction: the
+ * proxy above only forwards model accessors and raw helpers (`isProxiedProp`
+ * rejects anything starting with `$`). So `prisma.$transaction(...)` inside a
+ * request opens a SEPARATE transaction on a different connection, which cannot
+ * see rows the request has already written in the outer tenant transaction —
+ * that transaction does not commit until the response finishes.
+ *
+ * That is not hypothetical: `CartService.addItem` created the cart via the
+ * proxy (outer tx, uncommitted) and then inserted the cart item inside a nested
+ * `$transaction`, so the FK on `cart_items.cart_id` pointed at a row the nested
+ * transaction could not see → P2003, a 500 on the first add-to-cart of a
+ * session. Call sites that write-then-read within one request must use this to
+ * stay on the ambient transaction.
+ *
+ * Prisma does not support nested interactive transactions in any case.
+ */
+export function hasTenantContext(): boolean {
+  return tenantStorage.getStore() !== undefined;
+}
+
+/**
  * Proxy-wrapped Prisma client.
  *
  * When called inside `runInTenantContext`, model accessors and raw query

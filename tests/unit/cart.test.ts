@@ -40,8 +40,14 @@ vi.mock('@force/database', () => ({
   Prisma: {
     TransactionIsolationLevel: {
       Serializable: 'Serializable',
+      ReadCommitted: 'ReadCommitted',
     },
   },
+  // CartService.addItem branches on this: inside a tenant transaction it
+  // reuses the ambient client instead of opening a nested $transaction (which
+  // could not see the cart the same request just wrote). These unit tests
+  // exercise the standalone path, so report "no tenant context".
+  hasTenantContext: () => false,
   // CartService now imports STOREFRONT_PRODUCT_SELECT from product.service,
   // which evaluates `const SOLD_ORDER_STATUSES: OrderStatus[]` at MODULE load.
   // Without OrderStatus on this mock the whole suite fails to import — the
