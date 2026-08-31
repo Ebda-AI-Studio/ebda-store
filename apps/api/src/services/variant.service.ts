@@ -1,5 +1,6 @@
 import { prisma, Prisma, withMoneyTx } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
 
@@ -457,7 +458,7 @@ export class VariantService {
       },
     });
 
-    return {
+    const result = {
       ...variant,
       optionValues: variant.options.map(o => ({
         optionId: o.value.option.id,
@@ -468,6 +469,15 @@ export class VariantService {
         valueAr: o.value.valueAr,
       })),
     };
+
+    // Variant stock/price is serialised into the storefront product list,
+    // detail and suggest caches (lib/public-cache.ts, which states that ANY
+    // write changing price or stock MUST bust them). Without this the
+    // merchant restocks a variant and the storefront keeps serving "Sold
+    // Out" until the TTL lapses.
+    await invalidateStoreProductCaches(storeId);
+
+    return result;
   }
 
   /**
@@ -514,6 +524,13 @@ export class VariantService {
       );
     }
 
+    // Variant stock/price is serialised into the storefront product list,
+    // detail and suggest caches (lib/public-cache.ts, which states that ANY
+    // write changing price or stock MUST bust them). Without this the
+    // merchant restocks a variant and the storefront keeps serving "Sold
+    // Out" until the TTL lapses.
+    await invalidateStoreProductCaches(storeId);
+
     return updated;
   }
 
@@ -542,6 +559,13 @@ export class VariantService {
         logger.warn({ err, variantId }, '[variant.delete] r2 cleanup failed')
       );
     }
+
+    // Variant stock/price is serialised into the storefront product list,
+    // detail and suggest caches (lib/public-cache.ts, which states that ANY
+    // write changing price or stock MUST bust them). Without this the
+    // merchant restocks a variant and the storefront keeps serving "Sold
+    // Out" until the TTL lapses.
+    await invalidateStoreProductCaches(storeId);
   }
 
   /**
@@ -614,6 +638,13 @@ export class VariantService {
       created.push(variant.id);
     }
 
+    // Variant stock/price is serialised into the storefront product list,
+    // detail and suggest caches (lib/public-cache.ts, which states that ANY
+    // write changing price or stock MUST bust them). Without this the
+    // merchant restocks a variant and the storefront keeps serving "Sold
+    // Out" until the TTL lapses.
+    await invalidateStoreProductCaches(storeId);
+
     return {
       created: created.length,
       existing: product.variants.length,
@@ -656,6 +687,13 @@ export class VariantService {
         }
       })
     );
+
+    // Variant stock is serialised into the storefront product list, detail
+    // and suggest caches (lib/public-cache.ts, which states that ANY write
+    // changing price or stock MUST bust them). This is the bulk restock path
+    // — the one a merchant reaches for first — so a stale cache here reads
+    // exactly like the restock never happened.
+    await invalidateStoreProductCaches(storeId);
 
     return {
       updated: results.filter(r => r.success).length,
@@ -731,6 +769,12 @@ export class VariantService {
         })
       )
     );
+
+    // Deliberately NOT busting the product caches (unlike every other mutator
+    // in this service): this writes `position` only, and no cached storefront
+    // payload orders on variant position — the PDP renders variants in the
+    // order the detail query returns them, which this does not feed. If a
+    // cached surface ever starts honouring variant order, add the bust here.
   }
 
   // Helper to generate all combinations

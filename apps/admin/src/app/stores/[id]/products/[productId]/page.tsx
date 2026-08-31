@@ -24,6 +24,9 @@ interface Product {
   sku?: string;
   barcode?: string;
   inventory: number;
+  /** Variant-aware stock total from the API (variant sum for variant products, else `inventory`). */
+  totalInventory?: number;
+  hasVariants?: boolean;
   lowStockThreshold: number;
   trackInventory: boolean;
   status: string;

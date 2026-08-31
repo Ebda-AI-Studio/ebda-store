@@ -119,14 +119,24 @@ export async function handleOrderRefunded(
             FOR UPDATE
           `;
           if (!lockedProduct?.track_inventory) continue;
-          const prevStock = lockedProduct.inventory;
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { inventory: { increment: item.quantity } },
-          });
+
+          // One row per line, matching the sale. A variant refund returns
+          // stock to the variant only; `products.inventory` is not a total
+          // for a variant product (see lib/effective-inventory.ts). This used
+          // to increment BOTH, which is half of what drove the parent column
+          // out of step with reality across the catalogue.
+          let prevStock: number;
           if (item.variantId) {
-            await tx.productVariant.update({
+            const restored = await tx.productVariant.update({
               where: { id: item.variantId },
+              data: { inventory: { increment: item.quantity } },
+              select: { inventory: true },
+            });
+            prevStock = restored.inventory - item.quantity;
+          } else {
+            prevStock = lockedProduct.inventory;
+            await tx.product.update({
+              where: { id: item.productId },
               data: { inventory: { increment: item.quantity } },
             });
           }

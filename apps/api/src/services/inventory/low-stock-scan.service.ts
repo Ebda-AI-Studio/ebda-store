@@ -24,6 +24,7 @@
 
 import { withRlsBypass } from '@force/database';
 import { redis } from '../redis.service';
+import { effectiveInventory } from '../../lib/effective-inventory';
 import logger from '../../lib/logger';
 import type { LowStockAlertItem } from '../email-templates/low-stock-alert';
 
@@ -161,6 +162,9 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
         nameAr: true,
         inventory: true,
         lowStockThreshold: true,
+        // For a variant product the on-hand quantity is the variant sum;
+        // `inventory` is unused for one. See lib/effective-inventory.ts.
+        variants: { select: { inventory: true } },
       },
     });
 
@@ -195,7 +199,12 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
 
   for (const product of products) {
     const threshold = product.lowStockThreshold ?? 5;
-    const isLow = product.inventory > 0 && product.inventory <= threshold;
+    // Variant-aware on-hand. Reading `product.inventory` here meant a variant
+    // product — whose parent column is 0 by design, and had drifted negative —
+    // could never satisfy `> 0`, so NO variant product had ever produced a
+    // low-stock alert. A silent gap, not a visible failure.
+    const onHand = effectiveInventory(product);
+    const isLow = onHand > 0 && onHand <= threshold;
     const alerted = sentinelExists.get(product.id) === true;
 
     if (!isLow) {
@@ -219,7 +228,7 @@ export async function runLowStockScan(storeId: string): Promise<LowStockScanResu
       productId: product.id,
       name: product.name,
       nameAr: product.nameAr,
-      inventory: product.inventory,
+      inventory: onHand,
       lowStockThreshold: threshold,
     });
   }

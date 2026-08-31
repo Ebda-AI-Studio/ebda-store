@@ -20,6 +20,7 @@
  */
 
 import { prisma, withRlsBypass, Prisma } from '@force/database';
+import { effectiveInventory } from '../../lib/effective-inventory';
 import logger from '../../lib/logger';
 import { callGemini } from './gemini-ai.service';
 import { AppError } from '../../middleware/error-handler';
@@ -181,7 +182,13 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         trackInventory: true,
         deletedAt: null,
         status: 'active',
-        inventory: { gt: 0 },
+        // Variant-aware "has stock". Filtering on `inventory: { gt: 0 }` here
+        // excluded every variant product BEFORE the variant-aware valuation
+        // below could see it — the filter has to agree with the computation.
+        OR: [
+          { variants: { none: {} }, inventory: { gt: 0 } },
+          { variants: { some: { inventory: { gt: 0 } } } },
+        ],
         costPrice: { gt: 0 },
       },
       select: {
@@ -190,6 +197,9 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         nameAr: true,
         inventory: true,
         costPrice: true,
+        // For a variant product the on-hand quantity is the variant sum;
+        // `inventory` is unused for one. See lib/effective-inventory.ts.
+        variants: { select: { inventory: true } },
       },
     });
 
@@ -208,7 +218,11 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
 
     for (const product of products) {
       const days = daysSince(lastSales.get(product.id));
-      const stockValueFils = Math.round((product.inventory ?? 0) * (product.costPrice ?? 0));
+      // Variant-aware on-hand — valuing against `product.inventory` reported
+      // 0 (or a negative) stock-on-hand for the entire variant catalogue, so
+      // no variant product could ever clear the dead-stock value threshold.
+      const onHand = effectiveInventory(product);
+      const stockValueFils = Math.round(onHand * (product.costPrice ?? 0));
 
       if (days < DEADSTOCK_DAYS_THRESHOLD) continue;
       if (stockValueFils < DEADSTOCK_VALUE_FILS_THRESHOLD) continue;
@@ -218,7 +232,7 @@ export async function runDeadstockScan(storeId: string): Promise<DeadstockScanRe
         name: product.name,
         nameAr: product.nameAr,
         daysSinceSale: days,
-        stockOnHand: product.inventory ?? 0,
+        stockOnHand: onHand,
         stockValueFils,
         costPrice: product.costPrice ?? 0,
       });

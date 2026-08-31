@@ -5,6 +5,7 @@ import { getSystemAccountIdByCode } from './account.service';
 import { inngest } from '../../lib/inngest/client';
 import logger from '../../lib/logger';
 import { AppError } from '../../middleware/error-handler';
+import { effectiveInventory } from '../../lib/effective-inventory';
 
 export interface CreatePoInput {
   storeId: string;
@@ -181,6 +182,22 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
 
       // Step 1b: Replenish on-hand with remainder + WAC recompute
       if (remainingToProcess > 0) {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: {
+            inventory: true,
+            costPrice: true,
+            variants: { select: { inventory: true } },
+          },
+        });
+        if (!product) throw new Error(`Product ${item.productId} not found`);
+
+        // On-hand BEFORE this receive. For a variant product that is the
+        // variant sum — `products.inventory` is not stock for one (see
+        // lib/effective-inventory.ts), so using it here would weight the
+        // average against a meaningless quantity.
+        const onHandBefore = effectiveInventory(product);
+
         if (item.variantId) {
           // Variant inventory tracked separately; parent product.costPrice still holds the WAC.
           await tx.productVariant.update({
@@ -189,27 +206,25 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
           });
         }
 
-        const product = await tx.product.findUnique({
-          where: { id: item.productId },
-          select: { inventory: true, costPrice: true },
-        });
-        if (!product) throw new Error(`Product ${item.productId} not found`);
-
         // WAC formula: treat negative on-hand as 0 (backorder demand was consumed
         // in the FIFO clearance phase above; only pre-existing positive stock counts).
-        const oldStock = Math.max(product.inventory, 0);
+        const oldStock = Math.max(onHandBefore, 0);
         const oldCost = product.costPrice ?? item.unitCost; // first-receive fallback
-        const newStock = product.inventory + remainingToProcess;
+        const newStock = onHandBefore + remainingToProcess;
         const denom = oldStock + remainingToProcess;
         const newCost =
           denom > 0
             ? Math.round((oldStock * oldCost + remainingToProcess * item.unitCost) / denom)
             : item.unitCost;
 
+        // Cost always lands on the parent (the WAC is product-level). Stock
+        // lands on the parent ONLY for a variant-less line — the variant
+        // increment above already moved it otherwise. Writing both was the
+        // receive-side half of the parent-column drift.
         await tx.product.update({
           where: { id: item.productId },
           data: {
-            inventory: newStock,
+            ...(item.variantId ? {} : { inventory: newStock }),
             costPrice: newCost,
             lastCostUpdateAt: new Date(),
           },
@@ -222,7 +237,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
             storeId: input.storeId,
             type: 'transfer_in',
             quantity: remainingToProcess,
-            previousStock: product.inventory,
+            previousStock: onHandBefore,
             newStock,
             reason: `PO receive ${po.poNumber}`,
             reference: item.id,

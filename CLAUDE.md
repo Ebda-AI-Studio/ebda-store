@@ -64,6 +64,10 @@ Refuse: "ship on wadyaljuz first, roll out later", "setting for store X only", "
 
 **Code standards:** API: relaxed strict mode, `errorHandler` middleware, CSRF skips `/auth/`, auth rate limit 5/15min/IP+email. Admin: `middleware.ts` stays a passthrough; `StoreProvider`/`NotificationProvider` only mount when authenticated; SVG `<Image>` needs `unoptimized`. Web: store resolved via domain/slug in middleware; theme applied via CSS vars in `StoreContext`. `@force/database` build runs `prisma generate` first.
 
+## Inventory model
+
+**`products.inventory` is stock ONLY for a product with NO variants; for a variant product it is unused and stays 0, and the stock is `SUM(product_variants.inventory)`.** Read stock via `effectiveInventory`/`isOrderable`/`EFFECTIVE_STOCK_SELECT` (`apps/api/src/lib/effective-inventory.ts`) or `ON_HAND_SQL` (`…-sql.ts`) — never by dereferencing `.inventory`, and never with a filter that disagrees with its computation. One line writes the variant row XOR the product row, never both. Every variant write busts the product caches. Full rules + the 2026-08-30 defect that produced them: **`docs/architecture/inventory-model.md`**.
+
 ## Per-store visual configuration
 
 Canonical editors, all StoreTheme flags, the product-card CTA/OOS system, PLP facets, AI balancer, and layout invariants: **`docs/architecture/store-theme-flags.md`**. Binding headlines: Page Builder + Smart Palette are the canonical design system (the Branding tab's color/font/preset pickers are retired inputs); theme PUT is a server-side shallow-merge PATCH — send only the keys your surface owns; new visual toggles default OFF (rule 2 below); Store columns instead of StoreTheme JSON only when API-gated.

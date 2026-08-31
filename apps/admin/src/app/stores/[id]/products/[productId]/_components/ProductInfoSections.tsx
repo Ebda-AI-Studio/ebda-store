@@ -18,6 +18,9 @@ interface Product {
   sku?: string;
   barcode?: string;
   inventory: number;
+  /** Variant-aware stock total from the API (variant sum for variant products, else `inventory`). */
+  totalInventory?: number;
+  hasVariants?: boolean;
   lowStockThreshold: number;
   status: string;
   images: { id: string; url: string; alt?: string; position: number }[];
@@ -36,6 +39,11 @@ export function ProductInfoSections({
 }: ProductInfoSectionsProps) {
   const tSections = useT('products.detail.sections');
   const tFields = useT('products.detail.fields');
+
+  // `totalInventory` is the API's variant-aware stock (variant sum for a
+  // variant product, else `inventory`). Optional so an older cached payload
+  // still renders.
+  const onHand = product.totalInventory ?? product.inventory;
 
   return (
     <>
@@ -130,16 +138,24 @@ export function ProductInfoSections({
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">{tFields('stock')}</label>
+            {/* Variant products carry their stock on the variants; the
+                product-level `inventory` column is unused for them and had
+                drifted negative, which is how this panel came to read
+                "-16 in stock". Resolve against the API's variant-aware
+                `totalInventory`, mirroring ProductsTable.tsx (~:216).
+                `<= 0`, not `=== 0`: a non-variant product can hold a real
+                negative (backorder debt) and that must read out-of-stock,
+                not low-stock amber. */}
             <p
               className={`mt-1 text-lg font-semibold ${
-                product.inventory === 0
+                onHand <= 0
                   ? 'text-destructive'
-                  : product.inventory <= product.lowStockThreshold
+                  : onHand <= product.lowStockThreshold
                     ? 'text-warning'
                     : 'text-[hsl(var(--success))]'
               }`}
             >
-              {tFields('stockInStock', { count: product.inventory })}
+              {tFields('stockInStock', { count: onHand })}
             </p>
           </div>
         </div>

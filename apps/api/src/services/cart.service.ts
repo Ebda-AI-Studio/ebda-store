@@ -353,7 +353,14 @@ export class CartService {
 
     const item = await prisma.cartItem.findFirst({
       where: { id: itemId, cartId: cart.id },
-      include: { product: true },
+      // The variant is REQUIRED here, not a nicety: for a variant line the
+      // parent product's `inventory` column is not stock (see
+      // lib/effective-inventory.ts). Selecting only `product` is what made
+      // every quantity change on a variant product throw.
+      include: {
+        product: true,
+        variant: { select: { id: true, inventory: true, allowBackorder: true } },
+      },
     });
 
     if (!item) {
@@ -363,10 +370,15 @@ export class CartService {
     if (quantity <= 0) {
       await prisma.cartItem.delete({ where: { id: itemId } });
     } else {
-      const effectiveAllowBackorder = backorderFeatureEnabled && item.product.allowBackorder;
+      // Variant lines are authoritative on the VARIANT row; only a
+      // variant-less line falls back to the product column. Mirrors
+      // `addItem` (~:151) and `validate` (~:285), which have always done this.
+      const stockHolder = item.variant ?? item.product;
+      const effectiveAllowBackorder =
+        backorderFeatureEnabled && (item.variant?.allowBackorder ?? item.product.allowBackorder);
       if (
         item.product.trackInventory &&
-        item.product.inventory < quantity &&
+        stockHolder.inventory < quantity &&
         !effectiveAllowBackorder
       ) {
         throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');

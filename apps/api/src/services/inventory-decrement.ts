@@ -12,6 +12,15 @@ import type { Prisma } from '@prisma/client';
  * lock-acquired-early window — the row write-lock is taken at the decrement,
  * not at an upfront SELECT. Correctness (no oversell) is guaranteed by the
  * `inventory >= qty` guard: a losing concurrent writer sees 0 rows affected.
+ *
+ * There is deliberately NO unfloored product decrement here. One existed
+ * until 2026-08-30 to mirror a variant sale onto the parent
+ * `products.inventory` column; because a variant product's parent column
+ * starts at 0, it only ever went down, and 24 live products had drifted as
+ * far as -16 while their variants held four-figure stock. A line decrements
+ * the variant row or the product row, never both — see
+ * lib/effective-inventory.ts and
+ * docs/superpowers/plans/2026-08-30-variant-stock-drift.md.
  */
 
 export interface DecrementResult {
@@ -43,21 +52,6 @@ export async function decrementProductInventory(
   `;
   const inv = cur?.inventory ?? 0;
   return { ok: false, previousStock: inv, newStock: inv };
-}
-
-/** Unconditional decrement (may go negative) — backorder + parent-of-variant paths. */
-export async function forceDecrementProductInventory(
-  tx: Prisma.TransactionClient,
-  productId: string,
-  qty: number
-): Promise<DecrementResult> {
-  const [row] = await tx.$queryRaw<Array<{ inventory: number }>>`
-    UPDATE public.products SET inventory = inventory - ${qty}
-    WHERE id = ${productId}
-    RETURNING inventory
-  `;
-  const newStock = row?.inventory ?? 0;
-  return { ok: true, previousStock: newStock + qty, newStock };
 }
 
 /** Conditional variant decrement — only when enough variant stock exists. */

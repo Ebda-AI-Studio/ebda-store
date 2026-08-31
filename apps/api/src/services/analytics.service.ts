@@ -1,4 +1,5 @@
 import { prisma, Prisma } from '@force/database';
+import { ON_HAND_SQL } from '../lib/effective-inventory-sql';
 import { redis } from './redis.service';
 import { profitAndLoss } from './accounting/reports.service';
 
@@ -649,24 +650,44 @@ export class AnalyticsService {
    * Get low stock products
    */
   static async getLowStockProducts(storeId: string, threshold = 10) {
-    return prisma.product.findMany({
-      where: {
-        storeId,
-        status: 'active',
-        trackInventory: true,
-        inventory: { lte: threshold },
-      },
-      orderBy: { inventory: 'asc' },
-      take: 20,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        sku: true,
-        inventory: true,
-        images: { take: 1, orderBy: { position: 'asc' } },
-      },
-    });
+    // Variant-aware. This filtered and sorted on `products.inventory`, which
+    // is not stock for a variant product — so every variant product (parent 0,
+    // or drifted negative) matched `lte threshold` and the admin's Low Stock
+    // Alerts card was filled with products holding thousands of units, each
+    // rendered as "0 units left". See lib/effective-inventory.ts.
+    //
+    // Raw SQL because the filter and the sort both need the computed on-hand.
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        slug: string;
+        sku: string | null;
+        inventory: bigint | number;
+        image_url: string | null;
+      }>
+    >`
+      SELECT p.id, p.name, p.slug, p.sku, ${ON_HAND_SQL} AS inventory,
+             (SELECT pi.url FROM public.product_images pi
+               WHERE pi.product_id = p.id ORDER BY pi.position ASC LIMIT 1) AS image_url
+      FROM public.products p
+      WHERE p.store_id = ${storeId}
+        AND p.status = 'active'
+        AND p.track_inventory = true
+        AND ${ON_HAND_SQL} <= ${threshold}
+      ORDER BY inventory ASC, p.id ASC
+      LIMIT 20
+    `;
+
+    // Same shape the card already consumes (`images: [{ url }]`).
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      sku: r.sku,
+      inventory: Number(r.inventory),
+      images: r.image_url ? [{ url: r.image_url }] : [],
+    }));
   }
 
   /**
@@ -726,9 +747,13 @@ export class AnalyticsService {
    */
   static async stockSnapshot(storeId: string) {
     const [valueRow, backorderRow, rulesCount] = await Promise.all([
+      // Variant-aware quantity — see the same fix in finance.routes.ts and
+      // lib/effective-inventory-sql.ts. (Per-variant costPrice is not used
+      // here, matching this query's existing product-level cost simplification;
+      // accounting's inventoryValue in account.service.ts is the precise one.)
       prisma.$queryRaw<{ total: bigint }[]>`
-        SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total
-        FROM public.products WHERE store_id = ${storeId} AND deleted_at IS NULL
+        SELECT COALESCE(SUM(${ON_HAND_SQL} * COALESCE(p.cost_price, 0)), 0) AS total
+        FROM public.products p WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL
       `,
       prisma.$queryRaw<{ count: bigint; value: bigint }[]>`
         SELECT

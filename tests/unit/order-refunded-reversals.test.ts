@@ -137,12 +137,16 @@ beforeEach(() => {
     h.dispatch,
     h.notifyAdminsOfRefund,
     h.productUpdate,
-    h.productVariantUpdate,
     h.orderEventCreate,
     h.couponUpdateMany,
     h.inventoryHistoryCreate,
   ])
     fn.mockResolvedValue(undefined);
+  // The variant restore now READS BACK the post-increment inventory to derive
+  // the ledger's previousStock (the product row is no longer touched for a
+  // variant line, so it can no longer supply that number). v2 holds 40 after
+  // the +1 restore.
+  h.productVariantUpdate.mockResolvedValue({ inventory: 40 });
 });
 
 describe('order-refunded fanout — restore-inventory step', () => {
@@ -151,19 +155,25 @@ describe('order-refunded fanout — restore-inventory step', () => {
 
     await handleOrderRefunded('o1', 's1', true, true, stepStub);
 
-    expect(h.productUpdate).toHaveBeenCalledTimes(2);
+    // ONE row per line. p1 has no variant, so its stock goes back on the
+    // product row. p2's line names variant v2, so its stock goes back on the
+    // VARIANT row and the parent product row is left alone — mirroring the
+    // sale exactly. Until 2026-08-30 this incremented BOTH for p2, which is
+    // half of what drove `products.inventory` out of step across the catalogue
+    // (see docs/superpowers/plans/2026-08-30-variant-stock-drift.md).
+    expect(h.productUpdate).toHaveBeenCalledTimes(1);
     expect(h.productUpdate).toHaveBeenCalledWith({
       where: { id: 'p1' },
       data: { inventory: { increment: 2 } },
     });
-    expect(h.productUpdate).toHaveBeenCalledWith({
-      where: { id: 'p2' },
-      data: { inventory: { increment: 1 } },
-    });
+    expect(h.productUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'p2' } })
+    );
     expect(h.productVariantUpdate).toHaveBeenCalledTimes(1);
     expect(h.productVariantUpdate).toHaveBeenCalledWith({
       where: { id: 'v2' },
       data: { inventory: { increment: 1 } },
+      select: { inventory: true },
     });
 
     expect(h.inventoryHistoryCreate).toHaveBeenCalledTimes(2);

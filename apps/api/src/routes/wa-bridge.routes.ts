@@ -27,6 +27,11 @@ import { prisma } from '@force/database';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import { makeRateLimitStore } from '../middleware/security';
+import {
+  EFFECTIVE_STOCK_SELECT,
+  effectiveInventory,
+  isOrderable,
+} from '../lib/effective-inventory';
 import logger from '../lib/logger';
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
 import { CustomerAddressService } from '../services/customer-address.service';
@@ -172,6 +177,9 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
         inventory: true,
         trackInventory: true,
         allowBackorder: true,
+        // Required by the `inStock` flag below: for a variant product the
+        // stock is the variant sum, not `inventory`. See lib/effective-inventory.ts.
+        variants: { where: { isActive: true }, select: { inventory: true, allowBackorder: true } },
         images: {
           select: { url: true },
           orderBy: { position: 'asc' },
@@ -195,8 +203,8 @@ router.get('/products/search', waBridgeAuth, async (req: Request, res: Response)
         priceFils: p.price,
         currency: req.bridgeStore!.currency,
         compareAtFils: p.compareAtPrice,
-        inStock: !p.trackInventory || p.inventory > 0 || p.allowBackorder,
-        inventory: p.trackInventory ? p.inventory : null,
+        inStock: !p.trackInventory || effectiveInventory(p) > 0 || p.allowBackorder,
+        inventory: p.trackInventory ? effectiveInventory(p) : null,
         imageUrl: p.images[0]?.url || null,
       })),
       pagination: { page, perPage: limit, hasMore },
@@ -248,6 +256,9 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
         inventory: true,
         trackInventory: true,
         allowBackorder: true,
+        // Required by the `inStock` flag below: for a variant product the
+        // stock is the variant sum, not `inventory`. See lib/effective-inventory.ts.
+        variants: { where: { isActive: true }, select: { inventory: true, allowBackorder: true } },
         // Issue 3: include imageUrl so WBS can send product images before the list
         images: {
           select: { url: true },
@@ -268,7 +279,7 @@ router.get('/products/by-category', waBridgeAuth, async (req: Request, res: Resp
         nameAr: p.nameAr,
         priceFils: p.price,
         currency: req.bridgeStore!.currency,
-        inStock: !p.trackInventory || p.inventory > 0 || p.allowBackorder,
+        inStock: !p.trackInventory || effectiveInventory(p) > 0 || p.allowBackorder,
         imageUrl: p.images[0]?.url ?? null,
       })),
       pagination: { page, perPage: PAGE_SIZE, hasMore: products.length === PAGE_SIZE },
@@ -628,7 +639,7 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
         compareAtPrice: p.compareAtPrice ?? undefined,
         currency: storeRow.currency,
         categoryIds: p.categories.map(pc => pc.categoryId),
-        inStock: !p.trackInventory || p.inventory > 0 || p.allowBackorder,
+        inStock: !p.trackInventory || effectiveInventory(p) > 0 || p.allowBackorder,
         sku: p.sku ?? undefined,
         imageUrl: p.images[0]?.url ?? undefined,
         variants: p.variants.map(v => ({
@@ -749,9 +760,11 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
         name: true,
         nameAr: true,
         price: true,
-        inventory: true,
-        trackInventory: true,
-        allowBackorder: true,
+        // EFFECTIVE_STOCK_SELECT supplies inventory/trackInventory/
+        // allowBackorder plus the variants the stock check needs — spread it
+        // rather than listing the columns, so a future edit cannot drop
+        // `variants` and silently make this check variant-blind again.
+        ...EFFECTIVE_STOCK_SELECT,
       },
     });
     const byId = new Map(products.map(p => [p.id, p]));
@@ -772,14 +785,13 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
       store.id,
       'inventory.backorder'
     );
+    // A WhatsApp order line names a product, not a variant, so its available
+    // quantity is the product's EFFECTIVE stock — the variant sum when it has
+    // variants. Reading `product.inventory` here rejected every variant
+    // product whose parent column had drifted (see lib/effective-inventory.ts).
     const oos = items
       .map(i => ({ item: i, product: byId.get(i.productId)! }))
-      .filter(
-        ({ item, product }) =>
-          product.trackInventory &&
-          product.inventory < item.quantity &&
-          !(backorderFeatureEnabled && product.allowBackorder)
-      );
+      .filter(({ item, product }) => !isOrderable(product, item.quantity, backorderFeatureEnabled));
     if (oos.length > 0) {
       res.status(409).json({
         success: false,
@@ -787,7 +799,7 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
         outOfStock: oos.map(({ item, product }) => ({
           productId: item.productId,
           requested: item.quantity,
-          available: product.inventory,
+          available: effectiveInventory(product),
           name: product.name,
         })),
       });

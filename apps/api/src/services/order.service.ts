@@ -11,7 +11,6 @@ import { socketService } from './socket.service';
 import { featureService } from './feature.service';
 import {
   decrementProductInventory,
-  forceDecrementProductInventory,
   decrementVariantInventory,
   forceDecrementVariantInventory,
 } from './inventory-decrement';
@@ -602,10 +601,12 @@ export class OrderService {
       // across the rest of this multi-step order transaction (which under a
       // single-SKU flash-sale storm serialized every checkout on the row lock).
       // A losing concurrent writer sees 0 rows affected → INSUFFICIENT_INVENTORY
-      // (or backorder), never an oversell. Variant items decrement the variant
-      // (authoritative check) AND the parent product (unconditional), matching
-      // prior behavior; the InventoryHistory row tracks the PRODUCT stock, so we
-      // capture the accurate product pre/post stock per line for the ledger.
+      // (or backorder), never an oversell. A variant item decrements ONLY the
+      // variant row and a variant-less item ONLY the product row — never both
+      // (see lib/effective-inventory.ts for why the parent column is not stock
+      // for a variant product). The InventoryHistory row is keyed on productId,
+      // so for a variant line its pre/post stock describe the variant's
+      // movement; that is the movement that actually occurred.
       const stockChanges = new Map<string, { previousStock: number; newStock: number }>();
       for (const item of cart.items) {
         if (!(productInternalsById.get(item.productId)?.trackInventory ?? true)) continue;
@@ -643,28 +644,40 @@ export class OrderService {
               `Not enough inventory for ${item.product.name}${variantId ? ' (variant)' : ''}`
             );
           }
-          // Backorder accepted — force the decrement (may go negative) + track
-          // for BackorderLine creation below.
-          res = variantId
-            ? await forceDecrementVariantInventory(tx, variantId, qty)
-            : await forceDecrementProductInventory(tx, item.productId, qty);
+          // Backorder accepted — force the decrement + track for
+          // BackorderLine creation below. Variant lines floor at 0 so the
+          // admin grid never shows a negative. A NON-variant product's
+          // negative inventory is a real, meaningful backorder debt, so its
+          // decrement stays unfloored (inlined here rather than kept as an
+          // exported helper — see inventory-decrement.ts's module comment for
+          // why an exported one was a hazard).
+          if (variantId) {
+            res = await forceDecrementVariantInventory(tx, variantId, qty);
+          } else {
+            const [row] = await tx.$queryRaw<Array<{ inventory: number }>>`
+              UPDATE public.products SET inventory = inventory - ${qty}
+              WHERE id = ${item.productId}
+              RETURNING inventory
+            `;
+            const newStock = row?.inventory ?? 0;
+            res = { ok: true, previousStock: newStock + qty, newStock };
+          }
           backorderedItems.push({ productId: item.productId, variantId, quantity: qty });
         }
 
-        // Variant sale also decrements the parent product.inventory
-        // (unconditional, matching prior behavior); ledger tracks PRODUCT stock.
-        if (variantId) {
-          const prod = await forceDecrementProductInventory(tx, item.productId, qty);
-          stockChanges.set(lineKey, {
-            previousStock: prod.previousStock,
-            newStock: prod.newStock,
-          });
-        } else {
-          stockChanges.set(lineKey, {
-            previousStock: res.previousStock,
-            newStock: res.newStock,
-          });
-        }
+        // ONE row per line. A variant sale moves the variant's stock and
+        // nothing else — `products.inventory` is not a running total for a
+        // variant product, it is unused (held at 0). Mirroring the sale onto
+        // the parent is what drove that column negative across the catalogue
+        // (24 products, to -16) and made six read paths report a permanent,
+        // un-clearable "out of stock". The InventoryHistory row below is keyed
+        // on productId (the table has no variantId column), so for a variant
+        // line its previous/new stock describe the VARIANT's movement — which
+        // is the movement that actually happened.
+        stockChanges.set(lineKey, {
+          previousStock: res.previousStock,
+          newStock: res.newStock,
+        });
       }
 
       // Per-customer coupon usage limit (money-integrity audit F3-adjacent
@@ -1010,7 +1023,11 @@ export class OrderService {
       if (order.payments.length > 0) return;
       if (order.status !== 'pending') return; // Don't roll back further-progressed orders
 
-      // 1. Restore inventory (mirror what create() decremented)
+      // 1. Restore inventory — mirror EXACTLY what create() decremented: the
+      //    variant row for a variant line, the product row otherwise. This
+      //    used to increment the product for every line including variant
+      //    ones, so a rolled-back variant order handed stock back to a column
+      //    that was never debited while leaving the variant permanently short.
       for (const item of order.items) {
         const product = await tx.product.findUnique({
           where: { id: item.productId },
@@ -1018,10 +1035,21 @@ export class OrderService {
         });
         if (!product?.trackInventory) continue;
 
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { inventory: { increment: item.quantity } },
-        });
+        let previousStock: number;
+        if (item.variantId) {
+          const restored = await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { inventory: { increment: item.quantity } },
+            select: { inventory: true },
+          });
+          previousStock = restored.inventory - item.quantity;
+        } else {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { inventory: { increment: item.quantity } },
+          });
+          previousStock = product.inventory;
+        }
 
         await tx.inventoryHistory.create({
           data: {
@@ -1029,8 +1057,8 @@ export class OrderService {
             storeId,
             type: 'adjustment',
             quantity: item.quantity,
-            previousStock: product.inventory,
-            newStock: product.inventory + item.quantity,
+            previousStock,
+            newStock: previousStock + item.quantity,
             reason: 'Order rollback — payment step failed',
             reference: order.id,
           },

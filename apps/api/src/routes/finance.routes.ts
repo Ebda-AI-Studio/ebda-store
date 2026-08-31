@@ -15,6 +15,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
+import { ON_HAND_SQL } from '../lib/effective-inventory-sql';
 import { z } from 'zod';
 import { prisma, runInTenantContext } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
@@ -571,12 +572,17 @@ router.get(
         const [pnl, bs, stockValueRows] = await Promise.all([
           profitAndLoss(req.params.storeId, from, to),
           balanceSheet(req.params.storeId, to),
-          prisma.$queryRawUnsafe<{ total: bigint }[]>(
-            `SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total
-             FROM public.products
-             WHERE store_id = $1 AND deleted_at IS NULL`,
-            req.params.storeId
-          ),
+          // Variant-aware QUANTITY: `products.inventory` is not stock for a
+          // variant product, so this summed the wrong number of units — on
+          // pecannbee, 33,268 counted against 270,883 actually held. (That
+          // store has no cost prices set, so its stock VALUE reads 0 either
+          // way; the defect is the quantity term.) See
+          // lib/effective-inventory-sql.ts.
+          prisma.$queryRaw<{ total: bigint }[]>`
+            SELECT COALESCE(SUM(${ON_HAND_SQL} * COALESCE(p.cost_price, 0)), 0) AS total
+            FROM public.products p
+            WHERE p.store_id = ${req.params.storeId} AND p.deleted_at IS NULL
+          `,
         ]);
 
         const stockValue = Number(stockValueRows[0]?.total ?? 0);

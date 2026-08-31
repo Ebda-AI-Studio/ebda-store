@@ -36,6 +36,8 @@ import { encryption } from '../services/encryption.service';
 import { PaymentService } from '../services/payment-providers/payment.factory';
 import { getAuthUser } from '../utils/store-helpers';
 import { generateOrderNumber } from '../utils/order-number';
+import { EFFECTIVE_STOCK_SELECT, isOrderable } from '../lib/effective-inventory';
+import { featureService } from '../services/feature.service';
 import logger from '../lib/logger';
 import type { Currency } from '../services/payment-providers/types';
 
@@ -168,15 +170,23 @@ router.post(
               id: true,
               name: true,
               price: true,
-              inventory: true,
-              trackInventory: true,
-              allowBackorder: true,
               sku: true,
               costPrice: true,
+              // EFFECTIVE_STOCK_SELECT supplies inventory/trackInventory/
+              // allowBackorder plus the variants the stock check needs.
+              ...EFFECTIVE_STOCK_SELECT,
             },
           })
         : [];
       const byId = new Map(products.map(p => [p.id, p]));
+      // Backorder is a DUAL gate everywhere else in the codebase — the
+      // store-level feature flag AND the per-product flag. This route
+      // previously honoured only the per-product flag; resolving the feature
+      // here brings it in line with checkout and the WhatsApp bridge.
+      const backorderFeatureEnabled = await featureService.isFeatureEnabled(
+        storeId,
+        'inventory.backorder'
+      );
       for (const it of items) {
         const p = byId.get(it.productId);
         if (!p) {
@@ -187,7 +197,11 @@ router.post(
           });
           return;
         }
-        if (p.trackInventory && !p.allowBackorder && p.inventory < it.quantity) {
+        // Variant-aware: a payment-link line names a product, so its available
+        // stock is the variant sum when it has variants. Reading
+        // `p.inventory` rejected every variant product whose parent column had
+        // drifted negative (see lib/effective-inventory.ts).
+        if (!isOrderable(p, it.quantity, backorderFeatureEnabled)) {
           res.status(400).json({
             success: false,
             error: 'OUT_OF_STOCK',

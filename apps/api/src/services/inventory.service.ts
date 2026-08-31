@@ -2,6 +2,7 @@ import { prisma, Prisma, InventoryChangeType } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { notificationDispatcher } from './notification-dispatcher.service';
 import { WarehouseService } from './warehouse.service';
+import { ON_HAND_SQL } from '../lib/effective-inventory-sql';
 import logger from '../lib/logger';
 
 interface InventoryAdjustment {
@@ -39,50 +40,44 @@ export class InventoryService {
    * Get inventory statistics for a store
    */
   static async getStats(storeId: string): Promise<InventoryStats> {
-    const baseWhere: Prisma.ProductWhereInput = {
-      storeId,
-      deletedAt: null,
-      trackInventory: true,
-    };
-
-    const [aggregate, totalProducts, outOfStockCount, totalValue] = await Promise.all([
-      prisma.product.aggregate({
-        where: baseWhere,
-        _sum: { inventory: true },
-      }),
-      prisma.product.count({ where: baseWhere }),
-      prisma.product.count({
-        where: { ...baseWhere, inventory: { lte: 0 } },
-      }),
-      // totalValue requires per-row computation (inventory * costPrice) which
-      // Prisma aggregate cannot express; use raw SQL for accuracy.
-      prisma.$queryRaw<[{ total_value: bigint | null }]>`
-        SELECT COALESCE(SUM(inventory * COALESCE(cost_price, 0)), 0) AS total_value
-        FROM public.products
-        WHERE store_id = ${storeId}
-          AND deleted_at IS NULL
-          AND track_inventory = true
-      `,
-    ]);
-
-    // Low stock requires a column-to-column comparison (inventory <= lowStockThreshold)
-    // which Prisma does not support; use raw SQL.
-    const [{ low_stock_count }] = await prisma.$queryRaw<[{ low_stock_count: bigint }]>`
-      SELECT COUNT(*)::bigint AS low_stock_count
-      FROM public.products
-      WHERE store_id = ${storeId}
-        AND deleted_at IS NULL
-        AND track_inventory = true
-        AND inventory > 0
-        AND inventory <= low_stock_threshold
+    // ONE variant-aware pass. This was four separate queries reading
+    // `products.inventory` directly, so every variant product contributed its
+    // unused parent column (0, or a drifted negative) instead of its real
+    // variant stock — understating totalStock/totalValue and counting the
+    // whole variant catalogue as out-of-stock. See lib/effective-inventory.ts.
+    const [row] = await prisma.$queryRaw<
+      [
+        {
+          total_products: bigint;
+          total_stock: bigint | null;
+          low_stock_count: bigint;
+          out_of_stock_count: bigint;
+          total_value: bigint | null;
+        },
+      ]
+    >`
+      WITH on_hand AS (
+        SELECT ${ON_HAND_SQL} AS qty, p.low_stock_threshold, p.cost_price
+        FROM public.products p
+        WHERE p.store_id = ${storeId}
+          AND p.deleted_at IS NULL
+          AND p.track_inventory = true
+      )
+      SELECT
+        COUNT(*)::bigint                                                         AS total_products,
+        COALESCE(SUM(qty), 0)::bigint                                            AS total_stock,
+        COUNT(*) FILTER (WHERE qty > 0 AND qty <= low_stock_threshold)::bigint   AS low_stock_count,
+        COUNT(*) FILTER (WHERE qty <= 0)::bigint                                 AS out_of_stock_count,
+        COALESCE(SUM(qty * COALESCE(cost_price, 0)), 0)::bigint                  AS total_value
+      FROM on_hand
     `;
 
     return {
-      totalProducts,
-      totalStock: aggregate._sum.inventory ?? 0,
-      lowStockCount: Number(low_stock_count),
-      outOfStockCount,
-      totalValue: Number(totalValue[0].total_value ?? 0),
+      totalProducts: Number(row.total_products),
+      totalStock: Number(row.total_stock ?? 0),
+      lowStockCount: Number(row.low_stock_count),
+      outOfStockCount: Number(row.out_of_stock_count),
+      totalValue: Number(row.total_value ?? 0),
     };
   }
 
@@ -103,123 +98,97 @@ export class InventoryService {
     products: ProductInventory[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const page = options?.page || 1;
-    const limit = options?.limit || 20;
+    const page = Math.max(1, options?.page || 1);
+    const limit = Math.min(500, Math.max(1, options?.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ProductWhereInput = {
-      storeId,
-      deletedAt: null,
-    };
+    // Raw SQL because every part of this — the stock filter, the sort and the
+    // displayed quantity — needs the VARIANT-AWARE on-hand, and two of them
+    // also need a column-to-column comparison against `low_stock_threshold`
+    // that Prisma's where clause cannot express. The previous Prisma version
+    // filtered and sorted on `products.inventory`, which is not stock for a
+    // variant product: variant products sorted as if empty, `in_stock` never
+    // matched them and `out_of_stock` matched all of them. It also fetched
+    // the whole table and paginated in JS for two of the four filters.
+    const search = options?.search?.trim();
+    const searchSql = search
+      ? Prisma.sql`AND (p.name ILIKE ${`%${search}%`} OR p.name_ar ILIKE ${`%${search}%`} OR p.sku ILIKE ${`%${search}%`})`
+      : Prisma.empty;
 
-    if (options?.search) {
-      where.OR = [
-        { name: { contains: options.search, mode: 'insensitive' } },
-        { nameAr: { contains: options.search, mode: 'insensitive' } },
-        { sku: { contains: options.search, mode: 'insensitive' } },
-      ];
-    }
-
-    // Apply stock filter directly in the Prisma where clause to avoid fetching
-    // all rows and paginating in JS. Each filter uses a fixed threshold per product
-    // stored in lowStockThreshold. Since the threshold is per-row, we use a
-    // representative default (5) for the DB filter, then format results correctly.
-    // For precise per-product thresholds, the comparison is: lte lowStockThreshold.
-    // Prisma supports column-to-column comparison only via raw SQL; the approach
-    // below uses a reasonable split: inventory <= 0 = out_of_stock, > 0 and
-    // inventory <= lowStockThreshold (via Prisma raw comparison) = low_stock,
-    // else in_stock. We use the Prisma filter fields that map to column comparisons.
+    let stockSql = Prisma.empty;
     if (options?.stockFilter === 'out_of_stock') {
-      where.inventory = { lte: 0 };
+      stockSql = Prisma.sql`AND ${ON_HAND_SQL} <= 0`;
     } else if (options?.stockFilter === 'low_stock') {
-      // inventory > 0 AND inventory <= lowStockThreshold (column-level reference)
-      // Prisma does not support column references in filters directly, so we
-      // filter inventory > 0 and lte a sentinel, then rely on the select +
-      // JS check only for the page window (not the full table scan).
-      // The primary optimisation is pushing the non-null inventory bound to DB.
-      where.inventory = { gt: 0 };
-      where.trackInventory = true;
+      stockSql = Prisma.sql`AND p.track_inventory = true AND ${ON_HAND_SQL} > 0 AND ${ON_HAND_SQL} <= p.low_stock_threshold`;
     } else if (options?.stockFilter === 'in_stock') {
-      // inventory > lowStockThreshold: use gt: 0 as minimum, refine in format step
-      where.inventory = { gt: 0 };
-      where.trackInventory = true;
+      stockSql = Prisma.sql`AND p.track_inventory = true AND ${ON_HAND_SQL} > p.low_stock_threshold`;
     }
 
-    const orderBy: Prisma.ProductOrderByWithRelationInput = {};
-    if (options?.sortBy === 'name') {
-      orderBy.name = options?.sortOrder || 'asc';
-    } else if (options?.sortBy === 'sku') {
-      orderBy.sku = options?.sortOrder || 'asc';
-    } else {
-      orderBy.inventory = options?.sortOrder || 'asc';
-    }
+    // Whitelisted — these reach Prisma.raw, so they must never be caller text.
+    const sortColumn =
+      options?.sortBy === 'name' ? 'p.name' : options?.sortBy === 'sku' ? 'p.sku' : 'on_hand';
+    const sortDir = options?.sortOrder === 'desc' ? 'DESC' : 'ASC';
 
-    // Fetch only the page window when no per-row threshold filter is needed,
-    // otherwise fetch with DB-level bounds and apply the per-row threshold check
-    // across the smaller result set rather than the entire table.
-    const needsPerRowFilter =
-      options?.stockFilter === 'low_stock' || options?.stockFilter === 'in_stock';
+    const where = Prisma.sql`
+      WHERE p.store_id = ${storeId} AND p.deleted_at IS NULL ${searchSql} ${stockSql}
+    `;
 
-    let products = await prisma.product.findMany({
-      where,
-      orderBy,
-      // When a per-row threshold comparison is required we fetch without skip/take
-      // so we can filter and then slice. For all other cases (no filter or
-      // out_of_stock which is a pure DB filter) we push pagination to the DB.
-      ...(needsPerRowFilter ? {} : { skip, take: limit }),
-      select: {
-        id: true,
-        name: true,
-        nameAr: true,
-        sku: true,
-        inventory: true,
-        lowStockThreshold: true,
-        trackInventory: true,
-        costPrice: true,
-        status: true,
-      },
+    const [rows, [{ count }]] = await Promise.all([
+      prisma.$queryRaw<
+        Array<{
+          id: string;
+          name: string;
+          name_ar: string | null;
+          sku: string | null;
+          on_hand: bigint | number;
+          low_stock_threshold: number;
+          track_inventory: boolean;
+          cost_price: number | null;
+          status: string;
+        }>
+      >`
+        SELECT p.id, p.name, p.name_ar, p.sku, ${ON_HAND_SQL} AS on_hand,
+               p.low_stock_threshold, p.track_inventory, p.cost_price, p.status
+        FROM public.products p
+        ${where}
+        ORDER BY ${Prisma.raw(sortColumn)} ${Prisma.raw(sortDir)}, p.id ASC
+        LIMIT ${limit} OFFSET ${skip}
+      `,
+      prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(*)::bigint AS count FROM public.products p ${where}
+      `,
+    ]);
+
+    const total = Number(count);
+    const products: ProductInventory[] = rows.map(r => {
+      const inventory = Number(r.on_hand);
+      return {
+        id: r.id,
+        name: r.name,
+        nameAr: r.name_ar,
+        sku: r.sku,
+        inventory,
+        lowStockThreshold: r.low_stock_threshold,
+        trackInventory: r.track_inventory,
+        costPrice: r.cost_price,
+        status: r.status,
+        stockStatus: this.getStockStatus(inventory, r.low_stock_threshold),
+        stockValue: inventory * (r.cost_price || 0),
+      };
     });
 
-    // Finish per-row threshold filtering and paginate the filtered slice
-    if (needsPerRowFilter) {
-      products = products.filter(p => {
-        const stockStatus = this.getStockStatus(p.inventory, p.lowStockThreshold);
-        return stockStatus === options!.stockFilter;
-      });
-    }
-
-    const total = needsPerRowFilter ? products.length : await prisma.product.count({ where });
-    const paginatedProducts = needsPerRowFilter ? products.slice(skip, skip + limit) : products;
-
-    const formattedProducts: ProductInventory[] = paginatedProducts.map(p => ({
-      id: p.id,
-      name: p.name,
-      nameAr: p.nameAr,
-      sku: p.sku,
-      inventory: p.inventory,
-      lowStockThreshold: p.lowStockThreshold,
-      trackInventory: p.trackInventory,
-      costPrice: p.costPrice,
-      status: p.status,
-      stockStatus: this.getStockStatus(p.inventory, p.lowStockThreshold),
-      stockValue: p.inventory * (p.costPrice || 0),
-    }));
-
     return {
-      products: formattedProducts,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      products,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
 
   /**
    * Get low stock alerts
    * Uses raw SQL to compare inventory against the per-row low_stock_threshold
-   * column, which Prisma's where clause cannot express.
+   * column, which Prisma's where clause cannot express. On-hand is
+   * variant-aware (ON_HAND_SQL) — reading `products.inventory` here listed
+   * every variant product as out-of-stock and none as low-stock.
    */
   static async getLowStockAlerts(storeId: string): Promise<ProductInventory[]> {
     // Products that are low on stock (0 < inventory <= low_stock_threshold)
@@ -236,14 +205,14 @@ export class InventoryService {
         status: string;
       }>
     >`
-      SELECT id, name, name_ar, sku, inventory, low_stock_threshold,
-             track_inventory, cost_price, status
-      FROM public.products
-      WHERE store_id = ${storeId}
-        AND deleted_at IS NULL
-        AND track_inventory = true
-        AND inventory <= low_stock_threshold
-        AND inventory > 0
+      SELECT p.id, p.name, p.name_ar, p.sku, ${ON_HAND_SQL} AS inventory,
+             p.low_stock_threshold, p.track_inventory, p.cost_price, p.status
+      FROM public.products p
+      WHERE p.store_id = ${storeId}
+        AND p.deleted_at IS NULL
+        AND p.track_inventory = true
+        AND ${ON_HAND_SQL} <= p.low_stock_threshold
+        AND ${ON_HAND_SQL} > 0
       ORDER BY inventory ASC
       LIMIT 100
     `;
@@ -262,13 +231,13 @@ export class InventoryService {
         status: string;
       }>
     >`
-      SELECT id, name, name_ar, sku, inventory, low_stock_threshold,
-             track_inventory, cost_price, status
-      FROM public.products
-      WHERE store_id = ${storeId}
-        AND deleted_at IS NULL
-        AND track_inventory = true
-        AND inventory <= 0
+      SELECT p.id, p.name, p.name_ar, p.sku, ${ON_HAND_SQL} AS inventory,
+             p.low_stock_threshold, p.track_inventory, p.cost_price, p.status
+      FROM public.products p
+      WHERE p.store_id = ${storeId}
+        AND p.deleted_at IS NULL
+        AND p.track_inventory = true
+        AND ${ON_HAND_SQL} <= 0
       ORDER BY inventory ASC
       LIMIT 100
     `;
@@ -281,7 +250,7 @@ export class InventoryService {
       name: p.name,
       nameAr: p.name_ar,
       sku: p.sku,
-      inventory: p.inventory,
+      inventory: Number(p.inventory),
       lowStockThreshold: p.low_stock_threshold,
       trackInventory: p.track_inventory,
       costPrice: p.cost_price,
@@ -305,6 +274,24 @@ export class InventoryService {
 
     if (!product) {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
+    }
+
+    // A variant product's stock lives on its variants; `products.inventory`
+    // is unused for it (see lib/effective-inventory.ts). Writing it here
+    // would corrupt the column without moving any real stock, so refuse
+    // rather than silently no-op. The variant endpoints
+    // (PUT/POST .../variants/:id, .../variants/bulk-inventory) and the
+    // StockAdjustment flow — which the admin inventory grid already links to
+    // for these products — both handle variant products correctly.
+    const variantCount = await prisma.productVariant.count({
+      where: { productId: adjustment.productId },
+    });
+    if (variantCount > 0) {
+      throw new AppError(
+        400,
+        'VARIANT_PRODUCT',
+        'This product tracks stock on its variants. Adjust the variant inventory instead.'
+      );
     }
 
     const previousStock = product.inventory;
@@ -436,7 +423,15 @@ export class InventoryService {
     const ids = adjustments.map(a => a.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: ids }, storeId, deletedAt: null },
-      select: { id: true, inventory: true, name: true },
+      // `variants` (capped at 1 row — only its presence matters) so a variant
+      // product can be rejected instead of having its unused parent column
+      // written. See lib/effective-inventory.ts.
+      select: {
+        id: true,
+        inventory: true,
+        name: true,
+        variants: { select: { id: true }, take: 1 },
+      },
     });
     const productById = new Map(products.map(p => [p.id, p]));
 
@@ -453,6 +448,13 @@ export class InventoryService {
       if (!product) {
         failed++;
         errors.push(`Product ${adjustment.productId}: NOT_FOUND`);
+        continue;
+      }
+      if (product.variants.length > 0) {
+        failed++;
+        errors.push(
+          `${product.name}: tracks stock on its variants — adjust the variant inventory instead`
+        );
         continue;
       }
       const previousStock = product.inventory;

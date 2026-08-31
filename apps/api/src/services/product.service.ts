@@ -7,6 +7,7 @@ import {
   SlugEntityType,
 } from '@force/database';
 import { AppError } from '../middleware/error-handler';
+import { effectiveInventory } from '../lib/effective-inventory';
 import { slugify, AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches, invalidateStoreCategoriesCaches } from '../lib/public-cache';
@@ -560,6 +561,9 @@ export class ProductService {
         categories: { include: { category: true } },
         tags: { include: { tag: true } },
         store: { select: { id: true, name: true, slug: true } },
+        // Stock only — the admin detail page needs the variant-aware total,
+        // not the variant rows (it has a dedicated /variants page for those).
+        variants: { select: { inventory: true } },
       },
     });
 
@@ -567,7 +571,14 @@ export class ProductService {
       throw new AppError(404, 'NOT_FOUND', 'Product not found');
     }
 
-    return product;
+    // Same `totalInventory` contract the admin product LIST already returns
+    // (see listForAdmin ~:514): for a variant product `product.inventory` is
+    // not stock, so the detail page must not render it. Until 2026-08-30 it
+    // did, which is where the merchant saw "-16 in stock".
+    return {
+      ...product,
+      totalInventory: effectiveInventory(product),
+    };
   }
 
   static async getBySlug(storeId: string, slug: string) {
@@ -1878,9 +1889,20 @@ export class ProductService {
       where.price = { ...((where.price as object) || {}), lte: maxPrice };
     }
 
-    // In stock filter
+    // In stock filter — variant-aware. A variant product's stock lives on its
+    // variants and its own `inventory` column is unused (and had drifted
+    // negative), so filtering on that column alone excluded EVERY variant
+    // product from in-stock results, permanently. Expressed as relation
+    // filters so this stays one query. See lib/effective-inventory.ts.
     if (inStock === true) {
-      where.OR = [...(where.OR || []), { trackInventory: false }, { inventory: { gt: 0 } }];
+      where.OR = [
+        ...(where.OR || []),
+        { trackInventory: false },
+        // No variants: the product column is the stock.
+        { variants: { none: {} }, inventory: { gt: 0 } },
+        // Has variants: at least one of them carries stock.
+        { variants: { some: { inventory: { gt: 0 } } } },
+      ];
     }
 
     // On sale filter (has compare price higher than regular price)
