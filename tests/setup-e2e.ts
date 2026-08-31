@@ -1,72 +1,44 @@
 /**
  * E2E / Integration Test Setup
+ *
  * Resolves the database connection string for integration/e2e tests and resets
- * the Prisma singleton so tests connect to the correct (non-prod) database.
+ * the Prisma singleton so those suites connect to the correct (non-prod)
+ * database.
  *
  * Resolution order (highest priority first):
- *   1. TEST_DATABASE_URL environment variable  ← preferred (staging Neon preview branch)
- *   2. DATABASE_URL environment variable — ONLY when it doesn't point at prod
- *   3. DATABASE_URL read from .env file — ONLY when it doesn't point at prod
+ *   1. TEST_DATABASE_URL environment variable  ← preferred
+ *   2. DATABASE_URL environment variable (e.g. CI's postgres service container)
+ *   3. DATABASE_URL read from the repo .env file
  *
- * PRODUCTION GUARD: if the resolved host is the prod Neon endpoint
- * (ep-falling-meadow-a1uq2yil) this file throws immediately. Integration
- * tests MUST NOT run against the prod database.
+ * Every candidate is passed through the ALLOWLIST guard in
+ * `tests/helpers/db-guard.ts`, which throws unless the host is one the suites
+ * may seed and delete rows in. See that file for why it is an allowlist and
+ * why it now lives in its own tested module.
  *
- * Vitest loads setupFiles for EVERY test run (unit, integration, e2e). Unit
- * tests don't touch the DB and shouldn't trip the prod guard just because
- * the developer's local .env happens to point at production. We detect the
- * suite from process.argv and short-circuit on non-integration runs.
+ * SUITE DETECTION: `expect.getState().testPath`, read inside `beforeAll`, so
+ * it is accurate per test file. It must NOT be a module-load `process.argv`
+ * read — under `pool: 'forks'` a worker's argv carries no test paths, which is
+ * how the previous version of this file silently never ran at all. Unit tests
+ * bail before any resolution so a developer whose local .env points at
+ * production can still run them.
  */
 
 import fs from 'fs';
 import path from 'path';
-import { beforeAll } from 'vitest';
+import { beforeAll, expect } from 'vitest';
+import { assertNotProd, isIntegrationTestPath } from './helpers/db-guard';
 
-const argvJoined = process.argv.join(' ');
-const isIntegrationRun =
-  argvJoined.includes('tests/integration') ||
-  argvJoined.includes('tests/e2e') ||
-  process.env.VITEST_E2E === 'true';
-
-// Prod endpoint fragment — any connection string containing this host is prod.
-const PROD_HOST_FRAGMENT = 'ep-falling-meadow-a1uq2yil';
-
-function extractHost(connStr: string): string {
-  try {
-    // postgresql://user:pass@host:port/db?...
-    const withoutScheme = connStr.replace(/^[a-z]+:\/\/[^@]+@/, '');
-    return withoutScheme.split(/[:/?]/)[0];
-  } catch {
-    return connStr;
-  }
-}
-
-function isProd(connStr: string): boolean {
-  return connStr.includes(PROD_HOST_FRAGMENT);
-}
-
-function guardNotProd(connStr: string, source: string): void {
-  if (isProd(connStr)) {
-    throw new Error(
-      `\n\n🚨  PROD DB GUARD TRIGGERED — integration tests tried to connect to production!\n` +
-        `    Source: ${source}\n` +
-        `    Host:   ${extractHost(connStr)}\n\n` +
-        `    Set TEST_DATABASE_URL to the staging Neon preview branch (ep-spring-dew-a1nn6819)\n` +
-        `    before running integration tests. See .env.example for the exact format.\n`
-    );
-  }
-}
-
-if (isIntegrationRun) {
+/** Resolve DATABASE_URL for this suite, guarding every candidate. */
+function resolveTestDatabaseUrl(): void {
   // ── 1. TEST_DATABASE_URL — preferred path ──────────────────────────────────
   if (process.env.TEST_DATABASE_URL) {
-    guardNotProd(process.env.TEST_DATABASE_URL, 'TEST_DATABASE_URL env var');
+    assertNotProd(process.env.TEST_DATABASE_URL, 'TEST_DATABASE_URL env var');
     process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
   }
   // ── 2. DATABASE_URL already set (e.g. CI local postgres service) ───────────
   else if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('postgresql://test:')) {
     // If it's pointing at prod, refuse loudly instead of silently proceeding.
-    guardNotProd(process.env.DATABASE_URL, 'DATABASE_URL env var');
+    assertNotProd(process.env.DATABASE_URL, 'DATABASE_URL env var');
     // Already set to a non-placeholder, non-prod URL — nothing to do.
   }
   // ── 3. Fall back to .env file ──────────────────────────────────────────────
@@ -89,7 +61,7 @@ if (isIntegrationRun) {
             value = value.slice(1, -1);
           }
           // Guard: refuse to use the prod DB even when read from .env
-          guardNotProd(value, `.env file (${envPath}) — set TEST_DATABASE_URL to avoid this`);
+          assertNotProd(value, `.env file (${envPath}) — set TEST_DATABASE_URL to avoid this`);
           process.env.DATABASE_URL = value;
           break;
         }
@@ -107,58 +79,39 @@ if (isIntegrationRun) {
       );
     }
   }
+}
 
-  // Reset the Prisma singleton so it re-initializes with the resolved DATABASE_URL.
+/**
+ * Reset the Prisma singleton so it re-initialises against the resolved
+ * DATABASE_URL rather than whatever the module-load default was.
+ */
+async function resetPrismaSingleton(): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const g = globalThis as any;
   if (g.prisma) {
     await g.prisma.$disconnect().catch(() => {});
     g.prisma = undefined;
   }
-
-  // ── Truncate test tables before the integration suite runs ────────────────
-  // Accounting-specific tables accumulate leftover rows when a previous CI
-  // run's afterAll cleanup is blocked by RLS (prisma proxy requires
-  // app.current_store_id GUC; deleteMany outside a tenant context silently
-  // matches 0 rows). TRUNCATE is not subject to RLS policies (it requires
-  // TRUNCATE privilege, not DML access) so it reliably clears stale data.
-  //
-  // We only truncate tables that integration tests write to directly and
-  // that carry the unique constraint triggering the CI failures:
-  //   journal_entries(store_id, source, source_id)  ← the offending constraint
-  //   accounts(store_id, code)
-  //   sequences(store_id, kind)
-  // Plus all child/sibling accounting tables CASCADE handles them anyway, but
-  // listing them explicitly avoids ordering issues.
-  //
-  // We intentionally leave: users, stores, orders, products, order_items,
-  // payments — the seeded admin user + demo store are needed by api.test.ts,
-  // and stores created by accounting tests use unique UUIDs so they don't
-  // conflict within a single run.
-  beforeAll(async () => {
-    // Lazy import ensures prisma uses the DATABASE_URL resolved above.
-    const { prisma } = await import('@force/database');
-    await prisma.$executeRawUnsafe(`
-      TRUNCATE TABLE
-        journal_lines,
-        journal_entries,
-        accounts,
-        sequences,
-        purchase_order_items,
-        purchase_orders,
-        backorder_lines,
-        stock_adjustment_items,
-        stock_adjustments,
-        expenses,
-        reorder_suggestions,
-        reorder_rules,
-        deadstock_flags,
-        profit_anomalies,
-        customer_cohort_snapshots,
-        customer_rfm_snapshots,
-        funnel_snapshots,
-        suppliers
-      RESTART IDENTITY CASCADE
-    `);
-  });
 }
+
+/**
+ * Per-test-file setup for the integration/e2e suites.
+ *
+ * Registered unconditionally — Vitest cannot conditionally register hooks —
+ * and bails immediately for unit test files. That ordering matters: a unit
+ * test must never trip the DB guard just because a developer's local .env
+ * points at production.
+ *
+ * NOTE ON THE REMOVED TRUNCATE: this hook used to also TRUNCATE the accounting
+ * tables. That code had never executed (see the header), and waking it up on
+ * 2026-08-31 broke CI — it wiped fixtures the wa-bridge suites depend on and
+ * produced a 40P01 deadlock across parallel files. The suite has been green
+ * without it for its entire life, so it is deliberately not reinstated here.
+ * If accounting-table pollution ever returns, it belongs in a globalSetup that
+ * runs ONCE per run, not in a per-file hook.
+ */
+beforeAll(async () => {
+  if (!isIntegrationTestPath(expect.getState().testPath)) return;
+  resolveTestDatabaseUrl();
+  await resetPrismaSingleton();
+});
