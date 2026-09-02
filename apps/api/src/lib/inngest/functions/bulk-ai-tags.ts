@@ -197,7 +197,7 @@ const bulkAiTagsFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota();
+              await assertAiQuota({ storeId, bulk: true });
 
               const suggested = await callWithRetry(
                 () =>

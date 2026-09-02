@@ -207,6 +207,68 @@ router.post(
         return;
       }
 
+      // Idempotent create (adversarial audit P2): this route used to have NO
+      // existing-payment guard — every COD replay re-added the COD fee to
+      // `order.total` and minted another `cod_pending` row (a plain
+      // double-click corrupted real orders), and every online replay minted
+      // another live gateway invoice the customer could ALSO pay (undetected
+      // double capture). Terminal-failure payments (failed/cancelled/expired)
+      // are excluded so a legitimate retry after a failed attempt still works.
+      const existingPayment = await prisma.payment.findFirst({
+        where: {
+          orderId: order.id,
+          status: { notIn: ['failed', 'cancelled', 'expired'] },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existingPayment) {
+        const settled = ['completed', 'refunded', 'partially_refunded', 'disputed'].includes(
+          existingPayment.status
+        );
+        if (settled) {
+          res.status(409).json({
+            success: false,
+            error: {
+              code: 'ORDER_ALREADY_PAID',
+              message: 'This order already has a settled payment',
+            },
+          });
+          return;
+        }
+        if (existingPayment.provider === 'cod' && data.provider === 'cod') {
+          // Replay the original COD response — the fee was applied on the
+          // first call and must not stack.
+          const meta = (existingPayment.metadata ?? {}) as Record<string, unknown>;
+          res.json({
+            success: true,
+            data: {
+              transactionId: existingPayment.id,
+              provider: 'cod',
+              cod: true,
+              codFee: typeof meta.codFee === 'number' ? meta.codFee : 0,
+            },
+          });
+          return;
+        }
+        if (existingPayment.provider === data.provider && existingPayment.paymentUrl) {
+          // Same provider, live invoice already minted — hand back the
+          // existing paymentUrl instead of creating a second invoice.
+          res.json({
+            success: true,
+            data: {
+              transactionId: existingPayment.transactionId ?? existingPayment.id,
+              paymentUrl: existingPayment.paymentUrl,
+              provider: existingPayment.provider,
+            },
+          });
+          return;
+        }
+        // Different provider (customer switched payment method mid-checkout)
+        // or a legacy pending row without a stored paymentUrl — fall through
+        // and create. The abandoned pending invoice is driven terminal by the
+        // daily auto-cancel reconciler.
+      }
+
       // Set rollback context for the catch block. We only roll back if there's
       // no payment yet — paid orders don't get auto-cancelled by retry attempts.
       const sessionIdHeader = (req.headers['x-session-id'] as string | undefined) ?? '';
@@ -268,11 +330,20 @@ router.post(
 
           const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
 
-          // Add COD fee to order total if configured
-          if (codFee > 0) {
+          // Add the COD fee to order.total only when NO prior COD payment row
+          // exists for this order — a prior row (even a failed/cancelled one,
+          // which the idempotency guard above lets through) means the fee was
+          // already folded into order.total once and must not stack.
+          const priorCodPayment = await prisma.payment.findFirst({
+            where: { orderId: order.id, provider: 'cod' },
+            select: { id: true },
+          });
+          const applyFee = codFee > 0 && !priorCodPayment;
+          const chargedTotal = applyFee ? order.total + codFee : order.total;
+          if (applyFee) {
             await prisma.order.update({
               where: { id: order.id },
-              data: { total: order.total + codFee },
+              data: { total: chargedTotal },
             });
           }
 
@@ -283,9 +354,9 @@ router.post(
               provider: 'cod',
               method: 'cod',
               status: 'cod_pending',
-              amount: order.total + codFee,
+              amount: chargedTotal,
               currency: order.currency,
-              metadata: { codFee, originalTotal: order.total },
+              metadata: { codFee, originalTotal: chargedTotal - codFee },
             },
           });
 
@@ -301,7 +372,7 @@ router.post(
             toStatus: 'cod_pending',
             provider: 'cod',
             triggeredByUserId: req.user?.userId ?? null,
-            details: { amount: order.total + codFee, codFee, originalTotal: order.total },
+            details: { amount: chargedTotal, codFee, originalTotal: chargedTotal - codFee },
           });
 
           await auditLog({
@@ -312,7 +383,7 @@ router.post(
             resourceId: payment.id,
             details: {
               orderId: order.id,
-              amount: order.total + codFee,
+              amount: chargedTotal,
               codFee,
               provider: 'cod',
             },

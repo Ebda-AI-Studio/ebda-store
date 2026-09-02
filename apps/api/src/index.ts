@@ -313,6 +313,10 @@ app.use(
     },
     standardHeaders: true,
     legacyHeaders: false,
+    // Fail-OPEN on a Redis store error — see the posture comment on the
+    // limiters in middleware/security.ts (deliberate availability-over-
+    // strictness tradeoff, adversarial audit P2).
+    passOnStoreError: true,
     store: makeRateLimitStore(redis.getClient(), 'global'),
     // Skip the limiter for two cases:
     //

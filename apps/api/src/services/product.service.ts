@@ -28,14 +28,22 @@ import { recordSlugRedirect } from './slug-redirect.service';
  * previous single `contains`. Returns an array suitable for spreading into
  * `where.AND` (empty when the query is blank).
  *
+ * TOKEN CAP (adversarial audit P1-3): at most 8 tokens are used. Each token
+ * expands into a 4-5 way OR of leading-wildcard ILIKEs, so an unbounded
+ * whitespace-separated query string would multiply into hundreds of ILIKE
+ * clauses from one crafted request. No legitimate product search needs more
+ * than 8 words; extras are ignored.
+ *
+ * Exported for tests (the cap is otherwise unobservable from the route).
+ *
  * @param search   raw query string
  * @param withSku  include the (English-only) SKU column — admin paths only
  */
-function buildProductSearchAnd(
+export function buildProductSearchAnd(
   search: string | undefined | null,
   withSku: boolean
 ): Prisma.ProductWhereInput[] {
-  const tokens = (search ?? '').trim().split(/\s+/).filter(Boolean);
+  const tokens = (search ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 8);
   if (tokens.length === 0) return [];
   return tokens.map(token => {
     const or: Prisma.ProductWhereInput[] = [

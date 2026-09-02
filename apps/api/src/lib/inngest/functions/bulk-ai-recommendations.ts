@@ -342,7 +342,7 @@ const bulkAiRecommendationsFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota();
+              await assertAiQuota({ storeId, bulk: true });
 
               const desc = (product.description ?? '').slice(0, 300);
               const candidates = catalogIndex

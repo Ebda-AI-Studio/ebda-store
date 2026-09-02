@@ -22,6 +22,10 @@ const h = vi.hoisted(() => ({
   productVariantUpdate: vi.fn(),
   queryRaw: vi.fn(),
   orderEventFindFirst: vi.fn(),
+  // Partial-return markers (adversarial audit P1-2): the FULL restore path
+  // now reads prior partial_return_restored orderEvents to subtract
+  // already-restored quantities. Defaults to [] (no partial returns).
+  orderEventFindMany: vi.fn().mockResolvedValue([]),
   orderEventCreate: vi.fn(),
   couponUpdateMany: vi.fn(),
   backorderLineUpdateMany: vi.fn(),
@@ -47,7 +51,11 @@ const txClient = {
   inventoryHistory: { findFirst: h.inventoryHistoryFindFirst, create: h.inventoryHistoryCreate },
   product: { update: h.productUpdate },
   productVariant: { update: h.productVariantUpdate },
-  orderEvent: { findFirst: h.orderEventFindFirst, create: h.orderEventCreate },
+  orderEvent: {
+    findFirst: h.orderEventFindFirst,
+    findMany: h.orderEventFindMany,
+    create: h.orderEventCreate,
+  },
   coupon: { updateMany: h.couponUpdateMany },
   $queryRaw: h.queryRaw,
 };

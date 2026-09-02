@@ -11,6 +11,7 @@ import { AppError } from '../middleware/error-handler';
 import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
 import {
   publicLimiter,
+  publicTenantLimiter,
   storeResolveLimiter,
   cartLimiter,
   writeLimiter,
@@ -33,8 +34,10 @@ import type { PaymentProvider } from '../services/payment-providers/types';
 
 const router = Router();
 
-// Apply public rate limiter to all routes
+// Apply public rate limiter to all routes — per-IP first, then the
+// per-tenant aggregate backstop (see publicTenantLimiter's comment).
 router.use(publicLimiter);
+router.use(publicTenantLimiter);
 
 // GET /health - Health check endpoint
 router.get('/health', async (_req: Request, res: Response) => {
@@ -146,6 +149,30 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
       req.query;
     const storeId = await getStoreIdFromRequest(req);
 
+    // Search floor + length cap (adversarial audit P1-3, mirrors the >= 2
+    // floor on /:storeId/search/suggest below). The raw term used to pass
+    // straight into an unbounded leading-wildcard ILIKE over 4 TEXT columns
+    // AND into the cache key — so unique sub-floor terms ('a', 'aa', 'qx'…)
+    // bypassed every cache layer and ran a fresh scan per request. A term
+    // under the floor short-circuits to an empty page with NO DB or cache
+    // touch; longer terms are capped at 100 chars (token count is capped in
+    // buildProductSearchAnd) so a crafted query cannot expand into hundreds
+    // of ILIKE clauses.
+    const rawSearch = typeof search === 'string' ? search.trim() : '';
+    if (rawSearch.length === 1) {
+      const floorPage = page ? parseInt(page as string) || 1 : 1;
+      const floorLimit = Math.min(100, Math.max(1, (limit ? parseInt(limit as string) : 20) || 20));
+      res.json({
+        success: true,
+        data: {
+          products: [],
+          meta: { page: floorPage, limit: floorLimit, total: 0, totalPages: 0 },
+        },
+      });
+      return;
+    }
+    const effectiveSearch = rawSearch.length >= 2 ? rawSearch.slice(0, 100) : undefined;
+
     const sortValue =
       sort === 'newest' || sort === 'price_asc' || sort === 'price_desc' || sort === 'best_seller'
         ? sort
@@ -196,7 +223,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
 
     // Cache key includes cursor + ids + option filters — different selections get distinct entries.
     const cacheKey = `public:products:${storeId}:${page || 1}:${limit || 20}:${category || ''}:${
-      search || ''
+      effectiveSearch || ''
     }:${featured || ''}:${sortValue || ''}:${minPrice || ''}:${maxPrice || ''}:${
       validCursor || ''
     }:${idsParam?.sort().join(',') ?? ''}:${optionFilterKey}`;
@@ -206,7 +233,7 @@ router.get('/products', async (req: Request, res: Response, next: NextFunction) 
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         category: category as string,
-        search: search as string,
+        search: effectiveSearch,
         featured: featured === 'true',
         sort: sortValue,
         minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
@@ -917,7 +944,10 @@ router.get('/:storeId/search/suggest', async (req: Request, res: Response, next:
     }
 
     const q = typeof req.query.q === 'string' ? req.query.q : '';
-    const trimmed = q.trim();
+    // Length-cap alongside the >= 2 floor (same class as /products' search:
+    // the term is part of the cache key, so an unbounded term is unbounded
+    // cache-key cardinality AND an unbounded ILIKE pattern).
+    const trimmed = q.trim().slice(0, 100);
     if (trimmed.length < 2) {
       res.json({ success: true, data: { suggestions: [] } });
       return;

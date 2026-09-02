@@ -195,7 +195,7 @@ const bulkAiExcerptFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota();
+              await assertAiQuota({ storeId, bulk: true });
 
               const result = await callWithRetry(
                 () =>

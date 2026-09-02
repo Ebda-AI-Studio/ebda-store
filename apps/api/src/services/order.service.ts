@@ -1317,7 +1317,28 @@ export class OrderService {
   static async applyRefundEffects(
     storeId: string,
     orderId: string,
-    options: { restoreInventory?: boolean; fireRefundNotification?: boolean } = {}
+    options: {
+      restoreInventory?: boolean;
+      fireRefundNotification?: boolean;
+      /**
+       * Item-level (partial-return) reversal. When present, the
+       * `order-refunded` fanout restores ONLY the listed order-item
+       * lines/quantities and SKIPS every whole-order reversal (coupon,
+       * affiliate commission, loyalty, the refundReversedAt completion stamp
+       * and the GL journal reversal) — the customer kept the rest of the
+       * order, so those stay earned/consumed. `refundKey` (the Return id)
+       * is the idempotency key for the partial restore, so two different
+       * partial returns on one order each restore their own lines exactly
+       * once. `refundAmount` overrides the notification amount so the
+       * customer's "Refund issued" email states the partial amount, not the
+       * order total.
+       */
+      partial?: {
+        items: Array<{ orderItemId: string; quantity: number }>;
+        refundKey: string;
+        refundAmount?: number;
+      };
+    } = {}
   ): Promise<void> {
     const restoreInventory = options.restoreInventory ?? true;
     // Whether to fire the "Refund issued" merchant push + customer refund
@@ -1340,7 +1361,7 @@ export class OrderService {
     // silent money-loss failure mode this redesign removes.
     await inngest.send({
       name: 'order/refunded',
-      data: { orderId, storeId, restoreInventory, notify },
+      data: { orderId, storeId, restoreInventory, notify, partial: options.partial },
     });
   }
 

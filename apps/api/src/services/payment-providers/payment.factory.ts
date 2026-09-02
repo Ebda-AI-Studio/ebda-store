@@ -474,6 +474,57 @@ class PaymentFactory {
 // Singleton instance
 const factory = new PaymentFactory();
 
+/**
+ * Duplicate-capture detector (adversarial audit P2): when a payment reaches a
+ * captured state and ANOTHER payment on the same order is already captured
+ * (completed / refunded / partially_refunded), real money was taken twice for
+ * one order — e.g. two live invoices from a replayed /payments/create, both
+ * paid. Nothing reconciled that combination before; the merchant found out
+ * via a chargeback. Fires a P0 alert so finance refunds the duplicate before
+ * the customer disputes. Best-effort by design: called with `await` but every
+ * failure is swallowed — an alerting hiccup must never fail webhook
+ * processing.
+ */
+export async function alertIfDuplicateCapture(
+  paymentId: string,
+  orderId: string,
+  provider: string
+): Promise<void> {
+  try {
+    const duplicate = await prisma.payment.findFirst({
+      where: {
+        orderId,
+        id: { not: paymentId },
+        status: { in: ['completed', 'refunded', 'partially_refunded'] },
+      },
+      select: { id: true, provider: true, amount: true },
+    });
+    if (!duplicate) return;
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { storeId: true, store: { select: { name: true } } },
+    });
+    logger.error(
+      { orderId, paymentId, duplicatePaymentId: duplicate.id, provider },
+      '[PAYMENT WEBHOOK] duplicate capture detected — two captured payments on one order'
+    );
+    await sendAlert({
+      level: 'p0',
+      scope: 'store',
+      store: {
+        id: order?.storeId ?? '',
+        name: order?.store?.name ?? order?.storeId ?? 'unknown',
+      },
+      source: 'payment.duplicate_capture',
+      title: 'payment.duplicate_capture',
+      body: `Order ${orderId}: payment ${paymentId} (${provider}) completed while payment ${duplicate.id} (${duplicate.provider}, ${duplicate.amount} fils) is already captured. The customer likely paid twice — refund the duplicate before it becomes a dispute.`,
+      context: { orderId, paymentId, duplicatePaymentId: duplicate.id, provider },
+    });
+  } catch (err) {
+    logger.error({ err, orderId, paymentId }, '[PAYMENT WEBHOOK] duplicate-capture check failed');
+  }
+}
+
 // ==========================================
 // Unified Payment Service
 // ==========================================
@@ -932,8 +983,66 @@ export class PaymentService {
         return { success: true, status: newStatus, orderId: payment.orderId };
       }
 
-      // Update Payment metadata with the latest provider-reported refund
-      // status. Done in one update so prevMeta + new fields land atomically.
+      // Out-of-band refund detection: if Payment.status was not already
+      // 'refunded' / 'partially_refunded' when the executed webhook arrived,
+      // the admin Refund-via-provider button never ran — someone refunded
+      // directly in MyFatoorah's portal. Fire applyRefundEffects so the
+      // side-effects (inventory restore, coupon decrement, loyalty reversal,
+      // customer email) still happen. When the admin button DID run, we
+      // skip — the side-effects fired the moment they clicked.
+      //
+      // WRITE ORDERING (adversarial audit P2, closes 07-15 audit F3 for
+      // real): the reversal dispatch + order flip run BEFORE the durable
+      // `metadata.refundStatus` write below. That metadata field is this
+      // branch's idempotency key — writing it first meant a failed
+      // `applyRefundEffects` (Inngest event-API blip) or a rejected
+      // transition left the key committed, so the Inngest retry hit the
+      // `prevRefundStatus === newStatus` no-op above, the webhook was marked
+      // processed, and the reversal was silently lost forever (and because
+      // the order flip never ran either, refund-reversal-stuck-sweep — which
+      // keys on order status — could never rescue it). With effects-first,
+      // any failure leaves NO durable state, so the retry re-enters and
+      // re-runs the (idempotent) reversal dispatch.
+      const wasAlreadyHandled =
+        payment.status === 'refunded' || payment.status === 'partially_refunded';
+      if (newStatus === 'completed' && !wasAlreadyHandled && payment.order) {
+        // Reject a stale/invalid order state before running ANY reversal
+        // side-effects. A provider refund executed out-of-band for an
+        // order some OTHER path already moved to a terminal state (e.g.
+        // `cancelled`) must not regress it — and must not run
+        // applyRefundEffects first, which would leave the reversal applied
+        // but the status write rejected.
+        assertValidTransition(payment.order.status, 'refunded');
+
+        logger.info(
+          { paymentId: payment.id, orderId: payment.orderId },
+          '[PAYMENT WEBHOOK] out-of-band refund detected — running applyRefundEffects fresh'
+        );
+        // Let a genuine failure propagate. This runs inside the retriable
+        // `payment-webhook-process` Inngest step, so throwing gives 3 retries +
+        // the alerts-failure-watch P0 dead-letter for a money-adjacent reversal
+        // (inventory/coupon/loyalty restore + refund email). Swallowing it here
+        // marked the WebhookEvent 'processed' as if the reversal succeeded.
+        // Safe to retry: applyRefundEffects is idempotent (per-order
+        // alreadyRestoredInventory / alreadyAppliedEffects guards).
+        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId);
+        // Also flip the order's paymentStatus since OrderService.updateStatus
+        // is not the trigger here. PROPAGATE a failure (no .catch swallow):
+        // the idempotency metadata below is not yet written, so the Inngest
+        // retry re-enters this branch and re-runs the (idempotent) effects +
+        // this flip, instead of losing the order flip forever.
+        await prisma.order.update({
+          where: { id: payment.orderId },
+          data: { status: 'refunded', paymentStatus: 'refunded' },
+        });
+        // Bust the admin aggregated-customers snapshot — this paymentStatus
+        // transition changes the paid/refunded counts it aggregates.
+        await invalidateCustomersCache(payment.order.storeId);
+      }
+
+      // Durable idempotency write LAST — only after the reversal side-effects
+      // above have succeeded (or were legitimately skipped). Done in one
+      // update so prevMeta + new fields land atomically.
       await prisma.payment.update({
         where: { id: payment.id },
         data: {
@@ -972,54 +1081,6 @@ export class PaymentService {
           refundReference: webhookData.refund.refundReference ?? null,
         },
       });
-
-      // Out-of-band refund detection: if Payment.status was not already
-      // 'refunded' / 'partially_refunded' when the executed webhook arrived,
-      // the admin Refund-via-provider button never ran — someone refunded
-      // directly in MyFatoorah's portal. Fire applyRefundEffects so the
-      // side-effects (inventory restore, coupon decrement, loyalty reversal,
-      // customer email) still happen. When the admin button DID run, we
-      // skip — the side-effects fired the moment they clicked.
-      const wasAlreadyHandled =
-        payment.status === 'refunded' || payment.status === 'partially_refunded';
-      if (newStatus === 'completed' && !wasAlreadyHandled && payment.order) {
-        // Reject a stale/invalid order state before running ANY reversal
-        // side-effects. A provider refund executed out-of-band for an
-        // order some OTHER path already moved to a terminal state (e.g.
-        // `cancelled`) must not regress it — and must not run
-        // applyRefundEffects first, which would leave the reversal applied
-        // but the status write rejected.
-        assertValidTransition(payment.order.status, 'refunded');
-
-        logger.info(
-          { paymentId: payment.id, orderId: payment.orderId },
-          '[PAYMENT WEBHOOK] out-of-band refund detected — running applyRefundEffects fresh'
-        );
-        // Let a genuine failure propagate. This runs inside the retriable
-        // `payment-webhook-process` Inngest step, so throwing gives 3 retries +
-        // the alerts-failure-watch P0 dead-letter for a money-adjacent reversal
-        // (inventory/coupon/loyalty restore + refund email). Swallowing it here
-        // marked the WebhookEvent 'processed' as if the reversal succeeded.
-        // Safe to retry: applyRefundEffects is idempotent (per-order
-        // alreadyRestoredInventory / alreadyAppliedEffects guards).
-        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId);
-        // Also flip the order's paymentStatus since OrderService.updateStatus
-        // is not the trigger here.
-        await prisma.order
-          .update({
-            where: { id: payment.orderId },
-            data: { status: 'refunded', paymentStatus: 'refunded' },
-          })
-          .catch(err =>
-            logger.error(
-              { err, orderId: payment.orderId },
-              '[PAYMENT WEBHOOK] order status update failed after out-of-band refund'
-            )
-          );
-        // Bust the admin aggregated-customers snapshot — this paymentStatus
-        // transition changes the paid/refunded counts it aggregates.
-        await invalidateCustomersCache(payment.order.storeId);
-      }
 
       return { success: true, status: newStatus, orderId: payment.orderId };
     }
@@ -1136,6 +1197,20 @@ export class PaymentService {
         break;
     }
 
+    // Assert the ORDER transition BEFORE the payment write (adversarial audit
+    // P2; mirrors payment-confirm.service.ts:222-228). The assert used to run
+    // after `Payment.status` was already mutated — a stale/raced `completed`
+    // webhook on a cancelled order threw at the order write but left
+    // `Payment.status='completed'` + `Order.status='cancelled'` as durable
+    // state on every Inngest retry: money captured for a cancelled order,
+    // with no reconciler targeting that combination. Rejecting before ANY
+    // write keeps the rows consistent; payment-reconcile-sweep now watches
+    // for the captured-on-cancelled shape that arises when the capture
+    // happened anyway at the provider.
+    if (webhookData.status !== 'pending' && webhookData.status !== 'processing' && payment.order) {
+      assertValidTransition(payment.order.status, orderStatus);
+    }
+
     // Update payment
     const prevPaymentStatus = payment.status;
     await prisma.payment.update({
@@ -1152,6 +1227,13 @@ export class PaymentService {
         },
       },
     });
+
+    // Duplicate-capture watch: a second captured payment on one order means
+    // the customer paid twice (replayed create → two live invoices). Alert
+    // finance — best-effort, never blocks webhook processing.
+    if (webhookData.status === 'completed') {
+      await alertIfDuplicateCapture(payment.id, payment.orderId, provider);
+    }
 
     // Append-only audit row — every payment webhook receipt persists the
     // raw provider payload so a dispute 6+ months later can be replayed
@@ -1173,16 +1255,10 @@ export class PaymentService {
       },
     });
 
-    // Update order
+    // Update order — the transition was already asserted ABOVE, before the
+    // payment write, so this block can no longer be reached with an invalid
+    // transition.
     if (webhookData.status !== 'pending' && webhookData.status !== 'processing') {
-      // Reject a stale/out-of-order webhook before it can regress the
-      // order's status — e.g. a delayed "payment failed"/"expired"
-      // notification (which maps to `orderStatus:'pending'` below)
-      // arriving after the order already confirmed/shipped/delivered
-      // through a later, more-authoritative event.
-      if (payment.order) {
-        assertValidTransition(payment.order.status, orderStatus);
-      }
       await prisma.order.update({
         where: { id: payment.orderId },
         data: {

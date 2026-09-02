@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { prisma } from '@force/database';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
-import { promotionPreviewLimiter } from '../middleware/security';
+import { promotionPreviewLimiter, publicTenantLimiter } from '../middleware/security';
 import { PromotionService } from '../services/promotion.service';
 import { resolveBestPromotion, resolveCustomerContext } from '../services/promotion-resolver';
 import { tenantContext } from '../middleware/tenant-context';
@@ -218,6 +218,9 @@ router.patch(
 router.post(
   '/public/:storeId/promotions/preview',
   promotionPreviewLimiter,
+  // Per-tenant aggregate backstop (audit P3) — bounds distributed volume
+  // against one store's endpoint regardless of source-IP spread.
+  publicTenantLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

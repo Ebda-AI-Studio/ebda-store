@@ -195,7 +195,7 @@ const bulkAiCategorizeFn = inngest.createFunction(
               }
 
               try {
-                await assertAiQuota();
+                await assertAiQuota({ storeId, bulk: true });
 
                 const matches = await callWithRetry(
                   () =>

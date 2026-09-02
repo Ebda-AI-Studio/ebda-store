@@ -53,7 +53,7 @@ function stripFences(text: string): string {
 export async function translateReview(reviewId: string): Promise<void> {
   const review = await prisma.review.findUnique({
     where: { id: reviewId },
-    select: { id: true, body: true, language: true, bodyTranslated: true },
+    select: { id: true, storeId: true, body: true, language: true, bodyTranslated: true },
   });
   if (!review) {
     logger.warn({ reviewId }, '[REVIEW-TOOLS] translateReview: review not found');
@@ -70,7 +70,7 @@ export async function translateReview(reviewId: string): Promise<void> {
 Review:
 ${review.body}`;
 
-  await assertAiQuota();
+  await assertAiQuota({ storeId: review.storeId });
   await throttle();
 
   let result;
@@ -102,7 +102,7 @@ export interface SpamCheckResult {
 export async function detectSpamReview(reviewId: string): Promise<SpamCheckResult> {
   const review = await prisma.review.findUnique({
     where: { id: reviewId },
-    select: { body: true, title: true, rating: true, language: true },
+    select: { storeId: true, body: true, title: true, rating: true, language: true },
   });
   if (!review) {
     logger.warn({ reviewId }, '[REVIEW-TOOLS] detectSpamReview: review not found');
@@ -127,7 +127,7 @@ rating: ${review.rating}/5
 language: ${review.language}
 body: ${review.body}`;
 
-  await assertAiQuota();
+  await assertAiQuota({ storeId: review.storeId });
   await throttle();
 
   let result;
@@ -163,7 +163,7 @@ export interface ReviewSummary {
 export async function summarizeProductReviews(productId: string): Promise<ReviewSummary> {
   const reviews = await prisma.review.findMany({
     where: { productId, status: 'published', verifiedPurchase: true },
-    select: { rating: true, body: true, language: true },
+    select: { storeId: true, rating: true, body: true, language: true },
     orderBy: { createdAt: 'desc' },
     take: 100,
   });
@@ -183,7 +183,7 @@ Each theme should be a short phrase (3-7 words) summarizing what multiple review
 Reviews:
 ${reviewsText}`;
 
-  await assertAiQuota();
+  await assertAiQuota({ storeId: reviews[0].storeId });
   await throttle();
 
   let result;
@@ -218,6 +218,7 @@ export async function draftOwnerResponse(reviewId: string): Promise<OwnerRespons
     where: { id: reviewId },
     select: {
       id: true,
+      storeId: true,
       rating: true,
       title: true,
       body: true,
@@ -243,7 +244,7 @@ Review:
 - title: ${review.title ?? '(none)'}
 - body: ${review.body}`;
 
-  await assertAiQuota();
+  await assertAiQuota({ storeId: review.storeId });
   await throttle();
 
   let result;

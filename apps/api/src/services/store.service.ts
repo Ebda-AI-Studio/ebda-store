@@ -1,4 +1,4 @@
-import { prisma, Prisma, withMoneyTx } from '@force/database';
+import { prisma, Prisma, withMoneyTx, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { slugify } from '@force/shared';
 import { redis } from './redis.service';
@@ -30,7 +30,7 @@ import { revalidateStorefront } from '../lib/revalidate-storefront';
  * staleness, not unbounded; see `docs/audits/2026-07-12-scaling-cliff-reel.md`
  * finding #1.
  */
-async function bustStoreCaches(
+export async function bustStoreCaches(
   storeId: string,
   slug: string | null,
   domain?: string | null
@@ -123,6 +123,29 @@ export class StoreService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /**
+   * Flip a store's lifecycle status (suspend / reactivate) AND invalidate
+   * every cache layer that carries the `status` field — the service owns the
+   * write and its invalidation together so no route can flip status without
+   * the bust (adversarial audit P1-7 / feedback-cache-invalidate-every-write-path:
+   * account status is a NEVER-stale value; the status PATCH used to
+   * invalidate only the feature cache, so a suspended store kept serving the
+   * cached active `public:store:resolve:<domain>` — checkouts included — for
+   * up to the TTL, and reactivation was delayed the same way).
+   *
+   * `bustStoreCaches` clears the resolve/slug/id + categories/products keys
+   * and fires the storefront revalidate purge, exactly as the domain-change
+   * path does.
+   */
+  static async setStatus(storeId: string, status: StoreStatus) {
+    const store = await prisma.store.update({
+      where: { id: storeId },
+      data: { status },
+    });
+    await bustStoreCaches(store.id, store.slug, store.domain);
+    return store;
   }
 
   static async getById(storeId: string) {

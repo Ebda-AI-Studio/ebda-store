@@ -400,7 +400,7 @@ Return ONLY a JSON array. Each element must have exactly these keys:
   question, questionAr, answer, answerAr
 No other text, no markdown code fences — pure JSON only.`;
 
-        await assertAiQuota();
+        await assertAiQuota({ storeId, bulk: true });
 
         const genAI = getGenAI();
         const model = genAI.getGenerativeModel({
@@ -694,7 +694,7 @@ Return ONLY a JSON array. Each element must have exactly:
 where steps and stepsAr are arrays of { name, text }.
 No markdown, no code fences — pure JSON only.`;
 
-        await assertAiQuota();
+        await assertAiQuota({ storeId, bulk: true });
 
         const genAI = getGenAI();
         const model = genAI.getGenerativeModel({
@@ -1007,7 +1007,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 continue;
               }
               try {
-                await assertAiQuota();
+                await assertAiQuota({ storeId, bulk: true });
                 const prompt = buildMetaAeoPrompt('store', s.name, s.description ?? '');
                 const genResult = await callWithRetry(
                   () => model.generateContent(prompt),
@@ -1079,7 +1079,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
                 continue;
               }
               try {
-                await assertAiQuota();
+                await assertAiQuota({ storeId, bulk: true });
                 // Shared core — identical prompt + parse + usage-recording
                 // path as the per-product "Generate with AI" route
                 // (POST /ai/product-meta-aeo). DRY: both call
@@ -1148,7 +1148,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
               continue;
             }
             try {
-              await assertAiQuota();
+              await assertAiQuota({ storeId, bulk: true });
               const prompt = buildMetaAeoPrompt('category', c.name, c.description ?? '', storeName);
               const genResult = await callWithRetry(
                 () => model.generateContent(prompt),

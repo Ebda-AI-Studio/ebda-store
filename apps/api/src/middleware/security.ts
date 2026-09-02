@@ -271,6 +271,12 @@ export const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTestOrTests,
   keyGenerator: req => {
     // Use IP + email for more granular limiting. ipKeyGenerator() normalizes
@@ -292,6 +298,12 @@ export const writeLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
 });
 
@@ -306,6 +318,12 @@ export const paymentLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
 });
 
@@ -320,6 +338,12 @@ export const uploadLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
   keyGenerator: req => {
     // Limit per user, not per IP. ipKeyGenerator() applied to the IP
@@ -340,6 +364,12 @@ export const dailyUploadLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
   keyGenerator: req => {
     // ipKeyGenerator() normalizes IPv6 to /64 prefix (ERR_ERL_KEY_GEN_IPV6).
@@ -365,6 +395,12 @@ export const publicLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
 });
 
@@ -379,6 +415,12 @@ export const storeResolveLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
 });
 
@@ -393,6 +435,12 @@ export const cartLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
   keyGenerator: req => {
     // Use session ID if available, otherwise normalized IP (ipKeyGenerator
@@ -416,6 +464,12 @@ export const newsletterLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
   keyGenerator: req => {
     // ipKeyGenerator() collapses IPv6 to /64 prefix — ERR_ERL_KEY_GEN_IPV6.
@@ -438,6 +492,12 @@ export const couponValidateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
@@ -457,6 +517,12 @@ export const promotionPreviewLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
 });
@@ -477,8 +543,53 @@ export const viewIngestLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fail-OPEN on a Redis store error (deliberate availability-over-strictness
+  // tradeoff, adversarial audit P2): express-rate-limit v8 defaults this to
+  // false, which rethrew a Redis blip into a 500 on every limited route —
+  // Redis became a single point of failure for the whole write surface while
+  // the cache layer deliberately fails open. Unlimited-but-up beats down.
+  passOnStoreError: true,
   skip: skipForLoadTest,
   keyGenerator: req => ipKeyGenerator(req.ip ?? '') || 'noip',
+});
+
+// Per-TENANT aggregate limiter for the public surface (adversarial audit
+// P3 defense-in-depth): every public limiter above keys on IP (or session),
+// so a small IP pool multiplies its allowance and nothing bounds aggregate
+// load against ONE store's expensive endpoints (search, resolve, coupon
+// validate). This second dimension keys on the tenant headers the storefront
+// always sends and caps the aggregate regardless of source-IP spread. The
+// cap is deliberately generous (default 6000/min ≈ 100 rps per store —
+// far above legitimate flash-sale traffic) because it is a backstop against
+// distributed burn, not a per-user fairness limit. Keyed on the RAW header
+// (no DB lookup — limiters must stay cheap); requests with no tenant header
+// fall back to the normalized IP so they never share one global bucket.
+export const publicTenantLimiter = rateLimit({
+  store: makeRateLimitStore(redis.getClient(), 'public-tenant'),
+  windowMs: 60 * 1000,
+  max: Number(process.env.PUBLIC_TENANT_RATE_LIMIT_PER_MIN) || 6000,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many requests, please slow down.' },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Fail-OPEN on a Redis store error — same posture as every limiter above.
+  passOnStoreError: true,
+  skip: skipForLoadTestOrTests,
+  keyGenerator: req => {
+    // Route-level usages (coupons/validate, promotions/preview) carry the
+    // tenant as a :storeId path param; router-level usage sees only headers.
+    const paramStoreId = (req.params as Record<string, string> | undefined)?.storeId;
+    const storeId = req.headers['x-store-id'];
+    const storeDomain = req.headers['x-store-domain'];
+    const tenant =
+      (typeof paramStoreId === 'string' && paramStoreId) ||
+      (typeof storeId === 'string' && storeId) ||
+      (typeof storeDomain === 'string' && storeDomain.toLowerCase()) ||
+      '';
+    return tenant ? `t:${tenant}` : ipKeyGenerator(req.ip ?? '') || 'noip';
+  },
 });
 
 // ==========================================

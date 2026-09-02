@@ -14,6 +14,22 @@ interface FanoutStep {
 }
 
 /**
+ * Item-level (partial-return) reversal payload — see
+ * `OrderService.applyRefundEffects`. When present, only the listed order-item
+ * lines are restored (idempotent per `refundKey`, the Return id) and every
+ * whole-order reversal (coupon, affiliate, loyalty, claim-reversed stamp) is
+ * skipped: the customer kept the rest of the order.
+ */
+export interface PartialRefund {
+  items: Array<{ orderItemId: string; quantity: number }>;
+  refundKey: string;
+  refundAmount?: number;
+}
+
+/** orderEvent.toStatus marker for a completed partial-return restore. */
+const PARTIAL_RESTORE_MARKER = 'partial_return_restored';
+
+/**
  * Fans out side effects when an order is refunded — fires from
  * `OrderService.applyRefundEffects` so EVERY refund path (gateway-driven
  * webhook, admin "Refund via MyFatoorah", manual status-button) lands
@@ -64,11 +80,21 @@ export async function handleOrderRefunded(
   // Gates the notification block below (paid + genuinely-new refunds only —
   // see the two-tier failure policy comment above `handleOrderRefunded`).
   notify: boolean,
-  step: FanoutStep
+  step: FanoutStep,
+  // Optional item-level payload — presence flips the fanout into
+  // partial-return mode (item-restore only, no whole-order reversals).
+  partial?: PartialRefund
 ): Promise<{ skipped?: string } | void> {
   if (!orderId || !storeId) {
     logger.warn({ orderId, storeId }, 'order/refunded fired without ids — skipping');
     return { skipped: 'missing-ids' };
+  }
+  const isPartial = !!partial && partial.items.length > 0;
+  if (isPartial && !partial?.refundKey) {
+    // A partial event without an idempotency key cannot be safely retried —
+    // refuse it loudly rather than double-restoring on redelivery.
+    logger.error({ orderId, storeId }, 'order/refunded partial event missing refundKey — skipping');
+    return { skipped: 'partial-missing-refund-key' };
   }
 
   // FORCE RLS: Inngest jobs run outside HTTP — no tenant context middleware.
@@ -104,13 +130,18 @@ export async function handleOrderRefunded(
         // the pre-Task-1 `applyRefundEffects` lock (old order.service.ts ~1131).
         await tx.$queryRaw`SELECT id FROM public.orders WHERE id = ${orderId} FOR UPDATE`;
 
-        const stockMarker = await tx.inventoryHistory.findFirst({
-          where: { reference: orderId, type: 'return_stock', storeId },
-          select: { id: true },
-        });
-        if (stockMarker) return { skipped: true };
-
-        for (const item of order.items) {
+        // Restore one line's stock and write its InventoryHistory audit row.
+        // One row per line, matching the sale. A variant refund returns
+        // stock to the variant only; `products.inventory` is not a total
+        // for a variant product (see lib/effective-inventory.ts). This used
+        // to increment BOTH, which is half of what drove the parent column
+        // out of step with reality across the catalogue.
+        const restoreLine = async (
+          item: { productId: string; variantId: string | null },
+          qty: number,
+          reference: string,
+          reason: string
+        ): Promise<void> => {
           const [lockedProduct] = await tx.$queryRaw<
             Array<{ id: string; inventory: number; track_inventory: boolean }>
           >`
@@ -118,26 +149,21 @@ export async function handleOrderRefunded(
             WHERE id = ${item.productId}
             FOR UPDATE
           `;
-          if (!lockedProduct?.track_inventory) continue;
+          if (!lockedProduct?.track_inventory) return;
 
-          // One row per line, matching the sale. A variant refund returns
-          // stock to the variant only; `products.inventory` is not a total
-          // for a variant product (see lib/effective-inventory.ts). This used
-          // to increment BOTH, which is half of what drove the parent column
-          // out of step with reality across the catalogue.
           let prevStock: number;
           if (item.variantId) {
             const restored = await tx.productVariant.update({
               where: { id: item.variantId },
-              data: { inventory: { increment: item.quantity } },
+              data: { inventory: { increment: qty } },
               select: { inventory: true },
             });
-            prevStock = restored.inventory - item.quantity;
+            prevStock = restored.inventory - qty;
           } else {
             prevStock = lockedProduct.inventory;
             await tx.product.update({
               where: { id: item.productId },
-              data: { inventory: { increment: item.quantity } },
+              data: { inventory: { increment: qty } },
             });
           }
           await tx.inventoryHistory.create({
@@ -145,13 +171,90 @@ export async function handleOrderRefunded(
               productId: item.productId,
               storeId,
               type: 'return_stock',
-              quantity: item.quantity,
+              quantity: qty,
               previousStock: prevStock,
-              newStock: prevStock + item.quantity,
-              reason: 'Order refunded',
-              reference: orderId,
+              newStock: prevStock + qty,
+              reason,
+              reference,
             },
           });
+        };
+
+        // ---- PARTIAL (item-level) restore: only the returned lines. ----
+        if (isPartial && partial) {
+          // Idempotency marker: one orderEvent per refundKey (the Return id),
+          // written in the SAME tx as the restores — a retried or redelivered
+          // partial event never double-increments, while a DIFFERENT return
+          // on the same order still restores its own lines.
+          const partialMarker = await tx.orderEvent.findFirst({
+            where: {
+              storeId,
+              orderId,
+              toStatus: PARTIAL_RESTORE_MARKER,
+              metadata: { path: ['refundKey'], equals: partial.refundKey },
+            },
+            select: { id: true },
+          });
+          if (partialMarker) return { skipped: true };
+
+          const restored: Array<{ orderItemId: string; quantity: number }> = [];
+          for (const req of partial.items) {
+            const line = order.items.find(i => i.id === req.orderItemId);
+            if (!line) continue; // foreign/unknown line — never restore it
+            const qty = Math.min(Math.max(0, Math.floor(req.quantity)), line.quantity);
+            if (qty === 0) continue;
+            await restoreLine(line, qty, partial.refundKey, 'Return completed — partial restore');
+            restored.push({ orderItemId: line.id, quantity: qty });
+          }
+
+          await tx.orderEvent.create({
+            data: {
+              storeId,
+              orderId,
+              fromStatus: null,
+              toStatus: PARTIAL_RESTORE_MARKER,
+              actorId: null,
+              metadata: { refundKey: partial.refundKey, items: restored },
+            },
+          });
+          return { skipped: false };
+        }
+
+        // ---- FULL (whole-order) restore. ----
+        const stockMarker = await tx.inventoryHistory.findFirst({
+          where: { reference: orderId, type: 'return_stock', storeId },
+          select: { id: true },
+        });
+        if (stockMarker) return { skipped: true };
+
+        // Quantities already restored by completed PARTIAL returns must be
+        // subtracted, or a cancel/refund after a partial return would invent
+        // stock — the same double-restore class as the rollback-marker
+        // mismatch (P0-4). The partial markers carry exact per-line
+        // quantities, so the remainder is computed per order item.
+        const partialMarkers = await tx.orderEvent.findMany({
+          where: { storeId, orderId, toStatus: PARTIAL_RESTORE_MARKER },
+          select: { metadata: true },
+        });
+        const alreadyRestored = new Map<string, number>();
+        for (const m of partialMarkers) {
+          const items = (
+            m.metadata as { items?: Array<{ orderItemId?: string; quantity?: number }> } | null
+          )?.items;
+          if (!Array.isArray(items)) continue;
+          for (const it of items) {
+            if (typeof it?.orderItemId !== 'string' || typeof it?.quantity !== 'number') continue;
+            alreadyRestored.set(
+              it.orderItemId,
+              (alreadyRestored.get(it.orderItemId) ?? 0) + it.quantity
+            );
+          }
+        }
+
+        for (const item of order.items) {
+          const qty = item.quantity - (alreadyRestored.get(item.id) ?? 0);
+          if (qty <= 0) continue;
+          await restoreLine(item, qty, orderId, 'Order refunded');
         }
         return { skipped: false };
       })
@@ -166,6 +269,10 @@ export async function handleOrderRefunded(
   // retried/redelivered event never double-decrements. Order-level lock
   // matches restore-inventory above — same reasoning.
   await step.run('reverse-coupon', (): Promise<{ skipped: boolean }> => {
+    // Partial return: the customer kept the rest of the order, so the coupon
+    // stays legitimately consumed. Reversing it here erased OTHER customers'
+    // live redemptions once floored at 0 (adversarial audit P1-2).
+    if (isPartial) return Promise.resolve({ skipped: true });
     if (!order.couponCode) return Promise.resolve({ skipped: true });
 
     return runInTenantContext(storeId, () =>
@@ -205,14 +312,22 @@ export async function handleOrderRefunded(
   // `reverseCommission` is already internally idempotent (only acts on a
   // `commission_paid` referral) — throws on failure so Inngest retries
   // instead of silently leaving the affiliate overpaid.
-  await step.run('reverse-affiliate-commission', () =>
-    runInTenantContext(storeId, () => affiliateService.reverseCommission(storeId, orderId))
-  );
+  await step.run('reverse-affiliate-commission', async () => {
+    // Partial return: the affiliate's commission on the kept items stays
+    // earned — clawing back the whole-order commission on a trivial partial
+    // return underpaid affiliates (adversarial audit P1-2).
+    if (isPartial) return { skipped: true };
+    return runInTenantContext(storeId, () => affiliateService.reverseCommission(storeId, orderId));
+  });
 
   // Reverse loyalty points credited at delivery + re-credit points spent at
   // checkout. No-op for guest checkout (no customerId). Both calls are
   // already idempotent via tagged adjust rows — throw on failure.
   await step.run('reverse-loyalty', async () => {
+    // Partial return: the customer keeps the points earned/spent on the kept
+    // items — the loyalty reversal helpers are whole-order, so running them
+    // here stripped legitimately-earned points (adversarial audit P1-2).
+    if (isPartial) return { skipped: true };
     if (!order.customerId) return { skipped: true };
 
     return runInTenantContext(storeId, async () => {
@@ -229,7 +344,15 @@ export async function handleOrderRefunded(
   await step.run('cancel-backorders', () =>
     runInTenantContext(storeId, () =>
       prisma.backorderLine.updateMany({
-        where: { orderItem: { orderId }, fulfilledAt: null, cancelledAt: null },
+        // Partial return: only the returned lines' open backorder demand is
+        // released — the rest of the order may still be fulfilled.
+        where: {
+          orderItem: isPartial
+            ? { orderId, id: { in: partial!.items.map(i => i.orderItemId) } }
+            : { orderId },
+          fulfilledAt: null,
+          cancelledAt: null,
+        },
         data: { cancelledAt: new Date(), cancelledReason: 'Order refunded' },
       })
     )
@@ -239,7 +362,11 @@ export async function handleOrderRefunded(
   // payment.factory.refund), fall back to order total for status-button
   // refunds where the payment row may not exist (COD / manual paid).
   const latestPayment = order.payments[0];
-  const refundAmount = latestPayment?.refundedAmount || order.total;
+  // A partial return states its own refund amount — falling back to
+  // `order.total` on a partial emailed the customer a full-order "Refund
+  // issued" figure for a single returned item (adversarial audit P1-2).
+  const refundAmount =
+    (isPartial ? partial?.refundAmount : undefined) || latestPayment?.refundedAmount || order.total;
 
   // Customer contact info: prefer User row, fall back to the shipping
   // address snapshot for guest orders.
@@ -401,14 +528,19 @@ export async function handleOrderRefunded(
   //
   // updateMany + `refundReversedAt: null` keeps it idempotent: a re-delivered or
   // swept re-fire matches 0 rows and leaves the original timestamp intact.
-  await step.run('claim-reversed', () =>
-    runInTenantContext(storeId, () =>
+  await step.run('claim-reversed', async () => {
+    // Partial return: refundReversedAt is the WHOLE-order reversal claim.
+    // Stamping it here would hide a later cancel/refund of this order from
+    // refund-reversal-stuck-sweep (which keys on refundReversedAt IS NULL),
+    // permanently losing the remaining reversal if that fanout ever failed.
+    if (isPartial) return { skipped: true };
+    return runInTenantContext(storeId, () =>
       prisma.order.updateMany({
         where: { id: orderId, storeId, refundReversedAt: null },
         data: { refundReversedAt: new Date() },
       })
-    )
-  );
+    );
+  });
 }
 
 export const orderRefunded: InngestFunction.Any = inngest.createFunction(
@@ -422,13 +554,14 @@ export const orderRefunded: InngestFunction.Any = inngest.createFunction(
     triggers: [{ event: 'order/refunded' }],
   },
   async ({ event, step }) => {
-    const { orderId, storeId, restoreInventory, notify } = event.data;
+    const { orderId, storeId, restoreInventory, notify, partial } = event.data;
     return handleOrderRefunded(
       orderId,
       storeId,
       restoreInventory !== false,
       notify !== false,
-      step
+      step,
+      partial as PartialRefund | undefined
     );
   }
 );

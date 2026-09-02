@@ -132,7 +132,7 @@ export interface CallGeminiBatchOpts<TItem> {
  * @throws AppError on missing API key, quota exceeded, API error, or malformed JSON.
  */
 export async function callGemini<T>(opts: CallGeminiOpts): Promise<T> {
-  await assertAiQuota();
+  await assertAiQuota({ storeId: opts.storeId });
 
   const model = getClient().getGenerativeModel({
     model: MODEL,

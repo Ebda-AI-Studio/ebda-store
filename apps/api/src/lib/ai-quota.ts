@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error-handler';
 
 export const AI_QUOTA_DAILY_CODE = 'AI_QUOTA_DAILY_EXCEEDED';
 export const AI_QUOTA_MONTHLY_CODE = 'AI_QUOTA_MONTHLY_EXCEEDED';
+export const AI_QUOTA_STORE_DAILY_CODE = 'AI_QUOTA_STORE_DAILY_EXCEEDED';
 
 function errCode(err: unknown): string | null {
   if (!err || typeof err !== 'object') return null;
@@ -18,7 +19,11 @@ function errCode(err: unknown): string | null {
  */
 export function isPlatformQuotaCap(err: unknown): boolean {
   const code = errCode(err);
-  return code === AI_QUOTA_DAILY_CODE || code === AI_QUOTA_MONTHLY_CODE;
+  return (
+    code === AI_QUOTA_DAILY_CODE ||
+    code === AI_QUOTA_MONTHLY_CODE ||
+    code === AI_QUOTA_STORE_DAILY_CODE
+  );
 }
 
 // Codes that mean "AI budget/quota is exhausted — STOP the sweep, don't keep
@@ -38,6 +43,7 @@ export function isPlatformQuotaCap(err: unknown): boolean {
 const AI_QUOTA_STOP_CODES = new Set([
   AI_QUOTA_DAILY_CODE,
   AI_QUOTA_MONTHLY_CODE,
+  AI_QUOTA_STORE_DAILY_CODE,
   'AI_QUOTA_EXCEEDED',
   'AI_BUDGET_EXCEEDED',
 ]);
@@ -60,21 +66,51 @@ export function isAiQuotaCapError(err: unknown): boolean {
 // via AI_DAILY_REQUEST_CAP / AI_MONTHLY_REQUEST_CAP env vars.
 const DEFAULT_DAILY_REQUEST_CAP = 450;
 const DEFAULT_MONTHLY_REQUEST_CAP = 20000;
+// Per-tenant slice BENEATH the global cap (adversarial audit P2): the global
+// cap is shared across all stores, so without a slice one merchant's bulk
+// sweep over a big catalog drained it and denied AI to every other tenant
+// for the rest of the day. 150 = a third of the global default; override via
+// AI_STORE_DAILY_REQUEST_CAP.
+const DEFAULT_STORE_DAILY_REQUEST_CAP = 150;
 
-export async function assertAiQuota(): Promise<void> {
+/**
+ * Enforce the platform AI request caps BEFORE spending a Gemini call.
+ *
+ * Layers (checked in order):
+ *  1. per-store daily slice — `storeId` callers are bounded to their own
+ *     share so a single tenant cannot exhaust the platform budget;
+ *  2. global daily cap — KEPT: it protects the real Google project ceiling
+ *     (~500 req/day free tier). `bulk: true` callers (background sweeps)
+ *     stop an interactive-reserve below it (AI_DAILY_INTERACTIVE_RESERVE,
+ *     default 20% of the daily cap) so a sweep can never zero out the
+ *     interactive features (translate button, palette, answer-engine) for
+ *     the whole platform;
+ *  3. global monthly cap.
+ *
+ * Callers SHOULD pass their storeId; a no-arg call still enforces the
+ * global caps (backward compatible).
+ */
+export async function assertAiQuota(
+  opts: { storeId?: string; bulk?: boolean } = {}
+): Promise<void> {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const startOfMonth = new Date();
   startOfMonth.setUTCDate(1);
   startOfMonth.setUTCHours(0, 0, 0, 0);
 
-  const [today, thisMonth] = await Promise.all([
+  const [today, thisMonth, storeToday] = await Promise.all([
     prisma.aiUsage.count({
       where: { createdAt: { gte: startOfDay }, cachedHit: false },
     }),
     prisma.aiUsage.count({
       where: { createdAt: { gte: startOfMonth }, cachedHit: false },
     }),
+    opts.storeId
+      ? prisma.aiUsage.count({
+          where: { storeId: opts.storeId, createdAt: { gte: startOfDay }, cachedHit: false },
+        })
+      : Promise.resolve(0),
   ]);
 
   const dailyCap = parseInt(
@@ -85,12 +121,32 @@ export async function assertAiQuota(): Promise<void> {
     process.env.AI_MONTHLY_REQUEST_CAP ?? String(DEFAULT_MONTHLY_REQUEST_CAP),
     10
   );
+  const storeDailyCap = parseInt(
+    process.env.AI_STORE_DAILY_REQUEST_CAP ?? String(DEFAULT_STORE_DAILY_REQUEST_CAP),
+    10
+  );
 
-  if (today >= dailyCap) {
+  if (opts.storeId && storeToday >= storeDailyCap) {
+    throw new AppError(
+      429,
+      AI_QUOTA_STORE_DAILY_CODE,
+      `This store's daily AI request cap is reached (${storeToday}/${storeDailyCap}). Resets at 00:00 UTC.`
+    );
+  }
+
+  // Interactive headroom: bulk sweeps hit their ceiling before the global
+  // cap so live single-call features keep working after a sweep saturates.
+  const reserveEnv = parseInt(process.env.AI_DAILY_INTERACTIVE_RESERVE ?? '', 10);
+  const interactiveReserve = Number.isFinite(reserveEnv) ? reserveEnv : Math.ceil(dailyCap * 0.2);
+  const effectiveDailyCap = opts.bulk ? Math.max(0, dailyCap - interactiveReserve) : dailyCap;
+
+  if (today >= effectiveDailyCap) {
     throw new AppError(
       429,
       AI_QUOTA_DAILY_CODE,
-      `Daily AI request cap reached (${today}/${dailyCap}). Resets at 00:00 UTC.`
+      opts.bulk
+        ? `Daily AI bulk ceiling reached (${today}/${effectiveDailyCap}; ${interactiveReserve} reserved for interactive calls). Resets at 00:00 UTC.`
+        : `Daily AI request cap reached (${today}/${dailyCap}). Resets at 00:00 UTC.`
     );
   }
   if (thisMonth >= monthlyCap) {

@@ -78,7 +78,7 @@ export class GeminiAnswerEngineProvider implements AnswerEngineProvider {
   }
 
   async query(storeId: string, prompt: string): Promise<EngineAnswer> {
-    await assertAiQuota();
+    await assertAiQuota({ storeId });
 
     const result = await this.model.generateContent(prompt);
     const response = result.response;

@@ -324,7 +324,7 @@ export class AIService {
       return { translation: hit, cached: true };
     }
 
-    await assertAiQuota();
+    await assertAiQuota({ storeId: input.storeId });
     await checkBudget(input.storeId);
 
     const lengthHint =
@@ -390,7 +390,7 @@ export class AIService {
       return { suggestion: JSON.parse(hit) as SeoSuggestion, cached: true };
     }
 
-    await assertAiQuota();
+    await assertAiQuota({ storeId: input.storeId });
     await checkBudget(input.storeId);
 
     const systemInstruction =
@@ -484,7 +484,7 @@ export class AIService {
       };
     }
 
-    await assertAiQuota();
+    await assertAiQuota({ storeId: input.storeId });
     await checkBudget(input.storeId);
 
     const systemInstruction =
@@ -554,7 +554,7 @@ export class AIService {
    */
   static async extractPaletteFromLogo(logoUrl: string, storeId: string): Promise<ExtractedPalette> {
     ensureEnabled();
-    await assertAiQuota();
+    await assertAiQuota({ storeId });
 
     // Fetch the logo bytes — Gemini Vision needs inline base64 data.
     // SSRF guard: logoUrl is merchant-controlled — block private/loopback/
@@ -677,7 +677,7 @@ export class AIService {
       };
     }
 
-    await assertAiQuota();
+    await assertAiQuota({ storeId: input.storeId });
     await checkBudget(input.storeId);
 
     const catList = input.existingCategories

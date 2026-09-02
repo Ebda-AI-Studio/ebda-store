@@ -21,10 +21,11 @@ export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFu
     triggers: [{ event: 'order/refunded' }],
   },
   async ({ event, step }) => {
-    const { orderId, storeId, refundReason } = (event.data ?? {}) as {
+    const { orderId, storeId, refundReason, partial } = (event.data ?? {}) as {
       orderId?: string;
       storeId?: string;
       refundReason?: string;
+      partial?: { items?: unknown[] };
     };
     if (!orderId || !storeId) {
       logger.warn(
@@ -32,6 +33,17 @@ export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFu
         'accountingPostRefundJournal: missing ids'
       );
       return { skipped: 'missing-ids' };
+    }
+    // Partial-return events carry an item-level payload; postRefundJournal
+    // reverses the WHOLE sale journal, which would erase revenue the merchant
+    // still keeps. Skip — the GL keeps the original sale for partial returns
+    // (documented residual: no partial-return GL adjustment is posted yet).
+    if (partial && Array.isArray(partial.items) && partial.items.length > 0) {
+      logger.info(
+        { storeId, orderId },
+        'accountingPostRefundJournal: partial-return event — full journal reversal skipped'
+      );
+      return { skipped: true, reason: 'partial_refund' };
     }
     // Feature gate — skip reversal when accounting.basic is disabled.
     const accountingEnabled = await featureService.isFeatureEnabled(storeId, 'accounting.basic');

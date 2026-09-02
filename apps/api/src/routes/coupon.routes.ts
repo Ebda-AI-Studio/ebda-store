@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { requireStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { couponValidateLimiter, writeLimiter } from '../middleware/security';
+import { couponValidateLimiter, writeLimiter, publicTenantLimiter } from '../middleware/security';
 import { CouponService } from '../services/coupon.service';
 import { resolveCustomerContext } from '../services/promotion-resolver';
 import { tenantContext } from '../middleware/tenant-context';
@@ -241,6 +241,9 @@ router.patch(
 router.post(
   '/public/:storeId/coupons/validate',
   couponValidateLimiter,
+  // Per-tenant aggregate backstop (audit P3) — bounds distributed volume
+  // against one store's endpoint regardless of source-IP spread.
+  publicTenantLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { storeId } = req.params;

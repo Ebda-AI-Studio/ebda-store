@@ -318,3 +318,121 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
     });
   });
 });
+
+// ─── Adversarial audit P2 (Task 9): write ORDERING around the guard ────────
+//
+// The guard existing is not enough — the ORDER of durable writes matters:
+//
+//  A. General webhook path: `Payment.status` was written BEFORE the order
+//     transition assert, so a stale/raced `completed` webhook on a cancelled
+//     order left `Payment.status='completed'` + `Order.status='cancelled'`
+//     durably (money captured for a cancelled order, no reconciler for that
+//     combination). The payment write must not happen when the order
+//     transition is rejected — mirror payment-confirm.service.ts.
+//
+//  B. Refund webhook branch: the durable idempotency key
+//     (`metadata.refundStatus`) was written BEFORE `applyRefundEffects`, so a
+//     failed reversal dispatch hit the `prevRefundStatus === newStatus` no-op
+//     on retry and the reversal was silently lost forever (07-15 audit F3 —
+//     narrowed, not fixed). The idempotency write must come AFTER the
+//     effects succeed so a failure stays retryable.
+
+describe('handleWebhook write ordering — payment write vs order-transition assert (audit P2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProviderConfig();
+  });
+
+  function mockPaymentForWebhook(orderStatus: string, paymentStatus = 'pending') {
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      amount: 5000,
+      currency: 'KWD',
+      status: paymentStatus,
+      provider: 'myfatoorah',
+      metadata: {},
+      order: { storeId: STORE_ID, store: { name: 'Test Store' }, status: orderStatus },
+    });
+  }
+
+  it('a rejected order transition leaves Payment.status UNWRITTEN (no completed-payment-on-cancelled-order state)', async () => {
+    mockPaymentForWebhook('cancelled', 'pending');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      amount: 5000,
+      currency: 'KWD',
+      paidAt: new Date(),
+    });
+    assertValidTransitionMock.mockImplementation(() => {
+      throw new Error('Cannot transition from cancelled to confirmed');
+    });
+
+    await expect(
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+    ).rejects.toThrow('Cannot transition from cancelled to confirmed');
+
+    expect(orderUpdate).not.toHaveBeenCalled();
+    // The critical new assertion: the payment row must not have been mutated
+    // before the assert rejected.
+    expect(paymentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('refund branch: a failed applyRefundEffects leaves the idempotency metadata UNWRITTEN (retryable, not silently lost)', async () => {
+    mockPaymentForWebhook('shipped', 'completed');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', refundId: 'rf_9' },
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    applyRefundEffects.mockRejectedValueOnce(new Error('inngest event API down'));
+
+    await expect(
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+    ).rejects.toThrow('inngest event API down');
+
+    // metadata.refundStatus (the branch's idempotency key) must NOT be
+    // durable — a retry must re-enter the reversal, not hit the no-op.
+    expect(paymentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('refund branch: a failed order flip PROPAGATES (retryable) instead of being swallowed', async () => {
+    mockPaymentForWebhook('shipped', 'completed');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', refundId: 'rf_10' },
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    applyRefundEffects.mockResolvedValue(undefined);
+    orderUpdate.mockRejectedValueOnce(new Error('connection reset'));
+
+    await expect(
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+    ).rejects.toThrow('connection reset');
+
+    expect(paymentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('refund branch success: the idempotency metadata write happens AFTER applyRefundEffects', async () => {
+    mockPaymentForWebhook('shipped', 'completed');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', refundId: 'rf_11' },
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    applyRefundEffects.mockResolvedValue(undefined);
+    orderUpdate.mockResolvedValue({});
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(applyRefundEffects).toHaveBeenCalled();
+    expect(paymentUpdate).toHaveBeenCalled();
+    expect(applyRefundEffects.mock.invocationCallOrder[0]).toBeLessThan(
+      paymentUpdate.mock.invocationCallOrder[0]
+    );
+  });
+});

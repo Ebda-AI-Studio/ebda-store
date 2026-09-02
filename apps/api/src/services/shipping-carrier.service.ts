@@ -13,6 +13,9 @@ import logger from '../lib/logger';
 import { iCarryCarrier } from './carriers/icarry.carrier';
 import { aramexCarrier } from './carriers/aramex.carrier';
 import { ShippingCarrierProvider, CarrierCode, ShipmentAddress } from './carriers/types';
+import type { OrderStatus } from '@prisma/client';
+import { AppError } from '../middleware/error-handler';
+import { assertValidTransition } from './order-status-machine';
 
 const CARRIER_REGISTRY: Record<CarrierCode, ShippingCarrierProvider> = {
   icarry: iCarryCarrier,
@@ -343,10 +346,7 @@ class ShippingCarrierService {
           },
         });
 
-        await tx.order.update({
-          where: { id: orderId },
-          data: { status: 'shipped' },
-        });
+        await setOrderStatusGuarded(tx, storeId, orderId, 'shipped');
 
         return created;
       });
@@ -456,11 +456,9 @@ class ShippingCarrierService {
       },
     });
 
-    // Update order status back to processing
-    await prisma.order.update({
-      where: { id: shipment.orderId },
-      data: { status: 'processing' },
-    });
+    // Shipment cancelled → the order returns to processing. This transition is
+    // now expressed in the state machine (it always happened here in practice).
+    await setOrderStatusGuarded(prisma, shipment.storeId, shipment.orderId, 'processing');
 
     await auditLog({
       action: 'shipment.cancelled',
@@ -559,10 +557,7 @@ class ShippingCarrierService {
 
     // If delivered, update Order and dispatch notification
     if (tracking.status === 'delivered' && shipment.status !== 'delivered') {
-      await prisma.order.update({
-        where: { id: shipment.orderId },
-        data: { status: 'delivered' },
-      });
+      await setOrderStatusGuarded(prisma, shipment.storeId, shipment.orderId, 'delivered');
 
       const store = await prisma.store
         .findUnique({
@@ -671,10 +666,7 @@ class ShippingCarrierService {
 
     // If delivered → update Order + notify
     if (result.status === 'delivered' && shipment.status !== 'delivered') {
-      await prisma.order.update({
-        where: { id: shipment.orderId },
-        data: { status: 'delivered' },
-      });
+      await setOrderStatusGuarded(prisma, shipment.storeId, shipment.orderId, 'delivered');
 
       const store = await prisma.store
         .findUnique({
@@ -893,6 +885,29 @@ class ShippingCarrierService {
       );
     }
   }
+}
+
+/**
+ * Read the order's current status and assert the transition before writing it.
+ * These four writers set Order.status directly, outside OrderService.updateStatus,
+ * so they bypassed assertValidTransition entirely — the state machine could be
+ * violated by any carrier flow. Scoped by storeId as well: the order must belong
+ * to the store the shipment belongs to.
+ */
+async function setOrderStatusGuarded(
+  client: Prisma.TransactionClient | typeof prisma,
+  storeId: string,
+  orderId: string,
+  to: OrderStatus
+): Promise<void> {
+  const current = await client.order.findFirst({
+    where: { id: orderId, storeId },
+    select: { status: true },
+  });
+  if (!current) throw new AppError(404, 'NOT_FOUND', 'Order not found for this store');
+  if (current.status === to) return;
+  assertValidTransition(current.status, to);
+  await client.order.update({ where: { id: orderId }, data: { status: to } });
 }
 
 export const shippingCarrierService = new ShippingCarrierService();

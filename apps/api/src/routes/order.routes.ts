@@ -5,7 +5,7 @@ import { neutralizeRowObject } from '../lib/exports/xlsx';
 import { authenticate, authorize, customerUserId } from '../middleware/auth';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
-import { OrderService } from '../services/order.service';
+import { OrderService, assertValidTransition } from '../services/order.service';
 import { InvoiceService } from '../services/invoice.service';
 import { requirePermission } from '../middleware/rbac';
 import { auditLog, writeLimiter } from '../middleware/security';
@@ -1151,6 +1151,20 @@ router.post(
       const needsSideEffects =
         status.status === 'completed' && statusChanged && payment.status === 'completed';
       if (needsSideEffects) {
+        // Guard the direct Order.status write with the state machine — this
+        // was the last unguarded Order.status writer (adversarial audit P2).
+        // Re-read the CURRENT status and assert BEFORE any side-effect,
+        // mirroring payment-confirm.service.ts: a refresh racing another path
+        // that already moved the order to a terminal state must not regress
+        // it, and must not fire reversals it cannot commit.
+        const currentOrder = await prisma.order.findFirst({
+          where: { id: orderId, storeId },
+          select: { status: true },
+        });
+        if (!currentOrder) {
+          throw new AppError(404, 'NOT_FOUND', 'Order not found');
+        }
+        assertValidTransition(currentOrder.status, 'refunded');
         await OrderService.applyRefundEffects(storeId, orderId);
         await prisma.order.update({
           where: { id: orderId },

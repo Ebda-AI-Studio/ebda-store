@@ -606,10 +606,13 @@ router.patch(
         throw new AppError(400, 'INVALID_STATUS', 'Status must be active or suspended');
       }
 
-      const store = await prisma.store.update({
-        where: { id: req.params.id },
-        data: { status: status as StoreStatus },
-      });
+      // StoreService.setStatus owns the write AND the public-cache bust
+      // (resolve/slug/id keys + storefront revalidate purge) — account
+      // status is NEVER-stale, so the invalidation lives with the write
+      // (adversarial audit P1-7; this handler used to bust only the feature
+      // cache, leaving a suspended store serving the cached active resolve
+      // — checkouts included — for up to the TTL).
+      const store = await StoreService.setStatus(req.params.id, status as 'active' | 'suspended');
 
       // Invalidate the feature cache — store.status doesn't change the
       // resolved feature map directly, but downstream gates (storefront

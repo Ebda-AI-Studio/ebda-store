@@ -210,7 +210,7 @@ const bulkAiProductFaqsFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota();
+              await assertAiQuota({ storeId, bulk: true });
 
               // Shared core — identical to the per-product "Draft with AI" path.
               const faqs = await callWithRetry(

@@ -71,7 +71,8 @@ export const VALID_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
   confirmed: ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   processing: ['shipped', 'delivered', 'cancelled', 'refunded'],
-  shipped: ['delivered', 'refunded'],
+  // Mirrors the API machine: shipment cancellation returns shipped -> processing.
+  shipped: ['delivered', 'refunded', 'processing'],
   delivered: ['refunded'],
 };
 

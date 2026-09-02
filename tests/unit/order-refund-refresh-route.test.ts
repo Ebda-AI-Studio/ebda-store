@@ -21,6 +21,7 @@ import request from 'supertest';
 const paymentFindFirst = vi.fn();
 const paymentUpdate = vi.fn().mockResolvedValue({});
 const orderUpdate = vi.fn().mockResolvedValue({});
+const orderFindFirst = vi.fn().mockResolvedValue({ status: 'delivered' });
 vi.mock('@force/database', () => ({
   prisma: {
     payment: {
@@ -29,6 +30,7 @@ vi.mock('@force/database', () => ({
     },
     order: {
       update: (...a: unknown[]) => orderUpdate(...a),
+      findFirst: (...a: unknown[]) => orderFindFirst(...a),
     },
   },
   runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
@@ -84,8 +86,10 @@ vi.mock('@api/services/payment-providers/payment.factory', () => ({
 }));
 
 const applyRefundEffects = vi.fn().mockResolvedValue(undefined);
+const assertValidTransitionMock = vi.fn();
 vi.mock('@api/services/order.service', () => ({
   OrderService: { applyRefundEffects: (...a: unknown[]) => applyRefundEffects(...a) },
+  assertValidTransition: (...a: unknown[]) => assertValidTransitionMock(...a),
 }));
 
 vi.mock('@api/lib/logger', () => ({
@@ -144,6 +148,27 @@ describe('POST /:orderId/refresh-refund-status', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    orderFindFirst.mockResolvedValue({ status: 'delivered' });
+    orderUpdate.mockResolvedValue({});
+  });
+
+  it('guards the Order.status write with assertValidTransition — a terminal order rejects and NOTHING runs (audit P2)', async () => {
+    mockPaymentNeedingSideEffects();
+    orderFindFirst.mockResolvedValue({ status: 'cancelled' });
+    assertValidTransitionMock.mockImplementationOnce(() => {
+      throw new Error('Cannot transition from cancelled to refunded');
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(assertValidTransitionMock).toHaveBeenCalledWith('cancelled', 'refunded');
+    // Neither the reversal dispatch nor the status write may run after a
+    // rejected transition.
+    expect(applyRefundEffects).not.toHaveBeenCalled();
+    expect(orderUpdate).not.toHaveBeenCalled();
   });
 
   it('returns non-2xx (via next(err)) when applyRefundEffects fails — not swallowed to 200', async () => {

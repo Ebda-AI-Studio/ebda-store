@@ -191,7 +191,7 @@ const bulkAiImageAltFn = inngest.createFunction(
 
             for (const image of missingAlt) {
               try {
-                await assertAiQuota();
+                await assertAiQuota({ storeId, bulk: true });
 
                 const alt = await callWithRetry(
                   () =>

@@ -213,7 +213,7 @@ Generate a concise llms.txt file with the following sections:
 Use the exact URL format shown above. Keep the output under 2000 characters. Return ONLY the raw markdown text — no code fences, no extra commentary.`;
 
           try {
-            await assertAiQuota();
+            await assertAiQuota({ storeId, bulk: true });
 
             const genAI = getGenAI();
             const model = genAI.getGenerativeModel({ model: MODEL });
@@ -464,7 +464,7 @@ const bulkAiCitationCopyFn = inngest.createFunction(
             }
 
             try {
-              await assertAiQuota();
+              await assertAiQuota({ storeId, bulk: true });
 
               const prompt = `You are an expert at writing product descriptions optimised for LLM citation — the definitive, factual sentence an AI assistant would quote when answering "What is ${p.name}?".
 
@@ -705,7 +705,7 @@ Generate a JSON object with the following structure:
 Populate using only the information provided above. For keyCategories, use the category names. For contactMethods, only include what was explicitly stated. Keep it concise. Return ONLY the raw JSON object — no markdown, no code fences.`;
 
           try {
-            await assertAiQuota();
+            await assertAiQuota({ storeId, bulk: true });
 
             const genAI = getGenAI();
             const model = genAI.getGenerativeModel({

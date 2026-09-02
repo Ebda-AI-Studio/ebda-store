@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { prisma, Prisma, StoreStatus, withMoneyTx, withRlsBypass } from '@force/database';
+import { bustStoreCaches } from './store.service';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
 import { resolveDomainService } from './domain-provider';
@@ -373,10 +374,16 @@ export class ProvisioningService {
    * Update store status
    */
   static async updateStoreStatus(storeId: string, status: 'active' | 'inactive' | 'suspended') {
-    return prisma.store.update({
+    const store = await prisma.store.update({
       where: { id: storeId },
       data: { status },
     });
+    // Account status is NEVER-stale (adversarial audit P1-7) — bust the
+    // public resolve/slug/id caches + fire the storefront revalidate purge
+    // on EVERY status writer, or a suspended store keeps serving the cached
+    // active storefront for up to the TTL.
+    await bustStoreCaches(store.id, store.slug, store.domain);
+    return store;
   }
 
   /**

@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { requireMfaEnrolled } from '../middleware/require-mfa';
 import { requireRole } from '../middleware/rbac';
+import { bustStoreCaches } from '../services/store.service';
+import { invalidateCached } from '../lib/public-cache';
 import { hasAnyRateConfigured } from '../lib/ai-pricing';
 import { ProvisioningService } from '../services/provisioning.service';
 import { auditLog } from '../middleware/security';
@@ -292,6 +294,12 @@ router.put(
       const { id } = req.params;
       const { name, slug, plan, status } = updateStoreAdminSchema.parse(req.body);
 
+      // Pre-read so a slug change can bust the OLD slug's cache key too.
+      const before = await prisma.store.findUnique({
+        where: { id },
+        select: { slug: true },
+      });
+
       const store = await prisma.store.update({
         where: { id },
         data: {
@@ -306,6 +314,15 @@ router.put(
           },
         },
       });
+
+      // Account status / slug / name are NEVER-stale on the storefront
+      // (adversarial audit P1-7): bust the public resolve/slug/id caches +
+      // fire the storefront revalidate purge on this writer too — it used
+      // to write store.status with no invalidation at all.
+      await bustStoreCaches(store.id, store.slug, store.domain);
+      if (before?.slug && before.slug !== store.slug) {
+        await invalidateCached(`public:store:${before.slug}`);
+      }
 
       await auditLog({
         action: 'store.updated',

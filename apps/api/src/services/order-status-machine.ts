@@ -21,7 +21,13 @@ export const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending: ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
   confirmed: ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
   processing: ['shipped', 'delivered', 'cancelled', 'refunded'],
-  shipped: ['delivered', 'refunded'],
+  // 'processing' models SHIPMENT CANCELLATION: cancelling a carrier shipment
+  // returns the order to processing. shipping-carrier.service.ts has performed
+  // this write in production all along; the machine simply never described it,
+  // which is why that writer could not be guarded. Adding it here changes no
+  // behaviour — it makes the existing behaviour expressible, so the guard can
+  // be applied to every Order.status writer instead of all but four.
+  shipped: ['delivered', 'refunded', 'processing'],
   delivered: ['refunded'],
   cancelled: [],
   refunded: [],

@@ -55,6 +55,7 @@ vi.mock('@api/middleware/feature-gate', () => ({
 
 vi.mock('@api/middleware/security', () => ({
   couponValidateLimiter: (_req: any, _res: any, next: any) => next(),
+  publicTenantLimiter: (_req: any, _res: any, next: any) => next(),
   writeLimiter: (_req: any, _res: any, next: any) => next(),
 }));
 

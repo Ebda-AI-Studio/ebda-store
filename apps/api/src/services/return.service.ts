@@ -156,15 +156,46 @@ export class ReturnService {
       throw new AppError(400, 'INVALID_ORDER', 'Order not found or not eligible for return');
     }
 
-    // Validate items
+    // Cumulative quantities already claimed by this order's OTHER return
+    // requests (anything not rejected/cancelled still holds its claim —
+    // pending/approved requests reserve the quantity, completed ones consumed
+    // it). Without this, the same item could be returned twice across two
+    // requests and double-book the manual/store-credit refund side
+    // (adversarial audit P1-2 blast radius).
+    const priorReturns = await prisma.return.findMany({
+      where: {
+        storeId,
+        orderId: data.orderId,
+        status: { notIn: ['rejected', 'cancelled'] },
+      },
+      select: { items: { select: { orderItemId: true, quantity: true } } },
+    });
+    const claimedQty = new Map<string, number>();
+    for (const prior of priorReturns) {
+      for (const it of prior.items) {
+        claimedQty.set(it.orderItemId, (claimedQty.get(it.orderItemId) ?? 0) + it.quantity);
+      }
+    }
+
+    // Validate items — per-line AND cumulative across prior return requests
+    // (and across duplicate lines within THIS request, hence the running map).
     for (const item of data.items) {
       const orderItem = order.items.find(oi => oi.id === item.orderItemId);
       if (!orderItem) {
         throw new AppError(400, 'INVALID_ITEM', `Order item ${item.orderItemId} not found`);
       }
-      if (item.quantity > orderItem.quantity) {
-        throw new AppError(400, 'INVALID_QUANTITY', `Quantity exceeds order item quantity`);
+      if (item.quantity < 1) {
+        throw new AppError(400, 'INVALID_QUANTITY', `Quantity must be at least 1`);
       }
+      const alreadyClaimed = claimedQty.get(item.orderItemId) ?? 0;
+      if (alreadyClaimed + item.quantity > orderItem.quantity) {
+        throw new AppError(
+          400,
+          'INVALID_QUANTITY',
+          `Quantity exceeds remaining returnable quantity for this item`
+        );
+      }
+      claimedQty.set(item.orderItemId, alreadyClaimed + item.quantity);
     }
 
     const returnNumber = await this.generateReturnNumber(storeId);
@@ -359,10 +390,11 @@ export class ReturnService {
    *     the merchant handles the refund off-platform; we only record
    *     the bookkeeping side here.
    *
-   * In ALL cases we run `OrderService.applyRefundEffects` so inventory
-   * restoration, coupon-usage decrement, and affiliate-commission
-   * reversal happen consistently — the previous implementation only
-   * restored inventory and let coupons / commissions drift.
+   * In ALL cases the refund effects are dispatched through
+   * `OrderService.applyRefundEffects` — whole-order for a FULL return,
+   * item-level (`partial` payload) for a partial one — so inventory
+   * restoration and the whole-order reversals (coupon, affiliate, loyalty)
+   * happen consistently and only when the entire order actually came back.
    */
   static async complete(storeId: string, returnId: string, _userId: string, refundMethod: string) {
     const returnRequest = await this.getById(storeId, returnId);
@@ -373,11 +405,36 @@ export class ReturnService {
 
     const isInventoryRestoring = returnRequest.type === 'return' || returnRequest.type === 'refund';
 
+    // Full vs partial return: a return is FULL only when it covers EVERY
+    // order line at its full quantity. Anything less is a partial return and
+    // must apply ITEM-LEVEL effects — the whole-order `order/refunded` fanout
+    // would restore inventory the customer still holds, reverse the coupon,
+    // claw back the full affiliate commission and strip loyalty points earned
+    // on the kept items (adversarial audit P1-2).
+    let isFullReturn = false;
+    if (returnRequest.orderId) {
+      const orderItems = await prisma.orderItem.findMany({
+        where: { orderId: returnRequest.orderId },
+        select: { id: true, quantity: true },
+      });
+      const returnedQty = new Map<string, number>();
+      for (const it of returnRequest.items) {
+        returnedQty.set(it.orderItemId, (returnedQty.get(it.orderItemId) ?? 0) + it.quantity);
+      }
+      isFullReturn =
+        orderItems.length > 0 &&
+        orderItems.every(oi => (returnedQty.get(oi.id) ?? 0) >= oi.quantity);
+    }
+
     // Trigger the provider refund FIRST when the merchant chose
     // gateway-based refunds. If the provider fails we want to bail
     // out before flipping the return to 'completed' — otherwise the
     // customer sees a "refund processed" status with no money back.
     const isGatewayRefund = refundMethod === 'gateway' || refundMethod === 'original_payment';
+    // Set when PaymentService.refund itself fired the FULL whole-order
+    // effects internally (it does so only for a FULL provider refund:
+    // no amount, or amount >= payment.amount).
+    let gatewayRanFullEffects = false;
     if (isGatewayRefund && returnRequest.orderId) {
       const payment = await prisma.payment.findFirst({
         where: { orderId: returnRequest.orderId, status: 'completed' },
@@ -411,6 +468,11 @@ export class ReturnService {
           'Payment provider refund failed. Please retry or switch refund method.'
         );
       }
+      // Mirrors PaymentService.refund's own isFullRefund predicate
+      // (`!request.amount || request.amount >= payment.amount`) — when true,
+      // it already dispatched the FULL order/refunded fanout internally.
+      gatewayRanFullEffects =
+        !returnRequest.refundAmount || returnRequest.refundAmount >= payment.amount;
     }
 
     const updatedReturn = await prisma.return.update({
@@ -422,14 +484,37 @@ export class ReturnService {
       },
     });
 
-    // Side-effects (inventory + coupon + commission). PaymentService.refund
-    // also runs applyRefundEffects internally for full refunds, so for
-    // gateway refunds we'd be calling it twice — applyRefundEffects is
-    // idempotent (conditional updates + status filters) so doubling up
-    // is safe but wasteful. Only run it here when we DIDN'T just go
-    // through the gateway path.
-    if (isInventoryRestoring && !isGatewayRefund && returnRequest.orderId) {
-      await OrderService.applyRefundEffects(storeId, returnRequest.orderId);
+    // Side-effects (inventory + coupon + commission + loyalty) routing:
+    //
+    //   - FULL return, gateway FULL refund: PaymentService.refund already
+    //     dispatched the whole-order fanout internally — don't double-fire.
+    //   - FULL return, manual method (or a gateway refund the provider
+    //     treated as partial): fire the whole-order fanout here.
+    //   - PARTIAL return, ANY method: fire the ITEM-LEVEL event. The old
+    //     code's premise ("gateway refunds already ran applyRefundEffects,
+    //     calling it here would double up") only held for FULL refunds —
+    //     PaymentService.refund applies NO effects for a partial provider
+    //     refund, so partial gateway returns never restocked the returned
+    //     goods at all, and partial manual returns reversed the WHOLE order.
+    //
+    // Edge: a partial return whose refundAmount somehow covers the full
+    // payment makes the gateway run FULL effects internally; skipping the
+    // local partial event then avoids restoring the returned lines twice.
+    if (isInventoryRestoring && returnRequest.orderId && !gatewayRanFullEffects) {
+      if (isFullReturn) {
+        await OrderService.applyRefundEffects(storeId, returnRequest.orderId);
+      } else {
+        await OrderService.applyRefundEffects(storeId, returnRequest.orderId, {
+          partial: {
+            items: returnRequest.items.map(i => ({
+              orderItemId: i.orderItemId,
+              quantity: i.quantity,
+            })),
+            refundKey: returnRequest.id,
+            refundAmount: returnRequest.refundAmount || undefined,
+          },
+        });
+      }
     }
 
     return updatedReturn;
