@@ -312,7 +312,12 @@ export class AIService {
     if (!trimmed) return { translation: '', cached: false };
     if (input.from === input.to) return { translation: trimmed, cached: false };
 
+    // storeId is part of the key so the 7-day translate cache is per-tenant,
+    // matching suggestSeo/suggestSectionContent (which hash storeId-bearing
+    // input) and suggestCategories (store-owned UUIDs). Without it two tenants
+    // shared a cache entry keyed only on the submitted text.
     const key = cacheKey('translate', {
+      storeId: input.storeId,
       text: trimmed,
       from: input.from,
       to: input.to,

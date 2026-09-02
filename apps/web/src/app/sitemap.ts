@@ -165,13 +165,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return apex;
   }
 
-  const productResults = await Promise.all(
-    stores.map(store =>
-      fetchProducts(store.id)
-        .then(products => ({ store, products }))
-        .catch(() => ({ store, products: [] as ProductEntry[] }))
-    )
-  );
+  // Bounded fan-out. `fetchStores()` pages up to 50x100 = 5000 stores, and one
+  // subrequest per store in a single Worker invocation would blow Cloudflare's
+  // 1000-subrequest ceiling as the platform grows — the render would throw past
+  // it and the `apex` fallback below is declared too late to save it. Cap the
+  // per-render fan-out and emit the remaining stores with their static pages
+  // only (they still get indexed; they just don't contribute product URLs to
+  // this render). Chunked rather than one Promise.all so we also stop opening
+  // 200 sockets at once against the API.
+  const MAX_STORES_WITH_PRODUCTS = 200;
+  const FANOUT_CHUNK = 20;
+
+  const withProducts = stores.slice(0, MAX_STORES_WITH_PRODUCTS);
+  const withoutProducts = stores.slice(MAX_STORES_WITH_PRODUCTS);
+
+  const productResults: Array<{ store: StoreListEntry; products: ProductEntry[] }> = [];
+  for (let i = 0; i < withProducts.length; i += FANOUT_CHUNK) {
+    const chunk = withProducts.slice(i, i + FANOUT_CHUNK);
+    productResults.push(
+      ...(await Promise.all(
+        chunk.map(store =>
+          fetchProducts(store.id)
+            .then(products => ({ store, products }))
+            .catch(() => ({ store, products: [] as ProductEntry[] }))
+        )
+      ))
+    );
+  }
+  for (const store of withoutProducts) {
+    productResults.push({ store, products: [] });
+  }
 
   const perTenant: MetadataRoute.Sitemap = [];
   for (const { store, products } of productResults) {

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getStore } from '../../../lib/store-resolver';
+import { getStore, getStoreOrNotFound } from '../../../lib/store-resolver';
 import { decodeRouteParam } from '../../../lib/route-params';
 import { BlogPostBody, buildBlogPostMetadata, fetchPost } from './BlogPostBody';
 
@@ -25,7 +25,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function BlogPostPage({ params }: PageProps) {
   const slug = decodeRouteParam((await params).slug);
-  const store = await getStore();
+  // Strict here (the page must 404 on an unresolvable host rather than render
+  // the Force demo stub); generateMetadata above deliberately keeps the lenient
+  // resolver so it degrades to a title instead of throwing notFound().
+  const store = await getStoreOrNotFound();
 
   return <BlogPostBody store={store} slug={slug} />;
 }

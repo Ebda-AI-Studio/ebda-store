@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getStore } from '../../lib/store-resolver';
+import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { FaqPageBody } from './FaqPageBody';
 
 export const metadata: Metadata = {
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function FAQPage() {
-  const store = await getStore();
+  const store = await getStoreOrNotFound();
 
   return <FaqPageBody store={store} />;
 }

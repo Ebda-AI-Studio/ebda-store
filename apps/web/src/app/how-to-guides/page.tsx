@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getStore } from '../../lib/store-resolver';
+import { getStoreOrNotFound } from '../../lib/store-resolver';
 import { HowToGuidesPageBody } from './HowToGuidesPageBody';
 
 export const metadata: Metadata = {
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HowToGuidesPage() {
-  const store = await getStore();
+  const store = await getStoreOrNotFound();
 
   return <HowToGuidesPageBody store={store} />;
 }

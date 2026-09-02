@@ -1512,7 +1512,16 @@ router.get(
         return;
       }
 
-      setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
+      // This response is keyed on x-store-domain, NOT x-store-id (which this
+      // route never reads), so it must Vary on the header that actually
+      // selects it. With the default Vary alone a CDN configured to cache
+      // this would key on an always-absent header and serve the first
+      // domain's store to every other domain for the whole window.
+      setEdgeCache(res, {
+        sMaxAge: 120,
+        staleWhileRevalidate: 600,
+        varyOn: ['x-store-domain'],
+      });
       res.json({
         success: true,
         data: result,

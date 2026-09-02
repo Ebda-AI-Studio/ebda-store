@@ -20,6 +20,7 @@ import { cleanupRemovedJsonUrls } from '../services/r2-cleanup.service';
 import { redis } from '../services/redis.service';
 import { invalidateCached } from '../lib/public-cache';
 import logger from '../lib/logger';
+import { randomBytes } from 'node:crypto';
 
 const router = Router({ mergeParams: true });
 
@@ -868,7 +869,12 @@ router.post(
         });
         return;
       }
-      const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      // crypto.randomBytes, not Math.random: the read path
+      // (public-store-layout.routes.ts) is unauthenticated, and the previous
+      // Date.now()+Math.random() token carried roughly 41 bits — brute-forceable
+      // within the 1h TTL. The Redis key is storeId-scoped so a guessed token
+      // never crosses tenants, but it did expose that store's unsaved draft.
+      const token = randomBytes(24).toString('base64url');
       // Redis key includes storeId so a cross-tenant token paste can't leak.
       await redis.set(`layout-preview:${storeId}:${token}`, bundle, 3600);
       res.json({ success: true, data: { token } });
