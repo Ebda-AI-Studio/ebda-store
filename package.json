@@ -123,12 +123,12 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "sharp": "^0.35.3",
-    "fast-uri": "^3.1.5",
+    "fast-uri": "3.1.7",
     "miniflare": {
       "undici": "7.29.0"
     },
     "typed-rest-client": {
-      "qs": "6.15.2"
+      "qs": "6.16.0"
     },
     "nanoid": "3.3.18",
     "hono": "4.12.34",
@@ -152,11 +152,12 @@
       "tmp": "0.2.7",
       "inquirer": ">=9.3.7",
       "external-editor": ">=3.1.0",
-      "qs": ">=6.13.0",
+      "qs": "6.16.0",
       "typed-rest-client": ">=2.1.0"
     },
     "minimatch": "^10.0.3",
-    "deepmerge-ts": "^8.0.0"
+    "deepmerge-ts": "^8.0.0",
+    "qs": "6.16.0"
   },
   "dependencies": {
     "@emnapi/core": "^1.10.0",
