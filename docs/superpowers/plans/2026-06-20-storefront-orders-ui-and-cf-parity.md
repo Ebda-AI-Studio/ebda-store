@@ -123,7 +123,7 @@ The only CF "bugs" are the missing build-env that web already proved. No app-cod
 ### Task B1: Rebuild admin worker with build env → fixes "Load failed"
 
 - [ ] Add CF tooling locally to admin (`npm i -D @opennextjs/cloudflare@1.19.11 wrangler@^4.86.0 -w @force/admin` + recreate `wrangler.jsonc`/`open-next.config.ts`).
-- [ ] Build with the admin env inlined: `export NEXT_PUBLIC_API_URL=https://api-production-c058.up.railway.app/api/v1` (+ `NEXT_PUBLIC_ONESIGNAL_APP_ID` if push parity wanted) `&& bash scripts/cf-build.sh admin && (cd apps/admin && npx wrangler deploy)`.
+- [ ] Build with the admin env inlined: `export NEXT_PUBLIC_API_URL=https://api-production-c058.up.railway.app/api/v1` (+ `NEXT_PUBLIC_ONESIGNAL_APP_ID` if push parity wanted) `&& bash scripts/cf-build.sh admin && (cd apps/admin && npx wrangler deploy)`. — **corrected 2026-09-02**: that raw Railway hostname 404s today; use `https://api.force-ai.co/api/v1`, the current live API host (matches `cf-deploy.yml`).
 - [ ] **Verify**: `force-admin-cf-preview.workers.dev/login` → no "Load failed"; the login form reaches the API (CSRF/login network calls 200).
 
 ### Task B2: Rebuild orders worker with build env

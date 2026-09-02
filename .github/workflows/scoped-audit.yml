@@ -44,28 +44,63 @@ jobs:
           bash scripts/scoped-audit.sh force-website-builder "$BASE_REF" .
 
       - name: Run Claude scoped audit (subscription OAuth)
+        id: run-audit
         continue-on-error: true
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           AUDIT_INPUT: /tmp/scoped-audit-input.md
         run: |
+          # AUDIT_RAN sentinel (2026-09-02, adversarial audit P2, tracked
+          # #1115): this step is fail-open by design (continue-on-error) so a
+          # broken model never blocks every PR — but that used to also mean
+          # "model never ran" and "model ran, found nothing" produced the
+          # SAME green check with the same PASSED comment. audit.mjs now
+          # reads AUDIT_RAN/AUDIT_RAN_REASON and alerts loudly (PR comment +
+          # step summary + Telegram) whenever this is false, instead of
+          # silently passing.
           if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
             echo "CLAUDE_CODE_OAUTH_TOKEN not set — skipping audit (fail-open)."
             printf '%s' '{"result":"{\"summary\":\"Scoped audit skipped: CLAUDE_CODE_OAUTH_TOKEN not configured.\",\"findings\":[]}"}' \
               > /tmp/scoped-audit-out.json
-          else
-            # flock + skip-if-present: self-hosted runners share one global
-            # node_modules; concurrent 'npm install -g claude-code' jobs race it
-            # and one dies with ENOTEMPTY (the 2026-06-10 merge-blocking flake).
-            (
-              flock 200
-              command -v claude >/dev/null 2>&1 || npm install -g @anthropic-ai/claude-code
-            ) 200>/tmp/.force-claude-code-install.lock
-            claude -p \
+            echo "audit_ran=false" >> "$GITHUB_OUTPUT"
+            echo "audit_ran_reason=CLAUDE_CODE_OAUTH_TOKEN not configured" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # flock + skip-if-present: self-hosted runners share one global
+          # node_modules; concurrent 'npm install -g claude-code' jobs race it
+          # and one dies with ENOTEMPTY (the 2026-06-10 merge-blocking flake).
+          (
+            flock 200
+            command -v claude >/dev/null 2>&1 || npm install -g @anthropic-ai/claude-code
+          ) 200>/tmp/.force-claude-code-install.lock
+
+          if claude -p \
               --output-format json \
               --model claude-opus-5 \
               --allowedTools "Read,Grep,Glob" \
-              < "$AUDIT_INPUT" > /tmp/scoped-audit-out.json
+              < "$AUDIT_INPUT" > /tmp/scoped-audit-out.json; then
+            # CLI exited 0 — still confirm it actually produced a non-empty
+            # `.result` before calling this a real run. A 0-exit with an
+            # empty/malformed envelope is the same "silently vanished"
+            # failure mode as a non-zero exit.
+            if node -e "
+              const fs = require('fs');
+              const o = JSON.parse(fs.readFileSync('/tmp/scoped-audit-out.json', 'utf8'));
+              const text = typeof o === 'string' ? o : o.result;
+              process.exit(typeof text === 'string' && text.length > 0 ? 0 : 1);
+            " 2>/dev/null; then
+              echo "audit_ran=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::claude CLI exited 0 but produced an empty/malformed .result"
+              echo "audit_ran=false" >> "$GITHUB_OUTPUT"
+              echo "audit_ran_reason=CLI exited 0 but .result was empty or malformed" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            CLI_EXIT=$?
+            echo "::error::claude CLI exited $CLI_EXIT — the scoped-audit gate did not run for this PR"
+            echo "audit_ran=false" >> "$GITHUB_OUTPUT"
+            echo "audit_ran_reason=claude CLI exited $CLI_EXIT" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Parse findings, comment, gate (blocks on P0/P1; files P2/P3 as issues)
@@ -76,4 +111,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           CLAUDE_OUTPUT: /tmp/scoped-audit-out.json
+          AUDIT_RAN: ${{ steps.run-audit.outputs.audit_ran }}
+          AUDIT_RAN_REASON: ${{ steps.run-audit.outputs.audit_ran_reason }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
         run: node .github/scoped-audit/audit.mjs

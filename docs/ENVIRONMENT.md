@@ -57,7 +57,7 @@ Optional (feature degrades gracefully if missing):
 
 ## Admin (Cloudflare Worker `force-admin-cf-preview`)
 
-- `NEXT_PUBLIC_API_URL` — Railway API URL (e.g., `https://api-production-c058.up.railway.app`)
+- `NEXT_PUBLIC_API_URL` — the live API host, `https://api.force-ai.co` (Cloudflare custom domain in front of the Railway API service; the old raw `api-production-c058.up.railway.app` hostname 404s — corrected 2026-09-02)
 - `NEXT_PUBLIC_ONESIGNAL_APP_ID` — OneSignal app ID for the admin PWA (`react-onesignal` in `apps/admin`).
 - `NEXT_PUBLIC_SENTRY_DSN_ADMIN` — admin client Sentry DSN. Initialized in `apps/admin/instrumentation-client.ts` (replaced the dead `sentry.client.config.ts`, same latent bug as web — no `withSentryConfig`, fixed 2026-06-25). Server Sentry off on the CF target (instrumentation.ts moved aside). **`next.config.js` is now wrapped in `withSentryConfig` (fixed 2026-07-02, audit H2)** — see the shared `SENTRY_AUTH_TOKEN` note below for source maps/releases. **NOT yet given the `@sentry/cloudflare` worker-entry treatment** that `apps/web` got 2026-07-02; tracked as a follow-up, same pattern.
 

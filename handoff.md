@@ -1,135 +1,105 @@
-# Handoff — FWB OSOSS build program (develop-now, deploy-all-at-once)
+# Handoff — FWB adversarial-audit remediation, PR 3 (record + gates)
 
-_Updated 2026-07-22. Resume from here. Full context: memory [[project-fwb-ososs-competitive-strategy]]._
+_Updated 2026-09-02. Resume from here. Plan:
+`docs/plans/2026-09-02-adversarial-audit-remediation.md`, Tasks 13-19._
+
+## Correction (2026-09-02)
+
+This file was 6 weeks stale, describing PRs #874/#881/#908/#920 as OPEN and
+held behind a stuck CI runner (dated 2026-07-22). **All of that is done:**
+the runner unstuck and every PR in that batch merged within 48h of the last
+update — #879 (2026-07-22), #920 (2026-07-23), #908/#874/#881 (2026-07-24) —
+and the trimmed item-5 WarehouseStock fix landed separately as #935
+(2026-07-24). The whole 4-item OSOSS build program (agentic checkout,
+answer-engine citation measurement + GSC ingestion, inventory drift fix) is
+merged and live. Main is now at #1111 (verified `git log -1 main`, `gh pr
+list --state open` returns zero), and CI runners are healthy (verified: 5 of
+the last 5 workflow runs today `success`, the one `failure` is the known
+lighthouse Chrome-install gap this same PR addresses). A NEXT session reading
+the old version of this file would have resumed into a world 6 weeks gone —
+this is the exact "6-week-stale handoff" finding from Task 18 of the plan
+below, fixed on itself.
 
 ## Goal
 
-Close the OSOSS competitive gaps in dependency order, one PR per feature. **Strategy (Ahmad, 2026-07-22):
-keep DEVELOPING now; DEPLOY the whole stack at once later** — merges are blocked by a stuck CI runner,
-so don't wait, just build. Governing thesis: **win on AI/AEO/agentic-commerce, don't rebuild OSOSS's
-ERP breadth.**
-
-## CI state (2026-07-23) — runner UNSTUCK; merges HELD per Ahmad (deploy-all-at-once)
-
-- Runner works again. My 3 PRs (#881/#908/#920) had 2 fixable-mine issues — BOTH FIXED + pushed:
-  - **#881 lockfile out-of-sync** (`npm ci` failed: magicast@^0.3.5). Cause: fresh-worktree bootstrap ran
-    under local npm 11/node 25, producing a lockfile CI's npm 10.8.2 rejects. Fix: `npx npm@10 install
-    --package-lock-only` → regenerated npm-10-compatible lockfile (commit 38e7f81d… includes this + gitleaks).
-  - **gitleaks secret-scan** flagged CI-only test fixtures (perplexity/openai fake keys + the gsc-client
-    RSA test key). Fix: `.gitleaks.toml` allowlist (literal values for the fake keys; PATH allowlist for the
-    RSA PEM since gitleaks anchors private-key findings at the BEGIN line, so a value-substring can't match).
-    **KEY INSIGHT: the self-hosted runner scans ONE shared clone containing ALL pushed branches**, so the
-    allowlist had to go on ALL THREE branches (#881 38e7f81d, #908 5e6a5b86, #920 e982c731), not just 8A/8B.
-- **REMAINING BLOCKERS (pre-existing, repo-wide, NOT mine — gate every merge):** Security Audit fails on all
-  PRs incl the unrelated #874 (the 8 HIGH npm-audit findings — otel/next/sharp); E2E + Integration + RLS
-  force_app Cutover Proof fail on #874 AND #908 (base/env breakage on main — the RLS cutover may be mid-flight).
-  These need a real remediation/decision (Ahmad) before ANY merge; I will NOT admin-override security gates.
-- **#879 was MERGED** (into feat/customer-groups) outside this session — #874's branch now carries customer
-  groups + promotions. #874 is MERGEABLE/BEHIND.
-- Merge order when unblocked: #874→main, then #881 + #908→main, then retarget #920→main.
+Finish PR 3 of the 2026-09-02 adversarial-audit-remediation plan
+(`docs/plans/2026-09-02-adversarial-audit-remediation.md`) — Tasks 13-19,
+branch `fix/audit-record-and-gates`. This is the third of three PRs; PR 1
+(P0 security) and PR 2 (P1 correctness) are separate worktrees/branches, not
+this one — don't touch them from here.
 
 ## Current state
 
-- **PR #874** (customer groups) + **PR #879** (promotions) — both OPEN, work-complete, still BLOCKED on
-  the stuck self-hosted CI runner (verified 2026-07-22: #874 all 11 checks `pending`, `MERGEABLE`/`BEHIND`;
-  #879 `UNSTABLE` only via inherited pending checks). When the runner unsticks: merge #874 → main, retarget
-  #879 → main. Not code — infra.
-- **NEW: Ahmad picked items 7, 8, AND 5 to build** (all three). Verified all three premises against source
-  (the audit gap list was stale — item 4 was already built). Findings:
-  - **Item 7 (agentic checkout)** — PARTIALLY BUILT. Read side (feed/JSON-LD/llms.txt) shipped; guest
-    cart→order→payment REST already works headlessly. Gap = agent tool/MCP layer + no server-to-server
-    payment. Scope M. **→ BUILDING NOW.**
-  - **Item 8 (answer-engine/citation measurement)** — PARTIALLY BUILT. "Get citable" content mature; the
-    MEASUREMENT half (did an engine cite us) doesn't exist. Scope L. **→ NEXT after 7.**
-  - **Item 5 (ATP + stock transfers)** — PARTIALLY BUILT. Multi-warehouse counts + admin UI shipped, but no
-    reserved qty, checkout never touches WarehouseStock (drifts after every sale), transfer_in/out are dead
-    enum values. Also latent bug: setStock/adjustStock not tx-wrapped. Scope L (trimmable to M). Depth
-    DEFERRED ("decide when we get there"). **→ LAST.**
+On `fix/audit-record-and-gates`, one commit per task so far (conventional-
+commit style, `git log --oneline` on this branch shows the sequence).
+Nothing pushed, no PR opened yet — per the plan's explicit instruction, stop
+after the last commit.
 
-## Item 7: Agentic Checkout (MCP) — ✅ COMPLETE → PR #881 (OPEN, do not merge)
+## Done
 
-- Worktree `_worktrees/force-website-builder__feat-agent-checkout`, branch `feat/agent-checkout`.
-  All 7 SDD tasks done + per-task reviewed + whole-branch OPUS review (verdict: ready to merge).
-  Pushed (HEAD ff7b6a33); **PR #881 → main, OPEN, NOT merged** (deploy-all-at-once batch).
-- Shipped: `POST /api/v1/mcp/:storeSlug` stateless MCP (SDK 1.29.0 pinned), 7 tools (store/search/
-  product/add_to_cart/view_cart/place_order/get_order_status); `agent_checkout` feature key (default-ON
-  all paid plans); `Order.source` col + admin agent badge; llms.txt advertises the endpoint. COD
-  autonomous; online returns paymentUrl (provider resolved before create → no orphan). Cross-tenant
-  isolation tested (13/13 green). SDD ledger: `_worktrees/…feat-agent-checkout/.superpowers/sdd/progress.md`.
-- **⚠️ DECISION PENDING (Ahmad) — online-payment go-live gate:** the online paymentUrl path is default-ON
-  but UNEXERCISED in CI (no sandbox gateway). COD is fully tested. Before a merchant relies on agent
-  ONLINE checkout: staging smoke vs a sandbox gateway, OR beta-flag online while COD leads. Not a merge
-  blocker (order created unpaid, human-in-loop, rollback exists).
-- Fast-follows (non-blocking, logged in PR #881): unify online-payment request-building into a shared
-  `createPaymentForOrder`; COD retry/idempotency guard (agent-retry→double-order); anchor the /mcp CSRF
-  skip. Pre-existing (separate tickets): CartItem Cascade-vs-RESTRICT schema/DB drift; 8 repo-wide HIGH
-  npm-audit findings; agent_feed doc drift in 04-pricing-tiers/06-faq.
+- **Task 13** — corrected the dead `api-production-c058.up.railway.app`
+  Railway host to `api.force-ai.co` across CLAUDE.md/README/docs/runbooks
+  (direct fixes) and historical audits/plans (dated correction notes, not
+  rewrites); fixed the false "moved OUT of CI" pre-push comment.
+- **Task 14** — deleted the zombie `preview-env-isolation.yml` gate (checked
+  decommissioned Vercel projects, always exited 0); corrected
+  docs/DEPLOYMENT.md's claim that it enforced anything; swept a related dead
+  `.env.production.example` Vercel-vars fossil.
+- **Task 15** — widened the Unit Tests job's vitest glob from
+  `apps/web/src/lib` to `apps/web` (fixes 4 orphaned tests) and added a new
+  `orphan-tests` CI job that diffs the full vitest-discoverable test set
+  against the union of what CI actually runs, failing the build on any
+  future orphan. Verified both directions locally (0 orphans; a synthetic
+  orphan was caught and cleaned up).
+- **Task 16** — added a notify-failure job to `lighthouse-nightly.yml`
+  (7 weeks red, unnoticed) + a best-effort no-sudo Chrome install
+  (unverified against the live runner — next scheduled run settles it);
+  corrected `load-test-nightly.yml`'s header to stop claiming a live nightly
+  staging target that was retired 2026-06-13, without deleting the (real,
+  working) k6 tooling.
+- **Task 17** — removed gitleaks' blanket test-tree path allowlist (verified
+  clean via full-history `gitleaks detect`, fixed 3 real gaps it was
+  masking); removed `.gitleaks.toml`/`.gitleaksignore` from CI's docs-only
+  filters; added `E2E Tests` + `Client secret scan` to main's required
+  status checks via `gh api` (verified); added an `AUDIT_RAN` sentinel to
+  `scoped-audit.yml`/`audit.mjs` so "model never ran" now alerts (PR comment
+  + step summary + Telegram) instead of looking identical to "model ran,
+  found nothing."
 
-## Item 8 Plan 8A (answer-engine citation checking) — ✅ COMPLETE → PR #908 (OPEN, do not merge)
-
-- Worktree `_worktrees/force-website-builder__feat-answer-engine-insights`, branch `feat/answer-engine-insights`.
-  All 7 tasks done + per-task reviewed (2 Opus reviews caught+fixed a Critical budget-per-store bug + an
-  MFA-bypass) + Opus whole-branch review (caught+fixed a Critical: admin config page missing /api/v1 prefix
-  = built-but-unreachable; + cron per-store isolation). Pushed HEAD 70376f4f; **PR #908 → main, OPEN, NOT merged**.
-- Shipped: pluggable AnswerEngineProvider (Gemini grounded ACTIVE/free + Perplexity/OpenAI DORMANT until
-  keyed); weekly per-store citation-scan cron (platform-wide per-engine budget via withRlsBypass, fail-soft,
-  plan+feature gated); super-admin encrypted-key/toggle config (MFA-gated); merchant dashboard (zero-dep
-  charts, tenant-isolated). answer_engine_insights key (all paid plans); AnswerEngineCheck+ProviderConfig models.
-  SDD ledger: `_worktrees/…answer-engine-insights/.superpowers/sdd/progress.md`.
-- **⚠️ GO-LIVE GATE (Ahmad): live-smoke before selling as "real citation."** Gemini googleSearchRetrieval
-  grounding on gemini-flash-lite-latest is likely IGNORED by 2.x models on SDK 0.24.1 → most stores get
-  grounded:false. Before prod: smoke a grounding-capable model + set ANSWER_ENGINE_GEMINI_MODEL; smoke each
-  paid engine (Perplexity Sonar / OpenAI web-search) before enabling. Same class as item-7 payment gate.
-- Cost numbers Ahmad asked for (paid engines): ~$30-80/mo total @100 stores if BOTH enabled; free Gemini path = $0.
-- Fast-follows (in PR #908): persist a real `grounded` column (dashboard uses citedUrls-emptiness heuristic
-  now — honest); merchant-editable prompts (v1 auto-only); Store.country (v1 hardcodes Kuwait); coverage-
-  rotation under the daily cap at scale (first ~25 stores exhaust 200/day); ai-tools rec deep-link anchor.
-
-## Item 8 Plan 8B (Force-managed GSC ingestion) — ✅ COMPLETE → PR #920 (OPEN, STACKED on #908, do not merge)
-
-- Worktree `_worktrees/force-website-builder__feat-answer-engine-gsc`, branch `feat/answer-engine-gsc`
-  (stacked on feat/answer-engine-insights). All 4 tasks done + per-task reviewed + Opus whole-branch
-  review (verdict: ready to merge, no Critical/Important). Pushed HEAD d15a2b58; **PR #920 → base
-  feat/answer-engine-insights (STACKED), OPEN, NOT merged.** When 8A (#908) merges to main, RETARGET #920 → main.
-- Shipped: GscDailyMetric model (RLS); gsc-client.ts (service-account via existing jsonwebtoken, NO new
-  dep, dormant until GSC_SERVICE_ACCOUNT_JSON set, key never logged); daily fail-soft ingestion cron
-  (idempotent upsert, tenant-scoped, plan+feature gated); dashboard GSC section (zero-dep charts,
-  "not connected" empty state, tenant-isolated). Reuses answer_engine_insights key. SDD ledger in the worktree.
-- **⚠️ GO-LIVE GATE (Ahmad):** dormant until (1) create Force Google service account, (2) add its
-  client_email as a user on the Force-owned GSC properties, (3) set GSC_SERVICE_ACCOUNT_JSON in API env,
-  (4) live-smoke one property. Documented in docs/runbooks/google-search-console-indexing.md + ENVIRONMENT.md.
-- Fast-follows (in PR #920): all-zero-rows "still populating" hint; useGscDashboard error-vs-dormant state.
-
-## Item 5 (WarehouseStock data-integrity) — IN PROGRESS (spec+plan committed, SDD running)
-- Worktree `_worktrees/force-website-builder__feat-inventory-atp-reserved`, branch `feat/inventory-atp-reserved`
-  off main. Depth = TRIMMED (Ahmad): just fix the 2 bugs, NO reserved/ATP (FWB already oversell-safe via
-  decrement-at-order), NO transfer workflow. Spec 995bd540 + plan 058d20ab committed.
-- KEY: Product.inventory stays authoritative + MONEY PATH UNTOUCHED; reconcile WarehouseStock TO the aggregate
-  (default-warehouse-absorbs; sales reconcile async via order fanout, admin writes sync inline). 5 tasks:
-  1) atomic setStock/adjustStock (race), 2) reconcileWarehouseStockToAggregate + backfill, 3) wire into admin
-  writers, 4) wire into order fanout (money path untouched), 5) admin reconcile action + endpoint. Running via SDD.
+- **Task 18** — replaced `FIXES.md` with a 5-line pointer (was a 4-month-old
+  fossil presenting fixed P0s as open); refreshed this file; re-ran Stryker
+  (24s, real measurement: 10.65% overall, up from 9.34%) and set
+  `thresholds.break: 10` as a ratchet floor + added a manual
+  `mutation-testing.yml` CI job (verified: break=10 passes, break=90 fails
+  locally); wired the Playwright smoke suite into `cf-deploy.yml` as a
+  post-deploy job (chromium storefront+admin projects, feeds the existing
+  Telegram alert) and fixed its stale `app.forcemediakw.com` admin default
+  to `admin.force-ai.co` (verified: 5/5 smoke tests green against live prod
+  with the corrected default).
+- **Task 19** — added a dated "Correction (2026-09-02)" block to
+  `docs/audits/2026-08-31-reel-derived-lenses.md`: L16 (RLS) re-marked
+  PASS-provisioned/INERT-in-prod (verified prod still connects as
+  `neondb_owner`, `rolbypassrls=true`, and the cutover's Phase-1 plumbing is
+  still not on `main`); L20 re-marked FAIL (Sentry is error tracking, not
+  SLO/burn-rate alerting — verified zero SLO/burn-rate/error-budget code
+  anywhere in the repo). Original table rows kept intact with strikethrough
+  + a pointer, not silently rewritten. Standing rule recorded in the file
+  (not propagated to `force-ai-foundation`'s lens-pack source — that repo is
+  outside this worktree).
 
 ## Left to do
 
-- Finish item 5 SDD (5 tasks) → PR (do NOT merge; deploy-all-at-once). Then ALL THREE picks (7/8A/8B/5) done.
-
-- **Item 5 (ATP + stock transfers)** — LAST of the three. Depth deferred ("decide when we get there"):
-  full transfer workflow vs trimmed reserved-qty+ATP+fix-drift. Verify-first done (PARTIALLY BUILT, scope L).
-  Crux: Product.inventory is authoritative + oversell-safe; WarehouseStock is an admin-side shadow that
-  drifts (one-way sync only). Fix the WarehouseStock drift + the setStock/adjustStock race regardless of
-  depth. New worktree off main → decide depth with Ahmad → spec → plan → SDD.
-- **Item 5 (ATP + stock transfers)** — LAST. Depth deferred ("decide when we get there"): full transfer
-  workflow vs trimmed reserved-qty+ATP+fix-drift. Verify-first done (PARTIALLY BUILT, scope L).
-  Crux: Product.inventory is authoritative + oversell-safe; WarehouseStock is an admin-side shadow that
-  drifts (one-way sync only). Fix the WarehouseStock drift + the setStock/adjustStock race regardless of
-  depth. New worktree → decide depth with Ahmad → spec → plan → SDD.
-
-**Fast-follow tickets (not blockers):**
-- #879: createAdminOrder bypasses coupon scope/eligibility + auto-promos — apply evaluateForCart on admin path.
-- #874: customer-groups/page.tsx save()/remove() never check `{ error }` (silent write-failure).
-- Item 7: unify online-payment request-building into a shared `createPaymentForOrder` service (Task 6 dup).
+- Report back to the user per the task instructions (per-task done/partial/
+  not-applicable, blast-radius grep results, anything the plan claimed that
+  turned out wrong, anything needing Ahmad). Do not push, open a PR, or
+  merge.
+- All 7 tasks (13-19) are done as of this commit. Nothing else left on this
+  branch unless the user's review turns up something.
 
 ## Notes
-- Root checkout stays on `main`, read-only. Worktree per task.
-- SDD adversarial review loop caught ~8 real money/security bugs last time — mandatory on revenue features.
-- Blast-radius on every change; docs parity same session.
+
+- Root checkout stays on `main`, read-only. This is its own worktree per
+  task; don't touch `__fix-audit-p0-security` or `__fix-audit-p1-correctness`
+  from here — other work is live there.
+- Blast-radius grep after every task, result stated in the commit + the
+  final report.

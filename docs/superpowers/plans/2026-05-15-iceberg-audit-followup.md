@@ -216,7 +216,7 @@ FWB is an e-commerce platform for one-time product purchases. No subscription bi
 #### 28. Environments
 
 **Status**: ❌ Missing
-**Evidence**: `apps/admin/src/lib/api.ts:42` — `process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'`. There is no staging Railway service. Vercel preview deployments inherit the same `NEXT_PUBLIC_API_URL` as production (pointing at `api-production-c058.up.railway.app` or `store-api.forcemediakw.com`). No `.env.preview` or Vercel Preview environment variable override documented anywhere.
+**Evidence**: `apps/admin/src/lib/api.ts:42` — `process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'`. There is no staging Railway service. Vercel preview deployments inherit the same `NEXT_PUBLIC_API_URL` as production (pointing at `api-production-c058.up.railway.app` or `store-api.forcemediakw.com`, as of this audit's date — corrected 2026-09-02: that raw Railway hostname now 404s; the live API host is `api.force-ai.co`, and the platform has since moved off Vercel to Cloudflare Workers entirely). No `.env.preview` or Vercel Preview environment variable override documented anywhere.
 **Impact**: Every Vercel PR preview + every `vercel --preview` deploy writes to production Neon. E2E suite confirmed to run against prod DB (`project-fwb-test-stores-prod-db.md`). CLAUDE.md rule 8 violation. Risk: a developer running integration tests against a preview deploy mutates live merchant data.
 
 #### 29. Rollbacks

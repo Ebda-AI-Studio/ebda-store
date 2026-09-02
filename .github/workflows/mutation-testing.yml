@@ -1,0 +1,61 @@
+name: Mutation testing (Stryker)
+
+# Manual/quarterly, NOT scheduled — mirrors load-test-nightly.yml's
+# manual-dispatch pattern. Added 2026-09-02 (adversarial audit, P2/P3): the
+# config existed with thresholds.break: null and ZERO references anywhere
+# in .github/workflows/ — a gate that could never fail because nothing ever
+# invoked it. It's cheap (~24s for the 4 configured files, measured
+# 2026-09-02), so run it by hand every quarter, or after materially changing
+# apps/api/src/services/{auth,payment,recommendation}.service.ts or
+# apps/api/src/lib/ai-quota.ts, and paste the summary into a new
+# docs/test-reports/stryker-baseline-<date>.md following the existing
+# pattern. See docs/test-reports/stryker-baseline-2026-09-02.md for the
+# current baseline + the rationale for the break=10 floor.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_cloud:
+        description: 'Run on cloud (ubuntu-latest) instead of self-hosted'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  mutation-test:
+    name: Stryker mutation score
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Build database package
+        run: npm run build -w packages/database
+
+      - name: Build API package
+        run: npm run build -w apps/api
+
+      - name: Run Stryker
+        # stryker.conf.json's thresholds.break gates this — a non-zero exit
+        # here means the score dropped below the configured floor.
+        run: npx stryker run stryker.conf.json
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stryker-mutation-report
+          path: reports/mutation/
+          retention-days: 30

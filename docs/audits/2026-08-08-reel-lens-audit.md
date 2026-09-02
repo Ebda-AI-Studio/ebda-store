@@ -1,5 +1,22 @@
 # Audit — the 5 new foundation lenses (21–25) against FWB · 2026-08-08
 
+> **Correction (2026-09-02):** `api-production-c058.up.railway.app` (cited in the lens-24 evidence
+> below) 404s today — `server: railway-hikari`, `x-railway-fallback: true`. The live API host is
+> `api.force-ai.co`, and re-running the same probe against it now shows `server: cloudflare` +
+> `cf-ray` present:
+>
+> ```
+> $ curl -sI https://api.force-ai.co/health
+> server: cloudflare
+> cf-ray: a34c0d83abe55cea-KWI
+> ```
+>
+> That contradicts the letter of the lens-24 "API origin is not [protected]" evidence as quoted
+> (this exact request now shows edge headers). This note only corrects the hostname/evidence — it
+> does not re-run the full lens-24 rubric (whether the CF layer in front of this host is doing
+> WAF/rate-limit/bot-management, or just DNS-proxying HTTP through) and the original P1 verdict is
+> left standing pending that re-audit. Do not treat lens 24 as resolved on this note alone.
+
 Rubric: `force-ai-foundation/standard/{migration-safety,error-surface,ai-transparency,edge-protection,unit-economics}.md`
 (added in foundation PR #85, derived from a fleet of 8 builder-failure-mode reels).
 

@@ -118,7 +118,7 @@ Replicate the storefront's OpenNext setup for `apps/admin` + `apps/orders` (own 
 
 ### Phase 4 — FWB API custom domain (`api.force-ai.co`)
 
-- [ ] Add `api.force-ai.co` as a custom domain on the Railway FWB API service (`api-production-c058.up.railway.app`).
+- [ ] Add `api.force-ai.co` as a custom domain on the Railway FWB API service (`api-production-c058.up.railway.app` at the time this plan was written — **done, per correction 2026-09-02**: `api.force-ai.co` is live, verified 200 through Cloudflare; the raw `api-production-c058.up.railway.app` hostname now 404s).
 - [ ] Update `NEXT_PUBLIC_API_URL` on all FWB frontends (web/admin/orders) → `https://api.force-ai.co`.
 - [ ] **CORS allowlist**: add `https://{store,admin,orders}.force-ai.co` (keep the old `*.forcemediakw.com` origins during transition).
 - [ ] Verify auth refresh + CORS + `SameSite=None` cookies end-to-end.

@@ -12,7 +12,10 @@ inspection, and that is the point of the second pass.
 ## Result
 
 **17 of 21 lenses are code-auditable against FWB. 14 pass. 3 real gaps. 4 are OS/process
-or business lenses that do not apply to a repo.**
+or business lenses that do not apply to a repo.** ⚠️ **Corrected 2026-09-02: L16 and L20
+were originally scored PASS; both are falsified — see "Correction (2026-09-02)" below.
+As corrected: 12 pass, 1 provisioned-but-inert (L16), 1 alerting-category-error now FAIL
+(L20), 3 real gaps.**
 
 FWB scoring well here is expected rather than surprising — most of these lenses cover
 ground the existing audit fleet already walks. The value is in the 3 that were not
@@ -30,10 +33,10 @@ covered, and in registering all 21 so they re-run against the other repos.
 | L11 | `DceYRVpCFKG` | SSRF via server-side fetch of user URLs           | **GAP-1** (Medium)                                                                                                                                                                                                                             |
 | L13 | `DcbzcfyioD9` | Unverified webhook signatures / replay            | **PASS** — signature verification on payment providers, idempotency throughout, webhook inbox with replay                                                                                                                                      |
 | L15 | `DcYrFHSAOhJ` | No API versioning / deprecation policy            | **GAP-3** (Low)                                                                                                                                                                                                                                |
-| L16 | `DcWGRX2G2l8` | Per-client column degrades every tenant           | **PASS** — 324 `storeId` columns, 233 RLS policy statements                                                                                                                                                                                    |
+| L16 | `DcWGRX2G2l8` | Per-client column degrades every tenant           | ~~**PASS** — 324 `storeId` columns, 233 RLS policy statements~~ ⚠️ **see "Correction (2026-09-02)" below**                                                                                                                                     |
 | L18 | `DcRgRM2jjuv` | Rate limiting / WAF unconfigured                  | **PASS** — 67 limiter usages incl. a dedicated auth limiter (5/15min/IP+email)                                                                                                                                                                 |
 | L19 | `DcQ8u02Cj1A` | Per-client repo forks                             | **PASS** — single codebase, tenant config in `StoreTheme`; CLAUDE.md forbids per-tenant code                                                                                                                                                   |
-| L20 | `DcO7fDEj9eg` | No SLO / error budget / burn-rate alerting        | **PASS** — Sentry wired, alert-failure watch, log drain                                                                                                                                                                                        |
+| L20 | `DcO7fDEj9eg` | No SLO / error budget / burn-rate alerting        | ~~**PASS** — Sentry wired, alert-failure watch, log drain~~ ⚠️ **see "Correction (2026-09-02)" below**                                                                                                                                         |
 | L21 | `DcOX9AdERD2` | Read-after-write across replicas                  | **PASS** — `DIRECT_URL` split maintained                                                                                                                                                                                                       |
 | L6  | `DcoH5avEj3J` | Mobile plaintext API / no cert pinning            | **N/A** — no native mobile app in this repo                                                                                                                                                                                                    |
 | L14 | `DcZOrpQCcZW` | Capacitor secrets in localStorage                 | **N/A** — same                                                                                                                                                                                                                                 |
@@ -46,6 +49,57 @@ covered, and in registering all 21 so they re-run against the other repos.
 | L8  | `Dci-Qq_j9EL` | VPS/SSH hardening → the Umbra CI host, not this repo                                                                 |
 | L12 | `Dcd0uMTCHsl` | Market strategy (operator-owned apps vs 22% delivery fees) → business, not code                                      |
 | L17 | `DcThgrwlaDD` | Customization debt / productization threshold → business, already encoded in CLAUDE.md's "platform-level fixes" rule |
+
+## Correction (2026-09-02, adversarial audit)
+
+Two verdicts above are falsified by direct verification. Left as originally
+written above (not silently rewritten) — this section is the correction of
+record.
+
+**L16 — re-marked PASS-provisioned / INERT-in-prod (cutover parked).** The
+original verdict ("PASS — 324 `storeId` columns, 233 RLS policy statements")
+counts what was provisioned, not what's enforced — exactly the regression
+`docs/audits/2026-07-31-vibecoded-security-holes.md` lens 02 warned against in
+writing: "Counting policies tells you what was provisioned; only the role's
+`rolbypassrls` tells you whether any of it applies." Verified 2026-09-02:
+`docs/ENVIRONMENT.md:15` (current) — prod `DATABASE_URL` connects as
+`neondb_owner`, `rolbypassrls = true`. Every RLS policy is silently ignored
+for every row, on every connection, right now. This is a known, explicit,
+PARKED decision (Ahmad: "we will merge when I tell you" — memory
+`project-fwb-rls-cutover-and-security-program-2026-07`), not a regression to
+fix here — its Phase-1 prerequisite plumbing
+(`packages/database/src/tenant-storage.ts`) is verifiably not on `main`
+(`git cat-file -e origin/main:packages/database/src/tenant-storage.ts` fails).
+App-layer authorization is independently enforced per-route (see L3, L7
+above), so this is not directly exploitable — but a PASS on this lens tells a
+future reader the database enforces tenant isolation as a backstop. It does
+not, for any row, for any live connection, today.
+
+**L20 — re-marked FAIL.** The original verdict ("PASS — Sentry wired,
+alert-failure watch, log drain") answers a different question than the lens
+asks. Sentry is error tracking (did a request throw); SLO/error-budget/
+burn-rate alerting is latency/availability against a target (is p95 or error
+rate trending toward breaching a commitment). Verified 2026-09-02: no
+SLO/burn-rate/error-budget code or config exists anywhere in `apps/` or
+`.github/workflows/` (grepped; the workflows that DID watch performance,
+`lighthouse-nightly.yml` and `load-test-nightly.yml`, were themselves dead —
+see `docs/plans/2026-09-02-adversarial-audit-remediation.md` Task 16). Citing
+error-tracking evidence for an SLO-alerting claim is a category error, not a
+close call.
+
+**Standing rule these two produce, for this lens pack (recorded here; not
+propagated to `force-ai-foundation`'s lens-pack source — that repo is outside
+this worktree):** a PASS on an enforcement claim must cite the runtime fact
+the claim depends on, never a count of what was declared/provisioned/
+integrated. An RLS verdict cites the `pg_roles.rolbypassrls` query result for
+the ACTUAL connection role in use, never a policy count. An alerting-class
+verdict (SLO/burn-rate/error-budget) cites the alerting system that computes
+against a target, never a general-purpose error tracker whose presence is
+adjacent but doesn't answer the question. L9's PASS in this same file ("npm
+ci + npm audit gate, trufflehog + gitleaks in CI" against _malicious
+dependency exfiltrating env_) is the same shape of evidence-claim mismatch —
+flagged here, not re-verdicted, since it wasn't independently confirmed
+false.
 
 ## The gaps
 

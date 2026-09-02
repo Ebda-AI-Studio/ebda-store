@@ -7,6 +7,18 @@
 //   P2 / P3 only       → file follow-up issues (non-blocking), exit 0
 //   any infra/parse/network error → exit 0 (FAIL-OPEN — never falsely block)
 //
+// 2026-09-02 (adversarial audit, P2, tracked #1115): fail-open must not mean
+// SILENT. Before this fix, "model ran, found nothing" and "model never ran"
+// (bad --model alias, CLI crash, empty/unparseable output) were the same
+// green check with the same "PASSED" comment — the CLI step above this one
+// carries `continue-on-error: true`, so a broken model silently disabled the
+// one gate that blocks P0/P1 merges, indefinitely, with no signal anywhere.
+// The workflow step now writes AUDIT_RAN=true/false (+ AUDIT_RAN_REASON) to
+// $GITHUB_OUTPUT; this script checks it FIRST and, when false, posts a
+// distinct "did not run" PR comment + step-summary block + Telegram alert
+// before doing anything else, then exits 0 (fail-open is preserved
+// deliberately — see header above — but it is no longer quiet about it).
+//
 // Modeled on .github/ai-review/review.mjs — match its style exactly.
 
 import { readFileSync, appendFileSync } from 'node:fs';
@@ -19,6 +31,10 @@ const {
   CLAUDE_OUTPUT = '/tmp/scoped-audit-out.json',
   GITHUB_OUTPUT,
   GITHUB_STEP_SUMMARY,
+  AUDIT_RAN,
+  AUDIT_RAN_REASON,
+  TELEGRAM_BOT_TOKEN,
+  TELEGRAM_ALERT_CHAT_ID,
 } = process.env;
 
 // --- fail-open guards ---
@@ -39,49 +55,8 @@ if (!PR_NUMBER) {
 const [owner, repo] = repoParts;
 
 // ---------------------------------------------------------------------------
-// 1. Read and parse Claude's JSON envelope (.result)
-// ---------------------------------------------------------------------------
-let modelText;
-try {
-  const envelope = JSON.parse(readFileSync(CLAUDE_OUTPUT, 'utf8'));
-  modelText = typeof envelope === 'string' ? envelope : envelope.result;
-} catch (e) {
-  console.error('Could not read Claude output:', e.message);
-  process.exit(0); // fail-open
-}
-if (!modelText) {
-  console.error('Empty model result — skipping gate (fail-open).');
-  process.exit(0);
-}
-
-// Tolerate code fences / surrounding prose (same extractJson as review.mjs)
-function extractJson(s) {
-  const fenced = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced ? fenced[1] : s;
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  return candidate.slice(start, end + 1);
-}
-
-let result;
-try {
-  result = JSON.parse(extractJson(modelText));
-} catch (e) {
-  console.error('Model did not return valid JSON:\n', modelText);
-  process.exit(0); // fail-open
-}
-
-const findings = Array.isArray(result.findings) ? result.findings : [];
-const p0 = findings.filter((f) => f.severity === 'P0');
-const p1 = findings.filter((f) => f.severity === 'P1');
-const p2 = findings.filter((f) => f.severity === 'P2');
-const p3 = findings.filter((f) => f.severity === 'P3');
-const blocking = [...p0, ...p1];
-
-console.log(`scoped-audit: P0=${p0.length} P1=${p1.length} P2=${p2.length} P3=${p3.length}`);
-
-// ---------------------------------------------------------------------------
-// 2. GitHub REST helper (same style as review.mjs)
+// GitHub REST helper + shared constants (moved ahead of the parsing logic so
+// the AUDIT_RAN=false short-circuit below can use them too).
 // ---------------------------------------------------------------------------
 async function gh(method, path, body) {
   const r = await fetch(`https://api.github.com${path}`, {
@@ -104,6 +79,137 @@ async function gh(method, path, body) {
 const SEV_ICON = { P0: '🔴', P1: '🔴', P2: '🟡', P3: '🔵' };
 const PR_URL = `https://github.com/${owner}/${repo}/pull/${PR_NUMBER}`;
 const MARKER = '<!-- scoped-audit-bot -->';
+
+async function upsertMarkerComment(body) {
+  try {
+    // List existing issue comments to find the marker
+    const listResp = await gh(
+      'GET',
+      `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments?per_page=100`
+    );
+    if (!listResp.ok) {
+      // Can't list — just post a new one
+      await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, { body });
+      return;
+    }
+    const existing = await listResp.json();
+    const prior = existing.find((c) => c.body && c.body.includes(MARKER));
+    if (prior) {
+      await gh('PATCH', `/repos/${owner}/${repo}/issues/comments/${prior.id}`, { body });
+    } else {
+      await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, { body });
+    }
+  } catch (e) {
+    console.error('PR comment upsert failed (non-fatal):', e.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 0. AUDIT_RAN sentinel — "model ran, found nothing" vs "model never ran"
+// ---------------------------------------------------------------------------
+async function alertAuditDidNotRun(reason) {
+  const reasonText = reason || 'unknown';
+  console.error(
+    `::error::scoped-audit did NOT run for this PR (reason: ${reasonText}) — the blast-radius gate reviewed nothing. This is not "no findings."`
+  );
+
+  if (GITHUB_STEP_SUMMARY) {
+    try {
+      appendFileSync(
+        GITHUB_STEP_SUMMARY,
+        `### ⚠️ Scoped Audit — DID NOT RUN\n\nReason: \`${reasonText}\`. This PR has NOT been reviewed by the blast-radius audit gate — this is a different state from "reviewed, no findings." See the CLI step logs above.\n`
+      );
+    } catch (e) {
+      console.error('Step summary write failed (non-fatal):', e.message);
+    }
+  }
+
+  try {
+    await upsertMarkerComment(
+      `${MARKER}\n### ⚠️ Scoped Audit — DID NOT RUN\n\nReason: \`${reasonText}\`. The blast-radius audit gate did not produce a result for this PR — that is NOT the same as "no P0/P1 findings." Re-run \`workflow_dispatch\` on \`Scoped Audit Gate\` once the underlying issue is fixed, or have a human review this PR before merging.\n`
+    );
+  } catch (e) {
+    console.error('audit-did-not-run PR comment failed (non-fatal):', e.message);
+  }
+
+  if (TELEGRAM_BOT_TOKEN && TELEGRAM_ALERT_CHAT_ID) {
+    try {
+      const msg =
+        `⚠️ *scoped-audit did not run* — PR #${PR_NUMBER} (${owner}/${repo})\n` +
+        `reason: \`${reasonText}\`\n${PR_URL}`;
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          chat_id: TELEGRAM_ALERT_CHAT_ID,
+          parse_mode: 'Markdown',
+          disable_web_page_preview: 'true',
+          text: msg,
+        }),
+      });
+    } catch (e) {
+      console.error('Telegram alert failed (non-fatal):', e.message);
+    }
+  } else {
+    console.error(
+      'TELEGRAM_BOT_TOKEN/TELEGRAM_ALERT_CHAT_ID not set — alert is PR comment + logs only.'
+    );
+  }
+}
+
+if (AUDIT_RAN === 'false') {
+  await alertAuditDidNotRun(AUDIT_RAN_REASON);
+  // Fail-open by design (see file header): a broken model must not block
+  // every PR on a solo-dev repo with no human reviewer. But fail-open no
+  // longer means silent — alertAuditDidNotRun() above is what closes that
+  // gap. Nothing below this point has anything to parse.
+  process.exit(0);
+}
+
+// ---------------------------------------------------------------------------
+// 1. Read and parse Claude's JSON envelope (.result)
+// ---------------------------------------------------------------------------
+let modelText;
+try {
+  const envelope = JSON.parse(readFileSync(CLAUDE_OUTPUT, 'utf8'));
+  modelText = typeof envelope === 'string' ? envelope : envelope.result;
+} catch (e) {
+  console.error('Could not read Claude output:', e.message);
+  await alertAuditDidNotRun(`AUDIT_RAN was not 'false' but output was unreadable: ${e.message}`);
+  process.exit(0); // fail-open
+}
+if (!modelText) {
+  console.error('Empty model result — skipping gate (fail-open).');
+  await alertAuditDidNotRun("AUDIT_RAN was not 'false' but model result was empty");
+  process.exit(0);
+}
+
+// Tolerate code fences / surrounding prose (same extractJson as review.mjs)
+function extractJson(s) {
+  const fenced = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : s;
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  return candidate.slice(start, end + 1);
+}
+
+let result;
+try {
+  result = JSON.parse(extractJson(modelText));
+} catch (e) {
+  console.error('Model did not return valid JSON:\n', modelText);
+  await alertAuditDidNotRun(`AUDIT_RAN was not 'false' but model output did not parse as JSON: ${e.message}`);
+  process.exit(0); // fail-open
+}
+
+const findings = Array.isArray(result.findings) ? result.findings : [];
+const p0 = findings.filter((f) => f.severity === 'P0');
+const p1 = findings.filter((f) => f.severity === 'P1');
+const p2 = findings.filter((f) => f.severity === 'P2');
+const p3 = findings.filter((f) => f.severity === 'P3');
+const blocking = [...p0, ...p1];
+
+console.log(`scoped-audit: P0=${p0.length} P1=${p1.length} P2=${p2.length} P3=${p3.length}`);
 
 // ---------------------------------------------------------------------------
 // 3. Build PR comment body
@@ -166,30 +272,6 @@ const commentBody = [
 // ---------------------------------------------------------------------------
 // 4. UPSERT the single marker PR comment
 // ---------------------------------------------------------------------------
-async function upsertMarkerComment(body) {
-  try {
-    // List existing issue comments to find the marker
-    const listResp = await gh(
-      'GET',
-      `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments?per_page=100`
-    );
-    if (!listResp.ok) {
-      // Can't list — just post a new one
-      await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, { body });
-      return;
-    }
-    const existing = await listResp.json();
-    const prior = existing.find((c) => c.body && c.body.includes(MARKER));
-    if (prior) {
-      await gh('PATCH', `/repos/${owner}/${repo}/issues/comments/${prior.id}`, { body });
-    } else {
-      await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, { body });
-    }
-  } catch (e) {
-    console.error('PR comment upsert failed (non-fatal):', e.message);
-  }
-}
-
 try {
   await upsertMarkerComment(commentBody);
 } catch (e) {

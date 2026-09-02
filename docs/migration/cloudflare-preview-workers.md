@@ -28,7 +28,7 @@ After the DNS move, each store is served at its OWN domain (e.g. `wadyaljuz.com`
 `NEXT_PUBLIC_*` vars are **inlined at build time**. Without `NEXT_PUBLIC_API_URL` the worker falls back to `http://localhost:4000/api/v1` and every store fails to resolve (→ Platform landing for every slug). Build web with at least:
 
 ```bash
-export NEXT_PUBLIC_API_URL="https://api-production-c058.up.railway.app/api/v1"
+export NEXT_PUBLIC_API_URL="https://api.force-ai.co/api/v1"  # corrected 2026-09-02: the old raw api-production-c058.up.railway.app host now 404s
 export NEXT_PUBLIC_SITE_URL="https://force-web-cf-preview.ahmed0montaser.workers.dev"  # optional (canonical/OG)
 bash scripts/cf-build.sh web && (cd apps/web && npx wrangler deploy)
 ```

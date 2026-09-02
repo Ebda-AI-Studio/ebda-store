@@ -43,7 +43,10 @@ SMOKE_ADMIN_URL=https://staging-admin.example.com \
 Defaults:
 
 - Storefront: `https://wadyaljuz.com`
-- Admin: `https://app.forcemediakw.com`
+- Admin: `https://admin.force-ai.co` (corrected 2026-09-02 — `app.forcemediakw.com`
+  now 301-redirects here since the Cloudflare migration; it still "works" via the
+  redirect but every baseURL-relative check was really exercising the redirect
+  target under the wrong URL)
 
 ## Running a single project
 
@@ -54,26 +57,14 @@ npm run test:smoke -- --project=admin
 
 ## CI integration (post-deploy)
 
-Today these are not yet wired into `.github/workflows/ci.yml`. The intent is to run them as a separate post-deploy job (after Railway + Vercel deploys finish) — Track D in the ongoing audit cleanup covers wiring this in. To wire it manually:
-
-```yaml
-smoke:
-  runs-on: ubuntu-latest
-  needs: deploy
-  steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: 20
-    - run: npm ci
-    - run: npx playwright install --with-deps chromium
-    - run: npm run test:smoke
-    - uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: playwright-report
-        path: playwright-report/
-```
+**Wired in as of 2026-09-02** — the `smoke-test` job in
+`.github/workflows/cf-deploy.yml` runs the `storefront` + `admin` chromium
+projects (not the full 5-browser matrix — that's for local/manual runs)
+after `deploy-web`/`deploy-admin` complete, and feeds its result into the
+same Telegram alert `notify-failure` sends for a deploy failure. `orders`
+has no smoke coverage yet, so it doesn't gate this job. Before this, the
+suite existed and passed locally but had zero references in any workflow —
+a broken storefront/admin shell was detected by users, not by the repo.
 
 ## Why not just hit `/api/health`?
 

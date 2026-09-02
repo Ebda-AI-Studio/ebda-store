@@ -1,5 +1,11 @@
 # FWB Scaling-Cliff Audit — 2026-07-12
 
+> **Correction (2026-09-02):** the `api-production-c058.up.railway.app` hostname cited below as
+> "the API's raw domain" no longer serves anything (verified: 404, `server: railway-hikari`,
+> `x-railway-fallback: true`). The live API host is now `api.force-ai.co`, proxied through
+> Cloudflare. This does not change the finding's substance (whether the origin sat behind a CDN
+> at the time) — left as-is for the historical record; do not treat the hostname as current.
+
 Source: a reel on the "scaling cliff" (works at 100 users, dies at 10,000).
 Scope: `apps/api` (Express+TS on Railway), `apps/web`/`admin`/`orders` (Next.js
 on Cloudflare Workers), `packages/database` (Prisma+Neon). This audit does

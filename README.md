@@ -170,7 +170,7 @@ The bot degrades gracefully: if `GEMINI_API_KEY` is unset in WBS, the bot revert
 
 | Service         | Platform                                      | URL                                                                    |
 | --------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
-| API             | Railway                                       | `api-production-c058.up.railway.app`                                   |
+| API             | Railway (via Cloudflare custom domain)        | `api.force-ai.co`                                                      |
 | Admin Dashboard | Cloudflare Worker (`force-admin-cf-preview`)  | `admin.force-ai.co`                                                    |
 | Storefront      | Cloudflare Worker (`force-web-cf-preview`)    | `store.force-ai.co` + per-tenant custom domains (e.g. `wadyaljuz.com`) |
 | Orders PWA      | Cloudflare Worker (`force-orders-cf-preview`) | `orders.force-ai.co`                                                   |

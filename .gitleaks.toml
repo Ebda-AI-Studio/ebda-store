@@ -32,16 +32,28 @@ regexes = [
   '''sk-test-key''',
   '''sk-good-key''',
   '''sk-super-secret-key''',
+  # Fake Tap payment-provider secret key fixture (payment-provider.test.ts) — CI-only.
+  '''sk_secret_12345''',
+  # Fake WBS-bridge encryption-key fixture (wbs-bridge.test.ts) — CI-only, sibling of the
+  # test-encryption-key-for-ci-32chars entry above with a different literal value.
+  '''test-encryption-key-that-is-32-chars''',
   # Throwaway RSA key generated for the GSC service-account client test (8B) — CI-only,
-  # never a real credential (distinctive middle-of-body substring).
-  '''ItsSCX8UKLL5pB6IGJ0EOrC6PNjAEw0q''',
+  # never a real credential (distinctive middle-of-body substring). CORRECTED 2026-09-02:
+  # the previous entry here (`ItsSCX8UKLL5pB6IGJ0EOrC6PNjAEw0q`) was missing the `+` the
+  # actual key contains after "ItsSC" — it has never matched anything, ever (verified:
+  # zero hits for that literal anywhere in the tree or its git history). The `paths`
+  # blanket removed above was masking that this entry was dead on arrival; without it,
+  # gitleaks correctly flags this fixture (private-key rule) until fixed here.
+  '''nDjm07wI9wchYGBdTM7cFDagEuV6dm7xXAFfY5mkviqnPNWmjWChxTLTYs14cL0y''',
 ]
 
-paths = [
-  # Test files carry FAKE fixtures (pplx-secret-123, dummy PEMs) beside test passwords —
-  # never real creds. Repo already flags every test-file hit as a false positive; this
-  # consolidates so gitleaks stops re-flagging fixtures one at a time.
-  '''.*\.test\.(ts|tsx|js)$''',
-  '''.*/__tests__/.*''',
-]
+# CORRECTED 2026-09-02 (adversarial audit, P2): this used to also carry a
+# `paths` blanket allowlisting the ENTIRE `*.test.ts`/`__tests__/**` tree —
+# the most common real-world leak shape (a dev testing against a live API
+# key, pasted into a test file) was permanently invisible to this required
+# check. Removed; every fixture that tree actually needs is now the literal-
+# value list above (the mechanism already had 12 entries — it works). A new
+# fixture that looks secret-shaped needs its own literal entry here, which
+# is the point: it forces a human/reviewer to look at it once instead of
+# blanket-exempting the whole tree forever.
 

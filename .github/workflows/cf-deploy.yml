@@ -279,6 +279,45 @@ jobs:
         working-directory: apps/orders
         run: npx wrangler deploy
 
+  smoke-test:
+    # Added 2026-09-02 (adversarial audit, P3): tests/smoke/ (5 browsers ×
+    # real prod URLs) existed and worked but was wired into NOTHING — zero
+    # references in any workflow, so a broken deploy was detected by users,
+    # not by the repo (railway-deploy.yml at least curls /health; this
+    # workflow had no post-deploy check at all). Only the fast chromium
+    # storefront+admin projects run here — the full 5-browser matrix is for
+    # local/manual runs (npm run test:smoke), not every deploy. This checks
+    # the deployed shell actually renders, one layer past a green wrangler
+    # deploy or a passing /health check (client hydration, routing).
+    name: Post-deploy smoke test
+    needs: [deploy-web, deploy-admin, deploy-orders]
+    # Run whenever at least one of web/admin actually deployed (not skipped),
+    # regardless of whether a SIBLING deploy job was skipped/failed — orders
+    # has no smoke coverage yet (tests/smoke/README.md), so it doesn't gate
+    # this job either way.
+    if: always() && (needs.deploy-web.result == 'success' || needs.deploy-admin.result == 'success')
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run smoke suite (storefront + admin, chromium only)
+        run: npx playwright test --project=storefront --project=admin
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-smoke-report
+          path: playwright-report/
+          retention-days: 14
+
   notify-failure:
     # Stays on ubuntu-latest so it still alerts when the self-hosted runner is
     # the thing that died (mirrors ci.yml's fail-open notify job).
@@ -288,7 +327,7 @@ jobs:
     # the deploys queue (don't fail) so there's nothing to alert about anyway.
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 2
-    needs: [deploy-web, deploy-admin, deploy-orders]
+    needs: [deploy-web, deploy-admin, deploy-orders, smoke-test]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Send Telegram alert
@@ -301,13 +340,14 @@ jobs:
           WEB_RES: ${{ needs.deploy-web.result }}
           ADMIN_RES: ${{ needs.deploy-admin.result }}
           ORDERS_RES: ${{ needs.deploy-orders.result }}
+          SMOKE_RES: ${{ needs.smoke-test.result }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_ALERT_CHAT_ID" ]; then
             echo "telegram secrets not configured — skipping alert"
             exit 0
           fi
           TEXT="🔴 CF deploy FAILED
-          web: ${WEB_RES}  admin: ${ADMIN_RES}  orders: ${ORDERS_RES}
+          web: ${WEB_RES}  admin: ${ADMIN_RES}  orders: ${ORDERS_RES}  smoke: ${SMOKE_RES}
           repo: ${REPO}
           sha: ${SHA:0:8}
           https://github.com/${REPO}/actions/runs/${RUN_ID}"

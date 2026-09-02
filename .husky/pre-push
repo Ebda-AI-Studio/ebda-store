@@ -83,10 +83,13 @@ _DB="test_db"
 export TEST_DATABASE_URL="${_SCHEME}://${_CREDS}@${_HOST}/${_DB}"
 npm run test:unit
 
-# --- Blast-radius + AI review: moved OUT of CI to this AI-OS pre-push gate ---
-# These were the blast-radius.yml / scoped-audit.yml / ai-review.yml workflows that
-# each held a self-hosted runner ~15-20 min per PR. They now run locally before the
-# push so CI only does deterministic gates. Advisory + non-blocking. Skip: SKIP_AI_GATE=1.
+# --- Blast-radius + AI review: ALSO run locally before push (still run in CI too) ---
+# Corrected 2026-09-02 (adversarial audit): this used to claim blast-radius.yml /
+# scoped-audit.yml / ai-review.yml "moved OUT of CI" — false, verified all three still
+# trigger on `pull_request` in .github/workflows/. They run TWICE per PR: once here
+# (advisory, local) and once in CI (none of the three are required branch-protection
+# checks). This local pass is a fast local preview, not a CI replacement. Advisory +
+# non-blocking. Skip: SKIP_AI_GATE=1.
 if [ "${SKIP_AI_GATE:-0}" != "1" ] && [ "$current_branch" != "main" ]; then
   git fetch origin main -q 2>/dev/null || true
   RANGE="origin/main...HEAD"

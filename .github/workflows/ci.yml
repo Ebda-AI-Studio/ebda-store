@@ -6,11 +6,14 @@ on:
     # (worktree→PR→CI→main is the only flow; staging drained Neon + Railway
     # 24/7 for zero use). develop was never active either.
     branches: [main]
+    # .gitleaksignore / .gitleaks.toml REMOVED from this list 2026-09-02
+    # (adversarial audit, P2): a docs-only-looking push that weakens the
+    # secret-scanning config used to skip this ENTIRE workflow, including
+    # the gitleaks job itself — a security-gate config change is a code
+    # change, not a docs change.
     paths-ignore:
       - 'docs/**'
       - '*.md'
-      - '.gitleaksignore'
-      - '.gitleaks.toml'
       - '.github/ISSUE_TEMPLATE/**'
       - '.vscode/**'
       - '.editorconfig'
@@ -61,6 +64,13 @@ jobs:
           fetch-depth: 0
       - id: filter
         name: Detect non-docs changes
+        # .gitleaksignore / .gitleaks.toml REMOVED from the docs-only pattern
+        # 2026-09-02 (adversarial audit, P2): a PR that only weakens the
+        # secret-scanning allowlist used to read as docs-only here, which
+        # skips Build/Unit/Integration/E2E/RLS-proof — while the gitleaks
+        # job on that same PR runs WITH the weakened config, so the one gate
+        # actually reviewing the change is the weakened one. A security-gate
+        # config change is a code change.
         env:
           # GitHub-controlled SHA (not user text); bound via env per workflow-injection hygiene.
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -71,7 +81,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$BASE_SHA" HEAD \
-              | grep -qvE '^(docs/|.*\.md$|\.gitleaksignore$|\.gitleaks\.toml$|\.github/ISSUE_TEMPLATE/|\.vscode/|\.editorconfig$)'; then
+              | grep -qvE '^(docs/|.*\.md$|\.github/ISSUE_TEMPLATE/|\.vscode/|\.editorconfig$)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -271,9 +281,17 @@ jobs:
         # store-layout resolution. All are pure (no DB, no network), so they belong
         # in this job rather than integration.
         #
+        # 2026-09-02: `apps/web/src/lib` narrowed the glob past the app's own test
+        # tree and orphaned it again — 4 colocated web tests (checkout delivery
+        # windows, company-host routing, llms.txt, ProductDetailBody) shipped
+        # outside `src/lib` and silently never ran in CI. Widened to the whole
+        # `apps/web` tree (still pure/no-DB — verified no prisma/DATABASE_URL
+        # import in any apps/web test file); the `orphan-tests` job below now
+        # fails the build on any future gap instead of relying on this comment.
+        #
         # Adding a colocated test outside these paths = a test that does not run.
         # Prefer tests/unit; if you must colocate, add the directory here.
-        run: npx vitest run tests/unit packages/shared/src packages/database/src apps/web/src/lib apps/admin/src --coverage --reporter=verbose --maxWorkers=2
+        run: npx vitest run tests/unit packages/shared/src packages/database/src apps/web apps/admin/src --coverage --reporter=verbose --maxWorkers=2
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
@@ -284,6 +302,81 @@ jobs:
           name: unit-test-coverage
           path: coverage/
           retention-days: 7
+
+  orphan-tests:
+    name: Orphan test coverage
+    # P1-5 (2026-09-02): vitest.config.ts's root `include` is a broad glob, so
+    # ANY colocated *.test.ts/*.spec.ts anywhere in the repo passes locally —
+    # but only runs in CI if its directory is named in one of the job globs
+    # below. This already recurred once: the Unit Tests job's own comment
+    # documents a 2026-07-05 fix for 18 such orphans, and by 2026-09-02 four
+    # MORE had shipped outside it (apps/web/src/app + apps/web root) and never
+    # ran in CI. That fix only froze a list; it didn't stop the list from going
+    # stale again. This job is the thing that stops it: it diffs the full test
+    # universe vitest would collect (root config, same as `tests/smoke`'s own
+    # exclusion) against the UNION of every directory/file the unit,
+    # integration, RLS-proof and e2e jobs pass to `vitest run`, and fails on
+    # any file present in the first set but not the second. A gate that cannot
+    # fail must not report success — this one can, and does today if a colocated
+    # test lands outside every job's glob again.
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 10
+    needs: [build, changes]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Build database package
+        run: npm run build -w packages/database
+
+      - name: Build shared package
+        run: npm run build -w packages/shared
+
+      - name: Diff vitest's full test universe against CI job coverage
+        # KEEP THE PATH LIST BELOW IN SYNC with what test-unit / test-integration /
+        # test-rls-force-app / test-e2e actually pass to `vitest run` (this is
+        # intentionally a hand-copied list, not derived from the other jobs, so a
+        # change to one without the other shows up as a visible diff in review).
+        # --json=<file> (NOT bare --json, which vitest treats as an optional
+        # positional VALUE and greedily swallows the next arg as the output path)
+        # writes ONLY the JSON to that file, keeping it clean of the setup-file
+        # console warnings vitest's collection phase prints to stdout.
+        run: |
+          set -euo pipefail
+
+          npx vitest list --json=/tmp/all-tests.json
+
+          npx vitest list \
+            tests/unit packages/shared/src packages/database/src apps/web apps/admin/src \
+            tests/integration apps/api/src \
+            tests/e2e \
+            --json=/tmp/covered-tests.json
+
+          node -e "
+            const fs = require('fs');
+            const all = new Set(JSON.parse(fs.readFileSync('/tmp/all-tests.json', 'utf8')).map(t => t.file));
+            const covered = new Set(JSON.parse(fs.readFileSync('/tmp/covered-tests.json', 'utf8')).map(t => t.file));
+            const orphans = [...all].filter(f => !covered.has(f)).sort();
+            if (orphans.length > 0) {
+              console.error('::error::' + orphans.length + ' orphan test file(s) — vitest collects these but no CI job glob covers them, so they never run in CI:');
+              for (const f of orphans) console.error('  ' + f);
+              console.error('');
+              console.error('Fix: add the containing directory to the relevant job glob in ci.yml (test-unit/test-integration/test-e2e), AND to this job\'s covered-tests path list above.');
+              process.exit(1);
+            }
+            console.log('No orphan test files (' + all.size + ' vitest-discovered files, all covered by a CI job glob).');
+          "
 
   test-integration:
     name: Integration Tests

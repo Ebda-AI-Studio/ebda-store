@@ -1,19 +1,37 @@
-name: Load Test (Nightly)
+name: Load Test (Manual)
 
-# Runs nightly against the preview / staging Railway env (NOT production).
-# Manual trigger also available for pre-release validation.
+# CORRECTED 2026-09-02 (adversarial audit, P1-6): despite the (legacy) name
+# and the header this workflow used to carry, it does NOT run nightly (the
+# schedule below has been disabled since 2026-05-27) and its configured
+# target does not currently exist: ci.yml's own comment records that "the
+# staging environment + branch were retired" 2026-06-13 (staging drained
+# Neon + Railway 24/7 for zero use). The K6_BASE_URL/K6_STORE_ID/
+# K6_BYPASS_TOKEN/K6_PRODUCT_SLUG secrets are still SET on this repo (so the
+# "skip gracefully when secrets are missing" guard below won't save you) —
+# but they point at that retired staging env, so a workflow_dispatch today
+# will fail against a dead host, not skip. This workflow was last run
+# (and failing) 2026-06-04; loadtests/results/ has never held an artifact.
 #
-# Required GitHub repository secrets:
-#   K6_BYPASS_TOKEN  — matches LOAD_TEST_BYPASS_TOKEN on the Railway preview API
-#   K6_STORE_ID      — UUID of a live test store on the staging env
+# This is a genuinely parked layer, not a dead one to delete: k6 install,
+# 5 scenarios and the Axiom metrics push are real, working tooling, and
+# docs/DEPLOYMENT.md's "Environments & staging posture" section already
+# names "the team is about to run a load test that needs realistic
+# concurrent traffic" as one of its 4 documented triggers for graduating to
+# a real fwb-staging Railway project. Re-pointing the K6_* secrets at that
+# real staging env when it exists is what turns this back on — provisioning
+# it is Ahmad's call (real cost, ~$5/mo Railway + Neon branch), not
+# something fixable from a git worktree. Until then: manual-dispatch-only,
+# and do not read "k6 exists in this repo" as "the load-testing layer is
+# live" — it isn't.
+#
+# Required GitHub repository secrets (already set, but point at a retired target):
+#   K6_BYPASS_TOKEN  — matches LOAD_TEST_BYPASS_TOKEN on the target API
+#   K6_STORE_ID      — UUID of a live test store on that env
 #   K6_PRODUCT_SLUG  — slug of an in-stock product (for checkout-flow scenario)
-#   K6_BASE_URL      — staging API base, e.g. https://api-preview.up.railway.app/api/v1
+#   K6_BASE_URL      — target API base, e.g. https://<real-staging-host>/api/v1
 #
-# If these secrets are not yet set, the workflow will be skipped gracefully.
-# Set them in: GitHub → Settings → Secrets and variables → Actions → Repository secrets
-#
-# NOTE: checkout-flow.js creates real orders in the staging store. It is
-# intentionally gated to manual workflow_dispatch only (not the nightly cron).
+# NOTE: checkout-flow.js creates real orders on whatever K6_BASE_URL points
+# at. It is intentionally gated to manual workflow_dispatch only.
 
 on:
   # schedule: DISABLED 2026-05-27 — load tests are intended for pre-launch + post-infra-change runs, NOT nightly. Pure waste of action minutes when no real merchant load exists. Use workflow_dispatch to fire manually.
