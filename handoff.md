@@ -1,7 +1,9 @@
 # Handoff — FWB adversarial-audit remediation, PR 3 (record + gates)
 
-_Updated 2026-09-02. Resume from here. Plan:
-`docs/plans/2026-09-02-adversarial-audit-remediation.md`, Tasks 13-19._
+_Updated 2026-09-02. Resume from here. Task list: PR #1133
+(`fix: audit record and CI gates — kill the zombie gate, cover orphaned
+tests, correct falsified verdicts`) — no separate plan file was ever
+committed; the PR body and its commit history are the source of record._
 
 ## Correction (2026-09-02)
 
@@ -22,9 +24,11 @@ below, fixed on itself.
 
 ## Goal
 
-Finish PR 3 of the 2026-09-02 adversarial-audit-remediation plan
-(`docs/plans/2026-09-02-adversarial-audit-remediation.md`) — Tasks 13-19,
-branch `fix/audit-record-and-gates`. This is the third of three PRs; PR 1
+Finish PR 3 of the 2026-09-02 adversarial-audit remediation work — PR #1133
+(`fix: audit record and CI gates — kill the zombie gate, cover orphaned
+tests, correct falsified verdicts`; no separate plan file exists — see its
+PR body and commit history), branch `fix/audit-record-and-gates`. This is
+the third of three PRs; PR 1
 (P0 security) and PR 2 (P1 correctness) are separate worktrees/branches, not
 this one — don't touch them from here.
 

@@ -128,26 +128,34 @@ _None._ No finding rises to production-down / data-loss certainty. The nearest c
 - **DR / backups:** dual-layer — local `pg_dump` (launchd daily, `scripts/backup-db.sh`) + off-machine encrypted R2 daily (`db-backup.yml`, PG17 via docker, size-guard, Telegram-on-failure, 30-day prune). `neon-snapshot.yml` correctly retired to `workflow_dispatch`-only. ✅
 - **Rollback:** `scripts/rollback.sh` refuses on uncommitted changes, warns on migration-bearing HEAD, git-revert+push; `docs/ROLLBACK.md` has all three paths + the exec-form migration trap. ✅
 - **Preview isolation (Vercel):** `preview-env-isolation.yml` CI-enforces prod≠preview `NEXT_PUBLIC_API_URL` weekly + per-PR, with fork-PR guard. ✅
+
+  > **Correction (2026-09-02, PR #1133):** this workflow has been deleted. It only ever checked
+  > **Vercel** project env vars, and FWB's Vercel projects were decommissioned in the 2026-07
+  > Cloudflare migration — `VERCEL_API_TOKEN`/`VERCEL_PROJECT_ID_*` were absent, so it `exit 0`'d
+  > green on every run while checking nothing. No automated preview-isolation check currently
+  > exists; see `docs/DEPLOYMENT.md`'s "Environments & staging posture" section for the real,
+  > current mitigation (safe-by-default `localhost:4000` preview API URL) and its residual gap.
+
 - **Client Sentry + tenant context surface:** web/admin client init via `instrumentation-client.ts` (the correct post-v9 hook), API `sentry.service.ts` with Express error handler wired last (`index.ts:425`). ✅
 
 ---
 
 ## Ranked findings table
 
-| #   | Sev  | Verdict             | Finding                                                                                                | Where                                                                         |
-| --- | ---- | ------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| H1  | High | CONFIRMED           | Orders PWA deployed with zero Sentry (client + server)                                                 | `apps/orders/` (no sentry dep/instrumentation); `cf-deploy.yml` deploy-orders |
-| H2  | High | CONFIRMED           | Sentry source maps never uploaded (no `withSentryConfig`) → minified prod traces                       | `apps/web/next.config.js:165`; `apps/admin/next.config.js:152`                |
-| H3  | High | CONFIRMED           | 242 branches incl. orphan `auto-fix/*` — hygiene + gitleaks surface                                    | `git branch -a`                                                               |
-| M1  | Med  | CONFIRMED           | `deploy.yml`: no timeouts, no concurrency, migrate-after-deploy, no DIRECT_URL                         | `deploy.yml:121-142`                                                          |
-| M2  | Med  | CONFIRMED           | DEPLOYMENT.md stale: "Vercel Hobby" only, omits live CF Workers auto-deploy                            | `DEPLOYMENT.md:26,321-328` vs `cf-deploy.yml`                                 |
-| M3  | Med  | CONFIRMED           | Server-side Sentry inactive on Cloudflare Workers target (SSR/RSC dark)                                | `apps/web/instrumentation.ts` header; `scripts/cf-build.sh`                   |
-| M4  | Med  | CONFIRMED           | Missing timeout-minutes/concurrency on gitleaks, zap, lighthouse, load-test, cloud-rescue, preview-env | `.github/workflows/*`                                                         |
-| M5  | Med  | CONFIRMED/PLAUSIBLE | gitleaks installs via `sudo tar` but defaults to no-sudo self-hosted runner                            | `gitleaks.yml:20,31`                                                          |
-| M6  | Med  | PLAUSIBLE           | gitleaks scans pushed ref only, not all 242 branches                                                   | `gitleaks.yml:34-35`                                                          |
-| L1  | Low  | PLAUSIBLE           | Dockerfile.api CMD also migrates → double-migrate/multi-replica race off-Railway                       | `Dockerfile.api` CMD vs `railway.json:8-9`                                    |
-| L2  | Low  | PLAUSIBLE           | No queue-depth/backlog alert on in-process email/SMS/cart queues                                       | `apps/api/src/index.ts:373`                                                   |
-| L3  | Low  | PLAUSIBLE           | Preview-isolation gate covers Vercel web/admin only; not CF Workers/Orders                             | `preview-env-isolation.yml`                                                   |
-| L4  | Low  | PLAUSIBLE           | `.env.example` parity not machine-verified this pass                                                   | `.env.example`, `apps/api/.env.example`                                       |
+| #   | Sev  | Verdict                    | Finding                                                                                                                                                                       | Where                                                                         |
+| --- | ---- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| H1  | High | CONFIRMED                  | Orders PWA deployed with zero Sentry (client + server)                                                                                                                        | `apps/orders/` (no sentry dep/instrumentation); `cf-deploy.yml` deploy-orders |
+| H2  | High | CONFIRMED                  | Sentry source maps never uploaded (no `withSentryConfig`) → minified prod traces                                                                                              | `apps/web/next.config.js:165`; `apps/admin/next.config.js:152`                |
+| H3  | High | CONFIRMED                  | 242 branches incl. orphan `auto-fix/*` — hygiene + gitleaks surface                                                                                                           | `git branch -a`                                                               |
+| M1  | Med  | CONFIRMED                  | `deploy.yml`: no timeouts, no concurrency, migrate-after-deploy, no DIRECT_URL                                                                                                | `deploy.yml:121-142`                                                          |
+| M2  | Med  | CONFIRMED                  | DEPLOYMENT.md stale: "Vercel Hobby" only, omits live CF Workers auto-deploy                                                                                                   | `DEPLOYMENT.md:26,321-328` vs `cf-deploy.yml`                                 |
+| M3  | Med  | CONFIRMED                  | Server-side Sentry inactive on Cloudflare Workers target (SSR/RSC dark)                                                                                                       | `apps/web/instrumentation.ts` header; `scripts/cf-build.sh`                   |
+| M4  | Med  | CONFIRMED                  | Missing timeout-minutes/concurrency on gitleaks, zap, lighthouse, load-test, cloud-rescue, preview-env                                                                        | `.github/workflows/*`                                                         |
+| M5  | Med  | CONFIRMED/PLAUSIBLE        | gitleaks installs via `sudo tar` but defaults to no-sudo self-hosted runner                                                                                                   | `gitleaks.yml:20,31`                                                          |
+| M6  | Med  | PLAUSIBLE                  | gitleaks scans pushed ref only, not all 242 branches                                                                                                                          | `gitleaks.yml:34-35`                                                          |
+| L1  | Low  | PLAUSIBLE                  | Dockerfile.api CMD also migrates → double-migrate/multi-replica race off-Railway                                                                                              | `Dockerfile.api` CMD vs `railway.json:8-9`                                    |
+| L2  | Low  | PLAUSIBLE                  | No queue-depth/backlog alert on in-process email/SMS/cart queues                                                                                                              | `apps/api/src/index.ts:373`                                                   |
+| L3  | Low  | PLAUSIBLE (~~superseded~~) | Preview-isolation gate covers Vercel web/admin only; not CF Workers/Orders — **workflow deleted 2026-09-02 (PR #1133), see correction above; no replacement gate exists yet** | `preview-env-isolation.yml` (removed)                                         |
+| L4  | Low  | PLAUSIBLE                  | `.env.example` parity not machine-verified this pass                                                                                                                          | `.env.example`, `apps/api/.env.example`                                       |
 
 **Counts:** Critical 0 · High 3 · Medium 6 · Low 4 — total 13.

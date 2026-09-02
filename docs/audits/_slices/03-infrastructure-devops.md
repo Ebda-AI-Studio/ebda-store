@@ -133,6 +133,15 @@ Railway deploys from repo root so picks up `/railway.json` first. But if Railway
 
 **✅ Preview isolation check.** `.github/workflows/preview-env-isolation.yml` runs on PR + weekly schedule. Reads Vercel env vars via API, fails if Preview `NEXT_PUBLIC_API_URL` matches Production. Requires `VERCEL_API_TOKEN` + `VERCEL_PROJECT_ID_*` secrets — if not configured, warns and exits 0 (opt-in not enforced).
 
+> **Correction (2026-09-02, PR #1133):** `preview-env-isolation.yml` was deleted. It checked
+> **Vercel** project env vars via the Vercel API; FWB's Vercel projects were decommissioned in the
+> 2026-07 Cloudflare migration, so `VERCEL_API_TOKEN`/`VERCEL_PROJECT_ID_*` were absent from repo
+> secrets and every run fell through its own "unset → warn + exit 0" branch — reporting `success`
+> on every PR while checking nothing. See `docs/DEPLOYMENT.md`'s "Environments & staging posture"
+> section for the current (real) mitigation and gap: no automated CI check currently verifies the
+> safe-by-default preview `NEXT_PUBLIC_API_URL=http://localhost:4000` hasn't been overridden to
+> point at production.
+
 **⚠️ P2 — `deploy.yml` is dead workflow.** Builds Docker images to GHCR, references `staging`/`production` environments. Never used (no tag-triggered runs ever ran). Confusing.
 
 **⚠️ P2 — No Railway deploy notification in CI.** CI passes → Vercel auto-deploys from commit. But Railway auto-deploys from `main` independently. If pushed directly to `main` bypassing PR (Ahmad does regularly), CI runs in parallel with Railway build. Railway may finish deploying before CI finishes typecheck, meaning broken build hits prod before CI flags it.

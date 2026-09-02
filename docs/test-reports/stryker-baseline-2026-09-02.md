@@ -1,6 +1,6 @@
 # Mutation testing baseline — FWB — 2026-09-02
 
-Re-run per Task 18 of `docs/plans/2026-09-02-adversarial-audit-remediation.md`: the
+Re-run as part of PR #1133 (no separate plan file was ever committed): the
 2026-05-24 baseline had sat for 3+ months with `thresholds.break: null` (no CI gate
 possible) and zero references anywhere in `.github/workflows/` — a config that could
 never fail. This run re-measures the same 4 files, sets a real `break` floor so a

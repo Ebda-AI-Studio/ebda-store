@@ -83,7 +83,7 @@ rate trending toward breaching a commitment). Verified 2026-09-02: no
 SLO/burn-rate/error-budget code or config exists anywhere in `apps/` or
 `.github/workflows/` (grepped; the workflows that DID watch performance,
 `lighthouse-nightly.yml` and `load-test-nightly.yml`, were themselves dead —
-see `docs/plans/2026-09-02-adversarial-audit-remediation.md` Task 16). Citing
+fixed in PR #1133, no separate plan file was ever committed). Citing
 error-tracking evidence for an SLO-alerting claim is a category error, not a
 close call.
 

@@ -184,6 +184,15 @@ Verified good on this pass — not re-flagged:
 - **Loyalty reversal functions (`reverseEarnedPointsFromOrder`, `reverseRedeemedPointsFromOrder`) are correctly idempotent** — each writes its tagged `adjust`/`redeem-recredit` marker in the SAME `prisma.$transaction` as the balance mutation (`loyalty.service.ts:570-606`, `:779+`).
 - **Affiliate `reverseCommission` is correctly idempotent** — the `status: 'refunded'` marker and the `totalEarned`/`pendingBalance` decrements are in the same `prisma.$transaction` (`affiliate.service.ts:561-573`).
 - **Checkout inventory decrement is oversell-safe** — atomic conditional `UPDATE ... WHERE inventory >= qty` inside `withMoneyTx` (`order.service.ts:436-494`), no `SELECT ... FOR UPDATE` held across the transaction; a losing concurrent writer sees 0 rows affected, not a race.
+
+  > **FALSIFIED 2026-09-02** — this verified ONE writer and asserted it as a
+  > SYSTEM property. A sibling writer used a different (unfloored) helper
+  > that decremented the PARENT product instead of the variant on variant
+  > sales, outside this guarded path — production reached inventory = −16
+  > six weeks later. Root cause and fix: `docs/audits/2026-08-30-variant-stock-drift.md`.
+  > See the FALSIFIED entry in `docs/audits/_slices/2026-09-02-adversarial/falsification.md`
+  > for the full account.
+
 - **Webhook signature verification, durable inbox, and 3-layer idempotency remain solid** (`webhook.routes.ts` — `verifyWebhookSignature` before `recordInboundWebhook`, `checkIdempotency`, and `Order.webhookProcessedAt`), and the previously-flagged missing admin UI for `WebhookEvent` (2026-07-09 audit, E3-4) is now present at `apps/admin/src/app/webhook-events`.
 
 ---

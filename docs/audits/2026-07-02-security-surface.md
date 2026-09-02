@@ -273,6 +273,17 @@ Railway dashboard) rather than a code change.
   session ID + token for every other state-changing request. Webhook and
   `/auth/*`/`/public/*` skips are justified (HMAC / no-cookie / no-session
   respectively).
+
+  > **FALSIFIED 2026-09-02** — this claim is contradicted by the code, not
+  > supported by it: the skip condition ORs in `isAllowlistedMerchantOrigin(origin)`
+  > alongside the platform-origin check (`security.ts:150-155`), so it is
+  > exactly "any CORS-allowed origin" including merchant-controlled domains —
+  > the failure mode this paragraph says the code avoids. This is P0-3 in
+  > `docs/audits/2026-09-02-adversarial-audit.md` ("Merchant custom domain →
+  > CSRF-exempt credentialed cross-origin → platform takeover"), **confirmed
+  > still open** as of this correction — see that report for the current fix
+  > status.
+
 - **Auth cookies** — `token` + `refresh_token` are both `httpOnly: true`,
   `secure` in production, `sameSite: 'none'` in production (required for the
   documented cross-origin API↔frontend topology, not a misconfiguration).

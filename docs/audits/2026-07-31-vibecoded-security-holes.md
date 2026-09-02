@@ -163,6 +163,16 @@ Worth naming precisely: because the key is IP **+ email**, rotating the email yi
 
 `apps/api/src/lib/safe-fetch.ts` blocks the cloud metadata endpoint (`169.254.0.0/16`), all RFC1918 ranges, loopback and CGNAT, and — the part usually missed — **re-validates after each redirect** by handling redirects manually instead of letting the fetch layer follow them. Used at both user-URL entry points (`product-alt-text-generator.ts:72`, `ai.service.ts:499`). Bulk import stores URL strings without dereferencing them. Remaining outbound calls use server-controlled URLs (`process.env.STOREFRONT_REVALIDATE_URL`, a hardcoded Telegram endpoint).
 
+> **FALSIFIED 2026-09-02** — this PASS checked the two entry points where the
+> guard IS used and generalized to "SSRF via user-supplied URL — PASS." It
+> missed a third entry point outside its scope: merchant-supplied iCarry
+> shipping-carrier `credentials.baseUrl` is used verbatim as a fetch base in
+> `services/carriers/icarry.carrier.ts`, never through `safe-fetch`. The
+> ESLint SSRF rule is scoped to `routes/**`, so `services/**` — where this
+> lives — is structurally unguarded. This is P1-1 in
+> `docs/audits/2026-09-02-adversarial-audit.md`, **confirmed still open** as
+> of this correction — see that report for the current fix status.
+
 ### 10 — Prompt injection with tool access — PASS (no tool access) → but see H-1
 
 The AI layer has **no tool/function-calling surface**: it generates text and structured suggestions only. Nothing an LLM emits triggers a privileged action, so the carousel's headline risk doesn't apply. The palette extractor — the one AI output that drives a rendering decision — validates against `z.string().regex(/^#[0-9a-fA-F]{6}$/)` per channel.
