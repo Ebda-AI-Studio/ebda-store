@@ -2490,6 +2490,25 @@ model LoyaltyTransaction {
   // reverseRedeemedPointsFromOrder can both exist for one refunded order).
   // Prisma's schema DSL has no way to express a partial/filtered unique index,
   // so this is a hand-written raw-SQL migration with no matching @@unique here.
+  //
+  // A second partial unique index, from migration
+  // 20260903130000_loyalty_reversal_tag_unique, covers the two reversal tags:
+  //   CREATE UNIQUE INDEX ... ON loyalty_transactions
+  //     (store_id, order_id, description)
+  //   WHERE type = 'adjust' AND order_id IS NOT NULL
+  //     AND (description LIKE 'refund-revoke:%'
+  //          OR description LIKE 'redeem-recredit:%')
+  // It is what makes the check-then-write guards in reverseEarnedPointsFromOrder
+  // and reverseRedeemedPointsFromOrder race-safe — their P2002 handlers only
+  // fire because of it. The remaining `adjust` writer (admin manual awards,
+  // whose operator-supplied descriptions may legitimately repeat for one order)
+  // is deliberately outside the predicate.
+  //
+  // The earlier 20260903120000_loyalty_cycle_tag_unique scoped itself to
+  // `%:%` cycle-numbered tags that the code never writes, so it matched nothing;
+  // it is left applied-but-inert and dropped by 20260903130000. Do not edit an
+  // applied migration in place — Prisma checksums them and migrations run on
+  // API boot.
   @@index([storeId])
   @@index([customerId])
   @@index([orderId])
