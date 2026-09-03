@@ -1,5 +1,5 @@
 import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@force/database';
-import { csvField } from '@force/shared';
+import { csvField, slugifyWithFallback } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
 
@@ -1190,19 +1190,17 @@ export class BulkService {
     return obj as unknown as ProductImportRow;
   }
 
+  /**
+   * Delegates to the shared helper rather than keeping a private copy.
+   *
+   * This charset (ASCII + the Arabic block, with a non-empty fallback) was
+   * always the correct one — it is why importing a product produced a good slug
+   * while creating the same product in the admin produced '-1'. Keeping a
+   * fifth private implementation is what let the two drift apart, so the copy
+   * is gone and the shared helper is the single definition.
+   */
   private static generateSlug(name: string): string {
-    let slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9\u0600-\u06FF\s-]+/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/(^-|-$)/g, '');
-
-    if (!slug) {
-      slug = `product-${Date.now()}`;
-    }
-
-    return slug;
+    return slugifyWithFallback(name, 'product');
   }
 
   // Note: ensureUniqueSlug, updateProductCategories, updateProductTags,

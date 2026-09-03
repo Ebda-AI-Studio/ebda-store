@@ -1,3 +1,4 @@
+import { assertStoreOwns } from './assert-store-owns';
 import { prisma } from '@force/database';
 import type { Expense } from '@prisma/client';
 import {
@@ -55,6 +56,15 @@ export type ExpenseWithRelations = Expense & {
  * Status is always 'draft' on creation.
  */
 export async function createExpense(input: CreateExpenseInput): Promise<ExpenseWithRelations> {
+  // paidFromAccountId is validated against this store a few lines down, but
+  // supplierId and expenseAccountId were written straight from the body — the
+  // asymmetry is the bug. A foreign account/supplier id leaks its code and
+  // name back through the read path.
+  await assertStoreOwns(input.storeId, {
+    supplierIds: [input.supplierId],
+    accountIds: [input.expenseAccountId],
+  });
+
   // Money guard: the "paid from" account MUST be a cash/bank account so the
   // double-entry is correct (debit expense, credit cash). Paying out of
   // Inventory / Fixed Assets / AR would post a wrong credit. We validate the

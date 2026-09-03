@@ -20,6 +20,13 @@ export interface AuthPayload {
   storeId?: string | null;
   /** Token version stamped at issue time. Used for bulk revocation. */
   tv?: number;
+  /**
+   * Set to the acting super_admin's userId when this token was minted by
+   * POST /admin/impersonate. Read by `rejectImpersonated` — an impersonation
+   * session must not be able to perform irreversible account actions on the
+   * person being impersonated.
+   */
+  impersonatedBy?: string;
 }
 
 declare module 'express-serve-static-core' {
@@ -120,9 +127,30 @@ export async function authenticate(
 }
 
 /**
- * Optional authentication - sets req.user if valid token provided, but doesn't require it
+ * Optional authentication — sets req.user if a valid token is provided, but
+ * doesn't require one.
+ *
+ * This applies the SAME four guards as `authenticate` (refresh-token reject,
+ * non-access purpose reject, JTI denylist, token-version) and differs only in
+ * what it does on failure: continue as a guest rather than 401.
+ *
+ * It used to run `jwt.verify` alone. That made it a strictly weaker second
+ * verifier on the same secret: a 1-year REFRESH token (minted with the same
+ * `force-app` audience) was accepted as an access identity, and a token
+ * revoked by logout / logout-all / password-change was still honoured here.
+ * Ownership checks downstream meant a stale identity only ever reached its own
+ * orders — but "revoked" has to mean revoked everywhere, or the revocation
+ * guarantees the rest of the codebase builds are only as strong as the
+ * weakest verifier.
+ *
+ * Cost note: every check below is behind `if (!token)`, so guest traffic (the
+ * common case on these public routes) still does zero Redis/DB work.
  */
-export function optionalAuthenticate(req: Request, _res: Response, next: NextFunction): void {
+export async function optionalAuthenticate(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
   const token = extractToken(req);
 
   if (!token) {
@@ -136,7 +164,30 @@ export function optionalAuthenticate(req: Request, _res: Response, next: NextFun
       algorithms: ['HS256'],
       issuer: 'force-api',
       audience: 'force-app',
-    }) as AuthPayload;
+    }) as AuthPayload & { type?: string; purpose?: string };
+
+    // Same rejections as `authenticate` — a refresh token or any non-access
+    // purpose claim must never establish an identity.
+    if (payload.type === 'refresh') return next();
+    if (payload.purpose && payload.purpose !== 'access') return next();
+
+    const decoded = jwt.decode(token) as { jti?: string } | null;
+    if (decoded?.jti && (await redis.isJtiDenied(decoded.jti))) return next();
+
+    const cachedTv = await redis.getUserTokenVersion(payload.userId);
+    let currentTv: number;
+    if (cachedTv === null) {
+      const u = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { tokenVersion: true },
+      });
+      currentTv = u?.tokenVersion ?? 0;
+      await redis.setUserTokenVersion(payload.userId, currentTv);
+    } else {
+      currentTv = cachedTv;
+    }
+    if ((payload.tv ?? 0) < currentTv) return next();
+
     req.user = payload;
   } catch {
     // Invalid token, continue without user
@@ -175,4 +226,33 @@ export function authorize(...roles: string[]) {
  */
 export function customerUserId(req: Request): string | undefined {
   return req.user?.role === 'customer' ? req.user.userId : undefined;
+}
+
+/**
+ * Refuse irreversible, account-level self-service actions when the caller is
+ * an impersonation session.
+ *
+ * POST /admin/impersonate mints a 1h token carrying the target user's real
+ * role plus an `impersonatedBy` claim. The claim was documented as letting
+ * "downstream guards reject it for high-privilege operations if desired" —
+ * but nothing read it, so an impersonation session was indistinguishable from
+ * a real one and could erase the impersonated person's account, change their
+ * password or email, or revoke all their sessions.
+ *
+ * That is the amplifier that turned the merchant-custom-origin CSRF hole
+ * (fixed 2026-09-02) into a full takeover: read one impersonation token, then
+ * act irreversibly as anyone. Impersonation is for support and debugging —
+ * looking, not destroying.
+ */
+export function rejectImpersonated(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.impersonatedBy) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'IMPERSONATION_FORBIDDEN',
+        message: 'This action is not available while impersonating another user',
+      },
+    });
+  }
+  return next();
 }

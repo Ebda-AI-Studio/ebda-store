@@ -7,6 +7,7 @@ import { EmailService } from './email.service';
 import { resolveDomainService } from './domain-provider';
 import { ResendService } from './resend.service';
 import logger from '../lib/logger';
+import { slugifyWithFallback } from '@force/shared';
 
 // ==========================================
 // Store Provisioning Service
@@ -396,12 +397,16 @@ export class ProvisioningService {
   /**
    * Generate URL-safe slug from name
    */
+  /**
+   * Store slug for a provisioned store.
+   *
+   * Delegates to the shared `slugifyWithFallback` rather than keeping a fifth
+   * private copy: the local version stripped to `[a-z0-9]`, so an Arabic-only
+   * store name produced '' and the caller persisted an empty slug — the same
+   * defect that put '' and '-1'..'-4' product slugs on a live store.
+   */
   private static generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .substring(0, 50);
+    return slugifyWithFallback(name, 'store', { ascii: true }).substring(0, 50);
   }
 
   /**

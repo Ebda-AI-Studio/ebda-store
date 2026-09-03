@@ -24,7 +24,7 @@ export async function generateMetadata({
     if (!storeId) return { title: 'Product' };
 
     const response = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [`products:${storeId}`] },
       headers: {
         'Content-Type': 'application/json',
         'X-Store-ID': store.id,

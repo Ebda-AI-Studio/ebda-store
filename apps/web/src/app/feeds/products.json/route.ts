@@ -32,6 +32,24 @@ async function resolveStoreIdFromSlug(slug: string): Promise<string | null> {
   }
 }
 
+/** Same shape as resolveStoreIdFromSlug, for the custom-domain branch. */
+async function resolveStoreIdFromDomain(domain: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/public/store/resolve`, {
+      next: {
+        revalidate: 600,
+        tags: [`store-domain:${domain.toLowerCase().replace(/^www\./, '')}`],
+      },
+      headers: { 'Content-Type': 'application/json', 'x-store-domain': domain },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return (json?.data?.id as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   const h = await headers();
   const domain = h.get('x-store-domain');
@@ -46,9 +64,18 @@ export async function GET() {
     return new Response('Not found', { status: 404 });
   }
 
+  // The cache tag has to key on the store ID because that is what the API
+  // purges with. The slug branch already resolved one; the domain branch has
+  // to resolve one too, or custom-domain storefronts (the majority) would keep
+  // the untagged, TTL-only behaviour this fix exists to remove.
+  const storeId = domain ? await resolveStoreIdFromDomain(domain) : feedHeaders['X-Store-ID'];
+
   const upstream = await fetch(`${API_URL}/public/feed/products.json`, {
     headers: feedHeaders,
-    next: { revalidate: 600 },
+    // 10-minute TTL was the only freshness control here; the tag lets a
+    // product save purge the feed immediately (agentic-commerce consumers
+    // read this).
+    next: storeId ? { revalidate: 600, tags: [`products:${storeId}`] } : { revalidate: 600 },
   });
   if (!upstream.ok) return new Response('Not found', { status: 404 });
 

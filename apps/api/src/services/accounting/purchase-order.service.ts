@@ -1,3 +1,4 @@
+import { assertStoreOwns } from './assert-store-owns';
 import { prisma, withMoneyTx } from '@force/database';
 import type { Prisma, PurchaseOrder, PurchaseOrderItem } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
@@ -20,6 +21,18 @@ export interface CreatePoInput {
 export async function createPurchaseOrder(
   input: CreatePoInput
 ): Promise<PurchaseOrder & { items: PurchaseOrderItem[] }> {
+  // product/variant/supplier ids all arrive in the request body and were
+  // written onto the PO unchecked. requireStoreAccess only proves the caller
+  // owns the store in the URL — so a store_admin could plant a competitor's
+  // ids here and have receivePurchaseOrder write that tenant's inventory,
+  // weighted-average cost, backorders and order items, and read back the
+  // foreign supplier row via getPurchaseOrder's `include: { supplier: true }`.
+  await assertStoreOwns(input.storeId, {
+    productIds: input.items.map(i => i.productId),
+    variantIds: input.items.map(i => i.variantId),
+    supplierIds: [input.supplierId],
+  });
+
   const subtotal = input.items.reduce((s, i) => s + i.qty * i.unitCost, 0);
   const apAccountId = await getSystemAccountIdByCode(input.storeId, '2000'); // AP
   const poNumber = await nextSequence(input.storeId, 'po');
@@ -123,6 +136,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
       // Step 1a: FIFO-clear backorders (oldest open first)
       const openBackorders = await tx.backorderLine.findMany({
         where: {
+          storeId: input.storeId,
           productId: item.productId,
           variantId: item.variantId ?? null,
           fulfilledAt: null,
@@ -163,6 +177,7 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         if (isFullyFulfilled) {
           const remainingOpen = await tx.backorderLine.count({
             where: {
+              storeId: input.storeId,
               orderItemId: bo.orderItemId,
               fulfilledAt: null,
               cancelledAt: null,
@@ -170,8 +185,9 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
             },
           });
           if (remainingOpen === 0) {
-            await tx.orderItem.update({
-              where: { id: bo.orderItemId },
+            // OrderItem has no storeId of its own — scope through its order.
+            await tx.orderItem.updateMany({
+              where: { id: bo.orderItemId, order: { storeId: input.storeId } },
               data: { costPriceDeferred: false },
             });
           }
@@ -182,8 +198,8 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
 
       // Step 1b: Replenish on-hand with remainder + WAC recompute
       if (remainingToProcess > 0) {
-        const product = await tx.product.findUnique({
-          where: { id: item.productId },
+        const product = await tx.product.findFirst({
+          where: { id: item.productId, storeId: input.storeId },
           select: {
             inventory: true,
             costPrice: true,
@@ -200,10 +216,11 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
 
         if (item.variantId) {
           // Variant inventory tracked separately; parent product.costPrice still holds the WAC.
-          await tx.productVariant.update({
-            where: { id: item.variantId },
+          const vRes = await tx.productVariant.updateMany({
+            where: { id: item.variantId, product: { storeId: input.storeId } },
             data: { inventory: { increment: remainingToProcess } },
           });
+          if (vRes.count !== 1) throw new Error(`Variant ${item.variantId} not found in store`);
         }
 
         // WAC formula: treat negative on-hand as 0 (backorder demand was consumed
@@ -221,14 +238,15 @@ export async function receivePurchaseOrder(input: ReceiveInput): Promise<{
         // lands on the parent ONLY for a variant-less line — the variant
         // increment above already moved it otherwise. Writing both was the
         // receive-side half of the parent-column drift.
-        await tx.product.update({
-          where: { id: item.productId },
+        const pRes = await tx.product.updateMany({
+          where: { id: item.productId, storeId: input.storeId },
           data: {
             ...(item.variantId ? {} : { inventory: newStock }),
             costPrice: newCost,
             lastCostUpdateAt: new Date(),
           },
         });
+        if (pRes.count !== 1) throw new Error(`Product ${item.productId} not found in store`);
 
         // InventoryHistory row (existing FWB pattern)
         await tx.inventoryHistory.create({

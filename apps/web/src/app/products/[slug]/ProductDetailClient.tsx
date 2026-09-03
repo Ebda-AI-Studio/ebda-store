@@ -685,7 +685,9 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               </h1>
 
               {displayExcerpt && (
-                <p className="mt-2 text-base text-muted-foreground">{displayExcerpt}</p>
+                <p className="mt-2 whitespace-pre-line text-base text-muted-foreground">
+                  {displayExcerpt}
+                </p>
               )}
 
               {/* Price */}
@@ -708,7 +710,13 @@ export default function ProductDetailClient({ initialProduct, layout }: ProductD
               <TaxInclusiveLabel className="mt-1 block text-xs text-muted-foreground" />
 
               {displayDescription && (
-                <p className="mt-6 max-w-prose text-muted-foreground leading-relaxed">
+                // whitespace-pre-line: the admin edits this in a <Textarea>, so
+                // a merchant's line breaks are stored — but HTML collapses
+                // them, which ran every paragraph together into one block and
+                // read as "only the first line saved". Matches how FAQ answers
+                // and how-to guides already render merchant prose. Still plain
+                // text (React escapes it), so no HTML injection surface.
+                <p className="mt-6 max-w-prose whitespace-pre-line text-muted-foreground leading-relaxed">
                   {displayDescription}
                 </p>
               )}

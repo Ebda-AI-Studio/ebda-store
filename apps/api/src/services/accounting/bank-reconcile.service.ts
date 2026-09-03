@@ -24,6 +24,7 @@
 import { prisma, runInTenantContext, withRlsBypass } from '@force/database';
 import type { BankMatchStatus, BankTransaction, Prisma } from '@prisma/client';
 import { parseStatementCsv, parseStatementOfx, type ParsedRow } from './bank-statement-parser';
+import { assertStoreOwns } from './assert-store-owns';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,10 @@ export async function importBankStatement(
   input: ImportStatementInput
 ): Promise<ImportStatementResult> {
   const { storeId, glAccountId, fileName, buffer, fileType } = input;
+
+  // glAccountId comes from the request body and is written onto the
+  // BankStatement unchecked, then read back with the account's code and name.
+  await assertStoreOwns(storeId, { accountIds: [glAccountId] });
 
   // ── Parse ──
   const parsed = fileType === 'ofx' ? parseStatementOfx(buffer) : parseStatementCsv(buffer);

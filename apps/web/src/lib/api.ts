@@ -283,6 +283,14 @@ interface CreateOrderData {
   pointsToRedeem?: number;
 }
 
+/**
+ * Stand-in returned by refreshAccessToken() when the server rotated the
+ * httpOnly cookies without putting the token pair in the response body (the
+ * pure-cookie path). NOT a token — never send it as a Bearer credential; it
+ * exists only so callers keep a truthy "the refresh succeeded, retry" signal.
+ */
+const COOKIE_ROTATED = 'cookie-rotated';
+
 class ApiClient {
   private baseUrl: string;
   private storeId: string | null = null;
@@ -332,24 +340,40 @@ class ApiClient {
         const res = await fetch(`${this.baseUrl}/auth/refresh`, {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          // X-Session-ID is what the server keys the re-issued CSRF token on.
+          // This is a raw fetch (it deliberately bypasses buildHeaders to avoid
+          // recursing through the 401-refresh path), so the header has to be
+          // set explicitly or no csrfToken comes back.
+          headers: { 'Content-Type': 'application/json', 'X-Session-ID': this.getSessionId() },
           body: JSON.stringify(storedRefreshToken ? { refreshToken: storedRefreshToken } : {}),
         });
         if (!res.ok) return null;
         const json = await res.json();
         if (json.success && json.data) {
-          // Only persist rotated tokens to localStorage on iOS. On other
-          // browsers the server already rotated the httpOnly cookies in this
-          // response — no JS-visible token storage needed.
-          if (ios && typeof window !== 'undefined') {
-            if (json.data.refreshToken) {
-              localStorage.setItem('refreshToken', json.data.refreshToken);
-            }
-            if (json.data.csrfToken) {
-              localStorage.setItem('csrfToken', json.data.csrfToken);
-            }
+          // Only persist the rotated REFRESH token on iOS. On other browsers
+          // the server already rotated the httpOnly cookies in this response —
+          // no JS-visible token storage needed.
+          if (ios && typeof window !== 'undefined' && json.data.refreshToken) {
+            localStorage.setItem('refreshToken', json.data.refreshToken);
           }
-          return json.data.accessToken ?? null;
+          // The CSRF token is stored on EVERY platform, not just iOS. It is a
+          // double-submit token: it is *meant* to be JS-readable, and the
+          // request header carrying it is exactly what proves the caller is
+          // our own page rather than a cross-origin one. Merchant custom
+          // origins are no longer CSRF-exempt, so a session that never stores
+          // this token cannot make a state-changing request at all — which is
+          // what kept pre-existing sessions working before that exemption was
+          // removed.
+          if (typeof window !== 'undefined' && json.data.csrfToken) {
+            localStorage.setItem('csrfToken', json.data.csrfToken);
+          }
+          // On the cookie path the server rotates the httpOnly cookies but
+          // deliberately withholds the token pair from the body (a merchant
+          // custom origin must never be able to READ a session token — see
+          // apps/api/src/routes/auth.routes.ts POST /auth/refresh), so
+          // `refreshed` is the success signal there, not accessToken. The
+          // return value is only ever used as a truthy "retry now" flag.
+          return json.data.accessToken ?? (json.data.refreshed ? COOKIE_ROTATED : null);
         }
         return null;
       } catch {
@@ -402,8 +426,26 @@ class ApiClient {
         signal: options.signal ?? controller.signal,
       });
 
-      // On 401, attempt a single token refresh and retry the request
-      if (response.status === 401 && !endpoint.startsWith('/auth/')) {
+      // A 403 whose code starts CSRF_ means this session holds no valid CSRF
+      // token — typically a session established before the token was persisted
+      // on this platform. /auth/refresh re-mints one, so refreshing and
+      // retrying heals it on the FIRST failed request. Without this the
+      // customer's writes fail until the 30-minute access token expires and a
+      // 401 happens to trigger the same path.
+      let shouldRefreshRetry = response.status === 401;
+      if (response.status === 403) {
+        try {
+          const peek = await response.clone().json();
+          if (typeof peek?.error?.code === 'string' && peek.error.code.startsWith('CSRF_')) {
+            shouldRefreshRetry = true;
+          }
+        } catch {
+          // Non-JSON 403 — treat as a normal failure, not a CSRF problem.
+        }
+      }
+
+      // On 401 (or a CSRF 403), attempt a single token refresh and retry
+      if (shouldRefreshRetry && !endpoint.startsWith('/auth/')) {
         const newToken = await this.refreshAccessToken();
         if (newToken) {
           // Rebuild headers to pick up any new CSRF token set during refresh
@@ -491,10 +533,20 @@ class ApiClient {
      */
     storeId?: string;
   }) {
-    return this.request<{ user: User; accessToken: string; refreshToken: string }>(
-      '/auth/register',
-      { method: 'POST', body: JSON.stringify(data) }
-    );
+    const result = await this.request<{
+      user: User;
+      accessToken: string;
+      refreshToken: string;
+      csrfToken?: string;
+    }>('/auth/register', { method: 'POST', body: JSON.stringify(data) });
+
+    // Same as login: a session established here needs its CSRF token stored or
+    // the customer's first write 403s.
+    if (typeof window !== 'undefined' && result.success && result.data?.csrfToken) {
+      localStorage.setItem('csrfToken', result.data.csrfToken);
+    }
+
+    return result;
   }
 
   async login(email: string, password: string, storeId?: string) {
@@ -514,9 +566,16 @@ class ApiClient {
       // localStorage would needlessly expose it to XSS.
       if (typeof window !== 'undefined' && isIosWebkit()) {
         localStorage.setItem('refreshToken', result.data.refreshToken);
-        if (result.data.csrfToken) {
-          localStorage.setItem('csrfToken', result.data.csrfToken);
-        }
+      }
+      // The CSRF token is stored on EVERY platform, not just iOS. It is a
+      // double-submit token — it is MEANT to be JS-readable, and the header
+      // carrying it is what proves the caller is our own page. Storing it only
+      // on iOS meant a non-iOS customer on a merchant custom domain (no longer
+      // CSRF-exempt) had no token, so every wishlist/address write 403'd until
+      // the 30-minute access token expired and the refresh path finally
+      // supplied one. Same reasoning as refreshAccessToken above.
+      if (typeof window !== 'undefined' && result.data.csrfToken) {
+        localStorage.setItem('csrfToken', result.data.csrfToken);
       }
     }
 

@@ -1100,11 +1100,24 @@ export class OrderService {
         });
       }
 
-      // 4. Mark the order cancelled with a paper trail
+      // 4. Mark the order cancelled with a paper trail.
+      //
+      // `refundReversedAt` is stamped HERE, in the same transaction as the
+      // reversal, because this rollback IS the reversal: steps 1-2 above
+      // already restored inventory and released the coupon. It is the
+      // predicate `refund-reversal-stuck-sweep` uses to find orders that still
+      // need reversing, and the sweep cannot infer it from our markers — we
+      // write InventoryHistory.type='adjustment' while the order/refunded
+      // fanout's idempotency check looks for 'return_stock'. Leaving it null
+      // let the sweep re-send order/refunded, and the fanout — finding no
+      // 'return_stock' row — restored the stock a SECOND time and decremented
+      // the coupon again. That made stock inventable on a loop, and it also
+      // fired organically on every legitimate failed payment-create.
       await tx.order.update({
         where: { id: order.id },
         data: {
           status: 'cancelled',
+          refundReversedAt: new Date(),
           notes:
             (order.notes ? order.notes + '\n' : '') +
             '[auto-cancelled: payment step failed before completion]',
@@ -1448,6 +1461,21 @@ export class OrderService {
   ) {
     if (data.items.length === 0) {
       throw new AppError(400, 'NO_ITEMS', 'Order must have at least one item');
+    }
+
+    // The admin form may attach an existing customer by id. Products,
+    // variants and coupons below are all validated against this store — the
+    // customer was not, so any platform user's uuid could be attached to a
+    // fabricated order and their name + email read back through the order
+    // detail include. Validate it the same way.
+    if (data.customerId) {
+      const customer = await prisma.user.findFirst({
+        where: { id: data.customerId, storeId, role: 'customer' },
+        select: { id: true },
+      });
+      if (!customer) {
+        throw new AppError(404, 'NOT_FOUND', 'Customer not found for this store');
+      }
     }
 
     // Hydrate product + variant prices from the DB. Admin form

@@ -1,6 +1,6 @@
 import { prisma, Prisma, withMoneyTx, StoreStatus } from '@force/database';
 import { AppError } from '../middleware/error-handler';
-import { slugify } from '@force/shared';
+import { slugify, slugifyWithFallback } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateCached, invalidateCachedPrefix } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -208,7 +208,10 @@ export class StoreService {
   }
 
   static async create(ownerId: string, data: CreateStoreData) {
-    const baseSlug = data.slug || slugify(data.name);
+    // Same class as the product-slug defect: an empty slugify result made the
+    // de-duplication loop mint '-1'/'-2' store slugs. A store is even less
+    // recoverable than a product, so it gets the same guarantee.
+    const baseSlug = slugifyWithFallback(data.slug || data.name, 'store', { ascii: true });
 
     // Auto-deduplicate slug
     let slug = baseSlug;

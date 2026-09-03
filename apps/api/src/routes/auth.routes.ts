@@ -3,9 +3,10 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
 import { config } from '../config';
-import { authenticate } from '../middleware/auth';
+import { authenticate, rejectImpersonated } from '../middleware/auth';
 import { AuthService } from '../services/auth.service';
 import { authLimiter, auditLog, generateCsrfToken } from '../middleware/security';
+import { isPlatformOrigin } from '../lib/cors-cache';
 import { redis } from '../services/redis.service';
 
 const router = Router();
@@ -292,6 +293,85 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
   }
 });
 
+/**
+ * Roles that may still mint a CSRF token at /auth/refresh when the ONLY thing
+ * authenticating the call is the ambient refresh cookie and the Origin is not
+ * a platform origin. Allowlist (not denylist) so a future role fails closed.
+ *
+ * Storefront customers genuinely need this: they run on merchant custom
+ * origins, their non-`/public/` writes (wishlist, addresses, returns) require
+ * a CSRF token now that merchant origins are no longer exempt, and the token
+ * TTL (1h) is far shorter than the session — so the silent refresh is the only
+ * place a long-lived storefront session can re-mint one.
+ */
+const AMBIENT_CSRF_MINT_ROLES = new Set(['customer']);
+
+/**
+ * May this /auth/refresh call be handed a freshly minted CSRF token?
+ *
+ * The CSRF token is keyed on the caller-supplied `X-Session-ID` and the
+ * response body is readable by every CORS-allowlisted origin — which includes
+ * every merchant custom domain, because CORS runs `credentials: true` and the
+ * session cookies are `SameSite=None`. Minting unconditionally therefore
+ * re-opened the hole that removing the merchant-origin CSRF exemption closed:
+ * a merchant-controlled page lures a signed-in admin, POSTs here with the
+ * victim's ambient cookie riding along and `X-Session-ID: <attacker-chosen>`,
+ * reads back a valid token for a session id IT picked, and can then issue
+ * state-changing requests as the victim (another tenant's `/stores/:id` writes
+ * for a lured super_admin) that sail through `verifyCsrfToken`.
+ *
+ * Binding the token to the authenticated userId does NOT fix this: both the
+ * mint and the subsequent write ride the SAME victim cookie, so the binding
+ * matches. What distinguishes attacker from client is how the call was
+ * authenticated and who the session belongs to:
+ *
+ *   1. platform origin — an origin we control end-to-end; not attacker-hostable.
+ *   2. the caller PRESENTED the refresh token in the body — possession proof.
+ *      Attacker JS only has the ambient httpOnly cookie, never the token value.
+ *   3. ambient cookie from a merchant origin, but the session is a plain
+ *      storefront customer — no privileged surface to escalate onto.
+ *
+ * Residual, accepted: case 3 still lets merchant origin B ride a lured
+ * CUSTOMER's cookie against that customer's own account data. That is
+ * structurally unavoidable while every merchant domain is CORS-allowlisted
+ * with credentials — the durable fix is binding an origin to its own tenant —
+ * and it is bounded to the customer's own records. What must never happen is
+ * an ADMIN session handing a token to a merchant origin; that is what the role
+ * allowlist stops.
+ */
+function mayIssueCsrfToken(
+  req: Request,
+  newAccessToken: string,
+  presentedRefreshToken: string | undefined
+): boolean {
+  // (2) Possession proof — only a client that already holds the refresh token
+  // could have sent it.
+  if (presentedRefreshToken) return true;
+
+  // (1) Platform origins (admin / web / orders apps).
+  if (
+    isPlatformOrigin(req.headers.origin as string | undefined, {
+      webUrl: config.webUrl,
+      adminUrl: config.adminUrl,
+      nodeEnv: config.nodeEnv,
+    })
+  ) {
+    return true;
+  }
+
+  // (3) Ambient-cookie caller on a merchant origin: storefront customers only.
+  try {
+    const payload = jwt.verify(newAccessToken, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: 'force-api',
+      audience: 'force-app',
+    }) as { role?: string };
+    return !!payload.role && AMBIENT_CSRF_MINT_ROLES.has(payload.role);
+  } catch {
+    return false; // fail closed — we just minted this token, so this shouldn't happen
+  }
+}
+
 // POST /auth/refresh
 router.post('/refresh', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -299,9 +379,8 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
     // clients — the iOS admin PWA) OR the HTTP-only refresh cookie
     // (pure-browser path). Body wins when both are present so an explicit
     // localStorage token isn't shadowed by a stale cookie.
-    const refreshToken =
-      (req.body?.refreshToken as string | undefined) ||
-      (req.cookies?.refresh_token as string | undefined);
+    const bodyRefreshToken = req.body?.refreshToken as string | undefined;
+    const refreshToken = bodyRefreshToken || (req.cookies?.refresh_token as string | undefined);
 
     if (!refreshToken) {
       res.status(400).json({
@@ -321,12 +400,52 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
     // next refresh present the now-rotated token and self-revoke the family.
     setSessionCookies(res, tokens.accessToken, tokens.refreshToken);
 
-    // ALSO return them in the body for Bearer-token clients (iOS admin PWA)
-    // so they can replace their localStorage tokens. Same reasoning as
-    // login/register — the API supports both auth modes.
+    // Re-issue the CSRF token alongside the rotated pair.
+    //
+    // Merchant custom origins are no longer CSRF-exempt (see
+    // middleware/security.ts — the exemption let any merchant-controlled
+    // domain ride a victim's cookie). Sessions established BEFORE that change
+    // hold no csrfToken in localStorage and would start failing every
+    // state-changing request. Minting one here means each such session heals
+    // on its next silent refresh — the access token is 30 minutes, so the
+    // window closes on its own rather than requiring every user to re-login.
+    //
+    // GATED by `mayIssueCsrfToken`: handing a token to any caller that showed
+    // up with nothing but the ambient cookie would let a merchant-controlled
+    // page mint one for a session id of its choosing and ride a lured admin's
+    // cookie — see the full argument on that function.
+    const sessionId = req.headers['x-session-id'] as string | undefined;
+    const csrfToken =
+      sessionId && mayIssueCsrfToken(req, tokens.accessToken, bodyRefreshToken)
+        ? await generateCsrfToken(sessionId)
+        : undefined;
+
+    // ALSO return the rotated pair in the body for Bearer-token clients (iOS
+    // admin PWA) so they can replace their localStorage tokens — but ONLY when
+    // the caller presented the refresh token itself. A caller authenticated by
+    // nothing but the ambient HTTP-only cookie gets the rotation as Set-Cookie
+    // and nothing else.
+    //
+    // WHY THE ASYMMETRY: CORS runs with credentials:true and allowlists every
+    // merchant custom domain by DB lookup, and the session cookies are
+    // SameSite=None. Returning the pair unconditionally meant a
+    // merchant-controlled page could lure a signed-in super_admin, POST here
+    // with the victim's cookie riding along, and READ a 30-minute access JWT
+    // plus a 365-day refresh token out of the response — the same read-half
+    // takeover `restrictPlatformOnlyOrigins` closes for /admin/impersonate.
+    // This route CANNOT join PLATFORM_ONLY_ORIGIN_PATHS: storefront customers
+    // legitimately refresh from merchant custom origins. So the boundary is
+    // "an ambient-cookie caller never gets to read a token", which costs
+    // nothing — a client that needs the pair in the body must already hold a
+    // refresh token to have presented one.
+    //
+    // `refreshed` is the success signal for the cookie path (the frontends'
+    // 401-retry helpers key off it instead of accessToken).
     res.json({
       success: true,
-      data: tokens,
+      data: bodyRefreshToken
+        ? { ...tokens, csrfToken, refreshed: true }
+        : { csrfToken, refreshed: true },
     });
   } catch (error) {
     next(error);
@@ -393,6 +512,7 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
 router.post(
   '/logout-all',
   authenticate,
+  rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await AuthService.revokeAllSessions(req.user!.userId);
@@ -461,6 +581,7 @@ router.post(
   '/me/erase',
   authLimiter,
   authenticate,
+  rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
@@ -550,6 +671,7 @@ router.post(
   '/change-password',
   authLimiter,
   authenticate,
+  rejectImpersonated,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const changePasswordSchema = z.object({

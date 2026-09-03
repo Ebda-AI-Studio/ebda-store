@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@force/ui';
+import { api } from '../lib/api';
 import { useStore, useStoreUrl } from '../contexts/StoreContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { API_URL } from '../lib/api';
@@ -235,15 +236,18 @@ export default function ReviewSection({ storeId, productId }: Props) {
     setSubmitMessage(null);
 
     try {
-      const res = await fetch(`${API_URL}/stores/${storeId}/reviews`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, rating, comment }),
+      // Goes through the ApiClient, NOT a raw fetch. buildHeaders attaches
+      // X-Session-ID and X-CSRF-Token; a raw fetch sends neither. Merchant
+      // custom origins are no longer CSRF-exempt (that exemption let any
+      // merchant-controlled page ride a victim's cookie), so a bare fetch to
+      // this non-/public/ route now returns 403 CSRF_MISSING_SESSION on every
+      // custom-domain storefront — i.e. for every real merchant.
+      const json = await api.post<unknown>(`/stores/${storeId}/reviews`, {
+        productId,
+        rating,
+        comment,
       });
-
-      const json = await res.json();
-      if (res.ok && json.success) {
+      if (json.success) {
         setSubmitMessage({
           type: 'success',
           text: t(

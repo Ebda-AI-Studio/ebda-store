@@ -1,5 +1,6 @@
 import { redis } from '../services/redis.service';
 import { BoundedMap } from './bounded-map';
+import { revalidateStorefront } from './revalidate-storefront';
 
 /**
  * Public-route response cache. Used by the storefront-facing endpoints
@@ -123,6 +124,9 @@ export async function invalidateCachedPrefix(prefix: string): Promise<void> {
 export async function invalidateStoreCategoriesCaches(storeId: string): Promise<void> {
   await invalidateCached(`public:categories:${storeId}`);
   await invalidateCached(`admin:categories:${storeId}`);
+  // Same reasoning as invalidateStoreProductCaches: the storefront holds the
+  // API's response in the Next data cache, so Redis alone is not enough.
+  revalidateStorefront({ tags: [`categories:${storeId}`] });
 }
 
 /**
@@ -156,6 +160,16 @@ export async function invalidateStoreProductCaches(storeId: string): Promise<voi
   await invalidateCachedPrefix(`public:suggest:${storeId}:`);
   await invalidateCachedPrefix(`admin:products:${storeId}:`);
   await invalidateStoreCategoriesCaches(storeId);
+
+  // Clearing Redis is only half the job. The Next.js storefront caches the
+  // API's RESPONSE in its own data cache, so after a save the merchant kept
+  // seeing the old product until that window expired — which is why saving
+  // twice "worked": the second save just took long enough. Every storefront
+  // product fetch is tagged `products:<storeId>`; purge it here, at the one
+  // place every writer already funnels through, so no call site can forget.
+  // Fire-and-forget by design (see revalidate-storefront) — a storefront blip
+  // must never fail a save that already committed.
+  revalidateStorefront({ tags: [`products:${storeId}`] });
 }
 
 /** Cache key for the admin aggregated-customers snapshot (`customers.routes.ts`). */

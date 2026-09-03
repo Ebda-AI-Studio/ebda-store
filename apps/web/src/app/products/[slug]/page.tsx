@@ -33,7 +33,7 @@ export async function generateMetadata({
     // Sentry) before falling through to this public call. Hit the public
     // endpoint directly — it resolves the store from the X-Store-ID header.
     const response = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [`products:${store.id}`] },
       headers: {
         'Content-Type': 'application/json',
         'X-Store-ID': store.id,

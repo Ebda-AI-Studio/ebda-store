@@ -8,7 +8,7 @@ import {
 } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { effectiveInventory } from '../lib/effective-inventory';
-import { slugify, AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
+import { slugify, slugifyWithFallback, AI_AUTOFILL_FIELD_NAMES } from '@force/shared';
 import { redis } from './redis.service';
 import { invalidateStoreProductCaches, invalidateStoreCategoriesCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
@@ -632,8 +632,37 @@ export class ProductService {
     await invalidateStoreCategoriesCaches(storeId);
   }
 
+  /**
+   * Verify every supplied categoryId belongs to this store before linking.
+   *
+   * `bulkUpdate.addCategoryId` has carried this guard (and a comment naming
+   * this exact attack) since it shipped; plain create/update never got it, so
+   * a store-A admin could link their products to store-B categories straight
+   * from the request body.
+   */
+  private static async assertCategoriesInStore(
+    storeId: string,
+    categoryIds: string[] | undefined
+  ): Promise<void> {
+    const ids = [...new Set(categoryIds ?? [])];
+    if (ids.length === 0) return;
+    const found = await prisma.category.findMany({
+      where: { id: { in: ids }, storeId },
+      select: { id: true },
+    });
+    if (found.length !== ids.length) {
+      throw new AppError(404, 'CATEGORY_NOT_FOUND', 'Category not found in this store');
+    }
+  }
+
   static async create(storeId: string, data: CreateProductData) {
-    const baseSlug = data.slug || slugify(data.name);
+    await this.assertCategoriesInStore(storeId, data.categories);
+    // slugifyWithFallback, never bare slugify: a name that slugifies to '' (no
+    // letters/digits, or a product created before its name was filled in) gave
+    // baseSlug = '', so the de-duplication loop below produced '', '-1', '-2'.
+    // Five products on a live store ended up that way; the '' one was
+    // unreachable entirely because its URL collapses to the product listing.
+    const baseSlug = slugifyWithFallback(data.slug || data.name, 'product');
 
     // Auto-deduplicate slug: append -1, -2, etc. if exists
     let slug = baseSlug;
@@ -720,6 +749,7 @@ export class ProductService {
   }
 
   static async update(storeId: string, productId: string, data: UpdateProductData) {
+    await this.assertCategoriesInStore(storeId, data.categories);
     const product = await this.getById(storeId, productId);
 
     // Money guard: a fixed discount must never exceed the price (would store a

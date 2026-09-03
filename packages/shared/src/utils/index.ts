@@ -90,15 +90,69 @@ export function toArabicDigits(input: string | number): string {
 }
 
 /**
- * Generate URL-friendly slug from string
+ * Canonical slug charset for this codebase: lowercase ASCII alphanumerics plus
+ * the Arabic block, separated by `-`.
+ *
+ * This is not an arbitrary choice — it is the charset the server's own
+ * validators already enforce:
+ *   - `product.routes.ts`  slug regex  /^[a-z0-9\u0600-\u06FF-]+$/
+ *   - `BulkService.generateSlug`        strips to [a-z0-9\u0600-\u06FF\s-]
+ *
+ * A wider charset (e.g. `\p{L}\p{N}`, which admits accents, Cyrillic and CJK)
+ * makes the server mint slugs its own API then rejects with a 400 — a product
+ * named "Café Noir" would persist `café-noir` and fail validation the moment any
+ * client echoed it back on update.
  */
-export function slugify(text: string): string {
-  return text
+const SLUG_STRIP = /[^a-z0-9\u0600-\u06FF\s-]+/g;
+
+/** Store slugs are stricter: ASCII only. See `slugifyWithFallback`. */
+const SLUG_STRIP_ASCII = /[^a-z0-9\s-]+/g;
+
+/**
+ * Generate a URL-friendly slug from a string.
+ *
+ * Keeps the Arabic block, so an Arabic product name yields an Arabic slug
+ * rather than an empty string (`\w` is ASCII-only, and stripping to it meant
+ * every Arabic-only name slugified to ''). Product URLs already carry Arabic
+ * slugs in production and the storefront encodes/decodes them symmetrically.
+ *
+ * CAN RETURN AN EMPTY STRING for input with no letters or digits in the
+ * supported charset. Callers that persist a slug must use `slugifyWithFallback`.
+ */
+export function slugify(text: string, opts: { ascii?: boolean } = {}): string {
+  return (text ?? '')
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '')
+    .replace(opts.ascii ? SLUG_STRIP_ASCII : SLUG_STRIP, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * `slugify` that is guaranteed to return a non-empty, URL-safe slug.
+ *
+ * Persisting an empty slug is never harmless: a product whose slug is '' is
+ * unreachable (its URL collapses to the listing page), and a de-duplication
+ * loop appending a counter to an empty base produces '-1', '-2', '-3' — which
+ * is exactly what reached production on a live store (2026-09-02). Every
+ * server-side path that WRITES a slug must use this, not bare `slugify`.
+ *
+ * PASS `ascii: true` FOR STORE SLUGS. A store slug is the path prefix on
+ * platform hosts (`/<slug>/products/...`), and the storefront middleware reads
+ * it from `nextUrl.pathname` — which is percent-encoded for non-ASCII — then
+ * forwards it verbatim as the `x-store-slug` header. The by-slug lookup would
+ * compare `%D9%84%D9%88%D8%B2` against `لوز` and never match, so a non-ASCII
+ * store slug is unroutable. `store.routes.ts` enforces /^[a-z0-9-]+$/ for the
+ * same reason. An Arabic-only store name therefore falls back to `store-<id>`
+ * rather than minting a slug nothing can resolve.
+ */
+export function slugifyWithFallback(
+  text: string,
+  prefix = 'item',
+  opts: { ascii?: boolean } = {}
+): string {
+  const base = slugify(text ?? '', opts);
+  return base || `${prefix}-${Date.now().toString(36)}`;
 }
 
 /**

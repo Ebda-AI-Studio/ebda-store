@@ -8,6 +8,7 @@ import { inngest } from '../client';
 import { suggestProductCategory } from '../../ai/product-category-suggester';
 import { AppError } from '../../../middleware/error-handler';
 import { BULK_AI_BATCH_SIZE, chunk } from '../batch-utils';
+import { invalidateStoreProductCaches } from '../../public-cache';
 
 /**
  * Catalogue-wide category-assignment sweep — uncategorized products only.
@@ -300,6 +301,15 @@ const bulkAiCategorizeFn = inngest.createFunction(
         where: { id: jobId },
         select: { status: true },
       });
+
+      // A bulk AI sweep rewrites product-facing content (titles, descriptions,
+      // SEO, translations, tags, categories, image alt, FAQs) with raw Prisma
+      // writes that carry no cache awareness, so the storefront kept serving
+      // the pre-sweep copy until the TTL expired. Bust ONCE at the end, never
+      // per item — same discipline as bulk-import (a per-row sweep would be an
+      // invalidation storm). This also purges the storefront's Next data cache
+      // via the tag the public fetches carry.
+      await invalidateStoreProductCaches(storeId);
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {

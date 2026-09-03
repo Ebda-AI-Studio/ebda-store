@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
-import { isPlatformOrigin, isAllowlistedMerchantOrigin } from '../lib/cors-cache';
+import { isPlatformOrigin } from '../lib/cors-cache';
 import { config } from '../config';
 import logger from '../lib/logger';
 
@@ -76,6 +76,128 @@ async function verifyCsrfToken(sessionId: string, token: string): Promise<boolea
   return stored.token === token;
 }
 
+/**
+ * Route prefixes that no merchant-controlled origin may ever reach with the
+ * browser's credentials attached. These are the platform-admin and
+ * account-destructive surfaces; they are only ever called by the admin app,
+ * which is served from a platform origin.
+ */
+const PLATFORM_ONLY_ORIGIN_PATHS: RegExp[] = [
+  /^\/api\/v1\/admin(\/|$)/,
+  /^\/api\/v1\/payment-settings(\/|$)/,
+];
+
+// DELIBERATELY NOT LISTED: /auth/me/erase and /auth/logout-all.
+//
+// They read as "destructive, so lock them down", but they are CUSTOMER
+// self-service, not platform-admin. The storefront account page calls
+// /auth/me/erase (apps/web/.../account/settings/SettingsClient.tsx) — and the
+// storefront runs on merchant custom domains, which are by definition not
+// platform origins. Gating them here would have returned 403 for every
+// customer trying to erase their own account on a real merchant domain,
+// breaking the GDPR Art. 17 / Kuwait Law 13 erasure path this codebase
+// implements on purpose.
+//
+// They remain protected by authenticate + the CSRF token + rejectImpersonated,
+// which is the right boundary for a self-service action. This gate is for the
+// platform-ADMIN surface only.
+
+/**
+ * Normalize a path to the form Express actually routes on before testing it
+ * against `PLATFORM_ONLY_ORIGIN_PATHS`.
+ *
+ * WHY: the patterns above are a parallel, literal transcription of routes the
+ * router matches with `caseSensitive: false` and `strict: false` (both Express
+ * defaults). So `GET /api/v1/ADMIN/stores` and `POST /api/v1/auth/logout-all/`
+ * reach the real handlers, while a raw case-sensitive, trailing-slash-exact
+ * regex test matches NEITHER — the gate falls through to `next()` and a
+ * merchant origin gets exactly the credentialed cross-origin read this
+ * function exists to deny (GETs never reach the CSRF check).
+ *
+ * Percent-decoding is belt-and-braces rather than a live bypass: Express 4
+ * matches layers against the RAW pathname, so `/api/v1/%61dmin` 404s today.
+ * Decoding here can only ever make MORE paths match the deny list (it fails
+ * closed) and keeps the gate correct if a proxy or a future router version
+ * decodes before matching.
+ */
+function normalizePlatformGatePath(rawPath: string): string {
+  let path = rawPath;
+
+  // Decode repeatedly — one pass leaves a double-encoded `%2561dmin` encoded.
+  for (let i = 0; i < 3; i++) {
+    let decoded = path;
+    try {
+      decoded = decodeURIComponent(path);
+    } catch {
+      break; // malformed escape (`%zz`) — match on what we have, never throw
+    }
+    if (decoded === path) break;
+    path = decoded;
+  }
+
+  // Lowercase (caseSensitive:false), collapse repeated slashes, drop trailing
+  // slashes (strict:false) so the anchored `$` patterns still match.
+  const collapsed = path.toLowerCase().replace(/\/{2,}/g, '/');
+
+  return collapsed.replace(/\/+$/, '') || '/';
+}
+
+/**
+ * Refuse credentialed cross-origin access to the platform-admin surface from
+ * any origin we do not control.
+ *
+ * WHY THIS EXISTS SEPARATELY FROM CSRF: `csrfProtection` only guards
+ * state-changing methods. CORS runs with `credentials: true` and allowlists
+ * every custom merchant domain by DB lookup, so without this a merchant-
+ * controlled page could still issue credentialed *GETs* and READ the
+ * responses — for a lured super_admin that is every store's data — and could
+ * read the response of `POST /admin/impersonate`, which mints a full-privilege
+ * token for any user. Requiring a CSRF token closes the write half; this
+ * closes the read half.
+ *
+ * Domain verification is NOT the fix here and must not be mistaken for one:
+ * Cloudflare's addDomain creates a custom hostname with no ownership proof, but
+ * even a fully DNS-verified merchant domain is still merchant-controlled. Any
+ * merchant can buy a real domain. The durable boundary is that the admin
+ * surface is reachable only from origins the platform owns.
+ *
+ * A missing Origin is allowed through: every browser sets Origin on the
+ * cross-site credentialed requests this defends against (the API is on a
+ * different host from every frontend, so all browser traffic is cross-origin),
+ * while server-to-server and CLI callers carry no ambient cookie to abuse.
+ */
+export function restrictPlatformOnlyOrigins(req: Request, res: Response, next: NextFunction) {
+  const origin = req.headers.origin as string | undefined;
+  if (!origin) return next();
+
+  if (
+    isPlatformOrigin(origin, {
+      webUrl: config.webUrl,
+      adminUrl: config.adminUrl,
+      nodeEnv: config.nodeEnv,
+    })
+  ) {
+    return next();
+  }
+
+  const gatePath = normalizePlatformGatePath(req.path);
+  if (!PLATFORM_ONLY_ORIGIN_PATHS.some(pattern => pattern.test(gatePath))) {
+    return next();
+  }
+
+  logger.warn(
+    { origin, path: req.path, gatePath, method: req.method },
+    '[SECURITY] blocked non-platform origin on a platform-only route'
+  );
+  return res.status(403).json({
+    success: false,
+    error: {
+      code: 'ORIGIN_NOT_PERMITTED',
+      message: 'This endpoint is not available from this origin',
+    },
+  });
+}
+
 export function csrfProtection(req: Request, res: Response, next: NextFunction) {
   // Skip for safe methods
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
@@ -137,22 +259,36 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // the platform-origin gate a malicious merchant could configure
   // `attacker.com` as their store's domain, mount a JSON CSRF page
   // there, and ride the API host's cookie to call any other store's
-  // endpoints. The CSRF-token verifier below catches that case.
+  // endpoints. Merchant origins therefore fall THROUGH to the
+  // CSRF-token verifier below, which is what catches that case.
   //
-  // Guest checkout still works because the storefront is a platform
-  // origin (store.forcemediakw.com) and is in the platform allowlist.
+  // This comment used to sit directly above a condition that did the
+  // opposite: `|| isAllowlistedMerchantOrigin(origin)` was added in
+  // 619c43e7 (2026-05-14) and made every DB-registered custom domain
+  // CSRF-exempt. Cloudflare's addDomain creates a custom hostname with
+  // NO ownership proof, so any merchant could register a host they
+  // control, lure a logged-in super_admin there, and — with the cookie
+  // being SameSite=None and CORS running credentials:true — issue
+  // credentialed writes AND read the responses, including a full
+  // impersonation token from POST /admin/impersonate. Two audits
+  // (2026-07-02 security-surface, 2026-08-31 lens L10) read this
+  // comment and graded it PASS without reading the condition.
+  //
+  // Guest checkout is unaffected: `/public/` paths return early above,
+  // long before this branch, and the storefront client sends both
+  // X-Session-ID and X-CSRF-Token on every state-changing request
+  // (apps/web/src/lib/api.ts buildHeaders).
   const contentType = req.headers['content-type'] || '';
   const xRequestedWith = req.headers['x-requested-with'];
   const origin = req.headers.origin as string | undefined;
   const isJsonOrXhr = contentType.includes('application/json') || !!xRequestedWith;
   if (
     isJsonOrXhr &&
-    (isPlatformOrigin(origin, {
+    isPlatformOrigin(origin, {
       webUrl: config.webUrl,
       adminUrl: config.adminUrl,
       nodeEnv: config.nodeEnv,
-    }) ||
-      isAllowlistedMerchantOrigin(origin))
+    })
   ) {
     return next();
   }

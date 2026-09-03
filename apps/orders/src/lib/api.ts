@@ -50,6 +50,14 @@ function isIosWebkit(): boolean {
  */
 let refreshInFlight: Promise<string | null> | null = null;
 
+/**
+ * Stand-in returned by refreshAccessToken() when the server rotated the
+ * httpOnly cookies without putting the token pair in the response body (the
+ * pure-cookie path). NOT a token — never send it as a Bearer credential; it
+ * exists only so callers keep a truthy "the refresh succeeded, retry" signal.
+ */
+const COOKIE_ROTATED = 'cookie-rotated';
+
 export function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
 
@@ -79,7 +87,13 @@ export function refreshAccessToken(): Promise<string | null> {
           if (json.data.refreshToken) localStorage.setItem('refreshToken', json.data.refreshToken);
           if (json.data.csrfToken) localStorage.setItem('csrfToken', json.data.csrfToken);
         }
-        return json.data.accessToken ?? null;
+        // On the cookie path the server rotates the httpOnly cookies but
+        // deliberately withholds the token pair from the body (a merchant
+        // custom origin must never be able to READ a session token — see
+        // apps/api/src/routes/auth.routes.ts POST /auth/refresh), so
+        // `refreshed` is the success signal there, not accessToken. The return
+        // value is only ever used as a truthy "retry now" flag.
+        return json.data.accessToken ?? (json.data.refreshed ? COOKIE_ROTATED : null);
       }
       return null;
     } catch {

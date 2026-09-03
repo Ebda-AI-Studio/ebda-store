@@ -78,7 +78,9 @@ async function fetchProducts(storeId: string): Promise<ProductEntry[]> {
   const res = await fetch(
     `${API_URL}/public/products?limit=1000&status=published&storeId=${storeId}`,
     {
-      next: { revalidate: 3600 },
+      // 1-hour TTL was the only freshness control; the tag lets a product save
+      // refresh the sitemap immediately instead of up to an hour later.
+      next: { revalidate: 3600, tags: [`products:${storeId}`] },
       headers: { 'Content-Type': 'application/json', 'X-Store-ID': storeId },
     }
   );

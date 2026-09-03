@@ -208,9 +208,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('accessToken', data.accessToken);
       }
       localStorage.setItem('refreshToken', data.refreshToken);
-      if (data.csrfToken) {
-        localStorage.setItem('csrfToken', data.csrfToken);
-      }
+    }
+    // The CSRF token is stored on EVERY platform, not just iOS: it is a
+    // double-submit token, meant to be JS-readable, and a session without it
+    // cannot make a state-changing request. Admin and orders are safe today
+    // only because they sit on PLATFORM origins, which remain CSRF-exempt —
+    // this is the same latent defect that broke storefront writes on merchant
+    // custom domains, fixed here so the copies cannot diverge again.
+    if (data.csrfToken) {
+      localStorage.setItem('csrfToken', data.csrfToken);
     }
     // Set session indicator cookie so middleware can gate admin pages. 30
     // days is the "looks signed in" hint window — the real session lasts as

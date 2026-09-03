@@ -96,6 +96,85 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
   // expose database error messages, codes, hints, or stack traces to clients.)
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     logger.error({ err, requestId }, 'Prisma known request error');
+
+    // A CONSTRAINT VIOLATION IS THE CALLER'S FAULT, NOT A SERVER FAULT.
+    // Collapsing every Prisma error into an opaque 500 meant a merchant who
+    // typed an SKU another product already uses got "A database error
+    // occurred" with no idea what to change — this reached production on a
+    // live store (2026-09-02) and was only diagnosable from the Railway logs.
+    //
+    // We still never echo err.code, err.message or raw meta. `target` is
+    // translated through an ALLOWLIST of columns we are willing to name in
+    // business terms; anything unrecognised degrades to the generic message,
+    // so a new column can never leak by default.
+    // IDENTITY-BEARING COLUMNS ARE DELIBERATELY ABSENT.
+    //
+    // `email` is NOT on this list. auth.routes.ts documents a control (T1-4)
+    // that closed registration enumeration: register returns an identical body
+    // whether or not the address exists. That control is enforced by a
+    // `findFirst` pre-check, which is TOCTOU — two concurrent registrations for
+    // the same address race past it and the loser hits the unique index. If
+    // this handler answered "that email address is already used", the status
+    // code plus message would be exactly the oracle T1-4 removed, on an
+    // unauthenticated route. A duplicate email degrades to the generic message
+    // instead; an authenticated admin surface that wants a specific error
+    // should raise its own AppError, which this global mapper cannot do because
+    // it cannot tell a public route from an admin one.
+    //
+    // `name` is omitted for the same reason (identity-adjacent, and duplicate
+    // names are rarely actionable to the caller anyway).
+    const FIELD_LABELS: Record<string, string> = {
+      sku: 'SKU',
+      slug: 'URL slug',
+      domain: 'domain',
+      code: 'code',
+      barcode: 'barcode',
+      order_number: 'order number',
+    };
+
+    if (err.code === 'P2002') {
+      const target = err.meta?.target;
+      const columns = Array.isArray(target) ? target.map(String) : [];
+      // Ignore tenant-scoping columns — "store_id + sku is taken" is noise to a
+      // merchant who only ever operates inside their own store.
+      const named = columns
+        .filter(c => c !== 'store_id' && c !== 'storeId')
+        .map(c => FIELD_LABELS[c])
+        .filter((label): label is string => Boolean(label));
+
+      res.status(409).json({
+        success: false,
+        error: {
+          code: 'DUPLICATE_VALUE',
+          message: named.length
+            ? `That ${named.join(' + ')} is already used by another record. Choose a different one.`
+            : 'One of the values you entered is already in use. Choose a different one.',
+          requestId,
+        },
+      });
+      return;
+    }
+
+    if (err.code === 'P2025') {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'The requested record was not found', requestId },
+      });
+      return;
+    }
+
+    if (err.code === 'P2003') {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_REFERENCE',
+          message: 'A referenced record does not exist',
+          requestId,
+        },
+      });
+      return;
+    }
+
     res.status(500).json({
       success: false,
       error: {

@@ -56,7 +56,7 @@ async function fetchCategories(store: { id: string; domain?: string }): Promise<
     }
 
     const response = await fetch(`${API_URL}/public/categories`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [`categories:${store.id}`] },
       headers,
     });
 

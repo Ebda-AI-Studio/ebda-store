@@ -373,7 +373,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const draft = await draftOwnerResponse(id);
+      const draft = await draftOwnerResponse(req.storeId!, id);
       res.json({ success: true, data: draft });
     } catch (error) {
       next(error);
@@ -394,7 +394,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { productId } = req.params;
-      const summary = await summarizeProductReviews(productId);
+      const summary = await summarizeProductReviews(req.storeId!, productId);
       res.json({ success: true, data: summary });
     } catch (error) {
       next(error);

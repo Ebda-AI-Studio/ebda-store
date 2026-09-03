@@ -128,7 +128,7 @@ export async function fetchInitialProduct(slug: string, store: { id: string; dom
   // NOTE: network errors intentionally propagate (no try/catch) — a transient
   // fetch failure must 500, not be swallowed into a false 404.
   const response = await fetch(`${API_URL}/public/products/${encodeURIComponent(slug)}`, {
-    next: { revalidate: 60 },
+    next: { revalidate: 60, tags: [`products:${store.id}`] },
     headers: {
       'Content-Type': 'application/json',
       'X-Store-ID': store.id,

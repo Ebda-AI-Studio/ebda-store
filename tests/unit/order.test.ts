@@ -73,6 +73,10 @@ vi.mock('@force/database', () => ({
     // phone/email, same targeting behavior as before Fix B.
     user: {
       findUnique: vi.fn().mockResolvedValue(null),
+      // findFirst backs createAdminOrder's customerId ownership check — an
+      // attached customer must belong to THIS store (2026-09-02 audit).
+      // Default: resolves, so tests that don't exercise it are unaffected.
+      findFirst: vi.fn().mockResolvedValue({ id: 'customer-1' }),
     },
     promotion: {
       findMany: vi.fn().mockResolvedValue([]),

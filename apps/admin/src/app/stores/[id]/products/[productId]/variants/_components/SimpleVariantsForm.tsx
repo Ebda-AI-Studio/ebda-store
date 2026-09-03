@@ -381,16 +381,18 @@ export function SimpleVariantsForm({
       </div>
 
       <div className="space-y-3">
-        {rows.map((row, idx) => (
+        {rows.map(row => (
           <div key={row.rowId} className="rounded-lg border border-border bg-background p-3">
             <div className="grid gap-2 sm:grid-cols-2">
               <div>
-                {idx === 0 && (
-                  <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                    {t('colName')}
-                  </p>
-                )}
+                <label
+                  htmlFor={`variant-name-${row.rowId}`}
+                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                >
+                  {t('colName')}
+                </label>
                 <Input
+                  id={`variant-name-${row.rowId}`}
                   value={row.value}
                   onChange={e => updateRow(row.rowId, { value: e.target.value })}
                   placeholder={t('namePlaceholder')}
@@ -398,12 +400,14 @@ export function SimpleVariantsForm({
                 />
               </div>
               <div>
-                {idx === 0 && (
-                  <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                    {t('colNameAr')}
-                  </p>
-                )}
+                <label
+                  htmlFor={`variant-name-ar-${row.rowId}`}
+                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                >
+                  {t('colNameAr')}
+                </label>
                 <Input
+                  id={`variant-name-ar-${row.rowId}`}
                   value={row.valueAr}
                   onChange={e => updateRow(row.rowId, { valueAr: e.target.value })}
                   placeholder={t('nameArPlaceholder')}
@@ -416,12 +420,14 @@ export function SimpleVariantsForm({
 
             <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_120px_auto]">
               <div>
-                {idx === 0 && (
-                  <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                    {t('colPrice')}
-                  </p>
-                )}
+                <label
+                  htmlFor={`variant-price-${row.rowId}`}
+                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                >
+                  {t('colPrice')}
+                </label>
                 <Input
+                  id={`variant-price-${row.rowId}`}
                   type="number"
                   step="0.001"
                   value={row.priceKwd}
@@ -430,12 +436,14 @@ export function SimpleVariantsForm({
                 />
               </div>
               <div>
-                {idx === 0 && (
-                  <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                    {t('colCompareAt')}
-                  </p>
-                )}
+                <label
+                  htmlFor={`variant-compare-at-${row.rowId}`}
+                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                >
+                  {t('colCompareAt')}
+                </label>
                 <Input
+                  id={`variant-compare-at-${row.rowId}`}
                   type="number"
                   step="0.001"
                   value={row.compareAtKwd}
@@ -444,12 +452,14 @@ export function SimpleVariantsForm({
                 />
               </div>
               <div>
-                {idx === 0 && (
-                  <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                    {t('colCost')}
-                  </p>
-                )}
+                <label
+                  htmlFor={`variant-cost-${row.rowId}`}
+                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                >
+                  {t('colCost')}
+                </label>
                 <Input
+                  id={`variant-cost-${row.rowId}`}
                   type="number"
                   step="0.001"
                   value={row.costKwd}
@@ -458,23 +468,23 @@ export function SimpleVariantsForm({
                 />
               </div>
               <div>
-                {idx === 0 && (
-                  <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                    {t('colStock')}
-                  </p>
-                )}
+                <label
+                  htmlFor={`variant-stock-${row.rowId}`}
+                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                >
+                  {t('colStock')}
+                </label>
                 <Input
+                  id={`variant-stock-${row.rowId}`}
                   type="number"
                   value={row.inventory}
                   onChange={e => updateRow(row.rowId, { inventory: e.target.value })}
                 />
               </div>
               <div>
-                {idx === 0 && (
-                  <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                    {t('colImage')}
-                  </p>
-                )}
+                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                  {t('colImage')}
+                </span>
                 <ImageUpload
                   value={row.imageUrl || undefined}
                   onUpload={url => updateRow(row.rowId, { imageUrl: url })}

@@ -90,13 +90,13 @@ async function fetchInitialData(
   // Fetch categories and first page of products in parallel
   const [categoriesResult, productsResult] = await Promise.all([
     fetch(`${API_URL}/public/categories`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [`categories:${store.id}`] },
       headers: storeHeaders,
     })
       .then(r => (r.ok ? r.json() : null))
       .catch(() => null),
     fetch(`${API_URL}/public/products?${productsQuery.toString()}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [`products:${store.id}`] },
       headers: storeHeaders,
     })
       .then(r => (r.ok ? r.json() : null))

@@ -1,3 +1,5 @@
+import { assertStoreOwns } from './assert-store-owns';
+import { AppError } from '../../middleware/error-handler';
 import { prisma, Prisma, withMoneyTx } from '@force/database';
 import type { StockAdjustment, StockAdjustmentItem, StockAdjustmentType } from '@prisma/client';
 import { nextSequence } from '../sequence.service';
@@ -46,6 +48,16 @@ export type AdjustmentWithItems = StockAdjustment & {
  * The adjustment sits in status='draft' until postAdjustment is called.
  */
 export async function createAdjustment(input: CreateAdjustmentInput): Promise<AdjustmentWithItems> {
+  // Every product/variant id here comes from the request body. requireStoreAccess
+  // only proved the caller owns the store in the URL, so without this a
+  // store_admin could name a competitor's ids (harvestable from the public
+  // storefront) and have postAdjustment write their inventory. Prod runs
+  // BYPASSRLS, so there is no database backstop.
+  await assertStoreOwns(input.storeId, {
+    productIds: input.items.map(i => i.productId),
+    variantIds: input.items.map(i => i.variantId),
+  });
+
   const adjustmentNumber = await nextSequence(input.storeId, 'adjustment');
 
   // Snapshot current state for every item line
@@ -53,7 +65,13 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<Ad
     input.items.map(async item => {
       if (item.variantId) {
         const variant = await prisma.productVariant.findFirst({
-          where: { id: item.variantId, productId: item.productId },
+          // `product: { storeId }` is load-bearing: the product-only branch
+          // below always scoped by store, this one never did.
+          where: {
+            id: item.variantId,
+            productId: item.productId,
+            product: { storeId: input.storeId },
+          },
           select: { inventory: true, costPrice: true },
         });
         const previousQty = variant?.inventory ?? 0;
@@ -132,16 +150,25 @@ export async function postAdjustment(
 
   await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
     for (const item of adjustment.items) {
+      // Belt-and-braces on top of the createAdjustment guard: updateMany lets
+      // us carry a relation filter that update() (unique-where only) cannot,
+      // so a foreign id matches zero rows instead of writing another tenant.
       if (item.variantId) {
-        await tx.productVariant.update({
-          where: { id: item.variantId },
+        const res = await tx.productVariant.updateMany({
+          where: { id: item.variantId, product: { storeId } },
           data: { inventory: item.newQty },
         });
+        if (res.count !== 1) {
+          throw new AppError(404, 'NOT_FOUND', 'One or more referenced records were not found');
+        }
       } else {
-        await tx.product.update({
-          where: { id: item.productId },
+        const res = await tx.product.updateMany({
+          where: { id: item.productId, storeId },
           data: { inventory: item.newQty },
         });
+        if (res.count !== 1) {
+          throw new AppError(404, 'NOT_FOUND', 'One or more referenced records were not found');
+        }
       }
 
       await tx.inventoryHistory.create({

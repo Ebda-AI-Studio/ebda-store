@@ -70,38 +70,26 @@ export function isPlatformOrigin(
 }
 
 /**
- * True when the origin is currently allowlisted in the CORS domain cache
- * as a merchant custom domain. Used by the CSRF middleware's JSON-skip
- * decision so guest checkout / cart / review POSTs from a real merchant
- * storefront (e.g. `wadyaljuz.com`) aren't rejected as CSRF_MISSING_SESSION.
+ * REMOVED 2026-09-02: `isAllowlistedMerchantOrigin`.
  *
- * Safety: CORS preflight already verified this domain is configured by a
- * real merchant in the DB. Guest checkout endpoints don't read any session
- * cookie (so cookie-riding CSRF can't apply), and signed-in mutations use
- * Bearer tokens which short-circuit CSRF earlier in the middleware. The
- * residual threat (malicious merchant sets `attacker.com` as their store
- * domain, then redirects victim's storefront to it) requires the merchant
- * to compromise their own customers via their own configured domain —
- * outside the threat model the platform protects against.
+ * It existed to let the CSRF middleware skip its token check for merchant
+ * custom domains. That made every DB-registered custom domain CSRF-exempt,
+ * and Cloudflare's addDomain creates a custom hostname with NO ownership
+ * proof — so any merchant could register a host they control, lure a
+ * logged-in super_admin to it and, because the auth cookie is SameSite=None
+ * and CORS runs credentials:true, issue credentialed writes AND read the
+ * responses, including a full impersonation token from POST /admin/impersonate.
  *
- * Returns false when:
- *   - origin missing / empty
- *   - origin not in the cache (cold cache; CORS handler will populate on
- *     the same request and a refresh will succeed — extremely rare in
- *     practice because the storefront fetches store config first)
- *   - origin present but `allowed: false` (DB lookup explicitly rejected)
- *   - cache entry expired
+ * Its doc comment argued the residual threat "requires the merchant to
+ * compromise their own customers via their own configured domain — outside
+ * the threat model". That reasoning only considered the merchant's OWN
+ * customers. It never considered another tenant's admin, or a super_admin,
+ * being lured to that same domain.
+ *
+ * Do not reintroduce it. Guest checkout does not need it: `/public/` paths
+ * return early from csrfProtection long before the origin check, and the
+ * storefront client sends X-Session-ID plus X-CSRF-Token on every
+ * state-changing request. Trust for the admin surface is enforced by
+ * `restrictPlatformOnlyOrigins` in middleware/security.ts, which is an
+ * allowlist of platform origins — not a denylist of bad ones.
  */
-export function isAllowlistedMerchantOrigin(origin: string | undefined): boolean {
-  if (!origin) return false;
-  let host: string;
-  try {
-    host = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
-  } catch {
-    return false;
-  }
-  const entry = corsDomainCache.get(host);
-  if (!entry || !entry.allowed) return false;
-  if (entry.expiresAt < Date.now()) return false;
-  return true;
-}

@@ -47,10 +47,11 @@ interface CategoriesApiResult {
  *  concurrently with `fetchLayoutSettings` instead of waiting for layout
  *  first (Lens M streaming fallback — see the HomePageBody() call site). */
 function fetchFeaturedProducts(
-  storeHeaders: Record<string, string>
+  storeHeaders: Record<string, string>,
+  storeId: string
 ): Promise<ProductsApiResult | null> {
   return fetch(`${API_URL}/public/products?featured=true&limit=8`, {
-    next: { revalidate: 60 },
+    next: { revalidate: 60, tags: [`products:${storeId}`] },
     headers: storeHeaders,
   })
     .then(r => (r.ok ? r.json() : null))
@@ -58,10 +59,11 @@ function fetchFeaturedProducts(
 }
 
 function fetchHomeCategories(
-  storeHeaders: Record<string, string>
+  storeHeaders: Record<string, string>,
+  storeId: string
 ): Promise<CategoriesApiResult | null> {
   return fetch(`${API_URL}/public/categories`, {
-    next: { revalidate: 60 },
+    next: { revalidate: 60, tags: [`categories:${storeId}`] },
     headers: storeHeaders,
   })
     .then(r => (r.ok ? r.json() : null))
@@ -153,11 +155,11 @@ async function fetchHomepageData(
     categoryResults,
     manualResult,
   ] = await Promise.all([
-    prefetched?.featured ?? fetchFeaturedProducts(storeHeaders),
-    prefetched?.categories ?? fetchHomeCategories(storeHeaders),
+    prefetched?.featured ?? fetchFeaturedProducts(storeHeaders, store.id),
+    prefetched?.categories ?? fetchHomeCategories(storeHeaders, store.id),
     newArrivalsLimit > 0
       ? fetch(`${API_URL}/public/products?sort=newest&limit=${newArrivalsLimit}`, {
-          next: { revalidate: 60 },
+          next: { revalidate: 60, tags: [`products:${store.id}`] },
           headers: storeHeaders,
         })
           .then(r => (r.ok ? r.json() : null))
@@ -165,7 +167,7 @@ async function fetchHomepageData(
       : Promise.resolve(null),
     bestSellersLimit > 0
       ? fetch(`${API_URL}/public/products?sort=best_seller&limit=${bestSellersLimit}`, {
-          next: { revalidate: 60 },
+          next: { revalidate: 60, tags: [`products:${store.id}`] },
           headers: storeHeaders,
         })
           .then(r => (r.ok ? r.json() : null))
@@ -182,7 +184,7 @@ async function fetchHomepageData(
       categoryFetches.map(([slug, fetchLimit]) =>
         fetch(
           `${API_URL}/public/products?category=${encodeURIComponent(slug)}&limit=${fetchLimit}`,
-          { next: { revalidate: 60 }, headers: storeHeaders }
+          { next: { revalidate: 60, tags: [`products:${store.id}`] }, headers: storeHeaders }
         )
           .then(r => (r.ok ? r.json() : null))
           .catch(() => null)
@@ -192,7 +194,7 @@ async function fetchHomepageData(
       ? fetch(
           `${API_URL}/public/products?ids=${encodeURIComponent(manualIds.join(','))}&limit=50`,
           {
-            next: { revalidate: 60 },
+            next: { revalidate: 60, tags: [`products:${store.id}`] },
             headers: storeHeaders,
           }
         )
@@ -207,7 +209,7 @@ async function fetchHomepageData(
   // genuinely depends on the featured-fetch outcome, so it stays sequential.
   if (featuredProducts.length === 0) {
     const fallbackResult = await fetch(`${API_URL}/public/products?limit=8`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [`products:${store.id}`] },
       headers: storeHeaders,
     })
       .then(r => (r.ok ? r.json() : null))
@@ -296,8 +298,8 @@ export async function HomePageBody({
     'X-Store-ID': store.id,
     ...(store.domain ? { 'x-store-domain': store.domain } : {}),
   };
-  const featuredPromise = fetchFeaturedProducts(storeHeaders);
-  const categoriesPromise = fetchHomeCategories(storeHeaders);
+  const featuredPromise = fetchFeaturedProducts(storeHeaders, store.id);
+  const categoriesPromise = fetchHomeCategories(storeHeaders, store.id);
 
   const draftBundle = await fetchLayoutSettings(store.id, draftToken);
   const layout = draftBundle.layout;

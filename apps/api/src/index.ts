@@ -16,6 +16,7 @@ import {
   requestId,
   sanitizeInput,
   csrfProtection,
+  restrictPlatformOnlyOrigins,
   makeRateLimitStore,
 } from './middleware/security';
 import { authenticate } from './middleware/auth';
@@ -411,6 +412,10 @@ app.use(cookieParser());
 
 // Input sanitization
 app.use(sanitizeInput);
+
+// Origin gate for the platform-admin surface. Runs BEFORE csrfProtection
+// because it must cover reads too, not just state-changing methods.
+app.use(restrictPlatformOnlyOrigins);
 
 // CSRF protection
 app.use(csrfProtection);

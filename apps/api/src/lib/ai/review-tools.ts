@@ -160,9 +160,21 @@ export interface ReviewSummary {
   reviewCount: number;
 }
 
-export async function summarizeProductReviews(productId: string): Promise<ReviewSummary> {
+export async function summarizeProductReviews(
+  storeId: string,
+  productId: string
+): Promise<ReviewSummary> {
+  // storeId is load-bearing: productId arrives as a route param and product
+  // ids are public on the storefront, so without it any store_admin could
+  // summarise a competitor's reviews and read their exact verified-purchase
+  // count. ReviewService's own CRUD is store-scoped; only these AI helpers
+  // were not.
   const reviews = await prisma.review.findMany({
-    where: { productId, status: 'published', verifiedPurchase: true },
+    // storeId in the WHERE is the cross-tenant fix (a product id is public, so
+    // without it any store_admin could summarise a competitor's reviews);
+    // storeId in the SELECT is what main added for per-store AI accounting.
+    // Both are wanted — they solve different problems.
+    where: { storeId, productId, status: 'published', verifiedPurchase: true },
     select: { storeId: true, rating: true, body: true, language: true },
     orderBy: { createdAt: 'desc' },
     take: 100,
@@ -213,9 +225,12 @@ export interface OwnerResponseDraft {
   ar: string;
 }
 
-export async function draftOwnerResponse(reviewId: string): Promise<OwnerResponseDraft> {
-  const review = await prisma.review.findUnique({
-    where: { id: reviewId },
+export async function draftOwnerResponse(
+  storeId: string,
+  reviewId: string
+): Promise<OwnerResponseDraft> {
+  const review = await prisma.review.findFirst({
+    where: { id: reviewId, storeId },
     select: {
       id: true,
       storeId: true,
