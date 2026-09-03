@@ -108,12 +108,13 @@ npm run dev:api|dev:admin|dev:web     # dev servers (admin 3001, web 3000)
 npm run build|typecheck|lint|lint:fix|format|format:check
 npm run db:generate|db:migrate|db:push|db:seed|db:studio
 npm run test|test:unit|test:integration|test:e2e|test:coverage
+npm run test:defence-mutations           # deletes each security guard, asserts its test goes red
 npm run audit:high | npm run secrets
 ```
 
 CI (`ci.yml`): lint → typecheck → build → unit → integration (Postgres 16 + Redis 7 services) → e2e → audit + trufflehog; gitleaks separate workflow. The pre-push hook mirrors CI locally + runs blast-radius + a deduped Opus AI diff review (`SKIP_AI_GATE=1` skips the AI part).
 
-**Reviewer rotation:** the author and auto-fix run on `claude-opus-5`; the PR review runs on `claude-fable-5` — a _different, more capable_ model, so the reviewer is never the author. Same vendor means blind spots stay partly correlated, so the durable answer is turning each caught defect into a deterministic gate (lint/type/test), not adding reviewers. The reviewer sees ONLY the prompt contract + the unified diff — **never** the PR body or the author's rationale, or it inherits the framing that produced the defect. → `standard/skill-hygiene.md` (lens 26).
+**Reviewer rotation:** the author and auto-fix run on `claude-opus-5`; the PR review runs on `claude-fable-5` — a _different, more capable_ model, so the reviewer is never the author. Same vendor means blind spots stay partly correlated, so the durable answer is turning each caught defect into a deterministic gate (lint/type/test), not adding reviewers. Security controls in the five mutation-record-mandatory domains carry that gate explicitly: `npm run test:defence-mutations` deletes each guard and asserts its test goes red — see `docs/security/defence-mutation-record.md`. The reviewer sees ONLY the prompt contract + the unified diff — **never** the PR body or the author's rationale, or it inherits the framing that produced the defect. → `standard/skill-hygiene.md` (lens 26).
 
 ## Rollback + backup
 

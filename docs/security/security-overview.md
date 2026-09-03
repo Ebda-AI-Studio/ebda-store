@@ -75,6 +75,16 @@ deps) — dated reports live in `docs/audits/`.
 - Trackers are consent-gated (granular cookie-consent CMP); customer data is
   never fed to AI features.
 
+## Defence verification
+
+Security controls in the five mutation-record-mandatory domains (authn/session,
+tenant/RLS, money/payment/refund, consent, erasure) are not merely covered by a
+test — each is proven to FAIL when the control is removed. See
+`docs/security/defence-mutation-record.md` (generated; spec in
+`defence-mutations.json`, runner in `scripts/defence-mutation-record.mjs`). It
+runs in CI on every PR touching a defended source and fails if any defence
+survives its mutation, i.e. if a test would pass with the control deleted.
+
 ## Evidence log
 
 | Artifact                                    | Date       | Result                                                                                               |

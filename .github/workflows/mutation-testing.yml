@@ -13,6 +13,24 @@ name: Mutation testing (Stryker)
 # current baseline + the rationale for the break=10 floor.
 
 on:
+  # The Stryker job stays manual (see the header comment). The defence-mutation
+  # job is cheap and gates on a real hole, so it also runs on any PR that
+  # touches a defended source, the spec, or the runner — a gate nothing invokes
+  # is the exact defect this file's own history is about.
+  pull_request:
+    paths:
+      - 'scripts/defence-mutation-record.mjs'
+      - 'docs/security/defence-mutations.json'
+      - 'apps/api/src/middleware/**'
+      - 'apps/api/src/routes/product.routes.ts'
+      - 'apps/api/src/services/auth.service.ts'
+      - 'apps/api/src/services/accounting/**'
+      - 'apps/api/src/services/payment-providers/**'
+      - 'apps/api/src/lib/inngest/functions/order-refunded.ts'
+      - 'apps/web/src/lib/consent-cookie.ts'
+      - 'apps/web/src/lib/store-resolver.ts'
+      - 'tests/unit/**'
+      - '.github/workflows/mutation-testing.yml'
   workflow_dispatch:
     inputs:
       force_cloud:
@@ -20,12 +38,17 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   mutation-test:
     name: Stryker mutation score
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
     timeout-minutes: 15
     steps:
@@ -59,3 +82,60 @@ jobs:
           name: stryker-mutation-report
           path: reports/mutation/
           retention-days: 30
+
+  # Stryker's aggregate score cannot reach the defences that matter most: it
+  # runs vitest.stryker.config.ts, whose include is tests/unit/** only, and it
+  # scores whole FILES. This job answers the per-defence question instead —
+  # "remove this exact guard; does a test stop you?" — for the controls the
+  # standard marks mutation-record-mandatory (authn/session, tenant/RLS,
+  # money/payment/refund, consent, erasure). It is cheap (~2 min) and gates on
+  # a SURVIVED defence, so it runs on every PR that touches a defended source
+  # or the spec itself.
+  defence-mutations:
+    name: Defence mutation record
+    runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      # Required, not optional: an unbuilt @force/shared makes every test that
+      # imports it fail to COLLECT, which vitest reports as "Tests no tests".
+      # The script preflights for this and exits 2 rather than scoring a run
+      # that measured nothing.
+      - name: Build workspace packages
+        run: |
+          npm run build -w packages/shared
+          npm run build -w packages/database
+
+      # The main config sets `retry: 1` for genuinely flaky NETWORK tests in the
+      # e2e/integration tiers. On unit tests that retry masks state pollution:
+      # a queued mockResolvedValueOnce left undrained by clearAllMocks fed the
+      # next test's first call, and the retry — which re-runs only the failures,
+      # by then against a drained queue — turned it green. Five accounting
+      # tests were passing that way (fixed 2026-09-02). The Stryker config
+      # already sets retry: 0 and includes exactly tests/unit/**, so running it
+      # here is the honest unit gate, ~20s, with no risk to the e2e tier.
+      - name: Unit tier with retries disabled (no masked-flaky tests)
+        run: ./node_modules/.bin/vitest run --config vitest.stryker.config.ts
+
+      # --write both measures and refreshes the markdown, and exits non-zero if
+      # any defence SURVIVED. One run, not two — the measurement is the artifact.
+      - name: Run the defence mutation record
+        run: npm run test:defence-mutations -- --write
+
+      # A drifted record is the failure mode this job exists to prevent, so the
+      # committed markdown must match what the run just produced.
+      - name: Fail if the committed record is stale
+        run: |
+          git diff --exit-code -- docs/security/defence-mutation-record.md \
+            || { echo "::error::docs/security/defence-mutation-record.md is stale — re-run 'npm run test:defence-mutations -- --write' and commit it"; exit 1; }

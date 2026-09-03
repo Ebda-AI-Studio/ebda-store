@@ -1,0 +1,60 @@
+import { type Plugin } from 'vitest/config';
+import path from 'path';
+
+/**
+ * Shared module resolution for EVERY vitest config in the repo.
+ *
+ * This exists because it drifted. `vitest.config.ts` carried both the
+ * `perAppAtAlias()` plugin and a deliberate removal of the bare `'@'` →
+ * repo-root alias; `vitest.stryker.config.ts` was written earlier, kept the
+ * bare `'@'`, and never got either change. The result was silent and ugly:
+ * under the Stryker config, `'@/lib/x'` inside an app resolved to the REPO
+ * ROOT instead of that app's `src/`, so three test files
+ * (bank-reconciliation, shipping-zones-response,
+ * product-recommendation-selectors) imported different modules than they do
+ * under the main config and failed with inverted assertions rather than an
+ * import error — which reads as "those tests are broken", not "the config is".
+ *
+ * Because Stryker runs the Stryker config, every mutant those three files
+ * would have killed was scored as survived-or-uncovered, quietly deflating the
+ * mutation baseline in `docs/test-reports/`. A resolution rule that lives in
+ * one place cannot do that again.
+ */
+export function perAppAtAlias(): Plugin {
+  const apps = ['api', 'admin', 'web', 'orders'];
+  return {
+    name: 'per-app-at-alias',
+    async resolveId(source, importer) {
+      if (!importer || !source.startsWith('@/')) return null;
+      const normalizedImporter = importer.replace(/\\/g, '/');
+      for (const app of apps) {
+        const marker = `/apps/${app}/src/`;
+        const idx = normalizedImporter.indexOf(marker);
+        if (idx === -1) continue;
+        const appSrcRoot = normalizedImporter.slice(0, idx + marker.length);
+        const rewritten = path.join(appSrcRoot, source.slice(2));
+        return this.resolve(rewritten, importer, { skipSelf: true });
+      }
+      return null;
+    },
+  };
+}
+
+/**
+ * The workspace aliases every config shares.
+ *
+ * There is deliberately NO bare `'@'` → repo-root entry. Vite's
+ * `resolve.alias` plugin runs before ALL user plugins regardless of `enforce`,
+ * so a bare `'@'` prefix-matches `'@/...'` and rewrites it to a nonexistent
+ * repo-root path before `perAppAtAlias()` above ever sees the specifier.
+ * Adding it back re-breaks every app's own `'@/'` convention.
+ */
+export function workspaceAliases(root: string): Record<string, string> {
+  return {
+    '@api': path.resolve(root, './apps/api/src'),
+    '@web': path.resolve(root, './apps/web/src'),
+    '@admin': path.resolve(root, './apps/admin/src'),
+    '@database': path.resolve(root, './packages/database'),
+    '@shared': path.resolve(root, './packages/shared'),
+  };
+}

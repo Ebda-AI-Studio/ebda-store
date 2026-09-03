@@ -1,0 +1,155 @@
+{
+  "$comment": "Spec for scripts/defence-mutation-record.mjs. Each entry removes ONE security defence and names the single test that must then fail. `find` must occur EXACTLY once in `source` \u2014 the runner errors out otherwise, so a refactor that moves a defence breaks this loudly instead of silently scoring it green.",
+  "defences": [
+    {
+      "id": "tenant-deadstock-clearance-coupon",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "clearance coupon minted from another store's dead-stock flag",
+      "source": "apps/api/src/services/accounting/deadstock-scan.service.ts",
+      "find": "    where: { id: flagId, storeId },",
+      "replace": "    where: { id: flagId },",
+      "test": "tests/unit/deadstock-clearance-tenant-scoping.test.ts"
+    },
+    {
+      "id": "tenant-po-from-suggestion",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "purchase order raised against another store's reorder suggestion",
+      "source": "apps/api/src/services/accounting/purchase-order.service.ts",
+      "find": "    where: { id: suggestionId, storeId },",
+      "replace": "    where: { id: suggestionId },",
+      "test": "tests/unit/purchase-order-service-tenant-scoping.test.ts"
+    },
+    {
+      "id": "tenant-product-faq-ownership",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "FAQ read/write on a product owned by another store",
+      "source": "apps/api/src/routes/product.routes.ts",
+      "find": "        where: { id: req.params.id, storeId: req.params.storeId },\n        select: { id: true },\n      });\n      if (!product) throw new AppError(404, 'NOT_FOUND', 'Product not found');\n\n      const faqs = await prisma.productFaq.findMany({",
+      "replace": "        where: { id: req.params.id },\n        select: { id: true },\n      });\n\n      const faqs = await prisma.productFaq.findMany({",
+      "test": "tests/unit/product-faq-tenant-scoping.test.ts"
+    },
+    {
+      "id": "tenant-store-resolver-domain-notfound",
+      "domain": "tenant / RLS",
+      "tier": "unit",
+      "why": "unresolved custom domain falls through instead of 404ing (resolver defaults to a tenant)",
+      "source": "apps/web/src/lib/store-resolver.ts",
+      "find": "  const store = await resolveStoreByDomain(tenant);\n  if (!store) notFound();",
+      "replace": "  const store = await resolveStoreByDomain(tenant);",
+      "test": "tests/unit/web-store-resolver-tenant-param.test.ts"
+    },
+    {
+      "id": "authz-permission-gate",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "staff can issue refunds \u2014 the orders:refund RBAC gate",
+      "source": "apps/api/src/middleware/rbac.ts",
+      "find": "    if (!hasPermission(userRole, permission)) {",
+      "replace": "    if (false) {",
+      "test": "tests/unit/order-refund-permission.test.ts"
+    },
+    {
+      "id": "session-ratelimit-fail-open-posture",
+      "domain": "authn / session",
+      "tier": "unit",
+      "why": "login limiter's Redis failure posture flips to fail-closed, 500ing the write surface on a blip",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  // the cache layer deliberately fails open. Unlimited-but-up beats down.\n  passOnStoreError: true,\n  skip: skipForLoadTestOrTests,\n  keyGenerator: req => {\n    // Use IP + email for more granular limiting. ipKeyGenerator() normalizes",
+      "replace": "  // the cache layer deliberately fails open. Unlimited-but-up beats down.\n  passOnStoreError: false,\n  skip: skipForLoadTestOrTests,\n  keyGenerator: req => {\n    // Use IP + email for more granular limiting. ipKeyGenerator() normalizes",
+      "test": "tests/unit/rate-limit-fail-open.test.ts"
+    },
+    {
+      "id": "money-refund-transition-guard",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "provider refund fires on a stale order state (double refund)",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "    if (isFullRefund && payment.order) {\n      assertValidTransition(payment.order.status, 'refunded');",
+      "replace": "    if (isFullRefund && payment.order) {\n      /* transition guard removed */",
+      "test": "tests/unit/payment-webhook-status-transition.test.ts"
+    },
+    {
+      "id": "money-oob-refund-transition-guard",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "out-of-band refund webhook applies refund effects on a stale order state",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "        assertValidTransition(payment.order.status, 'refunded');",
+      "replace": "        /* transition guard removed */",
+      "test": "tests/unit/payment-webhook-status-transition.test.ts"
+    },
+    {
+      "id": "money-webhook-status-transition-guard",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a replayed 'completed' webhook overwrites an already-refunded order",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "      assertValidTransition(payment.order.status, orderStatus);",
+      "replace": "      /* transition guard removed */",
+      "test": "tests/unit/payment-webhook-status-transition.test.ts"
+    },
+    {
+      "id": "money-full-restore-idempotency-marker",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a retried order/refunded double-restores inventory (invents stock)",
+      "source": "apps/api/src/lib/inngest/functions/order-refunded.ts",
+      "find": "        if (stockMarker) return { skipped: true };",
+      "replace": "        if (false) return { skipped: true };",
+      "test": "tests/unit/order-refunded-reversals.test.ts"
+    },
+    {
+      "id": "money-coupon-reversal-idempotency-marker",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "a retried order/refunded decrements coupon usageCount twice",
+      "source": "apps/api/src/lib/inngest/functions/order-refunded.ts",
+      "find": "        if (couponMarker) return { skipped: true };",
+      "replace": "        if (false) return { skipped: true };",
+      "test": "tests/unit/order-refunded-reversals.test.ts"
+    },
+    {
+      "id": "money-refund-effects-rejection-refund-path",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "applyRefundEffects failing after the provider refund resolves silently on the DIRECT refund path, losing the GL/inventory reversal",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "        await OrderService.applyRefundEffects(order.storeId, payment.orderId);",
+      "replace": "        await OrderService.applyRefundEffects(order.storeId, payment.orderId).catch(\n          () => {}\n        );",
+      "test": "tests/unit/payment-service-refund.test.ts"
+    },
+    {
+      "id": "consent-marketing-cookie-strict-parse",
+      "domain": "consent",
+      "tier": "unit",
+      "why": "marketing pixels fire for a legacy/unversioned or malformed consent cookie",
+      "source": "apps/web/src/lib/consent-cookie.ts",
+      "find": "    return !!parsed && parsed.v === 1 && parsed.marketing === true;",
+      "replace": "    return true;",
+      "test": "tests/unit/web-consent-cookie.test.ts"
+    },
+    {
+      "id": "erasure-onesignal-id-propagation",
+      "domain": "erasure",
+      "tier": "unit",
+      "why": "erased account's OneSignal player ids never reach the propagation consumer, so the third party keeps the PII",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "      .send({ name: 'account/erased', data: { userId, oneSignalPlayerIds } })",
+      "replace": "      .send({ name: 'account/erased', data: { userId, oneSignalPlayerIds: [] } })",
+      "test": "tests/unit/auth-erase-propagation.test.ts"
+    },
+    {
+      "id": "money-refund-effects-rejection-webhook-path",
+      "domain": "money / payment / refund",
+      "tier": "unit",
+      "why": "same failure on the OUT-OF-BAND refund webhook path",
+      "source": "apps/api/src/services/payment-providers/payment.factory.ts",
+      "find": "        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId);",
+      "replace": "        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId).catch(\n          () => {}\n        );",
+      "test": "tests/unit/payment-webhook-status-transition.test.ts"
+    }
+  ]
+}

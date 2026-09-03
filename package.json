@@ -38,6 +38,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "test": "vitest run",
+    "test:defence-mutations": "node scripts/defence-mutation-record.mjs",
     "test:unit": "vitest run tests/unit",
     "ai:cost:baseline": "tsx scripts/ai-cost-baseline.ts",
     "test:contract": "TEST_DATABASE_URL=sqlite://placeholder vitest run tests/unit/contract-wbs-bridge.test.ts",

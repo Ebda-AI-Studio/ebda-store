@@ -363,7 +363,16 @@ function makeCandidate(entryId: string, debit = 10000, credit = 0) {
 
 // Wire the withRlsBypass mock to execute the callback with a mock tx
 beforeEach(() => {
-  vi.clearAllMocks();
+  // resetAllMocks, NOT clearAllMocks. clearAllMocks only wipes call history —
+  // it leaves queued `mockResolvedValueOnce` implementations in place. This
+  // file queues them heavily (setupMocks and every runAutoMatch case), so an
+  // undrained queue from an earlier test fed the NEXT test's first call,
+  // producing assertions crossed between cases. Vitest's `retry: 1` then hid
+  // it: the retry re-runs only the failed tests, by which point the stale
+  // queue is drained and they pass. Measured 2026-09-02 — with `--retry=0`
+  // five tests in `getReconciliationDifference` failed on the first attempt.
+  // A test that only passes on the second run is not a gate.
+  vi.resetAllMocks();
 
   // The mock tx passed to the callback mirrors the prisma client mocks
   const mockTx = {

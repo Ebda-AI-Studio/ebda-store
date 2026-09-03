@@ -276,6 +276,39 @@ describe('PaymentService.handleWebhook — state machine guard (sites 2/3 & 3/3)
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
   });
 
+  /**
+   * Found by scripts/defence-mutation-record.mjs, 2026-09-02: wrapping this
+   * call site in `.catch(() => {})` SURVIVED — every existing test passed with
+   * the failure swallowed, while the same mutation on the direct refund path
+   * was killed by payment-service-refund.test.ts. The comment above the call
+   * in payment.factory.ts explains at length why the rejection must propagate
+   * (the Inngest step's 3 retries + the alerts-failure-watch P0 dead-letter
+   * are the only thing standing between a failed reversal and a WebhookEvent
+   * marked 'processed' as if the money had been put back) — but nothing
+   * enforced it, so any future refactor could have quietly reinstated the
+   * swallow that this code was written to remove.
+   */
+  it('out-of-band refund webhook: a failing applyRefundEffects propagates and never writes the idempotency metadata', async () => {
+    mockPaymentForWebhook('shipped', 'completed');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', refundId: 'rf_3' },
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    applyRefundEffects.mockRejectedValueOnce(new Error('GL reversal failed'));
+
+    await expect(
+      PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID)
+    ).rejects.toThrow('GL reversal failed');
+
+    // The order flip and the durable idempotency write both sit AFTER the
+    // reversal. Neither may run, or the Inngest retry would skip the branch
+    // and the reversal would be lost for good.
+    expect(orderUpdate).not.toHaveBeenCalled();
+    expect(paymentUpdate).not.toHaveBeenCalled();
+  });
+
   it('general payment webhook: calls assertValidTransition(priorStatus, orderStatus) and rejects a stale "completed" webhook on an already-refunded order', async () => {
     mockPaymentForWebhook('refunded', 'refunded');
     providerParseWebhook.mockReturnValue({

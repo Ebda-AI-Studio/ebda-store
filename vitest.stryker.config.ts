@@ -4,9 +4,16 @@
  * tests/unit/ only mock Prisma and have no DB dependency.
  */
 import { defineConfig } from 'vitest/config';
-import path from 'path';
+import { perAppAtAlias, workspaceAliases } from './vitest.shared';
 
 export default defineConfig({
+  // Mirrors vitest.config.ts — WITHOUT these, `'@/...'` inside an app resolved
+  // to the repo root here and three unit test files silently ran against the
+  // wrong modules, deflating every Stryker score they contribute to.
+  oxc: {
+    jsx: 'automatic',
+  },
+  plugins: [perAppAtAlias()],
   test: {
     globals: true,
     environment: 'node',
@@ -21,13 +28,6 @@ export default defineConfig({
     retry: 0,
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './'),
-      '@api': path.resolve(__dirname, './apps/api/src'),
-      '@web': path.resolve(__dirname, './apps/web/src'),
-      '@admin': path.resolve(__dirname, './apps/admin/src'),
-      '@database': path.resolve(__dirname, './packages/database'),
-      '@shared': path.resolve(__dirname, './packages/shared'),
-    },
+    alias: workspaceAliases(__dirname),
   },
 });
