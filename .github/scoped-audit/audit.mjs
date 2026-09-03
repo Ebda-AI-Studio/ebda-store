@@ -22,6 +22,13 @@
 // Modeled on .github/ai-review/review.mjs — match its style exactly.
 
 import { readFileSync, appendFileSync } from 'node:fs';
+import {
+  fetchOpenFollowupTitles,
+  followupIssueTitle,
+  selectFollowupsToFile,
+} from './followup-filing.mjs';
+import { fetchAllPages } from './gh-paginate.mjs';
+import { resolveMarkerComment } from './marker-comment.mjs';
 
 const {
   GITHUB_TOKEN,
@@ -77,30 +84,49 @@ async function gh(method, path, body) {
 }
 
 const SEV_ICON = { P0: '🔴', P1: '🔴', P2: '🟡', P3: '🔵' };
+
+/**
+ * Most a single audit run may file. The PR comment carries every finding in
+ * full regardless, so this bounds the tracker, not the review.
+ */
+const MAX_ISSUES_PER_RUN = 10;
+
 const PR_URL = `https://github.com/${owner}/${repo}/pull/${PR_NUMBER}`;
 const MARKER = '<!-- scoped-audit-bot -->';
 
 async function upsertMarkerComment(body) {
   try {
-    // List existing issue comments to find the marker
-    const listResp = await gh(
-      'GET',
-      `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments?per_page=100`
-    );
-    if (!listResp.ok) {
-      // Can't list — just post a new one
-      await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, { body });
-      return;
-    }
-    const existing = await listResp.json();
-    const prior = existing.find((c) => c.body && c.body.includes(MARKER));
+    // The whole comment list: a marker past the first page would otherwise read
+    // as absent and this would post a duplicate audit comment on every run.
+    const { items, complete } = await fetchAllPages({
+      gh,
+      path: `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`,
+    });
+    const { prior, uncertain } = resolveMarkerComment({ items, complete, marker: MARKER });
     if (prior) {
       await gh('PATCH', `/repos/${owner}/${repo}/issues/comments/${prior.id}`, { body });
     } else {
+      // A partial read cannot vouch that no marker exists, but this comment is
+      // the ONLY place P3 and over-cap findings are reported — a duplicate is
+      // recoverable, a silently unreported finding is not. Post, and say so.
+      if (uncertain) {
+        console.log(
+          `::warning::scoped-audit could not read the full PR comment list; posting a fresh ` +
+            `audit comment. If an earlier audit comment already exists, this run duplicates it.`
+        );
+      }
       await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, { body });
     }
   } catch (e) {
-    console.error('PR comment upsert failed (non-fatal):', e.message);
+    // NOT non-fatal in any useful sense: the gate below may block this PR, and
+    // without this comment the reviewer is left reading the PREVIOUS commit's
+    // findings under a fresh red X — which is how a resolved P0 gets chased
+    // while the live P1 that actually blocked the merge goes unread.
+    console.log(
+      `::error::scoped-audit could not post its findings to the PR (${e.message}). ` +
+        `Any audit comment currently shown belongs to an EARLIER commit. The findings ` +
+        `for this commit are in this job's log and step summary.`
+    );
   }
 }
 
@@ -198,15 +224,17 @@ try {
   result = JSON.parse(extractJson(modelText));
 } catch (e) {
   console.error('Model did not return valid JSON:\n', modelText);
-  await alertAuditDidNotRun(`AUDIT_RAN was not 'false' but model output did not parse as JSON: ${e.message}`);
+  await alertAuditDidNotRun(
+    `AUDIT_RAN was not 'false' but model output did not parse as JSON: ${e.message}`
+  );
   process.exit(0); // fail-open
 }
 
 const findings = Array.isArray(result.findings) ? result.findings : [];
-const p0 = findings.filter((f) => f.severity === 'P0');
-const p1 = findings.filter((f) => f.severity === 'P1');
-const p2 = findings.filter((f) => f.severity === 'P2');
-const p3 = findings.filter((f) => f.severity === 'P3');
+const p0 = findings.filter(f => f.severity === 'P0');
+const p1 = findings.filter(f => f.severity === 'P1');
+const p2 = findings.filter(f => f.severity === 'P2');
+const p3 = findings.filter(f => f.severity === 'P3');
 const blocking = [...p0, ...p1];
 
 console.log(`scoped-audit: P0=${p0.length} P1=${p1.length} P2=${p2.length} P3=${p3.length}`);
@@ -255,7 +283,7 @@ const blockingSection =
 const followupSection =
   p2.length + p3.length > 0
     ? [
-        '#### Follow-up findings (P2/P3) — tracked as issues, non-blocking',
+        `#### Follow-up findings — non-blocking (P2 tracked as issues; P3 recorded here only)`,
         '',
         ...[...p2, ...p3].map(findingRow),
         '',
@@ -293,27 +321,43 @@ if (GITHUB_STEP_SUMMARY) {
 // 6. File P2/P3 findings as tracked GitHub Issues (deduplicated by title)
 // ---------------------------------------------------------------------------
 async function fileFollowupIssues(followups) {
-  // Fetch open issues with the audit-followup label to dedup
+  // Dedup against EVERY open followup, not the first page of them.
   let openTitles = new Set();
+  let dedupComplete = false;
   try {
-    const resp = await gh(
-      'GET',
-      `/repos/${owner}/${repo}/issues?labels=audit-followup&state=open&per_page=100`
-    );
-    if (resp.ok) {
-      const issues = await resp.json();
-      for (const iss of issues) openTitles.add(iss.title);
-    }
+    ({ titles: openTitles, complete: dedupComplete } = await fetchOpenFollowupTitles({
+      gh,
+      owner,
+      repo,
+    }));
   } catch (e) {
-    console.error('Could not fetch open issues for dedup (non-fatal):', e.message);
+    console.error('Could not fetch open issues for dedup:', e.message);
   }
 
-  for (const f of followups) {
-    const issueTitle = `[audit-followup][${f.severity}] ${f.title || 'untitled'}`;
-    if (openTitles.has(issueTitle)) {
-      console.log(`scoped-audit: issue already open, skipping: ${issueTitle}`);
-      continue;
-    }
+  const { toFile, alreadyTracked, overCap, untracked, dedupIncomplete } = selectFollowupsToFile({
+    followups,
+    openTitles,
+    cap: MAX_ISSUES_PER_RUN,
+    dedupComplete,
+  });
+
+  if (dedupIncomplete) {
+    console.log(
+      `::warning::scoped-audit could not read the open followups, so it filed none of ` +
+        `this run's ${followups.length} — filing against an unknown baseline is what ` +
+        `duplicates them. All of them are in the PR comment.`
+    );
+  } else {
+    console.log(
+      `scoped-audit: ${followups.length} followups — filing ${toFile.length}, ` +
+        `${alreadyTracked.length} already tracked, ${untracked.length} recorded on the PR ` +
+        `only, ${overCap.length} over the per-run cap of ${MAX_ISSUES_PER_RUN} ` +
+        `(all of them are in the PR comment)`
+    );
+  }
+
+  for (const f of toFile) {
+    const issueTitle = followupIssueTitle(f);
     const issueBody = [
       `**PR:** ${PR_URL}`,
       `**Commit:** ${HEAD_SHA || 'unknown'}`,
