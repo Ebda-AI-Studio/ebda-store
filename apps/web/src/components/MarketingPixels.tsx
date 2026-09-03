@@ -120,11 +120,28 @@ function MarketingPixelsInner({ pixels }: MarketingPixelsProps) {
 
       {/* Google Ads */}
       {validGoogleAds && (
-        <Script id="gads-config" strategy="afterInteractive">
-          {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('config','${
-            pixels.googleAds!.conversionId
-          }')`}
-        </Script>
+        <>
+          {/* gtag.js loader. The config call below pushes into window.dataLayer,
+              but NOTHING drains that queue unless the Google tag library is on
+              the page — and the only loader was inside the GA4 block above. So
+              a merchant running Google Ads WITHOUT GA4 (and without GTM) had
+              conversions silently never reported: gtag() existed, the config
+              landed, no library ever shipped it. Emitted only when GA4 is off,
+              because when GA4 is on its loader already provides the library and
+              a second copy would be redundant. */}
+          {!validGA4 && !validGTM && (
+            <Script
+              id="gads-lib"
+              src={`https://www.googletagmanager.com/gtag/js?id=${pixels.googleAds!.conversionId}`}
+              strategy="afterInteractive"
+            />
+          )}
+          <Script id="gads-config" strategy="afterInteractive">
+            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('config','${
+              pixels.googleAds!.conversionId
+            }')`}
+          </Script>
+        </>
       )}
 
       {/* Meta Pixel */}
