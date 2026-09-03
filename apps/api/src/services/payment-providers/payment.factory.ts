@@ -26,6 +26,15 @@ import { TapPaymentProvider } from './tap.provider';
 import { MyFatoorahPaymentProvider } from './myfatoorah.provider';
 import { HesabePaymentProvider } from './hesabe.provider';
 import { UPaymentsProvider } from './upayments.provider';
+import {
+  resolveRefundSettlement,
+  readAccountedRefundEventIds,
+  appendRefundEventId,
+  REFUND_EVENT_IDS_KEY,
+  REFUND_STATUS_BY_ID_KEY,
+  isRefundEventAlreadySeen,
+  recordRefundStatus,
+} from './refund-settlement';
 
 // ==========================================
 // Payment Factory
@@ -688,6 +697,28 @@ export class PaymentService {
     storeId?: string
   ): Promise<RefundResponse> {
     // Find payment to get provider
+    // Refuse an absent transaction id BEFORE the lookup. Prisma drops
+    // `undefined` filters, so `where: { transactionId: undefined }` is an EMPTY
+    // where — findFirst then returns an arbitrary payment row and every step
+    // below operates on the wrong order: the claim writes its status and
+    // refundedAmount, the transition guard runs against its order, and a
+    // successful provider call flips THAT order to refunded, restores its
+    // inventory, reverses its GL and emails "Refund issued" to a customer who
+    // returned nothing.
+    //
+    // A null transaction id is not exotic here: COD payments are created
+    // without one and the mark-COD-paid route flips them to 'completed'
+    // without ever setting one, and COD is the dominant method in this market.
+    // The order-level refund routes already guard this; centralising it means
+    // no future caller can reintroduce it.
+    if (!request.transactionId) {
+      throw new AppError(
+        400,
+        'PAYMENT_NOT_REFUNDABLE',
+        'This payment has no provider transaction and cannot be refunded at the gateway. Use a manual refund method.'
+      );
+    }
+
     const payment = await prisma.payment.findFirst({
       where: { transactionId: request.transactionId },
       include: { order: { include: { store: true } } },
@@ -697,7 +728,47 @@ export class PaymentService {
       throw new AppError(404, 'NOT_FOUND', 'Payment not found');
     }
 
-    const isFullRefund = !request.amount || request.amount >= payment.amount;
+    // `amount: 0` is a CALLER BUG, never "refund the whole payment".
+    // `Return.refundAmount` is `Int @default(0)` and NOT NULL, so
+    // `returnRequest.refundAmount ?? undefined` yields 0 — and the old
+    // `!request.amount` predicate turned every partial return whose amount was
+    // never entered into a FULL provider refund plus a whole-order
+    // `order/refunded`, reversing the entire sale journal and erasing the
+    // revenue, tax and COGS for the items the customer kept. Only an ABSENT
+    // amount may mean "the whole payment"; a zero or negative one is rejected
+    // loudly before any money moves.
+    if (request.amount != null && request.amount <= 0) {
+      throw new AppError(
+        400,
+        'INVALID_REFUND_AMOUNT',
+        'Refund amount must be greater than zero. Omit it to refund the full payment.'
+      );
+    }
+
+    // Budget against what is LEFT on the payment, not its original amount: a
+    // prior partial refund already sent part of it back, and `refundedAmount`
+    // records how much. Measuring "full" against `payment.amount` would let a
+    // second refund exceed the balance, and would read the remainder of an
+    // already-partially-refunded payment as a partial refund (skipping the
+    // whole-order fanout that a genuinely exhausting refund owes).
+    const alreadyRefunded = payment.refundedAmount ?? 0;
+    const refundableRemaining = payment.amount - alreadyRefunded;
+    if (refundableRemaining <= 0) {
+      throw new AppError(
+        400,
+        'ALREADY_REFUNDED',
+        'This payment has already been refunded in full.'
+      );
+    }
+    if (request.amount != null && request.amount > refundableRemaining) {
+      throw new AppError(
+        400,
+        'REFUND_EXCEEDS_REMAINING',
+        'Refund amount exceeds the un-refunded balance of this payment.'
+      );
+    }
+    const amountToRefund = request.amount ?? refundableRemaining;
+    const isFullRefund = amountToRefund >= refundableRemaining;
 
     // Reject a stale/invalid order state BEFORE any money moves. A full
     // refund flips `Order.status` to 'refunded' below (bypassing
@@ -716,21 +787,35 @@ export class PaymentService {
     // refund requests (admin double-click, client retry, two staff on one
     // order) both read 'completed', both pass, and both call provider.refund()
     // — a double refund at the gateway with no undo API = real money lost.
-    // We flip 'completed' -> the terminal refund status in one atomic
+    // We flip the refundable status -> the terminal refund status in one atomic
     // updateMany; only the request whose update matches (count === 1) proceeds.
     // (PaymentStatus is a Prisma enum with no transient 'refunding' value, so
-    // we claim with the final status and revert to 'completed' if the provider
-    // call throws — avoids an enum migration.)
+    // we claim with the final status and revert to the pre-claim one if the
+    // provider call throws — avoids an enum migration.)
+    //
+    // 'partially_refunded' is a legitimate STARTING state — a payment can be
+    // refunded piece by piece (two partial returns on one order), so the claim
+    // must accept it. But 'partially_refunded' -> 'partially_refunded' is not a
+    // state CHANGE, so the status flip alone stops being a mutex there. The
+    // guard is therefore a compare-and-swap on `refundedAmount`: we match the
+    // balance we read and write the post-refund one in the same statement, so
+    // of two concurrent requests only the one that still sees the old balance
+    // matches. (This is also why the increment moved out of the post-provider
+    // transaction below — it IS the claim now.)
     const claimedStatus = isFullRefund ? 'refunded' : 'partially_refunded';
     const claim = await prisma.payment.updateMany({
-      where: { id: payment.id, status: 'completed' },
-      data: { status: claimedStatus },
+      where: {
+        id: payment.id,
+        status: { in: ['completed', 'partially_refunded'] },
+        refundedAmount: alreadyRefunded,
+      },
+      data: { status: claimedStatus, refundedAmount: alreadyRefunded + amountToRefund },
     });
     if (claim.count === 0) {
       throw new AppError(
         400,
         'INVALID_STATE',
-        'Payment is not completed or a refund is already in progress'
+        'Payment is not refundable or a refund is already in progress'
       );
     }
 
@@ -738,14 +823,29 @@ export class PaymentService {
     const effectiveStoreId = storeId || payment.order?.storeId;
     let response: RefundResponse;
     try {
-      response = await (await factory.getProvider(providerName, effectiveStoreId)).refund(request);
+      // An ABSENT amount means "the whole payment" to every provider, so it
+      // would send the ORIGINAL amount back — paying the already-refunded
+      // portion a second time. Once anything has been refunded, spell the
+      // remaining balance out.
+      const providerRequest =
+        request.amount == null && alreadyRefunded > 0
+          ? { ...request, amount: refundableRemaining }
+          : request;
+      response = await (
+        await factory.getProvider(providerName, effectiveStoreId)
+      ).refund(providerRequest);
     } catch (providerError) {
       // The provider refund did NOT execute (no money moved) — release the
-      // claim back to 'completed' so the admin can legitimately retry.
+      // claim back to the pre-claim status AND balance so the admin can
+      // legitimately retry.
       await prisma.payment
         .updateMany({
-          where: { id: payment.id, status: claimedStatus },
-          data: { status: 'completed' },
+          where: {
+            id: payment.id,
+            status: claimedStatus,
+            refundedAmount: alreadyRefunded + amountToRefund,
+          },
+          data: { status: payment.status, refundedAmount: alreadyRefunded },
         })
         .catch(releaseError => {
           logger.error(
@@ -771,10 +871,16 @@ export class PaymentService {
           data: {
             status: isFullRefund ? 'refunded' : 'partially_refunded',
             refundId: response.refundId,
-            refundedAmount: { increment: request.amount || payment.amount },
+            // NO `refundedAmount` write here — the atomic claim above already
+            // applied it, and re-incrementing would double-count the balance
+            // and let a later refund overshoot the payment.
             metadata: {
               ...((payment.metadata as object) || {}),
               refundId: response.refundId,
+              // The atomic claim above already added this refund's amount to
+              // `refundedAmount`, so record its id: the provider's async settle
+              // webhook for the SAME refund must not add it a second time.
+              [REFUND_EVENT_IDS_KEY]: appendRefundEventId(payment.metadata, response.refundId),
               refundStatus: response.status,
               refundReason: request.reason ?? null,
               refundedAt: new Date().toISOString(),
@@ -800,7 +906,7 @@ export class PaymentService {
           paymentId: payment.id,
           orderId: payment.orderId,
           refundId: response.refundId,
-          refundAmount: request.amount || payment.amount,
+          refundAmount: amountToRefund,
           isFullRefund,
         },
         '[PAYMENT] DB transaction failed AFTER provider refund succeeded — manual reconciliation required (refund already executed at provider, cannot undo)'
@@ -969,8 +1075,18 @@ export class PaymentService {
       const prevRefundStatus = (prevMeta.refundStatus as string | undefined) || 'pending';
       const newStatus = webhookData.refund.status;
 
-      // Idempotent — duplicate webhooks (same final state) are no-ops.
-      if (prevRefundStatus === newStatus) {
+      // Idempotent — a REDELIVERY of this same refund at this same state is a
+      // no-op. Keyed on the refund's identity: `refundStatus` is one scalar for
+      // the whole payment, so after any refund settled it matched every later
+      // refund's webhook and dropped it unread.
+      if (
+        isRefundEventAlreadySeen({
+          metadata: prevMeta,
+          refundId: webhookData.refund.refundId,
+          status: newStatus,
+          previousPaymentStatus: prevRefundStatus,
+        })
+      ) {
         logger.info(
           {
             paymentId: payment.id,
@@ -1003,9 +1119,58 @@ export class PaymentService {
       // keys on order status — could never rescue it). With effects-first,
       // any failure leaves NO durable state, so the retry re-enters and
       // re-runs the (idempotent) reversal dispatch.
-      const wasAlreadyHandled =
-        payment.status === 'refunded' || payment.status === 'partially_refunded';
-      if (newStatus === 'completed' && !wasAlreadyHandled && payment.order) {
+      // Has the ORDER already been reversed? The payment's own status is the
+      // wrong question, and asking it cost the whole reversal chain. A payment
+      // reading `partially_refunded` counted as "handled", so once a first
+      // out-of-band refund left it in that state, the refund that finally
+      // SETTLED the payment was written as terminal while every effect was
+      // suppressed: 5000 then 4400 of a 9400-fil payment refunded in the
+      // provider's dashboard promoted the row to `refunded`, and the order sat
+      // at `delivered`/`paid` with its inventory unrestored, its coupon,
+      // loyalty and affiliate effects unreversed, its sale journal — revenue,
+      // tax and COGS — still booked, and no refund email sent. Nothing
+      // recovers it either: refund-reversal-stuck-sweep only selects orders
+      // already `cancelled` or `refunded`, and the flip never ran.
+      //
+      // A partial refund does not reverse an order, so it must not be able to
+      // stop the refund that does. The question is whether the ORDER has been
+      // reversed, and the order's own status answers it.
+      const orderAlreadyReversed = payment.order?.status === 'refunded';
+
+      // How much of this payment is settled once this webhook is accounted for,
+      // and whether that exhausts it. Computed ONCE, above the fanout, because
+      // the whole-order side-effects and the payment status write below MUST
+      // agree on it. The write records a short refund as 'partially_refunded',
+      // and ReturnService explicitly accepts that status as a still-refundable
+      // source. Running the whole-order fanout anyway would restore ALL
+      // inventory, reverse coupon/loyalty and post the FULL GL reversal for a
+      // 2000-fil refund on a 5000-fil payment while leaving 3000 refundable —
+      // a later partial return would then execute a second real gateway refund
+      // and restore the same units again, because the two paths guard on
+      // different idempotency markers (order-level vs refundKey). Whole-order
+      // effects belong to a whole-order refund; a partial refund's item-level
+      // effects belong to the returns flow, which carries the line data this
+      // webhook does not have. Same coupling order.routes.ts applies on the
+      // manual refund-status refresh.
+      //
+      // Shared with the refresh-refund-status route — see resolveRefundSettlement
+      // for the rule and for the two ways these copies diverged before it was
+      // extracted.
+      const {
+        settledTotal: settledRefund,
+        isFullRefund: refundIsFull,
+        accountedThisEvent,
+      } = resolveRefundSettlement({
+        paymentAmount: payment.amount,
+        alreadyRefunded: payment.refundedAmount,
+        reported: [webhookData.refund.amount],
+        // Distinguishes a refund nothing has counted from the provider's async
+        // settle notice for one the in-band claim already applied.
+        reportedEventId: webhookData.refund.refundId,
+        accountedEventIds: readAccountedRefundEventIds(payment.metadata),
+      });
+
+      if (newStatus === 'completed' && !orderAlreadyReversed && refundIsFull && payment.order) {
         // Reject a stale/invalid order state before running ANY reversal
         // side-effects. A provider refund executed out-of-band for an
         // order some OTHER path already moved to a terminal state (e.g.
@@ -1038,6 +1203,20 @@ export class PaymentService {
         // Bust the admin aggregated-customers snapshot — this paymentStatus
         // transition changes the paid/refunded counts it aggregates.
         await invalidateCustomersCache(payment.order.storeId);
+      } else if (newStatus === 'completed' && !orderAlreadyReversed && payment.order) {
+        // Partial out-of-band refund: record it on the payment below (leaving
+        // the balance refundable) and stop. No order flip, no whole-order
+        // reversal — see the arithmetic above.
+        logger.info(
+          {
+            paymentId: payment.id,
+            orderId: payment.orderId,
+            refundId: webhookData.refund.refundId,
+            settledFils: settledRefund,
+            paymentAmountFils: payment.amount,
+          },
+          '[PAYMENT WEBHOOK] partial out-of-band refund — recording the balance only, skipping whole-order effects'
+        );
       }
 
       // Durable idempotency write LAST — only after the reversal side-effects
@@ -1049,22 +1228,84 @@ export class PaymentService {
           metadata: {
             ...prevMeta,
             refundId: webhookData.refund.refundId,
+            // Appended only when this event's amount landed in `refundedAmount`
+            // below; recording it otherwise would make a later, genuine refund
+            // carrying the same id look already-counted.
+            // Recorded only when this event's amount actually went into the
+            // total. The settlement rule holds rather than raises when it
+            // cannot establish the event is new, and an id filed against an
+            // amount that was held would make the real refund carrying it look
+            // already counted — so it would never be added at all.
+            ...(accountedThisEvent
+              ? {
+                  [REFUND_EVENT_IDS_KEY]: appendRefundEventId(
+                    payment.metadata,
+                    webhookData.refund.refundId
+                  ),
+                }
+              : {}),
             refundStatus: newStatus,
+            // Per-refund, so the next refund's webhook is not mistaken for a
+            // redelivery of this one.
+            [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(
+              payment.metadata,
+              webhookData.refund.refundId,
+              newStatus
+            ),
             refundReference:
               webhookData.refund.refundReference ??
               (prevMeta.refundReference as string | undefined) ??
               null,
             refundStatusUpdatedAt: new Date().toISOString(),
           } as Prisma.InputJsonValue,
+          // `refundedAmount` is the CUMULATIVE refund budget that
+          // PaymentService.refund compare-and-swaps against, and `status`
+          // gates whether ReturnService will accept the payment at all. This
+          // branch used to write both absolutely — `refundedAmount` set to
+          // THIS refund's amount (the provider reports one refund, not a
+          // running total) and `status` forced to 'refunded' whenever it was
+          // not already. On a partially-refunded payment that erased the
+          // record of every earlier refund and marked the whole payment
+          // settled, so the remaining balance was recomputed against a
+          // too-small total and the next partial return was rejected outright
+          // for having no refundable payment.
+          //
+          // Cumulative and monotonic instead. An in-band refund has already
+          // been accounted by the atomic claim above, so the stored value is
+          // at or beyond this one and stays put; an out-of-band refund taken
+          // in the provider's dashboard was never accounted, so this webhook
+          // is the first evidence of it and raises the total. Terminal status
+          // follows the arithmetic rather than being asserted — the SAME
+          // `refundIsFull` the whole-order fanout above gates on, so the status
+          // written here and the effects that ran can never disagree.
+          //
+          // Unlike the sibling refresh route this guard admits an
+          // ALREADY-partially-refunded row on purpose, so a second, genuinely
+          // out-of-band partial refund can still raise the total. That is only
+          // safe because resolveRefundSettlement refuses to read an unreported
+          // amount — or MyFatoorah's `RefundAmount ?? Amount` invoice echo — as
+          // settling a payment that already has a refund accounted. Without
+          // that, the async settle webhook for an IN-BAND partial return would
+          // land here and mark the payment fully refunded at its full amount,
+          // stranding the remaining balance.
           ...(newStatus === 'completed' && payment.status !== 'refunded'
-            ? { status: 'refunded' as const, refundedAmount: webhookData.refund.amount ?? 0 }
+            ? {
+                status: (refundIsFull ? 'refunded' : 'partially_refunded') as
+                  | 'refunded'
+                  | 'partially_refunded',
+                refundedAmount: settledRefund,
+              }
             : {}),
         },
       });
 
       // Append-only audit row — refund webhook receipt with raw payload.
       const refundToStatus =
-        newStatus === 'completed' && payment.status !== 'refunded' ? ('refunded' as const) : null;
+        newStatus === 'completed' && payment.status !== 'refunded'
+          ? refundIsFull
+            ? ('refunded' as const)
+            : ('partially_refunded' as const)
+          : null;
       await recordPaymentEvent({
         paymentId: payment.id,
         storeId: payment.order?.storeId ?? '',

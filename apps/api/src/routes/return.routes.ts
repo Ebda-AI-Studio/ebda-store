@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, customerUserId } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
-import { ReturnService } from '../services/return.service';
+import { ReturnService, REFUND_METHODS } from '../services/return.service';
 import { auditLog, writeLimiter } from '../middleware/security';
 import { requireStoreAccess, checkStoreAccess } from '../middleware/store-access';
 import { requireFeature } from '../middleware/feature-gate';
@@ -355,6 +355,23 @@ router.post(
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'Refund method is required' },
+        });
+        return;
+      }
+
+      // Reject an unrecognised method instead of passing it through. The
+      // service branches on a known set, and anything outside it silently took
+      // the manual path — which is indistinguishable from a successful
+      // completion, so the admin sending 'original' against a service matching
+      // only 'gateway'/'original_payment' went unnoticed: no provider refund
+      // was ever issued from this endpoint.
+      if (!(REFUND_METHODS as readonly string[]).includes(refundMethod)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_REFUND_METHOD',
+            message: `Unknown refund method '${refundMethod}'. Expected one of: ${REFUND_METHODS.join(', ')}.`,
+          },
         });
         return;
       }

@@ -192,6 +192,61 @@ function mockHappyPathUpToEffects() {
   orderFindUnique.mockResolvedValue({ storeId: STORE_ID });
 }
 
+/**
+ * `amount: 0` must never mean "refund the whole payment".
+ *
+ * `Return.refundAmount` is `Int @default(0)` and NOT NULL, so
+ * `ReturnService.complete`'s `returnRequest.refundAmount ?? undefined` handed
+ * this function a literal 0 whenever the merchant never entered an amount —
+ * and the old `isFullRefund = !request.amount || …` read 0 as full. A merchant
+ * completing a PARTIAL return with refundMethod 'gateway' refunded the
+ * customer the ENTIRE order at the provider, and the whole-order
+ * `order/refunded` that follows reversed the whole sale journal, erasing the
+ * revenue, tax and COGS for the items the customer kept.
+ *
+ * Fixed at the source rather than only at the caller: any future caller that
+ * passes a computed 0 now gets a loud 400 before money moves, instead of the
+ * most expensive possible interpretation of a falsy value.
+ */
+describe('PaymentService.refund — a zero amount is a caller bug, not a full refund', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([0, -1])('rejects amount=%s without calling the provider', async amount => {
+    mockHappyPathUpToEffects();
+
+    await expect(PaymentService.refund({ transactionId: TRANSACTION_ID, amount })).rejects.toThrow(
+      /greater than zero/i
+    );
+
+    expect(providerRefund).not.toHaveBeenCalled();
+    expect(applyRefundEffects).not.toHaveBeenCalled();
+  });
+
+  it('an ABSENT amount still means the full payment (control)', async () => {
+    mockHappyPathUpToEffects();
+    applyRefundEffects.mockResolvedValue(undefined);
+
+    await PaymentService.refund({ transactionId: TRANSACTION_ID });
+
+    expect(providerRefund).toHaveBeenCalled();
+    // Full refund runs the whole-order effects internally — this is the branch
+    // ReturnService relies on for a genuinely full return.
+    expect(applyRefundEffects).toHaveBeenCalled();
+  });
+
+  it('a genuine partial amount refunds at the provider and runs NO whole-order effects', async () => {
+    mockHappyPathUpToEffects();
+    applyRefundEffects.mockResolvedValue(undefined);
+
+    await PaymentService.refund({ transactionId: TRANSACTION_ID, amount: 1000 });
+
+    expect(providerRefund).toHaveBeenCalled();
+    expect(applyRefundEffects).not.toHaveBeenCalled();
+  });
+});
+
 describe('PaymentService.refund — applyRefundEffects failure must surface', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -214,5 +269,44 @@ describe('PaymentService.refund — applyRefundEffects failure must surface', ()
 
     expect(result.refundId).toBe('rf_123');
     expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
+  });
+});
+
+describe('PaymentService.refund — an absent transaction id is refused, not looked up', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * Prisma DROPS `undefined` filters, so `findFirst({ where: { transactionId:
+   * undefined } })` is an EMPTY where and returns an ARBITRARY payment row.
+   * Every step after it then runs against the wrong order — the claim writes
+   * its status and refundedAmount, the transition guard checks its status, and
+   * a successful provider call flips THAT order to refunded, restores its
+   * inventory, reverses its GL and emails a refund notice to a customer who
+   * returned nothing.
+   *
+   * COD payments are exactly this shape: created without a transaction id, and
+   * flipped to 'completed' by the mark-COD-paid route without ever gaining one.
+   */
+  it.each([undefined, null, ''])('rejects %p before any lookup', async bad => {
+    mockHappyPathUpToEffects();
+
+    await expect(
+      PaymentService.refund({ transactionId: bad as unknown as string })
+    ).rejects.toThrow(/no provider transaction|cannot be refunded/i);
+
+    expect(paymentFindFirst, 'an empty WHERE must never be issued').not.toHaveBeenCalled();
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it('proceeds normally with a real transaction id (control)', async () => {
+    mockHappyPathUpToEffects();
+    applyRefundEffects.mockResolvedValue(undefined);
+
+    await PaymentService.refund({ transactionId: TRANSACTION_ID });
+
+    expect(paymentFindFirst).toHaveBeenCalled();
+    expect(providerRefund).toHaveBeenCalled();
   });
 });

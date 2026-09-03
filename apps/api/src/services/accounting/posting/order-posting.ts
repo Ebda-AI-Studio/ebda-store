@@ -9,7 +9,7 @@ import logger from '../../../lib/logger';
  * be debited when that provider's payment is received. KNET = 1000,
  * Card (Tap/Hesabe/UPayments) = 1010, COD = 1020.
  */
-const PROVIDER_TO_CASH_CODE: Record<string, string> = {
+export const PROVIDER_TO_CASH_CODE: Record<string, string> = {
   myfatoorah: '1000',
   tap: '1010',
   hesabe: '1010',

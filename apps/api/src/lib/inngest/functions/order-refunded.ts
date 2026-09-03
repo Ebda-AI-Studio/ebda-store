@@ -26,7 +26,10 @@ export interface PartialRefund {
   refundAmount?: number;
 }
 
-/** orderEvent.toStatus marker for a completed partial-return restore. */
+// orderEvent.toStatus marker for a completed partial-return restore. Owned
+// by THIS fanout (inventory side) — the GL's partial-return posting
+// deliberately does NOT read it (it derives prior returned quantities from
+// completed Return rows instead, see partial-return-posting.ts / issue 1189).
 const PARTIAL_RESTORE_MARKER = 'partial_return_restored';
 
 /**

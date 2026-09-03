@@ -469,3 +469,267 @@ describe('handleWebhook write ordering — payment write vs order-transition ass
     );
   });
 });
+
+describe('refund webhook — refundedAmount is a cumulative budget, not a scratch field', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProviderConfig();
+  });
+
+  /**
+   * `Payment.refundedAmount` is the running total PaymentService.refund
+   * compare-and-swaps against to compute the remaining refundable balance, and
+   * `Payment.status` decides whether ReturnService will accept the payment as a
+   * refund source at all.
+   *
+   * This branch used to write both absolutely: refundedAmount set to THIS
+   * refund's amount — the provider reports one refund, never a running total —
+   * and status forced to 'refunded'. On a partially-refunded payment that
+   * erased every earlier refund from the budget and marked the whole payment
+   * settled, so the next partial return was rejected for having no refundable
+   * payment while the balance was recomputed against a too-small total.
+   */
+  function paymentWith(refundedAmount: number, status: string) {
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      amount: 5000,
+      currency: 'KWD',
+      status,
+      refundedAmount,
+      provider: 'myfatoorah',
+      metadata: {},
+      order: { storeId: STORE_ID, store: { name: 'Test Store' }, status: 'shipped' },
+    });
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', refundId: 'rf_c', amount: 2000 },
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    applyRefundEffects.mockResolvedValue(undefined);
+  }
+
+  /** The data written by the payment.update that carries the refund fields. */
+  function refundWrite() {
+    return paymentUpdate.mock.calls
+      .map(c => (c[0] as { data: Record<string, unknown> }).data)
+      .find(d => 'refundedAmount' in d);
+  }
+
+  it('the refund that SETTLES a partially-refunded payment still reverses the order', async () => {
+    // The gate used to ask whether the PAYMENT had been handled. A payment
+    // reading `partially_refunded` counted as handled, so the refund that
+    // finally exhausted it was written as terminal with every effect
+    // suppressed: the customer had all their money back while the order sat
+    // delivered, inventory unrestored and the sale journal still booked.
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      amount: 9400,
+      currency: 'KWD',
+      status: 'partially_refunded',
+      refundedAmount: 5000,
+      provider: 'myfatoorah',
+      // The first portal refund is on record, so this second one is new.
+      metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+      order: { storeId: STORE_ID, store: { name: 'Test Store' }, status: 'delivered' },
+    });
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', refundId: 'rf_b', amount: 4400 },
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    applyRefundEffects.mockResolvedValue(undefined);
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(refundWrite()?.status, 'the payment is settled').toBe('refunded');
+    expect(
+      applyRefundEffects,
+      'a settled payment whose order was never reversed must reverse it'
+    ).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
+    expect(orderUpdate, 'and the order must leave delivered').toHaveBeenCalled();
+  });
+
+  it('does not reverse an order a previous refund already reversed', async () => {
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      amount: 9400,
+      currency: 'KWD',
+      status: 'refunded',
+      refundedAmount: 9400,
+      provider: 'myfatoorah',
+      metadata: { refundEventIds: ['rf_a'], refundStatusById: { rf_a: 'completed' } },
+      order: { storeId: STORE_ID, store: { name: 'Test Store' }, status: 'refunded' },
+    });
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', refundId: 'rf_b', amount: 100 },
+    });
+    assertValidTransitionMock.mockImplementation(() => undefined);
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(applyRefundEffects, 'the order is already reversed').not.toHaveBeenCalled();
+  });
+
+  it('never lowers the running total when the refund was already accounted', async () => {
+    // 3000 already refunded in-band; this webhook reports its own 2000 slice.
+    paymentWith(3000, 'partially_refunded');
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    const w = refundWrite();
+    expect(w?.refundedAmount, 'writing 2000 here would erase 1000 of real refunds').toBe(3000);
+  });
+
+  it('does not force a terminal status while a balance remains', async () => {
+    paymentWith(3000, 'partially_refunded');
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    // 3000 of 5000 refunded — still partially refunded, so ReturnService can
+    // still accept it for the remaining 2000.
+    expect(refundWrite()?.status).toBe('partially_refunded');
+  });
+
+  it('raises the total for an OUT-OF-BAND refund the system never accounted', async () => {
+    // Taken in the provider dashboard: nothing incremented refundedAmount, so
+    // this webhook is the first evidence of it.
+    paymentWith(0, 'completed');
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(refundWrite()?.refundedAmount).toBe(2000);
+    expect(refundWrite()?.status).toBe('partially_refunded');
+
+    // ...and it must NOT run the whole-order reversal. This case drove exactly
+    // this state and asserted only the write, so the suite ratified the defect:
+    // a 2000-of-5000 refund taken in the provider's portal restored inventory
+    // for every line the customer still holds, reversed the entire sale journal
+    // and COGS, decremented coupon usage, clawed back affiliate commission and
+    // stripped loyalty — then flipped the order to 'refunded' while the payment
+    // row said 'partially_refunded'.
+    expect(
+      applyRefundEffects,
+      'a partial out-of-band refund must not trigger whole-order effects'
+    ).not.toHaveBeenCalled();
+    expect(orderUpdate, 'nor flip the order to a terminal state').not.toHaveBeenCalled();
+  });
+
+  it('DOES run the whole-order reversal when the out-of-band refund settles the payment', async () => {
+    paymentWith(0, 'completed');
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', refundId: 'rf_full', amount: 5000 }, // the whole payment
+    });
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(applyRefundEffects).toHaveBeenCalledOnce();
+    expect(refundWrite()?.status).toBe('refunded');
+  });
+
+  it('marks the payment refunded only when the arithmetic says it is settled', async () => {
+    paymentWith(5000, 'partially_refunded');
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(refundWrite()?.status).toBe('refunded');
+    expect(refundWrite()?.refundedAmount).toBe(5000);
+  });
+});
+
+// ─── Whole-order fanout must follow the same arithmetic as the status ──────
+//
+// Once the write above stopped forcing 'refunded', a short out-of-band refund
+// leaves the payment as 'partially_refunded' — which ReturnService accepts as
+// a still-refundable source. The out-of-band branch, however, still ran the
+// WHOLE-order `applyRefundEffects` and flipped the order to refunded with no
+// amount check. That combination double-spends: MyFatoorah portal refund of
+// 2000 on a 5000 payment → all inventory restored, coupon/loyalty reversed,
+// full GL reversal posted, order marked refunded — and 3000 still refundable,
+// so a later partial return fires a second REAL gateway refund and restores
+// the same units again (the two paths guard on different idempotency markers:
+// order-level vs refundKey).
+describe('refund webhook — whole-order effects only for a refund that exhausts the payment', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProviderConfig();
+    assertValidTransitionMock.mockImplementation(() => undefined);
+    applyRefundEffects.mockResolvedValue(undefined);
+    orderUpdate.mockResolvedValue({});
+  });
+
+  /** Out-of-band refund: payment still 'completed', nothing ever accounted. */
+  function outOfBandRefundOf(refundAmount: number | undefined) {
+    paymentFindFirst.mockResolvedValue({
+      id: PAYMENT_ID,
+      orderId: ORDER_ID,
+      amount: 5000,
+      currency: 'KWD',
+      status: 'completed',
+      refundedAmount: 0,
+      provider: 'myfatoorah',
+      metadata: {},
+      order: { storeId: STORE_ID, store: { name: 'Test Store' }, status: 'shipped' },
+    });
+    providerParseWebhook.mockReturnValue({
+      transactionId: TRANSACTION_ID,
+      status: 'completed',
+      refund: { status: 'completed', refundId: 'rf_p', amount: refundAmount },
+    });
+  }
+
+  function refundWrite() {
+    return paymentUpdate.mock.calls
+      .map(c => (c[0] as { data: Record<string, unknown> }).data)
+      .find(d => 'refundedAmount' in d);
+  }
+
+  it('a PARTIAL out-of-band refund runs no whole-order reversal and does not flip the order', async () => {
+    outOfBandRefundOf(2000);
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(
+      applyRefundEffects,
+      'a 2000-of-5000 refund must not reverse the whole order while 3000 stays refundable'
+    ).not.toHaveBeenCalled();
+    expect(orderUpdate).not.toHaveBeenCalled();
+    // The balance is still recorded, so the returns flow can spend the rest.
+    expect(refundWrite()?.status).toBe('partially_refunded');
+    expect(refundWrite()?.refundedAmount).toBe(2000);
+  });
+
+  it('a refund that EXHAUSTS the payment still runs the whole-order reversal + order flip', async () => {
+    outOfBandRefundOf(5000);
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
+    expect(orderUpdate).toHaveBeenCalledWith({
+      where: { id: ORDER_ID },
+      data: { status: 'refunded', paymentStatus: 'refunded' },
+    });
+    expect(refundWrite()?.status).toBe('refunded');
+  });
+
+  it('an unreported refund amount is treated as full — terminal status, no refundable remainder', async () => {
+    // MyFatoorah's parseWebhook falls back to 0 when the payload carries no
+    // RefundAmount/Amount. That is missing data, not a partial refund: leaving
+    // the payment 'partially_refunded' there would be the same double-spend in
+    // its worst form (whole-order reversal ran, full amount still refundable).
+    outOfBandRefundOf(undefined);
+
+    await PaymentService.handleWebhook('myfatoorah', { fake: true }, undefined, STORE_ID);
+
+    expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
+    expect(refundWrite()?.status).toBe('refunded');
+  });
+});

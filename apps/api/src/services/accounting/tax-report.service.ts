@@ -1,33 +1,43 @@
 import { prisma } from '@force/database';
 
 /**
- * One transaction-level tax row.
+ * One transaction-level tax row — one row per order-source journal entry
+ * that moved Tax Payable (2100) in the period: the sale, and any
+ * refund/return reversal or partial-return adjustment. Reversal rows carry
+ * NEGATIVE amounts, so the summary nets to what the merchant actually owes.
  * All money fields are in FILS (integer — smallest KWD unit = 1/1000 KWD).
  */
 export interface TaxReportRow {
-  /** ISO date string of the journal posting (= order payment date) */
+  /** ISO date string of the journal posting (= order payment / reversal date) */
   date: string;
   orderNumber: string;
   /** Customer display name, or null for guest orders */
   customerName: string | null;
-  /** Taxable base (subtotal − discount) in fils */
+  /**
+   * Taxable-base movement of this entry in fils — the entry's net Sales
+   * Revenue (4000) credit. Positive on the sale (= subtotal − discount),
+   * negative on a refund reversal or partial-return adjustment.
+   */
   subtotal: number;
   /** Applied tax rate as a percentage string, e.g. "5.00" */
   taxRate: string;
-  /** Tax collected in fils — comes directly from account 2100 GL credits */
+  /**
+   * Tax movement of this entry in fils — the entry's net Tax Payable (2100)
+   * credit. Positive on the sale, negative on a reversal/adjustment.
+   */
   taxCollected: number;
-  /** Order total in fils */
+  /** Order total in fils (gross, unchanged across the order's rows) */
   total: number;
 }
 
 export interface TaxRateSummary {
   /** Tax rate percentage string, e.g. "5.00" */
   taxRate: string;
-  /** Number of transactions at this rate */
+  /** Number of tax-moving journal entries at this rate (reversals included) */
   transactionCount: number;
-  /** Sum of taxable bases in fils */
+  /** Net taxable-base movement in fils (reversals subtract) */
   totalSubtotal: number;
-  /** Sum of tax collected in fils */
+  /** Net tax collected in fils (reversals subtract) */
   totalTaxCollected: number;
 }
 
@@ -38,9 +48,12 @@ export interface TaxReportResult {
   rows: TaxReportRow[];
   /** Totals */
   summary: {
+    /** Rows in the period, reversal/adjustment rows included */
     transactionCount: number;
-    totalTaxableSales: number; // fils
-    totalTaxCollected: number; // fils
+    /** NET taxable sales in fils — sales minus refund/return reversals */
+    totalTaxableSales: number;
+    /** NET tax collected in fils — sales minus refund/return reversals */
+    totalTaxCollected: number;
     byRate: TaxRateSummary[];
   };
 }
@@ -48,25 +61,42 @@ export interface TaxReportResult {
 /**
  * Generate a transaction-level VAT / sales-tax report for a store.
  *
- * Data source:
- *   - `journal_lines` WHERE account.code = '2100' (Tax Payable)
- *     and the parent `journal_entry` was posted in [from, to]
- *   - Joined back to `orders` via journal_entry.source_id = order.id
- *     (order-posting sets source='order', sourceId=orderId)
- *   - Order fields used: orderNumber, subtotal, discount, tax (rate
- *     is back-computed as tax/taxable_base × 100 since the raw percentage
- *     is not stored on the order — mirrors what was stored in the journal).
+ * Data source — GL movement on Tax Payable (2100), per journal entry:
+ *   - Every `source='order'` journal entry in [from, to] whose lines move
+ *     account 2100: the sale entry AND every reversal/adjustment — full
+ *     refund reversals (`:reversal`) and partial-return pro-rata
+ *     adjustments (`:partial:<returnId>`). Reversals DEBIT 2100, so their
+ *     rows carry negative amounts and the summary nets to what is actually
+ *     owed. Before this (audit issue 1188) the report joined
+ *     `source_id = orders.id` and kept only `credit > 0` lines, so refund
+ *     and partial-return tax reversals were invisible and the filed VAT
+ *     over-declared; a fully-refunded sale even vanished retroactively
+ *     (status='posted' filter) instead of showing the reversal in ITS
+ *     period.
+ *   - Entries with status 'posted' OR 'reversed' both count: a reversal is
+ *     modelled by its own mirror entry, so both the original and the mirror
+ *     stand, each attributed to the period it posted in — period totals are
+ *     immutable once filed.
+ *   - The order is resolved by stripping the sourceId suffix
+ *     (`split_part(source_id, ':', 1)` — order-posting/refund-posting/
+ *     partial-return-posting all prefix sourceId with the order id).
+ *   - The taxable-base movement comes from the SAME entry's Sales Revenue
+ *     (4000) lines, so a reversal row's rate is computed from its own
+ *     netted pair (both negative → positive rate), never a netted figure
+ *     against the gross order base.
  *
- * Read-only, tenant-scoped (storeId filter on both accounts and journal_entries).
- * Uses $queryRawUnsafe with explicit parameter binding — same pattern as
- * reports.service.ts trialBalance().
+ * Read-only, tenant-scoped (storeId filter on accounts, journal_entries and
+ * orders). Uses $queryRawUnsafe with explicit parameter binding — same
+ * pattern as reports.service.ts trialBalance().
  *
- * Note: "taxRate" is derived from the order row rather than a TaxRate record
+ * Note: "taxRate" is derived per entry rather than from a TaxRate record
  * because (a) the journal only stores the computed fils amount, not the rate,
  * and (b) rate records can be edited/deleted after the fact. We derive the
- * effective rate as Math.round(taxCollected / taxableBase * 10000) / 100 and
+ * effective rate as Math.round(taxDelta / baseDelta * 10000) / 100 and
  * represent as a fixed-2 string ("5.00", "0.00"). This is what appears on the
- * transaction rows and the by-rate breakdown.
+ * transaction rows and the by-rate breakdown. (A partial-return adjustment's
+ * rate matches the sale's up to fils-level rounding of the pro-rata split, so
+ * rows group under the same rate bucket in practice.)
  */
 export async function generateTaxReport(
   storeId: string,
@@ -74,24 +104,27 @@ export async function generateTaxReport(
 ): Promise<TaxReportResult> {
   /**
    * The query:
-   *   - Finds all journal_lines whose account has code='2100' and belongs to this store
-   *   - Joins the parent journal_entry (must be status='posted', postedAt in [from, to])
-   *   - Joins orders via journal_entry.source_id = orders.id
-   *     (only 'order'-source entries have an order reference)
-   *   - Left-joins customers for display name
-   * Returns one row per order that had tax posted in the period.
-   * Filters out entries where source != 'order' (manual entries) — those
-   * could have manual 2100 debits (reversals/adjustments) which are not
-   * tax-collection events.
+   *   - Aggregates journal_lines per journal ENTRY over accounts 2100 (tax)
+   *     and 4000 (revenue) for this store
+   *   - Entry must be source='order', status posted/reversed, postedAt in
+   *     [from, to]
+   *   - Joins orders via split_part(e.source_id, ':', 1) = orders.id — the
+   *     order id prefix shared by the sale, its reversal, and every
+   *     partial-return adjustment
+   *   - Left-joins users for display name (orders.customer_id references
+   *     users.id — the previous join against `customers` never matched)
+   *   - HAVING keeps only entries that actually moved 2100
+   * Returns one row per tax-moving journal entry in the period.
+   * Entries with source != 'order' (manual entries) are excluded — manual
+   * 2100 movement is not an order tax-collection event.
    */
   const rows = await prisma.$queryRawUnsafe<
     Array<{
       posted_at: Date;
       order_number: string;
       customer_name: string | null;
-      subtotal: bigint;
-      discount: bigint;
-      tax_collected: bigint;
+      tax_delta: bigint;
+      base_delta: bigint;
       order_total: bigint;
     }>
   >(
@@ -99,29 +132,29 @@ export async function generateTaxReport(
     SELECT
       e.posted_at,
       o.order_number,
-      NULLIF(TRIM(CONCAT(c.first_name, ' ', c.last_name)), '') AS customer_name,
-      o.subtotal::bigint,
-      o.discount::bigint,
-      l.credit::bigint   AS tax_collected,
-      o.total::bigint    AS order_total
-    FROM public.journal_lines l
+      NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), '') AS customer_name,
+      COALESCE(SUM(CASE WHEN a.code = '2100' THEN l.credit - l.debit ELSE 0 END), 0)::bigint AS tax_delta,
+      COALESCE(SUM(CASE WHEN a.code = '4000' THEN l.credit - l.debit ELSE 0 END), 0)::bigint AS base_delta,
+      o.total::bigint AS order_total
+    FROM public.journal_entries e
+    JOIN public.journal_lines l
+      ON l.entry_id = e.id
     JOIN public.accounts a
       ON a.id = l.account_id
-      AND a.code = '2100'
+      AND a.code IN ('2100', '4000')
       AND a.store_id = $1
-    JOIN public.journal_entries e
-      ON e.id = l.entry_id
-      AND e.status = 'posted'
-      AND e.source = 'order'
+    JOIN public.orders o
+      ON o.id = split_part(e.source_id, ':', 1)
+      AND o.store_id = $1
+    LEFT JOIN public.users u
+      ON u.id = o.customer_id
+    WHERE e.source = 'order'
+      AND e.status IN ('posted', 'reversed')
       AND e.posted_at >= $2::timestamp
       AND e.posted_at <= $3::timestamp
       AND e.store_id = $1
-    JOIN public.orders o
-      ON o.id = e.source_id
-      AND o.store_id = $1
-    LEFT JOIN public.customers c
-      ON c.id = o.customer_id
-    WHERE l.credit > 0
+    GROUP BY e.id, e.posted_at, o.order_number, o.total, u.first_name, u.last_name
+    HAVING SUM(CASE WHEN a.code = '2100' THEN l.credit - l.debit ELSE 0 END) <> 0
     ORDER BY e.posted_at ASC, o.order_number ASC
     `,
     storeId,
@@ -134,21 +167,20 @@ export async function generateTaxReport(
 
   // ─── Build per-transaction rows ──────────────────────────────────────────────
   const txRows: TaxReportRow[] = rows.map(r => {
-    const taxCollected = Number(r.tax_collected);
-    const subtotal = Number(r.subtotal);
-    const discount = Number(r.discount);
-    const taxableBase = subtotal - discount;
+    const taxCollected = Number(r.tax_delta);
+    const taxableBase = Number(r.base_delta);
 
-    // Derive effective rate. Avoid divide-by-zero: if taxableBase = 0 but
-    // tax was somehow collected, show 0.00%.
+    // Derive effective rate from the entry's OWN tax/base pair — a reversal
+    // row's negatives cancel, giving the same positive rate as its sale.
+    // Avoid divide-by-zero: if the base is 0 but tax moved, show 0.00%.
     const effectiveRatePct =
-      taxableBase > 0 ? Math.round((taxCollected / taxableBase) * 10000) / 100 : 0;
+      taxableBase !== 0 ? Math.round((taxCollected / taxableBase) * 10000) / 100 : 0;
 
     return {
       date: r.posted_at.toISOString().slice(0, 10),
       orderNumber: r.order_number,
       customerName: r.customer_name ?? null,
-      subtotal: taxableBase, // taxable base = subtotal - discount
+      subtotal: taxableBase,
       taxRate: effectiveRatePct.toFixed(2),
       taxCollected,
       total: Number(r.order_total),

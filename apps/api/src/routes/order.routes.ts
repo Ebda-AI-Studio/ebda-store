@@ -20,6 +20,14 @@ import { runInTenantContext } from '@force/database';
 import { config } from '../config';
 import type { Currency } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';
+import {
+  resolveRefundSettlement,
+  readAccountedRefundEventIds,
+  appendRefundEventId,
+  recordRefundStatus,
+  REFUND_EVENT_IDS_KEY,
+  REFUND_STATUS_BY_ID_KEY,
+} from '../services/payment-providers/refund-settlement';
 
 const router = Router({ mergeParams: true });
 
@@ -1108,8 +1116,55 @@ router.post(
         payment.status !== 'refunded' &&
         payment.status !== 'partially_refunded'
       ) {
-        updateData.status = 'refunded';
-        updateData.refundedAmount = status.refundedAmount ?? status.amount ?? 0;
+        // Derive the terminal status from the arithmetic, do not assert it.
+        // `refundedAmount` is the cumulative budget PaymentService.refund
+        // compare-and-swaps against, and `status` decides whether ReturnService
+        // will accept the payment as a refund source at all. A PARTIAL
+        // out-of-band refund reported here would otherwise be written as a full
+        // one: the payment is marked settled while money remains refundable, so
+        // every later partial return is rejected for having no refundable
+        // payment. The guard above already skips rows that are refunded or
+        // partially_refunded, so this only ever raises the total from zero.
+        //
+        // A missing, non-finite or non-positive provider amount is NOT
+        // evidence of a partial refund — a status payload that carries no
+        // amount would otherwise be recorded as a 0-fil partial refund while
+        // the gateway has already sent the WHOLE sum back: the order keeps its
+        // pre-refund status, no reversal or GL entry runs, and the payment
+        // still reads as refundable so a later return fires a second real
+        // gateway refund. Same rule as the sibling webhook path in
+        // payment.factory.ts — only an amount the provider actually REPORTED,
+        // and that falls short of the total, downgrades to partial; unknown
+        // means FULL.
+        // Shared with the refund-webhook branch — see resolveRefundSettlement.
+        const {
+          settledTotal,
+          isFullRefund: refundIsFullRefund,
+          accountedThisEvent,
+        } = resolveRefundSettlement({
+          paymentAmount: payment.amount ?? 0,
+          alreadyRefunded: payment.refundedAmount,
+          reported: [status.refundedAmount, status.amount],
+          // This route raised the total but recorded nothing, so the refund it
+          // counted could be counted a SECOND time by the webhook that arrives
+          // for the same refund afterwards. The ledger is shared; every path
+          // that adds to the total has to maintain it.
+          reportedEventId: status.refundId,
+          accountedEventIds: readAccountedRefundEventIds(payment.metadata),
+        });
+        updateData.status = refundIsFullRefund ? 'refunded' : 'partially_refunded';
+        updateData.refundedAmount = settledTotal;
+        if (accountedThisEvent) {
+          updateData.metadata = {
+            ...(updateData.metadata as Record<string, unknown>),
+            [REFUND_EVENT_IDS_KEY]: appendRefundEventId(payment.metadata, status.refundId),
+            [REFUND_STATUS_BY_ID_KEY]: recordRefundStatus(
+              payment.metadata,
+              status.refundId,
+              status.status
+            ),
+          };
+        }
       }
       await prisma.payment.update({
         where: { id: payment.id },
@@ -1148,8 +1203,21 @@ router.post(
       // refund status had no way to know the reversal chain never ran. Let
       // both propagate to the route's `catch (error) { next(error); }` below
       // instead.
+      // Whole-order side effects belong to a whole-order refund. The write
+      // above now distinguishes a partial out-of-band refund from a full one,
+      // so gating this on the same arithmetic keeps the two coherent: without
+      // it a 2000-fil refund on a 5000-fil payment would record the payment as
+      // partially refunded and then flip the ORDER to refunded and restore ALL
+      // its inventory — the whole-order fanout the item-level path exists to
+      // avoid. A partial refresh updates the payment and stops there; the
+      // returns flow owns item-level effects and carries the line data this
+      // route does not have.
+      const refundIsFull = updateData.status === 'refunded';
       const needsSideEffects =
-        status.status === 'completed' && statusChanged && payment.status === 'completed';
+        status.status === 'completed' &&
+        statusChanged &&
+        payment.status === 'completed' &&
+        refundIsFull;
       if (needsSideEffects) {
         // Guard the direct Order.status write with the state machine — this
         // was the last unguarded Order.status writer (adversarial audit P2).

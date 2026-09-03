@@ -131,6 +131,10 @@ function mockPaymentNeedingSideEffects() {
     refundId: 'rf_123',
     provider: 'myfatoorah',
     status: 'completed',
+    // The route reads this to decide whether the refund settles the payment.
+    // Prisma returns it (the query has no `select`), so omitting it here made
+    // the mock diverge from production.
+    amount: 5000,
     metadata: {},
   });
   getRefundStatus.mockResolvedValue({
@@ -214,5 +218,122 @@ describe('POST /:orderId/refresh-refund-status', () => {
       where: { id: ORDER_ID },
       data: { status: 'refunded', paymentStatus: 'refunded' },
     });
+  });
+});
+
+describe('POST /:orderId/refresh-refund-status — partial out-of-band refunds', () => {
+  beforeAll(async () => {
+    app = await buildApp();
+  });
+  afterEach(() => {
+    vi.clearAllMocks();
+    orderFindFirst.mockResolvedValue({ status: 'delivered' });
+    orderUpdate.mockResolvedValue({});
+  });
+
+  /**
+   * `Payment.status` decides whether ReturnService will accept the payment as a
+   * refund source, and `refundedAmount` is the budget the refund path
+   * compare-and-swaps against. Asserting 'refunded' for a refund that only
+   * covered part of the payment marks it settled while money is still
+   * refundable, so every later partial return is rejected for having no
+   * refundable payment.
+   */
+  it('records a PARTIAL out-of-band refund as partially_refunded, not refunded', async () => {
+    mockPaymentNeedingSideEffects();
+    getRefundStatus.mockResolvedValue({
+      status: 'completed',
+      refundedAmount: 2000, // 2000 of a 5000 payment
+      amount: 2000,
+      refundReference: 'ref-partial',
+    });
+
+    applyRefundEffects.mockResolvedValue(undefined);
+    await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+
+    const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    expect(data.status).toBe('partially_refunded');
+    expect(data.refundedAmount).toBe(2000);
+
+    // ...and the whole-order effects must NOT run for a partial refund, or a
+    // 2000-fil refund on a 5000-fil payment restores the entire order's
+    // inventory and marks the order terminal.
+    expect(applyRefundEffects).not.toHaveBeenCalled();
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A provider status payload with NO amount is not evidence of a partial
+   * refund. Falling through to 0 recorded a FULL out-of-band refund as
+   * `partially_refunded` with `refundedAmount: 0`, which suppressed every
+   * whole-order effect (inventory restore, coupon/loyalty/affiliate reversal,
+   * GL reversal) while the money had already left the gateway — and left the
+   * payment looking refundable, so a later return could fire a SECOND real
+   * gateway refund. Unknown amount => FULL, same rule as the webhook path.
+   */
+  it('records the refund id it counted, so a later webhook cannot count it twice', async () => {
+    // This route raised `refundedAmount` but wrote nothing identifying the
+    // refund, so the provider webhook arriving for that SAME refund saw an
+    // unknown id, treated it as a new one and added the amount again.
+    mockPaymentNeedingSideEffects();
+    getRefundStatus.mockResolvedValue({
+      status: 'completed',
+      refundId: 'rf_counted',
+      refundedAmount: 2000,
+      amount: 2000,
+      refundReference: 'ref-partial',
+    });
+
+    applyRefundEffects.mockResolvedValue(undefined);
+    await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+
+    const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    expect(data.refundedAmount).toBe(2000);
+    const meta = data.metadata as Record<string, unknown>;
+    expect(meta.refundEventIds, 'the ledger every adding path must maintain').toContain(
+      'rf_counted'
+    );
+    expect(meta.refundStatusById).toMatchObject({ rf_counted: 'completed' });
+  });
+
+  it('treats an amount-less provider response as a FULL refund, not a 0-fil partial', async () => {
+    mockPaymentNeedingSideEffects();
+    getRefundStatus.mockResolvedValue({
+      status: 'completed',
+      refundReference: 'ref-no-amount',
+    });
+
+    applyRefundEffects.mockResolvedValue(undefined);
+    await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+
+    const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    expect(data.status).toBe('refunded');
+    expect(data.refundedAmount).toBe(5000);
+
+    // The whole-order reversal chain must run — the money is gone.
+    expect(applyRefundEffects).toHaveBeenCalledWith(STORE_ID, ORDER_ID);
+    expect(orderUpdate).toHaveBeenCalledWith({
+      where: { id: ORDER_ID },
+      data: { status: 'refunded', paymentStatus: 'refunded' },
+    });
+  });
+
+  it('still records a FULL out-of-band refund as refunded', async () => {
+    mockPaymentNeedingSideEffects();
+
+    applyRefundEffects.mockResolvedValue(undefined);
+    await request(app)
+      .post(`/api/v1/stores/${STORE_ID}/orders/${ORDER_ID}/refresh-refund-status`)
+      .send({});
+
+    const data = (paymentUpdate.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    expect(data.status).toBe('refunded');
+    expect(data.refundedAmount).toBe(5000);
   });
 });

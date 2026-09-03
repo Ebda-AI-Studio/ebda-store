@@ -18,22 +18,26 @@ import { generateTaxReport } from '../../apps/api/src/services/accounting/tax-re
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * One aggregated query row — the per-entry shape the SQL returns since the
+ * issue-1188 rewrite: `base_delta` is the entry's net Sales Revenue (4000)
+ * movement, `tax_delta` its net Tax Payable (2100) movement. Reversal rows
+ * carry negative deltas.
+ */
 function makeRow(overrides: {
   posted_at?: Date;
   order_number?: string;
   customer_name?: string | null;
-  subtotal?: bigint;
-  discount?: bigint;
-  tax_collected?: bigint;
+  tax_delta?: bigint;
+  base_delta?: bigint;
   order_total?: bigint;
 }) {
   return {
     posted_at: overrides.posted_at ?? new Date('2026-01-15'),
     order_number: overrides.order_number ?? 'ORD-001',
     customer_name: overrides.customer_name ?? 'Ahmad Sharaf',
-    subtotal: overrides.subtotal ?? BigInt(10_000), // 10 KWD in fils
-    discount: overrides.discount ?? BigInt(0),
-    tax_collected: overrides.tax_collected ?? BigInt(500), // 5% of 10 KWD
+    tax_delta: overrides.tax_delta ?? BigInt(500), // 5% of 10 KWD
+    base_delta: overrides.base_delta ?? BigInt(10_000), // 10 KWD in fils
     order_total: overrides.order_total ?? BigInt(10_500),
   };
 }
@@ -64,7 +68,7 @@ describe('generateTaxReport — basic aggregation', () => {
   it('computes one row correctly — fils math, taxRate derivation', async () => {
     // 10 KWD taxable, 500 fils tax = 5% effective rate
     mockQueryRawUnsafe.mockResolvedValueOnce([
-      makeRow({ subtotal: BigInt(10_000), discount: BigInt(0), tax_collected: BigInt(500) }),
+      makeRow({ base_delta: BigInt(10_000), tax_delta: BigInt(500) }),
     ]);
 
     const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
@@ -79,25 +83,25 @@ describe('generateTaxReport — basic aggregation', () => {
     expect(row.date).toBe('2026-01-15');
   });
 
-  it('subtracts discount from subtotal for taxable base', async () => {
-    // subtotal 20 KWD, discount 5 KWD → taxable base 15 KWD, tax 750 fils = 5%
+  it('uses the entry revenue movement as the taxable base (discount already netted by the GL)', async () => {
+    // Sale posted 15 KWD net revenue (20 KWD gross − 5 KWD discount), tax 750 fils = 5%
     mockQueryRawUnsafe.mockResolvedValueOnce([
-      makeRow({ subtotal: BigInt(20_000), discount: BigInt(5_000), tax_collected: BigInt(750) }),
+      makeRow({ base_delta: BigInt(15_000), tax_delta: BigInt(750) }),
     ]);
 
     const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
 
     const row = result.rows[0];
-    expect(row.subtotal).toBe(15_000); // 20k - 5k discount
+    expect(row.subtotal).toBe(15_000); // the entry's net 4000 movement
     expect(row.taxCollected).toBe(750);
     expect(row.taxRate).toBe('5.00');
   });
 
   it('totals sum all rows correctly — fils remain integers', async () => {
     mockQueryRawUnsafe.mockResolvedValueOnce([
-      makeRow({ order_number: 'ORD-001', subtotal: BigInt(10_000), tax_collected: BigInt(500) }),
-      makeRow({ order_number: 'ORD-002', subtotal: BigInt(20_000), tax_collected: BigInt(1_000) }),
-      makeRow({ order_number: 'ORD-003', subtotal: BigInt(5_000), tax_collected: BigInt(250) }),
+      makeRow({ order_number: 'ORD-001', base_delta: BigInt(10_000), tax_delta: BigInt(500) }),
+      makeRow({ order_number: 'ORD-002', base_delta: BigInt(20_000), tax_delta: BigInt(1_000) }),
+      makeRow({ order_number: 'ORD-003', base_delta: BigInt(5_000), tax_delta: BigInt(250) }),
     ]);
 
     const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
@@ -109,8 +113,8 @@ describe('generateTaxReport — basic aggregation', () => {
 
   it('groups by-rate breakdown — single rate', async () => {
     mockQueryRawUnsafe.mockResolvedValueOnce([
-      makeRow({ order_number: 'ORD-001', subtotal: BigInt(10_000), tax_collected: BigInt(500) }),
-      makeRow({ order_number: 'ORD-002', subtotal: BigInt(20_000), tax_collected: BigInt(1_000) }),
+      makeRow({ order_number: 'ORD-001', base_delta: BigInt(10_000), tax_delta: BigInt(500) }),
+      makeRow({ order_number: 'ORD-002', base_delta: BigInt(20_000), tax_delta: BigInt(1_000) }),
     ]);
 
     const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
@@ -126,9 +130,9 @@ describe('generateTaxReport — basic aggregation', () => {
   it('groups by-rate breakdown — multi-rate (5% and 10%)', async () => {
     mockQueryRawUnsafe.mockResolvedValueOnce([
       // 5% rate: 10 KWD taxable, 500 fils tax
-      makeRow({ order_number: 'ORD-001', subtotal: BigInt(10_000), tax_collected: BigInt(500) }),
+      makeRow({ order_number: 'ORD-001', base_delta: BigInt(10_000), tax_delta: BigInt(500) }),
       // 10% rate: 20 KWD taxable, 2000 fils tax
-      makeRow({ order_number: 'ORD-002', subtotal: BigInt(20_000), tax_collected: BigInt(2_000) }),
+      makeRow({ order_number: 'ORD-002', base_delta: BigInt(20_000), tax_delta: BigInt(2_000) }),
     ]);
 
     const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
@@ -157,15 +161,36 @@ describe('generateTaxReport — basic aggregation', () => {
   });
 
   it('zero taxable base yields 0.00% effective rate (no divide-by-zero)', async () => {
-    // Edge: subtotal=0 and somehow tax_collected=0 (shouldn't happen but guard it)
+    // Edge: an entry that moved tax but no revenue (shouldn't happen but guard it)
     mockQueryRawUnsafe.mockResolvedValueOnce([
-      makeRow({ subtotal: BigInt(0), discount: BigInt(0), tax_collected: BigInt(0) }),
+      makeRow({ base_delta: BigInt(0), tax_delta: BigInt(100) }),
     ]);
 
     const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
 
     // Should not throw; rate is 0.00
     expect(result.rows[0].taxRate).toBe('0.00');
+  });
+
+  it('nets refund/partial-return reversal rows into the summary (issue 1188)', async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      // Sale: 8 KWD net revenue, 900 fils tax
+      makeRow({ order_number: 'ORD-001', base_delta: BigInt(8_000), tax_delta: BigInt(900) }),
+      // Partial-return adjustment: negative deltas, same effective rate
+      makeRow({ order_number: 'ORD-001', base_delta: BigInt(-1_778), tax_delta: BigInt(-200) }),
+    ]);
+
+    const result = await generateTaxReport(STORE_ID, { from: FROM, to: TO });
+
+    expect(result.rows).toHaveLength(2);
+    const reversal = result.rows[1];
+    expect(reversal.taxCollected).toBe(-200);
+    expect(reversal.subtotal).toBe(-1_778);
+    // Negative/negative → the same positive rate bucket as the sale
+    expect(reversal.taxRate).toBe('11.25');
+    expect(result.summary.totalTaxCollected).toBe(700); // 900 − 200
+    expect(result.summary.totalTaxableSales).toBe(6_222); // 8000 − 1778
+    expect(result.summary.byRate).toHaveLength(1); // both rows in the 11.25 bucket
   });
 
   it('date boundaries are preserved in the row.date field', async () => {

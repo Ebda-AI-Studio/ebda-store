@@ -2,15 +2,25 @@ import type { InngestFunction } from 'inngest';
 import logger from '../../logger';
 import { inngest } from '../client';
 import { postRefundJournal } from '../../../services/accounting/posting/refund-posting';
+import { postPartialReturnJournal } from '../../../services/accounting/posting/partial-return-posting';
 import { featureService } from '../../../services/feature.service';
 
 /**
  * Listens to the canonical order/refunded Inngest event (fired by
  * OrderService.applyRefundEffects + provider refund-webhook handlers) and
- * posts the GL reversal: mirror entries with debits/credits swapped, linked
- * via reversedById.
+ * posts the GL adjustment:
  *
- * Idempotent — postRefundJournal skips already-reversed entries.
+ *   - FULL refund: mirror entries with debits/credits swapped, linked via
+ *     reversedById (postRefundJournal — also backs out any prior partial
+ *     adjustment entries so the ledger nets to zero, the GL equivalent of
+ *     the fanout's already-restored-quantity subtraction).
+ *   - PARTIAL return (item-level `partial` payload): a pro-rata adjustment
+ *     reversing only the returned lines' revenue/tax/COGS
+ *     (postPartialReturnJournal), keyed on `partial.refundKey` (the Return
+ *     id) so an at-least-once redelivery never posts twice.
+ *
+ * Idempotent — postRefundJournal skips already-reversed entries;
+ * postPartialReturnJournal posts one entry set per refundKey.
  */
 export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFunction(
   {
@@ -21,11 +31,17 @@ export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFu
     triggers: [{ event: 'order/refunded' }],
   },
   async ({ event, step }) => {
-    const { orderId, storeId, refundReason, partial } = (event.data ?? {}) as {
+    // NOTE: no `refundReason` read — no producer of order/refunded sets one
+    // (issue 1191). The partial path reads the merchant-entered reason off
+    // the Return row named by refundKey; the full path uses reverseEntry's
+    // default memo.
+    const { orderId, storeId, partial } = (event.data ?? {}) as {
       orderId?: string;
       storeId?: string;
-      refundReason?: string;
-      partial?: { items?: unknown[] };
+      partial?: {
+        items?: Array<{ orderItemId: string; quantity: number }>;
+        refundKey?: string;
+      };
     };
     if (!orderId || !storeId) {
       logger.warn(
@@ -34,18 +50,7 @@ export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFu
       );
       return { skipped: 'missing-ids' };
     }
-    // Partial-return events carry an item-level payload; postRefundJournal
-    // reverses the WHOLE sale journal, which would erase revenue the merchant
-    // still keeps. Skip — the GL keeps the original sale for partial returns
-    // (documented residual: no partial-return GL adjustment is posted yet).
-    if (partial && Array.isArray(partial.items) && partial.items.length > 0) {
-      logger.info(
-        { storeId, orderId },
-        'accountingPostRefundJournal: partial-return event — full journal reversal skipped'
-      );
-      return { skipped: true, reason: 'partial_refund' };
-    }
-    // Feature gate — skip reversal when accounting.basic is disabled.
+    // Feature gate — skip any GL posting when accounting.basic is disabled.
     const accountingEnabled = await featureService.isFeatureEnabled(storeId, 'accounting.basic');
     if (!accountingEnabled) {
       logger.info(
@@ -54,9 +59,36 @@ export const accountingPostRefundJournal: InngestFunction.Any = inngest.createFu
       );
       return { skipped: true, reason: 'feature_disabled', feature: 'accounting.basic' };
     }
-    const result = await step.run('reverse-journal', () =>
-      postRefundJournal({ orderId, reason: refundReason })
-    );
+    // Partial-return events carry an item-level payload; postRefundJournal
+    // reverses the WHOLE sale journal, which would erase revenue the merchant
+    // still keeps. Post the pro-rata adjustment for the returned lines
+    // instead, keyed on refundKey (the Return id) for at-least-once safety —
+    // mirrors the fanout's refusal of a keyless partial event.
+    if (partial && Array.isArray(partial.items) && partial.items.length > 0) {
+      const refundKey = partial.refundKey;
+      const partialItems = partial.items;
+      if (!refundKey) {
+        logger.error(
+          { storeId, orderId },
+          'accountingPostRefundJournal: partial event missing refundKey — skipping'
+        );
+        return { skipped: 'partial-missing-refund-key' };
+      }
+      const partialResult = await step.run('post-partial-return-adjustment', () =>
+        postPartialReturnJournal({
+          orderId,
+          storeId,
+          refundKey,
+          items: partialItems,
+        })
+      );
+      logger.info(
+        { orderId, storeId, refundKey, ...partialResult },
+        'accountingPostRefundJournal: partial adjustment done'
+      );
+      return partialResult;
+    }
+    const result = await step.run('reverse-journal', () => postRefundJournal({ orderId, storeId }));
     logger.info(
       { orderId, storeId, reversed: result.reversed },
       'accountingPostRefundJournal: done'

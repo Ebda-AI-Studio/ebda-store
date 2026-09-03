@@ -1369,8 +1369,11 @@ export class OrderService {
        * `order-refunded` fanout restores ONLY the listed order-item
        * lines/quantities and SKIPS every whole-order reversal (coupon,
        * affiliate commission, loyalty, the refundReversedAt completion stamp
-       * and the GL journal reversal) — the customer kept the rest of the
-       * order, so those stay earned/consumed. `refundKey` (the Return id)
+       * and the whole-sale GL journal reversal — the GL instead posts a
+       * pro-rata adjustment for just the returned lines, see
+       * accounting/posting/partial-return-posting.ts) — the customer kept
+       * the rest of the order, so those stay earned/consumed. `refundKey`
+       * (the Return id)
        * is the idempotency key for the partial restore, so two different
        * partial returns on one order each restore their own lines exactly
        * once. `refundAmount` overrides the notification amount so the
