@@ -206,7 +206,12 @@ export class OrderService {
         payments: { select: { provider: true, status: true } },
         _count: { select: { items: true } },
       },
-      orderBy: { createdAt: 'desc' as const },
+      // `id` is the tiebreaker, and it is load-bearing rather than tidiness.
+      // Keyset pagination is only stable when the ORDER BY uniquely identifies
+      // the cursor row, and createdAt is not unique — bulk-imported or
+      // same-second orders share a timestamp, so a page boundary landing inside
+      // such a group could skip rows or repeat them.
+      orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
     };
 
     // Cursor path fetches one extra row (`limit + 1`) so we know whether a
@@ -473,25 +478,23 @@ export class OrderService {
           )} KWD required for this coupon`
         );
       }
+      // Targeting is evaluated for EVERY coupon type, including free_shipping.
+      // It used to be skipped for free_shipping, which zeroed the shipping line
+      // unconditionally: a code restricted to a customer group, to first orders,
+      // to a minimum quantity, or to specific products or categories applied to
+      // anyone who typed it. `evaluateForCart` already accepts the type — the
+      // branch simply never asked it.
+      const evalResult = CouponService.evaluateForCart(appliedCoupon, targetingCtx);
+      if (!evalResult.eligible) {
+        throw new AppError(400, 'COUPON_NOT_ELIGIBLE', 'This coupon does not apply to your cart.');
+      }
       if (appliedCoupon.type === 'free_shipping') {
-        // Free-shipping coupon — zero out the shipping line we just
-        // resolved above. Stacks naturally with the store's own
-        // free-shipping threshold (whichever zeros first wins; both
-        // mean the customer pays no delivery fee).
+        // The benefit is the zeroed shipping line, not a cart discount, so the
+        // computed discount is deliberately not applied on top. Stacks
+        // naturally with the store's own free-shipping threshold — whichever
+        // zeros first wins, and both mean the customer pays no delivery fee.
         shipping = 0;
       } else {
-        // Evaluate the coupon's targeting (customer group, first-order,
-        // product/category scope, min qty) against the resolved cart. A coupon
-        // that doesn't apply to this cart is rejected outright — we never
-        // silently fall back to a whole-cart discount.
-        const evalResult = CouponService.evaluateForCart(appliedCoupon, targetingCtx);
-        if (!evalResult.eligible) {
-          throw new AppError(
-            400,
-            'COUPON_NOT_ELIGIBLE',
-            'This coupon does not apply to your cart.'
-          );
-        }
         couponDiscount = evalResult.discount;
       }
     }
@@ -1269,8 +1272,10 @@ export class OrderService {
         // event has no recovery sweep — so a failed enqueue (Inngest outage /
         // mid-deploy) would silently lose EVERY migrated side effect. Fall back
         // to running the fanout in-process (same pattern as the payment-webhook
-        // inline fallback). Dynamic import avoids a load-time import cycle
-        // (the fanout pulls in several services). Best-effort + non-blocking.
+        // inline fallback). `handleOrderStatusChanged` is imported statically at
+        // the top of this file — an earlier revision used a dynamic import to
+        // dodge a load-time cycle and the note outlived the code.
+        // Best-effort + non-blocking.
         logger.error(
           { err, orderId, status },
           'Failed to enqueue order/status-changed — running fanout inline as fallback'

@@ -292,11 +292,20 @@ router.post(
       // evaluated against the matching subtotal; callers that only send
       // orderTotal (no cartItems) keep the original whole-cart calculation
       // — this branch is intentionally untouched so existing callers are
-      // unaffected. free_shipping coupons have no cart-targeted discount
-      // math (see CouponService.calculateDiscount), so they always fall
-      // through to the orderTotal branch.
+      // unaffected.
+      //
+      // free_shipping is NOT excluded here. It has no cart-targeted discount
+      // math, which is why it used to skip this branch entirely — but skipping
+      // it also skipped the ELIGIBILITY check, so this route reported a
+      // free-shipping code as valid regardless of customer group, first-order,
+      // minimum quantity or product scope. order.service.ts now evaluates
+      // targeting for every coupon type at checkout, so leaving this route
+      // permissive would show the customer a valid coupon and then reject it
+      // at the last step. The discount it computes for free_shipping is zero
+      // by design; the benefit is the zeroed shipping line, applied at order
+      // creation.
       let discount = 0;
-      if (Array.isArray(cartItems) && cartItems.length > 0 && coupon.type !== 'free_shipping') {
+      if (Array.isArray(cartItems) && cartItems.length > 0) {
         // This route is unauthenticated (public storefront), so identity is
         // resolved from phone/email only — NOT a client-supplied customerId.
         // Accepting a body customerId here would let an attacker probe any

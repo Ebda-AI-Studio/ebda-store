@@ -223,6 +223,25 @@ describe('OrderService', () => {
     vi.clearAllMocks();
   });
 
+  describe('list — keyset pagination stability', () => {
+    it('orders by createdAt AND id, so a cursor page boundary cannot skip or repeat', async () => {
+      vi.mocked(prisma.order.findMany).mockResolvedValue([mockOrder] as never);
+      vi.mocked(prisma.order.count).mockResolvedValue(1);
+
+      await OrderService.list(mockStoreId, { cursor: 'order-1', limit: 20 });
+
+      const args = vi.mocked(prisma.order.findMany).mock.calls.at(-1)?.[0] as {
+        orderBy: unknown;
+      };
+      // createdAt alone is NOT unique — bulk-imported or same-second orders
+      // share a timestamp, and keyset pagination is only stable when the ORDER
+      // BY uniquely identifies the cursor row. Without the id tiebreaker a page
+      // boundary landing inside such a group drops orders from the admin list
+      // or shows them twice.
+      expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    });
+  });
+
   describe('list', () => {
     it('should return paginated orders', async () => {
       const mockOrders = [mockOrder, { ...mockOrder, id: 'order-456' }];

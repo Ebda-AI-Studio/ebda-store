@@ -1438,6 +1438,16 @@ export class ProductService {
     // arbitrary jumps. The storefront's page-number UI keeps using `page`
     // for the first ~10000 rows (capped above); the cursor path is for
     // "Load more" + crawler-safe deep scans.
+    // Append `id` as the final tiebreaker. The query below is served with
+    // `cursor: { id }`, and keyset pagination is only stable when the ORDER BY
+    // uniquely identifies the cursor row. None of the sorts resolved above are
+    // unique on their own — price, bestSellerPosition and newArrivalPosition
+    // all repeat freely, and createdAt ties across products imported in the
+    // same batch, which is how most catalogues are seeded. A page boundary
+    // landing inside a tied group silently drops products from the storefront
+    // listing or serves the same one twice.
+    orderBy = [...(Array.isArray(orderBy) ? orderBy : [orderBy]), { id: 'desc' }];
+
     const baseFindManyArgs = {
       where,
       take: limit + 1, // fetch one extra to know if there's a next page
