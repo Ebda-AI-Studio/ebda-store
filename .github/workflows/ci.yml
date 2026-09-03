@@ -372,6 +372,27 @@ jobs:
             const fs = require('fs');
             const all = new Set(JSON.parse(fs.readFileSync('/tmp/all-tests.json', 'utf8')).map(t => t.file));
             const covered = new Set(JSON.parse(fs.readFileSync('/tmp/covered-tests.json', 'utf8')).map(t => t.file));
+
+            // A collection that came back (near-)empty is a BROKEN RUN, not a
+            // repo full of orphans. Without this the job reports every file in
+            // the tree as an orphan — 268 of them on one occasion, including
+            // tests/unit files that are plainly inside the covered globs — and
+            // that reads as a code regression rather than as \"the second
+            // vitest list collected nothing\". Observed on one runner of the
+            // self-hosted pair while the same commit collected 269/269 locally
+            // and passed on the other runner.
+            //
+            // The covered set is a FILTERED subset of the same universe, so it
+            // should be within a whisker of `all`. Anything below half means
+            // the collection failed, and saying so is far more useful than
+            // listing the whole repo.
+            if (covered.size * 2 < all.size) {
+              console.error('::error::covered-test collection returned ' + covered.size +
+                ' file(s) against ' + all.size + ' discovered. The second vitest list failed to' +
+                ' collect, so this is a BROKEN RUN, not an orphan-test regression.' +
+                ' Re-run; if it persists, check the runner node_modules and disk state.');
+              process.exit(1);
+            }
             const orphans = [...all].filter(f => !covered.has(f)).sort();
             if (orphans.length > 0) {
               console.error('::error::' + orphans.length + ' orphan test file(s) — vitest collects these but no CI job glob covers them, so they never run in CI:');

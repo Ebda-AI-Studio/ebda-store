@@ -30,6 +30,19 @@ on:
       - 'apps/web/src/lib/consent-cookie.ts'
       - 'apps/web/src/lib/store-resolver.ts'
       - 'tests/unit/**'
+      # The artifact itself: a PR that hand-edits the record must re-run the
+      # gate, or the staleness check it exists to enforce never fires.
+      - 'docs/security/defence-mutation-record.md'
+      # The runner resolves through these, so changing one changes what the run
+      # measures — and an unbuilt workspace package makes every defence ERROR.
+      - 'vitest.stryker.config.ts'
+      - 'vitest.shared.ts'
+      - 'vitest.config.ts'
+      - 'packages/shared/src/**'
+      - 'packages/database/src/**'
+      # Colocated suites now inside the retry-0 gate above.
+      - 'apps/admin/src/**'
+      - 'apps/web/src/**'
       - '.github/workflows/mutation-testing.yml'
   workflow_dispatch:
     inputs:
@@ -126,7 +139,27 @@ jobs:
       # already sets retry: 0 and includes exactly tests/unit/**, so running it
       # here is the honest unit gate, ~20s, with no risk to the e2e tier.
       - name: Unit tier with retries disabled (no masked-flaky tests)
-        run: ./node_modules/.bin/vitest run --config vitest.stryker.config.ts
+        # ci.yml's config with retry forced off — NOT the stryker config.
+        #
+        # Vitest positional arguments are FILTERS applied to whatever
+        # `test.include` already collected; they narrow that set and can never
+        # widen it. vitest.stryker.config.ts includes `tests/unit/**` only, so
+        # running it with these paths collected 159 files where ci.yml's config
+        # collects 182 — the four extra filters matched nothing and the run was
+        # byte-for-byte what it had always been. The 23 files missing are the
+        # colocated __tests__ suites across packages/shared, packages/database,
+        # apps/web and apps/admin: precisely the ones ci.yml's own comment
+        # records as having been orphaned twice, and precisely where a masked
+        # flake would hide.
+        #
+        # The main config's include is broad, so the same positional list
+        # narrows it to exactly ci.yml's unit scope, and --retry=0 overrides the
+        # retry: 1 that hides order-dependent failures.
+        #
+        # Keep this list in step with ci.yml's "Run unit tests with coverage".
+        run: |
+          ./node_modules/.bin/vitest run --config vitest.config.ts --retry=0 \
+            tests/unit packages/shared/src packages/database/src apps/web apps/admin/src
 
       # --write both measures and refreshes the markdown, and exits non-zero if
       # any defence SURVIVED. One run, not two — the measurement is the artifact.
