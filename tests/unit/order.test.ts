@@ -28,8 +28,21 @@ vi.mock('@force/database', () => ({
     },
     product: {
       findUnique: vi.fn(),
-      // findMany backs OrderService.createAdminOrder's price-hydration lookup.
-      findMany: vi.fn().mockResolvedValue([]),
+      // findMany backs BOTH createAdminOrder's price-hydration lookup AND
+      // create()'s productInternals fetch (trackInventory + costPrice).
+      //
+      // It used to resolve to [] for every test, which is the
+      // product-hard-deleted-mid-checkout state — an order can never be
+      // created in it, because OrderItem.product is a required relation. The
+      // suite passed anyway because the trackInventory read defaulted a map
+      // miss to `true`. Returning the cart's product means these tests now
+      // exercise the state production is actually in; individual tests still
+      // override it where they need something else.
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { id: 'prod-123', trackInventory: true, costPrice: 500, categories: [] },
+        ]),
       update: vi.fn(),
     },
     productVariant: {
@@ -427,6 +440,25 @@ describe('OrderService', () => {
         mockSessionId,
         mockCustomerId
       );
+    });
+
+    /**
+     * The cart's product rows are re-fetched for trackInventory and costPrice.
+     * A hard delete between cart load and order creation leaves that map
+     * short, and the trackInventory read used to default the miss to `true` —
+     * so the order attempted an inventory decrement and an inventory-history
+     * row for a product that no longer exists. It could never have committed:
+     * OrderItem.product is a required relation, so the transaction dies on the
+     * foreign key regardless — but only after the decrement was attempted, and
+     * with an opaque Prisma error instead of something actionable.
+     */
+    it('rejects a cart whose product was deleted mid-checkout, before any stock moves', async () => {
+      // The product is gone: the internals lookup returns nothing for it.
+      vi.mocked(prisma.product.findMany).mockResolvedValueOnce([] as never);
+
+      await expect(
+        OrderService.create(mockStoreId, mockCustomerId, mockSessionId, createOrderData)
+      ).rejects.toThrow(/no longer available/i);
     });
 
     it('should throw error if cart is empty', async () => {

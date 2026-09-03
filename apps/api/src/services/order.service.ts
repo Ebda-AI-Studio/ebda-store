@@ -334,6 +334,30 @@ export class OrderService {
     });
     const productInternalsById = new Map(productInternals.map(p => [p.id, p]));
 
+    // Every cart line MUST resolve to a live product. A hard delete between
+    // cart load and here leaves a map miss, and the two `trackInventory` reads
+    // below defaulted that miss to `true` — so the order attempted an
+    // inventory decrement and an inventory-history row for a row that no
+    // longer exists. It could never have succeeded: OrderItem.product is a
+    // required relation, so the transaction dies on the foreign key anyway —
+    // but only AFTER the decrement was attempted, and with an opaque Prisma
+    // error rather than something a merchant or a log reader can act on.
+    //
+    // Fail here instead, before any money or stock moves, and say which line.
+    // Guessing a default for an absent product is the resolver-defaults
+    // anti-pattern: the honest answer to "does this deleted product track
+    // inventory" is that there is no product.
+    const missingProductIds = cart.items
+      .map(i => i.productId)
+      .filter(id => !productInternalsById.has(id));
+    if (missingProductIds.length > 0) {
+      throw new AppError(
+        409,
+        'PRODUCT_NO_LONGER_AVAILABLE',
+        `A product in your cart is no longer available (${missingProductIds.join(', ')}). Remove it and try again.`
+      );
+    }
+
     // Calculate totals (done before the transaction — no locks needed here).
     // Price each line at its chosen VARIANT's price when one is selected,
     // falling back to the parent product price for variant-less products —
@@ -612,7 +636,8 @@ export class OrderService {
       // movement; that is the movement that actually occurred.
       const stockChanges = new Map<string, { previousStock: number; newStock: number }>();
       for (const item of cart.items) {
-        if (!(productInternalsById.get(item.productId)?.trackInventory ?? true)) continue;
+        // No `?? true` fallback: presence is guaranteed by the guard above.
+        if (!productInternalsById.get(item.productId)!.trackInventory) continue;
         const qty = item.quantity;
         const variantId = (item as { variantId?: string }).variantId;
         const lineKey = `${item.productId}::${variantId ?? ''}`;
@@ -841,7 +866,8 @@ export class OrderService {
       // same transaction, using newOrder.id as the reference (DB-010). Collected
       // and written as a single createMany instead of one create() per line item.
       const inventoryHistoryRows = cart.items.flatMap(item => {
-        if (!(productInternalsById.get(item.productId)?.trackInventory ?? true)) return [];
+        // No `?? true` fallback: presence is guaranteed by the guard above.
+        if (!productInternalsById.get(item.productId)!.trackInventory) return [];
         const variantId = (item as { variantId?: string }).variantId;
         const sc = stockChanges.get(`${item.productId}::${variantId ?? ''}`);
         if (!sc) return [];
