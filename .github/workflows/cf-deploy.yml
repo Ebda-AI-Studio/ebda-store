@@ -309,6 +309,16 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Run smoke suite (storefront + admin, chromium only)
+        # The storefront target is a REPO VARIABLE so the reference merchant can
+        # change without a code change (#1139 — this deploy gate is otherwise
+        # hard-wired to one merchant's custom domain via playwright.config.ts's
+        # default). The fallback keeps today's behavior: wadyaljuz.com is the
+        # flagship live storefront, and the platform host serves the landing
+        # page (no product links), so it cannot satisfy the PDP smoke test.
+        # If wadyaljuz churns/lapses, set `SMOKE_STOREFRONT_URL` in the repo's
+        # Actions variables to the next reference storefront — no PR needed.
+        env:
+          SMOKE_STOREFRONT_URL: ${{ vars.SMOKE_STOREFRONT_URL || 'https://wadyaljuz.com' }}
         run: npx playwright test --project=storefront --project=admin
       - name: Upload Playwright report
         if: failure()

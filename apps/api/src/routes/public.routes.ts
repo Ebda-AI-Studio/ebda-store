@@ -1513,15 +1513,10 @@ router.get(
       }
 
       // This response is keyed on x-store-domain, NOT x-store-id (which this
-      // route never reads), so it must Vary on the header that actually
-      // selects it. With the default Vary alone a CDN configured to cache
-      // this would key on an always-absent header and serve the first
-      // domain's store to every other domain for the whole window.
-      setEdgeCache(res, {
-        sMaxAge: 120,
-        staleWhileRevalidate: 600,
-        varyOn: ['x-store-domain'],
-      });
+      // route never reads). setEdgeCache now Varies on BOTH tenant selectors
+      // by default (audit-followup #1145/#1160 — the same always-absent-header
+      // shape existed on 4 sibling routes), so no per-call varyOn is needed.
+      setEdgeCache(res, { sMaxAge: 120, staleWhileRevalidate: 600 });
       res.json({
         success: true,
         data: result,

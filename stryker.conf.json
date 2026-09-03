@@ -12,7 +12,7 @@
     "apps/api/src/services/recommendation.service.ts",
     "apps/api/src/lib/ai-quota.ts"
   ],
-  "thresholds": { "high": 80, "low": 60, "break": 10 },
+  "thresholds": { "high": 80, "low": 60, "break": 8 },
   "tempDirName": "stryker-tmp",
   "concurrency": 2,
   "timeoutMS": 60000,

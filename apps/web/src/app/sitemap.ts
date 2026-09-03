@@ -21,6 +21,9 @@ const STORE_STATIC_PAGES: Array<{ path: string; priority: number; freq: 'monthly
 type StoreListEntry = {
   id: string;
   slug: string;
+  /** ISO timestamp from /public/stores — used to pick which stores get
+   *  product fan-out (oldest first) when the store count exceeds the cap. */
+  createdAt?: string;
 };
 
 type ProductEntry = {
@@ -41,7 +44,7 @@ async function fetchStores(): Promise<StoreListEntry[]> {
     if (!res.ok) break;
     const data = await res.json();
     const batch: StoreListEntry[] = data?.data ?? [];
-    stores.push(...batch.map(s => ({ id: s.id, slug: s.slug })));
+    stores.push(...batch.map(s => ({ id: s.id, slug: s.slug, createdAt: s.createdAt })));
     const totalPages = data?.pagination?.totalPages ?? 1;
     if (page >= totalPages) break;
     page += 1;
@@ -74,19 +77,48 @@ async function resolveStoreByHost(host: string): Promise<StoreListEntry | null> 
   }
 }
 
-async function fetchProducts(storeId: string): Promise<ProductEntry[]> {
-  const res = await fetch(
-    `${API_URL}/public/products?limit=1000&status=published&storeId=${storeId}`,
-    {
-      // 1-hour TTL was the only freshness control; the tag lets a product save
-      // refresh the sitemap immediately instead of up to an hour later.
-      next: { revalidate: 3600, tags: [`products:${storeId}`] },
-      headers: { 'Content-Type': 'application/json', 'X-Store-ID': storeId },
+/**
+ * Fetch a store's published products, paginated. The API hard-clamps
+ * `limit` at 100 (`ProductService.listPublic`: `Math.min(100, ...)`) — the
+ * old single `?limit=1000` request silently got page 1 of 100, so any
+ * catalog past 100 products was absent from the sitemap (audit-followup
+ * #1147/#1163; live-verified: pecannbee returned 100 of 160). Loop pages at
+ * the real clamp until `meta.totalPages` is exhausted, bounded by
+ * `maxPages` so the master branch's fan-out can't blow the Worker's
+ * 1000-subrequest ceiling. Truncation past the bound is logged, never
+ * silent.
+ */
+async function fetchProducts(storeId: string, maxPages: number): Promise<ProductEntry[]> {
+  const products: ProductEntry[] = [];
+  let page = 1;
+  while (page <= maxPages) {
+    const res = await fetch(
+      `${API_URL}/public/products?page=${page}&limit=100&status=published&storeId=${storeId}`,
+      {
+        // The 1-hour TTL is the floor, not the control: the tag lets a product
+        // save refresh the sitemap immediately instead of up to an hour later.
+        // Kept from main — the pagination rewrite on this branch dropped it,
+        // and taking either side of the conflict whole would have lost one of
+        // the two fixes.
+        next: { revalidate: 3600, tags: [`products:${storeId}`] },
+        headers: { 'Content-Type': 'application/json', 'X-Store-ID': storeId },
+      }
+    );
+    if (!res.ok) break;
+    const data = await res.json();
+    products.push(...(data?.data?.products ?? []));
+    const totalPages = data?.data?.meta?.totalPages ?? 1;
+    if (page >= totalPages) break;
+    if (page === maxPages && totalPages > maxPages) {
+      console.warn('sitemap: product pagination capped for store', {
+        storeId,
+        fetchedPages: maxPages,
+        totalPages,
+      });
     }
-  );
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data?.data?.products ?? [];
+    page += 1;
+  }
+  return products;
 }
 
 /**
@@ -123,7 +155,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tenant = await resolveStoreByHost(requestHost);
   if (tenant) {
     const base = `https://${requestHost}`;
-    const products = await fetchProducts(tenant.id).catch(() => [] as ProductEntry[]);
+    // Single store, own domain: up to 10 pages x 100 = 1000 product URLs
+    // (11 subrequests worst case — nowhere near any Worker limit).
+    const products = await fetchProducts(tenant.id, 10).catch(() => [] as ProductEntry[]);
     const entries: MetadataRoute.Sitemap = [];
     for (const page of STORE_STATIC_PAGES) {
       entries.push({
@@ -172,14 +206,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1000-subrequest ceiling as the platform grows — the render would throw past
   // it and the `apex` fallback below is declared too late to save it. Cap the
   // per-render fan-out and emit the remaining stores with their static pages
-  // only (they still get indexed; they just don't contribute product URLs to
-  // this render). Chunked rather than one Promise.all so we also stop opening
-  // 200 sockets at once against the API.
+  // only (their 11 static pages still get indexed; their catalogs don't
+  // contribute product URLs to this render). Chunked rather than one
+  // Promise.all so we also stop opening 200 sockets at once against the API.
+  //
+  // Subrequest budget (worst case): 50 store-list pages + 1 host resolve +
+  // 200 stores x 3 product pages = 651, under the 1000 ceiling with headroom.
   const MAX_STORES_WITH_PRODUCTS = 200;
+  const PRODUCT_PAGES_PER_STORE = 3; // x100 = up to 300 product URLs per store
   const FANOUT_CHUNK = 20;
 
-  const withProducts = stores.slice(0, MAX_STORES_WITH_PRODUCTS);
-  const withoutProducts = stores.slice(MAX_STORES_WITH_PRODUCTS);
+  // /public/stores returns newest-first (`orderBy createdAt desc`), so a
+  // positional slice used to keep the 200 NEWEST stores and silently drop
+  // product URLs for every older one — the longest-tenured, largest-catalog
+  // anchor tenants lost their catalogs first while brand-new (possibly
+  // empty) stores kept theirs (audit-followup #1146/#1162). Select
+  // oldest-first for the product fan-out instead: deterministic, and
+  // priority-correct for accumulated SEO equity.
+  const byOldestFirst = [...stores].sort((a, b) =>
+    (a.createdAt ?? '').localeCompare(b.createdAt ?? '')
+  );
+  const withProducts = byOldestFirst.slice(0, MAX_STORES_WITH_PRODUCTS);
+  const withoutProducts = byOldestFirst.slice(MAX_STORES_WITH_PRODUCTS);
+  if (withoutProducts.length > 0) {
+    // No-silent-caps rule: the drop must be observable in Worker logs.
+    console.warn('sitemap: product fan-out capped', {
+      total: stores.length,
+      withProducts: withProducts.length,
+      dropped: withoutProducts.length,
+    });
+  }
 
   const productResults: Array<{ store: StoreListEntry; products: ProductEntry[] }> = [];
   for (let i = 0; i < withProducts.length; i += FANOUT_CHUNK) {
@@ -187,7 +243,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     productResults.push(
       ...(await Promise.all(
         chunk.map(store =>
-          fetchProducts(store.id)
+          fetchProducts(store.id, PRODUCT_PAGES_PER_STORE)
             .then(products => ({ store, products }))
             .catch(() => ({ store, products: [] as ProductEntry[] }))
         )
@@ -222,5 +278,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  return [...apex, ...perTenant];
+  // Sitemap protocol hard limit: 50,000 URLs per file (sitemaps.org) —
+  // past it Google reports an error and processes at most the first 50k.
+  // With 11 static pages per store, a full 5000-store fetch alone would
+  // emit 55,001 URLs, so clamp and log rather than ship an invalid
+  // document (audit-followup #1148/#1164). Product-bearing (oldest/anchor)
+  // stores are emitted first, so the clamp drops the newest stores' static
+  // pages last. The real fix past ~4,500 stores is sharding — but NOT via
+  // Next's `generateSitemaps()`, which remaps the route to
+  // `/sitemap/[id].xml` and 404s the bare `/sitemap.xml` every merchant
+  // has already submitted to GSC (verified against next@16.2.6's
+  // metadata-route loader; Next generates no sitemap index file).
+  const SITEMAP_URL_LIMIT = 50_000;
+  const entries = [...apex, ...perTenant];
+  if (entries.length > SITEMAP_URL_LIMIT) {
+    console.error('sitemap: master sitemap exceeds the 50k-URL protocol limit — truncating', {
+      total: entries.length,
+      emitted: SITEMAP_URL_LIMIT,
+      stores: stores.length,
+    });
+    return entries.slice(0, SITEMAP_URL_LIMIT);
+  }
+  return entries;
 }

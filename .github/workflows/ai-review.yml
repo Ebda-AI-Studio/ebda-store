@@ -100,10 +100,29 @@ jobs:
             flock 200
             command -v claude >/dev/null 2>&1 || npm install -g @anthropic-ai/claude-code
           ) 200>/tmp/.force-claude-code-install.lock
+          # Opus, not Fable (Ahmad's call, 2026-09-03). This gives up the
+          # reviewer/author model rotation — the author and auto-fix also run on
+          # Opus — so the reviewer no longer provides an independent second
+          # model, only a second pass with a different prompt and no access to
+          # the PR body. The scoped audit remains the gate that actually catches
+          # things; see CLAUDE.md's reviewer-rotation note for what this trades.
+          #
+          # stderr is merged into the log: stdout is redirected to a file, so
+          # under `set -e` a non-zero exit killed the step before the `cat` and
+          # the CLI's own error never appeared anywhere. Four PRs failed this
+          # check identically on 2026-09-02 with no diagnosable reason.
+          set +e
           claude -p --output-format json \
-            --model claude-fable-5 \
+            --model claude-opus-5 \
             --allowedTools "Read,Grep,Glob" \
-            < /tmp/review-input.md > /tmp/claude-out.json
+            < /tmp/review-input.md > /tmp/claude-out.json 2>/tmp/claude-err.txt
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::claude review CLI exited $rc"
+            sed -n '1,40p' /tmp/claude-err.txt
+            exit "$rc"
+          fi
           cat /tmp/claude-out.json
       - name: Parse, comment, decide
         id: review

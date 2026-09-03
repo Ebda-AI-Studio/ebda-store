@@ -3,10 +3,14 @@ import type { Response } from 'express';
 /**
  * Apply CDN-friendly Cache-Control + Vary headers so whatever edge/CDN sits
  * in front of the API (`api.force-ai.co`, Railway-hosted) can cache public
- * read responses. Most storefront reads are tenant-scoped via path or
- * `x-store-id` header — we Vary on `x-store-id` so two tenants don't
- * collide on the same cache key, plus Accept-Language for the few
- * endpoints that emit per-locale payloads.
+ * read responses. Storefront reads are tenant-scoped via `x-store-id` OR
+ * `x-store-domain` (`getStoreIdFromRequest` falls back to the domain header,
+ * and the storefront's feed proxy sends ONLY `x-store-domain` for
+ * custom-domain merchants) — so BOTH headers are default Vary tokens: a
+ * Vary of `x-store-id` alone would key domain-selected responses on an
+ * always-absent header and serve one merchant's payload to every other
+ * custom-domain merchant (audit-followup #1145/#1160). Callers add
+ * `Accept-Language` via `varyOn` for the few per-locale payloads.
  *
  * sMaxAge: how long the edge serves the cached copy without revalidating.
  * staleWhileRevalidate: how long after sMaxAge expires the edge will
@@ -15,10 +19,14 @@ import type { Response } from 'express';
  * The merchant-perceived staleness window for any admin-driven change is
  * roughly `sMaxAge` because the API also calls `invalidateCached(...)`
  * on writes (Redis L1 layer); the edge L2 just respects the TTL — IF
- * something in front of the API actually honors `Cache-Control`. As of
- * 2026-07-13 that's an open item: confirm whether `api.force-ai.co` is
- * Cloudflare-proxied (orange-cloud) in the dashboard. Not confirmable from
- * the repo alone — see docs/audits/2026-07-13-cache-stampede.md.
+ * something in front of the API actually honors `Cache-Control`. VERIFIED
+ * 2026-09-02: `api.force-ai.co` IS Cloudflare-proxied (live response carries
+ * `server: cloudflare` + `cf-ray`), but `cf-cache-status: DYNAMIC` — CF does
+ * not cache these JSON responses without an explicit cache rule, so today
+ * these headers are honored-but-inert. The moment a cache rule is added,
+ * the Vary set below becomes load-bearing for tenant isolation.
+ * (Supersedes the 2026-07-13 open item in
+ * docs/audits/2026-07-13-cache-stampede.md.)
  *
  * Don't apply to authenticated reads — most CDNs won't cache responses
  * with `Cache-Control: private` or with cookies. Public reads only.
@@ -33,14 +41,22 @@ export function setEdgeCache(
     sMaxAge: number;
     /** Stale-while-revalidate window in seconds. */
     staleWhileRevalidate?: number;
-    /** Vary tokens beyond the default (`x-store-id`). Add
-     *  `'Accept-Language'` for locale-split payloads. */
+    /** Vary tokens beyond the defaults (`x-store-id`, `x-store-domain`).
+     *  Add `'Accept-Language'` for locale-split payloads. */
     varyOn?: string[];
   }
 ): void {
   const swr = opts.staleWhileRevalidate ?? opts.sMaxAge * 5;
   res.setHeader('Cache-Control', `public, s-maxage=${opts.sMaxAge}, stale-while-revalidate=${swr}`);
-  // CDN-compliant edges respect Vary; combine our default with any caller-supplied tokens.
-  const vary = ['x-store-id', ...(opts.varyOn ?? [])];
-  res.setHeader('Vary', vary.join(', '));
+  // res.vary() APPENDS (merge + case-insensitive dedupe) instead of
+  // replacing — `setHeader('Vary', ...)` here used to clobber the
+  // `Vary: Origin` the global cors() middleware sets (its `origin` option
+  // is a function, so ACAO differs per requester), which would let a
+  // caching edge replay one merchant's ACAO to every other merchant's
+  // browser (audit-followup #1161).
+  res.vary('x-store-id');
+  res.vary('x-store-domain');
+  for (const token of opts.varyOn ?? []) {
+    res.vary(token);
+  }
 }

@@ -206,13 +206,13 @@ Backups: daily local `pg_dump` runs on the developer Mac at 3:30am via launchd (
 
 Add these records to your domain:
 
-| Type  | Name   | Value                   | Notes                                                     |
-| ----- | ------ | ----------------------- | --------------------------------------------------------- |
-| —     | store  | (Worker route)          | Cloudflare Worker `force-web-cf-preview` custom domain    |
-| —     | admin  | (Worker route)          | Cloudflare Worker `force-admin-cf-preview` custom domain  |
-| —     | orders | (Worker route)          | Cloudflare Worker `force-orders-cf-preview` custom domain |
-| CNAME | api    | your-app.up.railway.app | Railway API — no proxy                                    |
-| CNAME | cdn    | pub-xxx.r2.dev          | Cloudflare R2 public bucket (`*.r2.dev`)                  |
+| Type  | Name   | Value                   | Notes                                                                                                                                                                                                                                                      |
+| ----- | ------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| —     | store  | (Worker route)          | Cloudflare Worker `force-web-cf-preview` custom domain                                                                                                                                                                                                     |
+| —     | admin  | (Worker route)          | Cloudflare Worker `force-admin-cf-preview` custom domain                                                                                                                                                                                                   |
+| —     | orders | (Worker route)          | Cloudflare Worker `force-orders-cf-preview` custom domain                                                                                                                                                                                                  |
+| CNAME | api    | your-app.up.railway.app | Railway API — Cloudflare-PROXIED (verified live 2026-09-02: responses carry `server: cloudflare` + `cf-ray`; `cf-cache-status: DYNAMIC`, i.e. CF forwards but does not cache JSON without an explicit cache rule). The old "no proxy" note here was stale. |
+| CNAME | cdn    | pub-xxx.r2.dev          | Cloudflare R2 public bucket (`*.r2.dev`)                                                                                                                                                                                                                   |
 
 Custom domains for per-tenant storefronts are auto-registered via `apps/api/src/services/cloudflare-domain.service.ts` (Cloudflare-for-SaaS Custom Hostnames — see `docs/migration/cloudflare-cutover-runbook.md`) — merchants add their domain in the admin UI and the API provisions it automatically.
 

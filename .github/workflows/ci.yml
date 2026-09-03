@@ -321,7 +321,12 @@ jobs:
     # test lands outside every job's glob again.
     if: needs.changes.outputs.code == 'true'
     runs-on: ${{ (inputs.force_cloud || vars.USE_SELF_HOSTED != 'true') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","wsl2"]') }}
-    timeout-minutes: 10
+    # 20, not 10 — npm ci alone measured ~268s cold on the self-hosted runner
+    # (see the Lint job's 2026-08-11 budget post-mortem above), and this job
+    # additionally builds 2 packages and runs 2 full vitest collections. A
+    # 10-minute budget would cancel cold-cache runs with a timeout error —
+    # the same false-signal class this job exists to eliminate (#1138).
+    timeout-minutes: 20
     needs: [build, changes]
     steps:
       - uses: actions/checkout@v4

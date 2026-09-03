@@ -37,6 +37,29 @@ No changes to the sitemap/robots.txt/structured-data guidance above are needed f
 
 > **Why the sitemap is already correct:** `apps/web/src/app/sitemap.ts` is host-aware — on `wadyaljuz.com` it emits only Wady Aljuz's URLs rooted at `https://wadyaljuz.com`, not platform URLs. This was fixed 2026-05-14. The submitted sitemap will not bleed `store.forcemediakw.com` paths into the merchant's GSC property.
 
+> **Sitemap coverage limits (2026-09-02, audit-followup #1146/#1147/#1148):**
+> operators reading a GSC coverage drop should know these bounds before
+> suspecting a crawl bug.
+>
+> - **Per-store product URLs are paginated, not unlimited.** The API clamps
+>   `/public/products` at 100/page; the sitemap now pages through the catalog —
+>   up to **1,000 products** on a merchant's own custom-domain sitemap (10
+>   pages) and up to **300 products per store** in the master sitemap (3
+>   pages). Truncation past those bounds logs
+>   `sitemap: product pagination capped for store` in Worker logs.
+> - **Master-sitemap product fan-out covers at most 200 stores**, selected
+>   **oldest-first** (longest-tenured/anchor tenants keep their catalogs;
+>   the newest stores past the cap contribute their 11 static pages only).
+>   The drop logs `sitemap: product fan-out capped`.
+> - **The master sitemap hard-clamps at 50,000 URLs** (sitemaps.org protocol
+>   limit — Google rejects/truncates anything larger). Hitting the clamp logs
+>   `sitemap: master sitemap exceeds the 50k-URL protocol limit`. Reaching it
+>   takes ~4,500 stores; the fix at that scale is sharding — but NOT via
+>   Next's `generateSitemaps()`, which remaps the route to `/sitemap/[id].xml`
+>   and 404s the bare `/sitemap.xml` every merchant has already submitted.
+> - Merchant custom-domain sitemaps are unaffected by the store cap and the
+>   50k clamp (11 static pages + ≤1,000 products).
+
 ---
 
 ## AI crawler directives (robots.txt)

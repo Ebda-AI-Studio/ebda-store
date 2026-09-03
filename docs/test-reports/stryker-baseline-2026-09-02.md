@@ -71,9 +71,16 @@ because the logic is well-tested. Fix path is the same as May's:
 ## Ratchet
 
 `stryker.conf.json`'s `thresholds.break` was `null` (nothing could fail). Set
-to `10` — just under today's measured 10.65% (small margin for run-to-run
-noise; this suite has zero timeouts and low variance, so an actual regression,
-not noise, is what would trip it). This is a floor, not a target: `low`/`high`
+to `10` initially — then LOWERED to `8` (audit-followup #1143): 10 sat only
+0.65 points (~7 mutants of 1099) under the measured 10.65%, while this very
+document records 22 instrumented-but-unscored mutants (`payment.service.ts`
+has no row and the `ignoreStatic` explanation above is plausible, not
+verified). If those 22 ever get scored — a config change, a Stryker minor
+bump, a refactor out of static initializers — the denominator grows ~2% and
+a 10 floor breaks on a PR that changed nothing about test quality. The `8`
+floor is therefore DELIBERATELY below the measured score, not pinned to it;
+re-ratchet toward the measured score once the payment.service.ts mutant gap
+is explained. This is a floor, not a target: `low`/`high`
 (60/80) stay as the aspirational healthy-score bar. A CI job
 (`.github/workflows/mutation-testing.yml`, `workflow_dispatch`-only, matching
 `load-test-nightly.yml`'s manual pattern) now runs `npx stryker run` and fails
