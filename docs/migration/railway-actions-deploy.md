@@ -21,9 +21,35 @@ still runs on Railway before the new replica is promoted, regardless of what tri
 
 ## Safe by default
 
-`railway-deploy.yml` is **guarded on the `RAILWAY_TOKEN` secret**. With the secret unset
-(the state on merge), the workflow logs a warning and no-ops. So **merging this PR changes
-nothing** — the API keeps deploying via the Railway GitHub App until you actively cut over.
+`railway-deploy.yml` is **gated on the `RAILWAY_ACTIONS_DEPLOY` repo variable**, at job
+level. Until it is set to `true` the deploy job is reported as **skipped** — a grey
+square, not a green tick.
+
+That distinction is the point. The gate used to live inside a step: the job ran, wrote a
+warning, deployed nothing and reported **success**. Every push to `main` therefore showed
+a green "Deploy API (Railway)" that was indistinguishable from a real deploy, which is
+exactly the signal you would rely on to answer "did it ship?". A skipped job answers that
+honestly; a green one lied.
+
+Once the variable IS `true`, a missing `RAILWAY_TOKEN` **fails** the job rather than
+skipping it. After cutover an absent token is a misconfiguration, and the one thing it
+must not do is quietly go back to deploying nothing.
+
+## Before the cutover — prove the deploy path once
+
+**Do this while Railway's own auto-deploy is still enabled**, so the API keeps a working
+deploy path if it fails.
+
+1. Set `RAILWAY_ACTIONS_DEPLOY` = `true` and add the `RAILWAY_TOKEN` secret.
+2. Run the workflow manually (`workflow_dispatch`) and watch it finish.
+3. Confirm the **Stamp the commit being deployed** step succeeded and the **Verify the
+   deployed build is THIS commit** step reports the sha rather than warning about a null.
+
+Only then do the two steps below. A CLI invocation that is correct in a terminal is not
+thereby correct in the job — the Railway CLI is pinned in the workflow for exactly this
+reason, and a subcommand that does not exist would exit non-zero at the stamp step
+**before** `railway up`, leaving the API with no deploy path at all. That is the state
+this whole runbook exists to avoid, so it is worth one dispatch run to rule out.
 
 ## Cutover — 2 steps (do them together)
 
@@ -34,6 +60,7 @@ disabling auto-deploy without the token → **no deploy path**. So:
    - Railway → the `force-website-builder` project → **Settings → Tokens** → create a
      **Project token** scoped to the **`production`** environment. Copy it.
    - GitHub → repo **Settings → Secrets and variables → Actions**:
+     - **Variable** `RAILWAY_ACTIONS_DEPLOY` = `true` — this is what switches the job on.
      - **Secret** `RAILWAY_TOKEN` = the project token.
      - **Variable** `RAILWAY_SERVICE` = the exact service name of the API service (as shown
        in the Railway project). The service is named **`api`** (verified via the Railway
@@ -49,7 +76,26 @@ disabling auto-deploy without the token → **no deploy path**. So:
 
 Then push any change under `apps/api/**` / `packages/**` (or run the workflow via
 **Actions → Deploy API (Railway) → Run workflow**) and confirm: the Actions run deploys and
-the **Verify /health** step goes green.
+the **Verify the deployed build is THIS commit** step goes green.
+
+That step waits for `/health` to report the commit being deployed, not merely a 200. A 200
+is returned just as cheerfully by the container still running the PREVIOUS release, so the
+old check passed on a deploy that never landed. If `/health` reports `commit: null` the
+build was never told its commit — the step warns and passes, because unknown is not the
+same as wrong. Populating it is automatic once this workflow deploys: the **Stamp the commit being
+deployed** step sets `GIT_COMMIT_SHA` as a Railway service variable to the commit being
+deployed, and `Dockerfile.api` bakes it in as `BUILD_COMMIT_SHA`. Railway builds the image
+itself, so a build arg cannot be passed from the CLI — a service variable is how the value
+reaches the build.
+
+**Never set `GIT_COMMIT_SHA` to a fixed value by hand.** It has to change per deploy; a
+static one makes `/health` report a commit that is not the one running, which is a
+confident lie and strictly worse than the `null` it replaces. Checked 2026-09-03: the
+service defines 85 variables and `RAILWAY_GIT_COMMIT_SHA` is not among them — though note
+`RAILWAY_DEPLOYMENT_ID` is not either, and that one demonstrably reaches the container, so
+the variable list shows what is CONFIGURED and not what is injected at runtime. Whether
+Railway injects a commit sha of its own is answered the first time this ships: if
+`/health` reports a non-null `commit` before the cutover, it does.
 
 ## Rollback (post-cutover)
 
@@ -63,4 +109,6 @@ the **Verify /health** step goes green.
 ## Rollback of the cutover itself
 
 Re-enable "Deploy on push" in Railway and the GitHub App resumes deploying; the Actions
-workflow no-ops again once `RAILWAY_TOKEN` is removed. Fully reversible.
+workflow goes back to a skipped job once `RAILWAY_ACTIONS_DEPLOY` is unset or set to
+anything other than `true`. Fully reversible, and the rollback is a variable rather than a
+secret so it needs no token handling.

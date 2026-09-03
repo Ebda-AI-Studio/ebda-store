@@ -34,6 +34,13 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Which commit this image was built from, so /health can report it and a
+# deploy can be verified as LIVE rather than merely green. Supplied as a
+# build arg by whatever performs the build; absent when the builder does not
+# know the commit, in which case /health reports null rather than guessing.
+ARG GIT_COMMIT_SHA=""
+ENV BUILD_COMMIT_SHA=$GIT_COMMIT_SHA
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 api
 

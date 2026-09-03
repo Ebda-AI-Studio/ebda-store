@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   fetchOpenFollowupTitles,
   followupIssueTitle,
@@ -17,6 +18,8 @@ import {
 import { fetchAllPages } from '../../.github/scoped-audit/gh-paginate.mjs';
 // @ts-expect-error - plain .mjs script, no types
 import { resolveMarkerComment } from '../../.github/scoped-audit/marker-comment.mjs';
+// @ts-expect-error - plain .mjs script, no types
+import { nonRunExitCode, auditExitCode } from '../../.github/scoped-audit/gate-policy.mjs';
 
 type Finding = { severity: string; title: string };
 
@@ -306,5 +309,68 @@ describe('finding the gate own PR comment', () => {
     // If this destructure ever drifts again, this line fails at the boundary.
     const r = resolveMarkerComment({ ...page, marker: MARKER });
     expect(r.prior?.id).toBe(7);
+  });
+});
+
+describe('a gate that did not run must not report success', () => {
+  // Observed 2026-09-03 on this very PR: `claude CLI exited 1 — the
+  // scoped-audit gate did not run`, `AUDIT_RAN: false`, and the check reported
+  // completed/success. A run that audited nothing looked exactly like one that
+  // audited everything and approved it.
+  it('exits non-zero when nothing was audited', () => {
+    expect(nonRunExitCode()).toBe(1);
+  });
+
+  it('stays fail-open where a red tick WOULD block', () => {
+    // The policy is "must not block every PR on a model outage". That holds
+    // because this gate is not a required check. If it ever becomes one, the
+    // same non-run must go back to exiting zero or the trade-off inverts.
+    expect(nonRunExitCode({ isRequiredCheck: true })).toBe(0);
+  });
+
+  it('a completed audit still gates on its findings, not on having run', () => {
+    expect(auditExitCode({ blockingFindings: 0 })).toBe(0);
+    expect(auditExitCode({ blockingFindings: 1 })).toBe(1);
+  });
+});
+
+describe('every path that admits it did not audit must exit non-zero', () => {
+  // Three of these were fixed and a FOURTH was missed, which the gate itself
+  // caught on the very next run: "Fourth non-run path still exits 0 — gate
+  // still reports PASSED after auditing nothing". Counting the paths was the
+  // mistake; the invariant is what holds, so it is asserted structurally
+  // rather than trusted to the next reader's enumeration.
+  const source = readFileSync(
+    new URL('../../.github/scoped-audit/audit.mjs', import.meta.url),
+    'utf8'
+  );
+  const lines = source.split('\n');
+
+  const callSites = lines
+    .map((line, i) => ({ line, n: i + 1 }))
+    .filter(
+      ({ line }) => line.includes('alertAuditDidNotRun(') && !line.includes('async function')
+    );
+
+  it('finds the call sites at all (guards against a rename silently emptying this)', () => {
+    expect(callSites.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it.each([0, 1, 2, 3].map(i => [i]))('call site %i exits non-zero', i => {
+    const site = callSites[i];
+    expect(site, 'fewer call sites than expected').toBeDefined();
+    const following = lines.slice(site.n - 1, site.n + 7).find(l => l.includes('process.exit'));
+    expect(following, `no exit follows the call at line ${site.n}`).toBeDefined();
+    expect(
+      following,
+      `line ${site.n} admits the audit did not run, then reports success`
+    ).toContain('nonRunExitCode()');
+  });
+
+  it('no non-run path exits zero directly', () => {
+    for (const site of callSites) {
+      const following = lines.slice(site.n - 1, site.n + 7).find(l => l.includes('process.exit'));
+      expect(following).not.toMatch(/process\.exit\(\s*0\s*\)/);
+    }
   });
 });

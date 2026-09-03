@@ -28,6 +28,7 @@ import {
   selectFollowupsToFile,
 } from './followup-filing.mjs';
 import { fetchAllPages } from './gh-paginate.mjs';
+import { nonRunExitCode } from './gate-policy.mjs';
 import { resolveMarkerComment } from './marker-comment.mjs';
 
 const {
@@ -185,11 +186,12 @@ async function alertAuditDidNotRun(reason) {
 
 if (AUDIT_RAN === 'false') {
   await alertAuditDidNotRun(AUDIT_RAN_REASON);
-  // Fail-open by design (see file header): a broken model must not block
-  // every PR on a solo-dev repo with no human reviewer. But fail-open no
-  // longer means silent — alertAuditDidNotRun() above is what closes that
-  // gap. Nothing below this point has anything to parse.
-  process.exit(0);
+  // Still fail-open in the sense that matters: this gate is NOT one of the
+  // eleven required checks, so a non-zero exit informs without blocking the
+  // merge. What it stops doing is claiming to have PASSED — exiting zero
+  // rendered the check green, and green is what a merge decision reads. See
+  // gate-policy.mjs. Nothing below this point has anything to parse.
+  process.exit(nonRunExitCode());
 }
 
 // ---------------------------------------------------------------------------
@@ -202,12 +204,12 @@ try {
 } catch (e) {
   console.error('Could not read Claude output:', e.message);
   await alertAuditDidNotRun(`AUDIT_RAN was not 'false' but output was unreadable: ${e.message}`);
-  process.exit(0); // fail-open
+  process.exit(nonRunExitCode());
 }
 if (!modelText) {
   console.error('Empty model result — skipping gate (fail-open).');
   await alertAuditDidNotRun("AUDIT_RAN was not 'false' but model result was empty");
-  process.exit(0);
+  process.exit(nonRunExitCode());
 }
 
 // Tolerate code fences / surrounding prose (same extractJson as review.mjs)
@@ -227,7 +229,7 @@ try {
   await alertAuditDidNotRun(
     `AUDIT_RAN was not 'false' but model output did not parse as JSON: ${e.message}`
   );
-  process.exit(0); // fail-open
+  process.exit(nonRunExitCode());
 }
 
 const findings = Array.isArray(result.findings) ? result.findings : [];

@@ -177,6 +177,7 @@ app.use(
 
 // CORS domain cache shared via module so store.routes.ts can bust it on domain changes
 import { corsDomainCache, CORS_CACHE_TTL_MS, isPlatformOrigin } from './lib/cors-cache';
+import { buildIdentity } from './lib/build-identity';
 
 /**
  * A cross-origin request from an origin we don't recognise is a CLIENT
@@ -423,9 +424,16 @@ app.use(csrfProtection);
 // Request logging
 app.use(requestLogger);
 
-// Simple health check (for load balancers)
+// Simple health check (for load balancers).
+//
+// Carries the build's identity as well as its liveness. A 200 alone cannot
+// answer "did the merged code reach production" — the container serving the
+// PREVIOUS release returns exactly the same 200 — so the deploy verification
+// and any manual check had nothing to compare against. Unknown values are
+// reported as null rather than omitted or guessed, so a caller can tell
+// "this build is X" apart from "this build will not say".
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), ...buildIdentity() });
 });
 
 // Comprehensive health check with dependency status (requires auth)
