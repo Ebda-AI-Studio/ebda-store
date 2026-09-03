@@ -292,6 +292,12 @@ Use the exact URL format shown above. Keep the output under 2000 characters. Ret
         where: { id: jobId },
         select: { status: true },
       });
+
+      // Bust ONCE per sweep, never per item. This file defines THREE separate
+      // Inngest functions; an earlier pass inserted the bust before only the LAST
+      // completion block in the file, so two of the three sweeps still wrote
+      // product-facing content and invalidated nothing.
+      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {
@@ -576,6 +582,12 @@ Example: {"en": "Product X is a...\n• Spec 1\n• Spec 2", "ar": "المنتج
         where: { id: jobId },
         select: { status: true },
       });
+
+      // Bust ONCE per sweep, never per item. This file defines THREE separate
+      // Inngest functions; an earlier pass inserted the bust before only the LAST
+      // completion block in the file, so two of the three sweeps still wrote
+      // product-facing content and invalidated nothing.
+      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {
@@ -793,7 +805,7 @@ Populate using only the information provided above. For keyCategories, use the c
       // per item — same discipline as bulk-import (a per-row sweep would be an
       // invalidation storm). This also purges the storefront's Next data cache
       // via the tag the public fetches carry.
-      await invalidateStoreProductCaches(storeId);
+      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {

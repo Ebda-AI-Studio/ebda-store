@@ -1,3 +1,20 @@
+// ⚠️  REGENERATED AT DEPLOY TIME — EDITING THIS FILE CHANGES NOTHING IN PROD.
+//
+// `.github/workflows/cf-deploy.yml` runs `scripts/cf-setup-local.sh web` BEFORE
+// the build, and that script OVERWRITES this file unconditionally. Whatever is
+// committed here is replaced by the generator's output, so a cache override,
+// binding or entry point added here alone is dead weight that deploys as a
+// no-op while the repo, the docs and a green pipeline all say otherwise.
+//
+// This is not hypothetical: a D1 tag cache was added here on 2026-09-02,
+// documented as REQUIRED, given its own migration step, and never once
+// deployed. The live worker's bindings (confirmed against the Cloudflare API)
+// are NEXT_TAG_CACHE_DO_SHARDED, NEXT_CACHE_DO_QUEUE and
+// NEXT_INC_CACHE_R2_BUCKET — the OPENNEXT_CACHE=true branch of the generator.
+//
+// To change what actually deploys, edit scripts/cf-setup-local.sh.
+// To verify what IS deployed, read the worker's bindings, not this file.
+
 import { defineCloudflareConfig } from '@opennextjs/cloudflare';
 import r2IncrementalCache from '@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache';
 

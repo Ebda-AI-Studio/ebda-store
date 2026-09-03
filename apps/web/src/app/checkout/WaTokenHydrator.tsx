@@ -21,7 +21,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
-import { api, API_URL } from '../../lib/api';
+import { api } from '../../lib/api';
 import {
   sessionGet,
   sessionSet,
@@ -53,20 +53,22 @@ export default function WaTokenHydrator() {
 
     (async () => {
       try {
-        // API_URL already includes the /api/v1 prefix (see lib/api.ts) — do not
-        // re-append it here or the request 404s on /api/v1/api/v1/...
-        const res = await fetch(`${API_URL}/wa-bridge/cart/redeem`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ token }),
-        });
-        if (!res.ok) {
+        // Through the ApiClient, not a raw fetch: it attaches X-Session-ID and
+        // X-CSRF-Token. /wa-bridge is mounted before csrfProtection in
+        // apps/api/src/index.ts so redeem does not reach the verifier today,
+        // but merchant custom origins are no longer CSRF-exempt — a raw fetch
+        // here would 403 the moment that mount order changed, and the catch
+        // below only console.warns, so the cart would silently arrive empty.
+        const res = await api.post<{ items?: unknown[]; customerPhone?: string }>(
+          '/wa-bridge/cart/redeem',
+          { token }
+        );
+        if (!res.success) {
           // eslint-disable-next-line no-console
-          console.warn('[wa-token-hydrator] redeem failed', res.status);
+          console.warn('[wa-token-hydrator] redeem failed', res.error);
           return;
         }
-        const data = parseWaCartPayload(await res.json());
+        const data = parseWaCartPayload(res);
         if (!data) return;
 
         // Issue 4: call api.addToCart directly (bypassing the addItem

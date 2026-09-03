@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import rateLimit, { ipKeyGenerator, type Store } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import { randomUUID } from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
 import { redis } from '../services/redis.service';
 import { BoundedMap } from '../lib/bounded-map';
@@ -17,7 +18,7 @@ import logger from '../lib/logger';
 // count so the process can never exhaust heap through CSRF token churn
 // during a long Redis outage; old sessions are evicted and will re-mint.
 const MAX_CSRF_TOKENS = 10000;
-const csrfTokensMemory = new BoundedMap<string, { token: string; expiresAt: Date }>(
+const csrfTokensMemory = new BoundedMap<string, { value: string; expiresAt: Date }>(
   MAX_CSRF_TOKENS
 );
 
@@ -32,13 +33,60 @@ setInterval(
   5 * 60 * 1000
 ); // Every 5 minutes
 
-export async function generateCsrfToken(sessionId: string): Promise<string> {
+/**
+ * Principal a CSRF token is bound to when the minting request had no
+ * authenticated user. A literal sentinel (not `''`) so an unbound token can
+ * never be produced by a falsy userId slipping through unnoticed.
+ */
+const ANONYMOUS_CSRF_PRINCIPAL = 'anon';
+
+/**
+ * The stored CSRF record is `<principal>.<token>`; only `<token>` is ever
+ * handed to the client. Both halves are ids that cannot contain a `.`
+ * (cuid / uuid), and the split is on the FIRST separator regardless.
+ *
+ * WHY THE PRINCIPAL IS STORED AT ALL: without it the token proves only
+ * "somebody once minted a token for the session id you are claiming" — and
+ * the caller picks its own `X-Session-ID`. An attacker registers a throwaway
+ * customer, logs in with `X-Session-ID: <chosen>` (POST /auth/login is exempt
+ * from `csrfProtection` and mints for any id the caller supplies), and now
+ * holds a (sessionId, csrfToken) pair minted entirely within its OWN session.
+ * Hardcoding that pair into a page on its CORS-allowlisted merchant domain
+ * and luring a signed-in super_admin makes the browser attach the VICTIM's
+ * `SameSite=None` cookie while the attacker supplies both headers — an
+ * unbound verifier passes it and the write executes as the victim. Binding
+ * the token to the principal that minted it and re-checking against the
+ * cookie-derived identity is what makes the double-submit token an actual
+ * proof of same-session origin. `restrictPlatformOnlyOrigins` cannot cover
+ * this: it only guards `/admin` + `/payment-settings`, while the lured-admin
+ * attack lands just as well on every `/stores/:id/*` write.
+ */
+function packCsrfRecord(principal: string, token: string): string {
+  return `${principal}.${token}`;
+}
+
+function unpackCsrfRecord(record: string): { principal: string; token: string } | null {
+  const sep = record.indexOf('.');
+  // No separator = a record written before tokens carried a principal. Fail
+  // CLOSED rather than honouring it: those are exactly the unbound tokens the
+  // attack above uses, and both frontends re-mint on a `CSRF_*` 403 (refresh
+  // + retry once), so a live session heals on its next write instead of
+  // carrying the hole for the rest of the 1h TTL.
+  if (sep <= 0) return null;
+  return { principal: record.slice(0, sep), token: record.slice(sep + 1) };
+}
+
+export async function generateCsrfToken(
+  sessionId: string,
+  userId?: string | null
+): Promise<string> {
   const token = randomUUID();
+  const record = packCsrfRecord(userId || ANONYMOUS_CSRF_PRINCIPAL, token);
   const ttlSeconds = 3600; // 1 hour
 
   // Try Redis first
   if (redis.isAvailable()) {
-    await redis.setCsrfToken(sessionId, token, ttlSeconds);
+    await redis.setCsrfToken(sessionId, record, ttlSeconds);
   } else {
     // Fallback to in-memory with size limit
     if (csrfTokensMemory.size >= MAX_CSRF_TOKENS) {
@@ -50,30 +98,78 @@ export async function generateCsrfToken(sessionId: string): Promise<string> {
       }
     }
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-    csrfTokensMemory.set(sessionId, { token, expiresAt });
+    csrfTokensMemory.set(sessionId, { value: record, expiresAt });
   }
 
   return token;
 }
 
-async function verifyCsrfToken(sessionId: string, token: string): Promise<boolean> {
-  // Try Redis first
+/**
+ * Identity this request is authenticated as, derived from the access cookie —
+ * the only credential a cross-origin attacker can make the browser attach
+ * without being able to read it.
+ *
+ * Read here rather than from `req.user` because `csrfProtection` is mounted
+ * app-wide (index.ts), long before any route's `authenticate`. Bearer callers
+ * never reach this code (they return early — a header the browser never
+ * attaches by itself cannot be ridden).
+ */
+function csrfPrincipal(req: Request): string {
+  const cookieToken = req.cookies?.token as string | undefined;
+  if (!cookieToken) return ANONYMOUS_CSRF_PRINCIPAL;
+
+  try {
+    const payload = jwt.verify(cookieToken, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: 'force-api',
+      audience: 'force-app',
+      // Expiry is `authenticate`'s job, not ours. A 30-minute-old access
+      // cookie still identifies its owner unambiguously (the signature is
+      // verified), and treating it as anonymous here would turn every
+      // just-expired session's next write into a confusing CSRF 403 instead
+      // of the 401 that drives the client's silent refresh + retry.
+      ignoreExpiration: true,
+    }) as { userId?: string };
+    return payload.userId || ANONYMOUS_CSRF_PRINCIPAL;
+  } catch {
+    // Unsigned / tampered / wrong-secret cookie proves no identity.
+    return ANONYMOUS_CSRF_PRINCIPAL;
+  }
+}
+
+async function verifyCsrfToken(
+  sessionId: string,
+  token: string,
+  principal: string
+): Promise<boolean> {
+  if (!token) return false;
+
+  let record: string | null;
   if (redis.isAvailable()) {
-    const storedToken = await redis.getCsrfToken(sessionId);
-    return storedToken === token;
+    // Try Redis first
+    record = await redis.getCsrfToken(sessionId);
+  } else {
+    // Fallback to in-memory
+    const stored = csrfTokensMemory.get(sessionId);
+    if (!stored) return false;
+
+    // Clean up expired tokens
+    if (stored.expiresAt < new Date()) {
+      csrfTokensMemory.delete(sessionId);
+      return false;
+    }
+    record = stored.value;
   }
 
-  // Fallback to in-memory
-  const stored = csrfTokensMemory.get(sessionId);
-  if (!stored) return false;
+  if (!record) return false;
 
-  // Clean up expired tokens
-  if (stored.expiresAt < new Date()) {
-    csrfTokensMemory.delete(sessionId);
-    return false;
-  }
+  const unpacked = unpackCsrfRecord(record);
+  if (!unpacked) return false;
 
-  return stored.token === token;
+  // BOTH halves must match: the token proves the caller read a mint response,
+  // the principal proves it was minted for the identity this request is
+  // authenticated as — not for some throwaway account the attacker controls.
+  return unpacked.token === token && unpacked.principal === principal;
 }
 
 /**
@@ -85,22 +181,95 @@ async function verifyCsrfToken(sessionId: string, token: string): Promise<boolea
 const PLATFORM_ONLY_ORIGIN_PATHS: RegExp[] = [
   /^\/api\/v1\/admin(\/|$)/,
   /^\/api\/v1\/payment-settings(\/|$)/,
+  // Everything under /stores/:storeId, minus the storefront allow-list below.
+  //
+  // routes/index.ts mounts the whole merchant-admin surface here — orders,
+  // customers, analytics, finance, suppliers, purchase-orders, shipments,
+  // coupons, loyalty, promotions and roughly forty more routers, most at the
+  // BARE /stores prefix where each declares its own /:storeId/<segment>. CORS
+  // allowlists any DB-registered merchant domain with credentials:true,
+  // csrfProtection returns next() for GET, and the cookie is SameSite=None, so
+  // a merchant who registers a hostname they control can lure a signed-in
+  // admin and read these cross-origin. Store ids are not secret:
+  // /public/store/resolve returns one for any storefront domain.
+  //
+  // This was first written as a DENY-list of enumerated admin segments and
+  // that was the wrong direction. The list missed `shipments` (customer names,
+  // addresses, phones), `coupons` (full codes and values), `loyalty`,
+  // `promotions`, and `/orders/:id/invoice` — the last because the orders
+  // pattern deliberately stopped at one segment to spare `/timeline`, which
+  // let the admin-only invoice through with the customer's full name, address
+  // and line items. A deny-list is only ever as complete as the enumeration
+  // behind it, and enumerating forty routers' sub-paths is not a thing anyone
+  // will redo when the forty-first is added.
+  //
+  // So it is inverted: deny the prefix, allow the nine shapes the storefront
+  // actually calls. That set is small, comes from ONE app, and is mechanically
+  // re-derivable — tests/unit/platform-only-origins.test.ts re-runs the
+  // enumeration against apps/web and fails if a storefront call appears that
+  // this list does not permit. A missed admin route now fails CLOSED (a 403 on
+  // an admin surface, caught immediately) instead of open (silent PII read).
+  /^\/api\/v1\/stores(\/|$)/,
 ];
 
-// DELIBERATELY NOT LISTED: /auth/me/erase and /auth/logout-all.
-//
-// They read as "destructive, so lock them down", but they are CUSTOMER
-// self-service, not platform-admin. The storefront account page calls
-// /auth/me/erase (apps/web/.../account/settings/SettingsClient.tsx) — and the
-// storefront runs on merchant custom domains, which are by definition not
-// platform origins. Gating them here would have returned 403 for every
-// customer trying to erase their own account on a real merchant domain,
-// breaking the GDPR Art. 17 / Kuwait Law 13 erasure path this codebase
-// implements on purpose.
-//
-// They remain protected by authenticate + the CSRF token + rejectImpersonated,
-// which is the right boundary for a self-service action. This gate is for the
-// platform-ADMIN surface only.
+/**
+ * Paths under /stores that a BROWSER on a merchant custom domain legitimately
+ * calls. Checked before PLATFORM_ONLY_ORIGIN_PATHS; anything not listed is
+ * denied to non-platform origins.
+ *
+ * Enumerated from apps/web/src — every template-literal request to the bare
+ * /stores prefix, excluding /public/stores which this gate never touches.
+ * Deliberately exact rather than prefix-shaped: `/reviews/product/:id` is a
+ * storefront read, but a hypothetical `/reviews/:id/moderate` is not, and a
+ * prefix would hand over both.
+ */
+const STOREFRONT_ALLOWED_STORE_PATHS: RegExp[] = [
+  // The API's OWN public prefix. Several routers mounted at the bare /stores
+  // prefix declare their storefront endpoints as `/public/:storeId/...`, which
+  // resolve to `/api/v1/stores/public/:storeId/...` — shipping zones, shipping
+  // calculate, area rates, coupon validate, promotion preview, loyalty, blog
+  // list, locations, pwa config. CheckoutClient and CartClient call every one
+  // of those from the BROWSER on a merchant custom domain.
+  //
+  // The first version of this allow-list missed them entirely, because its
+  // patterns all expected a store id as the segment after /stores and these
+  // have the literal `public` there. That would have returned 403 on shipping,
+  // coupons and promotions for every merchant on a custom domain — checkout
+  // unusable — while working perfectly on store.force-ai.co, which is a
+  // platform origin and returns early long before this list is consulted.
+  /^\/api\/v1\/stores\/public\//,
+  // Blog post bodies — app/blog/[slug]/BlogPostBody.tsx.
+  /^\/api\/v1\/stores\/[^/]+\/blog\/[^/]+\/?$/,
+  // Customer order tracking — lib/api.ts getOrderTimeline. NOT the order list,
+  // detail or invoice, which are merchant-admin and stay denied.
+  /^\/api\/v1\/stores\/[^/]+\/orders\/[^/]+\/timeline\/?$/,
+  // Customer returns — app/returns/ReturnsClient.tsx.
+  /^\/api\/v1\/stores\/[^/]+\/returns\/?$/,
+  // Product reviews: submit, list, eligibility — components/ReviewSection.tsx.
+  /^\/api\/v1\/stores\/[^/]+\/reviews\/?$/,
+  /^\/api\/v1\/stores\/[^/]+\/reviews\/product\/[^/]+\/?$/,
+  /^\/api\/v1\/stores\/[^/]+\/reviews\/can-review\/[^/]+\/?$/,
+  //
+  // DELIBERATELY NOT LISTED, though an earlier version had them:
+  //
+  //   /stores/:id           store.routes.ts gates GET /:id with authenticate +
+  //                         requireMfaEnrolled + authorize(store_admin,
+  //                         super_admin) + requireStoreAccess. Its only web
+  //                         caller is a SERVER-side fetch (store-resolver.ts
+  //                         getStoreById) that sends no cookie and no Origin,
+  //                         so it never reaches this gate at all.
+  //   /stores/:id/products  product.routes.ts gates GET / the same way and its
+  //                         own comment says the storefront uses
+  //                         /public/products instead. The apps/web helpers
+  //                         getStoreProducts/getStoreProduct are labelled "for
+  //                         admin" and have ZERO callers.
+  //
+  // Both were allow-listed by enumerating string literals in apps/web rather
+  // than actual call sites, which let two admin endpoints back through the
+  // gate — including product reads carrying costPrice, draft and archived
+  // rows, and per-product sold-unit aggregates. A path appearing in a source
+  // file is not evidence the storefront calls it.
+];
 
 /**
  * Normalize a path to the form Express actually routes on before testing it
@@ -181,6 +350,14 @@ export function restrictPlatformOnlyOrigins(req: Request, res: Response, next: N
   }
 
   const gatePath = normalizePlatformGatePath(req.path);
+
+  // Allow-list FIRST: the storefront's own calls under /stores are permitted,
+  // everything else under that prefix is not. Order matters — the deny pattern
+  // covers the whole prefix, so checking it first would 403 the storefront.
+  if (STOREFRONT_ALLOWED_STORE_PATHS.some(pattern => pattern.test(gatePath))) {
+    return next();
+  }
+
   if (!PLATFORM_ONLY_ORIGIN_PATHS.some(pattern => pattern.test(gatePath))) {
     return next();
   }
@@ -260,7 +437,18 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // `attacker.com` as their store's domain, mount a JSON CSRF page
   // there, and ride the API host's cookie to call any other store's
   // endpoints. Merchant origins therefore fall THROUGH to the
-  // CSRF-token verifier below, which is what catches that case.
+  // CSRF-token verifier below.
+  //
+  // That fall-through only CATCHES the case because the stored token is
+  // bound to the principal it was minted for and re-checked against the
+  // cookie-derived identity (see `packCsrfRecord` / `csrfPrincipal`).
+  // An unbound verifier would merely compare the caller's own
+  // X-Session-ID against a token minted for that same id — both
+  // attacker-chosen — so a throwaway customer login would hand the
+  // attacker a pair that validates while riding the victim's cookie.
+  // Do not drop the principal check believing the origin gate covers it:
+  // `restrictPlatformOnlyOrigins` only guards /admin + /payment-settings,
+  // and this attack lands on every /stores/:id/* write too.
   //
   // This comment used to sit directly above a condition that did the
   // opposite: `|| isAllowlistedMerchantOrigin(origin)` was added in
@@ -278,6 +466,14 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // long before this branch, and the storefront client sends both
   // X-Session-ID and X-CSRF-Token on every state-changing request
   // (apps/web/src/lib/api.ts buildHeaders).
+  //
+  // Anything the storefront POSTs with a RAW fetch — bypassing buildHeaders —
+  // now 403s from a merchant custom domain unless its path returns early
+  // above or its router is mounted before this middleware in index.ts
+  // (/webhooks, /alerts/webhooks, /wa-bridge, /inngest). That mount order is
+  // the only thing exempting them, so a raw write-fetch to one of those paths
+  // is one `app.use` reorder away from breaking silently: keep storefront
+  // writes on the ApiClient rather than relying on it.
   const contentType = req.headers['content-type'] || '';
   const xRequestedWith = req.headers['x-requested-with'];
   const origin = req.headers.origin as string | undefined;
@@ -311,7 +507,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // Always verify the CSRF token for state-changing requests (POST/PUT/PATCH/DELETE).
   // Previously this check was only applied when an Authorization header was present,
   // which left unauthenticated state-changing endpoints unprotected.
-  verifyCsrfToken(sessionId, csrfToken)
+  verifyCsrfToken(sessionId, csrfToken, csrfPrincipal(req))
     .then(valid => {
       if (!valid) {
         res.status(403).json({

@@ -44,7 +44,10 @@ async function resolveStoreIdFromDomain(domain: string): Promise<string | null> 
     });
     if (!res.ok) return null;
     const json = await res.json();
-    return (json?.data?.id as string | undefined) ?? null;
+    // The endpoint answers { data: { store: {...}, enabledFeatures, ... } } —
+    // reading data.id was always undefined, so the custom-domain branch (the
+    // majority of real storefronts) silently fell back to an untagged fetch.
+    return (json?.data?.store?.id as string | undefined) ?? null;
   } catch {
     return null;
   }

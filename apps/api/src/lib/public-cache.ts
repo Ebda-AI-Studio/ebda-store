@@ -121,9 +121,17 @@ export async function invalidateCachedPrefix(prefix: string): Promise<void> {
  * product.service.ts, the bulk-import/bulk-AI Inngest functions) covers the
  * admin category-list cache too, with no second call site to thread through.
  */
-export async function invalidateStoreCategoriesCaches(storeId: string): Promise<void> {
+/** Redis-only half, so a caller that will purge for itself doesn't double-fire. */
+async function clearCategoriesRedis(storeId: string): Promise<void> {
   await invalidateCached(`public:categories:${storeId}`);
   await invalidateCached(`admin:categories:${storeId}`);
+  // Same reasoning as invalidateStoreProductCaches: the storefront holds the
+  // API's response in the Next data cache, so Redis alone is not enough.
+  revalidateStorefront({ tags: [`categories:${storeId}`] });
+}
+
+export async function invalidateStoreCategoriesCaches(storeId: string): Promise<void> {
+  await clearCategoriesRedis(storeId);
   // Same reasoning as invalidateStoreProductCaches: the storefront holds the
   // API's response in the Next data cache, so Redis alone is not enough.
   revalidateStorefront({ tags: [`categories:${storeId}`] });
@@ -159,7 +167,10 @@ export async function invalidateStoreProductCaches(storeId: string): Promise<voi
   await invalidateCachedPrefix(`public:product:${storeId}:`);
   await invalidateCachedPrefix(`public:suggest:${storeId}:`);
   await invalidateCachedPrefix(`admin:products:${storeId}:`);
-  await invalidateStoreCategoriesCaches(storeId);
+  // Redis-only: this function fires ONE purge below covering both tags. Calling
+  // the public categories invalidator here would fire a second outbound POST
+  // for every product write — two requests per bust, and one per order.
+  await clearCategoriesRedis(storeId);
 
   // Clearing Redis is only half the job. The Next.js storefront caches the
   // API's RESPONSE in its own data cache, so after a save the merchant kept
@@ -169,7 +180,9 @@ export async function invalidateStoreProductCaches(storeId: string): Promise<voi
   // place every writer already funnels through, so no call site can forget.
   // Fire-and-forget by design (see revalidate-storefront) — a storefront blip
   // must never fail a save that already committed.
-  revalidateStorefront({ tags: [`products:${storeId}`] });
+  // ONE request carrying both tags. revalidateStorefront accepts a list, so
+  // there is no reason to open a second connection to say the other half.
+  revalidateStorefront({ tags: [`products:${storeId}`, `categories:${storeId}`] });
 }
 
 /** Cache key for the admin aggregated-customers snapshot (`customers.routes.ts`). */

@@ -6,7 +6,7 @@ import { Button, Select } from '@force/ui';
 import { ShopChrome } from '../../components';
 import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { API_URL, type Order } from '../../lib/api';
+import { api, API_URL, type Order } from '../../lib/api';
 
 const RETURN_REASONS = [
   {
@@ -36,7 +36,12 @@ const RETURN_REASONS = [
 
 type ReturnReason = (typeof RETURN_REASONS)[number]['value'];
 
-/** Fetch with auth cookie attached. */
+/**
+ * Fetch with auth cookie attached. READ-ONLY use only — it sends no
+ * X-Session-ID / X-CSRF-Token, so any state-changing call must go through the
+ * ApiClient (`api.post` etc.) instead or csrfProtection 403s it on every
+ * merchant custom domain (only the platform origin is CSRF-exempt).
+ */
 async function authFetch(url: string, options: RequestInit = {}) {
   return fetch(url, {
     ...options,
@@ -169,22 +174,23 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
 
     setIsSubmitting(true);
     try {
-      const res = await authFetch(`${API_URL}/stores/${storeId}/returns`, {
-        method: 'POST',
-        body: JSON.stringify({
+      // Must go through the ApiClient, not authFetch: this is a state-changing
+      // request on a non-/public/ path, so csrfProtection requires X-Session-ID
+      // + X-CSRF-Token. A raw fetch 403s CSRF_MISSING_SESSION on every merchant
+      // custom domain (the platform origin is exempt, so it looks fine there).
+      const json = await api.post<{ return?: { returnNumber?: string } }>(
+        `/stores/${storeId}/returns`,
+        {
           orderId: selectedOrderId,
           type: 'return',
           items,
           reason,
           customerNotes: notes.trim() || undefined,
-        }),
-      });
+        }
+      );
 
-      const json = await res.json();
-
-      if (res.ok && json.success) {
-        const returnNumber =
-          json.data?.return?.returnNumber ?? json.data?.returnNumber ?? json.returnNumber;
+      if (json.success) {
+        const returnNumber = json.data?.return?.returnNumber;
         setSubmitResult({
           type: 'success',
           text: t(
@@ -199,14 +205,22 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         setReason('');
         setNotes('');
       } else {
+        // The ApiClient turns transport failures into a result rather than a
+        // throw, so keep the localized connection copy for those codes.
+        const transportFailure =
+          json.error?.code === 'NETWORK_ERROR' || json.error?.code === 'TIMEOUT';
         setSubmitResult({
           type: 'error',
-          text:
-            json.error?.message ||
-            t(
-              'Failed to submit return request. Please try again.',
-              '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.'
-            ),
+          text: transportFailure
+            ? t(
+                'Failed to submit return request. Please check your connection.',
+                '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643.'
+              )
+            : json.error?.message ||
+              t(
+                'Failed to submit return request. Please try again.',
+                '\u0641\u0634\u0644 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628 \u0627\u0644\u0625\u0631\u062c\u0627\u0639. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.'
+              ),
         });
       }
     } catch {

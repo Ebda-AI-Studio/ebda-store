@@ -55,6 +55,41 @@ function extractToken(req: Request): string | undefined {
   return undefined;
 }
 
+/**
+ * Resolve the user's current token version.
+ *
+ * Redis first, Postgres on a miss. There is deliberately NO in-process cache
+ * behind that.
+ *
+ * One was added here to bound the DB stampede when Redis is unavailable —
+ * `getUserTokenVersion` returns null both for a miss and for an outage, so a
+ * degraded Redis turns every authenticated request into a round-trip. The
+ * reasoning attached to it was wrong: it claimed a stale-low `tv` would keep a
+ * revoked token alive "for at most the same bound the Redis tier already
+ * accepts". The Redis tier accepts no such bound — revocation CLEARS that key,
+ * so the next request reads Postgres and sees the bump immediately. An
+ * in-process memo has nothing clearing it, and being per-process, nothing
+ * could: a bump on one instance cannot evict another instance's copy. It
+ * bought a cache hit and sold the revocation guarantee, keeping logged-out
+ * sessions and password-change victims authenticated for a full TTL window
+ * across every API instance. tests/integration/token-revocation.test.ts caught
+ * it — 200 where the suite demands 401.
+ *
+ * If the Redis-outage stampede is worth solving, it needs a mechanism that
+ * revocation can still reach: a shorter-lived negative cache keyed on the
+ * outage rather than on the user, or a circuit breaker in the Redis client.
+ * Not a silent local copy of a security-critical value.
+ */
+async function resolveTokenVersion(userId: string): Promise<number> {
+  const cachedTv = await redis.getUserTokenVersion(userId);
+  if (cachedTv !== null) return cachedTv;
+
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { tokenVersion: true } });
+  const currentTv = u?.tokenVersion ?? 0;
+  await redis.setUserTokenVersion(userId, currentTv);
+  return currentTv;
+}
+
 export async function authenticate(
   req: Request,
   _res: Response,
@@ -99,18 +134,7 @@ export async function authenticate(
 
     // --- Revocation check 2: per-user token-version (bulk revocation) ---
     // Read tv from Redis cache; fall back to DB + repopulate cache on miss.
-    const cachedTv = await redis.getUserTokenVersion(payload.userId);
-    let currentTv: number;
-    if (cachedTv === null) {
-      const u = await prisma.user.findUnique({
-        where: { id: payload.userId },
-        select: { tokenVersion: true },
-      });
-      currentTv = u?.tokenVersion ?? 0;
-      await redis.setUserTokenVersion(payload.userId, currentTv);
-    } else {
-      currentTv = cachedTv;
-    }
+    const currentTv = await resolveTokenVersion(payload.userId);
     if ((payload.tv ?? 0) < currentTv) {
       return next(new AppError(401, 'TOKEN_REVOKED', 'Session has been revoked'));
     }
@@ -174,18 +198,7 @@ export async function optionalAuthenticate(
     const decoded = jwt.decode(token) as { jti?: string } | null;
     if (decoded?.jti && (await redis.isJtiDenied(decoded.jti))) return next();
 
-    const cachedTv = await redis.getUserTokenVersion(payload.userId);
-    let currentTv: number;
-    if (cachedTv === null) {
-      const u = await prisma.user.findUnique({
-        where: { id: payload.userId },
-        select: { tokenVersion: true },
-      });
-      currentTv = u?.tokenVersion ?? 0;
-      await redis.setUserTokenVersion(payload.userId, currentTv);
-    } else {
-      currentTv = cachedTv;
-    }
+    const currentTv = await resolveTokenVersion(payload.userId);
     if ((payload.tv ?? 0) < currentTv) return next();
 
     req.user = payload;

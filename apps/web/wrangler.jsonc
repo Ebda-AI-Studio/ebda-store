@@ -1,3 +1,14 @@
+// ⚠️  REGENERATED AT DEPLOY TIME — EDITING THIS FILE CHANGES NOTHING IN PROD.
+//
+// `.github/workflows/cf-deploy.yml` runs `scripts/cf-setup-local.sh web` BEFORE
+// the build and it OVERWRITES this file unconditionally, so any binding added
+// here alone never reaches the worker. The live bindings (confirmed against the
+// Cloudflare API on 2026-09-02) are NEXT_TAG_CACHE_DO_SHARDED,
+// NEXT_CACHE_DO_QUEUE, NEXT_INC_CACHE_R2_BUCKET, WORKER_SELF_REFERENCE and
+// ASSETS — the generator's OPENNEXT_CACHE=true branch.
+//
+// To change what actually deploys, edit scripts/cf-setup-local.sh.
+
 {
   "name": "force-web-cf-preview",
   // Custom worker entry (NOT the raw OpenNext output) — wraps the generated

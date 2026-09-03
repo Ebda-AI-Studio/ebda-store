@@ -498,6 +498,12 @@ No other text, no markdown code fences — pure JSON only.`;
         where: { id: jobId },
         select: { status: true },
       });
+
+      // Bust ONCE per sweep, never per item. This file defines THREE separate
+      // Inngest functions; an earlier pass inserted the bust before only the LAST
+      // completion block in the file, so two of the three sweeps still wrote
+      // product-facing content and invalidated nothing.
+      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {
@@ -799,6 +805,12 @@ No markdown, no code fences — pure JSON only.`;
         where: { id: jobId },
         select: { status: true },
       });
+
+      // Bust ONCE per sweep, never per item. This file defines THREE separate
+      // Inngest functions; an earlier pass inserted the bust before only the LAST
+      // completion block in the file, so two of the three sweeps still wrote
+      // product-facing content and invalidated nothing.
+      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {
@@ -1257,7 +1269,7 @@ const bulkAiMetaAeoFn = inngest.createFunction(
       // per item — same discipline as bulk-import (a per-row sweep would be an
       // invalidation storm). This also purges the storefront's Next data cache
       // via the tag the public fetches carry.
-      await invalidateStoreProductCaches(storeId);
+      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {

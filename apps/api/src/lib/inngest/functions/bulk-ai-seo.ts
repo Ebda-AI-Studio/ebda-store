@@ -451,7 +451,7 @@ const bulkAiSeoFn = inngest.createFunction(
       // per item — same discipline as bulk-import (a per-row sweep would be an
       // invalidation storm). This also purges the storefront's Next data cache
       // via the tag the public fetches carry.
-      await invalidateStoreProductCaches(storeId);
+      await step.run('bust-product-caches', () => invalidateStoreProductCaches(storeId));
       await prisma.bulkAiJob.update({
         where: { id: jobId },
         data: {

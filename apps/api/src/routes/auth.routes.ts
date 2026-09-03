@@ -245,11 +245,16 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
       return;
     }
 
-    // Generate CSRF token for session
+    // Generate CSRF token for session, BOUND to the user that just
+    // authenticated. The binding is what stops an attacker minting a pair
+    // inside its own throwaway session and replaying it from a merchant
+    // origin against a lured admin's cookie — this route is exempt from
+    // csrfProtection and mints for whatever X-Session-ID the caller sends,
+    // so the principal is the only thing tying the token to a real session.
     const sessionId = req.headers['x-session-id'] as string;
     let csrfToken: string | undefined;
     if (sessionId) {
-      csrfToken = await generateCsrfToken(sessionId);
+      csrfToken = await generateCsrfToken(sessionId, result.user.id);
     }
 
     // Audit log
@@ -320,9 +325,16 @@ const AMBIENT_CSRF_MINT_ROLES = new Set(['customer']);
  * state-changing requests as the victim (another tenant's `/stores/:id` writes
  * for a lured super_admin) that sail through `verifyCsrfToken`.
  *
- * Binding the token to the authenticated userId does NOT fix this: both the
- * mint and the subsequent write ride the SAME victim cookie, so the binding
- * matches. What distinguishes attacker from client is how the call was
+ * Binding the token to the authenticated userId (which every mint now does —
+ * middleware/security.ts) does not on its OWN fix this particular path: both
+ * the mint and the subsequent write ride the SAME victim cookie, so the
+ * binding matches. The two defenses are complementary and neither is
+ * redundant — the binding kills the variant where the attacker mints inside
+ * its own throwaway session at /auth/login and replays the pair against the
+ * victim; this gate kills the variant where the attacker mints with the
+ * victim's own ambient cookie. Removing either reopens one of them.
+ *
+ * What distinguishes attacker from client here is how the call was
  * authenticated and who the session belongs to:
  *
  *   1. platform origin — an origin we control end-to-end; not attacker-hostable.
@@ -417,7 +429,13 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
     const sessionId = req.headers['x-session-id'] as string | undefined;
     const csrfToken =
       sessionId && mayIssueCsrfToken(req, tokens.accessToken, bodyRefreshToken)
-        ? await generateCsrfToken(sessionId)
+        ? // Bound to the rotated session's owner (decode, not verify — we
+          // minted this token microseconds ago) so the issued token is only
+          // usable by a request authenticating as that same user.
+          await generateCsrfToken(
+            sessionId,
+            (jwt.decode(tokens.accessToken) as { userId?: string } | null)?.userId
+          )
         : undefined;
 
     // ALSO return the rotated pair in the body for Bearer-token clients (iOS

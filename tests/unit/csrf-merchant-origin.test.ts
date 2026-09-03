@@ -20,23 +20,44 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
-import { csrfProtection } from '@api/middleware/security';
+import jwt from 'jsonwebtoken';
+import { csrfProtection, generateCsrfToken } from '@api/middleware/security';
+import { config } from '@api/config';
 
 const MERCHANT_ORIGIN = 'https://merchant-owned-shop.example';
 
 function makeReq(
   path: string,
-  opts: { origin?: string; method?: string; headers?: Record<string, string> } = {}
+  opts: {
+    origin?: string;
+    method?: string;
+    headers?: Record<string, string>;
+    cookies?: Record<string, string>;
+  } = {}
 ) {
   return {
     path,
     method: opts.method ?? 'POST',
+    cookies: opts.cookies ?? {},
     headers: {
       'content-type': 'application/json',
       ...(opts.origin ? { origin: opts.origin } : {}),
       ...(opts.headers ?? {}),
     },
   } as unknown as Request;
+}
+
+/** An access cookie exactly as login/refresh mint it, for `userId`. */
+function accessCookieFor(userId: string): string {
+  return jwt.sign(
+    { userId, email: `${userId}@example.test`, role: 'customer', tv: 0 },
+    config.jwtSecret,
+    {
+      expiresIn: '30m',
+      issuer: 'force-api',
+      audience: 'force-app',
+    }
+  );
 }
 
 function makeRes() {
@@ -110,6 +131,84 @@ describe('csrfProtection — merchant origins are no longer exempt', () => {
       n2 as unknown as NextFunction
     );
     expect(n2).toHaveBeenCalledOnce();
+  });
+
+  /**
+   * The token is a double-submit secret, so the verifier must answer "was this
+   * minted for the identity making the request", not merely "does this token
+   * exist for the session id you claim". Both the session id and the token are
+   * attacker-supplied headers: an attacker registers a throwaway customer,
+   * logs in with an X-Session-ID it picks (POST /auth/login is exempt from
+   * csrfProtection and mints for any id), and hardcodes the resulting pair
+   * into a page on its CORS-allowlisted merchant domain. A lured super_admin's
+   * SameSite=None cookie then rides along and the write executes as the
+   * victim. Only the principal binding rejects it — restrictPlatformOnlyOrigins
+   * covers /admin + /payment-settings, not /stores/:id/*.
+   */
+  describe('CSRF tokens are bound to the principal they were minted for', () => {
+    const ATTACKER = 'attacker-user-id';
+    const VICTIM = 'victim-super-admin-id';
+    const SESSION = 'attacker-chosen-session-id';
+
+    function runCsrf(req: Request) {
+      const res = makeRes();
+      const next = vi.fn();
+      return new Promise<{ res: typeof res; next: typeof next }>(resolve => {
+        const done = () => resolve({ res, next });
+        next.mockImplementation(done);
+        const originalJson = res.json.bind(res);
+        (res as unknown as { json: (p: unknown) => unknown }).json = (payload: unknown) => {
+          const out = originalJson(payload);
+          done();
+          return out;
+        };
+        csrfProtection(req, res, next as unknown as NextFunction);
+      });
+    }
+
+    it('rejects a pair minted in the attacker session but replayed on the victim cookie', async () => {
+      const token = await generateCsrfToken(SESSION, ATTACKER);
+
+      const { res, next } = await runCsrf(
+        makeReq('/api/v1/stores/other-tenant/products', {
+          origin: MERCHANT_ORIGIN,
+          headers: { 'x-session-id': SESSION, 'x-csrf-token': token },
+          cookies: { token: accessCookieFor(VICTIM) },
+        })
+      );
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.statusCode).toBe(403);
+      expect(res.body.error?.code).toBe('CSRF_INVALID');
+    });
+
+    it('accepts the same pair when the cookie identifies the user it was minted for', async () => {
+      const token = await generateCsrfToken(SESSION, ATTACKER);
+
+      const { next } = await runCsrf(
+        makeReq('/api/v1/stores/own-tenant/products', {
+          origin: MERCHANT_ORIGIN,
+          headers: { 'x-session-id': SESSION, 'x-csrf-token': token },
+          cookies: { token: accessCookieFor(ATTACKER) },
+        })
+      );
+
+      expect(next).toHaveBeenCalledOnce();
+    });
+
+    it('rejects a token minted for a signed-in user when the request carries no cookie', async () => {
+      const token = await generateCsrfToken(SESSION, ATTACKER);
+
+      const { res, next } = await runCsrf(
+        makeReq('/api/v1/stores/own-tenant/products', {
+          origin: MERCHANT_ORIGIN,
+          headers: { 'x-session-id': SESSION, 'x-csrf-token': token },
+        })
+      );
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.body.error?.code).toBe('CSRF_INVALID');
+    });
   });
 
   it('does not gate safe methods', () => {

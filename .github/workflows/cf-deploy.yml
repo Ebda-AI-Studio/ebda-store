@@ -130,6 +130,24 @@ jobs:
           # docs/migration/cf-opennext-hardening-plan.md.
           OPENNEXT_CACHE: ${{ vars.OPENNEXT_CACHE }}
         run: bash scripts/cf-setup-local.sh web
+      - name: Assert the generated worker config still carries the cache bindings
+        working-directory: apps/web
+        # cf-setup-local.sh REWRITES open-next.config.ts and wrangler.jsonc from
+        # scratch on every deploy, and its no-cache branch silently drops the tag
+        # cache, the R2 incremental cache and their bindings. When that happens
+        # revalidateTag resolves to the library's "dummy" no-op: every purge
+        # returns success, logs nothing, invalidates nothing, and merchants wait
+        # out the fetch TTL after each save while the pipeline stays green. That
+        # is precisely how a D1 tag cache was committed, documented as REQUIRED
+        # and never deployed. Fail loudly instead of deploying a silent no-op.
+        run: |
+          grep -q 'NEXT_TAG_CACHE' wrangler.jsonc \
+            || { echo "::error::generated wrangler.jsonc has NO tag-cache binding — revalidateTag would be a silent no-op. Check OPENNEXT_CACHE and scripts/cf-setup-local.sh"; exit 1; }
+          grep -q 'NEXT_INC_CACHE_R2_BUCKET' wrangler.jsonc \
+            || { echo "::error::generated wrangler.jsonc has NO incremental-cache binding — ISR/SSG pages would revalidate from origin on every isolate"; exit 1; }
+          grep -q 'tagCache' open-next.config.ts \
+            || { echo "::error::generated open-next.config.ts declares no tagCache override — revalidateTag resolves to the dummy no-op"; exit 1; }
+          echo "cache bindings present in the config that will actually deploy"
       - name: Write storefront public env (.env.production.local)
         # NEXT_PUBLIC_* are BUILD-TIME inlined; public values → repo variables,
         # with prod defaults so a missing var still builds.

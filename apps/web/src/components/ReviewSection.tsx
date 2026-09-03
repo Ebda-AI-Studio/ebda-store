@@ -171,6 +171,11 @@ export default function ReviewSection({ storeId, productId }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  // The API requires the ORDER the review is for — reviews are verified-purchase
+  // only. GET /reviews/can-review/:productId already returns it; the form never
+  // asked, so every submission failed createReviewSchema with a 400 regardless
+  // of origin. Null means "not eligible / not checked yet".
+  const [eligibleOrderId, setEligibleOrderId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{
     type: 'success' | 'error';
@@ -185,6 +190,27 @@ export default function ReviewSection({ storeId, productId }: Props) {
         .catch(() => setIsLoggedIn(false));
     }
   }, []);
+
+  // Resolve the eligible order for this product. Only a customer who bought it
+  // may review it, and the API needs that order's id on submit.
+  useEffect(() => {
+    if (!isLoggedIn || !storeId || !productId) return;
+    let cancelled = false;
+    api
+      .get<{ canReview: boolean; orderId?: string }>(
+        `/stores/${storeId}/reviews/can-review/${productId}`
+      )
+      .then(res => {
+        if (cancelled) return;
+        setEligibleOrderId(res.success && res.data?.canReview ? (res.data.orderId ?? null) : null);
+      })
+      .catch(() => {
+        if (!cancelled) setEligibleOrderId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, storeId, productId]);
 
   const fetchReviews = useCallback(async () => {
     setIsLoading(true);
@@ -232,6 +258,31 @@ export default function ReviewSection({ storeId, productId }: Props) {
       return;
     }
 
+    // Mirror the server contract client-side so the shopper gets a readable
+    // message instead of a bare 400. createReviewSchema requires body >= 20
+    // characters and an orderId proving the purchase.
+    if (comment.trim().length < 20) {
+      setSubmitMessage({
+        type: 'error',
+        text: t(
+          'Please write at least 20 characters so your review is useful to other shoppers.',
+          'يرجى كتابة 20 حرفاً على الأقل حتى تكون مراجعتك مفيدة للمتسوقين الآخرين.'
+        ),
+      });
+      return;
+    }
+
+    if (!eligibleOrderId) {
+      setSubmitMessage({
+        type: 'error',
+        text: t(
+          'Only customers who bought this product can review it.',
+          'يمكن للعملاء الذين اشتروا هذا المنتج فقط تقييمه.'
+        ),
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitMessage(null);
 
@@ -242,10 +293,15 @@ export default function ReviewSection({ storeId, productId }: Props) {
       // merchant-controlled page ride a victim's cookie), so a bare fetch to
       // this non-/public/ route now returns 403 CSRF_MISSING_SESSION on every
       // custom-domain storefront — i.e. for every real merchant.
+      // Shape must match createReviewSchema: productId + orderId + rating +
+      // `body` (min 20 chars). The form previously sent `comment` and no
+      // orderId, so every submission 400'd — on the platform origin too.
       const json = await api.post<unknown>(`/stores/${storeId}/reviews`, {
         productId,
+        orderId: eligibleOrderId,
         rating,
-        comment,
+        body: comment,
+        language: language === 'ar' ? 'ar' : 'en',
       });
       if (json.success) {
         setSubmitMessage({
