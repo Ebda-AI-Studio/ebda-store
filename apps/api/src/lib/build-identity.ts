@@ -21,9 +21,17 @@
  *
  * `BUILD_COMMIT_SHA` is baked by Dockerfile.api from a build arg, so it is set
  * whenever the image is built by something that knows the commit.
- * `RAILWAY_GIT_COMMIT_SHA` is Railway's own name for the same thing; it is read
- * opportunistically and is NOT verified to be present on this project's
- * service — treat a null here as "unknown", not as "not deployed".
+ * `RAILWAY_GIT_COMMIT_SHA` is Railway's own name for the same thing, and on
+ * 2026-09-03 it turned out to be the one actually doing the work: the first
+ * deploy carrying this endpoint reported the correct commit with no build arg
+ * supplied and no service variable set, so Railway injects it at runtime.
+ *
+ * It is worth recording HOW that stayed hidden. The variable appears in neither
+ * listing: not in the 85 the CLI reports, and not in the 8 the dashboard shows
+ * as "added by Railway". Both describe what is CONFIGURED on the service; the
+ * container's actual environment is a third thing that neither one shows, and
+ * only a running process can report it. A null here still means unknown rather
+ * than not-deployed.
  */
 export function buildCommitSha(env: NodeJS.ProcessEnv = process.env): string | null {
   return nonEmpty(env.BUILD_COMMIT_SHA) ?? nonEmpty(env.RAILWAY_GIT_COMMIT_SHA) ?? null;
@@ -32,19 +40,15 @@ export function buildCommitSha(env: NodeJS.ProcessEnv = process.env): string | n
 /**
  * The platform's id for this deployment, or null.
  *
- * NOT confirmed present, and an earlier version of this comment said it was.
- * The evidence for that claim was the Inngest client reading it to key its
- * deploy sync — but that read is a fallback CHAIN, so it could have been
- * falling through to a later term all along and nobody would have noticed.
- * Checked in the Railway dashboard on 2026-09-03: the platform adds exactly
- * eight variables to this service and this is not among them.
+ * Confirmed present at RUNTIME on 2026-09-03 — the first deploy carrying this
+ * endpoint reported a non-null id — which also clears the Inngest deploy sync
+ * that reads the same variable through a fallback chain. Until that deploy the
+ * claim rested on that chain working, which it could not have proven: a chain
+ * that falls through to a later term looks identical from outside.
  *
- * It is still read, because a variable absent from the dashboard's list can
- * still be injected into the container at runtime — the list describes what
- * Railway ADDS to the service, which is not the same question. This field is
- * what will settle it: the first deploy that reports a non-null id proves the
- * injection, and a null one proves the Inngest deploy sync has been falling
- * through and needs its own fix.
+ * Like the commit, it appears in neither the CLI's variable list nor the
+ * dashboard's "added by Railway" section. Absence from those is not absence
+ * from the container.
  */
 export function deploymentId(env: NodeJS.ProcessEnv = process.env): string | null {
   return nonEmpty(env.RAILWAY_DEPLOYMENT_ID) ?? null;
