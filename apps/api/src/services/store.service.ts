@@ -68,6 +68,19 @@ type UpdateStoreData = Partial<CreateStoreData> & {
   heroImage?: string | null;
   /** Bucket E1 (2026-05-17): opt-in blog feature toggle. */
   blogEnabled?: boolean;
+  /**
+   * Gate for the store-locations feature. Accepted by updateStoreSchema and
+   * PUT by the admin's LocationsTab, but it was absent from BOTH this type and
+   * the write below — so the toggle looked like it worked (the tab sets local
+   * state optimistically) until a reload, and the public locations endpoint
+   * kept 404ing.
+   *
+   * Typing a field here has no runtime effect on its own: the write is an
+   * explicit whitelist, and a field this type declares but that object omits is
+   * still silently dropped. The round-trip test is what actually holds them
+   * together.
+   */
+  locationsEnabled?: boolean;
 };
 
 export class StoreService {
@@ -329,6 +342,23 @@ export class StoreService {
         ...(data.heroCtaLink !== undefined && { heroCtaLink: data.heroCtaLink }),
         ...(data.heroImage !== undefined && { heroImage: data.heroImage }),
         ...(data.blogEnabled !== undefined && { blogEnabled: data.blogEnabled }),
+        // These three were accepted by updateStoreSchema and dropped here. The
+        // route validated them, the service typed them, and this object — the
+        // only thing that actually writes — never mentioned them. So the admin
+        // got "Saved", the column stayed NULL, and the value reappeared blank on
+        // reload. Store locations could not be enabled by any merchant that was
+        // not seeded, and the whole return-policy feature was dead: with the
+        // column NULL, merchantReturnPolicyJsonLd() returns null forever and
+        // hasMerchantReturnPolicy is never emitted.
+        //
+        // `!== undefined` rather than a truthiness check is load-bearing on all
+        // three. null is a MEANINGFUL value the admin sends to clear a declared
+        // policy, and 0 is a meaningful returnWindowDays ("returns not
+        // accepted") — both would be dropped by a falsy guard, reintroducing the
+        // same silent no-op for the two values that most need to persist.
+        ...(data.locationsEnabled !== undefined && { locationsEnabled: data.locationsEnabled }),
+        ...(data.returnWindowDays !== undefined && { returnWindowDays: data.returnWindowDays }),
+        ...(data.returnFeesPaidBy !== undefined && { returnFeesPaidBy: data.returnFeesPaidBy }),
       },
       include: {
         owner: {
