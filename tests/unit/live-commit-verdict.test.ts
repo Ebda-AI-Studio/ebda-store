@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 // @ts-expect-error - plain .mjs script, no types
 import {
   liveCommitVerdict,
@@ -78,5 +79,80 @@ describe('exit codes', () => {
   it('live passes, stale fails', () => {
     expect(exitCodeFor(VERDICT.LIVE)).toBe(0);
     expect(exitCodeFor(VERDICT.STALE)).toBe(1);
+  });
+});
+
+describe('an answer we could not read is not an answer', () => {
+  // The shell used `python3 ... 2>/dev/null || echo ''`, so a missing
+  // interpreter, an HTML error page and a genuine `commit: null` all became the
+  // same empty string — and empty was tolerated. A broken parser therefore
+  // passed every deploy, permanently, reinstating the exact failure the check
+  // exists to prevent one level down.
+  const unreadable = () => ({ ok: true, commit: null, unreadable: true });
+
+  it('does not pass when every reachable poll was unparseable', () => {
+    const v = liveCommitVerdict([unreadable(), unreadable()], SHA);
+    expect(v).toBe(VERDICT.UNREADABLE);
+    expect(exitCodeFor(v), 'a broken check must not report success').toBe(1);
+  });
+
+  it('still passes if the deployed commit is readable at some point', () => {
+    const v = liveCommitVerdict([unreadable(), up(SHA)], SHA);
+    expect(v).toBe(VERDICT.LIVE);
+  });
+
+  it('keeps unreadable distinct from a build that simply names nothing', () => {
+    expect(liveCommitVerdict([up(null)], SHA)).toBe(VERDICT.UNKNOWN);
+    expect(liveCommitVerdict([unreadable()], SHA)).toBe(VERDICT.UNREADABLE);
+    expect(exitCodeFor(VERDICT.UNKNOWN)).toBe(0);
+    expect(exitCodeFor(VERDICT.UNREADABLE)).toBe(1);
+  });
+
+  it('a real mismatch still outranks an unreadable poll', () => {
+    // Someone else is demonstrably serving: that is stale, not merely unread.
+    expect(liveCommitVerdict([unreadable(), up('0ldbu1ld')], SHA)).toBe(VERDICT.STALE);
+  });
+});
+
+describe('the workflow captures the parser status instead of dying on it', () => {
+  // GitHub Actions runs `run:` blocks under `bash -e`. A bare assignment from a
+  // command substitution inherits that command's exit status, so the parser's
+  // `exit 3` terminated the STEP: no observation recorded, the verdict script
+  // never reached, and UNREADABLE unreachable in production — the whole point
+  // of the check, silently disabled. The retry window collapsed to one poll
+  // too, so a single transient failed a healthy deploy.
+  //
+  // Asserted structurally because the failure is in shell semantics, not in
+  // any function this suite can call.
+  const workflow = readFileSync(
+    new URL('../../.github/workflows/railway-deploy.yml', import.meta.url),
+    'utf8'
+  );
+
+  it('guards the parser capture so errexit cannot kill the step', () => {
+    const line = workflow.split('\n').find(l => l.includes('live=$(printf'));
+    expect(line, 'the parser capture line has moved or been renamed').toBeDefined();
+    expect(
+      line,
+      "a bare assignment inherits node's exit 3 under bash -e and terminates the step"
+    ).toMatch(/\|\|\s*parse_rc=\$\?/);
+  });
+
+  it('resets the status before each attempt', () => {
+    // Without this, a success after a failure would carry the previous
+    // iteration's non-zero status and report a readable body as unreadable.
+    expect(workflow).toMatch(/parse_rc=0\s*\n\s*live=\$\(printf/);
+  });
+
+  it('every command substitution in the verify step tolerates failure', () => {
+    const step = workflow.slice(
+      workflow.indexOf('Verify the deployed build is THIS commit'),
+      workflow.indexOf('notify-failure:')
+    );
+    const assignments = step.split('\n').filter(l => /^\s+[a-z_]+=\$\(/.test(l));
+    expect(assignments.length).toBeGreaterThanOrEqual(3);
+    for (const a of assignments) {
+      expect(a, `unguarded substitution under bash -e: ${a.trim().slice(0, 60)}`).toMatch(/\|\|/);
+    }
   });
 });

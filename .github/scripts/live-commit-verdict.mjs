@@ -16,12 +16,13 @@
  * either.
  */
 
-/** @typedef {{ ok: boolean, commit: string|null }} Observation */
+/** @typedef {{ ok: boolean, commit: string|null, unreadable?: boolean }} Observation */
 
 export const VERDICT = Object.freeze({
   LIVE: 'live', // the deployed commit is answering
   UNKNOWN: 'unknown', // reachable, but no build would name itself
   STALE: 'stale', // something else is answering, or nothing is
+  UNREADABLE: 'unreadable', // answered, but the answer could not be parsed
 });
 
 /**
@@ -31,6 +32,7 @@ export const VERDICT = Object.freeze({
 export function liveCommitVerdict(observations, expectedSha) {
   let sawReachable = false;
   let sawOtherCommit = false;
+  let sawUnreadable = false;
 
   for (const o of observations) {
     if (!o || !o.ok) continue;
@@ -39,7 +41,12 @@ export function liveCommitVerdict(observations, expectedSha) {
     // A match is conclusive the moment it appears — nothing later can unmake it.
     if (o.commit && o.commit === expectedSha) return VERDICT.LIVE;
 
-    if (o.commit) sawOtherCommit = true;
+    // "I could not read the answer" is not "the build did not answer". Folding
+    // the two together is how a broken or missing parser passes every deploy
+    // forever: unknown is tolerated, so an unreadable body inherits that
+    // tolerance and the check silently stops checking.
+    if (o.unreadable) sawUnreadable = true;
+    else if (o.commit) sawOtherCommit = true;
   }
 
   // Never answered at all.
@@ -48,12 +55,21 @@ export function liveCommitVerdict(observations, expectedSha) {
   // Something named a commit and it was never ours: the deploy did not take.
   if (sawOtherCommit) return VERDICT.STALE;
 
+  // Reachable, but nothing we could read. That is a broken check, not a
+  // reassuring silence, and it must not pass.
+  if (sawUnreadable) return VERDICT.UNREADABLE;
+
   // Reachable throughout, and no build ever named itself. Genuinely unknown —
   // which is not the same as wrong, and must not be reported as failure.
   return VERDICT.UNKNOWN;
 }
 
-/** Exit code for a verdict. UNKNOWN passes: not knowing is not failing. */
+/**
+ * Exit code for a verdict. UNKNOWN passes — a build declining to name itself is
+ * not a failed deploy. UNREADABLE does not: being unable to read the answer is
+ * a broken verification, and a verification that cannot fail is the thing this
+ * whole file exists to prevent.
+ */
 export function exitCodeFor(verdict) {
-  return verdict === VERDICT.STALE ? 1 : 0;
+  return verdict === VERDICT.LIVE || verdict === VERDICT.UNKNOWN ? 0 : 1;
 }

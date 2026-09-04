@@ -336,41 +336,50 @@ describe('a gate that did not run must not report success', () => {
 
 describe('every path that admits it did not audit must exit non-zero', () => {
   // Three of these were fixed and a FOURTH was missed, which the gate itself
-  // caught on the very next run: "Fourth non-run path still exits 0 — gate
-  // still reports PASSED after auditing nothing". Counting the paths was the
-  // mistake; the invariant is what holds, so it is asserted structurally
-  // rather than trusted to the next reader's enumeration.
+  // caught on the next run. Then THREE MORE were found — the pre-flight guards
+  // — which this test could not see at all, because it keyed on the name of the
+  // alert function and those paths did not alert. A test that certifies an
+  // invariant it cannot observe is worse than no test.
+  //
+  // So it no longer looks for a function name. It looks at every zero-exit in
+  // the file and asserts that only ONE exists: the terminal success. Any new
+  // early return has to justify itself here.
   const source = readFileSync(
     new URL('../../.github/scoped-audit/audit.mjs', import.meta.url),
     'utf8'
   );
   const lines = source.split('\n');
 
-  const callSites = lines
+  const zeroExits = lines
     .map((line, i) => ({ line, n: i + 1 }))
-    .filter(
-      ({ line }) => line.includes('alertAuditDidNotRun(') && !line.includes('async function')
-    );
+    .filter(({ line }) => /process\.exit\(\s*0\s*\)/.test(line));
 
-  it('finds the call sites at all (guards against a rename silently emptying this)', () => {
-    expect(callSites.length).toBeGreaterThanOrEqual(4);
-  });
-
-  it.each([0, 1, 2, 3].map(i => [i]))('call site %i exits non-zero', i => {
-    const site = callSites[i];
-    expect(site, 'fewer call sites than expected').toBeDefined();
-    const following = lines.slice(site.n - 1, site.n + 7).find(l => l.includes('process.exit'));
-    expect(following, `no exit follows the call at line ${site.n}`).toBeDefined();
+  it('has exactly one exit-zero, and it is the terminal success', () => {
     expect(
-      following,
-      `line ${site.n} admits the audit did not run, then reports success`
-    ).toContain('nonRunExitCode()');
+      zeroExits.length,
+      `exit(0) at lines ${zeroExits.map(z => z.n).join(', ')} — every early exit must use nonRunExitCode()`
+    ).toBe(1);
+    // The terminal one is the last statement in the file, not an early return.
+    const remaining = lines.slice(zeroExits[0].n).filter(l => l.trim().length > 0);
+    expect(remaining, 'the one exit(0) is not the final statement').toHaveLength(0);
   });
 
-  it('no non-run path exits zero directly', () => {
-    for (const site of callSites) {
-      const following = lines.slice(site.n - 1, site.n + 7).find(l => l.includes('process.exit'));
-      expect(following).not.toMatch(/process\.exit\(\s*0\s*\)/);
+  it('no exit sits under a line admitting it skipped', () => {
+    // Catches the shape regardless of how the skip is worded or reported.
+    const admits = /skipping|fail-open|did NOT run|not set|missing|malformed/i;
+    for (const z of zeroExits) {
+      const before = lines.slice(Math.max(0, z.n - 6), z.n - 1).join('\n');
+      expect(
+        admits.test(before),
+        `line ${z.n} exits 0 right after admitting it did not audit`
+      ).toBe(false);
     }
+  });
+
+  it('every non-run path routes through the shared policy', () => {
+    const policyExits = lines.filter(l => l.includes('process.exit(nonRunExitCode())'));
+    expect(policyExits.length, 'expected the four parse/sentinel paths plus three pre-flight').toBe(
+      7
+    );
   });
 });

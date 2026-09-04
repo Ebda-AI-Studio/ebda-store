@@ -2,6 +2,18 @@
 
 Moved verbatim from `CLAUDE.md` (2026-07-11) so the instruction file stays rules-only. This is the canonical env catalog; update it in the SAME session as any env change (documentation-parity rule).
 
+## Deploy (GitHub Actions → Railway)
+
+Read by `.github/workflows/railway-deploy.yml`. Documented here because an operator who
+sets only some of them can leave the API with no deploy path at all — see
+`docs/migration/railway-actions-deploy.md` for the required order.
+
+- `RAILWAY_ACTIONS_DEPLOY` (repo **variable**) — **the switch.** Until it is the string `'true'` the deploy job is gated off at job level and reports as **skipped**. Not a secret, because a job-level `if:` cannot read secrets.
+- `RAILWAY_TOKEN` (repo **secret**) — Railway PROJECT token scoped to the `production` environment. Once `RAILWAY_ACTIONS_DEPLOY` is `'true'`, a missing token **fails** the job rather than skipping it: after cutover an absent token is a misconfiguration, not a no-op.
+- `RAILWAY_SERVICE` (repo variable, default `api`) — the service to deploy.
+- `RAILWAY_ENVIRONMENT` (repo variable, default `production`).
+- `RAILWAY_HEALTH_URL` (repo variable, default `https://api.force-ai.co/health`) — polled to confirm the deployed commit is the one serving.
+
 ## API (Railway)
 
 Required in production (app crashes without these):

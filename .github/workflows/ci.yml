@@ -743,7 +743,7 @@ jobs:
     # restore + pinning trufflehog off '@main' — small safety margin so a
     # cold npm ci + double audit + secret scan on a busy self-hosted runner
     # still fits comfortably now that the two known hangs are gone.
-    timeout-minutes: 7
+    timeout-minutes: 10 # 3 bounded audit attempts (~3.5 min worst case) + install headroom
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 

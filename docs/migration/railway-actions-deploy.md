@@ -42,8 +42,26 @@ deploy path if it fails.
 
 1. Set `RAILWAY_ACTIONS_DEPLOY` = `true` and add the `RAILWAY_TOKEN` secret.
 2. Run the workflow manually (`workflow_dispatch`) and watch it finish.
-3. Confirm the **Stamp the commit being deployed** step succeeded and the **Verify the
-   deployed build is THIS commit** step reports the sha rather than warning about a null.
+3. Confirm the **Stamp the commit being deployed** step succeeded — and check something
+   the platform cannot satisfy on its own.
+
+   A green **Verify the deployed build is THIS commit** is **no longer sufficient
+   evidence.** Railway injects its own `RAILWAY_GIT_COMMIT_SHA` at runtime (verified
+   2026-09-03), so while its auto-deploy is still enabled it deploys the same push and
+   reports the same sha — the verify step goes green with the stamp step having
+   accomplished nothing. That is the "green tick that deployed nothing" class this
+   project already gates against elsewhere, and it would be the evidence for an
+   irreversible step.
+
+   So confirm instead that **`GIT_COMMIT_SHA` is now present as a Railway service
+   variable, set to the deployed sha**:
+
+   ```bash
+   railway variables --kv --service api | grep '^GIT_COMMIT_SHA='
+   ```
+
+   Only the Actions stamp step writes that variable. If it is absent, the step did not
+   work no matter how green the verify looked.
 
 Only then do the two steps below. A CLI invocation that is correct in a terminal is not
 thereby correct in the job — the Railway CLI is pinned in the workflow for exactly this
@@ -90,12 +108,19 @@ reaches the build.
 
 **Never set `GIT_COMMIT_SHA` to a fixed value by hand.** It has to change per deploy; a
 static one makes `/health` report a commit that is not the one running, which is a
-confident lie and strictly worse than the `null` it replaces. Checked 2026-09-03: the
-service defines 85 variables and `RAILWAY_GIT_COMMIT_SHA` is not among them — though note
-`RAILWAY_DEPLOYMENT_ID` is not either, and that one demonstrably reaches the container, so
-the variable list shows what is CONFIGURED and not what is injected at runtime. Whether
-Railway injects a commit sha of its own is answered the first time this ships: if
-`/health` reports a non-null `commit` before the cutover, it does.
+confident lie and strictly worse than the `null` it replaces.
+
+**Verified 2026-09-03 — both platform variables ARE injected at runtime.** The first
+deploy carrying `/health`'s build identity reported the correct `commit` and a non-null
+`deploymentId` with no build arg supplied and no service variable set. That also clears
+the Inngest deploy sync, which reads `RAILWAY_DEPLOYMENT_ID` through a `||` fallback
+chain — a chain falling through would have looked identical from outside.
+
+Neither variable appears in **either** listing: not in the ~85 the CLI reports for the
+service, nor in the 8 the dashboard shows as "added by Railway". Those two counts are
+different measures — total configured vs. platform-added — and neither describes the
+environment the container actually receives, which is a third thing only a running
+process can report. Do not read absence from either list as absence from the process.
 
 ## Rollback (post-cutover)
 

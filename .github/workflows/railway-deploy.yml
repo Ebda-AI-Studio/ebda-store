@@ -7,18 +7,34 @@ name: Deploy API (Railway)
 # survives org moves (just needs the secret), is reviewable, and is the clean place
 # to gate + verify. Mirrors cf-deploy.yml (the frontends already deploy this way).
 #
-# SAFE TO MERGE BEFORE CUTOVER: the deploy is guarded on the RAILWAY_TOKEN secret —
-# with it unset this workflow no-ops (warning only), so merging changes nothing until
-# you actively cut over. See docs/migration/railway-actions-deploy.md for the 2-step
-# activation (add token + disable Railway auto-deploy so they don't double-fire).
+# SAFE TO MERGE BEFORE CUTOVER: the deploy job is gated at JOB level on the
+# RAILWAY_ACTIONS_DEPLOY repo variable, so until it is 'true' the job is reported
+# as SKIPPED and nothing happens. It used to no-op inside a step and report
+# SUCCESS — a green tick on main that had deployed nothing, which is the exact
+# signal an operator reads to answer "did it ship?".
+#
+# ⚠️ DO NOT disable Railway's own auto-deploy until RAILWAY_ACTIONS_DEPLOY is
+# 'true' AND one dispatch run has been observed succeeding. Setting only the
+# token leaves this job skipped, and turning Railway's deploy off at the same
+# time leaves the API with NO deploy path at all. The runbook's pre-cutover
+# section exists for exactly this order of operations:
+# docs/migration/railway-actions-deploy.md
 #
 # Migrations still run via railway.json `preDeployCommand` (prisma migrate deploy)
 # on Railway BEFORE the new replica is promoted — unchanged by this.
 #
-# REQUIRED to activate:
+# REQUIRED to activate, in this order:
+#   variable RAILWAY_ACTIONS_DEPLOY = 'true'  — THE switch. Until set, job skipped.
 #   secret   RAILWAY_TOKEN     — a Railway PROJECT token (Project → Settings → Tokens),
-#                                scoped to the `production` environment.
-#   variable RAILWAY_SERVICE   — the exact service name to deploy (default below).
+#                                scoped to the `production` environment. Once the
+#                                variable is 'true', a missing token FAILS the job
+#                                rather than skipping it: after cutover an absent
+#                                token is a misconfiguration, not a no-op.
+#   variable RAILWAY_SERVICE   — the service name to deploy (default 'api').
+#
+# ALSO READ (optional, defaulted):
+#   variable RAILWAY_ENVIRONMENT  — default 'production'
+#   variable RAILWAY_HEALTH_URL   — default 'https://api.force-ai.co/health'
 
 on:
   push:
@@ -53,7 +69,15 @@ jobs:
     # must be loud, not silently absorbed.
     if: vars.RAILWAY_ACTIONS_DEPLOY == 'true'
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    # Covers checkout + setup-node + a global CLI install + `railway up --ci`
+    # streaming a full multi-stage Docker build of this monorepo, AND the verify
+    # poll window below. The verify step only short-circuits on a MATCH, so an
+    # unknown-commit deploy runs the whole window — and the first post-cutover
+    # deploy is unknown by construction, because the release it replaces predates
+    # the commit field. At 15 the job could time out on a deploy that had already
+    # succeeded, and notify-failure would then post "consider rollback" for a
+    # healthy release.
+    timeout-minutes: 30
     steps:
       - name: Require RAILWAY_TOKEN (deploy is switched on)
         env:
@@ -142,10 +166,32 @@ jobs:
           for i in $(seq 1 30); do
             body=$(curl -s -m 10 "$HEALTH_URL" || echo '')
             code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "$HEALTH_URL" || echo 000)
-            live=$(printf '%s' "$body" | python3 -c 'import json,sys;print((json.load(sys.stdin).get("commit") or ""))' 2>/dev/null || echo '')
-            observations+=("$(printf '{"ok":%s,"commit":%s}' \
+            # Parsed with the node setup-node already guarantees, not python3:
+            # this runner is conditionally self-hosted, and `2>/dev/null || echo ''`
+            # made a missing interpreter, a non-JSON body and a genuine null
+            # commit indistinguishable — all three read as "unknown", which
+            # passes. A broken parser would then pass every deploy forever.
+            # `|| parse_rc=$?` is not stylistic. The step runs under the Actions
+            # default `bash -e`, where a bare assignment from a command
+            # substitution inherits that command's exit status — so node's
+            # `exit 3` would terminate the STEP right here. The line below would
+            # never run, no observation would be recorded, the verdict script
+            # would never execute, and UNREADABLE could never fire: the whole
+            # point of this check, unreachable. The retry window would also
+            # collapse to a single poll, so one transient would fail a healthy
+            # deploy and trigger the rollback alert.
+            #
+            # The python3 form this replaced was immune only because its
+            # `|| echo ''` swallowed the failure — which is the same swallow
+            # that made a broken parser indistinguishable from a null commit.
+            # Catching the status explicitly keeps errexit satisfied AND keeps
+            # the distinction.
+            parse_rc=0
+            live=$(printf '%s' "$body" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s).commit ?? ""))}catch{process.exit(3)}})' 2>/dev/null) || parse_rc=$?
+            observations+=("$(printf '{"ok":%s,"commit":%s,"unreadable":%s}' \
               "$([ "$code" = "200" ] && echo true || echo false)" \
-              "$([ -n "$live" ] && printf '"%s"' "$live" || echo null)")")
+              "$([ -n "$live" ] && printf '"%s"' "$live" || echo null)" \
+              "$([ "$code" = "200" ] && [ "$parse_rc" != "0" ] && echo true || echo false)")")
             if [ "$code" = "200" ] && [ "$live" = "$EXPECTED_SHA" ]; then break; fi
             echo "attempt $i: code=$code live=${live:0:8} want=${EXPECTED_SHA:0:8}"
             sleep 10
@@ -161,6 +207,8 @@ jobs:
             const verdict = liveCommitVerdict(obs, want);
             if (verdict === VERDICT.LIVE) {
               console.log(`live build is ${want.slice(0, 8)}`);
+            } else if (verdict === VERDICT.UNREADABLE) {
+              console.log(`::error::${process.env.HEALTH_URL} answered but its response could not be parsed, so ${want.slice(0, 8)} could not be verified. This is a broken check, not a healthy deploy.`);
             } else if (verdict === VERDICT.UNKNOWN) {
               console.log(`::warning::${process.env.HEALTH_URL} stayed healthy but no build reported a commit, so ${want.slice(0, 8)} could not be confirmed live. Ensure the stamp step ran and GIT_COMMIT_SHA reached the build.`);
             } else {

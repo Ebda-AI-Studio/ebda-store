@@ -61,7 +61,7 @@ try {
 }
 
 const findings = Array.isArray(result.findings) ? result.findings : [];
-const critical = findings.filter((f) => f.severity === 'critical');
+const critical = findings.filter(f => f.severity === 'critical');
 
 // 3. Post a summary review + inline comments via GitHub REST
 async function gh(method, path, body) {
@@ -80,8 +80,8 @@ async function gh(method, path, body) {
 
 const SEV = { critical: '🔴', warning: '🟡', info: '🔵' };
 const comments = findings
-  .filter((f) => f.file && f.line)
-  .map((f) => ({
+  .filter(f => f.file && f.line)
+  .map(f => ({
     path: f.file,
     line: f.line,
     side: 'RIGHT',
@@ -89,19 +89,18 @@ const comments = findings
   }));
 const list = findings
   .map(
-    (f) =>
+    f =>
       `- ${SEV[f.severity] || ''} **${String(f.severity).toUpperCase()}** \`${f.file || '?'}:${f.line || '?'}\` (${f.category}) — ${f.comment}`
   )
   .join('\n');
 
-const willFix =
-  critical.length > 0 && AI_FIX_ENABLED === 'true' && HEAD_IS_AI_FIX !== 'true';
+const willFix = critical.length > 0 && AI_FIX_ENABLED === 'true' && HEAD_IS_AI_FIX !== 'true';
 
 const summary =
   `### 🤖 Claude PR review\n\n${result.summary || ''}\n\n` +
   `- 🔴 critical: ${critical.length}\n` +
-  `- 🟡 warning: ${findings.filter((f) => f.severity === 'warning').length}\n` +
-  `- 🔵 info: ${findings.filter((f) => f.severity === 'info').length}\n\n` +
+  `- 🟡 warning: ${findings.filter(f => f.severity === 'warning').length}\n` +
+  `- 🔵 info: ${findings.filter(f => f.severity === 'info').length}\n\n` +
   (critical.length
     ? willFix
       ? '**Critical findings detected — pushing an automated fix; a fresh review will validate it.**'
@@ -111,16 +110,15 @@ const summary =
     : 'No critical findings — warnings/info are advisory only.');
 
 try {
-  const rv = await gh(
-    'POST',
-    `/repos/${owner}/${repo}/pulls/${PR_NUMBER}/reviews`,
-    { commit_id: HEAD_SHA, event: 'COMMENT', body: summary, comments }
-  );
+  const rv = await gh('POST', `/repos/${owner}/${repo}/pulls/${PR_NUMBER}/reviews`, {
+    commit_id: HEAD_SHA,
+    event: 'COMMENT',
+    body: summary,
+    comments,
+  });
   if (!rv.ok) {
     await gh('POST', `/repos/${owner}/${repo}/issues/${PR_NUMBER}/comments`, {
-      body:
-        summary +
-        (list ? `\n\n_(inline anchoring failed; findings below)_\n\n${list}` : ''),
+      body: summary + (list ? `\n\n_(inline anchoring failed; findings below)_\n\n${list}` : ''),
     });
   }
 } catch (e) {
@@ -137,9 +135,7 @@ if (willFix) {
   try {
     writeFileSync('/tmp/ai-fix-findings.json', JSON.stringify(critical, null, 2));
     if (GITHUB_OUTPUT) appendFileSync(GITHUB_OUTPUT, 'should_fix=true\n');
-    console.log(
-      `${critical.length} critical finding(s) — handing off to the auto-fix step.`
-    );
+    console.log(`${critical.length} critical finding(s) — handing off to the auto-fix step.`);
     process.exit(0);
   } catch (e) {
     console.error('Could not stage auto-fix hand-off:', e.message);

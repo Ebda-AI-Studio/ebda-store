@@ -28,7 +28,7 @@ import {
   selectFollowupsToFile,
 } from './followup-filing.mjs';
 import { fetchAllPages } from './gh-paginate.mjs';
-import { nonRunExitCode } from './gate-policy.mjs';
+import { nonRunExitCode, NON_RUN_REASONS } from './gate-policy.mjs';
 import { resolveMarkerComment } from './marker-comment.mjs';
 
 const {
@@ -45,19 +45,49 @@ const {
   TELEGRAM_ALERT_CHAT_ID,
 } = process.env;
 
-// --- fail-open guards ---
+// --- pre-flight guards ---
+//
+// These three ran before anything could audit and then exited 0, so the check
+// went green having reviewed nothing — and unlike the later non-run paths they
+// raised no alert at all, so there was no comment, no summary and no Telegram
+// either. A PR_NUMBER that fails to resolve is the realistic one: it produces a
+// green `scoped-audit` tick on a pull request nothing looked at, with no trace.
+//
+// They cannot use alertAuditDidNotRun: `owner`, `repo`, `PR_URL` and `MARKER`
+// are all declared BELOW this point, so calling it here throws a temporal dead
+// zone ReferenceError before it can report anything — a louder failure than the
+// silence, but still not the report. And by construction these guards fire
+// exactly when the identity needed to post a comment is missing. So they report
+// through the two channels that need nothing: the workflow log and the step
+// summary.
+function reportPreflightFailure(reason) {
+  console.error(
+    `::error::scoped-audit did NOT run (reason: ${reason}) — the gate reviewed nothing. This is not "no findings."`
+  );
+  if (GITHUB_STEP_SUMMARY) {
+    try {
+      appendFileSync(
+        GITHUB_STEP_SUMMARY,
+        `### ⚠️ Scoped Audit — DID NOT RUN\n\nReason: \`${reason}\`. The gate exited before auditing anything. This is a different state from "reviewed, no findings."\n`
+      );
+    } catch (e) {
+      console.error('Step summary write failed (non-fatal):', e.message);
+    }
+  }
+}
+
 if (!GITHUB_TOKEN) {
-  console.error('GITHUB_TOKEN not set — skipping scoped-audit gate (fail-open).');
-  process.exit(0);
+  reportPreflightFailure(NON_RUN_REASONS.NO_GITHUB_TOKEN);
+  process.exit(nonRunExitCode());
 }
 const repoParts = (GITHUB_REPOSITORY || '').split('/');
 if (repoParts.length !== 2) {
-  console.error('GITHUB_REPOSITORY missing/malformed — skipping (fail-open).');
-  process.exit(0);
+  reportPreflightFailure(NON_RUN_REASONS.NO_REPOSITORY);
+  process.exit(nonRunExitCode());
 }
 if (!PR_NUMBER) {
-  console.error('PR_NUMBER not set — skipping (fail-open).');
-  process.exit(0);
+  reportPreflightFailure(NON_RUN_REASONS.NO_PR_NUMBER);
+  process.exit(nonRunExitCode());
 }
 
 const [owner, repo] = repoParts;

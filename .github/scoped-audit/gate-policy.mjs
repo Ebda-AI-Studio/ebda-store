@@ -29,6 +29,12 @@ export const NON_RUN_REASONS = Object.freeze({
   SENTINEL: 'sentinel', // the workflow told us the model never ran
   UNREADABLE: 'unreadable', // output existed but could not be read
   EMPTY: 'empty', // output read but carried no result
+  // Pre-flight: the gate could not even begin. Kept in the same enum so this
+  // stays the enumeration of record — a reason that lives only at its call site
+  // is a reason the next reader will not know to look for.
+  NO_GITHUB_TOKEN: 'no-github-token',
+  NO_REPOSITORY: 'no-repository',
+  NO_PR_NUMBER: 'no-pr-number',
 });
 
 /**
