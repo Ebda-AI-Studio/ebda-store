@@ -8,6 +8,7 @@ import { AuthService } from '../services/auth.service';
 import { authLimiter, auditLog, generateCsrfToken } from '../middleware/security';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { redis } from '../services/redis.service';
+import { AppError } from '../middleware/error-handler';
 
 const router = Router();
 
@@ -64,10 +65,29 @@ export function setSessionCookies(res: Response, accessToken: string, refreshTok
   setRefreshCookie(res, refreshToken);
 }
 
+/** The delete-time attribute set for a session cookie: identical to the
+ *  set-time options minus maxAge. A browser only removes a cookie when the
+ *  deleting Set-Cookie carries the SAME same-site/secure/path attributes it
+ *  was stored with — per RFC6265bis §5.5 a Set-Cookie that is not
+ *  `SameSite=None; Secure` is ignored outright on a cross-site request, and
+ *  the storefront hits /auth/refresh cross-site (pecannbee.com.kw →
+ *  api.force-ai.co). Clearing with a bare `{ path: '/' }` therefore dropped
+ *  silently for exactly the shoppers that needed it. maxAge must be stripped:
+ *  clearCookie supplies the epoch `expires` itself and a surviving maxAge
+ *  would override it back into the future. */
+function clearOptionsFor(options: CookieOptions): CookieOptions {
+  return {
+    httpOnly: options.httpOnly,
+    secure: options.secure,
+    sameSite: options.sameSite,
+    path: options.path,
+  };
+}
+
 /** Clear both auth cookies on the response (logout / logout-all / erase). */
 function clearSessionCookies(res: Response): void {
-  res.clearCookie('token', { path: '/' });
-  res.clearCookie('refresh_token', { path: '/' });
+  res.clearCookie('token', clearOptionsFor(AUTH_COOKIE_OPTIONS));
+  res.clearCookie('refresh_token', clearOptionsFor(REFRESH_COOKIE_OPTIONS));
 }
 
 // Validation schemas
@@ -466,6 +486,24 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response, next: N
         : { csrfToken, refreshed: true },
     });
   } catch (error) {
+    // A refresh that fails on AUTHENTICATION means this browser is holding a
+    // session that no longer exists — a revoked family (password change,
+    // reuse detection), a deleted account, or natural expiry. The cookies
+    // outlive that by design: AUTH_COOKIE_OPTIONS.maxAge is 365 days, and
+    // clearSessionCookies otherwise runs only on explicit logout, which the
+    // storefront never calls (AuthContext just setUser(null)). So the browser
+    // would keep advertising a dead session for up to a year, and on the money
+    // path that is fatal: cookies present means the cookieless guest branch in
+    // csrfProtection does not fire, the stale localStorage token cannot
+    // verify, and this refresh — the only re-mint path — cannot succeed.
+    // Permanent 403 on POST /payments/create until the user re-logs in.
+    //
+    // Clearing here returns them to a genuinely cookieless state, where guest
+    // checkout works. Gated on AppError 401 SPECIFICALLY: a transient failure
+    // (database unreachable, Redis down) must never sign every user out.
+    if (error instanceof AppError && error.statusCode === 401) {
+      clearSessionCookies(res);
+    }
     next(error);
   }
 });

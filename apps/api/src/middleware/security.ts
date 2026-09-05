@@ -462,10 +462,19 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // (2026-07-02 security-surface, 2026-08-31 lens L10) read this
   // comment and graded it PASS without reading the condition.
   //
-  // Guest checkout is unaffected: `/public/` paths return early above,
-  // long before this branch, and the storefront client sends both
-  // X-Session-ID and X-CSRF-Token on every state-changing request
-  // (apps/web/src/lib/api.ts buildHeaders).
+  // Guest storefront traffic splits in TWO here, and the original version of
+  // this comment claimed only the first half existed. It said guest checkout
+  // was unaffected because `/public/` paths return early — true for the
+  // `/api/v1/stores/public/...` shipping, coupon-validate and promotion-preview
+  // calls, which do match the `/public/` early return above. But POST
+  // /payments/create is NOT a `/public/` path, so it fell through to the token
+  // verifier below, and a guest can never satisfy it: `generateCsrfToken` is
+  // reachable only from login and refresh. That sentence cost pecannbee.com.kw
+  // 17 unpaid orders over two days (2026-09-03 to 09-05).
+  //
+  // Non-`/public/` guest writes are carried by the cookieless branch further
+  // down, NOT by this exemption. Both halves are pinned by
+  // docs/security/defence-mutations.json so neither can be widened silently.
   //
   // Anything the storefront POSTs with a RAW fetch — bypassing buildHeaders —
   // now 403s from a merchant custom domain unless its path returns early
@@ -486,6 +495,26 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
       nodeEnv: config.nodeEnv,
     })
   ) {
+    return next();
+  }
+
+  // A request carrying no auth cookie has no ambient authority for a
+  // cross-origin page to ride. CSRF exists to stop a malicious site making the
+  // browser attach a VICTIM's credentials automatically; with no cookie
+  // attached there is nothing to hijack, and an attacker could call such an
+  // endpoint straight from their own server without a browser at all.
+  // `X-Session-ID` cannot substitute: a custom header is never auto-attached,
+  // so it can only be set by script that already cleared CORS preflight.
+  //
+  // This is what carries GUEST checkout on merchant custom domains: POST
+  // /payments/create is not a `/public/` path, and a guest never mints a token
+  // at all (`generateCsrfToken` runs only on login + refresh). See the fuller
+  // account above the platform-origin branch.
+  // Both auth-bearing cookies, not just the access one: an access cookie that
+  // has been cleared while `refresh_token` survives still represents a session
+  // a cross-origin page could try to ride, and treating that as "no credential"
+  // would be the narrower claim than the one this branch actually makes.
+  if (!req.cookies?.token && !req.cookies?.refresh_token) {
     return next();
   }
 

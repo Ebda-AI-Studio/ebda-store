@@ -217,6 +217,46 @@ jobs:
             process.exit(exitCodeFor(verdict));
           '
 
+      # Guest-checkout admission probe.
+      #
+      # On 2026-09-03 a correct security fix (removing the merchant-origin CSRF
+      # exemption) made POST /payments/create unreachable for cookieless guests,
+      # and pecannbee.com.kw took 17 orders over two days without a single
+      # payment row. Nothing caught it: the checkout monitor probes
+      # /payments/methods with curl, which never carries the browser's cookies
+      # or CSRF headers, so it stayed green the whole time.
+      #
+      # This asserts the ADMISSION decision only. A deliberately non-existent
+      # order id means a healthy API answers 404 NOT_FOUND -- the request cleared
+      # CSRF and reached business logic -- and nothing is created. A CSRF_* code
+      # means guests are locked out of the money path again.
+      #
+      # It cannot pass vacuously: a non-200/404 status, an unparseable body or a
+      # dead host all fail the step rather than being read as healthy.
+      - name: Verify guest checkout is still admitted
+        env:
+          API_BASE: ${{ vars.RAILWAY_API_BASE || 'https://api.force-ai.co' }}
+        run: |
+          set -euo pipefail
+          body=$(mktemp) || body="${RUNNER_TEMP:-/tmp}/admission-probe.json"
+          probe_args=(-s -m 20 -o "$body" -w '%{http_code}' -X POST "$API_BASE/api/v1/payments/create" -H 'Content-Type: application/json' -H 'X-Session-ID: deploy-admission-probe' -d '{"orderId":"00000000-0000-0000-0000-000000000000","provider":"tap"}')
+          code=$(curl "${probe_args[@]}") || code=000
+          err=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s)?.error?.code ?? ""))}catch{process.exit(3)}})' < "$body" 2>/dev/null) || err='__UNPARSEABLE__'
+          echo "status=$code error_code=${err:-<none>}"
+          case "$err" in
+            CSRF_*)
+              echo "::error::Guest checkout is locked out again: POST /payments/create returned $code $err for a cookieless request. This is the 2026-09-03 regression. Do not leave this deploy serving."
+              exit 1 ;;
+            __UNPARSEABLE__)
+              echo "::error::$API_BASE/api/v1/payments/create returned $code with a body this probe could not parse, so admission could not be verified. A broken check is not a healthy deploy."
+              exit 1 ;;
+          esac
+          if [ "$code" != "404" ]; then
+            echo "::error::Expected 404 NOT_FOUND for a non-existent order (proving the request cleared CSRF and reached business logic), got $code. Admission is unverified."
+            exit 1
+          fi
+          echo "Guest checkout admitted: cleared CSRF and reached business logic."
+
   notify-failure:
     name: Notify on failure
     needs: deploy

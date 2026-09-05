@@ -81,7 +81,13 @@ describe('csrfProtection — merchant origins are no longer exempt', () => {
     const res = makeRes();
     const next = vi.fn();
     csrfProtection(
-      makeReq('/api/v1/stores/abc/reviews', { origin: MERCHANT_ORIGIN }),
+      // Carries the auth cookie its name claims: that is what makes this a
+      // CSRF-relevant request. With no cookie there is no credential for a
+      // cross-origin page to ride, and the guard deliberately lets it through.
+      makeReq('/api/v1/stores/abc/reviews', {
+        origin: MERCHANT_ORIGIN,
+        cookies: { token: 'victim.jwt.value' },
+      }),
       res,
       next as unknown as NextFunction
     );
@@ -196,18 +202,32 @@ describe('csrfProtection — merchant origins are no longer exempt', () => {
       expect(next).toHaveBeenCalledOnce();
     });
 
-    it('rejects a token minted for a signed-in user when the request carries no cookie', async () => {
+    it('lets a cookieless request through, because it has no credential to ride', async () => {
+      // CSRF exists to stop a malicious page making the browser attach a
+      // VICTIM's credentials. A request with no auth cookie carries none, and
+      // an attacker can call such an endpoint straight from their own server
+      // without a browser at all -- so requiring a token here protects nothing
+      // and only breaks the callers who cannot obtain one.
+      //
+      // Those callers are the whole guest storefront: cart, coupon validate,
+      // shipping/tax calculate, promotions preview and POST /payments/create
+      // are unauthenticated by design, and `generateCsrfToken` is reachable
+      // only from login and refresh. Requiring a token from them 403'd every
+      // guest card payment on pecannbee.com.kw for two days.
+      //
+      // The impersonation case this replaced stays covered above by 'rejects a
+      // pair minted in the attacker session but replayed on the victim cookie',
+      // which is the attack that actually needs a victim.
       const token = await generateCsrfToken(SESSION, ATTACKER);
 
-      const { res, next } = await runCsrf(
-        makeReq('/api/v1/stores/own-tenant/products', {
+      const { next } = await runCsrf(
+        makeReq('/api/v1/payments/create', {
           origin: MERCHANT_ORIGIN,
           headers: { 'x-session-id': SESSION, 'x-csrf-token': token },
         })
       );
 
-      expect(next).not.toHaveBeenCalled();
-      expect(res.body.error?.code).toBe('CSRF_INVALID');
+      expect(next).toHaveBeenCalledOnce();
     });
   });
 

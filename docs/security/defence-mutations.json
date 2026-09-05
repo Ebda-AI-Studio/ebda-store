@@ -1,5 +1,5 @@
 {
-  "$comment": "Spec for scripts/defence-mutation-record.mjs. Each entry removes ONE security defence and names the single test that must then fail. `find` must occur EXACTLY once in `source` \u2014 the runner errors out otherwise, so a refactor that moves a defence breaks this loudly instead of silently scoring it green.",
+  "$comment": "Spec for scripts/defence-mutation-record.mjs. Each entry removes ONE security defence and names the single test that must then fail. `find` must occur EXACTLY once in `source` — the runner errors out otherwise, so a refactor that moves a defence breaks this loudly instead of silently scoring it green.",
   "defences": [
     {
       "id": "tenant-deadstock-clearance-coupon",
@@ -45,7 +45,7 @@
       "id": "authz-permission-gate",
       "domain": "authn / session",
       "tier": "unit",
-      "why": "staff can issue refunds \u2014 the orders:refund RBAC gate",
+      "why": "staff can issue refunds — the orders:refund RBAC gate",
       "source": "apps/api/src/middleware/rbac.ts",
       "find": "    if (!hasPermission(userRole, permission)) {",
       "replace": "    if (false) {",
@@ -150,6 +150,26 @@
       "find": "        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId);",
       "replace": "        await OrderService.applyRefundEffects(payment.order.storeId, payment.orderId).catch(\n          () => {}\n        );",
       "test": "tests/unit/payment-webhook-status-transition.test.ts"
+    },
+    {
+      "id": "csrf-cookieless-bypass-must-stay-narrow",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "the guest-checkout bypass widened to exempt cookie-BEARING requests too, re-opening the lured-admin impersonation that removing isAllowlistedMerchantOrigin closed (2026-09-03 incident: 17 unpaid orders came from the opposite mistake, so both directions must stay pinned)",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "  if (!req.cookies?.token && !req.cookies?.refresh_token) {\n    return next();\n  }",
+      "replace": "  if (true) {\n    return next();\n  }",
+      "test": "tests/unit/csrf-merchant-origin.test.ts"
+    },
+    {
+      "id": "csrf-token-principal-binding",
+      "domain": "csrf / session",
+      "tier": "unit",
+      "why": "CSRF token stops being bound to the principal that minted it, so an attacker-minted pair replays on a victim cookie",
+      "source": "apps/api/src/middleware/security.ts",
+      "find": "unpacked.principal === principal",
+      "replace": "true",
+      "test": "tests/unit/csrf-merchant-origin.test.ts"
     }
   ]
 }

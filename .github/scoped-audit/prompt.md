@@ -80,6 +80,33 @@ The input that follows this prompt contains four sections:
 - **`runInTenantContext` for async writers (audit F4):** the RLS async-writer
   coverage rule — grep gate in CI flags any tenant-table write outside context.
   If this PR adds a new async path, check it passes this gate.
+- **Removing an exemption breaks whoever it was carrying (2026-09-03, 17 unpaid
+  orders):** when a diff DELETES an exemption, a bypass, an allowlist entry or a
+  `return next()` from a shared gate, do not stop at "is the hole closed". ENUMERATE
+  the callers that exemption was carrying and name them in the finding. The commit
+  that removed the merchant-origin CSRF exemption was correct, but its comment
+  asserted "guest checkout is unaffected: `/public/` paths return early" — and
+  `POST /payments/create` is not a `/public/` path. Every guest card payment on a
+  merchant custom domain 403'd for two days while the storefront still looked fine.
+  Flag P0 when the exemption sat on a money path.
+
+- **A gate that demands a credential needs a mint path reachable by every caller it
+  gates:** if a diff makes some capability REQUIRED, grep the call sites of the thing
+  that ISSUES it, not just the thing that verifies it. `generateCsrfToken` had exactly
+  two callers, both behind authentication, while the gate covered unauthenticated
+  storefront routes — so the required token was unobtainable by the callers who needed
+  it. Any claimed self-heal ("the client re-mints on 403", "it heals on next refresh")
+  must be exercised for EACH client class it names — unauthenticated, cookie-session,
+  Bearer — since a role- or client-gated mint silently excludes one of them.
+
+- **A monitor that never walks the real client path is not coverage:** the checkout
+  monitor probed `/payments/methods` with curl and stayed green through the entire
+  outage, because curl never carries the browser's cookies or CSRF headers. When a
+  diff changes a request-admission gate (CSRF, CORS, auth, origin), say explicitly
+  which existing monitor would have caught it; if none would, that absence is itself
+  the finding. Prefer an outcome measurement over a liveness probe — orders created
+  versus payment rows written is what actually exposed this.
+
 - **Verify-by-rendering rule:** a finding is not fixed when tsc passes. The
   verify phase requires real execution (Mac test → CI → live). Surface P2+
   when a change touches a render pipeline (OG image, PDF, storefront CSS
