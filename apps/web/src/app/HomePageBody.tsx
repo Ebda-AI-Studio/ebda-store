@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation';
+import { PLATFORM_MARKETING_URL } from '../lib/platform';
 import type { ResolvedStore } from '../lib/store-resolver';
 import { API_URL } from '../lib/api';
 import type { Product, Category } from '../lib/api';
@@ -5,7 +7,6 @@ import { resolveLayoutSettings, type StoreLayoutSettings } from '@force/shared';
 import { storeJsonLd, breadcrumbJsonLd, itemList, storeAbsoluteUrl } from '../lib/structured-data';
 import { JsonLd } from '../components/JsonLd';
 import { HomePageContent } from './HomePageContent';
-import { EditorialLanding } from '../components/landing/EditorialLanding';
 import { emitZoneCss } from '../lib/emit-zone-css';
 
 /**
@@ -275,13 +276,19 @@ export async function HomePageBody({
    *  concept to thread through there. */
   draftToken?: string;
 }) {
-  // Bare-root on a platform domain (no slug, no custom domain) —
-  // serve the Force AI Store Builder landing page instead of a merchant
-  // homepage. Replaces the old "redirect to forcemediakw.com" flow
-  // because the marketing site doesn't actually pitch the store-
-  // builder service this URL belongs to.
+  // Bare-root on a platform domain (no slug, no custom domain) — send the
+  // visitor to the marketing site rather than rendering a second one here.
+  //
+  // This URL used to serve its own `EditorialLanding`, because at the time
+  // force-ai.co did not pitch the store-builder service. It does now, and
+  // covers the whole product range, so a separate pitch on the platform host
+  // only competed with it for the same search terms under a worse title
+  // ("Force - Online Shopping in Kuwait").
+  //
+  // 307, not 308: a permanent redirect is cached by browsers indefinitely and
+  // would be painful to undo if this host ever needs its own root again.
   if (store.id === 'demo') {
-    return <EditorialLanding />;
+    redirect(PLATFORM_MARKETING_URL);
   }
 
   // Kick off the two layout-independent homepage fetches (featured products

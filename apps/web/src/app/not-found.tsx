@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { EditorialLanding } from '../components/landing/EditorialLanding';
+import { PlatformNotFound } from '../components/PlatformNotFound';
 import { StoreNotFound } from '../components/StoreNotFound';
 import { getStore } from '../lib/store-resolver';
 
@@ -12,7 +12,8 @@ import { getStore } from '../lib/store-resolver';
  * `store.force-ai.co` — it shows its OWN branded "page not available" so a
  * merchant's customer is never dumped onto the platform pitch / competitor
  * links. Only the bare platform host (`store.force-ai.co` root, or an unknown
- * slug that no merchant owns) shows the platform landing.
+ * slug that no merchant owns) gets the platform 404, which links out to
+ * force-ai.co. The platform landing itself no longer lives on this host.
  */
 export default async function NotFound() {
   const h = await headers();
@@ -22,12 +23,12 @@ export default async function NotFound() {
 
   // Store context = a custom domain (always a real store), OR a platform
   // `/<slug>` path whose slug actually resolves to that store. Unknown slugs
-  // on the platform host (e.g. `/haha`) fall through to the platform landing.
+  // on the platform host (e.g. `/haha`) fall through to the platform 404.
   const isStoreContext = !!storeDomain || (!!storeSlug && store.slug === storeSlug);
 
   if (isStoreContext) {
     return <StoreNotFound store={store} />;
   }
 
-  return <EditorialLanding notFoundBanner />;
+  return <PlatformNotFound />;
 }
