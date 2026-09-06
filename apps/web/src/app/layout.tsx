@@ -69,6 +69,22 @@ export async function generateMetadata(): Promise<Metadata> {
   const requestHost = (await headers()).get('host')?.toLowerCase() ?? '';
   const isOnCustomDomain = !!(store.domain && requestHost === store.domain.toLowerCase());
 
+  // Bare platform host (no custom domain, no slug) resolves to DEFAULT_STORE,
+  // whose name is "Force" — which produced the merchant-shaped title
+  // "Force - Online Shopping in Kuwait" for a store that does not exist. The
+  // root now redirects to force-ai.co, so the ONLY page that renders under this
+  // sentinel is the platform 404; title it as one and keep it out of the index.
+  // Without this the tab still reads like the old marketing page even though
+  // the body is a 404 — the title kept making a promise the page no longer did.
+  if (store.id === 'demo') {
+    return {
+      title: 'Page not found — Force AI',
+      description:
+        'This page does not exist. Force AI builds online stores, WhatsApp ordering and custom systems for Kuwait and the GCC.',
+      robots: { index: false, follow: false },
+    };
+  }
+
   return buildStorefrontMetadata(store, isOnCustomDomain);
 }
 

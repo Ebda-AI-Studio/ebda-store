@@ -61,4 +61,20 @@ describe('platform root redirect', () => {
     expect(src).not.toContain('redirect(');
     expect(src).toContain('PLATFORM_MARKETING_URL');
   });
+
+  it('titles the platform sentinel as a 404, not as a merchant store', () => {
+    // DEFAULT_STORE is named "Force", so the shared storefront metadata builder
+    // produced "Force - Online Shopping in Kuwait" — a merchant title for a
+    // store that does not exist, on a page whose body is a 404. The tab kept
+    // making a promise the page had stopped making.
+    const src = web('app/layout.tsx');
+    expect(src).toMatch(/if \(store\.id === 'demo'\) \{/);
+    expect(src).toMatch(/title: 'Page not found — Force AI'/);
+    expect(src).toMatch(/robots: \{ index: false, follow: false \}/);
+    // It must short-circuit BEFORE the storefront builder, not after.
+    const sentinel = src.indexOf("store.id === 'demo'");
+    const builder = src.indexOf('return buildStorefrontMetadata');
+    expect(sentinel).toBeGreaterThan(-1);
+    expect(sentinel).toBeLessThan(builder);
+  });
 });
