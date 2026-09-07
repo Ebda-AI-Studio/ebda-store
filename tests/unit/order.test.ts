@@ -400,6 +400,9 @@ describe('OrderService', () => {
             cartItem: {
               deleteMany: vi.fn().mockResolvedValue({}),
             },
+            cartBundle: {
+              deleteMany: vi.fn().mockResolvedValue({}),
+            },
             inventoryHistory: {
               // return_stock idempotency marker: null = not yet restored.
               findFirst: vi.fn().mockResolvedValue(null),
@@ -501,6 +504,7 @@ describe('OrderService', () => {
               findUnique: vi.fn().mockResolvedValue({ allowBackorder: false }),
             },
             cartItem: { deleteMany: vi.fn() },
+            cartBundle: { deleteMany: vi.fn() },
             inventoryHistory: { create: vi.fn() },
             orderEvent: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
             $queryRaw: vi.fn().mockResolvedValue([]),
@@ -741,6 +745,7 @@ describe('OrderService', () => {
               product: { update: vi.fn().mockResolvedValue({}) },
               productVariant: { update: vi.fn().mockResolvedValue({}) },
               cartItem: { deleteMany: vi.fn().mockResolvedValue({}) },
+              cartBundle: { deleteMany: vi.fn().mockResolvedValue({}) },
               inventoryHistory: {
                 findFirst: vi.fn().mockResolvedValue(null),
                 create: vi.fn().mockResolvedValue({}),
@@ -845,6 +850,7 @@ describe('OrderService', () => {
               product: { update: vi.fn().mockResolvedValue({}) },
               productVariant: { update: vi.fn().mockResolvedValue({}) },
               cartItem: { deleteMany: vi.fn().mockResolvedValue({}) },
+              cartBundle: { deleteMany: vi.fn().mockResolvedValue({}) },
               inventoryHistory: {
                 findFirst: vi.fn().mockResolvedValue(null),
                 create: vi.fn().mockResolvedValue({}),

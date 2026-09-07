@@ -12,6 +12,7 @@ import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
+import { checkoutBundleErrorCopy } from '../../lib/checkout-bundle-errors';
 import { trackInitiateCheckout } from '../../components/MarketingPixels';
 import {
   isValidEmail,
@@ -30,6 +31,7 @@ import {
   formatWindowTime,
 } from './_lib/deliveryWindows';
 import { pageSurfaceStyle } from '@/lib/page-surface';
+import { couponQuoteBasis } from '@/lib/coupon-quote-basis';
 import {
   resolveSectionZone,
   zoneStyle,
@@ -49,11 +51,12 @@ const PaymentStep = dynamic(() => import('./PaymentStep'), {
     </div>
   ),
 });
-import type { CheckoutCartItem, Coupon, PaymentProvider } from './types';
+import type { CheckoutCartItem, CheckoutCartBundle, Coupon, PaymentProvider } from './types';
 
 interface Cart {
   id: string;
   items: CheckoutCartItem[];
+  bundles: CheckoutCartBundle[];
   subtotal: number;
   total: number;
 }
@@ -135,7 +138,12 @@ export default function CheckoutClient() {
   const checkoutLabelAr = (store?.settings?.checkoutLabelAr as string | undefined) ?? 'دفع آمن';
   const storeUrl = useStoreUrl();
   const continueShoppingHref = useLastListing();
-  const { items: cartContextItems, total: cartContextTotal, isReady: cartIsReady } = useCart();
+  const {
+    items: cartContextItems,
+    bundles: cartContextBundles,
+    total: cartContextTotal,
+    isReady: cartIsReady,
+  } = useCart();
   const { language, t } = useLanguage();
   // Passed down to PaymentStep as the `formatPrice` prop too.
   const formatPrice = useLocalePrice();
@@ -175,21 +183,31 @@ export default function CheckoutClient() {
   const pixelFiredRef = useRef(false);
   useEffect(() => {
     if (pixelFiredRef.current) return;
-    if (!cartIsReady || cartContextItems.length === 0) return;
+    if (!cartIsReady || (cartContextItems.length === 0 && cartContextBundles.length === 0)) return;
     pixelFiredRef.current = true;
     trackInitiateCheckout({
-      contentIds: cartContextItems.map(item => item.productId),
-      numItems: cartContextItems.reduce((sum, item) => sum + item.quantity, 0),
+      contentIds: [
+        ...cartContextItems.map(item => item.productId),
+        ...cartContextBundles.map(b => b.bundleId),
+      ],
+      numItems:
+        cartContextItems.reduce((sum, item) => sum + item.quantity, 0) +
+        cartContextBundles.reduce((sum, b) => sum + b.quantity, 0),
       value: cartContextTotal / 1000,
       currency: 'KWD',
     });
-  }, [cartIsReady, cartContextItems, cartContextTotal]);
+  }, [cartIsReady, cartContextItems, cartContextBundles, cartContextTotal]);
 
   // CartContext is write-through to /public/cart, so the context is the
   // single source of truth for both display and order creation. Memoized so
   // hooks that depend on it don't re-run on unrelated re-renders.
+  //
+  // A cart holding ONLY bundles (no loose items) is valid — gating this on
+  // `cartContextItems.length` alone made `cart` null for a bundle-only
+  // cart, which rendered the "cart is empty" screen and blocked checkout
+  // entirely for a customer who bought nothing but a box.
   const cart: Cart | null = useMemo(() => {
-    if (cartContextItems.length === 0) return null;
+    if (cartContextItems.length === 0 && cartContextBundles.length === 0) return null;
     return {
       id: 'cart',
       items: cartContextItems.map(item => ({
@@ -211,10 +229,27 @@ export default function CheckoutClient() {
           images: item.image ? [{ id: '1', url: item.image, alt: item.name }] : [],
         },
       })),
+      bundles: cartContextBundles.map(b => ({
+        id: b.id,
+        bundleId: b.bundleId,
+        name: b.name,
+        nameAr: b.nameAr,
+        image: b.image,
+        quantity: b.quantity,
+        total: b.total,
+      })),
       subtotal: cartContextTotal,
       total: cartContextTotal,
     };
-  }, [cartContextItems, cartContextTotal]);
+  }, [cartContextItems, cartContextBundles, cartContextTotal]);
+  // The basis a COUPON is quoted against: loose items only, never the
+  // bundle-inclusive `cart.subtotal`. `OrderService.create` evaluates a
+  // coupon against `cart.items` alone (Ruling B1 — a coupon never
+  // discounts an already-discounted box), so quoting against a subtotal
+  // that included bundles promised a discount the server then refused to
+  // apply, and the customer was charged more than this page showed.
+  // Identical to `cart.subtotal` for a cart with no bundle.
+  const couponBasis = useMemo(() => couponQuoteBasis(cartContextItems), [cartContextItems]);
   const [, setShippingZones] = useState<ShippingZone[]>([]);
   const [paymentProviders, setPaymentProviders] = useState<PaymentProvider[]>([]);
   // A FAILED payment-config load must not masquerade as "no payment methods
@@ -657,7 +692,11 @@ export default function CheckoutClient() {
       try {
         const result = await api.post<{ coupon: Coupon; discount: number }>(
           `/stores/public/${store.id}/coupons/validate`,
-          { code, orderTotal: cart.subtotal }
+          // `couponBasis`, NOT `cart.subtotal` — see its definition: the
+          // server applies the coupon to loose items only, so quoting
+          // against the bundle-inclusive total displayed a discount the
+          // order would never receive.
+          { code, orderTotal: couponBasis }
         );
         if (result.success && result.data) {
           setCouponCode(result.data.coupon.code);
@@ -690,7 +729,7 @@ export default function CheckoutClient() {
         setCouponError(t('Failed to apply coupon', 'فشل تطبيق الكوبون'));
       }
     },
-    [couponCode, store?.id, cart, promoStorageKey, t]
+    [couponCode, store?.id, cart, couponBasis, promoStorageKey, t]
   );
 
   const handleApplyCoupon = () => applyCouponCode();
@@ -1173,6 +1212,20 @@ export default function CheckoutClient() {
         }
       }
 
+      // Bundle-specific checkout failures get their own copy naming the
+      // bundle — BUNDLE_NOT_PURCHASABLE and a bundle-component
+      // INSUFFICIENT_INVENTORY are otherwise either unhandled (falls to the
+      // fully generic default below) or handled only generically (doesn't
+      // say which box). Must run BEFORE the switch: it already has its own
+      // (non-bundle-specific) INSUFFICIENT_INVENTORY case that would
+      // otherwise shadow this. See checkout-bundle-errors.ts.
+      const bundleFriendly = checkoutBundleErrorCopy(code, raw, t);
+      if (bundleFriendly) {
+        setCheckoutError(bundleFriendly);
+        setIsProcessing(false);
+        return;
+      }
+
       let friendly: string;
       switch (code) {
         case 'COD_NOT_AVAILABLE':
@@ -1266,7 +1319,7 @@ export default function CheckoutClient() {
     );
   }
 
-  if (!cart || cart.items.length === 0) {
+  if (!cart || (cart.items.length === 0 && cart.bundles.length === 0)) {
     return (
       <MinimalChrome label={checkoutLabelEn} labelAr={checkoutLabelAr}>
         <div className="mx-auto max-w-7xl px-4 py-16 text-center">
@@ -1807,6 +1860,7 @@ export default function CheckoutClient() {
             {/* Order Summary */}
             <OrderSummary
               items={cart.items}
+              bundles={cart.bundles}
               subtotal={subtotal}
               discount={discount}
               promotionDiscount={promotionAppliedDiscount}

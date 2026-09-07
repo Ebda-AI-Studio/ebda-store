@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { CartService } from '../services/cart.service';
 import { customerUserId } from '../middleware/auth';
+import { requireFeature } from '../middleware/feature-gate';
 
 const router = Router({ mergeParams: true });
 
@@ -33,6 +34,11 @@ const bulkSyncSchema = z.object({
 
 const updateCartItemSchema = z.object({
   quantity: z.number().int().min(0),
+});
+
+const addBundleToCartSchema = z.object({
+  bundleId: z.string().uuid(),
+  quantity: z.number().int().min(1).max(1000).default(1),
 });
 
 // Helper to get session ID
@@ -151,6 +157,82 @@ router.delete('/items/:itemId', async (req: Request, res: Response, next: NextFu
     next(error);
   }
 });
+
+// POST /stores/:storeId/cart/bundles - Add a bundle to the cart
+//
+// Gated on the `bundles` feature (no plan baseline — super-admin
+// StoreFeature override only), same as every bundle route in
+// bundle.routes.ts. This is a guest-cart surface (no `authenticate`), so
+// `requireFeature` runs on its own here rather than as part of an
+// admin-only middleware chain — it resolves storeId from the route param
+// and works for anonymous requests (see feature-gate.ts).
+//
+// A refusal for a business rule (bundle inactive/expired/sold out, or not
+// enough component stock to make the requested quantity) is a flat
+// `{ error: '<code>' }` 422 — deliberately NOT the generic AppError
+// envelope (`{ success:false, error:{code,...} }`). This is its own
+// convention, independent of bundle.routes.ts's admin-CRUD errors (which
+// moved onto the standard AppError envelope in RULING T9-a) — the
+// storefront cart is a different consumer with its own contract/tests
+// (tests/integration/cart-bundles.test.ts), and this shape is unchanged. A
+// genuine 404 (unknown bundle / wrong store) still flows through
+// `resolveBundle` -> `next(error)` -> the normal error handler.
+router.post(
+  '/bundles',
+  requireFeature('bundles'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId } = req.params;
+      const sessionId = getSessionId(req);
+      const customerId = customerUserId(req);
+      const data = addBundleToCartSchema.parse(req.body);
+
+      const result = await CartService.addBundle(
+        storeId,
+        sessionId,
+        data.bundleId,
+        data.quantity,
+        customerId
+      );
+
+      if (!result.ok) {
+        res.status(422).json({ error: result.error });
+        return;
+      }
+
+      res.status(201).json({
+        success: true,
+        data: { cart: result.cart },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /stores/:storeId/cart/bundles/:id - Remove a bundle from the cart
+// `:id` is the CartBundle row id (mirrors `:itemId` on the item routes
+// above being the CartItem row id, not the productId).
+router.delete(
+  '/bundles/:id',
+  requireFeature('bundles'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { storeId, id } = req.params;
+      const sessionId = getSessionId(req);
+      const customerId = customerUserId(req);
+
+      const cart = await CartService.removeBundle(storeId, sessionId, id, customerId);
+
+      res.json({
+        success: true,
+        data: { cart },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // DELETE /stores/:storeId/cart - Clear cart
 router.delete('/', async (req: Request, res: Response, next: NextFunction) => {

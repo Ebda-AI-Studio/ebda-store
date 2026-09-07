@@ -24,6 +24,16 @@ vi.mock('@force/database', () => ({
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
+    // CartService.clear() also clears CartBundle rows (Task 5, product
+    // bundles) — bundles live in their own table, never expanded into
+    // cart_items, so clearing the cart must clear both.
+    cartBundle: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     product: {
       findFirst: vi.fn(),
       update: vi.fn(),

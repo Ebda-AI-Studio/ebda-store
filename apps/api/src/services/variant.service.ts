@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error-handler';
 import { invalidateStoreProductCaches } from '../lib/public-cache';
 import logger from '../lib/logger';
 import { deleteR2ObjectIfOrphan } from './r2-cleanup.service';
+import { throwIfBundleFkViolation } from '../lib/bundle-fk-errors';
 
 interface CreateOptionInput {
   name: string;
@@ -221,21 +222,32 @@ export class VariantService {
       select: { imageUrl: true },
     });
 
-    await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
-      // Delete all variants since they depend on options
-      await tx.productVariant.deleteMany({ where: { productId } });
+    try {
+      await withMoneyTx(prisma, async (tx: Prisma.TransactionClient) => {
+        // Delete all variants since they depend on options
+        await tx.productVariant.deleteMany({ where: { productId } });
 
-      // Delete option (cascade will delete values and variant option junctions)
-      await tx.productOption.delete({ where: { id: optionId } });
+        // Delete option (cascade will delete values and variant option junctions)
+        await tx.productOption.delete({ where: { id: optionId } });
 
-      // If no more options, mark product as not having variants
-      if (option.product.options.length <= 1) {
-        await tx.product.update({
-          where: { id: productId },
-          data: { hasVariants: false },
-        });
-      }
-    });
+        // If no more options, mark product as not having variants
+        if (option.product.options.length <= 1) {
+          await tx.product.update({
+            where: { id: productId },
+            data: { hasVariants: false },
+          });
+        }
+      });
+    } catch (err) {
+      // Deleting an option takes ALL its variants with it in one deleteMany
+      // — if any one of them is pinned by a bundle_items row, the whole
+      // transaction rolls back (RESTRICT). This is inherently all-or-nothing
+      // (an option's variants form one set), so the actionable error names
+      // the option deletion as blocked rather than attempting a partial
+      // per-variant retry.
+      throwIfBundleFkViolation(err);
+      throw err;
+    }
 
     // Fire-and-forget R2 cleanup after the commit — same pattern as
     // updateVariant / deleteVariant above.
@@ -353,9 +365,17 @@ export class VariantService {
     });
 
     if (variantsWithValue.length > 0) {
-      await prisma.productVariant.deleteMany({
-        where: { id: { in: variantsWithValue.map(v => v.id) } },
-      });
+      try {
+        await prisma.productVariant.deleteMany({
+          where: { id: { in: variantsWithValue.map(v => v.id) } },
+        });
+      } catch (err) {
+        // Same all-or-nothing shape as deleteOption: every variant carrying
+        // this option value is deleted together, so a single bundle-pinned
+        // variant blocks the whole value deletion.
+        throwIfBundleFkViolation(err);
+        throw err;
+      }
     }
 
     await prisma.productOptionValue.delete({ where: { id: valueId } });
@@ -549,7 +569,12 @@ export class VariantService {
       throw new AppError(404, 'NOT_FOUND', 'Variant not found');
     }
 
-    await prisma.productVariant.delete({ where: { id: variantId } });
+    try {
+      await prisma.productVariant.delete({ where: { id: variantId } });
+    } catch (err) {
+      throwIfBundleFkViolation(err);
+      throw err;
+    }
 
     // Variant rows are hard-deleted (no soft-delete on this table), so
     // the image is genuinely orphaned the moment the row goes. Safe to

@@ -9,6 +9,7 @@ import { prisma, SlugEntityType } from '@force/database';
 import { resolveSlugRedirect } from '../services/slug-redirect.service';
 import { AppError } from '../middleware/error-handler';
 import { authenticate, optionalAuthenticate, customerUserId } from '../middleware/auth';
+import { requireFeature } from '../middleware/feature-gate';
 import {
   publicLimiter,
   publicTenantLimiter,
@@ -25,6 +26,7 @@ import { featureService } from '../services/feature.service';
 import { getCached } from '../lib/public-cache';
 import { setEdgeCache } from '../lib/edge-cache';
 import { buildProductFeed } from '../lib/product-feed';
+import { listPurchasableBundles, describeBundleContents } from '../services/bundle.service';
 import { stripMarketingPixelSecrets } from '../lib/marketing-pixels-secrets';
 import { verifyReviewToken } from '../lib/review-token';
 import { inngest } from '../lib/inngest/client';
@@ -78,6 +80,19 @@ const addCartItemSchema = z.object({
 
 const updateCartItemSchema = z.object({
   quantity: z.number().int().min(1),
+});
+
+// The storefront (apps/web) is a merchant-custom-domain origin, so it can
+// only ever call `/public/*` — `restrictPlatformOnlyOrigins` (security.ts)
+// blocks a merchant origin from `/stores/:storeId/*` in production (see
+// tests/unit/platform-only-origins.test.ts). Task 5 added the bundle cart
+// mutation routes ONLY under `/stores/:storeId/cart/bundles[/:id]`
+// (cart.routes.ts) — an admin-space path the storefront cannot reach at
+// all outside local dev. These two mirror them here, under `/public/cart`,
+// exactly like every other cart route in this file.
+const addBundleToCartSchema = z.object({
+  bundleId: z.string().uuid(),
+  quantity: z.number().int().min(1).max(1000).default(1),
 });
 
 // Kuwait-friendly address schema: see notes in order.routes.ts. State and
@@ -319,6 +334,12 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
     const baseUrl = store.domain
       ? `https://${store.domain}`
       : `https://${req.get('x-original-host') ?? req.get('host')}`;
+    // `bundles` is in NO plan baseline (super-admin override only) — a
+    // store without it must see this feed completely unchanged, so the
+    // bundle listing query below is skipped entirely rather than run and
+    // discarded. Checked alongside `agent_feed` so both flags are read in
+    // one round trip (featureService coalesces concurrent per-store reads).
+    const bundlesEnabled = await featureService.isFeatureEnabled(storeId, 'bundles');
     // Cache key under public:products:<storeId>:* so invalidateStoreProductCaches busts it on product writes.
     const feed = await getCached(`public:products:${storeId}:feed:v1`, 600, async () => {
       // listPublic() internally caps limit at 100 (Math.min(100, ...)) — the
@@ -334,7 +355,19 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
         status: 'active',
         limit: 100,
       });
-      return buildProductFeed(store, products, baseUrl);
+      // Task 10: bundles appear as sibling feed entries (see
+      // buildProductFeed's `is_bundle` field) so AI shopping agents can
+      // recommend them — only when purchasable, and only for a store with
+      // the override. Empty array when disabled reproduces the pre-Task-10
+      // feed byte-for-byte (buildProductFeed's `bundles` param defaults to
+      // `[]` too — the explicit `[]` here just makes the branch visible).
+      const bundles = bundlesEnabled
+        ? (await listPurchasableBundles(prisma, storeId)).map(b => {
+            const { description, descriptionAr } = describeBundleContents(b);
+            return { ...b, description, descriptionAr };
+          })
+        : [];
+      return buildProductFeed(store, products, baseUrl, bundles);
     });
     setEdgeCache(res, { sMaxAge: 600, staleWhileRevalidate: 86400 });
     res.json(feed);
@@ -532,6 +565,104 @@ router.delete(
       const { itemId } = req.params;
       const storeId = await getStoreIdFromRequest(req);
       const cart = await CartService.removeItem(storeId, sessionId, itemId);
+
+      res.json({
+        success: true,
+        data: { cart },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /cart/bundles - Add a bundle to the cart (its own CartBundle row —
+// see cart.service.ts; a bundle is NEVER expanded into cart_items here).
+//
+// A refusal for a business rule (bundle inactive/expired/sold out, or not
+// enough component stock for the requested quantity) is a flat
+// `{ error: '<code>' }` 422 — the same convention as the identical route
+// in cart.routes.ts, independent of bundle.routes.ts's admin-CRUD errors
+// (which moved onto the standard AppError envelope in RULING T9-a; this
+// storefront-facing shape is unaffected). A genuine 404 (unknown bundle /
+// wrong store) flows through `resolveBundle` -> `next(error)` -> the
+// normal error handler.
+router.post(
+  '/cart/bundles',
+  cartLimiter,
+  requireFeature('bundles'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const storeId = await getStoreIdFromRequest(req);
+      const customerId = customerUserId(req);
+      const data = addBundleToCartSchema.parse(req.body);
+
+      const result = await CartService.addBundle(
+        storeId,
+        sessionId,
+        data.bundleId,
+        data.quantity,
+        customerId
+      );
+
+      if (!result.ok) {
+        res.status(422).json({ error: result.error });
+        return;
+      }
+
+      res.status(201).json({
+        success: true,
+        data: { cart: result.cart },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// DELETE /cart/bundles/:cartBundleId - Remove a bundle from the cart.
+// `:cartBundleId` is the CartBundle row id (mirrors `:itemId` on
+// /cart/items/:itemId being the CartItem row id, not the bundleId).
+//
+// Deliberately NOT named `:id`: `requireFeature`'s storeId resolution reads
+// `req.params.storeId || req.params.id || ... || x-store-id header` — a
+// param literally named `id` on THIS route (which has no `:storeId` param
+// at all, unlike its `/stores/:storeId/cart/bundles/:id` sibling in
+// cart.routes.ts, where `:storeId` always wins first) would have been
+// picked up as the "storeId" instead of the CartBundle row id, sending a
+// random UUID into the feature-flag lookup and 403ing `FEATURE_DISABLED`
+// on every real removal. Caught by the HTTP-level test that exercises this
+// route with only headers, no route param, for the store id (fix-round-2,
+// Finding 1) — every existing bundle-cart test called `CartService`
+// directly or hit the OTHER route, so none of them could have found this.
+router.delete(
+  '/cart/bundles/:cartBundleId',
+  cartLimiter,
+  requireFeature('bundles'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_SESSION', message: 'Session ID required' },
+        });
+        return;
+      }
+
+      const { cartBundleId } = req.params;
+      const storeId = await getStoreIdFromRequest(req);
+      const customerId = customerUserId(req);
+      const cart = await CartService.removeBundle(storeId, sessionId, cartBundleId, customerId);
 
       res.json({
         success: true,

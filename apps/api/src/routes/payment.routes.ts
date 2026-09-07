@@ -11,6 +11,7 @@ import { getAuthUser } from '../utils/store-helpers';
 import { OrderService } from '../services/order.service';
 import { recordPaymentEvent } from '../services/payment-event.service';
 import logger from '../lib/logger';
+import { buildPaymentLineItems } from '../lib/payment-line-items';
 
 const router = Router();
 
@@ -443,12 +444,7 @@ router.post(
                 phone: shipping.phone || undefined,
               };
             })(),
-            items: order.items.map(item => ({
-              name: item.productName,
-              quantity: item.quantity,
-              unitPrice: item.price,
-              sku: item.sku || undefined,
-            })),
+            items: buildPaymentLineItems(order.items),
             // Resolve relative paths against the order's storefront base URL so
             // payment providers always receive an absolute URL that points back
             // at the correct tenant domain (custom domain or platform slug).

@@ -24,6 +24,13 @@ export interface OrderLineItem {
   variantName?: string | null;
   quantity: number;
   price?: number;
+  // Bundle tagging snapshot (see packages/database Prisma schema's OrderItem
+  // comment) — set on every component row a bundle box expanded into at
+  // checkout, null otherwise. Needed here so the list-row summary can group
+  // a box back into one entry instead of listing its unrelated components.
+  bundleGroupId?: string | null;
+  bundleName?: string | null;
+  bundleNameAr?: string | null;
 }
 
 export interface Order {

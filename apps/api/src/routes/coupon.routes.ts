@@ -275,8 +275,13 @@ router.post(
         return;
       }
 
-      // Check minimum order amount
-      if (coupon.minOrderAmount && orderTotal && orderTotal < coupon.minOrderAmount) {
+      // Check minimum order amount. `orderTotal != null` rather than a
+      // truthiness check: a bundle-only cart's basis is legitimately `0`
+      // (P2-a) — the old truthy guard skipped this check entirely for that
+      // cart, so the quote said "applied" and checkout then 400ed at
+      // order.service.ts's own minOrderAmount gate with no way for the
+      // customer to recover short of clearing the code.
+      if (coupon.minOrderAmount && orderTotal != null && orderTotal < coupon.minOrderAmount) {
         res.status(400).json({
           success: false,
           error: {

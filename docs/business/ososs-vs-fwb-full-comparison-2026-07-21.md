@@ -3,6 +3,17 @@
 **Version:** 1.0 · **Date:** 2026-07-21 · **Owner:** Ahmad Sharaf
 **Supersedes:** `ososs-vs-fwb-gap-analysis-2026-07-21.md` (rev 1–2). That file was a gap list; this is the complete comparison and is now the canonical document.
 
+> **Addendum — 2026-09-07.** This document is a snapshot of FWB's code as of 2026-07-21. Since then,
+> FWB has shipped product bundles: a merchant can define a fixed kit of specific products at set
+> quantities and sell it as one line at one price, with availability derived from the components'
+> own stock (never a separate count) and returns handled atomically (the whole box, at the bundle
+> price — no itemized partial-box return). Feature key `bundles`, category `commerce`, tier
+> `addon` — **not part of any plan baseline**, off by default, enabled per store only via an
+> explicit `StoreFeature` override once sold (see `docs/business/plan-feature-matrix.md`). **Every
+> "product bundles" reference below — the §2.1 matrix row, the §9 roadmap item, and the §11
+> "Confirmed absent" list — is out of date.** Left uncorrected in place below to preserve this as
+> an honest point-in-time snapshot; this addendum is the correction, not a rewrite of the analysis.
+
 ---
 
 ## 0. Method and evidence quality

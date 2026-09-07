@@ -1,9 +1,71 @@
+/**
+ * Cart service.
+ *
+ * A cart holds two independent line kinds: `CartItem` (a single product/
+ * variant) and, as of Task 5 of the product-bundles feature, `CartBundle`
+ * (a bundle, at a store-defined discount over its component prices). A
+ * bundle is NEVER expanded into `cart_items` — `cart_items` carries two
+ * PARTIAL UNIQUE INDEXES, `(cart_id, product_id)` WHERE `variant_id IS NULL`
+ * and `(cart_id, product_id, variant_id)` WHERE `variant_id IS NOT NULL` —
+ * so expanding a bundle into that table would violate one of those indexes
+ * the moment a customer already had one of the bundle's own products in
+ * their cart, 500ing on a live store. `CartBundle` is its own table for
+ * exactly this reason; expansion into orderable component lines happens
+ * once, at order creation (Task 6), never here. Bundle prices are NEVER
+ * cached on the `CartBundle` row — every read recomputes via
+ * `resolveBundle` from the CURRENT component prices/stock.
+ */
 import { prisma, Prisma, hasTenantContext } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
+import { resolveBundle, type ResolvedBundle } from './bundle.service';
+
+/**
+ * A bundle line in a cart response. Priced live — `unitPrice`/`total`/
+ * `available` are recomputed from `resolveBundle` on EVERY read (never
+ * cached on the `CartBundle` row), so a component price/stock change moves
+ * this line before the customer pays. `id` is the `CartBundle` row id
+ * (what `DELETE /cart/bundles/:id` takes); `bundleId` is the catalog
+ * `Bundle` id — kept distinct the same way `CartItem`'s row `id` is
+ * distinct from its `productId`.
+ */
+export interface CartBundleView {
+  id: string;
+  bundleId: string;
+  name: string;
+  nameAr: string | null;
+  image: string | null;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  available: number;
+}
+
+/**
+ * `resolveBundle`, but returns `null` instead of throwing on a 404.
+ *
+ * A `CartBundle` row references a bundle that should always resolve — the
+ * admin DELETE route never hard-deletes (see bundle.routes.ts), it only
+ * flips `isActive`, which `resolveBundle` deliberately still resolves
+ * through. This is defense-in-depth for any other anomaly (e.g. a row left
+ * over from a data migration): one bad reference is dropped from the
+ * cart's bundle list instead of 500ing the customer's entire cart read.
+ * Mirrors the same-named helper in bundle.routes.ts.
+ */
+async function tryResolveCartBundle(
+  storeId: string,
+  bundleId: string
+): Promise<ResolvedBundle | null> {
+  try {
+    return await resolveBundle(prisma, storeId, bundleId);
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 404) return null;
+    throw err;
+  }
+}
 
 export class CartService {
   static async getOrCreate(storeId: string, sessionId: string, customerId?: string) {
@@ -23,6 +85,10 @@ export class CartService {
           variant: { select: { id: true, title: true, titleAr: true, price: true } },
         },
       },
+      // Raw rows only — `bundleId`/`quantity` is all we need. Display fields
+      // (name/image) and every priced field come from `resolveBundle` below,
+      // recomputed live rather than joined from a possibly-stale Bundle row.
+      bundles: true,
     } as const;
 
     // Try to find an existing cart for this session (or customer).
@@ -80,12 +146,44 @@ export class CartService {
     // one is selected (variant products), falling back to the parent product's
     // price for variant-less products. Using product.price for a variant line
     // charged every variant at the parent's (lowest) price — a real undercharge.
-    const subtotal = cart.items.reduce(
+    const itemsSubtotal = cart.items.reduce(
       (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
       0
     );
 
-    return { ...cart, subtotal };
+    // Bundles are NEVER expanded into cart_items (see cart-bundles.test.ts —
+    // that would collide with the partial unique indexes on that table the
+    // moment a bundle contained a product the customer already had). Each
+    // bundle stays its own `CartBundle` row and is priced fresh here via
+    // `resolveBundle`, which recomputes componentSum/price/available from
+    // the CURRENT product/variant rows — never a cached price — so a
+    // component price change between add-to-cart and this read is reflected
+    // before the customer pays.
+    // `cart.bundles ?? []`: a real Prisma read with `bundles: true` always
+    // returns an array (empty when there are none) — the fallback exists so
+    // pre-existing unit tests that mock a bare `{ id, items }` cart object
+    // (predating this task) don't throw on `.map` of `undefined`.
+    const resolvedBundles = await Promise.all(
+      (cart.bundles ?? []).map(async (cb): Promise<CartBundleView | null> => {
+        const resolved = await tryResolveCartBundle(storeId, cb.bundleId);
+        if (!resolved) return null;
+        return {
+          id: cb.id,
+          bundleId: cb.bundleId,
+          name: resolved.name,
+          nameAr: resolved.nameAr,
+          image: resolved.image,
+          quantity: cb.quantity,
+          unitPrice: resolved.price,
+          total: resolved.price * cb.quantity,
+          available: resolved.available,
+        };
+      })
+    );
+    const bundles = resolvedBundles.filter((b): b is CartBundleView => b !== null);
+    const bundlesSubtotal = bundles.reduce((sum, b) => sum + b.total, 0);
+
+    return { ...cart, bundles, subtotal: itemsSubtotal + bundlesSubtotal };
   }
 
   static async addItem(
@@ -229,6 +327,126 @@ export class CartService {
     }
 
     // Track activity for abandonment detection
+    await prisma.cart.update({
+      where: { id: cart.id, storeId },
+      data: { lastActivityAt: new Date() },
+    });
+
+    return this.getOrCreate(storeId, sessionId, customerId);
+  }
+
+  /**
+   * Add a bundle to the cart — as its OWN `CartBundle` row, never expanded
+   * into `cart_items`. Expanding here would collide with the partial unique
+   * indexes on `cart_items` the moment the bundle contained a product the
+   * customer already had in their cart standalone (see the regression test
+   * in tests/integration/cart-bundles.test.ts). Component-level expansion
+   * happens once, at order creation (Task 6) — never in the cart.
+   *
+   * Returns a discriminated result instead of throwing for the two
+   * BUSINESS-rule refusals (`bundle_not_purchasable` / `insufficient_stock`)
+   * so the route can respond with the flat `{ error: '<code>' }` 422 body
+   * the cart-bundles test suite expects — a convention independent of
+   * bundle.routes.ts's admin-CRUD errors (which moved onto the standard
+   * AppError envelope in RULING T9-a; this cart-facing shape is
+   * unaffected), and still kept separate from the generic `AppError`
+   * envelope (`{ success:false, error:{code,...} }`) that a genuine 404
+   * (wrong store / unknown bundle, still thrown via `resolveBundle` below
+   * and left to propagate) goes through.
+   */
+  static async addBundle(
+    storeId: string,
+    sessionId: string,
+    bundleId: string,
+    quantity: number = 1,
+    customerId?: string
+  ): Promise<
+    | { ok: true; cart: Awaited<ReturnType<typeof CartService.getOrCreate>> }
+    | { ok: false; error: 'bundle_not_purchasable' | 'insufficient_stock' }
+  > {
+    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+
+    // Recomputed from CURRENT component prices/stock — resolveBundle never
+    // caches. Throws AppError(404) for a bundle that isn't this store's;
+    // that propagates to the route's catch-all `next(error)` unchanged,
+    // same as every other cross-tenant 404 in this codebase.
+    const resolved = await resolveBundle(prisma, storeId, bundleId);
+
+    if (!resolved.isPurchasable) {
+      return { ok: false, error: 'bundle_not_purchasable' };
+    }
+
+    // Read-check-write for the (cartId, bundleId) line. Mirrors addItem's
+    // writeLine: under the ambient tenant transaction (cart.routes.ts's
+    // mount always opens one — see tenant-context.ts) this runs inline on
+    // the SAME connection; standalone callers (scripts/tests with no tenant
+    // context) get their own transaction. `resolved.available` is a
+    // snapshot taken just above — same advisory-only posture addItem
+    // documents: the authoritative oversell guard is order creation's
+    // atomic decrement, not this check.
+    const writeBundleLine = async (
+      tx: Prisma.TransactionClient
+    ): Promise<{ ok: true } | { ok: false; error: 'insufficient_stock' }> => {
+      const existing = await tx.cartBundle.findFirst({ where: { cartId: cart.id, bundleId } });
+      const targetQuantity = (existing?.quantity ?? 0) + quantity;
+
+      if (targetQuantity > resolved.available) {
+        return { ok: false, error: 'insufficient_stock' };
+      }
+
+      if (existing) {
+        await tx.cartBundle.update({
+          where: { id: existing.id },
+          data: { quantity: targetQuantity },
+        });
+      } else {
+        await tx.cartBundle.create({ data: { cartId: cart.id, bundleId, quantity } });
+      }
+      return { ok: true };
+    };
+
+    const result = hasTenantContext()
+      ? await writeBundleLine(prisma as unknown as Prisma.TransactionClient)
+      : await retryOnWriteConflict(
+          () =>
+            prisma.$transaction(writeBundleLine, {
+              isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+              maxWait: 10000,
+              timeout: 30000,
+            }),
+          { label: 'cart.addBundle', extraRetryCodes: ['P2002'] }
+        );
+
+    if (!result.ok) {
+      return result;
+    }
+
+    await prisma.cart.update({
+      where: { id: cart.id, storeId },
+      data: { lastActivityAt: new Date() },
+    });
+
+    return { ok: true, cart: await this.getOrCreate(storeId, sessionId, customerId) };
+  }
+
+  /** Remove one bundle line (by its `CartBundle` row id) from the cart. */
+  static async removeBundle(
+    storeId: string,
+    sessionId: string,
+    cartBundleId: string,
+    customerId?: string
+  ) {
+    const cart = await this.getOrCreate(storeId, sessionId, customerId);
+
+    const bundle = await prisma.cartBundle.findFirst({
+      where: { id: cartBundleId, cartId: cart.id },
+    });
+    if (!bundle) {
+      throw new AppError(404, 'NOT_FOUND', 'Cart bundle not found');
+    }
+
+    await prisma.cartBundle.delete({ where: { id: cartBundleId } });
+
     await prisma.cart.update({
       where: { id: cart.id, storeId },
       data: { lastActivityAt: new Date() },
@@ -442,6 +660,12 @@ export class CartService {
     await prisma.cartItem.deleteMany({
       where: { cartId: cart.id },
     });
+    // Bundles live in their own table (see the file header) — clearing the
+    // cart must clear both, or a "cleared" cart would still show its bundle
+    // lines and a non-zero subtotal.
+    await prisma.cartBundle.deleteMany({
+      where: { cartId: cart.id },
+    });
 
     // Track activity for abandonment detection
     await prisma.cart.update({
@@ -456,15 +680,20 @@ export class CartService {
     const [guestCart, userCart] = await Promise.all([
       prisma.cart.findFirst({
         where: { storeId, sessionId: guestSessionId, customerId: null },
-        include: { items: true },
+        include: { items: true, bundles: true },
       }),
       prisma.cart.findFirst({
         where: { storeId, customerId },
-        include: { items: true },
+        include: { items: true, bundles: true },
       }),
     ]);
 
-    if (!guestCart || guestCart.items.length === 0) {
+    // `guestCart.bundles ?? []`: pre-existing unit tests in tests/unit/cart.test.ts
+    // mock a bare `{ id, items }` cart object that predates the CartBundle table
+    // and carries no `bundles` field.
+    const guestBundles = guestCart?.bundles ?? [];
+
+    if (!guestCart || (guestCart.items.length === 0 && guestBundles.length === 0)) {
       return userCart;
     }
 
@@ -500,7 +729,32 @@ export class CartService {
       }
     }
 
-    // Delete guest cart
+    // Merge bundles — match on bundleId. `cart_bundles` has a UNIQUE
+    // (cart_id, bundle_id) index (same trap `cart_items`' partial unique
+    // indexes exist to avoid — see the file header): if the user's own cart
+    // already carries this bundle, the guest's line MUST increment that
+    // row's quantity rather than INSERT a second one, or this merge itself
+    // would violate the index it exists to protect.
+    for (const guestBundle of guestBundles) {
+      const existingBundle = userCart?.bundles?.find(b => b.bundleId === guestBundle.bundleId);
+
+      if (existingBundle) {
+        await prisma.cartBundle.update({
+          where: { id: existingBundle.id },
+          data: { quantity: existingBundle.quantity + guestBundle.quantity },
+        });
+      } else {
+        await prisma.cartBundle.create({
+          data: {
+            cartId: targetCart.id,
+            bundleId: guestBundle.bundleId,
+            quantity: guestBundle.quantity,
+          },
+        });
+      }
+    }
+
+    // Delete guest cart (cascades to its own CartItem/CartBundle rows).
     await prisma.cart.delete({ where: { id: guestCart.id } });
 
     return prisma.cart.findUnique({
@@ -516,6 +770,7 @@ export class CartService {
             },
           },
         },
+        bundles: true,
       },
     });
   }

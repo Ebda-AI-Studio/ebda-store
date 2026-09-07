@@ -45,6 +45,10 @@ export const FEATURE_KEYS_ARRAY = [
   // Gates the Inngest sweep that stamps paymentGatewayAbandonedAt and the
   // admin retargeting UI at /stores/:id/payment-abandonments.
   'payment_abandonment',
+  // Product Bundles (2026-09-06) — sold per store, NOT part of any plan
+  // baseline (see plan-baselines.ts). A merchant only gets it via an
+  // explicit super-admin StoreFeature override.
+  'bundles',
   // Accounting sub-features (2026-05-27)
   'accounting.basic',
   'accounting.expenses',
@@ -523,6 +527,19 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
       'تحديد المتسوّقين الذين وصلوا إلى بوابة الدفع لكنهم لم يُكملوا الدفع. ' +
       'تُسجَّل البيانات بشكل تلقائي وتظهر في لوحة إعادة الاستهداف مع بيانات التواصل وقيمة العربة والبوابة المستخدمة.',
     category: 'marketing',
+    tier: 'addon',
+  },
+  bundles: {
+    key: 'bundles',
+    name: 'Product Bundles',
+    nameAr: 'باقات المنتجات',
+    description:
+      'Sell a fixed kit of products as one item at one price. Stock is drawn from the ' +
+      'component products, so nothing is double-counted.',
+    descriptionAr:
+      'بيع مجموعة ثابتة من المنتجات كعنصر واحد بسعر واحد. يُخصم المخزون من المنتجات ' +
+      'المكوّنة، فلا يُحتسب أي صنف مرتين.',
+    category: 'commerce',
     tier: 'addon',
   },
 };

@@ -14,6 +14,7 @@ import { prisma, withRlsBypass } from '@force/database';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { redis } from './redis.service';
 import { notificationDispatcher } from './notification-dispatcher.service';
+import { resolveBundle } from './bundle.service';
 import { wbsBridgeService, WbsUnauthorizedError, type AbandonedWaCart } from './wbs-bridge.service';
 import { encryption } from './encryption.service';
 import logger from '../lib/logger';
@@ -82,6 +83,15 @@ interface CartItemSnapshot {
   productImage: string | null;
   price: number;
   quantity: number;
+  /**
+   * Set on a snapshot row built from a `CartBundle` (never expanded into
+   * per-component rows here, mirroring the cart/checkout rule that a
+   * bundle is always ONE line). `price` on a bundle row is always
+   * `resolveBundle(...).price` — the bundle's sale price — NEVER the sum
+   * of its per-component allocated shares (`componentSum`), which must
+   * never reach a customer-facing surface.
+   */
+  isBundle?: boolean;
 }
 
 // ==========================================
@@ -190,14 +200,20 @@ class AbandonedCartService {
     for (const storeId of storeIds) {
       // Find carts that:
       // 1. Haven't been active for >1 hour
-      // 2. Have at least one item
+      // 2. Have at least one item OR at least one bundle — a bundle-only
+      //    cart (no `CartItem` rows at all; a bundle is never expanded into
+      //    `cart_items`, see cart.service.ts's file doc comment) must be
+      //    detected exactly like a loose-item cart. A store without the
+      //    `bundles` feature can never have a `CartBundle` row (bundle
+      //    creation is itself feature-gated), so this OR arm is a no-op —
+      //    0 extra matches, 0 extra work — for every such store.
       // 3. Don't already have an AbandonedCart record
       // 4. Have a customer with email or phone (so we can actually reach them)
       const carts = await prisma.cart.findMany({
         where: {
           storeId,
           lastActivityAt: { lt: abandonmentCutoff },
-          items: { some: {} },
+          OR: [{ items: { some: {} } }, { bundles: { some: {} } }],
           abandonedCart: null,
           customer: {
             OR: [{ email: { not: '' } }, { phone: { not: null } }],
@@ -215,6 +231,10 @@ class AbandonedCartService {
               variant: { select: { price: true } },
             },
           },
+          // Raw rows only — display fields (name/image) and price come from
+          // `resolveBundle` below, recomputed live, same as every other
+          // cart-bundle read in this codebase (see cart.service.ts).
+          bundles: true,
         },
       });
 
@@ -237,12 +257,47 @@ class AbandonedCartService {
             quantity: item.quantity,
           }));
 
+          // Each `CartBundle` row becomes ONE snapshot line, priced at
+          // `resolveBundle(...).price` — the bundle's sale price, never the
+          // sum of its per-component allocated shares (`componentSum`,
+          // which never reaches a customer-facing surface — see
+          // `ResolvedBundle`'s doc comment in bundle.service.ts). A bundle
+          // reference that fails to resolve (e.g. a stale/cross-store row —
+          // see `tryResolveCartBundle` in cart.service.ts for the same
+          // defensive pattern) is dropped from the snapshot rather than
+          // failing the whole detection for this cart.
+          const bundleSnapshot: CartItemSnapshot[] = (
+            await Promise.all(
+              cart.bundles.map(async (cb): Promise<CartItemSnapshot | null> => {
+                try {
+                  const resolved = await resolveBundle(prisma, storeId, cb.bundleId);
+                  return {
+                    productName: resolved.name,
+                    productImage: resolved.image,
+                    price: resolved.price,
+                    quantity: cb.quantity,
+                    isBundle: true,
+                  };
+                } catch (err) {
+                  logger.warn(
+                    { err, correlationId, storeId, cartId: cart.id, bundleId: cb.bundleId },
+                    '[AbandonedCart] Failed to resolve cart bundle — omitting from snapshot'
+                  );
+                  return null;
+                }
+              })
+            )
+          ).filter((b): b is CartItemSnapshot => b !== null);
+
           // Calculate total from snapshot (price is in fils / integer cents) —
-          // per chosen variant price, matching cart/checkout.
-          const cartTotal = cart.items.reduce(
-            (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
-            0
-          );
+          // per chosen variant price, matching cart/checkout. Bundles add
+          // their resolved bundle price x quantity, exactly like the
+          // storefront cart's own `bundlesSubtotal` (cart.service.ts).
+          const cartTotal =
+            cart.items.reduce((sum, item) => sum + cartLineUnitPrice(item) * item.quantity, 0) +
+            bundleSnapshot.reduce((sum, b) => sum + b.price * b.quantity, 0);
+
+          const cartItemCount = cart.items.length + bundleSnapshot.length;
 
           const nextStepAt = nextStepAtFromConfig();
 
@@ -258,15 +313,15 @@ class AbandonedCartService {
               customerEmail: customerEmail ?? undefined,
               customerPhone: customerPhone ?? undefined,
               cartTotal: cartTotal,
-              cartItemCount: cart.items.length,
-              cartItems: itemSnapshot as any,
+              cartItemCount,
+              cartItems: [...itemSnapshot, ...bundleSnapshot] as any,
               status: 'pending',
               nextStepAt,
             },
           });
 
           logger.info(
-            { correlationId, storeId, cartId: cart.id, itemCount: cart.items.length },
+            { correlationId, storeId, cartId: cart.id, itemCount: cartItemCount },
             '[AbandonedCart] New abandoned cart detected'
           );
         } catch (err) {

@@ -4,7 +4,11 @@
 > (the code that actually gates features at runtime). If this table and the code disagree, the code
 > wins — regenerate this doc.**
 >
-> **Last synced: 2026-07-21.** 🤖 marks an AI capability — all AI is available on every paid plan (AI-first policy).
+> **Last synced: 2026-09-07.** 🤖 marks an AI capability — all AI is available on every paid plan (AI-first policy).
+>
+> **Prior sync 2026-07-21.** Added `bundles` (fixed-kit product bundles) — in no plan baseline,
+> same "sold as an add-on, enable per store via `StoreFeature`" shape as `agent_feed` and
+> `agent_checkout`; see the "Not plan-gated" section below.
 >
 > **Prior sync 2026-07-02.** Multi-currency, bank reconciliation, barcode scanning, and
 > multi-warehouse are shipped Enterprise features (not roadmap). Tax reports (XLSX export),
@@ -71,6 +75,28 @@ self-serve signup and no free trial). Super-admin can override any feature per s
 - **Email campaigns** (`email_campaigns`), **customer wallet** (`customer_wallet`) — present in the registry; enable per-store via override when sold. Not in baselines as of this sync. (**`staff_accounts`** moved from this list into `STARTER_CORE` on 2026-07-02 — it's now a real matrix row above, universal by default like `whatsapp`. The `/staff` admin page now renders the `FeatureUpgradeGate` for a store without it; API-side `staff.routes` enforcement is tracked separately.)
 - **AI Product Feed** (`agent_feed`) — **in every paid plan baseline** (Starter/Professional/Enterprise) since 2026-07-21 under the AI-first policy. `free` (lapsed-payment / demo grace) still excludes it. Still fail-closed at the API: a store without the feature gets a **404** (not 403) on `GET /api/v1/public/feed/products.json` and the storefront's `/feeds/products.json`, so a disabled store never reveals the endpoint's existence. Disable for a specific client via a `StoreFeature` override from the FeatureMatrix admin grid.
 - **Agentic checkout / MCP** (`agent_checkout`) — **in every paid plan baseline** (Starter/Professional/Enterprise), same rollout as `agent_feed`. Exposes a store-scoped [Model Context Protocol](https://modelcontextprotocol.io) server at `POST /api/v1/mcp/:storeSlug` (stateless Streamable HTTP) with 7 tools (`search_products`, `get_product`, `get_store_info`, `add_to_cart`, `view_cart`, `place_order`, `get_order_status`) so AI shopping agents can browse and check out directly, no human in the loop. Fail-closed like `agent_feed`: an unknown slug and a disabled-feature slug both 404 with the byte-identical error body (no capability leak). Orders it places are stamped `Order.source = 'agent'` (audit-only, visible in the admin order list/detail as an "Agent" badge) and are otherwise identical to a web checkout (same validation, inventory, payment rails). Discoverable via the store's `/llms.txt` (`## Agentic checkout (MCP)` section, links the endpoint + tool list) when enabled. Disable for a specific client via a `StoreFeature` override.
+- **Product Bundles** (`bundles`) — added 2026-09-06, **in no plan baseline** (Starter, Professional,
+  and Enterprise all default to disabled) — sold as an individually-priced add-on and enabled per
+  store via a `StoreFeature` override, same shape as `agent_feed`/`agent_checkout`. A fixed kit of
+  specific products at specific quantities, sold as one line at one price (fixed price / % off the
+  component sum / fixed amount off). Availability is derived from component stock
+  (`min(floor(componentStock / quantity))`) — no separate bundle stock row, so nothing is
+  double-counted. Single-line representation in cart/checkout/order/invoice; returns are atomic
+  (whole box, refunds exactly the bundle price — itemized partial-box returns are not built).
+  Surfaced in the AI product feed (with a `/bundles/<slug>` link) and the WhatsApp bridge's
+  store-catalog read when enabled. **The customer-facing purchase path ships**: `GET
+/public/:storeId/bundles/:slug`, `apps/web/src/app/bundles/page.tsx` and
+  `apps/web/src/app/bundles/[slug]/page.tsx` (add-to-cart via `addBundle`), an auto-appended
+  "Bundles" nav entry in `ShopChrome` (gated on `store.enabledFeatures` — no per-page request),
+  sitemap fan-out and JSON-LD. WhatsApp DM ordering works without any whatsapp-bulk-sender change:
+  `POST /wa-bridge/cart/from-wa` resolves an id that isn't a product as a bundle, behind the same
+  feature gate `/wa-bridge/store-catalog` uses (the consumer-PR launch gate this entry used to
+  carry was discharged 2026-09-07 — see Ruling C3 CLOSED in
+  `docs/superpowers/plans/2026-09-06-product-bundles-decisions.md`). Coupons and cart promotions
+  are excluded from bundle lines by design, and the storefront quotes a coupon against the loose
+  items only so the quote matches the charge. Rollout is a supervised pilot: one merchant, one real
+  order, one real return, then offer to others. Flipping the flag does not bust the 600s AI-feed
+  cache. See `docs/business/04-pricing-tiers.md` §6 for the full rollout note.
 - **Answer-Engine Insights** (`answer_engine_insights`) — added to `STARTER_CORE` on 2026-07-22 (Plan 8A, same AI-first policy as `agent_feed`), so it's on every paid plan and off on `free`. Merchant surface: `/stores/:id/answer-engine` (Marketing hub) shows per-engine (Gemini/Perplexity/OpenAI) cited counts, a week-over-week trend, and the latest per-prompt win/lose list with a "run AI citation fix" deep-link to the `bulk-ai-citation-copy` GEO sweep for every prompt the store lost. Read API (`GET /stores/:id/answer-engine/summary`) fails closed like every other feature-gated route in this codebase — `403 FEATURE_DISABLED`, not a 404. Underlying `AnswerEngineCheck` rows come from a weekly citation-scan cron (Gemini always runs on the platform key; Perplexity/OpenAI are opt-in, platform-wide-toggled, DB-config-keyed add-on engines — see `docs/ENVIRONMENT.md`). **Google Search Console ingestion (Plan 8B, added 2026-07-23) is part of this SAME feature — no separate feature key.** The same page's GSC section (`GET /stores/:id/answer-engine/gsc`, same `403 FEATURE_DISABLED` gate) surfaces a daily impressions/clicks/CTR/position trend and top queries from `GscDailyMetric` rows written by a force-managed daily ingestion cron. Dormant (zero rows, UI shows "Google Search Console not connected") until `GSC_SERVICE_ACCOUNT_JSON` is provisioned — see `docs/ENVIRONMENT.md` and `docs/runbooks/google-search-console-indexing.md`.
 
 ### 2026-07-21 — AI-first baseline

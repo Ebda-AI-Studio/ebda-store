@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import { prisma, Prisma, OrderStatus, withMoneyTx } from '@force/database';
-import { checkMinimumOrder } from '@force/shared';
+import { checkMinimumOrder, allocateBundlePrice } from '@force/shared';
 import { generateOrderNumber } from '../utils/order-number';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
+import { restoreCartShape } from '../lib/order-cart-restore';
 import { AppError } from '../middleware/error-handler';
 import { CartService } from './cart.service';
+import { resolveBundle } from './bundle.service';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { CouponService } from './coupon.service';
 import { resolveCustomerContext, resolveBestPromotion } from './promotion-resolver';
@@ -312,8 +315,12 @@ export class OrderService {
   ) {
     // Get cart
     const cart = await CartService.getOrCreate(storeId, sessionId, customerId);
+    // Raw CartBundle rows ({ id, bundleId, quantity } — one per BOX type in
+    // the cart). A cart holding ONLY bundles (no loose items) is valid, so
+    // the empty-cart guard below must check both, not just `cart.items`.
+    const cartBundles = cart.bundles ?? [];
 
-    if (cart.items.length === 0) {
+    if (cart.items.length === 0 && cartBundles.length === 0) {
       throw new AppError(400, 'EMPTY_CART', 'Cart is empty');
     }
 
@@ -358,15 +365,123 @@ export class OrderService {
       );
     }
 
+    // --- Bundles (Task 6): resolve, refuse if no longer purchasable, and
+    // pre-compute the per-box price allocation. Everything here is a READ —
+    // no stock is touched yet. The oversell guard is the atomic per-line
+    // decrement inside the transaction below (Ruling T5-c); this block only
+    // establishes what a box costs and how that cost splits across its
+    // components.
+    //
+    // Price is recomputed from `resolveBundle` (current component prices,
+    // current pricingType/pricingValue) — never trusted from the cart, which
+    // may have been priced minutes or hours ago.
+    const resolvedBundles = await Promise.all(
+      cartBundles.map(async cb => ({
+        cartBundle: cb,
+        resolved: await resolveBundle(prisma, storeId, cb.bundleId),
+      }))
+    );
+
+    // A bundle that was purchasable when added to the cart is not trusted to
+    // still be: a component could have sold out, the bundle could have been
+    // deactivated, or its date window could have closed since. `isPurchasable`
+    // is recomputed fresh by `resolveBundle` above — refuse rather than sell
+    // a box the merchant can no longer fulfil.
+    for (const { resolved } of resolvedBundles) {
+      if (!resolved.isPurchasable) {
+        throw new AppError(
+          409,
+          'BUNDLE_NOT_PURCHASABLE',
+          `"${resolved.name}" is no longer available. Remove it from your cart and try again.`
+        );
+      }
+    }
+
+    // Raw BundleItem rows for every bundle in the cart — `resolveBundle`'s
+    // `lines` only carries `{ key, unitPrice, quantity }` (enough to price
+    // and allocate), not the productId/variantId/name/sku/costPrice an
+    // OrderItem needs. `key` on a resolved line IS the BundleItem id, so this
+    // map is joined back onto the allocation by that id below. A component
+    // product can never be hard-deleted out from under a bundle (BundleItem's
+    // FK to Product is `onDelete: Restrict`), so — unlike loose cart items —
+    // there is no "missing product" case to guard here.
+    const bundleIds = cartBundles.map(cb => cb.bundleId);
+    const bundleItemRows =
+      bundleIds.length > 0
+        ? await prisma.bundleItem.findMany({
+            where: { bundleId: { in: bundleIds } },
+            select: {
+              id: true,
+              productId: true,
+              variantId: true,
+              quantity: true,
+              product: { select: { name: true, sku: true, costPrice: true, trackInventory: true } },
+            },
+          })
+        : [];
+    const bundleItemById = new Map(bundleItemRows.map(bi => [bi.id, bi]));
+
+    /** One component line, allocated for exactly ONE box — reused across every box of that bundle in the cart (allocation is a pure function of `lines`+`price`, so it is identical for every box). */
+    interface BundleExpansion {
+      cartBundle: (typeof cartBundles)[number];
+      resolved: (typeof resolvedBundles)[number]['resolved'];
+      allocated: ReturnType<typeof allocateBundlePrice>;
+    }
+
+    const bundleExpansions: BundleExpansion[] = resolvedBundles.map(({ cartBundle, resolved }) => {
+      const allocated = allocateBundlePrice(resolved.lines, resolved.price);
+
+      // Defence in depth for money invariant 1. Admin validates
+      // allocatability at SAVE time (bundle.routes.ts), but that check runs
+      // against the componentSum AT THAT TIME — a component's price can
+      // drift afterward and `resolveBundle` always recomputes componentSum
+      // from CURRENT prices, so a bundle that was allocatable when saved is
+      // not guaranteed to still be allocatable at checkout. Refusing here
+      // (order never created, nothing written) is the only acceptable
+      // outcome if that drift ever produces a residual — silently writing a
+      // group whose lines don't sum to the price the customer was quoted
+      // would violate the invariant this whole task exists to guarantee.
+      const allocatedSum = allocated.reduce((sum, line) => sum + line.totalAllocated, 0);
+      if (allocatedSum !== resolved.price) {
+        throw new AppError(
+          409,
+          'BUNDLE_PRICE_NOT_ALLOCATABLE',
+          `"${resolved.name}" can no longer be priced exactly at checkout. Please try again.`
+        );
+      }
+
+      return { cartBundle, resolved, allocated };
+    });
+
     // Calculate totals (done before the transaction — no locks needed here).
     // Price each line at its chosen VARIANT's price when one is selected,
     // falling back to the parent product price for variant-less products —
     // matches CartService and prevents charging every variant the parent
     // (lowest) price.
-    const subtotal = cart.items.reduce(
+    const bundlesSubtotal = bundleExpansions.reduce(
+      (sum, b) => sum + b.resolved.price * b.cartBundle.quantity,
+      0
+    );
+    // Order.bundleDiscount = Σ((componentSum − bundlePrice) × bundleQuantity)
+    // across every bundle in the cart — the merchant-facing "how much did
+    // bundling save the customer" figure, independent of the per-line
+    // allocation used for accounting.
+    const bundleDiscount = bundleExpansions.reduce(
+      (sum, b) => sum + (b.resolved.componentSum - b.resolved.price) * b.cartBundle.quantity,
+      0
+    );
+    // The LOOSE-items-only subtotal — every cart line that is not part of a
+    // bundle. It is the basis a coupon is evaluated against, because a
+    // coupon never discounts a bundle (Ruling B1: no stacking on an
+    // already-discounted box; `cartItems` below, which drives
+    // `matchesTargeting`/`matchingSubtotal`, is likewise built from
+    // `cart.items` only). Identical to `subtotal` for every cart with no
+    // bundle, so a store without the `bundles` feature is unaffected.
+    const looseSubtotal = cart.items.reduce(
       (sum, item) => sum + cartLineUnitPrice(item) * item.quantity,
       0
     );
+    const subtotal = looseSubtotal + bundlesSubtotal;
 
     // Build the targeting cart snapshot (product + category ids, per-line
     // totals) shared by coupon targeting and automatic promotion resolution.
@@ -493,7 +608,14 @@ export class OrderService {
     let couponDiscount = 0;
     if (data.couponCode) {
       appliedCoupon = await CouponService.getByCode(storeId, data.couponCode);
-      if (appliedCoupon.minOrderAmount && subtotal < appliedCoupon.minOrderAmount) {
+      // Gate on the LOOSE subtotal, not the bundle-inclusive one. A coupon
+      // discounts only loose lines (Ruling B1), so measuring its minimum
+      // against a total that INCLUDES bundles let a bundle-only cart pass
+      // the minimum and then receive a zero discount from the very coupon it
+      // had just "qualified" for. `looseSubtotal === subtotal` whenever the
+      // cart holds no bundle, so this is the identity for every store
+      // without the `bundles` feature.
+      if (appliedCoupon.minOrderAmount && looseSubtotal < appliedCoupon.minOrderAmount) {
         throw new AppError(
           400,
           'MIN_ORDER_NOT_MET',
@@ -622,29 +744,105 @@ export class OrderService {
       const backorderedItems: Array<{ productId: string; variantId?: string; quantity: number }> =
         [];
 
-      // Atomic check + decrement per tracked item. A conditional
-      // `UPDATE … WHERE inventory >= qty` does the oversell guard AND the
-      // decrement in ONE statement, so there is no SELECT … FOR UPDATE held
-      // across the rest of this multi-step order transaction (which under a
-      // single-SKU flash-sale storm serialized every checkout on the row lock).
-      // A losing concurrent writer sees 0 rows affected → INSUFFICIENT_INVENTORY
-      // (or backorder), never an oversell. A variant item decrements ONLY the
-      // variant row and a variant-less item ONLY the product row — never both
-      // (see lib/effective-inventory.ts for why the parent column is not stock
-      // for a variant product). The InventoryHistory row is keyed on productId,
-      // so for a variant line its pre/post stock describe the variant's
-      // movement; that is the movement that actually occurred.
-      const stockChanges = new Map<string, { previousStock: number; newStock: number }>();
-      for (const item of cart.items) {
-        // No `?? true` fallback: presence is guaranteed by the guard above.
-        if (!productInternalsById.get(item.productId)!.trackInventory) continue;
-        const qty = item.quantity;
-        const variantId = (item as { variantId?: string }).variantId;
-        const lineKey = `${item.productId}::${variantId ?? ''}`;
+      // Expand every cart bundle into its component OrderItem specs, ONE
+      // bundleGroupId per BOX (never per bundle-in-cart) so a single box can
+      // later be returned independently of any others of the same bundle in
+      // the same order. `allocated` was computed once per bundle above (pure
+      // function of `lines`+`price`), so it is simply re-read for every box —
+      // every box of the same bundle gets the identical per-line price/total.
+      interface BundleComponentLine {
+        productId: string;
+        variantId: string | null;
+        productName: string;
+        sku: string | null;
+        costPrice: number | null;
+        trackInventory: boolean;
+        quantity: number;
+        price: number;
+        total: number;
+        bundleId: string;
+        bundleGroupId: string;
+        bundleName: string;
+        bundleNameAr: string | null;
+      }
+      const bundleComponentLines: BundleComponentLine[] = [];
+      for (const { cartBundle, resolved, allocated } of bundleExpansions) {
+        for (let box = 0; box < cartBundle.quantity; box++) {
+          const bundleGroupId = randomUUID();
+          for (const line of allocated) {
+            // `line.key` is the BundleItem id (see resolveBundle) — joined
+            // back onto the raw component data fetched above.
+            //
+            // P2-3 (final review): the raw rows are read AFTER `resolveBundle`
+            // and BEFORE this transaction, and `PUT /stores/:id/bundles/:id`
+            // with `items` does a deleteMany + recreate that MINTS NEW
+            // BundleItem ids. A merchant saving an edit in that window made
+            // this lookup miss, and the non-null assertion turned it into a
+            // TypeError — an unhandled 500 on checkout, in code that is
+            // otherwise careful to answer 409. Refuse the same way every
+            // other "the bundle moved under us" case does; no order is
+            // created either way.
+            const bi = bundleItemById.get(line.key);
+            if (!bi) {
+              throw new AppError(
+                409,
+                'BUNDLE_NOT_PURCHASABLE',
+                `"${resolved.name}" was just changed. Reload your cart and try again.`
+              );
+            }
+            bundleComponentLines.push({
+              productId: bi.productId,
+              variantId: bi.variantId,
+              productName: bi.product.name,
+              sku: bi.product.sku,
+              costPrice: bi.product.costPrice,
+              trackInventory: bi.product.trackInventory,
+              quantity: bi.quantity,
+              price: line.unitAllocated,
+              total: line.totalAllocated,
+              bundleId: resolved.id,
+              bundleGroupId,
+              bundleName: resolved.name,
+              bundleNameAr: resolved.nameAr,
+            });
+          }
+        }
+      }
+
+      // Shared atomic check + decrement, used by BOTH loose cart items and
+      // every bundle component line below — one code path, not two. A
+      // conditional `UPDATE … WHERE inventory >= qty` does the oversell guard
+      // AND the decrement in ONE statement, so there is no SELECT … FOR
+      // UPDATE held across the rest of this multi-step order transaction
+      // (which under a single-SKU flash-sale storm serialized every checkout
+      // on the row lock). A losing concurrent writer sees 0 rows affected →
+      // INSUFFICIENT_INVENTORY (or backorder), never an oversell.
+      //
+      // RULING T5-c: this is also how COMBINED demand across loose items and
+      // every bundle's expansion is enforced. There is no separate
+      // "sum demand then check" pass — every call below runs sequentially,
+      // in this one transaction, against Postgres's actual current row
+      // value. Two bundles sharing a component (or a bundle plus a loose
+      // item of the same product) each call this once, in order; the second
+      // call always sees the stock the first call already consumed, so
+      // jointly-oversold demand fails on whichever call runs second — and
+      // because it throws, the WHOLE transaction (including the first
+      // call's decrement) rolls back. Checking each bundle's availability
+      // against a shared pre-transaction snapshot (what the cart itself
+      // does, independently, for cart-side warnings) is exactly what this
+      // must NOT do for the actual oversell guard.
+      const decrementTrackedStock = async (target: {
+        productId: string;
+        variantId?: string | null;
+        quantity: number;
+        label: string;
+      }): Promise<{ previousStock: number; newStock: number }> => {
+        const { productId, quantity: qty, label } = target;
+        const variantId = target.variantId ?? undefined;
 
         let res = variantId
           ? await decrementVariantInventory(tx, variantId, qty)
-          : await decrementProductInventory(tx, item.productId, qty);
+          : await decrementProductInventory(tx, productId, qty);
 
         if (!res.ok) {
           // Insufficient stock — accept ONLY when BOTH the store feature flag
@@ -661,16 +859,12 @@ export class OrderService {
               )?.allowBackorder
             : (
                 await tx.product.findUnique({
-                  where: { id: item.productId },
+                  where: { id: productId },
                   select: { allowBackorder: true },
                 })
               )?.allowBackorder;
           if (!backorderFeatureEnabled || !perFlag) {
-            throw new AppError(
-              400,
-              'INSUFFICIENT_INVENTORY',
-              `Not enough inventory for ${item.product.name}${variantId ? ' (variant)' : ''}`
-            );
+            throw new AppError(400, 'INSUFFICIENT_INVENTORY', `Not enough inventory for ${label}`);
           }
           // Backorder accepted — force the decrement + track for
           // BackorderLine creation below. Variant lines floor at 0 so the
@@ -684,14 +878,38 @@ export class OrderService {
           } else {
             const [row] = await tx.$queryRaw<Array<{ inventory: number }>>`
               UPDATE public.products SET inventory = inventory - ${qty}
-              WHERE id = ${item.productId}
+              WHERE id = ${productId}
               RETURNING inventory
             `;
             const newStock = row?.inventory ?? 0;
             res = { ok: true, previousStock: newStock + qty, newStock };
           }
-          backorderedItems.push({ productId: item.productId, variantId, quantity: qty });
+          backorderedItems.push({ productId, variantId, quantity: qty });
         }
+        return { previousStock: res.previousStock, newStock: res.newStock };
+      };
+
+      // Atomic check + decrement per tracked item. A variant item decrements
+      // ONLY the variant row and a variant-less item ONLY the product row —
+      // never both (see lib/effective-inventory.ts for why the parent column
+      // is not stock for a variant product). The InventoryHistory row is
+      // keyed on productId, so for a variant line its pre/post stock
+      // describe the variant's movement; that is the movement that actually
+      // occurred.
+      const stockChanges = new Map<string, { previousStock: number; newStock: number }>();
+      for (const item of cart.items) {
+        // No `?? true` fallback: presence is guaranteed by the guard above.
+        if (!productInternalsById.get(item.productId)!.trackInventory) continue;
+        const qty = item.quantity;
+        const variantId = (item as { variantId?: string }).variantId;
+        const lineKey = `${item.productId}::${variantId ?? ''}`;
+
+        const stockChange = await decrementTrackedStock({
+          productId: item.productId,
+          variantId,
+          quantity: qty,
+          label: `${item.product.name}${variantId ? ' (variant)' : ''}`,
+        });
 
         // ONE row per line. A variant sale moves the variant's stock and
         // nothing else — `products.inventory` is not a running total for a
@@ -702,10 +920,32 @@ export class OrderService {
         // on productId (the table has no variantId column), so for a variant
         // line its previous/new stock describe the VARIANT's movement — which
         // is the movement that actually happened.
-        stockChanges.set(lineKey, {
-          previousStock: res.previousStock,
-          newStock: res.newStock,
+        stockChanges.set(lineKey, stockChange);
+      }
+
+      // Same decrement path, for every bundle component line built above.
+      // Runs AFTER the loose-item loop, in the SAME transaction — see the
+      // Ruling T5-c note on `decrementTrackedStock` above for why this
+      // ordering is what makes combined demand (a shared component across
+      // bundles, or a bundle plus a loose item of the same product) refuse
+      // correctly rather than overselling. Keyed by array index (not
+      // productId/variantId) because, unlike loose cart items, the SAME
+      // product/variant can legitimately appear on multiple lines here (two
+      // boxes of the same bundle, or two different bundles sharing a
+      // component) — each needs its OWN InventoryHistory row.
+      const bundleStockChanges: Array<{ previousStock: number; newStock: number } | null> = [];
+      for (const line of bundleComponentLines) {
+        if (!line.trackInventory) {
+          bundleStockChanges.push(null);
+          continue;
+        }
+        const stockChange = await decrementTrackedStock({
+          productId: line.productId,
+          variantId: line.variantId,
+          quantity: line.quantity,
+          label: `${line.productName} (component of "${line.bundleName}")`,
         });
+        bundleStockChanges.push(stockChange);
       }
 
       // Per-customer coupon usage limit (money-integrity audit F3-adjacent
@@ -819,6 +1059,11 @@ export class OrderService {
           // reconciles to `discount` in every non-tie case.
           promotionDiscount: appliedPromotionId ? promotionDiscount : 0,
           appliedPromotionId,
+          // Reporting-only, like couponDiscount/promotionDiscount above — the
+          // saving is already reflected in a LOWER `subtotal` (bundles are
+          // priced at `bundlePrice`, not `componentSum`), so this is never
+          // added again into `discount`/`total`.
+          bundleDiscount,
           loyaltyPointsRedeemed: loyaltyPointsRedeemed > 0 ? loyaltyPointsRedeemed : null,
           loyaltyDiscount,
           total,
@@ -829,27 +1074,48 @@ export class OrderService {
           billingAddress: data.billingAddress || data.shippingAddress,
           notes: data.notes,
           items: {
-            create: cart.items.map(item => ({
-              productId: item.productId,
-              // Persist the variant link onto OrderItem. Without this,
-              // `updateStatus(cancel/refund)`, `rollbackForPaymentFailure`,
-              // and `ReturnService.complete` all read OrderItem.variantId
-              // to restore variant inventory — and always saw null.
-              // Variant stock drifted every cancel/refund. CartItem
-              // already carries variantId; we just have to copy it.
-              variantId: (item as { variantId?: string | null }).variantId ?? null,
-              productName: item.product.name,
-              sku: item.product.sku,
-              quantity: item.quantity,
-              // Charge the chosen variant's price (fall back to the parent
-              // product for variant-less products). Persisting product.price
-              // here undercharged every variant at the parent (lowest) price.
-              price: cartLineUnitPrice(item),
-              // Snapshot cost-of-goods at sale time so profit reports
-              // stay correct even if the product's cost changes later.
-              costPrice: productInternalsById.get(item.productId)?.costPrice ?? null,
-              total: cartLineUnitPrice(item) * item.quantity,
-            })),
+            create: [
+              ...cart.items.map(item => ({
+                productId: item.productId,
+                // Persist the variant link onto OrderItem. Without this,
+                // `updateStatus(cancel/refund)`, `rollbackForPaymentFailure`,
+                // and `ReturnService.complete` all read OrderItem.variantId
+                // to restore variant inventory — and always saw null.
+                // Variant stock drifted every cancel/refund. CartItem
+                // already carries variantId; we just have to copy it.
+                variantId: (item as { variantId?: string | null }).variantId ?? null,
+                productName: item.product.name,
+                sku: item.product.sku,
+                quantity: item.quantity,
+                // Charge the chosen variant's price (fall back to the parent
+                // product for variant-less products). Persisting product.price
+                // here undercharged every variant at the parent (lowest) price.
+                price: cartLineUnitPrice(item),
+                // Snapshot cost-of-goods at sale time so profit reports
+                // stay correct even if the product's cost changes later.
+                costPrice: productInternalsById.get(item.productId)?.costPrice ?? null,
+                total: cartLineUnitPrice(item) * item.quantity,
+              })),
+              // Every bundle box's components, appended to the SAME array the
+              // loose cart items build above — ordinary product lines from
+              // here on, with no bundle-aware code anywhere downstream
+              // (stock, scan-to-pick, returns, backorders, per-line COGS all
+              // already work off OrderItem).
+              ...bundleComponentLines.map(line => ({
+                productId: line.productId,
+                variantId: line.variantId,
+                productName: line.productName,
+                sku: line.sku,
+                quantity: line.quantity,
+                price: line.price,
+                costPrice: line.costPrice,
+                total: line.total,
+                bundleId: line.bundleId,
+                bundleGroupId: line.bundleGroupId,
+                bundleName: line.bundleName,
+                bundleNameAr: line.bundleNameAr,
+              })),
+            ],
           },
         },
         include: {
@@ -884,8 +1150,31 @@ export class OrderService {
           },
         ];
       });
-      if (inventoryHistoryRows.length > 0) {
-        await tx.inventoryHistory.createMany({ data: inventoryHistoryRows });
+      // Same ledger, for every bundle component line — keyed by array index
+      // via `bundleStockChanges` (see its declaration above for why that
+      // index, not productId/variantId, is the right key here). One row per
+      // component line, same as a loose item: "decrements component stock,
+      // not any bundle counter" — there is no bundle-level stock anywhere to
+      // record instead.
+      const bundleInventoryHistoryRows = bundleComponentLines.flatMap((line, i) => {
+        const sc = bundleStockChanges[i];
+        if (!sc) return [];
+        return [
+          {
+            productId: line.productId,
+            storeId,
+            type: 'sale' as const,
+            quantity: -line.quantity,
+            previousStock: sc.previousStock,
+            newStock: sc.newStock,
+            reason: 'Sold via order (bundle component)',
+            reference: newOrder.id,
+          },
+        ];
+      });
+      const allInventoryHistoryRows = [...inventoryHistoryRows, ...bundleInventoryHistoryRows];
+      if (allInventoryHistoryRows.length > 0) {
+        await tx.inventoryHistory.createMany({ data: allInventoryHistoryRows });
       }
 
       // Create BackorderLine rows and mark OrderItems as cost-deferred for any
@@ -932,8 +1221,12 @@ export class OrderService {
         );
       }
 
-      // Clear cart
+      // Clear cart. Bundles live in their own table — clearing the cart
+      // must clear both, or a gateway redirect that never lands leaves a
+      // PAID bundle in the cart at a live price, and the customer checks
+      // out again believing the first attempt failed (double charge).
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+      await tx.cartBundle.deleteMany({ where: { cartId: cart.id } });
 
       // Check for abandoned cart recovery
       try {
@@ -1114,19 +1407,44 @@ export class OrderService {
           })
         ).id;
 
-      // Clear any current items first (defensive — usually empty post-create)
+      // Clear any current rows first (defensive — usually empty post-create).
       await tx.cartItem.deleteMany({ where: { cartId } });
-      // Re-create items from the order. CartItem has no price column —
-      // price is read from the product at cart-render time.
-      for (const item of order.items) {
-        await tx.cartItem.create({
-          data: {
-            cartId,
-            productId: item.productId,
-            variantId: item.variantId ?? undefined,
-            quantity: item.quantity,
-          },
-        });
+      await tx.cartBundle.deleteMany({ where: { cartId } });
+      // Re-create the cart the customer should find waiting for them:
+      // genuinely loose lines aggregated by (productId, variantId), and ONE
+      // `CartBundle` per bundle at the number of boxes ordered. Aggregation
+      // is required because `cart_items` carries a partial unique index per
+      // (cartId, productId[, variantId]) and a bundle order can produce two
+      // OrderItem rows for one product. Restoring the BOX (rather than
+      // dissolving it into its components, which the pre-P1-1 code did) is
+      // what keeps the retried cart priced at the bundle price instead of
+      // the shelf-price component sum. See `restoreCartShape`.
+      // `OrderItem.bundleId` has no FK to `Bundle` (snapshot semantics), so
+      // confirm — store-scoped — which of them still exist before writing a
+      // `cart_bundles` row against one. A FK violation here would abort the
+      // whole compensating transaction and strand the order in `pending`
+      // with its inventory unrestored; a vanished bundle falls back to loose
+      // lines instead, which is the pre-P1-1 behaviour and still leaves the
+      // customer holding their goods.
+      const candidateBundleIds = [
+        ...new Set(order.items.map(i => i.bundleId).filter((id): id is string => !!id)),
+      ];
+      const liveBundleIds = new Set(
+        candidateBundleIds.length > 0
+          ? (
+              await tx.bundle.findMany({
+                where: { id: { in: candidateBundleIds }, storeId },
+                select: { id: true },
+              })
+            ).map(b => b.id)
+          : []
+      );
+      const restored = restoreCartShape(order.items, liveBundleIds);
+      for (const item of restored.items) {
+        await tx.cartItem.create({ data: { cartId, ...item } });
+      }
+      for (const bundle of restored.bundles) {
+        await tx.cartBundle.create({ data: { cartId, ...bundle } });
       }
 
       // 4. Mark the order cancelled with a paper trail.

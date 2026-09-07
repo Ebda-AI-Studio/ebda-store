@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
+import { groupOrderLinesForDisplay } from '@force/shared';
 import { useT } from '@/i18n/useT';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { DataTable, type DataTableColumn } from '@/components/mobile/DataTable';
@@ -31,18 +33,35 @@ import { formatDate, filsToKwd } from '@/lib/format';
 
 /**
  * Build a compact, single-line item summary for the orders list row, e.g.
- * "2x Mastic, 1x Caraway +2 more". Shows the first two line items with their
- * quantities and rolls the rest into a "+N more" suffix so the cell stays
- * scannable. Returns null when the API didn't return items for the order.
+ * "2x Mastic, 1x Caraway +2 more". Shows the first two DISPLAY ROWS with
+ * their quantities and rolls the rest into a "+N more" suffix so the cell
+ * stays scannable. Returns null when the API didn't return items for the
+ * order.
+ *
+ * Grouped through `groupOrderLinesForDisplay` first, then summarized — the
+ * same "group first, then limit" rule `ItemsCard.previewRows` documents
+ * (commit `21e074bd`). Without it, a bundle box's components read as
+ * unrelated products ("1x Dates, 1x Honey +2 more" for a single "Ramadan
+ * Box"), and worse, the FIRST two components of the box could crowd out
+ * every other line on the order. `price` is defaulted to 0 purely for the
+ * grouping call — the raw `item.price` is never read by this function.
  */
-function summarizeItems(
+export function summarizeItems(
   items: OrderLineItem[] | undefined,
-  moreLabel: (count: number) => string
+  moreLabel: (count: number) => string,
+  locale: string
 ): string | null {
   if (!items || items.length === 0) return null;
+  const rows = groupOrderLinesForDisplay(items.map(it => ({ ...it, price: it.price ?? 0 })));
   const MAX_SHOWN = 2;
-  const shown = items.slice(0, MAX_SHOWN).map(it => `${it.quantity}x ${it.productName}`);
-  const remaining = items.length - MAX_SHOWN;
+  const shown = rows.slice(0, MAX_SHOWN).map(row => {
+    if (row.kind === 'bundle') {
+      const name = locale === 'ar' && row.nameAr ? row.nameAr : row.name;
+      return `${row.quantity}x ${name}`;
+    }
+    return `${row.item.quantity}x ${row.item.productName}`;
+  });
+  const remaining = rows.length - MAX_SHOWN;
   const summary = shown.join(', ');
   return remaining > 0 ? `${summary} ${moreLabel(remaining)}` : summary;
 }
@@ -59,6 +78,7 @@ export function OrdersTable({
   onToggleSelected,
 }: OrdersTableProps) {
   const t = useT('orders.list');
+  const locale = useLocale();
   const params = useParams();
   const router = useRouter();
   const storeId = params?.id as string;
@@ -108,7 +128,11 @@ export function OrdersTable({
     {
       header: t('table.customer'),
       cell: order => {
-        const itemSummary = summarizeItems(order.items, count => t('table.moreItems', { count }));
+        const itemSummary = summarizeItems(
+          order.items,
+          count => t('table.moreItems', { count }),
+          locale
+        );
         // Guest orders have no `customer` row — fall back to the name/email the
         // shopper entered in the shipping address so the cell is never blank.
         const addr = order.shippingAddress;

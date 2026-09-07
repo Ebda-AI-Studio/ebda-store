@@ -12,13 +12,89 @@ interface ItemsCardProps {
   previewLimit?: number;
 }
 
+/**
+ * I6 (final review): a bundle purchase expands into one `OrderItem` per
+ * component at checkout, all sharing a `bundleGroupId` — one id per BOX. The
+ * admin order screen must GROUP and LABEL those lines under the bundle's
+ * name (so a merchant fulfilling "Ramadan Box" doesn't see three unrelated
+ * products at allocated prices with no idea what they belong to), but —
+ * unlike the storefront's `groupOrderLinesForDisplay`, which COLLAPSES a
+ * group into one customer-facing row — must keep every component line
+ * visible: the merchant needs to know exactly what to physically put in the
+ * box. This is a separate, admin-specific grouping (not a reuse of the
+ * customer-facing collapse helper), preserving the flat item order.
+ */
+export type ItemsCardEntry =
+  | { kind: 'item'; item: OrderItemDetail }
+  | {
+      kind: 'group';
+      bundleGroupId: string;
+      name: string;
+      nameAr: string | null;
+      items: OrderItemDetail[];
+    };
+
+export function groupItemsForAdmin(items: OrderItemDetail[]): ItemsCardEntry[] {
+  const entries: ItemsCardEntry[] = [];
+  const groupIndex = new Map<string, number>();
+
+  for (const item of items) {
+    if (item.bundleGroupId) {
+      const idx = groupIndex.get(item.bundleGroupId);
+      if (idx === undefined) {
+        groupIndex.set(item.bundleGroupId, entries.length);
+        entries.push({
+          kind: 'group',
+          bundleGroupId: item.bundleGroupId,
+          name: item.bundleName ?? 'Bundle',
+          nameAr: item.bundleNameAr ?? null,
+          items: [item],
+        });
+      } else {
+        const existing = entries[idx];
+        if (existing.kind === 'group') existing.items.push(item);
+      }
+    } else {
+      entries.push({ kind: 'item', item });
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * The preview cut, taken in DISPLAY ROWS.
+ *
+ * P1-2 (final review): `ItemsCard` used to slice the raw `items` array and
+ * THEN group it. With 4 loose lines followed by a 3-component box and
+ * `previewLimit = 5`, the slice kept only the box's FIRST component, so
+ * `BundleGroupRow` summed one allocated line and the merchant read
+ * "Ramadan Box · 3.724 KWD" for a box the customer paid 12.000 for — and
+ * "+2 more" counted component lines, not rows. Group first, then limit, so a
+ * box is never rendered as a fraction of itself. Identity for an order with
+ * no bundle, where one item is exactly one row.
+ */
+export function previewRows(
+  items: OrderItemDetail[],
+  previewLimit: number,
+  expanded: boolean
+): { entries: ItemsCardEntry[]; totalRows: number; hiddenRows: number } {
+  const allEntries = groupItemsForAdmin(items);
+  const entries = expanded ? allEntries : allEntries.slice(0, previewLimit);
+  return {
+    entries,
+    totalRows: allEntries.length,
+    hiddenRows: allEntries.length - entries.length,
+  };
+}
+
 export function ItemsCard({ order, previewLimit = 5 }: ItemsCardProps) {
   const t = useT('orders.detail');
+  const locale = useLocale();
   const [expanded, setExpanded] = useState(false);
 
   const items = order.items;
-  const visible = expanded ? items : items.slice(0, previewLimit);
-  const hiddenCount = items.length - visible.length;
+  const { entries, totalRows, hiddenRows } = previewRows(items, previewLimit, expanded);
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
@@ -27,26 +103,41 @@ export function ItemsCard({ order, previewLimit = 5 }: ItemsCardProps) {
           {t('items')}
         </h2>
         <span className="text-xs text-muted-foreground">
-          {t('itemCount', { count: items.length })}
+          {/* P2-g (scoped re-review): P1-2 fixed the "+N more" button to
+              count display ROWS (`totalRows` — one bundle box is one row,
+              not its N components); this header count was left counting
+              component LINES (`items.length`), so a 4-loose+3-component
+              order showed "7 items" above a "View all (5)" button. Both
+              now agree. */}
+          {t('itemCount', { count: totalRows })}
         </span>
       </div>
 
       <ul className="divide-y divide-border/60">
-        {visible.map(item => (
-          <ItemRow key={item.id} item={item} currency={order.currency} />
-        ))}
+        {entries.map(entry =>
+          entry.kind === 'item' ? (
+            <ItemRow key={entry.item.id} item={entry.item} currency={order.currency} />
+          ) : (
+            <BundleGroupRow
+              key={entry.bundleGroupId}
+              name={locale === 'ar' && entry.nameAr ? entry.nameAr : entry.name}
+              items={entry.items}
+              currency={order.currency}
+            />
+          )
+        )}
       </ul>
 
-      {hiddenCount > 0 && !expanded && (
+      {hiddenRows > 0 && !expanded && (
         <button
           type="button"
           onClick={() => setExpanded(true)}
           className="mt-3 w-full rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
         >
-          {t('viewAll')} ({items.length})
+          {t('viewAll')} ({totalRows})
         </button>
       )}
-      {expanded && items.length > previewLimit && (
+      {expanded && totalRows > previewLimit && (
         <button
           type="button"
           onClick={() => setExpanded(false)}
@@ -56,6 +147,43 @@ export function ItemsCard({ order, previewLimit = 5 }: ItemsCardProps) {
         </button>
       )}
     </section>
+  );
+}
+
+function BundleGroupRow({
+  name,
+  items,
+  currency,
+}: {
+  name: string;
+  items: OrderItemDetail[];
+  currency: string;
+}) {
+  const t = useT('orders.detail');
+  const groupTotal = items.reduce((sum, i) => sum + i.total, 0);
+
+  return (
+    <li className="py-3 first:pt-0 last:pb-0">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('bundleBadge')}
+          </span>
+          <p className="text-sm font-semibold text-foreground line-clamp-1 min-w-0">{name}</p>
+        </div>
+        <p className="text-sm font-semibold text-foreground shrink-0">
+          {formatMoney(groupTotal, currency)}
+        </p>
+      </div>
+      {/* Component lines stay individually visible — the merchant needs to
+          know exactly what to physically put in the box, not just its
+          total. Indented under the bundle header, never collapsed. */}
+      <ul className="ms-3 ps-3 border-s-2 border-border/60 divide-y divide-border/40">
+        {items.map(item => (
+          <ItemRow key={item.id} item={item} currency={currency} />
+        ))}
+      </ul>
+    </li>
   );
 }
 

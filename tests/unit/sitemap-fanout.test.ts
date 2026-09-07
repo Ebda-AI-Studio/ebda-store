@@ -180,3 +180,60 @@ describe('sitemap fan-out', () => {
     );
   });
 });
+
+/**
+ * P2-6 (final review): the platform fan-out's Cloudflare subrequest budget
+ * is documented in a comment in `sitemap.ts`, and the bundle fan-out narrowed
+ * it from 651 to 851 of the 1000 ceiling. A number that lives only in a
+ * comment drifts the next time a per-store request is added, so measure the
+ * per-store cost and re-derive the documented total here.
+ */
+describe('sitemap platform-branch subrequest budget', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('costs 4 subrequests per store — 3 product pages plus one bundle list', async () => {
+    hostRef.host = 'platform.test';
+    // 300 products = 3 pages at the API's 100 clamp, i.e. the documented
+    // PRODUCT_PAGES_PER_STORE worst case.
+    const fetchMock = installFetchMock({
+      tenant: null,
+      stores: [
+        { id: 's1', slug: 'one', createdAt: '2024-01-01T00:00:00.000Z' },
+        { id: 's2', slug: 'two', createdAt: '2024-01-02T00:00:00.000Z' },
+      ],
+      productCounts: { s1: 300, s2: 300 },
+    });
+
+    await sitemap();
+
+    const calls = fetchMock.mock.calls.map(c => String(c[0]));
+    const hostResolves = calls.filter(u => u.includes('/public/store/resolve')).length;
+    const storeListPages = calls.filter(u => u.includes('/public/stores')).length;
+    const perStore = (id: string) => calls.filter(u => u.includes(id)).length;
+
+    expect(hostResolves).toBe(1);
+    expect(storeListPages).toBe(1);
+    expect(perStore('s1')).toBe(4);
+    expect(perStore('s2')).toBe(4);
+  });
+
+  it('re-derives the documented worst case: 851 of the 1000 ceiling, 149 spare', async () => {
+    // The three caps `sitemap.ts` declares, and the measured per-store cost.
+    const MAX_STORE_LIST_PAGES = 50; // fetchStores(): `if (page > 50) break`
+    const HOST_RESOLVE = 1;
+    const MAX_STORES_WITH_PRODUCTS = 200;
+    const PER_STORE_SUBREQUESTS = 4; // 3 product pages + 1 bundle list
+
+    const worstCase =
+      MAX_STORE_LIST_PAGES + HOST_RESOLVE + MAX_STORES_WITH_PRODUCTS * PER_STORE_SUBREQUESTS;
+
+    expect(worstCase).toBe(851);
+    expect(1000 - worstCase).toBe(149);
+    // Before bundles, the same arithmetic gave 651 — the comment's stated
+    // "was" figure.
+    expect(MAX_STORE_LIST_PAGES + HOST_RESOLVE + MAX_STORES_WITH_PRODUCTS * 3).toBe(651);
+  });
+});

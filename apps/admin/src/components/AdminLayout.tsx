@@ -124,6 +124,7 @@ export function AdminLayout({
     coupons: t('hubTabs.coupons'),
     promotions: t('hubTabs.promotions'),
     loyalty: t('hubTabs.loyalty'),
+    bundles: t('hubTabs.bundles'),
     // Stock tabs
     stockDashboard: t('hubTabs.stockDashboard'),
     inventory: t('hubTabs.inventory'),

@@ -20,6 +20,7 @@ import { runInTenantContext } from '@force/database';
 import { config } from '../config';
 import type { Currency } from '../services/payment-providers/types';
 import { AppError } from '../middleware/error-handler';
+import { buildPaymentLineItems } from '../lib/payment-line-items';
 import {
   resolveRefundSettlement,
   readAccountedRefundEventIds,
@@ -1614,12 +1615,7 @@ router.post(
             email: customerEmail,
             phone: customerPhone,
           },
-          items: order.items.map(item => ({
-            name: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.price,
-            sku: item.sku || undefined,
-          })),
+          items: buildPaymentLineItems(order.items),
           callbackUrl: `${storefrontBaseUrl}/checkout/success`,
           errorUrl: `${storefrontBaseUrl}/checkout/error`,
           webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/myfatoorah`,

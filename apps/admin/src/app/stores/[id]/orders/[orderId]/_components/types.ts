@@ -39,6 +39,21 @@ export interface OrderItemDetail {
     nameAr?: string | null;
     images?: Array<{ url: string; alt?: string | null }>;
   };
+  /**
+   * I6 (final review): bundle-expansion tags. A bundle purchase expands into
+   * one `OrderItem` per component at checkout, all sharing one `bundleGroupId`
+   * per box (never per bundle-in-cart — two boxes of the same bundle produce
+   * TWO groups). `bundleName`/`bundleNameAr` are snapshotted at checkout time
+   * like `productName`, so a renamed/deleted bundle still shows the name the
+   * customer actually bought. Unlike the storefront's `groupOrderLinesForDisplay`
+   * (which COLLAPSES a group into one row), the admin order screen must keep
+   * every component line visible — the merchant fulfilling the order needs to
+   * know what to physically put in the box — and only GROUP + LABEL them under
+   * the bundle name.
+   */
+  bundleGroupId?: string | null;
+  bundleName?: string | null;
+  bundleNameAr?: string | null;
 }
 
 export interface OrderPaymentDetail {
@@ -87,6 +102,15 @@ export interface OrderDetail {
   /** The promotion that discounted this order, when `promotionDiscount` > 0.
    *  Null when a coupon (or nothing) was the winning lever. */
   appliedPromotion?: { id: string; name: string; nameAr?: string | null } | null;
+  /**
+   * Reporting-only: Σ(componentSum − bundlePrice) across every bundle box in
+   * the order. Unlike `couponDiscount`/`promotionDiscount`, this is NOT a
+   * component of `discount` — the saving is already reflected in a lower
+   * `subtotal` (a bundle is priced at `bundlePrice`, never `componentSum`),
+   * so it must never be subtracted from anything here; it is shown purely so
+   * the merchant can see how much a customer saved by buying the bundle.
+   */
+  bundleDiscount?: number;
   notes: string | null;
   customerNotes: string | null;
   shippingAddress: AddressJson | null;

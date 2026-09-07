@@ -11,25 +11,47 @@ import { prisma } from '@force/database';
 const router = Router({ mergeParams: true });
 
 // Validation schemas
-const createReturnSchema = z.object({
-  orderId: z.string().uuid(),
-  type: z.enum(['return', 'exchange', 'refund']),
-  reason: z.string().min(1).max(500),
-  reasonDetail: z.string().max(2000).optional(),
-  customerNotes: z.string().max(2000).optional(),
-  items: z
-    .array(
-      z.object({
-        orderItemId: z.string().uuid(),
-        productId: z.string().uuid(),
-        productName: z.string(),
-        quantity: z.number().int().min(1),
-        reason: z.string().optional(),
-        condition: z.enum(['new', 'opened', 'damaged']).optional(),
-      })
-    )
-    .min(1),
-});
+const createReturnSchema = z
+  .object({
+    orderId: z.string().uuid(),
+    type: z.enum(['return', 'exchange', 'refund']),
+    reason: z.string().min(1).max(500),
+    reasonDetail: z.string().max(2000).optional(),
+    customerNotes: z.string().max(2000).optional(),
+    // Individual (non-bundle) order lines. Now optional — a request may
+    // instead (or additionally) name whole bundle boxes via
+    // `bundleGroupIds` below. `.optional()` alone would accept a request
+    // with neither field, so the `.refine()` at the bottom re-imposes "at
+    // least one of the two" — the same requirement `.min(1)` enforced here
+    // before bundles existed.
+    items: z
+      .array(
+        z.object({
+          orderItemId: z.string().uuid(),
+          productId: z.string().uuid(),
+          productName: z.string(),
+          quantity: z.number().int().min(1),
+          reason: z.string().optional(),
+          condition: z.enum(['new', 'opened', 'damaged']).optional(),
+        })
+      )
+      .optional(),
+    // Bundle boxes to return as complete, atomic units — see
+    // `ReturnService.create`'s `bundleGroupIds`. One id per BOX; capped at
+    // 50 because a single customer return spanning 50 boxes in one
+    // submission is already an anomaly worth a support conversation, not a
+    // payload the endpoint should silently accept.
+    bundleGroupIds: z.array(z.string().uuid()).min(1).max(50).optional(),
+  })
+  .refine(
+    data =>
+      (data.items && data.items.length > 0) ||
+      (data.bundleGroupIds && data.bundleGroupIds.length > 0),
+    {
+      message: 'At least one item or bundle group must be selected for return',
+      path: ['items'],
+    }
+  );
 
 // Customer Routes
 

@@ -11,6 +11,7 @@ import { redis } from '../redis.service';
 import { sendAlert } from '../alerts.service';
 import { recordPaymentEvent } from '../payment-event.service';
 import { invalidateCustomersCache } from '../../lib/public-cache';
+import { buildPaymentLineItems } from '../../lib/payment-line-items';
 import {
   IPaymentProvider,
   PaymentProvider,
@@ -1657,12 +1658,7 @@ export class PaymentService {
           email: order.customer?.email || retryShipping.email || '',
           phone: retryShipping.phone || undefined,
         },
-        items: order.items.map(item => ({
-          name: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          sku: item.sku || undefined,
-        })),
+        items: buildPaymentLineItems(order.items),
         callbackUrl: `${config.webUrl}/checkout/success`,
         errorUrl: `${config.webUrl}/checkout/error`,
         webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider || payment.provider}`,

@@ -1,0 +1,106 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { Button } from '@force/ui';
+import type { PublicBundle } from '@/lib/api';
+import { useLocalePrice } from '../../hooks/useLocalePrice';
+import { useCart } from '../../contexts/CartContext';
+import { useStoreUrl } from '../../contexts/StoreContext';
+import { useLanguage, translations } from '../../contexts/LanguageContext';
+import { pickBundleName } from '@/lib/bundle-locale';
+import { trackAddToCart } from '../../components/MarketingPixels';
+import { BundlePlaceholderIcon } from '../../components/BundleLine';
+
+interface BundleCardProps {
+  bundle: PublicBundle;
+}
+
+/**
+ * One tile on the `/bundles` index grid — mirrors `ProductListItem`'s grid
+ * card chrome (rounded-2xl bordered card, square image, name + price + Add
+ * to Cart) trimmed to what a bundle actually needs. `bundles` (the list
+ * this renders) is already pre-filtered to `isPurchasable` bundles only
+ * (see `PublicBundle`'s doc comment on `api.ts`), so unlike the product
+ * grid there is no out-of-stock state to render here.
+ *
+ * The savings badge sits at a fixed physical corner (`left-3`), never
+ * RTL-mirrored — same rule the product grid's discount badge follows (see
+ * `ProductListItem`'s own comment on `discountBadgePositionCls`).
+ */
+export function BundleCard({ bundle }: BundleCardProps) {
+  const { language, t } = useLanguage();
+  const formatPrice = useLocalePrice();
+  const { addBundle } = useCart();
+  const storeUrl = useStoreUrl();
+  const [isAdding, setIsAdding] = useState(false);
+
+  const displayName = pickBundleName(bundle, language);
+  const savings = bundle.componentSum - bundle.price;
+
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    // The whole card is a Link to the bundle detail page — stop the click
+    // from navigating when the shopper meant to add-to-cart instead.
+    e.preventDefault();
+    e.stopPropagation();
+    setIsAdding(true);
+    const added = await addBundle(bundle.id, 1);
+    setIsAdding(false);
+    if (!added) return;
+    trackAddToCart({
+      contentId: bundle.id,
+      contentName: bundle.name,
+      quantity: 1,
+      value: bundle.price / 1000,
+      currency: 'KWD',
+    });
+  };
+
+  return (
+    <Link
+      href={storeUrl(`/bundles/${bundle.slug}`)}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:border-primary/30 hover:shadow-lg"
+    >
+      <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10">
+        {bundle.image ? (
+          <Image
+            src={bundle.image}
+            alt={displayName}
+            fill
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          />
+        ) : (
+          <BundlePlaceholderIcon />
+        )}
+        {savings > 0 && (
+          <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-white">
+            {t('Save', 'وفّر')} {formatPrice(savings)}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <span className="inline-flex w-fit items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+          {t('Bundle', 'باقة')}
+        </span>
+        <h3 className="line-clamp-2 text-base font-semibold text-foreground">{displayName}</h3>
+        <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+          <div className="flex items-baseline gap-2">
+            <span className="text-lg font-bold text-primary tabular-nums">
+              {formatPrice(bundle.price)}
+            </span>
+            {savings > 0 && (
+              <span className="text-xs text-muted-foreground line-through">
+                {formatPrice(bundle.componentSum)}
+              </span>
+            )}
+          </div>
+          <Button size="sm" onClick={handleAddToCart} isLoading={isAdding}>
+            {t('Add to Cart', translations['Add to Cart'])}
+          </Button>
+        </div>
+      </div>
+    </Link>
+  );
+}

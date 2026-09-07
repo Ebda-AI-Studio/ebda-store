@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocalePrice } from '../../hooks/useLocalePrice';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -13,7 +13,9 @@ import { useFeatures } from '../../contexts/FeatureContext';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { api } from '@/lib/api';
 import { CartRecommendations } from '../../components/CartRecommendations';
+import { BundleLine } from '../../components/BundleLine';
 import { pageSurfaceStyle } from '@/lib/page-surface';
+import { couponQuoteBasis } from '@/lib/coupon-quote-basis';
 import {
   resolveSectionZone,
   zoneStyle,
@@ -27,8 +29,10 @@ import { resolveColor, checkMinimumOrder } from '@force/shared';
 export default function CartClient() {
   const {
     items: cartItems,
+    bundles: cartBundles,
     updateQuantity: updateCartQuantity,
     removeItem: removeCartItem,
+    removeBundle: removeCartBundle,
     itemCount,
     total: cartTotal,
     isReady: cartIsReady,
@@ -36,6 +40,13 @@ export default function CartClient() {
   const { store, layout } = useStore();
   const storeUrl = useStoreUrl();
   const { isEnabled } = useFeatures();
+  // The basis a COUPON is quoted against: loose items only, never the
+  // bundle-inclusive `cartTotal`. `OrderService.create` evaluates a coupon
+  // against `cart.items` alone (Ruling B1 — a coupon never discounts an
+  // already-discounted box), so quoting against a bundle-inclusive total
+  // promised a discount the order would never receive. Identical to
+  // `cartTotal` for a cart with no bundle.
+  const couponBasis = useMemo(() => couponQuoteBasis(cartItems), [cartItems]);
   // Standalone Cart-page typography (page-builder → Cart page). Resolved to
   // inline styles below so they beat the cart's Tailwind size classes.
   //   heading     → page title + "Order summary" heading
@@ -183,6 +194,18 @@ export default function CartClient() {
     }
   };
 
+  const handleRemoveBundle = async (cartBundleId: string, name: string) => {
+    try {
+      await removeCartBundle(cartBundleId);
+      success(
+        t('Item removed', 'تمت الإزالة'),
+        t(`${name} has been removed from your cart`, `تمت إزالة ${name} من سلة التسوق`)
+      );
+    } catch {
+      cartErrorToast();
+    }
+  };
+
   const applyPromoCode = useCallback(async () => {
     if (!promoCode.trim() || isValidating) return;
     setIsValidating(true);
@@ -192,7 +215,9 @@ export default function CartClient() {
         discount: number;
       }>(`/stores/public/${store.id}/coupons/validate`, {
         code: promoCode,
-        orderTotal: cartTotal,
+        // `couponBasis`, NOT `cartTotal` — the server applies a coupon to
+        // loose items only (see its definition above).
+        orderTotal: couponBasis,
       });
       if (result.success && result.data) {
         setPromoApplied(true);
@@ -233,7 +258,7 @@ export default function CartClient() {
     } finally {
       setIsValidating(false);
     }
-  }, [promoCode, isValidating, store.id, cartTotal, success, info, errorToast, t]);
+  }, [promoCode, isValidating, store.id, couponBasis, success, info, errorToast, t]);
 
   // Re-apply a previously validated promo code once the cart has hydrated.
   // The server is still the source of truth for the discount amount; if the
@@ -253,7 +278,8 @@ export default function CartClient() {
           discount: number;
         }>(`/stores/public/${store.id}/coupons/validate`, {
           code: stored,
-          orderTotal: cartTotal,
+          // Same loose-items-only basis as the manual apply above.
+          orderTotal: couponBasis,
         });
         if (result.success && result.data) {
           setPromoCode(result.data.coupon.code);
@@ -269,7 +295,7 @@ export default function CartClient() {
         // Silent -- user can re-enter the code manually.
       }
     })();
-  }, [cartIsReady, cartTotal, store.id]);
+  }, [cartIsReady, cartTotal, couponBasis, store.id]);
 
   // Fetch shipping zones on mount
   useEffect(() => {
@@ -365,14 +391,14 @@ export default function CartClient() {
           >
             {t('Shopping Cart', '\u0633\u0644\u0629 \u0627\u0644\u062a\u0633\u0648\u0642')}
           </h1>
-          {cartItems.length > 0 && (
+          {(cartItems.length > 0 || cartBundles.length > 0) && (
             <p className="mt-2 text-muted-foreground" style={cartZoneStyle(cartLabelZone)}>
               {cartCount} {t('items', '\u0645\u0646\u062a\u062c\u0627\u062a')}{' '}
               {t('in your cart', '\u0641\u064a \u0633\u0644\u062a\u0643')}
             </p>
           )}
 
-          {cartItems.length === 0 ? (
+          {cartItems.length === 0 && cartBundles.length === 0 ? (
             T?.EmptyState ? (
               <div className="mt-16">
                 <T.EmptyState
@@ -440,6 +466,32 @@ export default function CartClient() {
               <div className="mt-8 lg:grid lg:grid-cols-12 lg:gap-8">
                 {/* Cart Items */}
                 <div className="lg:col-span-8">
+                  {/* Bundle boxes — always ONE row per box (never the split
+                      per-component allocation), rendered the same regardless
+                      of the active theme. `cartBundles` are `CartBundle` rows,
+                      each already priced/summed server-side. */}
+                  {cartBundles.length > 0 && (
+                    <div className="mb-4 space-y-4">
+                      {cartBundles.map(bundle => (
+                        <BundleLine
+                          key={bundle.id}
+                          variant="card"
+                          name={bundle.name}
+                          nameAr={bundle.nameAr}
+                          image={bundle.image}
+                          quantity={bundle.quantity}
+                          total={bundle.total}
+                          isRtl={language === 'ar'}
+                          onRemove={() =>
+                            handleRemoveBundle(
+                              bundle.id,
+                              language === 'ar' && bundle.nameAr ? bundle.nameAr : bundle.name
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
                   {T?.CartTable ? (
                     <T.CartTable
                       items={cartItems.map(item => ({
@@ -741,6 +793,16 @@ export default function CartClient() {
                                 {t('off', 'خصم')}
                               </p>
                             )}
+                            {promoApplied && cartBundles.length > 0 && (
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                {t(
+                                  'Coupon applies to items outside your bundles — a bundle is already discounted.',
+                                  translations[
+                                    'Coupon applies to items outside your bundles — a bundle is already discounted.'
+                                  ]
+                                )}
+                              </p>
+                            )}
                           </div>
                         )}
                       </T.OrderSummary>
@@ -826,6 +888,16 @@ export default function CartClient() {
                                   </svg>
                                   {promoCode.toUpperCase()} - {promoName} ({formatPrice(discount)}{' '}
                                   off)
+                                </p>
+                              )}
+                              {promoApplied && cartBundles.length > 0 && (
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  {t(
+                                    'Coupon applies to items outside your bundles — a bundle is already discounted.',
+                                    translations[
+                                      'Coupon applies to items outside your bundles — a bundle is already discounted.'
+                                    ]
+                                  )}
                                 </p>
                               )}
                             </div>

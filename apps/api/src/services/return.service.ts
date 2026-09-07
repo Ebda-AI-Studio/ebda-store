@@ -8,6 +8,15 @@ import { PaymentService } from './payment-providers/payment.factory';
 import logger from '../lib/logger';
 import { allocatePartialReturn } from './accounting/posting/partial-return-allocation';
 
+interface CreateReturnItemInput {
+  orderItemId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  reason?: string;
+  condition?: string;
+}
+
 interface CreateReturnData {
   orderId: string;
   customerId: string;
@@ -15,14 +24,27 @@ interface CreateReturnData {
   reason: string;
   reasonDetail?: string;
   customerNotes?: string;
-  items: {
-    orderItemId: string;
-    productId: string;
-    productName: string;
-    quantity: number;
-    reason?: string;
-    condition?: string;
-  }[];
+  /**
+   * Individual (non-bundle) order lines to return. An entry naming a line
+   * that belongs to a bundle box (`OrderItem.bundleGroupId` set) is refused
+   * with `bundle_returns_are_atomic` — `bundleGroupIds` below is the only
+   * way to return a bundle's components.
+   */
+  items?: CreateReturnItemInput[];
+  /**
+   * Bundle boxes to return as complete, atomic units (product-bundles design
+   * doc, "Returns — atomic"). Every component of the named group returns at
+   * its FULL ordered quantity — restocking every component — and the refund
+   * is the sum of the group's allocated line totals, which by Task 6's
+   * invariant (`Σ(line.total) === bundlePrice` per group) is exactly the
+   * bundle price the customer paid, never any component's shelf price. One
+   * id per BOX (Task 6 writes one `bundleGroupId` per box, not per bundle),
+   * so returning one box out of an order with several leaves the others
+   * untouched. Itemized (partial-box) bundle returns are out of scope — the
+   * allocated share is already stored per line so enabling them later is a
+   * UI + validation change, not a migration.
+   */
+  bundleGroupIds?: string[];
 }
 
 interface ListReturnsOptions {
@@ -93,7 +115,21 @@ export class ReturnService {
           customer: {
             select: { id: true, email: true, firstName: true, lastName: true },
           },
-          items: true,
+          // `orderItem` select pulls the bundle-tagging snapshot
+          // (bundleGroupId/bundleName/bundleNameAr — see OrderItem in
+          // schema.prisma) so the admin returns list/drawer can group a
+          // bundle box's ReturnItem rows back under the box's name instead
+          // of listing its components as unrelated products. `ReturnItem`
+          // itself carries no bundle columns — every component of a
+          // returned box is a separate row (see ReturnService.create's
+          // bundleGroupIds expansion), tied together only via this join.
+          items: {
+            include: {
+              orderItem: {
+                select: { bundleGroupId: true, bundleName: true, bundleNameAr: true },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -138,6 +174,12 @@ export class ReturnService {
                 images: { take: 1, orderBy: { position: 'asc' } },
               },
             },
+            // Same bundle-grouping join as `list()` above — kept in sync so
+            // whichever surface reads a single return by id can group its
+            // component rows under the bundle's name too.
+            orderItem: {
+              select: { bundleGroupId: true, bundleName: true, bundleNameAr: true },
+            },
           },
         },
       },
@@ -178,6 +220,60 @@ export class ReturnService {
       throw new AppError(400, 'INVALID_ORDER', 'Order not found or not eligible for return');
     }
 
+    // Bundle groups requested as atomic units (see `bundleGroupIds` on
+    // CreateReturnData) expand here into one synthesized item per component,
+    // at that component's FULL ordered quantity — restocking every component
+    // and refunding Σ(line.total) for the group, which by Task 6's invariant
+    // is exactly the bundle price. Deduped: naming the same box twice must
+    // not double the refund or the claimed quantity.
+    const requestedGroupIds = Array.from(new Set(data.bundleGroupIds ?? []));
+    const bundleGroupItems: CreateReturnItemInput[] = [];
+    for (const groupId of requestedGroupIds) {
+      const groupLines = order.items.filter(oi => oi.bundleGroupId === groupId);
+      if (groupLines.length === 0) {
+        throw new AppError(
+          400,
+          'INVALID_BUNDLE_GROUP',
+          `Bundle group ${groupId} was not found on this order`
+        );
+      }
+      for (const line of groupLines) {
+        bundleGroupItems.push({
+          orderItemId: line.id,
+          productId: line.productId,
+          productName: line.productName,
+          quantity: line.quantity,
+        });
+      }
+    }
+
+    // A component line inside a bundle box is NOT independently selectable —
+    // only the whole box, via `bundleGroupIds` above, can be returned.
+    // Letting a single component through here would let the customer keep
+    // the rest of the box while it refunds/restocks as if the whole box came
+    // back, AND would refund the wrong figure: a component's allocated price
+    // is only correct as part of the group's Σ, not standing alone (see the
+    // shelf-price note on refundAmount below).
+    for (const item of data.items ?? []) {
+      const orderItem = order.items.find(oi => oi.id === item.orderItemId);
+      if (orderItem?.bundleGroupId) {
+        throw new AppError(
+          422,
+          'bundle_returns_are_atomic',
+          `"${orderItem.bundleName ?? 'This bundle'}" can only be returned as a complete box. Select the bundle group instead of an individual component.`
+        );
+      }
+    }
+
+    const items: CreateReturnItemInput[] = [...(data.items ?? []), ...bundleGroupItems];
+    if (items.length === 0) {
+      throw new AppError(
+        400,
+        'NO_ITEMS',
+        'At least one item or bundle group must be selected for return'
+      );
+    }
+
     // Cumulative quantities already claimed by this order's OTHER return
     // requests (anything not rejected/cancelled still holds its claim —
     // pending/approved requests reserve the quantity, completed ones consumed
@@ -201,7 +297,9 @@ export class ReturnService {
 
     // Validate items — per-line AND cumulative across prior return requests
     // (and across duplicate lines within THIS request, hence the running map).
-    for (const item of data.items) {
+    // `items` here is the COMBINED list: explicit non-bundle lines plus every
+    // bundle group's synthesized component lines from above.
+    for (const item of items) {
       const orderItem = order.items.find(oi => oi.id === item.orderItemId);
       if (!orderItem) {
         throw new AppError(400, 'INVALID_ITEM', `Order item ${item.orderItemId} not found`);
@@ -222,8 +320,16 @@ export class ReturnService {
 
     const returnNumber = await this.generateReturnNumber(storeId);
 
-    // Calculate refund amount
-    const refundAmount = data.items.reduce((total, item) => {
+    // Calculate refund amount — from `orderItem.price`, the ALLOCATED
+    // per-unit price Task 6 snapshotted onto the OrderItem row at checkout,
+    // never a live Product/shelf price lookup. For a bundle group this
+    // matters: a component's shelf price is its ordinary catalog price, but
+    // the customer paid the box's discounted allocation, and
+    // `price × quantity === total` (Task 6's invariant) at the FULL quantity
+    // requested per bundle group above means this sum equals exactly
+    // Σ(line.total) for the group — i.e. the bundle price — never the higher
+    // shelf-price total.
+    const refundAmount = items.reduce((total, item) => {
       const orderItem = order.items.find(oi => oi.id === item.orderItemId);
       if (orderItem) {
         return total + orderItem.price * item.quantity;
@@ -244,7 +350,7 @@ export class ReturnService {
         customerNotes: data.customerNotes,
         refundAmount,
         items: {
-          create: data.items.map(item => ({
+          create: items.map(item => ({
             orderItemId: item.orderItemId,
             productId: item.productId,
             productName: item.productName,

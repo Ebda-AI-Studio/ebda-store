@@ -46,6 +46,24 @@ export interface OrderLineItem {
     nameAr?: string | null;
     images?: Array<{ url: string; alt?: string | null }>;
   };
+  /**
+   * Bundle-expansion tags — a bundle purchase expands into one `OrderItem`
+   * per component at checkout, all sharing a `bundleGroupId` (one id per
+   * BOX, never per bundle-in-cart, so two boxes of the same bundle produce
+   * two separate groups). `bundleName`/`bundleNameAr` are snapshotted onto
+   * the order at checkout time — like `productName` already is — so a
+   * renamed/deleted bundle still shows the name the customer actually
+   * bought. Mirrors the admin's `OrderItemDetail` and the web's `Order`
+   * item shape (`apps/web/src/lib/api.ts`) so all three surfaces agree on
+   * field names. This is the fulfilment app: like admin (and unlike the
+   * customer-facing storefront), it must keep every component line
+   * individually visible under the bundle's grouped/labelled row — the
+   * fulfiller needs to know exactly what to physically put in the box.
+   */
+  bundleId?: string | null;
+  bundleGroupId?: string | null;
+  bundleName?: string | null;
+  bundleNameAr?: string | null;
 }
 
 export interface Order {

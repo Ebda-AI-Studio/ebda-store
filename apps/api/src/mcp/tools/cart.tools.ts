@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpStore } from '../resolve-store';
-import { CartService } from '../../services/cart.service';
+import { CartService, type CartBundleView } from '../../services/cart.service';
 import { cartLineUnitPrice } from '../../lib/cart-pricing';
 import { ok } from './tool-result';
 
@@ -30,8 +30,19 @@ import { ok } from './tool-result';
  *     `store.currency` (the `McpStore` passed into `registerCartTools`),
  *     confirmed absent from `STOREFRONT_PRODUCT_SELECT` (Task 4 finding,
  *     re-verified here against `schema.prisma`).
+ *
+ * A bundle in the cart is a THIRD, separate line kind (see `cart.service.ts`):
+ * `CartBundle` rows are never expanded into `cart.items` — each is already
+ * ONE row per box, priced live via `resolveBundle`. `getOrCreate`/`addItem`
+ * return it pre-resolved as `cart.bundles: CartBundleView[]` and roll it into
+ * `cart.subtotal` (`itemsSubtotal + bundlesSubtotal`). This view used to map
+ * `cart.items` only and silently drop `cart.bundles` — an agent reading
+ * `view_cart` never saw a bundle it (or a human sharing the same cart
+ * session) had added, and `subtotal` no longer reconciled to the sum of the
+ * listed lines with no line explaining the gap. `bundles` below is additive:
+ * a cart with none renders `bundles: []`, `items` unchanged.
  */
-function cartView(cartId: string, cart: any, currency: string) {
+export function cartView(cartId: string, cart: any, currency: string) {
   return {
     cartId,
     items: cart.items.map((item: any) => ({
@@ -42,6 +53,15 @@ function cartView(cartId: string, cart: any, currency: string) {
       title_ar: item.product?.nameAr ?? undefined,
       quantity: item.quantity,
       unitPrice: cartLineUnitPrice(item),
+    })),
+    bundles: (cart.bundles ?? []).map((b: CartBundleView) => ({
+      cartBundleId: b.id,
+      bundleId: b.bundleId,
+      title: b.name,
+      title_ar: b.nameAr ?? undefined,
+      quantity: b.quantity,
+      unitPrice: b.unitPrice,
+      total: b.total,
     })),
     subtotal: cart.subtotal,
     currency,
@@ -84,7 +104,8 @@ export function registerCartTools(server: McpServer, store: McpStore): void {
   server.registerTool(
     'view_cart',
     {
-      description: "View a cart's items and subtotal by its cartId.",
+      description:
+        "View a cart's items, bundles, and subtotal by its cartId. `bundles` are boxes the store sells at a fixed price — each is one entry, never split into its component products.",
       inputSchema: { cartId: z.string().min(1) },
     },
     async ({ cartId }) => {

@@ -45,8 +45,9 @@ describe('Feature Registry', () => {
     // 2026-06-22: 37 keys (added payment_abandonment Enterprise feature).
     // 2026-07-13: 38 keys (added agent_feed add-on feature).
     // 2026-07-24: 40 keys (merge of agent_checkout + answer_engine_insights add-on features).
-    it('has exactly 40 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(40);
+    // 2026-09-06: 41 keys (added `bundles` — Product Bundles, in NO plan baseline).
+    it('has exactly 41 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(41);
     });
   });
 

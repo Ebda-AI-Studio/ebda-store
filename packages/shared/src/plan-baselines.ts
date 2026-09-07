@@ -112,6 +112,12 @@ const ENTERPRISE_ADDITIONS: FeatureKey[] = [
   'payment_abandonment',
 ];
 
+// 'bundles' (2026-09-06) is deliberately in NO baseline — not starter, not
+// professional, not enterprise. It is sold per store and enabled via a
+// super-admin StoreFeature override, so every existing merchant (on every
+// plan) is unaffected until they are explicitly opted in. Do NOT add it to
+// STARTER_CORE/PROFESSIONAL_ADDITIONS/ENTERPRISE_ADDITIONS above.
+
 /**
  * Features that resolve to ENABLED for a store on this plan by default.
  * Super-admin can override per-store via the StoreFeature table; see

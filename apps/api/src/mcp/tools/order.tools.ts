@@ -10,6 +10,7 @@ import { auditLog } from '../../middleware/security';
 import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
+import { buildPaymentLineItems } from '../../lib/payment-line-items';
 import { ok } from './tool-result';
 
 /**
@@ -211,12 +212,14 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
               email: customer.email ?? '',
               phone: customer.phone,
             },
-            items: order.items.map(i => ({
-              name: i.productName,
-              quantity: i.quantity,
-              unitPrice: i.price,
-              sku: i.sku || undefined,
-            })),
+            // Same collapse every other payment-provider call site uses
+            // (`payment.routes.ts` /create, `order.routes.ts` payment-link,
+            // `payment.factory.ts` retry — see `payment-line-items.ts`'s I3
+            // note): a bundle box must reach the gateway's hosted page as
+            // ONE line at the bundle price, never its per-component
+            // allocated shares. This call site mapped `order.items` raw and
+            // was the one instance final review missed.
+            items: buildPaymentLineItems(order.items),
             callbackUrl: `${base}/checkout/success`,
             errorUrl: `${base}/checkout/error`,
             webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,

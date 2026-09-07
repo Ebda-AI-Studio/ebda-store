@@ -379,6 +379,7 @@ model Store {
   paymentConfigs           PaymentConfig[]
   coupons                  Coupon[]
   promotions               Promotion[]
+  bundles                  Bundle[]
   shippingZones            ShippingZone[]
   shippingAreaRates        ShippingAreaRate[]
   taxRates                 TaxRate[]
@@ -884,6 +885,7 @@ model Product {
   warehouseStock       WarehouseStock[]
   countLines           CountLine[]
   dailyViews           ProductDailyView[]
+  bundleItems          BundleItem[]
 
   @@unique([storeId, slug])
   @@unique([storeId, sku]) // Prevent duplicate SKUs within a store (null values are excluded)
@@ -1083,6 +1085,7 @@ model ProductVariant {
   deadstockFlags       DeadStockFlag[]
   warehouseStock       WarehouseStock[]
   countLines           CountLine[]
+  bundleItems          BundleItem[]
 
   @@index([productId])
   @@index([sku])
@@ -1121,6 +1124,7 @@ model Cart {
   store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
   customer      User?          @relation(fields: [customerId], references: [id])
   items         CartItem[]
+  bundles       CartBundle[]
   abandonedCart AbandonedCart?
 
   @@unique([storeId, sessionId])
@@ -1160,6 +1164,76 @@ model CartItem {
 }
 
 // ==========================================
+// Bundles
+// ==========================================
+
+enum BundlePricingType {
+  fixed_price // value = the bundle's price in fils (e.g. 12000)
+  percentage  // value = basis points off the component sum (12.5% -> 1250)
+  fixed       // value = fils off the component sum
+}
+
+model Bundle {
+  id            String            @id @default(uuid())
+  storeId       String            @map("store_id")
+  name          String
+  nameAr        String?           @map("name_ar")
+  slug          String
+  description   String?
+  descriptionAr String?           @map("description_ar")
+  image         String?
+  pricingType   BundlePricingType @map("pricing_type")
+  pricingValue  Int               @map("pricing_value")
+  isActive      Boolean           @default(true) @map("is_active")
+  startsAt      DateTime?         @map("starts_at")
+  expiresAt     DateTime?         @map("expires_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  store Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items BundleItem[]
+  carts CartBundle[]
+
+  @@unique([storeId, slug])
+  @@index([storeId, isActive])
+  @@map("bundles")
+}
+
+model BundleItem {
+  id        String  @id @default(uuid())
+  bundleId  String  @map("bundle_id")
+  productId String  @map("product_id")
+  variantId String? @map("variant_id")
+  quantity  Int
+
+  bundle  Bundle          @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@unique([bundleId, productId, variantId])
+  @@index([bundleId])
+  @@index([productId])
+  @@index([variantId])
+  @@map("bundle_items")
+}
+
+model CartBundle {
+  id        String   @id @default(uuid())
+  cartId    String   @map("cart_id")
+  bundleId  String   @map("bundle_id")
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  bundle Bundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, bundleId])
+  @@index([cartId])
+  @@map("cart_bundles")
+}
+
+// ==========================================
 // Orders
 // ==========================================
 
@@ -1187,6 +1261,7 @@ model Order {
   couponDiscount        Int                @default(0) @map("coupon_discount")
   promotionDiscount     Int                @default(0) @map("promotion_discount")
   appliedPromotionId    String?            @map("applied_promotion_id")
+  bundleDiscount        Int                @default(0) @map("bundle_discount")
   // Loyalty redemption applied at checkout. loyaltyPointsRedeemed is the
   // number of points the customer spent on this order (NULL = none redeemed
   // / pre-feature order); loyaltyDiscount is the resulting discount amount in
@@ -1368,6 +1443,18 @@ model OrderItem {
   pickedQty Int       @default(0) @map("picked_qty")
   pickedAt  DateTime? @map("picked_at")
 
+  // Bundle tagging — deliberately a snapshot, not a join, exactly like
+  // productName and costPrice above: a six-month-old invoice must still
+  // read "Ramadan Box" after the bundle is renamed or deleted. bundleId
+  // identifies which bundle a line came from; bundleGroupId ties together
+  // every OrderItem produced by the same add-to-cart of that bundle (a
+  // bundle expands into one OrderItem per component). All four are NULL
+  // for orders that don't involve a bundle.
+  bundleId      String? @map("bundle_id")
+  bundleGroupId String? @map("bundle_group_id")
+  bundleName    String? @map("bundle_name")
+  bundleNameAr  String? @map("bundle_name_ar")
+
   order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product        Product         @relation(fields: [productId], references: [id])
   variant        ProductVariant? @relation(fields: [variantId], references: [id])
@@ -1377,6 +1464,7 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
   @@index([variantId])
+  @@index([bundleGroupId])
   @@map("order_items")
 }
 

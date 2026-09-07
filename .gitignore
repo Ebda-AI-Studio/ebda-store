@@ -156,3 +156,7 @@ dump.rdb
 
 # per-session subagent-driven-development scratch
 .superpowers/
+
+# Session-local handoff artifacts written by the agent OS (never committed).
+# Sibling of handoff.md, which .prettierignore already exempts.
+.handoff/

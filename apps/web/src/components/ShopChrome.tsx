@@ -5,6 +5,7 @@ import { useStore, useStoreBranding, useStoreContact, useStoreUrl } from '../con
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useTemplateComponents } from '../hooks/useTemplateComponents';
+import { withBundlesNavEntry, bundlesNavVisible } from '../lib/bundles-nav';
 import { BottomTabBar } from '../templates/shared/BottomTabBar';
 import { FloatingWidget } from '../templates/shared/FloatingWidget';
 import { SectionDivider, resolveSlotDividerSettings } from '../templates/shared/SectionDivider';
@@ -143,7 +144,7 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
     ? navigation
     : navigation.filter(n => !isLocationsHref(n.href));
 
-  const filteredNavigation: NavItem[] =
+  const navigationWithLocations: NavItem[] =
     store.locationsEnabled && !hasExplicitLocations
       ? [
           ...baseNavigation,
@@ -154,6 +155,28 @@ export function ShopChrome({ children, layout: layoutProp }: ShopChromeProps) {
           },
         ]
       : baseNavigation;
+
+  // "Bundles" nav entry — same auto-append shape as Locations above, read
+  // straight off the store-resolve payload.
+  //
+  // P1-6 (final review): this used to call a `useBundlesNavVisible` hook
+  // that issued `GET /stores/public/:storeId/bundles` on mount — from the
+  // component that wraps EVERY storefront page, for every store, with no
+  // memo and no cache. `bundles` is in no plan baseline, so essentially the
+  // entire fleet paid a full round-trip per page view to be told `403
+  // FEATURE_DISABLED`, spending budget on both `publicLimiter` and
+  // `publicTenantLimiter` for a value that is false. The hook's premise —
+  // "no client-visible boolean equivalent" — was simply wrong:
+  // `store.enabledFeatures` is already on the resolve payload and already
+  // read a few lines below for `floating_widget`. The decision itself stays
+  // a pure, unit-tested function (`withBundlesNavEntry`) — see
+  // lib/bundles-nav.ts.
+  const showBundlesNav = bundlesNavVisible(store.enabledFeatures);
+  const filteredNavigation: NavItem[] = withBundlesNavEntry(
+    navigationWithLocations,
+    showBundlesNav,
+    storeUrl('/bundles')
+  );
 
   // Per-store footer columns are saved in `store.settings.footerLinks` by the
   // admin's pages settings UI. Mirror the navMenu treatment: only forward if

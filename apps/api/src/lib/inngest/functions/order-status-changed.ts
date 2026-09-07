@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, runInTenantContext } from '@force/database';
+import { groupOrderLinesForDisplay } from '@force/shared';
 import { EmailService } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { LoyaltyService } from '../../../services/loyalty.service';
@@ -140,11 +141,15 @@ export async function handleOrderStatusChanged(
             orderNumber: order.orderNumber,
             customerName,
             customerEmail,
-            items: order.items.map(item => ({
-              name: item.productName,
-              quantity: item.quantity,
-              price: item.price,
-            })),
+            // Bundle boxes collapse to ONE row each (see
+            // groupOrderLinesForDisplay) — the payment-success email must
+            // show "Ramadan Box · 12.000 KWD", never the per-component
+            // allocated shares that fund that one price.
+            items: groupOrderLinesForDisplay(order.items).map(row =>
+              row.kind === 'bundle'
+                ? { name: row.name, nameAr: row.nameAr, quantity: row.quantity, price: row.total }
+                : { name: row.item.productName, quantity: row.item.quantity, price: row.item.price }
+            ),
             subtotal: order.subtotal,
             tax: order.tax,
             shipping: order.shipping,

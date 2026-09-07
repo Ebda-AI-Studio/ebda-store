@@ -16,17 +16,38 @@
  *
  * Idempotent: sessionStorage marker prevents re-running on HMR /
  * strict-mode double-mount.
+ *
+ * Bundle lines (Task 10): a token carrying `bundles` adds each one via
+ * `api.addBundleToCart` — the exact client call `BundleDetailClient`/
+ * `CartContext.addBundle` already use to reach `CartService.addBundle`, not
+ * a new endpoint. Mirrors the product loop above it (direct API call, not
+ * `useCart().addBundle`, so this hydration path stays toast-free by
+ * default and only surfaces a failure). Unlike a product add's silent
+ * `console.warn`, a bundle that sold out between token issue and
+ * redemption gets a user-visible toast: the customer picked one specific
+ * box, not a fungible SKU, so silently dropping it is more likely to
+ * confuse them into paying for a box they never received. The copy is
+ * `bundle-cart-errors.ts`'s existing `classifyBundleCartError`/
+ * `bundleCartErrorCopy` — the SAME classifier `CartContext.addBundle`
+ * already uses for this identical `/public/cart/bundles` 422 shape (a flat
+ * `{ error: 'bundle_not_purchasable' | 'insufficient_stock' }` string, not
+ * this app's usual `{code,message}` envelope) — reused rather than
+ * reinventing copy.
  */
 
 import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '../../contexts/CartContext';
+import { useToast } from '@force/ui';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { api } from '../../lib/api';
+import { classifyBundleCartError, bundleCartErrorCopy } from '../../lib/bundle-cart-errors';
 import {
   sessionGet,
   sessionSet,
   parseWaCartPayload,
   isRedeemableItem,
+  hydrateBundles,
   urlWithoutToken,
 } from './wa-token';
 
@@ -36,6 +57,8 @@ export default function WaTokenHydrator() {
   const router = useRouter();
   const params = useSearchParams();
   const { isReady, refetchCart } = useCart();
+  const toast = useToast();
+  const { t } = useLanguage();
   const ranRef = useRef(false);
 
   useEffect(() => {
@@ -59,10 +82,11 @@ export default function WaTokenHydrator() {
         // but merchant custom origins are no longer CSRF-exempt — a raw fetch
         // here would 403 the moment that mount order changed, and the catch
         // below only console.warns, so the cart would silently arrive empty.
-        const res = await api.post<{ items?: unknown[]; customerPhone?: string }>(
-          '/wa-bridge/cart/redeem',
-          { token }
-        );
+        const res = await api.post<{
+          items?: unknown[];
+          bundles?: unknown[];
+          customerPhone?: string;
+        }>('/wa-bridge/cart/redeem', { token });
         if (!res.success) {
           // eslint-disable-next-line no-console
           console.warn('[wa-token-hydrator] redeem failed', res.error);
@@ -87,6 +111,24 @@ export default function WaTokenHydrator() {
           }
         }
 
+        // Bundle lines (Task 10) — same client call BundleDetailClient uses
+        // (api.addBundleToCart -> POST /public/cart/bundles ->
+        // CartService.addBundle), one call per entry. A failure here (the
+        // box sold out between token issue and redemption) gets a
+        // user-visible toast, unlike the silent console.warn above — see
+        // the file doc comment for why.
+        const bundleAdded = await hydrateBundles(
+          data.bundles ?? [],
+          (bundleId, quantity) => api.addBundleToCart(bundleId, quantity),
+          (bundleId, error) => {
+            // eslint-disable-next-line no-console
+            console.warn('[wa-token-hydrator] addBundleToCart failed for', bundleId, error);
+            const { title, message } = bundleCartErrorCopy(classifyBundleCartError(error), t);
+            toast.error(title, message);
+          }
+        );
+        if (bundleAdded) anyAdded = true;
+
         if (anyAdded) {
           // Refetch to get the authoritative server cart state (prices,
           // stock status, slugs) rather than relying on the JWT snapshot.
@@ -105,7 +147,7 @@ export default function WaTokenHydrator() {
         console.warn('[wa-token-hydrator] failed', (err as Error).message);
       }
     })();
-  }, [isReady, params, refetchCart, router]);
+  }, [isReady, params, refetchCart, router, toast, t]);
 
   return null;
 }

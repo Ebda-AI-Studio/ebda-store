@@ -280,6 +280,20 @@ All errors follow this format:
             quantity: { type: 'integer' },
             reason: { type: 'string' },
             condition: { type: 'string' },
+            // Bundle-tagging snapshot joined from the returned line's
+            // OrderItem (list/getById `items.include.orderItem`) — present
+            // when this line was one component of an atomic bundle-box
+            // return, null/absent for a loose line. See
+            // packages/database's OrderItem model.
+            orderItem: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                bundleGroupId: { type: 'string', format: 'uuid', nullable: true },
+                bundleName: { type: 'string', nullable: true },
+                bundleNameAr: { type: 'string', nullable: true },
+              },
+            },
           },
         },
         // Analytics schemas

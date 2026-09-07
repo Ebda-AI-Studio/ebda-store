@@ -11,6 +11,16 @@ _Drafted 2026-07-21. Rev 2 — after a targeted deep crawl of contested pages (r
 
 Items still unread are listed in §8 rather than guessed at.
 
+> **Addendum — 2026-09-07.** This is a snapshot of FWB's code as of 2026-07-21 (superseded by
+> `ososs-vs-fwb-full-comparison-2026-07-21.md`, but still referenced directly — corrected here
+> too). Since then, FWB has shipped product bundles: fixed kits of specific products at set
+> quantities, sold as one line at one price, with availability derived from the components' own
+> stock and atomic (whole-box, not itemized) returns. Feature key `bundles` — an add-on in no plan
+> baseline, off by default, enabled per store only via a `StoreFeature` override once sold. The §3
+> P1 "Bundles / Services / Addons" row's "Absent" call and the §6 "Bundles + Addons + BOM" roadmap
+> item are **out of date** on the bundles half (Services and Addons as separate sellable types are
+> still genuinely absent). Left in place below as-is; this addendum carries the correction.
+
 ---
 
 ## 1. The one-line read

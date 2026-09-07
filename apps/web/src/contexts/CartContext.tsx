@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@force/ui';
 import { api } from '@/lib/api';
+import { classifyBundleCartError, bundleCartErrorCopy } from '@/lib/bundle-cart-errors';
 import { useLanguage } from './LanguageContext';
 import { useStore } from './StoreContext';
 
@@ -45,12 +46,51 @@ interface ServerCartItem {
   variant?: { id: string; title: string; titleAr?: string | null; price?: number } | null;
 }
 
+/**
+ * A bundle line in the cart — the box the customer bought, priced and
+ * displayed as ONE row (see `CartBundleView` on the API). Never expose the
+ * per-component allocated shares to the customer; those exist only for
+ * admin/picking/accounting. `id` is the `CartBundle` row id (what
+ * `DELETE /public/cart/bundles/:cartBundleId` takes), distinct from
+ * `bundleId` (the catalog `Bundle` id) — same distinction as `CartItem.id`
+ * vs `.productId`.
+ */
+export interface CartBundle {
+  id: string;
+  bundleId: string;
+  name: string;
+  nameAr?: string;
+  image?: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  available: number;
+}
+
+// Shape returned by GET /public/cart's `bundles` array (CartBundleView).
+interface ServerCartBundle {
+  id: string;
+  bundleId: string;
+  name: string;
+  nameAr: string | null;
+  image: string | null;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  available: number;
+}
+
 interface CartContextType {
   items: CartItem[];
+  bundles: CartBundle[];
   isReady: boolean;
   addItem: (item: Omit<CartItem, 'quantity' | 'productId'>, quantity?: number) => Promise<boolean>;
   removeItem: (id: string) => Promise<void>;
   updateQuantity: (id: string, quantity: number) => Promise<void>;
+  /** Add a bundle to the cart as its own row (never expanded into items). */
+  addBundle: (bundleId: string, quantity?: number) => Promise<boolean>;
+  /** Remove one bundle line — `id` is the CartBundle row id, not bundleId. */
+  removeBundle: (id: string) => Promise<void>;
   clearCart: () => Promise<void>;
   syncCartToBackend: () => Promise<void>;
   /** Refetch the server cart and update local state. Used by WaTokenHydrator. */
@@ -91,8 +131,23 @@ function mapServerItem(item: ServerCartItem): CartItem {
   };
 }
 
+function mapServerBundle(bundle: ServerCartBundle): CartBundle {
+  return {
+    id: bundle.id,
+    bundleId: bundle.bundleId,
+    name: bundle.name,
+    nameAr: bundle.nameAr ?? undefined,
+    image: bundle.image ?? undefined,
+    quantity: bundle.quantity,
+    unitPrice: bundle.unitPrice,
+    total: bundle.total,
+    available: bundle.available,
+  };
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [bundles, setBundles] = useState<CartBundle[]>([]);
   const [isReady, setIsReady] = useState(false);
   const migratedRef = useRef(false);
   const toast = useToast();
@@ -135,6 +190,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const res = await api.getCart();
     if (res.success && res.data?.cart) {
       setItems((res.data.cart.items as ServerCartItem[]).map(mapServerItem));
+      setBundles(
+        ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
+      );
     }
   }, [hasStore]);
 
@@ -159,13 +217,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
 
         const serverItems = (res.data.cart.items as ServerCartItem[]).map(mapServerItem);
-        const hasServerItems = serverItems.length > 0;
+        const serverBundles = ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(
+          mapServerBundle
+        );
+        // A cart holding ONLY bundles (no loose items) is valid — don't treat
+        // it as empty and try to migrate the guest's local items over it.
+        const hasServerContent = serverItems.length > 0 || serverBundles.length > 0;
 
         // Read localStorage directly instead of the React state `items` so we
         // don't need it in the effect deps (which would re-run the migration).
         const localItems = readLocalCart(cartStorageKey);
 
-        if (!hasServerItems && localItems.length > 0 && !migratedRef.current) {
+        if (!hasServerContent && localItems.length > 0 && !migratedRef.current) {
           migratedRef.current = true;
           const syncPayload = toSyncPayload(localItems);
           if (syncPayload.length > 0) {
@@ -175,6 +238,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           await refetchCart();
         } else {
           setItems(serverItems);
+          setBundles(serverBundles);
         }
       } catch {
         // Network error -- keep whatever was loaded from localStorage.
@@ -240,6 +304,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const res = await api.addToCart(productId, quantity, item.variantId ?? undefined);
         if (res.success && res.data?.cart) {
           setItems((res.data.cart.items as ServerCartItem[]).map(mapServerItem));
+          setBundles(
+            ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
+          );
         } else {
           await refetchCart();
           throw new Error(res.error?.message || 'Failed to add item to cart');
@@ -277,6 +344,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const res = await api.removeCartItem(id);
         if (res.success && res.data?.cart) {
           setItems((res.data.cart.items as ServerCartItem[]).map(mapServerItem));
+          setBundles(
+            ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
+          );
         } else {
           await refetchCart();
           throw new Error(res.error?.message || 'Failed to remove item');
@@ -300,6 +370,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const res = await api.updateCartItem(id, quantity);
         if (res.success && res.data?.cart) {
           setItems((res.data.cart.items as ServerCartItem[]).map(mapServerItem));
+          setBundles(
+            ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
+          );
         } else {
           await refetchCart();
           throw new Error(res.error?.message || 'Failed to update item');
@@ -312,8 +385,78 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [refetchCart, removeItem]
   );
 
+  // A bundle is never expanded into `cart_items` — it lives in its own
+  // `CartBundle` row (see cart.service.ts). `api.addBundleToCart`/
+  // `removeCartBundle` call `/public/cart/bundles[/:id]` (public.routes.ts)
+  // — NOT the store-scoped `/stores/:storeId/cart/bundles[/:id]` Task 5
+  // originally shipped, which `restrictPlatformOnlyOrigins` blocks for
+  // every non-platform origin (i.e. every real merchant storefront) in
+  // production. See public.routes.ts's comment on those two routes for the
+  // full story.
+  const addBundle = useCallback(
+    async (bundleId: string, quantity: number = 1): Promise<boolean> => {
+      if (!hasStore || !store?.id) return false;
+      try {
+        const res = await api.addBundleToCart(bundleId, quantity);
+        if (res.success && res.data?.cart) {
+          setItems((res.data.cart.items as ServerCartItem[]).map(mapServerItem));
+          setBundles(
+            ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
+          );
+          toast.success(
+            t('Added to cart', 'تمت الإضافة للسلة'),
+            t('Bundle added to your cart', 'تمت إضافة الباقة إلى سلتك')
+          );
+          return true;
+        }
+
+        await refetchCart().catch(() => {});
+        // See bundle-cart-errors.ts: this route's business-rule refusals
+        // arrive as a flat error STRING, not this app's usual
+        // `{code,message}` envelope — a customer must never see the generic
+        // fallback copy for a condition (`bundle_not_purchasable` /
+        // `insufficient_stock`) the API named precisely.
+        const { title, message } = bundleCartErrorCopy(classifyBundleCartError(res.error), t);
+        toast.error(title, message);
+        return false;
+      } catch {
+        await refetchCart().catch(() => {});
+        toast.error(
+          t('Unable to add to cart', 'تعذّرت الإضافة للسلة'),
+          t('Please try again.', 'يرجى المحاولة مرة أخرى.')
+        );
+        return false;
+      }
+    },
+    [hasStore, store, refetchCart, toast, t]
+  );
+
+  const removeBundle = useCallback(
+    async (id: string): Promise<void> => {
+      setBundles(prev => prev.filter(b => b.id !== id));
+      if (!hasStore || !store?.id) return;
+      try {
+        const res = await api.removeCartBundle(id);
+        if (res.success && res.data?.cart) {
+          setItems((res.data.cart.items as ServerCartItem[]).map(mapServerItem));
+          setBundles(
+            ((res.data.cart.bundles as ServerCartBundle[] | undefined) ?? []).map(mapServerBundle)
+          );
+        } else {
+          await refetchCart();
+          throw new Error(res.error?.message || 'Failed to remove bundle');
+        }
+      } catch (err) {
+        await refetchCart().catch(() => {});
+        throw err;
+      }
+    },
+    [hasStore, store, refetchCart]
+  );
+
   const clearCart = useCallback(async () => {
     setItems([]);
+    setBundles([]);
     try {
       const res = await api.clearCart();
       if (!res.success) {
@@ -331,17 +474,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     await refetchCart().catch(() => {});
   }, [refetchCart]);
 
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const itemCount =
+    items.reduce((sum, item) => sum + item.quantity, 0) +
+    bundles.reduce((sum, b) => sum + b.quantity, 0);
+  const total =
+    items.reduce((sum, item) => sum + item.price * item.quantity, 0) +
+    bundles.reduce((sum, b) => sum + b.total, 0);
 
   return (
     <CartContext.Provider
       value={{
         items,
+        bundles,
         isReady,
         addItem,
         removeItem,
         updateQuantity,
+        addBundle,
+        removeBundle,
         clearCart,
         syncCartToBackend,
         refetchCart,

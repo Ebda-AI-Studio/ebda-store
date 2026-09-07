@@ -121,6 +121,34 @@ async function fetchProducts(storeId: string, maxPages: number): Promise<Product
   return products;
 }
 
+type BundleEntry = { slug: string };
+
+/**
+ * Fetch a store's purchasable bundles for the sitemap. Unlike
+ * `fetchProducts`, this is deliberately a SINGLE, unpaginated request:
+ * `GET /stores/public/:storeId/bundles` (bundle.routes.ts) has no `limit`
+ * param and no pagination — a merchant hand-curates a small set of bundles
+ * (see that route's own doc comments), so one request per store is already
+ * bounded, unlike an unbounded product dump would be. `bundles` is in NO
+ * plan baseline (see plan-baselines.ts), so for the overwhelming majority
+ * of stores this 403s (`FEATURE_DISABLED`) and resolves to `[]` — that's
+ * the expected, non-exceptional case here, so (unlike the product
+ * pagination cap above) it is NOT logged.
+ */
+async function fetchBundles(storeId: string): Promise<BundleEntry[]> {
+  try {
+    const res = await fetch(`${API_URL}/stores/public/${storeId}/bundles`, {
+      next: { revalidate: 3600, tags: [`products:${storeId}`] },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data?.data?.bundles ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Sitemap with host-aware tenant fan-out.
  *
@@ -155,9 +183,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tenant = await resolveStoreByHost(requestHost);
   if (tenant) {
     const base = `https://${requestHost}`;
-    // Single store, own domain: up to 10 pages x 100 = 1000 product URLs
-    // (11 subrequests worst case — nowhere near any Worker limit).
-    const products = await fetchProducts(tenant.id, 10).catch(() => [] as ProductEntry[]);
+    // Single store, own domain: up to 10 pages x 100 = 1000 product URLs,
+    // plus 1 unpaginated bundle-list request (see fetchBundles) — 12
+    // subrequests worst case, nowhere near any Worker limit.
+    const [products, bundles] = await Promise.all([
+      fetchProducts(tenant.id, 10).catch(() => [] as ProductEntry[]),
+      fetchBundles(tenant.id),
+    ]);
     const entries: MetadataRoute.Sitemap = [];
     for (const page of STORE_STATIC_PAGES) {
       entries.push({
@@ -177,6 +209,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             : now,
         changeFrequency: 'weekly',
         priority: 0.7,
+      });
+    }
+    // No `updatedAt` on the bundle-list response (it's the pre-filtered,
+    // customer-facing shape — see PublicBundle) — `now` is an acceptable
+    // freshness signal for a merchant-curated set this small.
+    //
+    // The `/bundles` index itself is NOT in `STORE_STATIC_PAGES` (unlike
+    // `/products`/`/categories`, which every store has) — it 404s for a
+    // store without the `bundles` feature (see `BundlesPageBody`'s
+    // 403-means-404 treatment), so it's only listed when `bundles` is
+    // non-empty, exactly like the ShopChrome nav entry's own gating.
+    if (bundles.length > 0) {
+      entries.push({
+        url: `${base}/bundles`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: 0.6,
+      });
+    }
+    for (const bundle of bundles) {
+      entries.push({
+        url: `${base}/bundles/${bundle.slug}`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: 0.6,
       });
     }
     return entries;
@@ -211,7 +268,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Promise.all so we also stop opening 200 sockets at once against the API.
   //
   // Subrequest budget (worst case): 50 store-list pages + 1 host resolve +
-  // 200 stores x 3 product pages = 651, under the 1000 ceiling with headroom.
+  // 200 stores x (3 product pages + 1 unpaginated bundle-list request) =
+  // 851, under the 1000 ceiling — less headroom than before bundles (was
+  // 651), still safely bounded. The bundle-list request is unpaginated per
+  // store (see fetchBundles) rather than getting its own PAGES_PER_STORE
+  // knob, so it doesn't compound the way product pagination would.
   const MAX_STORES_WITH_PRODUCTS = 200;
   const PRODUCT_PAGES_PER_STORE = 3; // x100 = up to 300 product URLs per store
   const FANOUT_CHUNK = 20;
@@ -237,25 +298,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  const productResults: Array<{ store: StoreListEntry; products: ProductEntry[] }> = [];
+  const productResults: Array<{
+    store: StoreListEntry;
+    products: ProductEntry[];
+    bundles: BundleEntry[];
+  }> = [];
   for (let i = 0; i < withProducts.length; i += FANOUT_CHUNK) {
     const chunk = withProducts.slice(i, i + FANOUT_CHUNK);
     productResults.push(
       ...(await Promise.all(
         chunk.map(store =>
-          fetchProducts(store.id, PRODUCT_PAGES_PER_STORE)
-            .then(products => ({ store, products }))
-            .catch(() => ({ store, products: [] as ProductEntry[] }))
+          Promise.all([fetchProducts(store.id, PRODUCT_PAGES_PER_STORE), fetchBundles(store.id)])
+            .then(([products, bundles]) => ({ store, products, bundles }))
+            .catch(() => ({ store, products: [] as ProductEntry[], bundles: [] as BundleEntry[] }))
         )
       ))
     );
   }
   for (const store of withoutProducts) {
-    productResults.push({ store, products: [] });
+    productResults.push({ store, products: [], bundles: [] });
   }
 
   const perTenant: MetadataRoute.Sitemap = [];
-  for (const { store, products } of productResults) {
+  for (const { store, products, bundles } of productResults) {
     for (const page of STORE_STATIC_PAGES) {
       perTenant.push({
         url: `${siteUrl}/${store.slug}${page.path}`,
@@ -274,6 +339,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             : now,
         changeFrequency: 'weekly',
         priority: 0.7,
+      });
+    }
+    // Same gating as the tenant branch above: `/bundles` only listed when
+    // this store actually has purchasable bundles.
+    if (bundles.length > 0) {
+      perTenant.push({
+        url: `${siteUrl}/${store.slug}/bundles`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: 0.6,
+      });
+    }
+    for (const bundle of bundles) {
+      perTenant.push({
+        url: `${siteUrl}/${store.slug}/bundles/${bundle.slug}`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: 0.6,
       });
     }
   }

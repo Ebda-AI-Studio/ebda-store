@@ -12,6 +12,7 @@ import {
   formatDate as formatStoreDate,
   formatDateTime as formatStoreDateTime,
 } from '@/lib/format-date';
+import { groupOrderLinesForDisplay } from '@force/shared';
 
 interface OrderDetail {
   id: string;
@@ -71,6 +72,12 @@ interface OrderDetail {
       name: string;
       images: Array<{ id: string; url: string; alt?: string }>;
     };
+    /** Set when this line is a bundle component (Task 6) — see
+     *  `groupOrderLinesForDisplay`. Snapshotted at order time; render
+     *  as-is, never re-fetch from the (possibly renamed/deleted) bundle. */
+    bundleGroupId?: string | null;
+    bundleName?: string | null;
+    bundleNameAr?: string | null;
   }[];
   payments: {
     id: string;
@@ -313,6 +320,11 @@ export default function OrderDetailClient() {
 
   if (!order) return null;
 
+  // Bundle boxes collapse to ONE row each (see groupOrderLinesForDisplay) —
+  // a customer must never see the per-component allocated prices that fund
+  // that one price. Two boxes of the same bundle render as TWO rows.
+  const displayRows = groupOrderLinesForDisplay(order.items);
+
   const shippingAddr = order.shippingAddress;
   const successfulPayment = order.payments?.find(
     p => p.status === 'completed' || p.status === 'paid'
@@ -389,7 +401,7 @@ export default function OrderDetailClient() {
         <div className="border-b bg-muted px-4 py-3">
           <h2 className="font-semibold text-foreground">
             {t('Order Items', '\u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a')} (
-            {order.items.length})
+            {displayRows.length})
           </h2>
         </div>
 
@@ -413,96 +425,138 @@ export default function OrderDetailClient() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {order.items.map(item => (
-                <tr key={item.id}>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-muted overflow-hidden">
-                        {item.product?.images?.[0]?.url ? (
-                          <Image
-                            src={item.product.images[0].url}
-                            alt={item.product?.name || 'Product'}
-                            width={48}
-                            height={48}
-                            className="h-full w-full object-cover"
-                            sizes="48px"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
-                            <svg
-                              className="h-5 w-5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1}
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                              />
-                            </svg>
-                          </div>
-                        )}
+              {displayRows.map(row => {
+                // Bundle boxes collapse to ONE row: name (snapshotted at
+                // order time), no per-unit price column (the box has no
+                // single "each" price a customer should see), and the
+                // group's total. Never render `row.lines` here.
+                const name =
+                  row.kind === 'bundle'
+                    ? language === 'ar' && row.nameAr
+                      ? row.nameAr
+                      : row.name
+                    : row.item.product?.name || 'Product';
+                const image = row.kind === 'item' ? row.item.product?.images?.[0]?.url : undefined;
+                const quantity = row.kind === 'bundle' ? row.quantity : row.item.quantity;
+                const total =
+                  row.kind === 'bundle' ? row.total : row.item.price * row.item.quantity;
+                return (
+                  <tr key={row.key}>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-muted overflow-hidden">
+                          {image ? (
+                            <Image
+                              src={image}
+                              alt={name}
+                              width={48}
+                              height={48}
+                              className="h-full w-full object-cover"
+                              sizes="48px"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
+                              <svg
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={1}
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <span className="font-medium text-foreground">
+                          {name}
+                          {row.kind === 'bundle' && (
+                            <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                              {t('Bundle', '\u0628\u0627\u0642\u0629')}
+                            </span>
+                          )}
+                        </span>
                       </div>
-                      <span className="font-medium text-foreground">
-                        {item.product?.name || 'Product'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-center text-foreground">{item.quantity}</td>
-                  <td className="px-4 py-4 text-right text-foreground">
-                    {formatPrice(item.price)}
-                  </td>
-                  <td className="px-4 py-4 text-right font-medium text-foreground">
-                    {formatPrice(item.price * item.quantity)}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-4 text-center text-foreground">{quantity}</td>
+                    <td className="px-4 py-4 text-right text-foreground">
+                      {row.kind === 'bundle' ? '\u2014' : formatPrice(row.item.price)}
+                    </td>
+                    <td className="px-4 py-4 text-right font-medium text-foreground">
+                      {formatPrice(total)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         {/* Mobile items */}
         <div className="sm:hidden divide-y">
-          {order.items.map(item => (
-            <div key={item.id} className="flex items-center gap-3 p-4">
-              <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-muted overflow-hidden">
-                {item.product?.images?.[0]?.url ? (
-                  <Image
-                    src={item.product.images[0].url}
-                    alt={item.product?.name || 'Product'}
-                    width={56}
-                    height={56}
-                    className="h-full w-full object-cover"
-                    sizes="56px"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-                )}
+          {displayRows.map(row => {
+            const name =
+              row.kind === 'bundle'
+                ? language === 'ar' && row.nameAr
+                  ? row.nameAr
+                  : row.name
+                : row.item.product?.name || 'Product';
+            const image = row.kind === 'item' ? row.item.product?.images?.[0]?.url : undefined;
+            const quantity = row.kind === 'bundle' ? row.quantity : row.item.quantity;
+            const total = row.kind === 'bundle' ? row.total : row.item.price * row.item.quantity;
+            return (
+              <div key={row.key} className="flex items-center gap-3 p-4">
+                <div className="h-14 w-14 flex-shrink-0 rounded-lg bg-muted overflow-hidden">
+                  {image ? (
+                    <Image
+                      src={image}
+                      alt={name}
+                      width={56}
+                      height={56}
+                      className="h-full w-full object-cover"
+                      sizes="56px"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground truncate">
+                    {name}
+                    {row.kind === 'bundle' && (
+                      <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {t('Bundle', '\u0628\u0627\u0642\u0629')}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {row.kind === 'bundle'
+                      ? `${t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: ${quantity}`
+                      : `${formatPrice(row.item.price)} x ${quantity}`}
+                  </p>
+                </div>
+                <p className="font-medium text-foreground">{formatPrice(total)}</p>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">
-                  {item.product?.name || 'Product'}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {formatPrice(item.price)} x {item.quantity}
-                </p>
-              </div>
-              <p className="font-medium text-foreground">
-                {formatPrice(item.price * item.quantity)}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

@@ -51,6 +51,7 @@ const PAGE_KEYWORDS: Record<string, string> = {
   coupons: 'discounts promo codes vouchers كوبونات خصومات أكواد قسائم',
   promotions: 'automatic discounts sale deals عروض ترويجية خصومات تلقائية عروض',
   loyalty: 'points rewards tiers نقاط مكافآت ولاء',
+  bundles: 'kits combos sets product bundles باقات مجموعات عروض مجمعة',
   inventory: 'stock quantity warehouse مخزون كمية مستودع جرد',
   warehouses: 'locations stores depot مستودعات مخازن مواقع',
   suppliers: 'vendors purchasing موردين بائعين شراء',

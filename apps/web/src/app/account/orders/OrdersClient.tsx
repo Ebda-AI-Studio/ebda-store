@@ -8,6 +8,7 @@ import { api, type Order } from '@/lib/api';
 import { useStore, useStoreUrl } from '../../../contexts/StoreContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate as formatStoreDate } from '@/lib/format-date';
+import { groupOrderLinesForDisplay } from '@force/shared';
 
 export default function OrdersClient() {
   const storeUrl = useStoreUrl();
@@ -179,47 +180,67 @@ export default function OrdersClient() {
               <div className="p-4">
                 {order.items && order.items.length > 0 ? (
                   <div className="space-y-4">
-                    {order.items.map(item => (
-                      <div key={item.id} className="flex items-center gap-4">
-                        <div className="h-16 w-16 flex-shrink-0 rounded-lg bg-muted">
-                          {item.product?.images?.[0]?.url ? (
-                            <Image
-                              src={item.product.images[0].url}
-                              alt={item.product?.name || 'Product'}
-                              width={64}
-                              height={64}
-                              className="h-full w-full rounded-lg object-cover"
-                              sizes="64px"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
-                              <svg
-                                className="h-6 w-6"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={1}
-                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                />
-                              </svg>
-                            </div>
-                          )}
+                    {groupOrderLinesForDisplay(order.items).map(row => {
+                      // Bundle boxes collapse to ONE row (see
+                      // groupOrderLinesForDisplay) \u2014 never the per-component
+                      // allocated prices that fund the box's one price.
+                      const name =
+                        row.kind === 'bundle'
+                          ? language === 'ar' && row.nameAr
+                            ? row.nameAr
+                            : row.name
+                          : row.item.product?.name || 'Product';
+                      const image =
+                        row.kind === 'item' ? row.item.product?.images?.[0]?.url : undefined;
+                      const quantity = row.kind === 'bundle' ? row.quantity : row.item.quantity;
+                      const price = row.kind === 'bundle' ? row.total : row.item.price;
+                      return (
+                        <div key={row.key} className="flex items-center gap-4">
+                          <div className="h-16 w-16 flex-shrink-0 rounded-lg bg-muted">
+                            {image ? (
+                              <Image
+                                src={image}
+                                alt={name}
+                                width={64}
+                                height={64}
+                                className="h-full w-full rounded-lg object-cover"
+                                sizes="64px"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-muted-foreground/70">
+                                <svg
+                                  className="h-6 w-6"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1}
+                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">
+                              {name}
+                              {row.kind === 'bundle' && (
+                                <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                  {t('Bundle', '\u0628\u0627\u0642\u0629')}
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {quantity}
+                            </p>
+                          </div>
+                          <p className="font-medium text-foreground">{formatPrice(price)}</p>
                         </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground">
-                            {item.product?.name || 'Product'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {item.quantity}
-                          </p>
-                        </div>
-                        <p className="font-medium text-foreground">{formatPrice(item.price)}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">

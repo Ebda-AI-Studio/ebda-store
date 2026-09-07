@@ -32,6 +32,7 @@ export type HubLabels = {
   coupons: string;
   promotions: string;
   loyalty: string;
+  bundles: string;
   // Stock tabs
   stockDashboard: string;
   inventory: string;
@@ -111,6 +112,7 @@ export const HUBS: HubDefinition[] = [
       '/coupons',
       '/promotions',
       '/loyalty',
+      '/bundles',
     ],
     buildTabs: (storeId, labels) => [
       { label: labels.orders, href: `/stores/${storeId}/orders` },
@@ -127,6 +129,10 @@ export const HUBS: HubDefinition[] = [
       // reasoning as customer-groups (dependency root for targeting).
       { label: labels.promotions, href: `/stores/${storeId}/promotions` },
       { label: labels.loyalty, href: `/stores/${storeId}/loyalty` },
+      // Bundles are feature-gated (`bundles` is in NO plan baseline) via
+      // useRequireFeature('bundles') — same "tab always renders, the page
+      // itself gates" pattern as coupons/loyalty above.
+      { label: labels.bundles, href: `/stores/${storeId}/bundles` },
     ],
   },
   {

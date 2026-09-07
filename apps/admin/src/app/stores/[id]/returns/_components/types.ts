@@ -8,6 +8,19 @@ export interface ReturnItem {
     name: string;
     images?: { url: string }[];
   };
+  /**
+   * Bundle-tagging snapshot, joined from the returned line's `OrderItem`
+   * (`ReturnService.list`/`getById`'s `items.include.orderItem` select) — a
+   * bundle box's return always includes EVERY component at its full
+   * quantity (returns are atomic, see `bundle_returns_are_atomic`), so
+   * every `ReturnItem` sharing a `bundleGroupId` belongs to the same box.
+   * `null`/`undefined` for a non-bundle line.
+   */
+  orderItem?: {
+    bundleGroupId: string | null;
+    bundleName: string | null;
+    bundleNameAr: string | null;
+  } | null;
 }
 
 export interface ReturnRecord {

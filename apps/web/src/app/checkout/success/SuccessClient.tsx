@@ -13,6 +13,7 @@ import { trackPurchase } from '../../../components/MarketingPixels';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { formatDate } from '@/lib/format-date';
 import { useLastListing } from '../../../hooks/useLastListing';
+import { groupOrderLinesForDisplay } from '@force/shared';
 
 // Payment verification outcome that drives the truthful headline/icon.
 //   verifying → we're asking the API to confirm with the gateway
@@ -233,24 +234,40 @@ function SuccessContent() {
               </div>
             </div>
 
-            {/* Order Items */}
+            {/* Order Items \u2014 bundle boxes collapse to ONE row each (see
+                groupOrderLinesForDisplay); a customer must never see the
+                per-component allocated prices that fund that one price. */}
             {order?.items && order.items.length > 0 && (
               <div className="divide-y py-4">
-                {order.items.map(item => (
-                  <div key={item.id} className="flex items-center justify-between py-3">
-                    <div>
+                {groupOrderLinesForDisplay(order.items).map(row =>
+                  row.kind === 'bundle' ? (
+                    <div key={row.key} className="flex items-center justify-between py-3">
+                      <div>
+                        <p className="font-medium text-foreground">
+                          {language === 'ar' && row.nameAr ? row.nameAr : row.name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {row.quantity}
+                        </p>
+                      </div>
+                      <p className="font-medium text-foreground">{formatPrice(row.total)}</p>
+                    </div>
+                  ) : (
+                    <div key={row.key} className="flex items-center justify-between py-3">
+                      <div>
+                        <p className="font-medium text-foreground">
+                          {row.item.product?.name || 'Product'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {row.item.quantity}
+                        </p>
+                      </div>
                       <p className="font-medium text-foreground">
-                        {item.product?.name || 'Product'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {item.quantity}
+                        {formatPrice(row.item.price * row.item.quantity)}
                       </p>
                     </div>
-                    <p className="font-medium text-foreground">
-                      {formatPrice(item.price * item.quantity)}
-                    </p>
-                  </div>
-                ))}
+                  )
+                )}
                 <div className="flex items-center justify-between pt-3">
                   <p className="font-semibold text-foreground">
                     {t('Total', '\u0627\u0644\u0645\u062c\u0645\u0648\u0639')}

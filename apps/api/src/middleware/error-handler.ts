@@ -8,7 +8,14 @@ export class AppError extends Error {
     public statusCode: number,
     public code: string,
     message: string,
-    public details?: Record<string, string[]>
+    // Was `Record<string, string[]>` (the Zod-validation-issues shape,
+    // built inline below, never through this constructor). Widened for
+    // RULING T9-a: `bundle.routes.ts`'s `price_not_allocatable` 422 needed
+    // a structured non-string payload (`{ suggested: <fils integer> }`)
+    // carried through this SAME field rather than inventing a second,
+    // bespoke response shape — see that file's `PRICE_NOT_ALLOCATABLE`
+    // throws for the first real caller of a non-string-array `details`.
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'AppError';

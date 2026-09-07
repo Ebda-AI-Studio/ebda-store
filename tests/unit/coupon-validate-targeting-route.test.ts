@@ -155,6 +155,39 @@ describe('POST /public/:storeId/coupons/validate — targeting', () => {
     expect(mockPrisma.order.count).not.toHaveBeenCalled();
   });
 
+  it('P2-a: rejects a bundle-only cart (orderTotal: 0) against a minOrderAmount coupon instead of silently applying it', async () => {
+    // A bundle-only cart's coupon-quote basis is the loose subtotal, which
+    // is legitimately 0 when the cart holds only bundle lines. The old
+    // `orderTotal && …` truthiness guard treated 0 the same as "absent"
+    // and skipped the minOrderAmount check entirely — the quote said
+    // "applied", and checkout then 400ed at order.service.ts's own
+    // minOrderAmount gate with no way for the customer to recover short of
+    // clearing the code.
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ minOrderAmount: 5000 }));
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'SAVE10', orderTotal: 0 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('MIN_ORDER_NOT_MET');
+  });
+
+  it('still applies a coupon with no minOrderAmount to a bundle-only cart (orderTotal: 0)', async () => {
+    // Additive-safety check: a coupon with no minOrderAmount must not be
+    // newly rejected just because orderTotal is 0.
+    mockPrisma.coupon.findFirst.mockResolvedValue(couponRow({ value: 20 }));
+
+    const res = await request(app)
+      .post(`/api/v1/stores/public/${STORE_ID}/coupons/validate`)
+      .send({ code: 'SAVE10', orderTotal: 0 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.discount).toBe(0);
+  });
+
   it('keeps the generic INVALID_COUPON response for an unknown code (enumeration protection)', async () => {
     mockPrisma.coupon.findFirst.mockResolvedValue(null);
 

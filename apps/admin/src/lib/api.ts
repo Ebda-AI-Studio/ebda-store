@@ -28,6 +28,11 @@ export interface ApiResponse<T = unknown> {
   error?: {
     code: string;
     message: string;
+    /** Structured extra data alongside the message — Zod validation's
+     *  `{ field: string[] }` issue map, or a route-specific payload like
+     *  bundle.routes.ts's `PRICE_NOT_ALLOCATABLE`'s `{ suggested: number }`.
+     *  Shape depends on `code`; callers narrow it themselves. */
+    details?: Record<string, unknown>;
   };
 }
 
@@ -65,6 +70,11 @@ export interface ApiError {
   code: string;
   message: string;
   status: number;
+  /** See `ApiResponse['error']['details']` — forwarded through unparsed so
+   *  callers that need route-specific structured data (e.g. bundle saves'
+   *  `PRICE_NOT_ALLOCATABLE` -> `{ suggested: number }`) don't have to
+   *  bypass this envelope parser to get at it. */
+  details?: Record<string, unknown>;
 }
 
 /**
@@ -257,6 +267,7 @@ export async function apiRequest<T = unknown>(
           code: data.error?.code || 'SERVER_ERROR',
           message: data.error?.message || `Request failed with status ${response.status}`,
           status: response.status,
+          details: data.error?.details,
         },
       };
     }

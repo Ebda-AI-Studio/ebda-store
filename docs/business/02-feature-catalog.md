@@ -455,6 +455,18 @@ The affiliate program is available as a premium add-on. Affiliates, influencers,
 
 Available as an individually-priced add-on, sold separately from any plan tier. Publishes a machine-readable product feed at `/feeds/products.json` so AI assistants and shopping agents (ChatGPT, Perplexity, and agent crawlers) can read, cite, and recommend the store's products — following the OpenAI Product Feed field conventions (title, price, availability, image, and category per product). The feed URL returns a 404 for any store that hasn't purchased the add-on, so its existence is never revealed to stores without it. Once enabled, the store's `llms.txt` index also links to the feed for AI crawlers.
 
+### Product Bundles (باقات المنتجات)
+
+Available as an individually-priced add-on, sold separately from any plan tier. Define a named bundle — a fixed kit of specific products at specific quantities — and sell it as one item at one price. Choose how the price is set: a fixed bundle price, a percentage off the sum of the components, or a fixed amount off.
+
+Availability is calculated automatically from the components' own stock — a bundle built from 20 of one product and 5 of another shows 5 available, and that number updates the moment either component's stock changes. There's no separate bundle stock count to keep in sync, so nothing is double-counted between a bundle and the products inside it.
+
+Once a bundle is in a customer's cart, it shows as one line — in the cart, at checkout, on the order confirmation, and on the invoice. The per-component breakdown is kept internally only, so your per-line profit and P&L numbers stay accurate. A return on a bundle refunds the whole box at the price the customer paid; returning a single item out of a box isn't supported — the box returns as a unit. Bundles don't currently combine with coupons or other cart promotions — the bundle's own price already reflects the deal.
+
+Customers buy a bundle the same way they buy anything else. Your storefront gets a **Bundles** page listing every bundle that's currently live, a dedicated page per bundle with its own web address (`/bundles/<name>`), an add-to-cart button, and a "Bundles" link in your main navigation — added automatically once the add-on is switched on for your store. Bundle pages are in your sitemap and carry search-engine structured data, so Google can index them like any product page. Bundles also appear in the AI product feed (if that add-on is enabled) and in the catalogue the WhatsApp bot reads — and a customer ordering by WhatsApp DM can buy one there too.
+
+**One thing to know before we switch it on for you:** this add-on is new, and we roll it out one merchant at a time — you build a real bundle, place one real order, and complete one real return with us before we offer it to the next store. Nothing about bundles is visible to your customers until we enable the add-on for your store specifically.
+
 ---
 
 ## 11. Plan-Gated Features — What Each Tier Unlocks

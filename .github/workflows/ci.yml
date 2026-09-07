@@ -289,9 +289,16 @@ jobs:
         # import in any apps/web test file); the `orphan-tests` job below now
         # fails the build on any future gap instead of relying on this comment.
         #
+        # 2026-09-07: `apps/orders` added — the fulfilment app's colocated
+        # `ItemsCard.test.ts` (bundle-box grouping) was the orphan-tests job's
+        # first real catch: vitest collected it locally, no CI job glob ran it.
+        # Pure grouping logic, no DOM/DB (the root config's `node` environment
+        # is all it needs), so it belongs in this job like the other colocated
+        # suites. Keep the `orphan-tests` covered-tests list below in sync.
+        #
         # Adding a colocated test outside these paths = a test that does not run.
         # Prefer tests/unit; if you must colocate, add the directory here.
-        run: npx vitest run tests/unit packages/shared/src packages/database/src apps/web apps/admin/src --coverage --reporter=verbose --maxWorkers=2
+        run: npx vitest run tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders --coverage --reporter=verbose --maxWorkers=2
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
@@ -363,7 +370,7 @@ jobs:
           npx vitest list --json=/tmp/all-tests.json
 
           npx vitest list \
-            tests/unit packages/shared/src packages/database/src apps/web apps/admin/src \
+            tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders \
             tests/integration apps/api/src \
             tests/e2e \
             --json=/tmp/covered-tests.json

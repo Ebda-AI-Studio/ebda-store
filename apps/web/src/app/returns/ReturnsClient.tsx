@@ -7,6 +7,7 @@ import { ShopChrome } from '../../components';
 import { useStoreContact, useStore, useStoreUrl } from '../../contexts/StoreContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { api, API_URL, type Order } from '../../lib/api';
+import { groupOrderLinesForDisplay } from '@force/shared';
 
 const RETURN_REASONS = [
   {
@@ -61,6 +62,11 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  // Bundle boxes are selected as ONE unit — this holds `bundleGroupId`s,
+  // never individual component `orderItemId`s. The route accepts
+  // `bundleGroupIds: string[]` (Task 7) precisely so a box never has to be
+  // expressed as its components.
+  const [selectedBundleGroupIds, setSelectedBundleGroupIds] = useState<Set<string>>(new Set());
   const [reason, setReason] = useState<ReturnReason | ''>('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,6 +106,11 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
   }, [isLoggedIn]);
 
   const selectedOrder = orders.find(o => o.id === selectedOrderId);
+  // Collapses every component line of a bundle box into ONE selectable
+  // row (see groupOrderLinesForDisplay) — a customer ticks the box, never
+  // one of its components. Non-bundle lines pass through unchanged and
+  // stay individually selectable exactly as before.
+  const displayRows = selectedOrder ? groupOrderLinesForDisplay(selectedOrder.items) : [];
 
   function toggleItem(itemId: string) {
     setSelectedItemIds(prev => {
@@ -108,6 +119,18 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         next.delete(itemId);
       } else {
         next.add(itemId);
+      }
+      return next;
+    });
+  }
+
+  function toggleBundleGroup(bundleGroupId: string) {
+    setSelectedBundleGroupIds(prev => {
+      const next = new Set(prev);
+      if (next.has(bundleGroupId)) {
+        next.delete(bundleGroupId);
+      } else {
+        next.add(bundleGroupId);
       }
       return next;
     });
@@ -127,7 +150,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
       });
       return;
     }
-    if (selectedItemIds.size === 0) {
+    if (selectedItemIds.size === 0 && selectedBundleGroupIds.size === 0) {
       setSubmitResult({
         type: 'error',
         text: t(
@@ -152,16 +175,24 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
     // (orderItemId + productId + productName + quantity) from the selected
     // order's line items. Sending only { orderItemId } — as this form used to —
     // fails Zod validation server-side, so the request never created a return.
+    // `selectedItemIds` only ever holds NON-bundle order item ids — a
+    // bundle box's components are never offered as individually tickable
+    // (see the "Select Items to Return" block below) — so the
+    // `!it.bundleGroupId` filter here is defensive, not load-bearing.
     const items = (selectedOrder?.items ?? [])
-      .filter(it => selectedItemIds.has(it.id))
+      .filter(it => selectedItemIds.has(it.id) && !it.bundleGroupId)
       .map(it => ({
         orderItemId: it.id,
         productId: it.productId,
         productName: it.product?.name ?? '',
         quantity: it.quantity,
       }));
+    // One id per BOX — selecting a bundle box submits its bundleGroupId,
+    // never the component orderItemIds inside it (the route refuses those
+    // with `bundle_returns_are_atomic` — see return.service.ts).
+    const bundleGroupIds = Array.from(selectedBundleGroupIds);
 
-    if (items.length === 0) {
+    if (items.length === 0 && bundleGroupIds.length === 0) {
       setSubmitResult({
         type: 'error',
         text: t(
@@ -178,12 +209,17 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
       // request on a non-/public/ path, so csrfProtection requires X-Session-ID
       // + X-CSRF-Token. A raw fetch 403s CSRF_MISSING_SESSION on every merchant
       // custom domain (the platform origin is exempt, so it looks fine there).
+      // `items`/`bundleGroupIds` are only included when non-empty — the
+      // route's Zod schema has `.min(1)` on a PRESENT `bundleGroupIds`, so
+      // sending `[]` (rather than omitting the key) would 400 a return
+      // that is entirely bundle boxes.
       const json = await api.post<{ return?: { returnNumber?: string } }>(
         `/stores/${storeId}/returns`,
         {
           orderId: selectedOrderId,
           type: 'return',
-          items,
+          ...(items.length > 0 ? { items } : {}),
+          ...(bundleGroupIds.length > 0 ? { bundleGroupIds } : {}),
           reason,
           customerNotes: notes.trim() || undefined,
         }
@@ -202,6 +238,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
         // Reset form
         setSelectedOrderId('');
         setSelectedItemIds(new Set());
+        setSelectedBundleGroupIds(new Set());
         setReason('');
         setNotes('');
       } else {
@@ -344,6 +381,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
               onChange={e => {
                 setSelectedOrderId(e.target.value);
                 setSelectedItemIds(new Set());
+                setSelectedBundleGroupIds(new Set());
               }}
               required
               options={[
@@ -354,14 +392,24 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
                     '-- \u0627\u062e\u062a\u0631 \u0637\u0644\u0628\u0627\u064b --'
                   ),
                 },
-                ...orders.map(order => ({
-                  value: order.id,
-                  label: `#${order.orderNumber}${
-                    order.items.length > 0 && order.items[0].product?.name
-                      ? ` \u2014 ${order.items[0].product.name}${order.items.length > 1 ? ` (+${order.items.length - 1} more)` : ''}`
-                      : ''
-                  }`,
-                })),
+                ...orders.map(order => {
+                  // Collapse to display rows first \u2014 a box's own component
+                  // count must not inflate "(+N more)" past what the
+                  // customer actually bought (e.g. one 3-component bundle
+                  // must read as one line, not "+2 more").
+                  const rows = groupOrderLinesForDisplay(order.items);
+                  const first = rows[0];
+                  const firstName =
+                    first?.kind === 'bundle' ? first.name : first?.item.product?.name;
+                  return {
+                    value: order.id,
+                    label: `#${order.orderNumber}${
+                      firstName
+                        ? ` \u2014 ${firstName}${rows.length > 1 ? ` (+${rows.length - 1} more)` : ''}`
+                        : ''
+                    }`,
+                  };
+                }),
               ]}
               className="w-full rounded-lg border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
@@ -376,7 +424,7 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
           )}
         </div>
 
-        {selectedOrder && selectedOrder.items.length > 0 && (
+        {selectedOrder && displayRows.length > 0 && (
           <div>
             <p className="block text-sm font-medium text-foreground mb-2">
               {t(
@@ -386,26 +434,61 @@ function ReturnRequestForm({ storeId }: { storeId: string }) {
               <span className="text-destructive">*</span>
             </p>
             <div className="space-y-2">
-              {selectedOrder.items.map(item => (
-                <label
-                  key={item.id}
-                  className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 cursor-pointer hover:bg-muted"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedItemIds.has(item.id)}
-                    onChange={() => toggleItem(item.id)}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span className="flex-1 text-sm text-foreground">
-                    {item.product?.name || `Item #${item.id.slice(0, 8)}`}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {item.quantity}
-                  </span>
-                </label>
-              ))}
+              {displayRows.map(row =>
+                row.kind === 'bundle' ? (
+                  // A bundle box is ONE selectable unit \u2014 ticking it submits
+                  // its bundleGroupId, never the component orderItemIds
+                  // inside it. Individual components of a box are never
+                  // offered here (see `groupOrderLinesForDisplay`).
+                  <label
+                    key={row.key}
+                    className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 cursor-pointer hover:bg-muted"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedBundleGroupIds.has(row.bundleGroupId)}
+                      onChange={() => toggleBundleGroup(row.bundleGroupId)}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                    <span className="flex-1 text-sm text-foreground">
+                      {row.name}
+                      <span className="ms-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {t(
+                          'Whole box',
+                          '\u0627\u0644\u0635\u0646\u062f\u0648\u0642 \u0643\u0627\u0645\u0644\u0627\u064b'
+                        )}
+                      </span>
+                    </span>
+                  </label>
+                ) : (
+                  <label
+                    key={row.key}
+                    className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 cursor-pointer hover:bg-muted"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedItemIds.has(row.item.id)}
+                      onChange={() => toggleItem(row.item.id)}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                    <span className="flex-1 text-sm text-foreground">
+                      {row.item.product?.name || `Item #${row.item.id.slice(0, 8)}`}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {t('Qty', '\u0627\u0644\u0643\u0645\u064a\u0629')}: {row.item.quantity}
+                    </span>
+                  </label>
+                )
+              )}
             </div>
+            {displayRows.some(row => row.kind === 'bundle') && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t(
+                  "A bundle box is returned as a whole \u2014 its components can't be selected individually.",
+                  '\u064a\u062a\u0645 \u0625\u0631\u062c\u0627\u0639 \u0627\u0644\u0635\u0646\u062f\u0648\u0642 \u0628\u0627\u0644\u0643\u0627\u0645\u0644 \u2014 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0627\u062e\u062a\u064a\u0627\u0631 \u0645\u0643\u0648\u0646\u0627\u062a\u0647 \u0628\u0634\u0643\u0644 \u0645\u0646\u0641\u0635\u0644.'
+                )}
+              </p>
+            )}
           </div>
         )}
 

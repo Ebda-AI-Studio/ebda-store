@@ -16,6 +16,21 @@ export interface CheckoutCartItem {
   };
 }
 
+/**
+ * A bundle line in the checkout order summary — rendered as ONE row (see
+ * `BundleLine`), never split into its per-component allocated prices.
+ * Mirrors `CartContext`'s `CartBundle`.
+ */
+export interface CheckoutCartBundle {
+  id: string;
+  bundleId: string;
+  name: string;
+  nameAr?: string;
+  image?: string;
+  quantity: number;
+  total: number;
+}
+
 export interface Coupon {
   id: string;
   code: string;

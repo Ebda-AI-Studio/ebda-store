@@ -24,6 +24,7 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
+import { groupOrderLinesForDisplay } from '@force/shared';
 import { config } from '../config';
 import { waBridgeAuth } from '../middleware/wa-bridge-auth';
 import { makeRateLimitStore } from '../middleware/security';
@@ -34,10 +35,17 @@ import {
 } from '../lib/effective-inventory';
 import logger from '../lib/logger';
 import { waBridgeTiming } from '../lib/observability/wa-bridge-timing';
+import { AppError } from '../middleware/error-handler';
 import { CustomerAddressService } from '../services/customer-address.service';
 import { encryption } from '../services/encryption.service';
 import { featureService } from '../services/feature.service';
 import { redis } from '../services/redis.service';
+import {
+  listPurchasableBundles,
+  describeBundleContents,
+  resolveBundle,
+  type ResolvedBundle,
+} from '../services/bundle.service';
 
 const addressSvc = new CustomerAddressService(prisma as any);
 
@@ -319,7 +327,7 @@ const FREQUENT_PRODUCTS_TOP = 5;
  * A phone that belongs to Store A and Store B gets separate histories.
  * Privacy: no email, address, or payment data returned.
  */
-async function buildCustomerHistory(
+export async function buildCustomerHistory(
   phone: string,
   storeId: string,
   currency: string
@@ -376,10 +384,15 @@ async function buildCustomerHistory(
         total: true,
         items: {
           select: {
+            id: true,
             productId: true,
             productName: true,
             quantity: true,
             price: true,
+            bundleId: true,
+            bundleGroupId: true,
+            bundleName: true,
+            bundleNameAr: true,
             product: {
               select: {
                 nameAr: true,
@@ -419,20 +432,42 @@ async function buildCustomerHistory(
     // Compute aggregate spend across the window
     const totalSpentFils = orders.reduce((sum, o) => sum + o.total, 0);
 
-    // Build lastOrder from most-recent order (already sorted desc)
+    // Build lastOrder from most-recent order (already sorted desc). Grouped
+    // through `groupOrderLinesForDisplay` first — this feeds the WBS
+    // shopping bot's conversational context (the design doc's "the
+    // WhatsApp thread" collapse requirement), so a returning customer's
+    // last purchase must read as ONE "Ramadan Box" line, never its 3
+    // components at their per-line allocated (and confusing) prices.
     const latest = orders[0];
     const lastOrder = {
       orderId: latest.id,
       orderNumber: latest.orderNumber,
       createdAt: latest.createdAt.toISOString(),
       totalFils: latest.total,
-      items: latest.items.map(i => ({
-        productId: i.productId,
-        productName: i.productName, // snapshot name at time of purchase
-        productNameAr: i.product?.nameAr ?? null,
-        quantity: i.quantity,
-        priceFils: i.price,
-      })),
+      items: groupOrderLinesForDisplay(latest.items).map(row =>
+        row.kind === 'bundle'
+          ? {
+              // WBS echoes this id back verbatim on "repeat last order"
+              // (`/cart/from-wa`'s `cartFromWaSchema` requires a uuid and
+              // rejects `null`), so this must be a resolvable id, not a
+              // display placeholder — the bundle's own id, exactly what
+              // `/store-catalog` already advertises and what the bundle
+              // branch below already resolves.
+              productId: row.lines[0].bundleId,
+              productName: row.name,
+              productNameAr: row.nameAr,
+              quantity: row.quantity,
+              priceFils: row.total,
+              isBundle: true,
+            }
+          : {
+              productId: row.item.productId,
+              productName: row.item.productName, // snapshot name at time of purchase
+              productNameAr: row.item.product?.nameAr ?? null,
+              quantity: row.item.quantity,
+              priceFils: row.item.price,
+            }
+      ),
     };
 
     // Frequency analysis: count category orders + product quantity across all fetched orders
@@ -616,6 +651,23 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
       );
     }
 
+    // Task 10: bundles appear in the catalogue FWB offers WBS, as siblings
+    // of a product entry — `bundles` is in NO plan baseline, so a store
+    // without the super-admin override must see this response completely
+    // unchanged (no bundle rows queried at all, not just filtered out).
+    // WBS needs no change to BUY one: it echoes back whatever id this
+    // catalogue handed it, and `POST /wa-bridge/cart/from-wa` now resolves an
+    // id that matches no Product as a bundle, behind this same feature gate
+    // (Ruling C3 CLOSED, 2026-09-07 — the consumer PR against that repo is no
+    // longer a prerequisite for enabling the flag).
+    const bundlesEnabled = await featureService.isFeatureEnabled(store.id, 'bundles');
+    const bundles = bundlesEnabled
+      ? (await listPurchasableBundles(prisma, store.id)).map(b => {
+          const { description, descriptionAr } = describeBundleContents(b);
+          return { ...b, description, descriptionAr };
+        })
+      : [];
+
     const catalog = {
       storeId: storeRow.id,
       storeName: storeRow.name,
@@ -629,26 +681,58 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
         slug: c.slug,
         position: c.position,
       })),
-      products: productSlice.map(p => ({
-        id: p.id,
-        name: p.name,
-        nameAr: p.nameAr ?? '',
-        descriptionAr: p.descriptionAr ?? '',
-        slug: p.slug,
-        price: p.price,
-        compareAtPrice: p.compareAtPrice ?? undefined,
-        currency: storeRow.currency,
-        categoryIds: p.categories.map(pc => pc.categoryId),
-        inStock: !p.trackInventory || effectiveInventory(p) > 0 || p.allowBackorder,
-        sku: p.sku ?? undefined,
-        imageUrl: p.images[0]?.url ?? undefined,
-        variants: p.variants.map(v => ({
-          id: v.id,
-          name: v.title,
-          price: v.price ?? p.price,
-          inStock: v.inventory > 0 || v.allowBackorder,
+      products: [
+        ...productSlice.map(p => ({
+          id: p.id,
+          name: p.name,
+          nameAr: p.nameAr ?? '',
+          descriptionAr: p.descriptionAr ?? '',
+          slug: p.slug,
+          price: p.price,
+          compareAtPrice: p.compareAtPrice ?? undefined,
+          currency: storeRow.currency,
+          categoryIds: p.categories.map(pc => pc.categoryId),
+          inStock: !p.trackInventory || effectiveInventory(p) > 0 || p.allowBackorder,
+          sku: p.sku ?? undefined,
+          imageUrl: p.images[0]?.url ?? undefined,
+          variants: p.variants.map(v => ({
+            id: v.id,
+            name: v.title,
+            price: v.price ?? p.price,
+            inStock: v.inventory > 0 || v.allowBackorder,
+          })),
         })),
-      })),
+        // Bundle entries: only isPurchasable ones (via listPurchasableBundles),
+        // never the per-component allocated prices — `price`/`compareAtPrice`
+        // are the one advertised total, same as computeBundlePrice/componentSum
+        // are used everywhere else a bundle is sold as a single line.
+        // `categoryIds`/`variants` are legitimately empty (bundles have
+        // neither), never fabricated. `isBundle: true` is the ONLY field a
+        // product entry never carries — WBS uses it to tell the two apart.
+        ...bundles.map(b => {
+          // `price` is the bundle's actual selling price (already the
+          // discounted total) — same meaning as `product.price` above.
+          // `compareAtPrice` is the reference "full value" (componentSum),
+          // shown crossed-out, only when it's actually higher.
+          const onSale = b.componentSum > b.price;
+          return {
+            id: b.id,
+            name: b.name,
+            nameAr: b.nameAr ?? '',
+            descriptionAr: b.descriptionAr ?? '',
+            slug: b.slug,
+            price: b.price,
+            compareAtPrice: onSale ? b.componentSum : undefined,
+            currency: storeRow.currency,
+            categoryIds: [] as string[],
+            inStock: true, // only isPurchasable bundles reach here (available >= 1)
+            sku: undefined as string | undefined,
+            imageUrl: b.image ?? undefined,
+            variants: [] as Array<{ id: string; name: string; price: number; inStock: boolean }>,
+            isBundle: true as const,
+          };
+        }),
+      ],
       cachedAt: new Date().toISOString(),
       ...(truncated ? { truncated: true, totalProducts: products.length } : {}),
     };
@@ -686,7 +770,9 @@ router.get('/store-catalog', waBridgeAuth, async (req: Request, res: Response) =
 });
 
 // ─── POST /cart/from-wa ──────────────────────────────────────────────────────
-const cartFromWaSchema = z.object({
+// Exported so a unit test can prove a `customerHistory.lastOrder` bundle row
+// round-trips through this schema without needing a live DB (NEW-P1).
+export const cartFromWaSchema = z.object({
   items: z
     .array(
       z
@@ -769,12 +855,54 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
     });
     const byId = new Map(products.map(p => [p.id, p]));
 
-    const missing = items.filter(i => !byId.has(i.productId));
-    if (missing.length > 0) {
+    // Ids that resolved to a product stay on this existing path unchanged.
+    const productItems = items.filter(i => byId.has(i.productId));
+    const unresolvedItems = items.filter(i => !byId.has(i.productId));
+
+    // Task 10 (WA-ordering bundle purchase path): an id that isn't a
+    // product may be a bundle id — WBS posts back whatever id
+    // `/store-catalog` handed it, and that catalogue now includes bundle
+    // entries (see the `isBundle` block above) when the store's `bundles`
+    // feature is on. Only resolved AFTER an id fails to match a product,
+    // AND only when the flag is enabled — a store without it never calls
+    // `resolveBundle` at all, so its `PRODUCTS_NOT_FOUND` response (body
+    // included) stays byte-identical to the pre-bundle behaviour. This is
+    // the server-side resolution that makes the separate WBS consumer PR
+    // (Ruling C3) unnecessary — WBS needs zero changes/deploys.
+    let bundleLines: Array<{ item: (typeof items)[number]; bundle: ResolvedBundle }> = [];
+    let stillMissing = unresolvedItems;
+
+    if (unresolvedItems.length > 0) {
+      const bundlesEnabled = await featureService.isFeatureEnabled(store.id, 'bundles');
+      if (bundlesEnabled) {
+        const attempts = await Promise.all(
+          unresolvedItems.map(async item => {
+            try {
+              // Tenant-scoped: resolveBundle filters by storeId and throws
+              // 404 rather than defaulting to another tenant's row — a
+              // bundle id belonging to a DIFFERENT store's bridge key stays
+              // unresolved here, same as any other unknown id.
+              const bundle = await resolveBundle(prisma, store.id, item.productId);
+              return { item, bundle };
+            } catch (err) {
+              if (err instanceof AppError && err.statusCode === 404) return null;
+              throw err;
+            }
+          })
+        );
+        bundleLines = attempts.filter(
+          (a): a is { item: (typeof items)[number]; bundle: ResolvedBundle } => a !== null
+        );
+        const resolvedIds = new Set(bundleLines.map(({ item }) => item.productId));
+        stillMissing = unresolvedItems.filter(i => !resolvedIds.has(i.productId));
+      }
+    }
+
+    if (stillMissing.length > 0) {
       res.status(400).json({
         success: false,
         error: 'PRODUCTS_NOT_FOUND',
-        missing: missing.map(m => m.productId),
+        missing: stillMissing.map(m => m.productId),
       });
       return;
     }
@@ -789,25 +917,49 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
     // quantity is the product's EFFECTIVE stock — the variant sum when it has
     // variants. Reading `product.inventory` here rejected every variant
     // product whose parent column had drifted (see lib/effective-inventory.ts).
-    const oos = items
+    const oos = productItems
       .map(i => ({ item: i, product: byId.get(i.productId)! }))
       .filter(({ item, product }) => !isOrderable(product, item.quantity, backorderFeatureEnabled));
-    if (oos.length > 0) {
+
+    // A bundle refusal joins the SAME `outOfStock` array/shape a product
+    // does, so WBS's existing error handling (keyed on `outOfStock[]`)
+    // needs no change to understand it. `available` reads 0 for a bundle
+    // that fails `isPurchasable` (inactive/expired/zero stock) rather than
+    // re-deriving purchasability here — `resolveBundle` already computed
+    // it. A bundle whose remaining availability is merely less than the
+    // requested quantity also lands here (never PRODUCTS_NOT_FOUND).
+    const bundleOos = bundleLines
+      .map(({ item, bundle }) => ({
+        item,
+        bundle,
+        available: bundle.isPurchasable ? bundle.available : 0,
+      }))
+      .filter(({ item, available }) => item.quantity > available);
+
+    if (oos.length > 0 || bundleOos.length > 0) {
       res.status(409).json({
         success: false,
         error: 'INSUFFICIENT_INVENTORY',
-        outOfStock: oos.map(({ item, product }) => ({
-          productId: item.productId,
-          requested: item.quantity,
-          available: effectiveInventory(product),
-          name: product.name,
-        })),
+        outOfStock: [
+          ...oos.map(({ item, product }) => ({
+            productId: item.productId,
+            requested: item.quantity,
+            available: effectiveInventory(product),
+            name: product.name,
+          })),
+          ...bundleOos.map(({ item, bundle, available }) => ({
+            productId: item.productId,
+            requested: item.quantity,
+            available,
+            name: bundle.name,
+          })),
+        ],
       });
       return;
     }
 
     // Build the cart payload that the checkout JWT carries.
-    const cartItems = items.map(i => {
+    const cartItems = productItems.map(i => {
       const p = byId.get(i.productId)!;
       return {
         productId: i.productId,
@@ -817,7 +969,20 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
         nameAr: p.nameAr,
       };
     });
-    const totalFils = cartItems.reduce((sum, ci) => sum + ci.priceFils * ci.quantity, 0);
+    // Bundle lines price at the BUNDLE price (`resolveBundle`'s
+    // `computeBundlePrice` output — already the discounted total), NEVER
+    // the component sum — same `priceFils * quantity` shape as `cartItems`
+    // so `totalFils` below sums both uniformly.
+    const cartBundles = bundleLines.map(({ item, bundle }) => ({
+      bundleId: item.productId,
+      quantity: item.quantity,
+      priceFils: bundle.price,
+      name: bundle.name,
+      nameAr: bundle.nameAr,
+    }));
+    const totalFils =
+      cartItems.reduce((sum, ci) => sum + ci.priceFils * ci.quantity, 0) +
+      cartBundles.reduce((sum, cb) => sum + cb.priceFils * cb.quantity, 0);
 
     // Sign single-use checkout token. The storefront's checkout page
     // calls /cart/redeem with this token to hydrate the cart.
@@ -831,6 +996,11 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
       locale: locale || 'auto',
       waConversationId: waConversationId || null,
       items: cartItems,
+      // Present ONLY when non-empty — an absent key so a store with no
+      // bundle lines (including every store today) produces an
+      // unchanged token payload; `WaTokenHydrator`/`wa-token.ts` on the
+      // storefront treat a missing key exactly like the pre-bundle shape.
+      ...(cartBundles.length > 0 ? { bundles: cartBundles } : {}),
       totalFils,
       currency: store.currency,
       // Phase C native catalog fields (passed through for downstream order creation)
@@ -881,7 +1051,11 @@ router.post('/cart/from-wa', waBridgeAuth, async (req: Request, res: Response) =
         paymentMethod,
         expiresAt: new Date(Date.now() + CHECKOUT_TOKEN_TTL_SECONDS * 1000).toISOString(),
         summary: {
-          itemCount: items.reduce((s, i) => s + i.quantity, 0),
+          // Bundle quantities count toward itemCount too, same as a loose
+          // product's quantity does.
+          itemCount:
+            productItems.reduce((s, i) => s + i.quantity, 0) +
+            bundleLines.reduce((s, { item }) => s + item.quantity, 0),
           totalFils,
           currency: store.currency,
         },

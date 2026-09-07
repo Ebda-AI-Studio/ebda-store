@@ -2,7 +2,7 @@
 
 # Force AI Store — Proposal Pricing Framework
 
-**Internal document. Last updated: 2026-06-15. Owner: Ahmad Sharaf / Force AI.**
+**Internal document. Last updated: 2026-09-07. Owner: Ahmad Sharaf / Force AI.**
 
 > **There is no public tier list.** Force AI Store is sold as a **managed e-commerce platform** by
 > Force AI / Force Media. Every client gets a **custom proposal** based on the features they need.
@@ -118,7 +118,7 @@ Also included in every tier at no extra charge:
 | ------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
 | `loyalty`                                                           | "Customer loyalty program — points, tiers, rewards"                          | Setup: 100-300 KWD + Annual: 5-15 KWD/mo equiv. |
 | `push_notifications`                                                | "Web push to opt-in customers"                                               | Setup: 50-100 KWD + Annual: 2-8 KWD/mo equiv.   |
-| `upsell_crosssell`                                                  | "AI-driven product recommendations + bundles"                                | Setup: 50-100 KWD + Annual: 3-10 KWD/mo equiv.  |
+| `upsell_crosssell`                                                  | "AI-driven product recommendations"                                          | Setup: 50-100 KWD + Annual: 3-10 KWD/mo equiv.  |
 | `inventory.stock_alerts`                                            | "Auto-email when stock drops below your threshold"                           | Included in Professional                        |
 | `inventory.backorder`                                               | "Accept orders for out-of-stock products, queue for fulfillment"             | Included in Professional                        |
 | `accounting.basic` + `accounting.expenses` + `accounting.invoicing` | "Full Chart of Accounts, journal, P&L, expenses, Kuwait-compliant invoicing" | Included in Professional                        |
@@ -158,6 +158,25 @@ base.
 > product feed at `/feeds/products.json` so AI shopping assistants (ChatGPT, Perplexity, agent
 > crawlers) can read and recommend the store's catalog. Priced individually per quote — not a
 > fixed price band yet.
+
+> **Product Bundles (`bundles`) — plan-independent add-on, available at any tier.** Not part of any
+> plan baseline (Starter, Professional, and Enterprise all default to disabled); a super-admin
+> enables it per store via a `StoreFeature` override once sold. Lets a merchant define a named kit
+> of specific products at specific quantities and sell it as one line at one price — fixed price,
+> a percentage off the component sum, or a fixed amount off. Stock is never double-counted:
+> availability is derived from the components' own inventory (`min(floor(componentStock /
+quantity))` across components), not tracked as a separate count. The customer sees one row
+> everywhere — cart, checkout, confirmation, invoice, order detail — and a return refunds the
+> whole box at the bundle price; there is no itemized (partial-box) return. Excluded from coupons
+> and cart promotions (stacking would discount the same components twice and can drive a box below
+> cost) — the cart and checkout say so in EN/AR when a coupon is applied to a cart holding a
+> bundle, and the coupon is quoted against the loose items only, so the quote matches the charge.
+> **The customer-facing purchase path ships:** a `/bundles` index, a `/bundles/<slug>` detail page
+> with add-to-cart, an auto-appended "Bundles" nav entry, sitemap fan-out and JSON-LD. WhatsApp DM
+> ordering works too — `POST /wa-bridge/cart/from-wa` resolves a bundle id server-side, so the
+> whatsapp-bulk-sender bot needs no changes. Setup: 50-150 KWD + Annual: 5-15 KWD/mo equiv.
+> **Before selling this to a second client, read the rollout note in §6 below** — the first
+> enablement is a supervised pilot, not a self-serve flip.
 
 #### Band 3 — White-glove services (your time, billed at agency rates)
 
@@ -342,6 +361,18 @@ Before sending a proposal:
    arrives, check the `payment_events` audit log shows the full lifecycle
 8. **Hand over** — give the client admin credentials, schedule the training session, schedule a
    2-week check-in
+
+> **Product Bundles (`bundles`) rollout — read before flipping this `StoreFeature` for ANY store.**
+> The whatsapp-bulk-sender consumer-PR dependency this note used to carry is **discharged**
+> (2026-09-07): `POST /wa-bridge/cart/from-wa` now resolves an id that isn't a product as a bundle
+> server-side, behind the same `bundles` feature gate `/wa-bridge/store-catalog` already checks, so
+> the bot can buy a bundle it was shown with zero changes or deploys in that repo. What remains is
+> a supervised pilot, not a code dependency: `bundles` is in no plan baseline, so nothing changes
+> for any store until a super-admin enables it. Enable it for the one asking merchant only, have
+> them build one real bundle, place one real order, and complete one real return — only after that
+> succeeds, offer `bundles` to other merchants. Note that flipping the flag does NOT bust the
+> 600-second AI-product-feed cache, so bundles can take up to ten minutes to appear in (or
+> disappear from) that feed after a toggle.
 
 ---
 

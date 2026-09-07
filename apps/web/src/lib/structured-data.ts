@@ -196,6 +196,56 @@ export function productJsonLd(
   };
 }
 
+interface BundleForJsonLd {
+  name: string;
+  description?: string | null;
+  slug: string;
+  image?: string | null;
+  /** The bundle's single selling price (fils) — never a per-component price. */
+  price: number;
+  available: number;
+}
+
+/**
+ * Schema.org Product structured data for a bundle detail page
+ * (`/bundles/<slug>`). Deliberately a smaller sibling of `productJsonLd`
+ * (no sku/category/reviews — bundles carry none of those), reusing the same
+ * `brandJsonLd`/`merchantReturnPolicyJsonLd`/`storeAbsoluteUrl` building
+ * blocks so a bundle's structured data stays consistent with a product's.
+ * `availability` is derived from `available` (the bundle's OWN derived
+ * stock, from `resolveBundle`), not from any per-component figure.
+ */
+export function bundleJsonLd(bundle: BundleForJsonLd, store: ResolvedStore) {
+  const bundleUrl = storeAbsoluteUrl(store, `/bundles/${bundle.slug}`);
+  const availability =
+    bundle.available > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: bundle.name,
+    ...(bundle.description ? { description: bundle.description } : {}),
+    ...(bundle.image ? { image: bundle.image } : {}),
+    url: bundleUrl,
+    brand: brandJsonLd(store),
+    ...(() => {
+      const rp = merchantReturnPolicyJsonLd(store);
+      return rp ? { hasMerchantReturnPolicy: rp } : {};
+    })(),
+    offers: {
+      '@type': 'Offer',
+      price: (bundle.price / 1000).toFixed(3),
+      priceCurrency: store.currency || 'KWD',
+      availability,
+      url: bundleUrl,
+      seller: {
+        '@type': 'Organization',
+        name: store.name,
+      },
+    },
+  };
+}
+
 /**
  * Schema.org Organization structured data for the store.
  * When `store.aboutJson` is present (populated by the GEO brand-facts sweep),

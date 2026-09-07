@@ -109,6 +109,7 @@ export interface Messages {
     itemCount: string;
     viewAll: string;
     showLess: string;
+    bundleBadge: string;
     notFound: string;
     updateStatus: string;
     markPaid: string;
@@ -319,6 +320,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       itemCount: '{count} items',
       viewAll: 'View all',
       showLess: 'Show less',
+      bundleBadge: 'Bundle',
       notFound: 'Order not found.',
       updateStatus: 'Update status',
       markPaid: 'Mark as paid',
@@ -531,6 +533,7 @@ export const MESSAGES: Record<Locale, Messages> = {
       itemCount: '{count} منتجات',
       viewAll: 'عرض الكل',
       showLess: 'عرض أقل',
+      bundleBadge: 'باقة',
       notFound: 'لم يتم العثور على الطلب.',
       updateStatus: 'تحديث الحالة',
       markPaid: 'تعليم كمدفوع',

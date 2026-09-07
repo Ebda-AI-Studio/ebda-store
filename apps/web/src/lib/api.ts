@@ -173,11 +173,65 @@ interface CartItem {
   product: Product;
 }
 
+/**
+ * A bundle line on the cart response (`CartBundleView` on the API) — the
+ * box the customer bought, priced and displayed as ONE row. `id` is the
+ * `CartBundle` row id (what `DELETE /cart/bundles/:cartBundleId` takes),
+ * distinct from `bundleId` (the catalog `Bundle` id).
+ */
+export interface CartBundleItem {
+  id: string;
+  bundleId: string;
+  name: string;
+  nameAr: string | null;
+  image: string | null;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  available: number;
+}
+
 interface Cart {
   id: string;
   items: CartItem[];
+  bundles?: CartBundleItem[];
   total: number;
   subtotal: number;
+}
+
+/**
+ * Public bundle listing shape, returned by `GET /stores/public/:storeId/bundles`.
+ * Already filtered to purchasable bundles only; `componentSum` (vs. `price`)
+ * is what a "Save X" badge is computed from — never render it as a price.
+ */
+export interface PublicBundle {
+  id: string;
+  name: string;
+  nameAr: string | null;
+  slug: string;
+  image: string | null;
+  price: number;
+  componentSum: number;
+  available: number;
+}
+
+/**
+ * Public single-bundle detail shape, returned by
+ * `GET /stores/public/:storeId/bundles/:slug`. Unlike `PublicBundle` (the
+ * PLP listing, pre-filtered to purchasable-only), this can describe a
+ * bundle that is currently NOT sellable (`isPurchasable: false` — out of
+ * stock, expired, not yet started) so the detail page can render it as
+ * unavailable rather than 404 — a deactivated bundle 404s at the route
+ * itself and never reaches this shape. `componentNames` is "what's inside"
+ * by name only; there is deliberately no per-component price anywhere on
+ * this shape — see `PublicBundle`'s sibling doc comment and
+ * `ResolvedBundle` on the API for why.
+ */
+export interface PublicBundleDetail extends PublicBundle {
+  description: string | null;
+  descriptionAr: string | null;
+  isPurchasable: boolean;
+  componentNames: Array<{ name: string; nameAr: string | null }>;
 }
 
 interface Order {
@@ -192,6 +246,18 @@ interface Order {
     quantity: number;
     price: number;
     product?: Product;
+    /**
+     * Set when this line is a bundle component (Task 6). `bundleGroupId`
+     * groups the lines that came from ONE box — group by it to render a
+     * single customer-facing row; never render these fields' presence to
+     * the customer as separate lines. `bundleName`/`bundleNameAr` are
+     * snapshotted at order time and must be rendered as-is, never
+     * re-fetched from the (possibly renamed/deleted) live bundle.
+     */
+    bundleId?: string | null;
+    bundleGroupId?: string | null;
+    bundleName?: string | null;
+    bundleNameAr?: string | null;
   }>;
   shippingAddress: Record<string, string>;
   billingAddress?: Record<string, string>;
@@ -794,6 +860,57 @@ class ApiClient {
     return this.request<{ cart: Cart }>('/public/cart', {
       method: 'DELETE',
     });
+  }
+
+  // Bundles (public storefront).
+  //
+  // The bundle cart mutation routes were added ONLY under
+  // `/stores/:storeId/cart/bundles[/:id]` (cart.routes.ts, Task 5) — an
+  // admin-space path family that `restrictPlatformOnlyOrigins`
+  // (security.ts) blocks for every non-platform origin in production (see
+  // tests/unit/platform-only-origins.test.ts). The storefront runs on
+  // merchant custom domains, so calling that path directly would 403 on
+  // every live merchant while appearing to work in local dev (which hits
+  // the platform origin). Mirror routes were added to public.routes.ts
+  // under `/public/cart/bundles[/:id]`, exactly like every other cart
+  // route in this file — these call THAT surface. GET /public/cart already
+  // returns `cart.bundles`, so no separate public read endpoint was needed.
+
+  /** GET /stores/public/:storeId/bundles — purchasable bundles for the PLP.
+   *  `/stores/public/...` is its own allow-listed pattern (distinct from
+   *  `/stores/:storeId/...`), already used by the storefront's shipping/
+   *  coupon/promotion calls. */
+  async getPublicBundles(storeId: string) {
+    return this.request<{ bundles: PublicBundle[] }>(
+      `/stores/public/${encodeURIComponent(storeId)}/bundles`
+    );
+  }
+
+  /** GET /stores/public/:storeId/bundles/:slug — single bundle detail for
+   *  the /bundles/<slug> PDP. Same allow-listed `/stores/public/...`
+   *  pattern as `getPublicBundles` above. */
+  async getPublicBundle(storeId: string, slug: string) {
+    return this.request<{ bundle: PublicBundleDetail }>(
+      `/stores/public/${encodeURIComponent(storeId)}/bundles/${encodeURIComponent(slug)}`
+    );
+  }
+
+  /** POST /public/cart/bundles — add a bundle to the cart as its own row. */
+  async addBundleToCart(bundleId: string, quantity = 1) {
+    return this.request<{ cart: Cart }>('/public/cart/bundles', {
+      method: 'POST',
+      body: JSON.stringify({ bundleId, quantity }),
+    });
+  }
+
+  /** DELETE /public/cart/bundles/:cartBundleId — the CartBundle row id. */
+  async removeCartBundle(cartBundleId: string) {
+    return this.request<{ cart: Cart }>(
+      `/public/cart/bundles/${encodeURIComponent(cartBundleId)}`,
+      {
+        method: 'DELETE',
+      }
+    );
   }
 
   // Orders (public endpoints)

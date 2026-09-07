@@ -43,6 +43,7 @@ on:
       # Colocated suites now inside the retry-0 gate above.
       - 'apps/admin/src/**'
       - 'apps/web/src/**'
+      - 'apps/orders/src/**'
       - '.github/workflows/mutation-testing.yml'
   workflow_dispatch:
     inputs:
@@ -159,7 +160,7 @@ jobs:
         # Keep this list in step with ci.yml's "Run unit tests with coverage".
         run: |
           ./node_modules/.bin/vitest run --config vitest.config.ts --retry=0 \
-            tests/unit packages/shared/src packages/database/src apps/web apps/admin/src
+            tests/unit packages/shared/src packages/database/src apps/web apps/admin/src apps/orders
 
       # --write both measures and refreshes the markdown, and exits non-zero if
       # any defence SURVIVED. One run, not two — the measurement is the artifact.

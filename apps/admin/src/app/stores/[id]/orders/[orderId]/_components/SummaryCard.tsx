@@ -22,6 +22,11 @@ export function SummaryCard({ order }: SummaryCardProps) {
   const couponPortion = order.couponDiscount ?? 0;
   const promotionPortion = order.promotionDiscount ?? 0;
   const otherDiscount = Math.max(0, order.discount - couponPortion - promotionPortion);
+  // I5 (final review): reporting-only, NOT a component of `discount` — the
+  // saving already lives in a lower `subtotal` (a bundle is priced at
+  // bundlePrice, never componentSum), so it is shown as its own informational
+  // line and never subtracted from anything here.
+  const bundleSavings = order.bundleDiscount ?? 0;
   const promotionName = order.appliedPromotion
     ? locale === 'ar' && order.appliedPromotion.nameAr
       ? order.appliedPromotion.nameAr
@@ -56,6 +61,15 @@ export function SummaryCard({ order }: SummaryCardProps) {
       : []),
     ...(order.discount === 0
       ? [{ label: t('discount'), value: `${formatMoney(0, order.currency)} (0%)`, muted: true }]
+      : []),
+    ...(bundleSavings > 0
+      ? [
+          {
+            label: t('bundleSavings'),
+            value: formatMoney(bundleSavings, order.currency),
+            muted: true,
+          },
+        ]
       : []),
     { label: t('tax'), value: formatMoney(order.tax, order.currency), muted: order.tax === 0 },
     {

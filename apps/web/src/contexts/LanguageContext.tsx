@@ -151,6 +151,13 @@ export const translations = {
   // Automatic-promotion discount line at checkout — distinct from the
   // generic "Discount" label used for coupon-code discounts.
   Promotion: 'عرض ترويجي',
+  // Shown on the cart + checkout order summary ONLY when the cart holds a
+  // bundle AND a coupon is applied. A bundle's price is already discounted,
+  // so a coupon is deliberately evaluated against the loose items only — the
+  // customer otherwise sees a discount much smaller than the coupon's
+  // headline percentage with no explanation.
+  'Coupon applies to items outside your bundles — a bundle is already discounted.':
+    'يُطبَّق الكوبون على المنتجات خارج الباقات فقط — سعر الباقة مخفَّض بالفعل.',
 
   // Checkout
   Checkout: 'الدفع',

@@ -110,11 +110,19 @@ const CustomerHistoryPresentSchema = StoreCatalogSchema.extend({
           totalFils: z.number().int().nonnegative(),
           items: z.array(
             z.object({
+              // For a collapsed bundle row (see `isBundle` below) this is
+              // the BUNDLE's own id, not a Product id — a bundle box is
+              // not one product, only a `bundleGroupId` on its component
+              // OrderItems. It must be a resolvable uuid, never null:
+              // WBS's `cartFromWaSchema` (`z.string().uuid().optional()`)
+              // rejects `null` and 400s the WHOLE repeat-order request
+              // (NEW-P1, fixed by emitting `bundleId` here).
               productId: z.string().uuid(),
               productName: z.string(),
               productNameAr: z.string().nullable(),
               quantity: z.number().int().positive(),
               priceFils: z.number().int().nonnegative(),
+              isBundle: z.literal(true).optional(),
             })
           ),
         })
@@ -217,6 +225,29 @@ vi.mock('@force/database', () => ({
     order: {
       findMany: vi.fn(),
     },
+    // Task 10: listPurchasableBundles (bundle.service.ts) — findMany for the
+    // candidate id/updatedAt/description rows, findFirst for resolveBundle's
+    // per-bundle resolve.
+    bundle: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    bundleItem: {
+      findMany: vi.fn(),
+    },
+  },
+}));
+
+// Task 10: /store-catalog now checks the `bundles` feature. Mocked directly
+// (rather than mocking @force/database's withRlsBypass/storeFeature that
+// FeatureService.readFromDb needs) — same pattern as
+// tests/unit/backorder-enforcement.test.ts. Every existing test in this file
+// predates bundles and expects the pre-Task-10 catalog shape, so the default
+// resolves `false` — see the dedicated bundles describe block below for the
+// enabled case.
+vi.mock('../../apps/api/src/services/feature.service', () => ({
+  featureService: {
+    isFeatureEnabled: vi.fn().mockResolvedValue(false),
   },
 }));
 
@@ -269,6 +300,12 @@ describe('contract: GET /wa-bridge/store-catalog (FWB → WBS consumer)', () => 
     (prisma.product.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([MOCK_PRODUCT]);
     (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null); // unknown phone
     (prisma.order.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    // Task 10 defaults: no bundles, feature disabled. Individual bundle
+    // tests below override these with mockResolvedValueOnce/mockReturnValueOnce.
+    (prisma.bundle.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (prisma.bundleItem.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    const { featureService } = await import('../../apps/api/src/services/feature.service');
+    (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockResolvedValue(false);
   });
 
   afterAll(() => {
@@ -388,5 +425,332 @@ describe('contract: GET /wa-bridge/store-catalog (FWB → WBS consumer)', () => 
 
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
+  });
+
+  // ── Task 10: bundles in the catalogue bridge payload ──────────────────────
+  //
+  // `bundles` is in NO plan baseline — every test above ran with it
+  // defaulted to disabled (see beforeAll) and already proves the pre-Task-10
+  // shape is untouched. These tests cover the enabled case.
+
+  const MOCK_BUNDLE_ROW = {
+    id: '33333333-3333-3333-3333-333333333333',
+    storeId: TEST_STORE_ID,
+    name: 'Ramadan Box',
+    nameAr: 'علبة رمضان',
+    slug: 'ramadan-box',
+    image: 'https://r2.example.com/ramadan-box.jpg',
+    pricingType: 'fixed_price',
+    pricingValue: 9000,
+    isActive: true,
+    startsAt: null,
+    expiresAt: null,
+    items: [
+      {
+        id: 'bundle-item-1',
+        quantity: 1,
+        variantId: null,
+        variant: null,
+        product: {
+          price: 3500,
+          trackInventory: true,
+          inventory: 50,
+          variants: [],
+          deletedAt: null,
+          status: 'active',
+        },
+      },
+      {
+        id: 'bundle-item-2',
+        quantity: 1,
+        variantId: null,
+        variant: null,
+        product: {
+          price: 8000,
+          trackInventory: true,
+          inventory: 50,
+          variants: [],
+          deletedAt: null,
+          status: 'active',
+        },
+      },
+    ],
+  };
+
+  describe('bundles feature', () => {
+    it('disabled (default): catalog.products contains ONLY the real product — byte-identical to the pre-bundles shape', async () => {
+      const res = await request(app)
+        .get('/api/v1/wa-bridge/store-catalog')
+        .set('x-wbs-api-key', TEST_WBS_API_KEY);
+
+      expect(res.status).toBe(200);
+      expect(res.body.catalog.products).toHaveLength(1);
+      expect(res.body.catalog.products[0].id).toBe(MOCK_PRODUCT.id);
+      expect(res.body.catalog.products.some((p: { isBundle?: boolean }) => p.isBundle)).toBe(false);
+      // bundles is disabled -> listPurchasableBundles must never be queried.
+      const { prisma } = await import('@force/database');
+      expect(prisma.bundle.findMany).not.toHaveBeenCalled();
+    });
+
+    it('enabled: a purchasable bundle appears as a sibling product entry with isBundle:true, correct price, and Arabic name — without leaking per-component prices', async () => {
+      const { featureService } = await import('../../apps/api/src/services/feature.service');
+      const { prisma } = await import('@force/database');
+      (featureService.isFeatureEnabled as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+      (prisma.bundle.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+        {
+          id: MOCK_BUNDLE_ROW.id,
+          updatedAt: new Date('2026-08-01T00:00:00Z'),
+          description: null,
+          descriptionAr: null,
+        },
+      ]);
+      (prisma.bundle.findFirst as ReturnType<typeof vi.fn>).mockResolvedValueOnce(MOCK_BUNDLE_ROW);
+      (prisma.bundleItem.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+        { bundleId: MOCK_BUNDLE_ROW.id, product: { name: 'Dates', nameAr: 'تمر' } },
+        { bundleId: MOCK_BUNDLE_ROW.id, product: { name: 'Honey', nameAr: 'عسل' } },
+      ]);
+
+      const res = await request(app)
+        .get('/api/v1/wa-bridge/store-catalog')
+        .set('x-wbs-api-key', TEST_WBS_API_KEY);
+
+      expect(res.status).toBe(200);
+      expect(res.body.catalog.products).toHaveLength(2);
+      const bundleEntry = res.body.catalog.products.find(
+        (p: { id: string }) => p.id === MOCK_BUNDLE_ROW.id
+      );
+      expect(bundleEntry).toBeDefined();
+      expect(bundleEntry.isBundle).toBe(true);
+      expect(bundleEntry.name).toBe('Ramadan Box');
+      expect(bundleEntry.nameAr).toBe('علبة رمضان');
+      expect(bundleEntry.descriptionAr).toBe('يشمل: تمر، عسل');
+      // fixed_price 9000 against componentSum 3500+8000=11500 -> price 9000,
+      // compareAtPrice (the "was" reference) is the componentSum.
+      expect(bundleEntry.price).toBe(9000);
+      expect(bundleEntry.compareAtPrice).toBe(11500);
+      expect(bundleEntry.inStock).toBe(true);
+      expect(bundleEntry.categoryIds).toEqual([]);
+      expect(bundleEntry.variants).toEqual([]);
+      // Never the per-component allocated prices (3500 / 8000) or the
+      // internal pricingType/pricingValue fields.
+      const serialized = JSON.stringify(bundleEntry);
+      expect(serialized).not.toContain('"pricingType"');
+      expect(serialized).not.toContain('"pricingValue"');
+      expect(serialized).not.toContain('3500');
+      expect(serialized).not.toContain('8000');
+      // The real product entry is unaffected by the bundle being present.
+      const productEntry = res.body.catalog.products.find(
+        (p: { id: string }) => p.id === MOCK_PRODUCT.id
+      );
+      expect(productEntry.isBundle).toBeUndefined();
+    });
+  });
+
+  // ── buildCustomerHistory — the design doc's "the WhatsApp thread [...]
+  // render[s] the group as one row" requirement (2026-09-06-product-bundles-
+  // design.md, "Customer-facing display"). A returning customer's LAST order
+  // feeds the bot's conversational context on every catalog refresh; if it
+  // contained a bundle box, the bot must not read the customer's own
+  // purchase history back to them as 3 unrelated products at fractional
+  // allocated prices.
+  describe('customerHistory.lastOrder with a bundle', () => {
+    const RETURNING_USER = {
+      id: 'cccccccc-4444-4444-4444-cccccccccccc',
+      firstName: 'Sara',
+      language: 'en',
+    };
+    const BUNDLE_ID = 'bbbbbbbb-6666-6666-6666-bbbbbbbbbbbb';
+
+    it('collapses a bundle box in lastOrder.items into ONE row — never its per-component allocated prices — and emits the bundle id, not null (NEW-P1)', async () => {
+      const { prisma } = await import('@force/database');
+      (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValueOnce(RETURNING_USER);
+      (prisma.order.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+        {
+          id: 'dddddddd-5555-5555-5555-dddddddddddd',
+          orderNumber: 'ORD-1001',
+          createdAt: new Date('2026-09-01T00:00:00Z'),
+          total: 12000,
+          items: [
+            {
+              id: 'oi-1',
+              productId: '10000000-0000-0000-0000-000000000001',
+              productName: 'Dates',
+              quantity: 1,
+              price: 3724,
+              bundleId: BUNDLE_ID,
+              bundleGroupId: 'grp-1',
+              bundleName: 'Ramadan Box',
+              bundleNameAr: 'علبة رمضان',
+              product: { nameAr: 'تمر', categories: [] },
+            },
+            {
+              id: 'oi-2',
+              productId: '10000000-0000-0000-0000-000000000002',
+              productName: 'Honey',
+              quantity: 1,
+              price: 4966,
+              bundleId: BUNDLE_ID,
+              bundleGroupId: 'grp-1',
+              bundleName: 'Ramadan Box',
+              bundleNameAr: 'علبة رمضان',
+              product: { nameAr: 'عسل', categories: [] },
+            },
+            {
+              id: 'oi-3',
+              productId: '10000000-0000-0000-0000-000000000003',
+              productName: 'Nuts',
+              quantity: 2,
+              price: 1655,
+              bundleId: BUNDLE_ID,
+              bundleGroupId: 'grp-1',
+              bundleName: 'Ramadan Box',
+              bundleNameAr: 'علبة رمضان',
+              product: { nameAr: 'مكسرات', categories: [] },
+            },
+          ],
+        },
+      ]);
+
+      const res = await request(app)
+        .get('/api/v1/wa-bridge/store-catalog?phone=%2B96512340001')
+        .set('x-wbs-api-key', TEST_WBS_API_KEY);
+
+      expect(res.status).toBe(200);
+      const parse = CustomerHistoryPresentSchema.safeParse(res.body);
+      if (!parse.success) {
+        console.error(
+          'customerHistory shape drift:',
+          JSON.stringify(parse.error.flatten(), null, 2)
+        );
+      }
+      expect(parse.success).toBe(true);
+
+      const items = res.body.customerHistory.lastOrder.items;
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        productId: BUNDLE_ID,
+        productName: 'Ramadan Box',
+        productNameAr: 'علبة رمضان',
+        quantity: 1,
+        priceFils: 12000,
+        isBundle: true,
+      });
+
+      // No per-component name or allocated price anywhere in the payload.
+      const serialized = JSON.stringify(items);
+      expect(serialized).not.toContain('Dates');
+      expect(serialized).not.toContain('Honey');
+      expect(serialized).not.toContain('Nuts');
+      expect(serialized).not.toContain('3724');
+    });
+
+    it('NEW-P1: a repeat-order payload built from this bundle row round-trips through cartFromWaSchema (WBS `handleRepeatLastOrder` shape)', async () => {
+      const { prisma } = await import('@force/database');
+      const { cartFromWaSchema } = await import('../../apps/api/src/routes/wa-bridge.routes');
+      (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValueOnce(RETURNING_USER);
+      (prisma.order.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+        {
+          id: 'eeeeeeee-5555-5555-5555-eeeeeeeeeeee',
+          orderNumber: 'ORD-1003',
+          createdAt: new Date('2026-09-01T00:00:00Z'),
+          total: 15500,
+          items: [
+            {
+              id: 'oi-5',
+              productId: '10000000-0000-0000-0000-000000000004',
+              productName: 'Dates',
+              quantity: 1,
+              price: 12000,
+              bundleId: BUNDLE_ID,
+              bundleGroupId: 'grp-2',
+              bundleName: 'Ramadan Box',
+              bundleNameAr: 'علبة رمضان',
+              product: { nameAr: 'تمر', categories: [] },
+            },
+            {
+              id: 'oi-6',
+              productId: MOCK_PRODUCT.id,
+              productName: 'Date Box',
+              quantity: 1,
+              price: 3500,
+              bundleId: null,
+              bundleGroupId: null,
+              bundleName: null,
+              bundleNameAr: null,
+              product: { nameAr: 'علبة تمر', categories: [] },
+            },
+          ],
+        },
+      ]);
+
+      const res = await request(app)
+        .get('/api/v1/wa-bridge/store-catalog?phone=%2B96512340003')
+        .set('x-wbs-api-key', TEST_WBS_API_KEY);
+
+      expect(res.status).toBe(200);
+      const lastOrderItems = res.body.customerHistory.lastOrder.items;
+
+      // Mirrors whatsapp-bulk-sender's `handleRepeatLastOrder`
+      // (`backend/src/services/wa-ordering.js:476-482`), which maps
+      // `customerHistory.lastOrder.items` straight into the
+      // `/cart/from-wa` payload shape: `{ productId, quantity }` per line.
+      const repeatOrderPayload = {
+        items: lastOrderItems.map((i: { productId: string | null; quantity: number }) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+        })),
+        waId: '96512340003',
+      };
+
+      const parsed = cartFromWaSchema.safeParse(repeatOrderPayload);
+      if (!parsed.success) {
+        console.error(
+          'repeat-order payload rejected by cartFromWaSchema:',
+          JSON.stringify(parsed.error.flatten(), null, 2)
+        );
+      }
+      expect(parsed.success).toBe(true);
+    });
+
+    it('leaves a non-bundle lastOrder unchanged — one item row per product, same shape as before this fix', async () => {
+      const { prisma } = await import('@force/database');
+      (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValueOnce(RETURNING_USER);
+      (prisma.order.findMany as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+        {
+          id: 'dddddddd-5555-5555-5555-dddddddddddd',
+          orderNumber: 'ORD-1002',
+          createdAt: new Date('2026-09-01T00:00:00Z'),
+          total: 3500,
+          items: [
+            {
+              id: 'oi-4',
+              productId: MOCK_PRODUCT.id,
+              productName: 'Date Box',
+              quantity: 1,
+              price: 3500,
+              bundleGroupId: null,
+              bundleName: null,
+              bundleNameAr: null,
+              product: { nameAr: 'علبة تمر', categories: [] },
+            },
+          ],
+        },
+      ]);
+
+      const res = await request(app)
+        .get('/api/v1/wa-bridge/store-catalog?phone=%2B96512340002')
+        .set('x-wbs-api-key', TEST_WBS_API_KEY);
+
+      expect(res.status).toBe(200);
+      expect(res.body.customerHistory.lastOrder.items).toEqual([
+        {
+          productId: MOCK_PRODUCT.id,
+          productName: 'Date Box',
+          productNameAr: 'علبة تمر',
+          quantity: 1,
+          priceFils: 3500,
+        },
+      ]);
+    });
   });
 });

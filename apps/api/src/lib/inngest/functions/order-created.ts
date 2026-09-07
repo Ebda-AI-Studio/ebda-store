@@ -1,5 +1,6 @@
 import type { InngestFunction } from 'inngest';
 import { prisma, runInTenantContext } from '@force/database';
+import { groupOrderLinesForDisplay } from '@force/shared';
 import { EmailService, type OrderEmailData } from '../../../services/email.service';
 import { notificationDispatcher } from '../../../services/notification-dispatcher.service';
 import { OneSignalService } from '../../../services/onesignal.service';
@@ -128,19 +129,30 @@ export const orderCreated: InngestFunction.Any = inngest.createFunction(
       orderNumber: order.orderNumber,
       customerName,
       customerEmail: order.customer?.email || guestEmail,
-      items: (
+      // Bundle boxes collapse to ONE row each (see groupOrderLinesForDisplay)
+      // — the emailed confirmation must show "Ramadan Box · 12.000 KWD",
+      // never the per-component allocated shares that fund that one price.
+      items: groupOrderLinesForDisplay(
         order.items as Array<{
+          id: string;
           productName: string;
           quantity: number;
           price: number;
           product?: { nameAr?: string | null } | null;
+          bundleGroupId?: string | null;
+          bundleName?: string | null;
+          bundleNameAr?: string | null;
         }>
-      ).map(item => ({
-        name: item.productName,
-        nameAr: item.product?.nameAr ?? null,
-        quantity: item.quantity,
-        price: item.price,
-      })),
+      ).map(row =>
+        row.kind === 'bundle'
+          ? { name: row.name, nameAr: row.nameAr, quantity: row.quantity, price: row.total }
+          : {
+              name: row.item.productName,
+              nameAr: row.item.product?.nameAr ?? null,
+              quantity: row.item.quantity,
+              price: row.item.price,
+            }
+      ),
       subtotal: order.subtotal,
       tax: order.tax,
       shipping: order.shipping,

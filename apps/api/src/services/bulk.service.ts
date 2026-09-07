@@ -2,6 +2,11 @@ import { prisma, Prisma, ProductStatus, SlugEntityType, withMoneyTx } from '@for
 import { csvField, slugifyWithFallback } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 import { recordSlugRedirect } from './slug-redirect.service';
+import {
+  bundleFkViolationKind,
+  planBundlePinnedVariantSkips,
+  throwIfBundleFkViolation,
+} from '../lib/bundle-fk-errors';
 
 interface ProductImportRow {
   name: string;
@@ -127,7 +132,20 @@ async function createVariantsForProductTx(
   if (variants.length === 0) return 0;
 
   // Clear existing options/variants (cascades to values + junction rows).
-  await tx.productVariant.deleteMany({ where: { productId } });
+  //
+  // P1-4 (final review): `bundle_items.variant_id` is ON DELETE RESTRICT, so
+  // this delete raises P2003 for any variant a bundle pins. The import plan
+  // above already skips such products (see `planBundlePinnedVariantSkips`),
+  // which is what keeps the rest of the batch alive; this catch is the
+  // residual race — a bundle created between that read and this write — and
+  // turns the global handler's generic "A referenced record does not exist"
+  // into something that names the constraint that fired.
+  try {
+    await tx.productVariant.deleteMany({ where: { productId } });
+  } catch (err) {
+    throwIfBundleFkViolation(err);
+    throw err;
+  }
   await tx.productOption.deleteMany({ where: { productId } });
 
   // 1) Options, batched. Correlate created rows back by `name` (distinct per
@@ -735,6 +753,35 @@ export class BulkService {
       }
     }
 
+    // ---- Phase 2.5: drop variant rows a bundle would block ----
+    //
+    // P1-4 (final review). Re-importing a product's variants is
+    // replace-semantics: `createVariantsForProductTx` deletes the existing
+    // variant rows first. `bundle_items.variant_id` is ON DELETE RESTRICT, so
+    // if a bundle pins one of them Postgres raises P2003 INSIDE the batch
+    // transaction — the batch rolls back and every unrelated product in the
+    // same CSV is lost with it, reported as the global handler's generic "A
+    // referenced record does not exist". Detect it here instead, before any
+    // write, and skip only the affected parent's variant rows: its own
+    // product row and every other row in the file still import.
+    const parentIdBySku = new Map<string, string>();
+    for (const parentSku of variantsByParent.keys()) {
+      const existingParent = productBySku.get(parentSku);
+      if (existingParent) parentIdBySku.set(parentSku, existingParent.id);
+    }
+    if (parentIdBySku.size > 0) {
+      const pinned = await prisma.bundleItem.findMany({
+        where: { productId: { in: [...parentIdBySku.values()] }, variantId: { not: null } },
+        select: { productId: true, bundle: { select: { name: true } } },
+      });
+      for (const skip of planBundlePinnedVariantSkips(parentIdBySku, pinned)) {
+        const skipped = variantsByParent.get(skip.parentSku) ?? [];
+        variantsByParent.delete(skip.parentSku);
+        result.failed += skipped.length;
+        result.errors.push({ row: 0, error: skip.message });
+      }
+    }
+
     // ---- Phase 3: Batch-create new categories and tags ----
 
     // Track the IDs of categories/tags this run created so we can clean
@@ -1076,11 +1123,40 @@ export class BulkService {
     }
 
     if (permanent) {
-      // Hard delete: remove rows that belong to this store in one query
-      const result = await prisma.product.deleteMany({
-        where: { id: { in: productIds }, storeId },
-      });
-      return { deleted: result.count, failed: productIds.length - result.count, errors: [] };
+      // Hard delete: remove rows that belong to this store in one query.
+      // `products.id` is now referenced by `bundle_items.product_id`
+      // (ON DELETE RESTRICT, final-review I1) — if ANY id in this batch is
+      // pinned by a bundle, Postgres raises P2003 and the single deleteMany
+      // fails as a whole, taking down products that were never bundled with
+      // it. Fall back to one delete per id ONLY on that specific failure, so
+      // the common case (no bundle-pinned products) stays a single query.
+      try {
+        const result = await prisma.product.deleteMany({
+          where: { id: { in: productIds }, storeId },
+        });
+        return { deleted: result.count, failed: productIds.length - result.count, errors: [] };
+      } catch (err) {
+        if (bundleFkViolationKind(err) !== 'product') {
+          throw err;
+        }
+        let deleted = 0;
+        const errors: string[] = [];
+        for (const id of productIds) {
+          try {
+            const r = await prisma.product.deleteMany({ where: { id, storeId } });
+            deleted += r.count;
+          } catch (innerErr) {
+            if (bundleFkViolationKind(innerErr) === 'product') {
+              errors.push(
+                `Product ${id} is used in a bundle and cannot be permanently deleted. Remove it from the bundle first.`
+              );
+            } else {
+              throw innerErr;
+            }
+          }
+        }
+        return { deleted, failed: productIds.length - deleted, errors };
+      }
     }
 
     // Soft delete: stamp deletedAt on all matching rows in one query

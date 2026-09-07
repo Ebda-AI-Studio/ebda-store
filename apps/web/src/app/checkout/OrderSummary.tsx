@@ -6,7 +6,8 @@ import { Button, Input } from '@force/ui';
 import type { CSSProperties } from 'react';
 import { useLanguage, translations } from '../../contexts/LanguageContext';
 import { useNumerals } from '../../hooks/useNumerals';
-import type { CheckoutCartItem, Coupon } from './types';
+import { BundleLine } from '../../components/BundleLine';
+import type { CheckoutCartItem, CheckoutCartBundle, Coupon } from './types';
 
 /** Loyalty redemption control state, threaded from CheckoutClient. Present
  *  only for logged-in customers with a positive balance on a loyalty-enabled
@@ -40,6 +41,9 @@ export interface SummaryColors {
 
 interface OrderSummaryProps {
   items: CheckoutCartItem[];
+  /** Bundle boxes in the cart — each rendered as ONE row via `BundleLine`,
+   *  never the per-component allocated prices. */
+  bundles?: CheckoutCartBundle[];
   subtotal: number;
   discount: number;
   /** The automatic-promotion portion of `discount` (0 when no promotion is
@@ -66,6 +70,7 @@ interface OrderSummaryProps {
 
 export function OrderSummary({
   items,
+  bundles = [],
   subtotal,
   discount,
   promotionDiscount = 0,
@@ -110,6 +115,18 @@ export function OrderSummary({
         </h2>
 
         <div className="mt-6 divide-y">
+          {bundles.map(bundle => (
+            <BundleLine
+              key={bundle.id}
+              variant="row"
+              name={bundle.name}
+              nameAr={bundle.nameAr}
+              image={bundle.image}
+              quantity={bundle.quantity}
+              total={bundle.total}
+              isRtl={isRtl}
+            />
+          ))}
           {items.map(item => (
             <div key={item.id} className="flex gap-4 py-4 first:pt-0">
               <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
@@ -201,6 +218,21 @@ export function OrderSummary({
             </div>
           )}
           {couponError && <p className="mt-2 text-sm text-destructive">{couponError}</p>}
+          {/* A coupon never discounts a bundle (the box price already is the
+              discount), and the quote is computed against the loose items
+              only — say so, or the customer reads a 10% coupon returning
+              almost nothing as a bug. Only rendered when BOTH a bundle and a
+              coupon are present, so a non-bundle order is unchanged. */}
+          {appliedCoupon && bundles.length > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t(
+                'Coupon applies to items outside your bundles — a bundle is already discounted.',
+                translations[
+                  'Coupon applies to items outside your bundles — a bundle is already discounted.'
+                ]
+              )}
+            </p>
+          )}
         </div>
 
         {/* Loyalty points redemption — only for logged-in customers with a

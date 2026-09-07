@@ -1,4 +1,5 @@
 import { prisma } from '@force/database';
+import { groupOrderLinesForDisplay } from '@force/shared';
 import { AppError } from '../middleware/error-handler';
 
 /**
@@ -202,8 +203,33 @@ export class InvoiceService {
       timeZone: order.store.timezone || 'Asia/Kuwait',
     });
 
-    const itemsHtml = order.items
-      .map((item, i) => {
+    // Bundle boxes collapse to ONE row each — see groupOrderLinesForDisplay.
+    // A customer's invoice must show "Ramadan Box · 12.000 KWD", never the
+    // per-component allocated shares that fund that one price; those exist
+    // only for the merchant's own P&L. `bundleName`/`bundleNameAr` are
+    // snapshotted at order time, so a bundle renamed or deleted since still
+    // prints correctly here.
+    const itemsHtml = groupOrderLinesForDisplay(order.items)
+      .map((row, i) => {
+        if (row.kind === 'bundle') {
+          const displayName = ar && row.nameAr ? row.nameAr : row.name;
+          return `
+          <tr>
+            <td class="col-num">${i + 1}</td>
+            <td class="col-item">
+              <div class="item-cell">
+                <div class="item-thumb item-thumb-placeholder"></div>
+                <div class="item-meta">
+                  <div class="item-name">${escapeHtml(displayName)}</div>
+                </div>
+              </div>
+            </td>
+            <td class="col-qty">${row.quantity}</td>
+            <td class="col-price">&mdash;</td>
+            <td class="col-total">${formatPrice(row.total)}</td>
+          </tr>`;
+        }
+        const item = row.item;
         const image = item.product?.images?.[0]?.url;
         // Use Arabic product name when available and locale is AR
         const displayName = ar && item.product?.nameAr ? item.product.nameAr : item.productName;
