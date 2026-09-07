@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AdminLayout } from '@/components/AdminLayout';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
+import { textFieldValue } from '@/lib/form-text';
 import { Button, useToast } from '@force/ui';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -113,15 +114,18 @@ export default function WarehousesPage() {
     }
     setSaving(true);
     try {
+      // Reused by the PUT (edit) branch below — an emptied optional field
+      // must send null to actually clear it.
+      const intent = editTarget ? 'update' : 'create';
       const payload = {
         name: form.name.trim(),
-        nameAr: form.nameAr.trim() || undefined,
+        nameAr: textFieldValue(form.nameAr.trim(), intent),
         code: form.code.trim(),
         isDefault: form.isDefault,
         priority: form.priority,
         lat: form.lat !== '' ? parseFloat(form.lat) : undefined,
         lng: form.lng !== '' ? parseFloat(form.lng) : undefined,
-        address: form.address.trim() || undefined,
+        address: textFieldValue(form.address.trim(), intent),
       };
 
       if (editTarget) {

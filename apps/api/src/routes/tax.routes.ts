@@ -22,12 +22,15 @@ const updateSettingsSchema = z.object({
   defaultTaxRate: z.number().min(0).max(100).nullable().optional(),
 });
 
+// Optional columns are `.nullable()` so an emptied field on the edit modal
+// CLEARS them: Prisma reads `null` as "set to NULL", `undefined` (omitted
+// key) as "leave alone". Without the null form the merchant's clear no-ops.
 const createTaxRateSchema = z.object({
   name: z.string().min(1).max(100),
-  nameAr: z.string().max(100).optional(),
+  nameAr: z.string().max(100).optional().nullable(),
   rate: z.number().min(0).max(100),
-  country: z.string().max(2).optional(),
-  state: z.string().max(100).optional(),
+  country: z.string().max(2).optional().nullable(),
+  state: z.string().max(100).optional().nullable(),
   priority: z.number().int().min(0).optional(),
   isCompound: z.boolean().optional(),
   isActive: z.boolean().optional(),

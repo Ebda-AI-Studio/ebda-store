@@ -128,6 +128,20 @@ jobs:
       - name: Run ESLint
         run: npm run lint --if-present
 
+      # Deterministic gate for the "an emptied admin field must clear" class:
+      # `X || undefined` inside an apiPut/apiPatch body serializes to an
+      # ABSENT key, and every write path here reads an absent key as "leave
+      # the stored value alone" — so the save succeeds and the merchant's
+      # clear is discarded (it shipped as a store's order-invoice address that
+      # could not be removed). ESLint can't host it: the admin config's
+      # `no-restricted-syntax` entries are deliberately `warn` for the ~143
+      # known Tailwind-token violations, and flat config can't mix severities
+      # within one rule — an `error` block here would silently downgrade or
+      # promote those. AST-based (typescript, already a devDependency), not
+      # grep, and it carries a documented `clear-gate-allow:` waiver form.
+      - name: Clear-on-empty payload gate
+        run: npm run check:clear-on-empty
+
       - name: Check formatting
         run: npm run format:check --if-present
 

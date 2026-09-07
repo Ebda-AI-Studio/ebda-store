@@ -38,27 +38,41 @@ export const kuwaitAddressSchema = z.object({
 });
 export type KuwaitAddressInput = z.infer<typeof kuwaitAddressSchema>;
 
+// Optional http(s) URL. `null` (or '') clears the stored value on an UPDATE;
+// an omitted key leaves it alone. See the nullability note on
+// `locationInputSchema` below.
 const httpsUrl = z
   .string()
   .trim()
   .url()
   .refine(u => /^https?:\/\//i.test(u), 'URL must be http(s)')
+  .nullable()
   .optional()
-  .or(z.literal('').transform(() => undefined));
+  .or(z.literal('').transform(() => null));
 
+/**
+ * Branch/location input, shared by the admin CREATE (POST) and the
+ * `.partial()` UPDATE (PUT).
+ *
+ * Every optional column is `.nullable()` so an emptied field on the edit form
+ * can CLEAR it: Prisma reads `null` as "set to NULL" and `undefined` (an
+ * omitted key) as "leave alone". Without the null form the admin's clear
+ * silently no-ops — the PUT succeeds and the old text survives.
+ * `name` / `country` / `address` are required and have no null form.
+ */
 export const locationInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  nameAr: z.string().trim().max(200).optional(),
+  nameAr: z.string().trim().max(200).nullable().optional(),
   country: z.string().trim().min(1).max(100),
-  countryAr: z.string().trim().max(100).optional(),
+  countryAr: z.string().trim().max(100).nullable().optional(),
   address: z.string().trim().min(1).max(500),
-  addressAr: z.string().trim().max(500).optional(),
-  phone: z.string().trim().max(40).optional(),
-  whatsapp: z.string().trim().max(40).optional(),
+  addressAr: z.string().trim().max(500).nullable().optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  whatsapp: z.string().trim().max(40).nullable().optional(),
   mapsUrl: httpsUrl,
   mapsEmbedUrl: httpsUrl,
-  hours: z.string().trim().max(200).optional(),
-  hoursAr: z.string().trim().max(200).optional(),
+  hours: z.string().trim().max(200).nullable().optional(),
+  hoursAr: z.string().trim().max(200).nullable().optional(),
   isPublished: z.boolean().optional().default(true),
   position: z.number().int().min(0).max(10_000).optional().default(0),
 });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useT } from '@/i18n/useT';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../../lib/api';
+import { textFieldValue } from '../../../../../lib/form-text';
 
 interface Location {
   id: string;
@@ -141,19 +142,23 @@ export function LocationsTab({ storeId }: { storeId: string }) {
   async function handleSave() {
     setIsSaving(true);
     setFormError(null);
+    // This body is reused by the PUT (edit) branch below, so an emptied
+    // optional field MUST send null — `undefined` omits the key and Prisma
+    // then leaves the old value in place (the merchant can never clear it).
+    const intent = formMode === 'new' ? 'create' : 'update';
     const body = {
       name: formData.name.trim(),
-      nameAr: formData.nameAr.trim() || undefined,
+      nameAr: textFieldValue(formData.nameAr.trim(), intent),
       country: formData.country.trim(),
-      countryAr: formData.countryAr.trim() || undefined,
+      countryAr: textFieldValue(formData.countryAr.trim(), intent),
       address: formData.address.trim(),
-      addressAr: formData.addressAr.trim() || undefined,
-      phone: formData.phone.trim() || undefined,
-      whatsapp: formData.whatsapp.trim() || undefined,
-      mapsUrl: formData.mapsUrl.trim() || undefined,
-      mapsEmbedUrl: formData.mapsEmbedUrl.trim() || undefined,
-      hours: formData.hours.trim() || undefined,
-      hoursAr: formData.hoursAr.trim() || undefined,
+      addressAr: textFieldValue(formData.addressAr.trim(), intent),
+      phone: textFieldValue(formData.phone.trim(), intent),
+      whatsapp: textFieldValue(formData.whatsapp.trim(), intent),
+      mapsUrl: textFieldValue(formData.mapsUrl.trim(), intent),
+      mapsEmbedUrl: textFieldValue(formData.mapsEmbedUrl.trim(), intent),
+      hours: textFieldValue(formData.hours.trim(), intent),
+      hoursAr: textFieldValue(formData.hoursAr.trim(), intent),
       isPublished: formData.isPublished,
       position: formData.position,
     };

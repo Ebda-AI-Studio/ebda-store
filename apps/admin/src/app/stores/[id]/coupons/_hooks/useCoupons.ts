@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../../lib/api';
+import { textFieldValue, numericFieldValue, dateFieldValue } from '../../../../../lib/form-text';
 import type { Coupon, CouponFormData, CouponStatusFilter } from '../_components/types';
 
 interface UseCouponsResult {
@@ -57,27 +58,38 @@ export function useCoupons(storeId: string): UseCouponsResult {
           ? `/api/v1/stores/${storeId}/coupons/${editingId}`
           : `/api/v1/stores/${storeId}/coupons`;
 
+        // Reused by the PUT (edit) branch below — an emptied optional field
+        // must send null to actually clear it, the way customerGroupId /
+        // minQuantity already do.
+        const intent = editingId ? 'update' : 'create';
         const body = {
           code: formData.code,
           name: formData.name,
-          nameAr: formData.nameAr || undefined,
-          description: formData.description || undefined,
-          descriptionAr: formData.descriptionAr || undefined,
+          nameAr: textFieldValue(formData.nameAr, intent),
+          description: textFieldValue(formData.description, intent),
+          descriptionAr: textFieldValue(formData.descriptionAr, intent),
           type: formData.type,
           // `fixed` coupons: the input is in KWD (dinar) → store as fils (×1000).
           // `percentage` coupons: the value is a percent (e.g. 5 = 5%), stored as-is.
           value: formData.type === 'fixed' ? Math.round(formData.value * 1000) : formData.value,
-          minOrderAmount: formData.minOrderAmount
-            ? parseInt(formData.minOrderAmount) * 1000
-            : undefined,
-          maxDiscount: formData.maxDiscount ? parseInt(formData.maxDiscount) * 1000 : undefined,
-          usageLimit: formData.usageLimit ? parseInt(formData.usageLimit) : undefined,
-          usageLimitPerUser: formData.usageLimitPerUser
-            ? parseInt(formData.usageLimitPerUser)
-            : undefined,
+          // Clearing a limit/date must remove the restriction (null), not
+          // silently no-op (undefined) — same convention as the text fields
+          // above. A cleared minOrderAmount/expiresAt/usageLimit makes the
+          // coupon MORE permissive (no minimum / never expires / unlimited
+          // uses); see CouponService.getByCode + evaluateForCart.
+          minOrderAmount: numericFieldValue(
+            formData.minOrderAmount,
+            intent,
+            v => parseInt(v) * 1000
+          ),
+          maxDiscount: numericFieldValue(formData.maxDiscount, intent, v => parseInt(v) * 1000),
+          usageLimit: numericFieldValue(formData.usageLimit, intent, v => parseInt(v)),
+          usageLimitPerUser: numericFieldValue(formData.usageLimitPerUser, intent, v =>
+            parseInt(v)
+          ),
           isActive: formData.isActive,
-          startsAt: formData.startsAt ? new Date(formData.startsAt).toISOString() : undefined,
-          expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : undefined,
+          startsAt: dateFieldValue(formData.startsAt, intent),
+          expiresAt: dateFieldValue(formData.expiresAt, intent),
           // Targeting — shared shape with Promotion (see
           // promotion.routes.ts's createSchema). Empty group/scope = "everyone,
           // whole cart".

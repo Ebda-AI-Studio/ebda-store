@@ -96,7 +96,14 @@ const MANUAL_PROVENANCE_FIELDS = ['excerpt', 'excerptAr'] as const;
  * a manual edit that changes the value stamps 'human' (so the admin
  * `AiFieldBadge` stops showing "✨ AI" after the merchant rewrites an
  * AI-drafted excerpt); clearing the field to empty removes the provenance
- * entry entirely, matching the convention used everywhere else.
+ * entry entirely.
+ *
+ * These fields deliberately keep the drop-on-clear behaviour that
+ * `stampHumanEdits` no longer has. There, dropping the key let the autopilot
+ * — which fires automatically on every save — undo the merchant's clear.
+ * Nothing auto-fills an excerpt: only the merchant-triggered `bulk-ai-excerpt`
+ * sweep writes these, and its contract is already "fill products with no
+ * excerpt" regardless of provenance, so the stamp changes nothing there.
  */
 function stampManualProvenance(
   sources: Record<string, 'ai' | 'human'>,
@@ -213,10 +220,16 @@ function enrichStockFlags<
 
 interface CreateProductData {
   name: string;
-  nameAr?: string;
+  /**
+   * Free-text columns the merchant can empty from the edit form. `null`
+   * clears, `undefined` leaves the stored value alone — the same convention
+   * as `excerpt` / the SEO meta fields below. `name` is required and has no
+   * null form.
+   */
+  nameAr?: string | null;
   slug?: string;
-  description?: string;
-  descriptionAr?: string;
+  description?: string | null;
+  descriptionAr?: string | null;
   /** Short 1-2 sentence blurb — written by the bulk-ai-excerpt sweep or manually. */
   excerpt?: string | null;
   excerptAr?: string | null;
@@ -234,7 +247,8 @@ interface CreateProductData {
    * null when no discount.
    */
   discountValue?: number | null;
-  sku?: string;
+  /** `null` clears the SKU; `undefined` leaves the stored value alone. */
+  sku?: string | null;
   inventory?: number;
   /** Per-product threshold for the LOW STOCK badge / merchant alerts. */
   lowStockThreshold?: number;
@@ -868,10 +882,13 @@ export class ProductService {
         where: { id: productId, storeId },
         data: {
           name: data.name,
-          nameAr: data.nameAr,
           slug: finalSlug,
-          description: data.description,
-          descriptionAr: data.descriptionAr,
+          // Free text the merchant can empty — accept only when present in
+          // the patch: `null` clears the column, an omitted key leaves it
+          // alone. Same convention as excerpt / SEO meta below.
+          ...(data.nameAr !== undefined ? { nameAr: data.nameAr } : {}),
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          ...(data.descriptionAr !== undefined ? { descriptionAr: data.descriptionAr } : {}),
           // Excerpt — null clears (bulk-sweep/manual clear), undefined leaves
           // the existing value alone, same convention as SEO meta below.
           ...(data.excerpt !== undefined ? { excerpt: data.excerpt } : {}),
@@ -885,7 +902,7 @@ export class ProductService {
           // Discount input columns — same undefined/null convention.
           ...(data.discountType !== undefined ? { discountType: data.discountType } : {}),
           ...(data.discountValue !== undefined ? { discountValue: data.discountValue } : {}),
-          sku: data.sku,
+          ...(data.sku !== undefined ? { sku: data.sku } : {}),
           inventory: data.inventory,
           ...(data.lowStockThreshold !== undefined
             ? { lowStockThreshold: data.lowStockThreshold }

@@ -16,8 +16,26 @@ describe('stampHumanEdits', () => {
     expect(next).toEqual({ nameAr: 'ai', metaTitle: 'human' });
   });
 
-  it('clears the key when a field is emptied', () => {
+  it('stamps human when a field is emptied — a clear is an edit', () => {
+    // Dropping the key here made the field look like an empty gap, so the
+    // autopilot (fired by product.upserted on the same save) re-translated it
+    // from the sibling language and the merchant's clear reappeared.
     const next = stampHumanEdits({ nameAr: 'ai' }, { nameAr: 'x' }, { nameAr: '' });
+    expect(next.nameAr).toBe('human');
+  });
+
+  it('stamps human when a field is cleared with null (the PUT clear path)', () => {
+    const next = stampHumanEdits(
+      { description: 'ai' },
+      { description: 'An English description', descriptionAr: 'وصف عربي' },
+      { description: null }
+    );
+    expect(next.description).toBe('human');
+  });
+
+  it('leaves an already-empty field fillable through whitespace churn', () => {
+    // '' → '  ' on create is not a merchant clear; the field must stay a gap.
+    const next = stampHumanEdits({}, { nameAr: '' }, { nameAr: '  ' });
     expect(next.nameAr).toBeUndefined();
   });
 
@@ -66,5 +84,18 @@ describe('computeFillSet', () => {
   it('without stale-refresh an ai field with no source change is left alone', () => {
     const fields = computeFillSet({ nameAr: 'ai' }, 'sweep', [], false);
     expect(fields).not.toContain('nameAr');
+  });
+
+  it('never re-fills a field the merchant just cleared (end-to-end of the two helpers)', () => {
+    // Bilingual product: merchant empties the English description, Arabic stays.
+    const sources = stampHumanEdits(
+      { description: 'ai', descriptionAr: 'human' },
+      { description: 'Old English copy', descriptionAr: 'وصف عربي' },
+      { description: null }
+    );
+    // The autopilot's own fill set, computed from that provenance map.
+    expect(computeFillSet(sources, 'update', ['description'])).not.toContain('description');
+    // Even the stale-refresh sweep leaves it alone.
+    expect(computeFillSet(sources, 'sweep', [], true)).not.toContain('description');
   });
 });

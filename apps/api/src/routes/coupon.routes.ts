@@ -25,26 +25,40 @@ const createCouponSchema = z.object({
     .max(50)
     .transform(s => s.toUpperCase()),
   name: z.string().min(1).max(100),
-  nameAr: z.string().max(100).optional(),
-  description: z.string().max(500).optional(),
-  descriptionAr: z.string().max(500).optional(),
+  // Optional free text — `null` clears the column on an update, `undefined`
+  // (omitted key) leaves it alone, same convention as customerGroupId /
+  // minQuantity below. Without the null form an emptied field cannot clear.
+  nameAr: z.string().max(100).optional().nullable(),
+  description: z.string().max(500).optional().nullable(),
+  descriptionAr: z.string().max(500).optional().nullable(),
   type: z.enum(['percentage', 'fixed', 'free_shipping']),
   value: z.number().min(0),
-  minOrderAmount: z.number().min(0).optional(),
-  maxDiscount: z.number().min(0).optional(),
-  usageLimit: z.number().int().min(1).optional(),
-  usageLimitPerUser: z.number().int().min(1).optional(),
+  // Limits/dates the merchant can clear — `null` removes the restriction
+  // (no minimum / no cap / unlimited uses / never expires), `undefined`
+  // (omitted key) leaves the stored value alone. Same convention as
+  // nameAr/description above and customerGroupId/minQuantity below.
+  minOrderAmount: z.number().min(0).nullish(),
+  maxDiscount: z.number().min(0).nullish(),
+  usageLimit: z.number().int().min(1).nullish(),
+  usageLimitPerUser: z.number().int().min(1).nullish(),
   isActive: z.boolean().optional(),
+  // `.nullable()` runs BEFORE the transform so `null` bypasses the
+  // `.datetime()` format check entirely instead of being coerced into
+  // `new Date(null)` (which is the epoch, not "no restriction") or being
+  // dropped to `undefined` (which would silently leave the old date in
+  // place instead of clearing it).
   startsAt: z
     .string()
     .datetime()
+    .nullable()
     .optional()
-    .transform(s => (s ? new Date(s) : undefined)),
+    .transform(s => (s == null ? s : new Date(s))),
   expiresAt: z
     .string()
     .datetime()
+    .nullable()
     .optional()
-    .transform(s => (s ? new Date(s) : undefined)),
+    .transform(s => (s == null ? s : new Date(s))),
   // Targeting — shared shape with Promotion (see promotion.routes.ts's
   // createSchema). All optional/empty = "everyone, whole cart" so existing
   // coupons are unchanged. CouponService.create/update already accepts

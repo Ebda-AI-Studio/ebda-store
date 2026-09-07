@@ -16,15 +16,21 @@ const router = Router({ mergeParams: true });
 // Validation schemas
 const createProductSchema = z.object({
   name: z.string().min(1).max(255),
-  nameAr: z.string().max(255).optional(),
+  // Free-text columns the merchant can legitimately empty on the edit form.
+  // Nullable so an emptied input can CLEAR the column — `undefined` (key
+  // omitted) still means "leave alone", same convention as `excerpt` and the
+  // SEO meta below. Without `.nullable()` the admin's `null` 400s, which is
+  // why an emptied description used to save with no effect.
+  // `name` is required and stays non-nullable.
+  nameAr: z.string().max(255).optional().nullable(),
   slug: z
     .string()
     .min(1)
     .max(255)
     .regex(/^[a-z0-9\u0600-\u06FF-]+$/)
     .optional(),
-  description: z.string().optional(),
-  descriptionAr: z.string().optional(),
+  description: z.string().optional().nullable(),
+  descriptionAr: z.string().optional().nullable(),
   // Short 1-2 sentence blurb — written by the bulk-ai-excerpt sweep or
   // manually. Nullable so the admin form can explicitly clear it (same
   // undefined/null convention as SEO meta below).
@@ -43,7 +49,7 @@ const createProductSchema = z.object({
   // percentage → basis points (percent×100, e.g. 12.5%→1250, range 0–10000)
   // fixed      → fils
   discountValue: z.number().int().min(0).optional().nullable(),
-  sku: z.string().optional(),
+  sku: z.string().optional().nullable(),
   inventory: z.number().int().min(0).optional(),
   // Per-product threshold for the LOW STOCK badge / merchant alerts.
   // Default lives on the schema (5). Without this in Zod, the createProductSchema

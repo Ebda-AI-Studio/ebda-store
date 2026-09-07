@@ -76,6 +76,11 @@ function ProviderRow({
     // A genuinely new value (no `****`) is encrypted and replaces it.
     const { data, error } = await apiPut<ProviderConfig>(
       `/api/v1/admin/answer-engine/providers/${config.engine}`,
+      // clear-gate-allow: the provider API has no clear form for a stored key
+      // — `upsertBodySchema` is `z.string().min(1).optional()` (no null) and
+      // there is no DELETE route, so an empty field must mean "leave the
+      // encrypted key alone". Turning the provider off is `enabled: false`.
+      // Removing a stored key needs a new endpoint (product decision).
       { apiKey: apiKey || undefined, enabled }
     );
     setSaving(false);

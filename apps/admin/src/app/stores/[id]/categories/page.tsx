@@ -11,6 +11,7 @@ import { AdminLayout } from '../../../../components/AdminLayout';
 import { ImageUpload } from '../../../../components/ImageUpload';
 import { SearchInput } from '../../../../components/SearchInput';
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../../lib/api';
+import { textFieldValue } from '../../../../lib/form-text';
 import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { CategoryTable, type Category } from './CategoryTable';
 import { useT } from '@/i18n/useT';
@@ -330,17 +331,21 @@ export default function StoreCategoriesPage() {
     setSaveMessage(null);
     try {
       const isEditing = !!editingId;
+      const intent = isEditing ? 'update' : 'create';
       const endpoint = isEditing
         ? `/api/v1/stores/${storeId}/categories/${editingId}`
         : `/api/v1/stores/${storeId}/categories`;
 
       const body = {
         name: form.name.trim(),
-        nameAr: form.nameAr.trim() || undefined,
+        // null clears, undefined leaves alone — same convention as the meta
+        // fields below. This body is reused by the PUT (edit) branch, so an
+        // emptied field MUST send null or the merchant can never clear it.
+        nameAr: textFieldValue(form.nameAr.trim(), intent),
         slug: form.slug.trim(),
-        description: form.description.trim() || undefined,
-        descriptionAr: form.descriptionAr.trim() || undefined,
-        image: form.image || undefined,
+        description: textFieldValue(form.description.trim(), intent),
+        descriptionAr: textFieldValue(form.descriptionAr.trim(), intent),
+        image: textFieldValue(form.image, intent),
         metaTitle: form.metaTitle?.trim() || null,
         metaTitleAr: form.metaTitleAr?.trim() || null,
         metaDescription: form.metaDescription?.trim() || null,

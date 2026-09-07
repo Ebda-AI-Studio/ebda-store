@@ -1,0 +1,300 @@
+/**
+ * Sibling surfaces of the product "an emptied text field must clear" defect.
+ *
+ * The product edit page was the reported sample; the same three-layer mistake
+ * (Zod rejects `null` → the merchant's clear 400s or is dropped) was present
+ * on every other admin form that reuses ONE body for both POST (create) and
+ * PUT (update): store locations, tax rates and coupons. Categories and
+ * warehouses already accepted `null` server-side — only their admin callers
+ * were wrong, and those are covered by
+ * apps/admin/src/lib/__tests__/form-text.test.ts.
+ *
+ * The convention throughout: `null` clears, `undefined` (omitted key) leaves
+ * the stored value alone.
+ */
+
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import express, { type Express } from 'express';
+import request from 'supertest';
+// Imported from SOURCE, not from the package entry point: `@force/shared`
+// resolves to packages/shared/DIST, so a schema test written against it
+// passes on the last build instead of on the code under review.
+import { locationInputSchema } from '@shared/src/schemas/location';
+
+const { mockPrisma } = vi.hoisted(() => ({
+  mockPrisma: {
+    coupon: { findFirst: vi.fn(), update: vi.fn() },
+    taxRate: { findFirst: vi.fn(), update: vi.fn() },
+  },
+}));
+
+vi.mock('@force/database', () => ({
+  prisma: mockPrisma,
+  runInTenantContext: (_storeId: string, fn: () => unknown) => fn(),
+}));
+
+vi.mock('@api/middleware/auth', () => ({
+  authenticate: (req: any, _res: any, next: any) => {
+    req.user = { userId: 'admin-1', role: 'store_admin' };
+    next();
+  },
+  authorize:
+    (..._roles: string[]) =>
+    (_req: any, _res: any, next: any) =>
+      next(),
+}));
+
+vi.mock('@api/middleware/store-access', () => ({
+  requireStoreAccess: (_req: any, _res: any, next: any) => next(),
+  checkStoreAccess: (_req: any, _res: any, next: any) => next(),
+}));
+
+vi.mock('@api/middleware/feature-gate', () => ({
+  requireFeature:
+    (..._args: unknown[]) =>
+    (_req: any, _res: any, next: any) =>
+      next(),
+}));
+
+vi.mock('@api/middleware/security', () => ({
+  auditLog: vi.fn(),
+  couponValidateLimiter: (_req: any, _res: any, next: any) => next(),
+  publicTenantLimiter: (_req: any, _res: any, next: any) => next(),
+  writeLimiter: (_req: any, _res: any, next: any) => next(),
+}));
+
+vi.mock('@api/middleware/tenant-context', () => ({
+  tenantContext: (_req: any, _res: any, next: any) => next(),
+}));
+
+vi.mock('@api/lib/logger', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+const STORE_ID = '11111111-1111-1111-1111-111111111111';
+
+// ─── Locations — packages/shared/src/schemas/location.ts ─────────────────────
+
+describe('locationInputSchema — an emptied branch field can clear', () => {
+  const updateSchema = locationInputSchema.partial();
+
+  const NULLABLE_FIELDS = [
+    'nameAr',
+    'countryAr',
+    'addressAr',
+    'phone',
+    'whatsapp',
+    'hours',
+    'hoursAr',
+  ] as const;
+
+  for (const field of NULLABLE_FIELDS) {
+    it(`accepts null for ${field} (rejected before the fix)`, () => {
+      const parsed = updateSchema.parse({ [field]: null });
+      expect(parsed[field]).toBeNull();
+    });
+  }
+
+  it('accepts null for the maps URLs and normalises an empty string to null', () => {
+    expect(updateSchema.parse({ mapsUrl: null }).mapsUrl).toBeNull();
+    expect(updateSchema.parse({ mapsEmbedUrl: '' }).mapsEmbedUrl).toBeNull();
+  });
+
+  it('still accepts a real https maps URL unchanged', () => {
+    const url = 'https://maps.google.com/?q=Salmiya';
+    expect(updateSchema.parse({ mapsUrl: url }).mapsUrl).toBe(url);
+  });
+
+  it('leaves an omitted key absent — never a null the caller did not send', () => {
+    const parsed = updateSchema.parse({ name: 'Salmiya Branch' });
+    expect('phone' in parsed).toBe(false);
+    expect(parsed.phone).toBeUndefined();
+  });
+
+  it('still rejects null for the required columns', () => {
+    expect(() => updateSchema.parse({ name: null })).toThrow();
+    expect(() => updateSchema.parse({ country: null })).toThrow();
+    expect(() => updateSchema.parse({ address: null })).toThrow();
+  });
+});
+
+// ─── Coupons — apps/api/src/routes/coupon.routes.ts ──────────────────────────
+
+describe('PUT /stores/:storeId/coupons/:id — an emptied coupon field clears', () => {
+  let app: Express;
+
+  beforeAll(async () => {
+    const { default: couponRouter } = await import('@api/routes/coupon.routes');
+    const { errorHandler } = await import('@api/middleware/error-handler');
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/stores', couponRouter);
+    app.use(errorHandler);
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.coupon.findFirst.mockResolvedValue({
+      id: 'coupon-1',
+      code: 'VIP10',
+      nameAr: 'خصم',
+      description: 'Ten percent off everything',
+      descriptionAr: 'وصف',
+    });
+    mockPrisma.coupon.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'coupon-1', ...data })
+    );
+  });
+
+  for (const field of ['nameAr', 'description', 'descriptionAr'] as const) {
+    it(`accepts null for ${field} and writes null`, async () => {
+      const res = await request(app)
+        .put(`/api/v1/stores/${STORE_ID}/coupons/coupon-1`)
+        .send({ [field]: null });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.coupon.update.mock.calls[0][0].data[field]).toBeNull();
+    });
+  }
+
+  it('leaves the stored text alone when the key is omitted', async () => {
+    const res = await request(app)
+      .put(`/api/v1/stores/${STORE_ID}/coupons/coupon-1`)
+      .send({ isActive: false });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.coupon.update.mock.calls[0][0].data.description).toBeUndefined();
+  });
+
+  // ── CLEAR-1: limits/dates (min order, max discount, usage limits) ─────────
+  //
+  // useCoupons.ts sent `formData.minOrderAmount ? ... : undefined` for these
+  // six fields, so a merchant who cleared an already-set minimum/cap/limit/
+  // date had the restriction silently survive the save — the numeric/date
+  // shape of the same bug the text fields above were fixed for.
+  const NUMERIC_FIELDS = [
+    ['minOrderAmount', 5000],
+    ['maxDiscount', 2000],
+    ['usageLimit', 10],
+    ['usageLimitPerUser', 2],
+  ] as const;
+
+  for (const [field, value] of NUMERIC_FIELDS) {
+    describe(field, () => {
+      it('accepts null and writes null (clears the restriction)', async () => {
+        const res = await request(app)
+          .put(`/api/v1/stores/${STORE_ID}/coupons/coupon-1`)
+          .send({ [field]: null });
+
+        expect(res.status).toBe(200);
+        expect(mockPrisma.coupon.update.mock.calls[0][0].data[field]).toBeNull();
+      });
+
+      it('sets a real value exactly as sent', async () => {
+        const res = await request(app)
+          .put(`/api/v1/stores/${STORE_ID}/coupons/coupon-1`)
+          .send({ [field]: value });
+
+        expect(res.status).toBe(200);
+        expect(mockPrisma.coupon.update.mock.calls[0][0].data[field]).toBe(value);
+      });
+
+      it('leaves the stored value untouched when the key is omitted', async () => {
+        const res = await request(app)
+          .put(`/api/v1/stores/${STORE_ID}/coupons/coupon-1`)
+          .send({ isActive: false });
+
+        expect(res.status).toBe(200);
+        expect(mockPrisma.coupon.update.mock.calls[0][0].data[field]).toBeUndefined();
+      });
+    });
+  }
+
+  const SAMPLE_ISO = '2026-12-01T00:00:00.000Z';
+
+  for (const field of ['startsAt', 'expiresAt'] as const) {
+    describe(field, () => {
+      it('accepts null and writes null — the date-transform trap', async () => {
+        // Before the fix, `.transform(s => (s ? new Date(s) : undefined))`
+        // dropped an explicit null to undefined here, so the clear silently
+        // no-opped instead of reaching Prisma.
+        const res = await request(app)
+          .put(`/api/v1/stores/${STORE_ID}/coupons/coupon-1`)
+          .send({ [field]: null });
+
+        expect(res.status).toBe(200);
+        expect(mockPrisma.coupon.update.mock.calls[0][0].data[field]).toBeNull();
+      });
+
+      it('sets a real ISO value, transformed to a Date', async () => {
+        const res = await request(app)
+          .put(`/api/v1/stores/${STORE_ID}/coupons/coupon-1`)
+          .send({ [field]: SAMPLE_ISO });
+
+        expect(res.status).toBe(200);
+        const written = mockPrisma.coupon.update.mock.calls[0][0].data[field];
+        expect(written).toBeInstanceOf(Date);
+        expect(written.toISOString()).toBe(SAMPLE_ISO);
+      });
+
+      it('leaves the stored value untouched when the key is omitted', async () => {
+        const res = await request(app)
+          .put(`/api/v1/stores/${STORE_ID}/coupons/coupon-1`)
+          .send({ isActive: false });
+
+        expect(res.status).toBe(200);
+        expect(mockPrisma.coupon.update.mock.calls[0][0].data[field]).toBeUndefined();
+      });
+    });
+  }
+});
+
+// ─── Tax rates — apps/api/src/routes/tax.routes.ts ───────────────────────────
+
+describe('PUT /stores/:storeId/tax/rates/:id — an emptied tax-rate field clears', () => {
+  let app: Express;
+
+  beforeAll(async () => {
+    const { default: taxRouter } = await import('@api/routes/tax.routes');
+    const { errorHandler } = await import('@api/middleware/error-handler');
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/stores', taxRouter);
+    app.use(errorHandler);
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.taxRate.findFirst.mockResolvedValue({
+      id: 'rate-1',
+      name: 'VAT',
+      nameAr: 'ضريبة',
+      rate: 5,
+      country: 'KW',
+      state: 'Hawally',
+    });
+    mockPrisma.taxRate.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ id: 'rate-1', rate: 5, ...data })
+    );
+  });
+
+  for (const field of ['nameAr', 'country', 'state'] as const) {
+    it(`accepts null for ${field} and writes null`, async () => {
+      const res = await request(app)
+        .put(`/api/v1/stores/${STORE_ID}/tax/rates/rate-1`)
+        .send({ [field]: null });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.taxRate.update.mock.calls[0][0].data[field]).toBeNull();
+    });
+  }
+
+  it('leaves the stored value alone when the key is omitted', async () => {
+    const res = await request(app)
+      .put(`/api/v1/stores/${STORE_ID}/tax/rates/rate-1`)
+      .send({ isActive: false });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.taxRate.update.mock.calls[0][0].data.country).toBeUndefined();
+  });
+});

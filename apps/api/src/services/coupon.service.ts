@@ -5,18 +5,25 @@ import { matchesTargeting, computeDiscount, TargetingCtx } from './promotion-tar
 interface CreateCouponData {
   code: string;
   name: string;
-  nameAr?: string;
-  description?: string;
-  descriptionAr?: string;
+  /** `null` clears the column; `undefined` leaves the stored value alone. */
+  nameAr?: string | null;
+  description?: string | null;
+  descriptionAr?: string | null;
   type: 'percentage' | 'fixed' | 'free_shipping';
   value: number;
-  minOrderAmount?: number;
-  maxDiscount?: number;
-  usageLimit?: number;
-  usageLimitPerUser?: number;
+  /**
+   * `null` removes the restriction (no minimum / no cap / unlimited uses /
+   * never expires); `undefined` leaves the stored value alone. Passed
+   * straight to Prisma, same as nameAr/description above — Prisma omits an
+   * `undefined` key from the write and writes an explicit `null` as NULL.
+   */
+  minOrderAmount?: number | null;
+  maxDiscount?: number | null;
+  usageLimit?: number | null;
+  usageLimitPerUser?: number | null;
   isActive?: boolean;
-  startsAt?: Date;
-  expiresAt?: Date;
+  startsAt?: Date | null;
+  expiresAt?: Date | null;
   // Targeting — shared shape with Promotion (see PromotionService's
   // CreatePromotionData). All optional/empty = "everyone, whole cart" so
   // existing coupons are unchanged. Nullable (not just optional) since the

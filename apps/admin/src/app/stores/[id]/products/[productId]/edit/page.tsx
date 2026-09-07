@@ -21,6 +21,7 @@ import { MultiImageUpload } from '../../../../../../components/ImageUpload';
 import { AITranslateMissingButton } from '../../../../../../components/AITranslateMissingButton';
 import { useAuth } from '../../../../../../lib/auth';
 import { apiGet, apiPost, apiPut } from '../../../../../../lib/api';
+import { productTextFields } from '../../../../../../lib/product-payload';
 import { EditSidebar } from './_components/EditSidebar';
 import { ProductFaqSection, type ProductFaqSectionHandle } from './_components/ProductFaqSection';
 import { AiFieldBadge } from './_components/AiFieldBadge';
@@ -449,10 +450,11 @@ export default function EditProductPage() {
 
       const body: Record<string, unknown> = {
         name: formData.name,
-        nameAr: formData.nameAr || undefined,
-        description: formData.description || undefined,
-        descriptionAr: formData.descriptionAr || undefined,
-        // null clears, undefined leaves alone — same convention as metaTitle below.
+        // Clearable free text (nameAr / description / descriptionAr / sku).
+        // null clears, undefined leaves alone — same convention as metaTitle
+        // below. These MUST send null: `undefined` omits the key, so an
+        // emptied field saved with no effect and could never be cleared.
+        ...productTextFields(formData, 'update'),
         excerpt: formData.excerpt || null,
         excerptAr: formData.excerptAr || null,
         price: finalPrice,
@@ -462,7 +464,6 @@ export default function EditProductPage() {
         // null clears previously stored discount columns.
         discountType: apiDiscountType,
         discountValue: apiDiscountValue,
-        sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
         // Only send when filled so an empty field doesn't clobber the existing
         // threshold with 0. The API leaves it untouched when omitted.

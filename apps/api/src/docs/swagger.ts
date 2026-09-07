@@ -138,12 +138,16 @@ All errors follow this format:
             id: { type: 'string', format: 'uuid' },
             storeId: { type: 'string', format: 'uuid' },
             name: { type: 'string' },
-            nameAr: { type: 'string' },
+            // Nullable free text. On PUT, `null` CLEARS the column and an
+            // omitted key leaves it alone (Prisma's convention) — sending
+            // `undefined` is what made an emptied field impossible to clear.
+            nameAr: { type: 'string', nullable: true },
             slug: { type: 'string' },
-            description: { type: 'string' },
+            description: { type: 'string', nullable: true },
+            descriptionAr: { type: 'string', nullable: true },
             price: { type: 'integer', description: 'Price in fils (1 KWD = 1000 fils)' },
-            compareAtPrice: { type: 'integer' },
-            sku: { type: 'string' },
+            compareAtPrice: { type: 'integer', nullable: true },
+            sku: { type: 'string', nullable: true },
             inventory: { type: 'integer' },
             status: { type: 'string', enum: ['active', 'draft', 'archived'] },
             images: { type: 'array', items: { $ref: '#/components/schemas/ProductImage' } },
@@ -165,10 +169,16 @@ All errors follow this format:
           properties: {
             id: { type: 'string', format: 'uuid' },
             name: { type: 'string' },
-            nameAr: { type: 'string' },
+            // Same clearable-field contract as Product above: these are
+            // nullable columns, `updateCategorySchema` accepts `null` for
+            // each (category.routes.ts) and the admin now SENDS null when the
+            // merchant empties the input. Documenting them as plain `string`
+            // told an integrator a clear was invalid.
+            nameAr: { type: 'string', nullable: true },
             slug: { type: 'string' },
-            description: { type: 'string' },
-            image: { type: 'string', format: 'uri' },
+            description: { type: 'string', nullable: true },
+            descriptionAr: { type: 'string', nullable: true },
+            image: { type: 'string', format: 'uri', nullable: true },
           },
         },
         // Order schemas

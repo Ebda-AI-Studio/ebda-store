@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@force/ui';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPut } from '../../../../lib/api';
+import { buildCheckoutDeliverySettings } from '../../../../lib/checkout-delivery-payload';
 import { useT } from '@/i18n/useT';
 import type { CheckoutDeliverySettings, CheckoutDeliveryWindow } from '@force/shared';
 
@@ -13,15 +14,6 @@ const DEFAULT_CONFIG: CheckoutDeliverySettings = {
   note: { enabled: false, text: '', textAr: '' },
   windows: { enabled: false, items: [] },
 };
-
-/** Round a KWD string input to integer fils. Empty/invalid/non-positive
- *  input resolves to 0 (= no minimum), matching the platform's opt-in
- *  convention for this field. */
-function kwdInputToFils(kwd: string): number {
-  const parsed = parseFloat(kwd);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-  return Math.round(parsed * 1000);
-}
 
 function genId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -96,12 +88,12 @@ export default function CheckoutDeliveryPage() {
     setMessage(null);
     try {
       const { error } = await apiPut(`/api/v1/stores/${storeId}`, {
-        settings: {
-          ...existingSettings,
-          checkoutDelivery: config,
-          minimumOrderFils: kwdInputToFils(minimumOrderKwd),
-          orderInvoiceEmail: orderInvoiceEmail.trim() || undefined,
-        },
+        settings: buildCheckoutDeliverySettings({
+          existingSettings,
+          config,
+          minimumOrderKwd,
+          orderInvoiceEmail,
+        }),
       });
       if (!error) {
         setMessage({ type: 'success', text: t('successMessage') });

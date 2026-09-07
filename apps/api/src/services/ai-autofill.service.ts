@@ -7,10 +7,22 @@ import logger from '../lib/logger';
 
 /**
  * Diff incoming admin-form values against the stored values and update the
- * provenance map: any AI-writable field whose value changed becomes
- * 'human' (the override guarantee); a field cleared to empty loses its key
- * (back to "empty"). Only AI-writable fields are considered. `incoming` may
- * omit fields (PATCH semantics) — omitted = unchanged.
+ * provenance map: any AI-writable field whose value changed becomes 'human'
+ * (the override guarantee) — INCLUDING a field the merchant explicitly
+ * emptied. A clear is an edit, not an absence.
+ *
+ * Dropping the key on a clear (the original behaviour) left
+ * `sources[field] === undefined`, which `fieldsNeedingRefresh` reads as an
+ * empty gap to fill. `product.upserted` fires right after this save, so the
+ * autopilot would re-translate the cleared field from its still-populated
+ * sibling language and stamp it 'ai' — for a bilingual product (the common
+ * case here) the merchant's clear reappeared as fresh AI text seconds later,
+ * burning Gemini quota on every such save. 'human' is the one stamp the fill
+ * engine never overrides. Merchants who want AI to own the field again use
+ * the "✨ Switch to AI" hand-back endpoint, which deletes the key itself.
+ *
+ * Only AI-writable fields are considered. `incoming` may omit fields (PATCH
+ * semantics) — omitted = unchanged.
  */
 export function stampHumanEdits(
   current: AiFieldSources,
@@ -23,11 +35,10 @@ export function stampHumanEdits(
     const before = (stored[field] ?? '') as string;
     const after = (incoming[field] ?? '') as string;
     if (after === before) continue;
-    if (String(after).trim() === '') {
-      delete next[field];
-    } else {
-      next[field] = 'human';
-    }
+    // Whitespace churn between two effectively-empty values (e.g. '' → '  '
+    // on create) is not an edit — leave the field a fillable gap.
+    if (String(after).trim() === '' && String(before).trim() === '') continue;
+    next[field] = 'human';
   }
   return next;
 }

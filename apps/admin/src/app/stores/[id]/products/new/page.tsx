@@ -14,6 +14,7 @@ import { AdminLayout } from '../../../../../components/AdminLayout';
 import { MultiImageUpload } from '../../../../../components/ImageUpload';
 import { useAuth } from '../../../../../lib/auth';
 import { apiGet, apiPost } from '../../../../../lib/api';
+import { productTextFields } from '../../../../../lib/product-payload';
 import { useT } from '@/i18n/useT';
 
 type DiscountType = 'none' | 'percentage' | 'fixed';
@@ -162,15 +163,15 @@ export default function NewProductPage() {
 
       const body: Record<string, unknown> = {
         name: formData.name,
-        nameAr: formData.nameAr || undefined,
-        description: formData.description || undefined,
-        descriptionAr: formData.descriptionAr || undefined,
+        // CREATE path — nothing to clear, so an empty field omits the key
+        // entirely (`undefined`). The EDIT form sends `null` instead; see
+        // lib/product-payload.ts.
+        ...productTextFields(formData, 'create'),
         price: finalPrice,
         compareAtPrice: finalCompareAtPrice,
         costPrice: costPriceInFils,
         discountType: apiDiscountType,
         discountValue: apiDiscountValue,
-        sku: formData.sku || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory, 10) : 0,
         ...(formData.lowStockThreshold !== ''
           ? { lowStockThreshold: parseInt(formData.lowStockThreshold, 10) }

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useT } from '@/i18n/useT';
 import { AdminLayout } from '../../../../components/AdminLayout';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../../lib/api';
+import { textFieldValue } from '../../../../lib/form-text';
 import { TaxGeneralSettings } from './_components/TaxGeneralSettings';
 import { TaxRatesTable } from './_components/TaxRatesTable';
 import { TaxRateFormModal } from './_components/TaxRateFormModal';
@@ -137,12 +138,15 @@ export default function TaxSettingsPage() {
     setSaving(true);
 
     try {
+      // Reused by the PUT (edit) branch below — an emptied optional field
+      // must send null to actually clear it, not undefined.
+      const intent = editingRate ? 'update' : 'create';
       const body = {
         name: formData.name,
-        nameAr: formData.nameAr || undefined,
+        nameAr: textFieldValue(formData.nameAr, intent),
         rate: parseFloat(formData.rate),
-        country: formData.country || undefined,
-        state: formData.state || undefined,
+        country: textFieldValue(formData.country, intent),
+        state: textFieldValue(formData.state, intent),
         priority: parseInt(formData.priority) || 0,
         isCompound: formData.isCompound,
         isActive: formData.isActive,

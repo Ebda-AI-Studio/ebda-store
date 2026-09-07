@@ -105,8 +105,13 @@ export interface StoreSettings {
    * store auto-emails the rendered invoice to this address (e.g. the store
    * owner). Empty/unset = no owner invoice email is sent. Per-store — only
    * stores that configure it receive it.
+   *
+   * `null` is the CLEARED form: the admin sends an explicit null when the
+   * merchant empties the field, because an omitted key would be preserved by
+   * the server's shallow `settings` merge (the merchant could never turn the
+   * invoice emails off). Readers treat null exactly like unset.
    */
-  orderInvoiceEmail?: string;
+  orderInvoiceEmail?: string | null;
   /**
    * Optional, opt-in per-store checkout "delivery" block: a merchant-written
    * bilingual note plus a set of merchant-configured delivery time windows

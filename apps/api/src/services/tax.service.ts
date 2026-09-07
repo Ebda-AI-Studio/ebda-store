@@ -4,10 +4,11 @@ import { featureService } from './feature.service';
 
 interface CreateTaxRateData {
   name: string;
-  nameAr?: string;
+  /** `null` clears the column; `undefined` leaves the stored value alone. */
+  nameAr?: string | null;
   rate: number;
-  country?: string;
-  state?: string;
+  country?: string | null;
+  state?: string | null;
   priority?: number;
   isCompound?: boolean;
   isActive?: boolean;
