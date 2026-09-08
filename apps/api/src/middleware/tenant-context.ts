@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { runInTenantContext } from '@force/database';
+import { withDeferredWork } from '../lib/after-tenant-commit';
 import logger from '../lib/logger';
 
 /**
@@ -65,40 +66,48 @@ export function tenantContext(req: Request, res: Response, next: NextFunction): 
     return;
   }
 
-  runInTenantContext(
-    storeId,
-    () => {
-      return new Promise<void>((resolve, reject) => {
-        // When the response finishes, commit on 2xx/3xx/4xx and roll back on 5xx
-        // so failed handlers don't leave partial writes behind.
-        res.on('finish', () => {
-          if (res.statusCode >= 500) {
-            reject(new Error(`Handler returned ${res.statusCode}`));
-          } else {
-            resolve();
+  // `withDeferredWork` wraps the transaction, not the handler: work registered
+  // via `deferAfterTenantCommit` runs AFTER the commit below, in a fresh
+  // tenant transaction carrying the same GUCs. Without it, a fire-and-forget
+  // promise inherits this (soon-to-be-committed) transaction and its Prisma
+  // calls die with P2028 inside a swallowed `.catch`. See
+  // lib/after-tenant-commit.ts.
+  withDeferredWork({ storeId, userId: req.user?.userId }, () =>
+    runInTenantContext(
+      storeId,
+      () => {
+        return new Promise<void>((resolve, reject) => {
+          // When the response finishes, commit on 2xx/3xx/4xx and roll back on 5xx
+          // so failed handlers don't leave partial writes behind.
+          res.on('finish', () => {
+            if (res.statusCode >= 500) {
+              reject(new Error(`Handler returned ${res.statusCode}`));
+            } else {
+              resolve();
+            }
+          });
+          // Premature close (client disconnect) — don't roll back, just let the tx commit.
+          res.on('close', resolve);
+
+          // Advance to the next middleware. Passing a function here is a bug:
+          // Express treats any truthy argument to next() as an error and skips
+          // straight to the error handler, which is why every store-scoped
+          // route was returning 500 before the handler ever ran.
+          try {
+            next();
+          } catch (err) {
+            reject(err);
           }
         });
-        // Premature close (client disconnect) — don't roll back, just let the tx commit.
-        res.on('close', resolve);
-
-        // Advance to the next middleware. Passing a function here is a bug:
-        // Express treats any truthy argument to next() as an error and skips
-        // straight to the error handler, which is why every store-scoped
-        // route was returning 500 before the handler ever ran.
-        try {
-          next();
-        } catch (err) {
-          reject(err);
-        }
-      });
-    },
-    // Additive user-scoped GUC (RLS cutover Phase 1b) — sets
-    // `app.current_user_id` alongside `app.current_store_id` when the
-    // request is authenticated, so user-scoped policies (e.g. `addresses`)
-    // can evaluate `user_id = current_user_id()` for requests that happen to
-    // flow through a store-scoped route. Undefined for unauthenticated
-    // requests — identical to today's behavior (GUC unset → allow-contextless).
-    req.user?.userId
+      },
+      // Additive user-scoped GUC (RLS cutover Phase 1b) — sets
+      // `app.current_user_id` alongside `app.current_store_id` when the
+      // request is authenticated, so user-scoped policies (e.g. `addresses`)
+      // can evaluate `user_id = current_user_id()` for requests that happen to
+      // flow through a store-scoped route. Undefined for unauthenticated
+      // requests — identical to today's behavior (GUC unset → allow-contextless).
+      req.user?.userId
+    )
   ).catch(err => {
     // Transaction timeout or DB error — let Express error handler deal with it
     // Don't double-send if the response was already started
@@ -178,26 +187,31 @@ export function userContext(
     const rawStoreId = getStoreId?.(req);
     const storeId = rawStoreId && UUID_RE.test(rawStoreId) ? rawStoreId : undefined;
 
-    runInTenantContext(
-      storeId,
-      () => {
-        return new Promise<void>((resolve, reject) => {
-          res.on('finish', () => {
-            if (res.statusCode >= 500) {
-              reject(new Error(`Handler returned ${res.statusCode}`));
-            } else {
-              resolve();
+    // Same post-commit deferral scope as `tenantContext` above — a
+    // fire-and-forget promise started by a user-scoped handler inherits this
+    // transaction too. See lib/after-tenant-commit.ts.
+    withDeferredWork({ storeId, userId }, () =>
+      runInTenantContext(
+        storeId,
+        () => {
+          return new Promise<void>((resolve, reject) => {
+            res.on('finish', () => {
+              if (res.statusCode >= 500) {
+                reject(new Error(`Handler returned ${res.statusCode}`));
+              } else {
+                resolve();
+              }
+            });
+            res.on('close', resolve);
+            try {
+              next();
+            } catch (err) {
+              reject(err);
             }
           });
-          res.on('close', resolve);
-          try {
-            next();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      },
-      userId
+        },
+        userId
+      )
     ).catch(err => {
       if (!res.headersSent) {
         logger.error({ err, userId, storeId }, 'User context transaction failed');

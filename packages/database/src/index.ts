@@ -110,6 +110,67 @@ type TenantTx = Omit<
 const tenantStorage = new AsyncLocalStorage<TenantTx>();
 
 /**
+ * Tenant transactions whose `runInTenantContext` callback has already
+ * returned — i.e. Prisma is committing (or has committed) them.
+ *
+ * Why this exists: the API holds ONE interactive transaction per request in
+ * `tenantStorage` and commits it on `res.on('finish')` (see
+ * apps/api/src/middleware/tenant-context.ts). A fire-and-forget promise
+ * started inside the handler INHERITS this AsyncLocalStorage context, so any
+ * Prisma call it makes after the response flushes lands on a committed
+ * transaction and throws P2028 ("Transaction already closed"). Every such
+ * call site wraps itself in a logging `.catch`, so the work silently never
+ * happened — return-confirmation emails never sent, affiliate audit events
+ * never written, orphaned R2 objects never reclaimed.
+ *
+ * The transaction object itself is the only stable identity we have for
+ * "this request's tx", hence a WeakSet (entries are collected with the tx).
+ *
+ * This is DETECTION ONLY. The proxy still routes the call to the closed
+ * transaction exactly as before — the P2028 still throws, byte-identical
+ * behaviour — but a registered reporter gets told, with the property name
+ * and a stack, so the failure is loud instead of silent. Routing the call to
+ * the base client instead would drop the `app.current_store_id` GUC that
+ * `runInTenantContext` set, trading a transaction bug for a tenancy bug.
+ */
+const closedTenantTxs = new WeakSet<object>();
+
+/** What a closed-tenant-tx access reports to the host application. */
+export interface ClosedTenantTxAccess {
+  /** The Prisma property that was read (model accessor or raw helper). */
+  property: string;
+  /** Capture stack of the offending access, so the call site is nameable. */
+  stack?: string;
+}
+
+let closedTenantTxReporter: ((info: ClosedTenantTxAccess) => void) | null = null;
+
+/**
+ * Register a handler invoked whenever code touches the ambient tenant
+ * transaction AFTER its `runInTenantContext` callback returned.
+ *
+ * The API registers one at boot that logs at error level and fires the
+ * standard Telegram alert (see apps/api/src/lib/after-tenant-commit.ts).
+ * Registering is optional — with no reporter this is a no-op, which is what
+ * scripts, migrations and tests get.
+ */
+export function onClosedTenantTxAccess(
+  handler: ((info: ClosedTenantTxAccess) => void) | null
+): void {
+  closedTenantTxReporter = handler;
+}
+
+function reportClosedTenantTxAccess(property: string): void {
+  const reporter = closedTenantTxReporter;
+  if (!reporter) return;
+  try {
+    reporter({ property, stack: new Error('Prisma call on a committed tenant transaction').stack });
+  } catch {
+    // A broken reporter must never change the behaviour of the query path.
+  }
+}
+
+/**
  * Model-level property names on PrismaClient (e.g. `user`, `product`, `store`).
  * When a tenant transaction is active, reads of these properties are proxied
  * to the transaction client so every query runs inside the SET LOCAL scope.
@@ -171,6 +232,10 @@ export const prisma = new Proxy(basePrisma, {
   get(target, prop, receiver) {
     const tx = tenantStorage.getStore();
     if (tx && isProxiedProp(prop)) {
+      // Detection only — see `closedTenantTxs`. Routing is unchanged.
+      if (closedTenantTxs.has(tx as object)) {
+        reportClosedTenantTxAccess(String(prop));
+      }
       return Reflect.get(tx, prop, tx);
     }
     return Reflect.get(target, prop, receiver);
@@ -294,7 +359,15 @@ export async function runInTenantContext<T>(
           `SET LOCAL app.current_user_id = '${userId.replace(/'/g, "''")}'`
         );
       }
-      return tenantStorage.run(tx, fn);
+      try {
+        return await tenantStorage.run(tx, fn);
+      } finally {
+        // The callback has returned, so Prisma is about to COMMIT: from here
+        // on, any query that reaches this tx throws P2028. Mark it so the
+        // proxy can name the offender instead of leaving a swallowed
+        // rejection. Behaviour is otherwise unchanged.
+        closedTenantTxs.add(tx as object);
+      }
     },
     // maxWait raised from Prisma's 2s default — admin dashboards fire 4-6
     // parallel /stores/:id/* requests, each opening an interactive tx for

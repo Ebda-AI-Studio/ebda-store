@@ -781,7 +781,18 @@ export class EmailService {
         : 'en');
     const subject = returnConfirmationTemplate.subject[lang](data, store.name);
     const content = returnConfirmationTemplate[lang](data, store.name);
-    await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
+    // `queue: true` — same durable Redis retry path the order-lifecycle
+    // emails use. The render (two Prisma reads) stays synchronous so it runs
+    // inside the caller's tenant transaction; only the Resend call moves to
+    // the queue drainer, where a transient failure retries 3x instead of
+    // vanishing. Before this, the whole chain was fired-and-forgotten past
+    // the response and died on a committed transaction (P2028) at
+    // `resend.service.ts` — every return confirmation silently unsent.
+    await this.sendForStore(
+      storeId,
+      { to: data.email, subject, content, language: lang },
+      { queue: true }
+    );
   }
 
   /**
@@ -811,7 +822,12 @@ export class EmailService {
         : 'en');
     const subject = returnStatusUpdateTemplate.subject[lang](data, store.name);
     const content = returnStatusUpdateTemplate[lang](data, store.name);
-    await this.sendForStore(storeId, { to: data.email, subject, content, language: lang });
+    // Durable queue, same reasoning as sendReturnConfirmation above.
+    await this.sendForStore(
+      storeId,
+      { to: data.email, subject, content, language: lang },
+      { queue: true }
+    );
   }
 
   /**

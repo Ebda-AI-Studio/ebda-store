@@ -1,0 +1,188 @@
+/**
+ * Post-response work that has to outlive the per-request tenant transaction.
+ *
+ * ## The defect class this exists to close
+ *
+ * `middleware/tenant-context.ts` runs each store-scoped request inside ONE
+ * Prisma interactive transaction, held in AsyncLocalStorage and committed on
+ * `res.on('finish')` — i.e. AFTER the response is flushed.
+ *
+ * A fire-and-forget promise started inside a handler (`void Svc.doThing(...)`)
+ * INHERITS that AsyncLocalStorage context. Any Prisma query it makes once the
+ * response has flushed lands on an already-committed transaction:
+ *
+ *   Transaction API error: Transaction already closed: A query cannot be
+ *   executed on a committed transaction.  (P2028)
+ *
+ * Every such call site wraps itself in a logging `.catch`, so the work
+ * silently never happened. Measured against a real Postgres (see
+ * `tests/integration/after-tenant-commit.test.ts`): a detached promise with
+ * even ONE `await` before its Prisma call loses the race reliably; a single
+ * un-awaited query loses it whenever the handler returns promptly.
+ *
+ * ## The contract
+ *
+ * `deferAfterTenantCommit(name, run)` says: "run this AFTER the request's
+ * tenant transaction has committed, in a FRESH tenant transaction carrying
+ * the same `app.current_store_id` / `app.current_user_id` GUCs."
+ *
+ * - Inside a store-scoped request → the task is queued and executed after
+ *   the commit, wrapped in its own `runInTenantContext(storeId, …, userId)`.
+ *   Tenant scoping is therefore identical to the request's own — the GUCs are
+ *   re-established, not dropped. (This is the same shape
+ *   `payment-confirm.service.ts` already uses for its post-payment push:
+ *   `void runInTenantContext(order.storeId, …)`.)
+ * - Outside one (Inngest functions, crons, scripts, and the routers that are
+ *   deliberately context-less) → there is no ambient transaction to outlive,
+ *   so `run()` executes inline and its promise is returned unchanged. That is
+ *   byte-identical to the behaviour before this module existed, which is why
+ *   adopting it at a call site cannot regress a path that works today.
+ * - If the request's transaction ROLLS BACK (handler returned 5xx), queued
+ *   tasks are DROPPED: the rows they were about to react to no longer exist.
+ *
+ * Failures of deferred work are loud — error log plus the standard Telegram
+ * alert — because a swallowed `.catch` is exactly why the original defect ran
+ * undetected in production.
+ */
+
+import { AsyncLocalStorage } from 'async_hooks';
+import { onClosedTenantTxAccess, runInTenantContext } from '@force/database';
+import logger from './logger';
+import { sendAlert } from '../services/alerts.service';
+
+interface DeferredTask {
+  /** Stable, greppable identifier — appears in logs and alert headers. */
+  name: string;
+  run: () => Promise<unknown>;
+}
+
+interface DeferralScope {
+  tasks: DeferredTask[];
+}
+
+export interface TenantCommitContext {
+  storeId?: string;
+  userId?: string;
+}
+
+const deferralStorage = new AsyncLocalStorage<DeferralScope>();
+
+/**
+ * True when the current async context is inside a request whose tenant
+ * transaction commits after the response. Exported for call sites that need
+ * to branch on it (e.g. to keep a synchronous return value honest).
+ */
+export function hasDeferralScope(): boolean {
+  return deferralStorage.getStore() !== undefined;
+}
+
+/**
+ * Queue `run` to execute after the ambient tenant transaction commits, or
+ * execute it inline when there is no such transaction.
+ *
+ * Returns `run()`'s value when it ran inline, and `null` when it was deferred
+ * (the result is not knowable yet). Callers that already treat this work as
+ * fire-and-forget — every current one does — can ignore the difference.
+ */
+export function deferAfterTenantCommit<T>(name: string, run: () => Promise<T>): Promise<T | null> {
+  const scope = deferralStorage.getStore();
+  if (!scope) {
+    return run();
+  }
+  scope.tasks.push({ name, run });
+  return Promise.resolve(null);
+}
+
+/**
+ * Establish a deferral scope around a request's tenant transaction, then
+ * drain whatever the handler queued once that transaction has committed.
+ *
+ * `fn` MUST be the `runInTenantContext(...)` call itself: the scope has to
+ * live OUTSIDE the transaction so the drain happens after the commit, and
+ * INSIDE this function's dynamic extent so handlers can find it.
+ */
+export async function withDeferredWork<T>(
+  ctx: TenantCommitContext,
+  fn: () => Promise<T>
+): Promise<T> {
+  const scope: DeferralScope = { tasks: [] };
+  let result: T;
+  try {
+    // `await` resumes in THIS function's context, which is outside the
+    // AsyncLocalStorage store — so the drain below (and anything it calls)
+    // sees no scope and runs its own work inline rather than re-queueing it.
+    result = await deferralStorage.run(scope, fn);
+  } catch (err) {
+    // The tenant transaction rolled back (5xx handler, timeout, DB error).
+    // Deferred work reacts to writes that no longer exist — drop it.
+    if (scope.tasks.length > 0) {
+      logger.warn(
+        { storeId: ctx.storeId, dropped: scope.tasks.map(t => t.name) },
+        '[after-tenant-commit] tenant transaction failed — dropping deferred work'
+      );
+      scope.tasks.length = 0;
+    }
+    throw err;
+  }
+  await drain(scope.tasks, ctx);
+  return result;
+}
+
+/** Run queued tasks sequentially, each in its own fresh tenant transaction. */
+async function drain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<void> {
+  if (tasks.length === 0) return;
+  const queued = tasks.splice(0, tasks.length);
+  for (const task of queued) {
+    try {
+      await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
+    } catch (err) {
+      reportDeferredFailure(task.name, err, ctx);
+    }
+  }
+}
+
+function reportDeferredFailure(name: string, err: unknown, ctx: TenantCommitContext): void {
+  const message = err instanceof Error ? err.message : String(err);
+  const code = (err as { code?: string } | null)?.code;
+  logger.error(
+    { err, task: name, code, storeId: ctx.storeId },
+    '[after-tenant-commit] deferred post-response work failed'
+  );
+  void sendAlert({
+    level: 'p1',
+    scope: 'platform',
+    source: `after-tenant-commit.${name}`,
+    title: `Deferred post-response work failed: ${name}`,
+    body: message.slice(0, 1000),
+    context: { task: name, code, storeId: ctx.storeId },
+  }).catch(() => undefined);
+}
+
+/**
+ * Wire the `@force/database` closed-transaction detector to the API's logging
+ * and alerting. Call once at boot.
+ *
+ * This is the enforcement half: `deferAfterTenantCommit` fixes the sites we
+ * know about, this names any site we missed (or that gets added later) the
+ * first time it fires, instead of leaving it in a swallowed `.catch`. It does
+ * not change query routing — the P2028 still throws exactly as before.
+ */
+export function installClosedTenantTxAlerting(): void {
+  onClosedTenantTxAccess(({ property, stack }) => {
+    logger.error(
+      { property, stack },
+      '[after-tenant-commit] Prisma call on a COMMITTED tenant transaction — ' +
+        'this work is being silently dropped; wrap it in deferAfterTenantCommit()'
+    );
+    void sendAlert({
+      level: 'p1',
+      scope: 'platform',
+      source: 'after-tenant-commit.closed_tx_access',
+      title: 'Prisma call on a committed tenant transaction',
+      body:
+        `prisma.${property} was reached after the request's tenant transaction committed. ` +
+        'The query will fail with P2028 and its work will be lost.',
+      context: { property, stack: stack?.slice(0, 1200) },
+    }).catch(() => undefined);
+  });
+}

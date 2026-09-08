@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { prisma, Prisma, ReturnStatus, ReturnType } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { EmailService } from './email.service';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { socketService } from './socket.service';
 import { OrderService } from './order.service';
 import { PaymentService } from './payment-providers/payment.factory';
@@ -365,21 +366,33 @@ export class ReturnService {
       },
     });
 
-    // Return is committed — fire-and-forget the confirmation email so SMTP
-    // latency can't stall the API response.
-    void EmailService.sendReturnConfirmation(
-      storeId,
-      {
-        email: order.customer?.email || '',
-        customerName:
-          `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-          'Customer',
-        storeName: order.store.name,
-        returnNumber,
-        orderNumber: order.orderNumber,
-        type: data.type,
-      },
-      orderLocale
+    // Return is committed — hand the confirmation email to the post-commit
+    // queue so SMTP latency can't stall the API response.
+    //
+    // This used to be a bare `void EmailService.sendReturnConfirmation(...)`.
+    // `/stores/:storeId/returns` runs under `tenantContext`, so the detached
+    // promise inherited the request's tenant transaction and made its Prisma
+    // reads (three of them, ending at `resend.service.ts`'s
+    // `prisma.store.findUnique`) AFTER that transaction committed — P2028,
+    // swallowed by the `.catch` below. Every return confirmation email
+    // silently failed to send. `deferAfterTenantCommit` reruns the same call
+    // in a fresh tenant transaction once the request's has committed; the
+    // send itself is now durable (`{ queue: true }` in email.service.ts).
+    void deferAfterTenantCommit('email.returnConfirmation', () =>
+      EmailService.sendReturnConfirmation(
+        storeId,
+        {
+          email: order.customer?.email || '',
+          customerName:
+            `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
+            'Customer',
+          storeName: order.store.name,
+          returnNumber,
+          orderNumber: order.orderNumber,
+          type: data.type,
+        },
+        orderLocale
+      )
     ).catch(err => logger.error({ err }, 'Failed to send return confirmation email'));
 
     // Send real-time notification to store admins
@@ -457,19 +470,21 @@ export class ReturnService {
 
     const returnOrderLocale = (updatedReturn.order?.locale ?? undefined) as 'en' | 'ar' | undefined;
 
-    // Status was updated — fire-and-forget the email so SMTP latency can't
-    // stall the API response.
-    void EmailService.sendReturnStatusUpdate(
-      storeId,
-      {
-        email: updatedReturn.customer.email,
-        customerName: `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`,
-        storeName: updatedReturn.store.name,
-        returnNumber: updatedReturn.returnNumber,
-        status,
-        notes,
-      },
-      returnOrderLocale
+    // Status was updated — same post-commit deferral as sendReturnConfirmation
+    // above; this path was broken in exactly the same way.
+    void deferAfterTenantCommit('email.returnStatusUpdate', () =>
+      EmailService.sendReturnStatusUpdate(
+        storeId,
+        {
+          email: updatedReturn.customer.email,
+          customerName: `${updatedReturn.customer.firstName} ${updatedReturn.customer.lastName}`,
+          storeName: updatedReturn.store.name,
+          returnNumber: updatedReturn.returnNumber,
+          status,
+          notes,
+        },
+        returnOrderLocale
+      )
     ).catch(err => logger.error({ err }, 'Failed to send return status email'));
 
     // Send real-time notification to customer

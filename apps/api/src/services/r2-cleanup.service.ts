@@ -1,5 +1,6 @@
 import { prisma } from '@force/database';
 import { config } from '../config';
+import { deferAfterTenantCommit } from '../lib/after-tenant-commit';
 import { StorageService } from './storage.service';
 import logger from '../lib/logger';
 
@@ -112,6 +113,19 @@ async function isStillReferenced(url: string): Promise<boolean> {
  * "still referenced" against the row we just deleted.
  */
 export async function deleteR2ObjectIfOrphan(url: string | null | undefined): Promise<void> {
+  // Every caller fires this AFTER its own write, without awaiting, so under a
+  // store-scoped request it used to run on the request's tenant transaction
+  // AFTER that transaction committed: `isStillReferenced` below issues ELEVEN
+  // Prisma queries, all of which died with P2028 and were swallowed by the
+  // `catch` at the bottom of this function as "[r2-cleanup] failed to delete
+  // orphan R2 object". The object then leaked — the exact failure this
+  // service was written to prevent. Deferring runs the same work in a fresh
+  // tenant transaction once the request's has committed; outside a request
+  // (Inngest, crons, scripts) it still executes inline, unchanged.
+  await deferAfterTenantCommit('r2-cleanup.deleteOrphan', () => deleteR2ObjectIfOrphanNow(url));
+}
+
+async function deleteR2ObjectIfOrphanNow(url: string | null | undefined): Promise<void> {
   if (!url) return;
   const key = urlToR2Key(url);
   if (!key) {

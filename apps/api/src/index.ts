@@ -43,6 +43,7 @@ import { inngest } from './lib/inngest/client';
 import { inngestFunctions } from './lib/inngest/functions';
 import { serve as inngestServe } from 'inngest/express';
 import { withLeaderLock } from './lib/leader-election';
+import { installClosedTenantTxAlerting } from './lib/after-tenant-commit';
 import logger from './lib/logger';
 
 // Initialize Sentry before anything else
@@ -97,6 +98,14 @@ let isShuttingDown = false;
 
 // Initialize Socket.io
 socketService.initialize(httpServer);
+
+// Make "Prisma query on an already-committed tenant transaction" loud.
+// Detection only — the query still fails with P2028 exactly as before — but
+// it now reaches the error log and the Telegram alert channel instead of
+// dying inside a caller's `.catch`. That silence is why every return
+// confirmation email failed to send for months without a single signal.
+// See lib/after-tenant-commit.ts.
+installClosedTenantTxAlerting();
 
 // Connect Redis before starting queue processors
 (async () => {
