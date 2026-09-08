@@ -22,8 +22,11 @@
  *   (b) do external I/O in-request (Gemini, courier APIs, Resend, WBS
  *       fetch) that can now blow the 30s tx timeout, or
  *   (c) do fire-and-forget work that outlives the response (the tx
- *       commits on res.finish, then the detached work hits "transaction
- *       already closed").
+ *       settles as soon as the handler is done — since 2026-09-08 that is
+ *       BEFORE the response is flushed, see
+ *       middleware/request-transaction.ts — and the detached work then hits
+ *       "transaction already closed" (P2028). The supported way to do such
+ *       work is `deferAfterTenantCommit`, lib/after-tenant-commit.ts).
  *
  * REWORKED 2026-07-02 (surgical follow-up, same PR #499, blast-radius
  * review): the `router.param(...)` wrapping was REVERTED on every router

@@ -37,19 +37,35 @@ vi.mock('@api/lib/logger', () => ({
 
 import { userContext } from '@api/middleware/tenant-context';
 
+/**
+ * A response double complete enough for `runRequestInTransaction`
+ * (middleware/request-transaction.ts), which `userContext` delegates its
+ * lifecycle to. That module patches `end`/`write` (and, when present,
+ * `download`/`sendFile`/`flushHeaders`) to decide the commit lane, so a double
+ * missing `end` throws before the middleware runs at all. Keep this in step
+ * with what that module touches — a partial double here fails as a TypeError
+ * inside the middleware, which reads as "userContext is broken" rather than
+ * "the double is thin".
+ */
 function makeRes(): Response {
   const listeners: Record<string, () => void> = {};
-  return {
+  const res = {
     statusCode: 200,
     headersSent: false,
+    end: vi.fn(),
+    write: vi.fn(() => true),
+    removeHeader: vi.fn(),
     on: vi.fn((event: string, cb: () => void) => {
       listeners[event] = cb;
-      // Fire 'finish' synchronously so the wrapped promise resolves for the test.
+      // Fire 'finish' asynchronously so the wrapped promise resolves for the
+      // test — this suite never calls res.end(), so 'finish' is the only path
+      // that settles the transaction gate.
       if (event === 'finish') {
         setImmediate(cb);
       }
     }),
-  } as unknown as Response;
+  };
+  return res as unknown as Response;
 }
 
 describe('userContext middleware factory (RLS-3)', () => {

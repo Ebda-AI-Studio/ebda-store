@@ -14,13 +14,20 @@
  * `GET /cart`, `POST /cart/items` or `POST /cart/bundles` — the guard written
  * to absorb the race was the thing that surfaced it.
  *
- * The race is routine, not exotic. `tenantContext` resolves its transaction on
- * `res.on('finish')`, i.e. AFTER the response has been flushed to the client,
- * so even a strictly sequential client can start its next request before the
- * previous one's cart row has committed. That is how this reached CI as an
- * intermittent 500 in `cart-bundles.test.ts` (~1 sequential request in 30 on a
- * developer machine, far more on a loaded runner) rather than as an obvious
- * always-red failure.
+ * The race was routine, not exotic. `tenantContext` USED TO resolve its
+ * transaction on `res.on('finish')`, i.e. AFTER the response had been flushed
+ * to the client, so even a strictly sequential client could start its next
+ * request before the previous one's cart row had committed. That is how this
+ * reached CI as an intermittent 500 in `cart-bundles.test.ts` (~1 sequential
+ * request in 30 on a developer machine, far more on a loaded runner) rather
+ * than as an obvious always-red failure. That half is now fixed at the source:
+ * `middleware/request-transaction.ts` commits BEFORE the response is sent on
+ * the buffered lane, which is why these suites no longer need a
+ * commit barrier between a write and the read-back that follows it.
+ *
+ * The savepoint fix below is independent of that and still load-bearing: two
+ * requests genuinely IN FLIGHT AT ONCE still race the same unique indexes,
+ * and commit-before-respond does nothing for concurrency.
  *
  * Concurrency is the deterministic form of the same race, so that is what
  * these tests drive: several requests for ONE session, in flight at once. Each
@@ -47,7 +54,6 @@ import {
   seedBundle,
   cartClientFor,
   cartSessionId,
-  awaitCartCommitted,
   type FixtureStore,
 } from '../helpers/bundle-fixtures';
 
@@ -93,8 +99,8 @@ describe.skipIf(!hasDb)('cart unique-race recovery under the ambient tenant tran
     const sessionId = cartSessionId('race-additem');
     const cart = cartClientFor(app, store.storeId, sessionId);
     await cart.getCart().expect(200);
-    await awaitCartCommitted(store.storeId, sessionId);
-    // ^ the cart row is now genuinely committed, so this test isolates the
+    // ^ this 200 means the cart row is COMMITTED (commit-before-respond, see
+    // middleware/request-transaction.ts), so this test isolates the
     // cart_items race rather than also racing the cart insert.
 
     const responses = await Promise.all([
@@ -107,7 +113,6 @@ describe.skipIf(!hasDb)('cart unique-race recovery under the ambient tenant tran
 
     // The losers merged rather than being dropped: one line, quantity 3. A
     // recovery that swallowed the loser would leave quantity 1 or 2 here.
-    await awaitCartCommitted(store.storeId, sessionId);
     const got = await cart.getCart().expect(200);
     expect(got.body.data.cart.items).toHaveLength(1);
     expect(got.body.data.cart.items[0].quantity).toBe(3);
@@ -117,7 +122,6 @@ describe.skipIf(!hasDb)('cart unique-race recovery under the ambient tenant tran
     const sessionId = cartSessionId('race-addbundle');
     const cart = cartClientFor(app, store.storeId, sessionId);
     await cart.getCart().expect(200);
-    await awaitCartCommitted(store.storeId, sessionId);
 
     const responses = await Promise.all([
       cart.addBundleToCart({ bundleId, quantity: 1 }),
@@ -127,7 +131,6 @@ describe.skipIf(!hasDb)('cart unique-race recovery under the ambient tenant tran
 
     expect(responses.map(r => r.status)).toEqual([201, 201, 201]);
 
-    await awaitCartCommitted(store.storeId, sessionId);
     const got = await cart.getCart().expect(200);
     expect(got.body.data.cart.bundles).toHaveLength(1);
     expect(got.body.data.cart.bundles[0].quantity).toBe(3);

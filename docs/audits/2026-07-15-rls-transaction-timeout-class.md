@@ -16,6 +16,18 @@ handler does while that transaction is open (Redis, HTTP, per-row loops, long
 service chains) eats into the same 30-second clock, regardless of whether
 the slow work touches the database at all.
 
+> **Correction, 2026-09-08 (not a rewrite — the finding above was accurate when written).**
+> `tenant-context.ts` no longer commits on `res.on('finish')` for buffered
+> responses. The lifecycle moved to `apps/api/src/middleware/request-transaction.ts`,
+> which COMMITS BEFORE THE RESPONSE IS SENT on the buffered lane (every JSON /
+> redirect / `res.send(buffer)` reply) and keeps the old commit-on-finish
+> semantics only for the escalated STREAMING lane (`res.write` / `res.download` /
+> `res.sendFile` / `res.flushHeaders` / `pipe(res)`). The 30-second transaction
+> budget this audit is about is UNCHANGED — the transaction is still held for
+> the whole handler, so every conclusion below about slow work inside it still
+> stands; only the moment of COMMIT moved, and it moved EARLIER (the commit is
+> now inside the response's critical path rather than after it).
+
 Governing rule this class violates:
 `feedback-redis-io-inside-rls-transaction-timeout.md` — "an interactive
 transaction is a budget… put nothing slow in it." That rule was applied to

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { runInTenantContext } from '@force/database';
 import { withDeferredWork } from '../lib/after-tenant-commit';
-import logger from '../lib/logger';
+import { runRequestInTransaction } from './request-transaction';
 
 /**
  * Tenant Context Middleware
@@ -28,7 +28,20 @@ import logger from '../lib/logger';
  * 2. Opens a Prisma $transaction and runs SET LOCAL inside it
  * 3. Stores the transaction client in AsyncLocalStorage
  * 4. Calls next() — all downstream Prisma queries auto-use the transaction
- * 5. When the response finishes, the transaction commits
+ * 5. The transaction COMMITS BEFORE THE RESPONSE IS SENT. The lifecycle lives
+ *    in `./request-transaction.ts` — read its header for the two lanes
+ *    (buffered = commit-then-respond; streaming = escalated, still
+ *    commit-after-flush) and why the split exists. A 2xx that reaches the
+ *    client on the buffered lane is a COMMITTED 2xx; a COMMIT that fails
+ *    becomes a 500 the client actually sees, instead of a silent lost write
+ *    behind a 201.
+ * 6. Work registered by `deferAfterTenantCommit()` drains AFTER that commit
+ *    and AFTER the response has been released to the client, each task in its
+ *    own FRESH tenant transaction carrying the same GUCs
+ *    (`lib/after-tenant-commit.ts`). The full order is
+ *    `COMMIT → response → deferred work`, so post-response side effects never
+ *    sit on the request's latency path and never inherit a closed transaction.
+ *    A rolled-back request drops its deferred work entirely.
  *
  * Safety guarantees:
  * - Routes WITHOUT a storeId skip this middleware (no RLS filtering)
@@ -66,56 +79,39 @@ export function tenantContext(req: Request, res: Response, next: NextFunction): 
     return;
   }
 
-  // `withDeferredWork` wraps the transaction, not the handler: work registered
-  // via `deferAfterTenantCommit` runs AFTER the commit below, in a fresh
-  // tenant transaction carrying the same GUCs. Without it, a fire-and-forget
-  // promise inherits this (soon-to-be-committed) transaction and its Prisma
-  // calls die with P2028 inside a swallowed `.catch`. See
-  // lib/after-tenant-commit.ts.
-  withDeferredWork({ storeId, userId: req.user?.userId }, () =>
-    runInTenantContext(
-      storeId,
-      () => {
-        return new Promise<void>((resolve, reject) => {
-          // When the response finishes, commit on 2xx/3xx/4xx and roll back on 5xx
-          // so failed handlers don't leave partial writes behind.
-          res.on('finish', () => {
-            if (res.statusCode >= 500) {
-              reject(new Error(`Handler returned ${res.statusCode}`));
-            } else {
-              resolve();
-            }
-          });
-          // Premature close (client disconnect) — don't roll back, just let the tx commit.
-          res.on('close', resolve);
+  // Additive user-scoped GUC (RLS cutover Phase 1b) — sets
+  // `app.current_user_id` alongside `app.current_store_id` when the request is
+  // authenticated, so user-scoped policies (e.g. `addresses`) can evaluate
+  // `user_id = current_user_id()` for requests that happen to flow through a
+  // store-scoped route. Undefined for unauthenticated requests — identical to
+  // today's behavior (GUC unset → allow-contextless).
+  const userId = req.user?.userId;
 
-          // Advance to the next middleware. Passing a function here is a bug:
-          // Express treats any truthy argument to next() as an error and skips
-          // straight to the error handler, which is why every store-scoped
-          // route was returning 500 before the handler ever ran.
-          try {
-            next();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      },
-      // Additive user-scoped GUC (RLS cutover Phase 1b) — sets
-      // `app.current_user_id` alongside `app.current_store_id` when the
-      // request is authenticated, so user-scoped policies (e.g. `addresses`)
-      // can evaluate `user_id = current_user_id()` for requests that happen to
-      // flow through a store-scoped route. Undefined for unauthenticated
-      // requests — identical to today's behavior (GUC unset → allow-contextless).
-      req.user?.userId
-    )
-  ).catch(err => {
-    // Transaction timeout or DB error — let Express error handler deal with it
-    // Don't double-send if the response was already started
-    if (!res.headersSent) {
-      logger.error({ err, storeId }, 'Tenant context transaction failed');
-      next(err);
-    }
-  });
+  runRequestInTransaction(
+    res,
+    next,
+    // `withDeferredWork` wraps the TRANSACTION, not the handler: work
+    // registered via `deferAfterTenantCommit` runs AFTER the commit, in a
+    // fresh tenant transaction carrying the same GUCs. Without it a
+    // fire-and-forget promise inherits this (about-to-commit) transaction and
+    // its Prisma calls die with P2028 inside a swallowed `.catch`.
+    //
+    // ORDERING — the whole point of the nesting below:
+    //   COMMIT  →  releaseResponse()  →  drain the deferred tasks
+    // `releaseResponse` is `runRequestInTransaction`'s own "the bytes may go
+    // now" trigger, handed in so the drain cannot get in front of it. Draining
+    // BEFORE the flush would put email sends and R2 cleanup on the request's
+    // latency path; draining before the COMMIT would reintroduce the P2028
+    // this closes. A transaction that rolls back never reaches either step and
+    // its queued work is dropped. See lib/after-tenant-commit.ts.
+    (body, releaseResponse) =>
+      withDeferredWork(
+        { storeId, userId },
+        () => runInTenantContext(storeId, body, userId),
+        releaseResponse
+      ),
+    { storeId, middleware: 'tenantContext' }
+  );
 }
 
 /**
@@ -187,36 +183,19 @@ export function userContext(
     const rawStoreId = getStoreId?.(req);
     const storeId = rawStoreId && UUID_RE.test(rawStoreId) ? rawStoreId : undefined;
 
-    // Same post-commit deferral scope as `tenantContext` above — a
+    // Same COMMIT → release → drain ordering as `tenantContext` above; a
     // fire-and-forget promise started by a user-scoped handler inherits this
     // transaction too. See lib/after-tenant-commit.ts.
-    withDeferredWork({ storeId, userId }, () =>
-      runInTenantContext(
-        storeId,
-        () => {
-          return new Promise<void>((resolve, reject) => {
-            res.on('finish', () => {
-              if (res.statusCode >= 500) {
-                reject(new Error(`Handler returned ${res.statusCode}`));
-              } else {
-                resolve();
-              }
-            });
-            res.on('close', resolve);
-            try {
-              next();
-            } catch (err) {
-              reject(err);
-            }
-          });
-        },
-        userId
-      )
-    ).catch(err => {
-      if (!res.headersSent) {
-        logger.error({ err, userId, storeId }, 'User context transaction failed');
-        next(err);
-      }
-    });
+    runRequestInTransaction(
+      res,
+      next,
+      (body, releaseResponse) =>
+        withDeferredWork(
+          { storeId, userId },
+          () => runInTenantContext(storeId, body, userId),
+          releaseResponse
+        ),
+      { userId, storeId, middleware: 'userContext' }
+    );
   };
 }

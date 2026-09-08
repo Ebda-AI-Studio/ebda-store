@@ -290,7 +290,25 @@ router.post(
       // branch of the policies, which works but defeats the purpose
       // of RLS. Bootstrap order lookup above stays OUTSIDE the wrap
       // because we don't yet know the storeId at that point.
-      await runInTenantContext(order.storeId, async () => {
+      //
+      // COMMIT BEFORE RESPOND. This callback RETURNS the response instead of
+      // sending it, and the send happens after `runInTenantContext` resolves —
+      // i.e. after Postgres has COMMITted. `payments/*` is mounted bare (no
+      // `tenantContext`), so it does not get the middleware lifecycle in
+      // `middleware/request-transaction.ts`; it has to do this itself.
+      //
+      // Measured before this change (2026-09-08, local Postgres): the 200
+      // reached the client 0.376ms BEFORE its own COMMIT landed, so a caller
+      // that read the payment row back immediately could miss it — on the
+      // money path, where a 200 means "your payment is recorded". CI caught it
+      // as a real, non-deterministic failure of
+      // `tests/integration/export-response-lifecycle.test.ts`. Same defect
+      // class as #1596, one layer down. Do not move a `res.*` call back inside
+      // this callback.
+      const paymentResponse = await runInTenantContext<{
+        status: number;
+        body: Record<string, unknown>;
+      }>(order.storeId, async () => {
         // ==========================================
         // COD (Cash on Delivery) — skip payment gateway
         // ==========================================
@@ -319,14 +337,16 @@ router.post(
                 )
               );
             }
-            res.status(400).json({
-              success: false,
-              error: {
-                code: 'COD_NOT_AVAILABLE',
-                message: 'Cash on Delivery is not available for this store',
+            return {
+              status: 400,
+              body: {
+                success: false,
+                error: {
+                  code: 'COD_NOT_AVAILABLE',
+                  message: 'Cash on Delivery is not available for this store',
+                },
               },
-            });
-            return;
+            };
           }
 
           const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
@@ -392,16 +412,18 @@ router.post(
             userAgent: req.headers['user-agent'],
           });
 
-          res.json({
-            success: true,
-            data: {
-              transactionId: payment.id,
-              provider: 'cod',
-              cod: true,
-              codFee,
+          return {
+            status: 200,
+            body: {
+              success: true,
+              data: {
+                transactionId: payment.id,
+                provider: 'cod',
+                cod: true,
+                codFee,
+              },
             },
-          });
-          return;
+          };
         }
 
         // ==========================================
@@ -484,16 +506,23 @@ router.post(
           userAgent: req.headers['user-agent'],
         });
 
-        res.json({
-          success: true,
-          data: {
-            transactionId: result.transactionId,
-            paymentUrl: result.paymentUrl,
-            provider: result.provider,
-            paymentMethods: result.paymentMethods,
+        return {
+          status: 200,
+          body: {
+            success: true,
+            data: {
+              transactionId: result.transactionId,
+              paymentUrl: result.paymentUrl,
+              provider: result.provider,
+              paymentMethods: result.paymentMethods,
+            },
           },
-        });
+        };
       });
+
+      // COMMITTED. Only now do the bytes go out, so a 200 here means the
+      // payment row is durable and visible to every other connection.
+      res.status(paymentResponse.status).json(paymentResponse.body);
     } catch (error) {
       // Compensating rollback: if the order was committed (cart cleared,
       // inventory decremented) but the payment step failed, undo all of that

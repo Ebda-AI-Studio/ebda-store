@@ -714,10 +714,12 @@ router.get(
 
       // Build the workbook into an in-memory buffer BEFORE touching the
       // response.  This bounds all DB work to the fast fetch+build window and
-      // ensures the tenant tx (held by tenantContext middleware until res.finish)
-      // is not kept open across the slow client download that follows.
+      // keeps the tenant tx off the slow client download that follows.
       // Using writeBuffer() here means the stream to the client carries no open
-      // DB connection at all — a much safer pattern for large exports.
+      // DB connection at all — a much safer pattern for large exports — and it
+      // keeps this response on the BUFFERED lane of
+      // middleware/request-transaction.ts (one `res.send`, no `res.write`), so
+      // the tx COMMITS BEFORE the bytes go out rather than after.
       const xlsxBuffer = await workbook.xlsx.writeBuffer();
 
       res.setHeader(

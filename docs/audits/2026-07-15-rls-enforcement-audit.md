@@ -176,6 +176,15 @@ per-request tx on `res.on('finish')`, which fires as soon as the HTTP
 response flushes — independent of any unawaited background promise still in
 flight.
 
+> **Correction, 2026-09-08.** `tenant-context.ts` now commits BEFORE the
+> response is sent for buffered responses (`apps/api/src/middleware/request-transaction.ts`);
+> commit-on-`res.on('finish')` survives only on the escalated streaming lane.
+> The affiliate finding below was FIXED by awaiting `linkOrderToReferral`
+> (`order.service.ts`) and remains fixed; the systemic "detached `void` work
+> races the tx close" class it describes is narrowed by roughly one event-loop
+> turn but NOT eliminated — see the header of `request-transaction.ts` for the
+> current site list.
+
 **New finding, ranked High — live today, independent of the RLS cutover:**
 
 `apps/api/src/services/order.service.ts:730-735`, inside `OrderService.create`

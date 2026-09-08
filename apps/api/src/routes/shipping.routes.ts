@@ -173,8 +173,11 @@ router.get(
       }
 
       // Build into an in-memory buffer BEFORE writing the response so the
-      // tenant tx (held by tenantContext until res.finish) is not kept open
-      // across the slow client download. Mirrors customers export.xlsx.
+      // tenant tx is not kept open across the slow client download, and so a
+      // single `res.send` keeps this response on the BUFFERED lane
+      // (middleware/request-transaction.ts): it commits before the bytes go
+      // out, instead of escalating to the streaming lane the way a
+      // `wb.xlsx.write(res)` would. Mirrors customers export.xlsx.
       const xlsxBuffer = await workbook.xlsx.writeBuffer();
 
       res.setHeader(

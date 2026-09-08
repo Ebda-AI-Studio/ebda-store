@@ -29,7 +29,6 @@ import {
   resolveBundleFor,
   cartClientFor,
   cartSessionId,
-  awaitCartCommitted,
   type FixtureStore,
 } from '../helpers/bundle-fixtures';
 import { prisma } from '@force/database';
@@ -74,7 +73,6 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
     const res = await cart.addBundleToCart({ bundleId: ramadanBox, quantity: 1 });
     expect(res.status).toBe(201);
 
-    await awaitCartCommitted(store.storeId, sessionId);
     const got = await cart.getCart().expect(200);
     expect(got.body.data.cart.items).toHaveLength(1); // the standalone dates, untouched
     expect(got.body.data.cart.bundles).toHaveLength(1); // the box, in its own row
@@ -108,11 +106,12 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
     expect(res.status).toBe(422);
     expect(res.body).toMatchObject({ error: 'insufficient_stock' });
 
-    // Nothing was written on the refused request. The barrier matters MORE
-    // for a zero-assertion than a positive one: without it an empty read
-    // could just mean "the write has not committed yet", and the test would
-    // pass for the wrong reason.
-    await awaitCartCommitted(store.storeId, sessionId);
+    // Nothing was written on the refused request. A zero-assertion is the
+    // one most at risk of passing for the wrong reason: an empty read used to
+    // be indistinguishable from "the write has not committed yet". It is not
+    // any more — the 422 above was answered only after its transaction
+    // settled (middleware/request-transaction.ts), so an empty cart here is
+    // a real empty cart.
     const got = await cart.getCart().expect(200);
     expect(got.body.data.cart.bundles).toHaveLength(0);
   });
@@ -195,7 +194,6 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
     await cart.addToCart({ productId: shirt, quantity: 2 }).expect(201); // 1200 * 2 = 2400
     await cart.addBundleToCart({ bundleId: bundle, quantity: 3 }).expect(201); // 700 * 3 = 2100
 
-    await awaitCartCommitted(store.storeId, sessionId);
     const got = await cart.getCart().expect(200);
     const body = got.body.data.cart;
 
@@ -241,7 +239,6 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
 
     await cart.addBundleToCart({ bundleId: bundle, quantity: 1 }).expect(201);
 
-    await awaitCartCommitted(store.storeId, sessionId);
     const before = await cart.getCart().expect(200);
     // componentSum 800, 10% off -> 720
     expect(before.body.data.cart.bundles[0].unitPrice).toBe(720);
@@ -273,14 +270,12 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
     await cart.addToCart({ productId: shirt, quantity: 2 }).expect(201);
     await cart.addBundleToCart({ bundleId: bundle, quantity: 1 }).expect(201);
 
-    await awaitCartCommitted(store.storeId, sessionId);
     const withBundle = await cart.getCart().expect(200);
     const cartBundleId = withBundle.body.data.cart.bundles[0].id;
     expect(withBundle.body.data.cart.items).toHaveLength(1);
 
     await cart.removeBundleFromCart(cartBundleId).expect(200);
 
-    await awaitCartCommitted(store.storeId, sessionId);
     const after = await cart.getCart().expect(200);
     expect(after.body.data.cart.bundles).toHaveLength(0);
     expect(after.body.data.cart.items).toHaveLength(1);

@@ -7,12 +7,20 @@ that runs with a tenant context it should no longer be using.
 ## The defect
 
 `apps/api/src/middleware/tenant-context.ts` runs each store-scoped request inside
-ONE Prisma interactive transaction, held in AsyncLocalStorage and committed on
-`res.on('finish')` — i.e. **after** the response is flushed.
+ONE Prisma interactive transaction, held in AsyncLocalStorage.
+
+> **Note added 2026-09-08 (merge of #1587 with #1596).** When this audit was
+> written the transaction committed on `res.on('finish')` — i.e. **after** the
+> response was flushed. It now commits BEFORE the response is released
+> (`middleware/request-transaction.ts`). That does not change the defect or the
+> fix; it makes the window **wider**, because the transaction now settles a
+> whole event-loop turn earlier than it used to. Every measurement below still
+> holds, and the "single un-awaited query, handler does one DB round-trip first"
+> row is now a race rather than a pass.
 
 A fire-and-forget promise started inside a handler (`void Svc.doThing(...)`)
-inherits that AsyncLocalStorage context. Any Prisma query it makes once the
-response has flushed lands on an already-committed transaction:
+inherits that AsyncLocalStorage context. Any Prisma query it makes once that
+transaction has settled lands on an already-committed transaction:
 
 ```
 Transaction API error: Transaction already closed: A query cannot be executed on a committed transaction.
@@ -82,9 +90,21 @@ no-op; those routers only get context if they register
 
 `apps/api/src/lib/after-tenant-commit.ts`
 
-- `withDeferredWork(ctx, fn)` — wraps the request's `runInTenantContext` call in
-  `tenant-context.ts` (both `tenantContext` and `userContext`), collecting
-  deferred tasks and draining them **after** the transaction commits.
+- `withDeferredWork(ctx, fn, onCommitted?)` — wraps the request's
+  `runInTenantContext` call in `tenant-context.ts` (both `tenantContext` and
+  `userContext`), collecting deferred tasks and draining them **after** the
+  transaction commits. `onCommitted` is `request-transaction.ts`'s
+  `releaseResponse` callback, fired between the COMMIT and the drain, which
+  fixes the one ordering the two changes could disagree about:
+
+      COMMIT  ->  response released to the client  ->  deferred work drains
+
+  Draining before the COMMIT is the defect this file is about; draining before
+  the release would put an email round-trip on the request's latency path,
+  which the old commit-on-`finish` wiring never did. Asserted end-to-end in
+  `apps/api/src/middleware/__tests__/deferred-work-lifecycle.test.ts` and
+  `tests/integration/deferred-work-lifecycle.test.ts`.
+
 - `deferAfterTenantCommit(name, run)` — queues `run` when a request transaction
   is in play; otherwise runs it inline and returns its result unchanged, so
   Inngest / cron / script paths are byte-identical to before.
@@ -92,7 +112,9 @@ no-op; those routers only get context if they register
   re-establishing `app.current_store_id` and `app.current_user_id`. Escaping
   AsyncLocalStorage to grab a bare client would have dropped those GUCs and
   traded a transaction bug for a tenancy bug; this does not.
-- A request that returns 5xx rolls its transaction back, so its deferred work is
+- A request that returns 5xx rolls its transaction back — and, since #1596, so
+  does a request whose COMMIT itself fails (which now surfaces to the client as
+  a 500 instead of a 201 over a lost write). Either way its deferred work is
   **dropped** — the rows it reacts to no longer exist.
 - A failing task logs at error level AND fires the standard Telegram alert
   (`sendAlert`, `p1`, `source: after-tenant-commit.<task>`). Remaining tasks
@@ -136,6 +158,9 @@ are the same AST shape). The runtime detector is the enforceable gate.
   affiliate-event helpers are already covered, which removes part of that
   blocker; `recalculateFBT` (recommendationRoutes) is not and would need the
   same treatment first.
-- A one-line rule for the repo `CLAUDE.md` ("fire-and-forget work started inside
-  a store-scoped request must go through `deferAfterTenantCommit`") is worth
-  adding but is left to Ahmad — this change did not edit `CLAUDE.md`.
+- ~~A one-line rule for the repo `CLAUDE.md` ("fire-and-forget work started
+  inside a store-scoped request must go through `deferAfterTenantCommit`") is
+  worth adding but is left to Ahmad — this change did not edit `CLAUDE.md`.~~
+  **Done 2026-09-08** as part of the #1587 x #1596 merge: the RLS bullet in
+  `CLAUDE.md` and the Consequences section of `docs/adr/0001-fwb-tenant-isolation.md`
+  both now state the rule and the `COMMIT -> response -> drain` order.

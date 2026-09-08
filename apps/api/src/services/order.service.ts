@@ -1260,11 +1260,15 @@ export class OrderService {
     });
 
     // Link order to affiliate referral. Must be awaited (not fire-and-forget):
-    // the per-request tenant tx (held by tenantContext until res.finish) can
-    // commit before a detached promise's bare prisma.* calls run, silently
-    // dropping commission attribution with no reconciliation sweep. Awaiting
-    // keeps it inside the same request flow/tx, mirroring reverseCommission's
-    // await+catch pattern below (refund path).
+    // the per-request tenant tx now COMMITS BEFORE THE RESPONSE IS SENT
+    // (middleware/request-transaction.ts), so a detached promise's bare
+    // prisma.* calls land on a closed transaction even sooner than they used
+    // to — silently dropping commission attribution with no reconciliation
+    // sweep. Awaiting keeps it inside the same request flow/tx, mirroring
+    // reverseCommission's await+catch pattern below (refund path). Work that
+    // genuinely has to outlive the transaction goes through
+    // `deferAfterTenantCommit` (lib/after-tenant-commit.ts) instead — this one
+    // must not, because the order response depends on it having happened.
     if (referralCode) {
       await affiliateService
         .linkOrderToReferral(storeId, order.id, referralCode)

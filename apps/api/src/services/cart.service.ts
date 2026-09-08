@@ -124,13 +124,17 @@ export class CartService {
         // and the request 500'd on the very race this catch block was written
         // to absorb.
         //
-        // The race is routine, not exotic: `tenantContext` commits the ambient
-        // transaction on `res.on('finish')`, i.e. AFTER the response has been
-        // flushed to the client, so a customer's NEXT request can legitimately
-        // begin before the previous request's cart row is visible — the second
-        // request's `findFirst` sees nothing, its `create` then collides with
-        // the winner on `(store_id, session_id)`. Two concurrent requests on
-        // one session hit it head-on. See tests/integration/cart-session-race.test.ts.
+        // The race is routine, not exotic. It USED to fire even for a strictly
+        // SEQUENTIAL customer: `tenantContext` committed the ambient
+        // transaction on `res.on('finish')`, i.e. AFTER the response had been
+        // flushed, so the NEXT request could begin before the previous
+        // request's cart row was visible. That half is fixed at the source —
+        // `middleware/request-transaction.ts` now commits before it answers.
+        // What remains, and what this catch block is still for, is genuine
+        // CONCURRENCY: two requests on one session in flight at once, where
+        // the second's `findFirst` sees nothing and its `create` then collides
+        // with the winner on `(store_id, session_id)`. Commit-before-respond
+        // does nothing for that. See tests/integration/cart-session-race.test.ts.
         cart = await withSavepoint(() =>
           prisma.cart.create({
             data: {

@@ -4,12 +4,11 @@
  * ## The defect class this exists to close
  *
  * `middleware/tenant-context.ts` runs each store-scoped request inside ONE
- * Prisma interactive transaction, held in AsyncLocalStorage and committed on
- * `res.on('finish')` — i.e. AFTER the response is flushed.
+ * Prisma interactive transaction, held in AsyncLocalStorage.
  *
  * A fire-and-forget promise started inside a handler (`void Svc.doThing(...)`)
- * INHERITS that AsyncLocalStorage context. Any Prisma query it makes once the
- * response has flushed lands on an already-committed transaction:
+ * INHERITS that AsyncLocalStorage context. Any Prisma query it makes once that
+ * transaction has settled lands on an already-committed transaction:
  *
  *   Transaction API error: Transaction already closed: A query cannot be
  *   executed on a committed transaction.  (P2028)
@@ -37,12 +36,36 @@
  *   so `run()` executes inline and its promise is returned unchanged. That is
  *   byte-identical to the behaviour before this module existed, which is why
  *   adopting it at a call site cannot regress a path that works today.
- * - If the request's transaction ROLLS BACK (handler returned 5xx), queued
- *   tasks are DROPPED: the rows they were about to react to no longer exist.
+ * - If the request's transaction ROLLS BACK (handler returned 5xx) or its
+ *   COMMIT fails, queued tasks are DROPPED: the rows they were about to react
+ *   to no longer exist.
  *
  * Failures of deferred work are loud — error log plus the standard Telegram
  * alert — because a swallowed `.catch` is exactly why the original defect ran
  * undetected in production.
+ *
+ * ## Where the drain sits in the request lifecycle
+ *
+ * The request transaction now COMMITS BEFORE THE RESPONSE IS SENT
+ * (`middleware/request-transaction.ts`), which makes the ordering of three
+ * events — the commit, the response, the drain — a decision rather than an
+ * accident. It is:
+ *
+ *     COMMIT  →  response released to the client  →  deferred work drains
+ *
+ * `withDeferredWork`'s optional `onCommitted` callback is how the middle step
+ * is expressed: `request-transaction.ts` passes its own `releaseResponse`, and
+ * this module calls it the moment the transaction resolves and BEFORE
+ * awaiting the drain. So:
+ *
+ * - deferred work never runs inside the transaction (that is the P2028), and
+ * - deferred work never blocks the response (an email send or an R2 delete on
+ *   the client's latency path would be a regression the old
+ *   commit-on-`finish` wiring did not have).
+ *
+ * On the streaming lane the response is already on the wire by the time the
+ * transaction settles; `onCommitted` is then a no-op and the drain still runs
+ * after the commit, so streaming exports keep their deferred work.
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
@@ -100,10 +123,18 @@ export function deferAfterTenantCommit<T>(name: string, run: () => Promise<T>): 
  * `fn` MUST be the `runInTenantContext(...)` call itself: the scope has to
  * live OUTSIDE the transaction so the drain happens after the commit, and
  * INSIDE this function's dynamic extent so handlers can find it.
+ *
+ * `onCommitted` — when given — fires between the COMMIT and the drain, and is
+ * how the response is released to the client before any deferred work starts.
+ * `middleware/request-transaction.ts` passes its `releaseResponse` here; see
+ * the "Where the drain sits" section at the top of this file. It is NEVER
+ * called when the transaction failed, which is exactly right: on that path the
+ * middleware turns the discarded response into a 500 instead.
  */
 export async function withDeferredWork<T>(
   ctx: TenantCommitContext,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  onCommitted?: () => void
 ): Promise<T> {
   const scope: DeferralScope = { tasks: [] };
   let result: T;
@@ -113,8 +144,9 @@ export async function withDeferredWork<T>(
     // sees no scope and runs its own work inline rather than re-queueing it.
     result = await deferralStorage.run(scope, fn);
   } catch (err) {
-    // The tenant transaction rolled back (5xx handler, timeout, DB error).
-    // Deferred work reacts to writes that no longer exist — drop it.
+    // The tenant transaction rolled back (5xx handler, timeout, DB error) or
+    // its COMMIT failed. Deferred work reacts to writes that no longer exist —
+    // drop it.
     if (scope.tasks.length > 0) {
       logger.warn(
         { storeId: ctx.storeId, dropped: scope.tasks.map(t => t.name) },
@@ -124,11 +156,24 @@ export async function withDeferredWork<T>(
     }
     throw err;
   }
+  // COMMITTED. Let the client have its response BEFORE the drain: deferred
+  // work is post-response work by definition and must not sit on the request's
+  // latency path.
+  onCommitted?.();
   await drain(scope.tasks, ctx);
   return result;
 }
 
-/** Run queued tasks sequentially, each in its own fresh tenant transaction. */
+/**
+ * Run queued tasks sequentially, each in its own fresh tenant transaction.
+ *
+ * MUST NOT REJECT. By the time this runs the response is already on the wire,
+ * so a rejection here cannot change the client's outcome — it would only
+ * surface in `request-transaction.ts`'s failure branch and mislabel a
+ * committed, delivered request as a transaction failure. Every task failure is
+ * therefore reported and swallowed, including a failure of the reporter
+ * itself.
+ */
 async function drain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<void> {
   if (tasks.length === 0) return;
   const queued = tasks.splice(0, tasks.length);
@@ -136,7 +181,11 @@ async function drain(tasks: DeferredTask[], ctx: TenantCommitContext): Promise<v
     try {
       await runInTenantContext(ctx.storeId, () => task.run().then(() => undefined), ctx.userId);
     } catch (err) {
-      reportDeferredFailure(task.name, err, ctx);
+      try {
+        reportDeferredFailure(task.name, err, ctx);
+      } catch {
+        // A broken logger/alerter must not strand the rest of the queue.
+      }
     }
   }
 }
