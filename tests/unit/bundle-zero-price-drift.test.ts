@@ -124,6 +124,11 @@ const { mockPrisma } = vi.hoisted(() => ({
     },
     backorderLine: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     $queryRaw: vi.fn().mockResolvedValue([{ inventory: 50 }]),
+    // `hasTenantContext` is mocked `true` below, so CartService.addBundle takes
+    // the ambient-transaction path and brackets its write in a Postgres
+    // SAVEPOINT (apps/api/src/lib/savepoint.ts). Without this the mock throws
+    // "$executeRawUnsafe is not a function" before any pricing assertion runs.
+    $executeRawUnsafe: vi.fn(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     $transaction: vi.fn(async (fn: any) => {
       if (typeof fn !== 'function') return fn;

@@ -28,6 +28,8 @@ import {
   setStock,
   resolveBundleFor,
   cartClientFor,
+  cartSessionId,
+  awaitCartCommitted,
   type FixtureStore,
 } from '../helpers/bundle-fixtures';
 import { prisma } from '@force/database';
@@ -61,7 +63,7 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
       ],
     });
 
-    const sessionId = `session-${suffix}-already-in-cart`;
+    const sessionId = cartSessionId('already-in-cart');
     const cart = cartClientFor(app, store.storeId, sessionId);
 
     await cart.addToCart({ productId: dates, quantity: 1 }).expect(201);
@@ -72,6 +74,7 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
     const res = await cart.addBundleToCart({ bundleId: ramadanBox, quantity: 1 });
     expect(res.status).toBe(201);
 
+    await awaitCartCommitted(store.storeId, sessionId);
     const got = await cart.getCart().expect(200);
     expect(got.body.data.cart.items).toHaveLength(1); // the standalone dates, untouched
     expect(got.body.data.cart.bundles).toHaveLength(1); // the box, in its own row
@@ -98,14 +101,18 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
 
     await setStock(honey, 1); // only 1 honey in stock -> floor(1/1) = 1 bundle makeable
 
-    const sessionId = `session-${suffix}-insufficient-stock`;
+    const sessionId = cartSessionId('insufficient-stock');
     const cart = cartClientFor(app, store.storeId, sessionId);
 
     const res = await cart.addBundleToCart({ bundleId: ramadanBox, quantity: 2 });
     expect(res.status).toBe(422);
     expect(res.body).toMatchObject({ error: 'insufficient_stock' });
 
-    // Nothing was written on the refused request.
+    // Nothing was written on the refused request. The barrier matters MORE
+    // for a zero-assertion than a positive one: without it an empty read
+    // could just mean "the write has not committed yet", and the test would
+    // pass for the wrong reason.
+    await awaitCartCommitted(store.storeId, sessionId);
     const got = await cart.getCart().expect(200);
     expect(got.body.data.cart.bundles).toHaveLength(0);
   });
@@ -122,7 +129,7 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
       isActive: false,
     });
 
-    const cart = cartClientFor(app, store.storeId, `session-${suffix}-inactive`);
+    const cart = cartClientFor(app, store.storeId, cartSessionId('inactive'));
     const res = await cart.addBundleToCart({ bundleId: bundle, quantity: 1 });
     expect(res.status).toBe(422);
     expect(res.body).toMatchObject({ error: 'bundle_not_purchasable' });
@@ -140,7 +147,7 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
       expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // yesterday
     });
 
-    const cart = cartClientFor(app, store.storeId, `session-${suffix}-expired`);
+    const cart = cartClientFor(app, store.storeId, cartSessionId('expired'));
     const res = await cart.addBundleToCart({ bundleId: bundle, quantity: 1 });
     expect(res.status).toBe(422);
     expect(res.body).toMatchObject({ error: 'bundle_not_purchasable' });
@@ -154,7 +161,7 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
       items: [{ productId: p, quantity: 1 }],
     });
 
-    const cart = cartClientFor(app, store.storeId, `session-${suffix}-zero`);
+    const cart = cartClientFor(app, store.storeId, cartSessionId('zero'));
     const res = await cart.addBundleToCart({ bundleId: bundle, quantity: 1 });
     expect(res.status).toBe(422);
     expect(res.body).toMatchObject({ error: 'bundle_not_purchasable' });
@@ -182,12 +189,13 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
       ],
     });
 
-    const sessionId = `session-${suffix}-totals`;
+    const sessionId = cartSessionId('totals');
     const cart = cartClientFor(app, store.storeId, sessionId);
 
     await cart.addToCart({ productId: shirt, quantity: 2 }).expect(201); // 1200 * 2 = 2400
     await cart.addBundleToCart({ bundleId: bundle, quantity: 3 }).expect(201); // 700 * 3 = 2100
 
+    await awaitCartCommitted(store.storeId, sessionId);
     const got = await cart.getCart().expect(200);
     const body = got.body.data.cart;
 
@@ -228,11 +236,12 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
       ],
     });
 
-    const sessionId = `session-${suffix}-pricemove`;
+    const sessionId = cartSessionId('pricemove');
     const cart = cartClientFor(app, store.storeId, sessionId);
 
     await cart.addBundleToCart({ bundleId: bundle, quantity: 1 }).expect(201);
 
+    await awaitCartCommitted(store.storeId, sessionId);
     const before = await cart.getCart().expect(200);
     // componentSum 800, 10% off -> 720
     expect(before.body.data.cart.bundles[0].unitPrice).toBe(720);
@@ -258,18 +267,20 @@ describe.skipIf(!hasDb)('cart holds bundles', () => {
       items: [{ productId: p, quantity: 1 }],
     });
 
-    const sessionId = `session-${suffix}-remove`;
+    const sessionId = cartSessionId('remove');
     const cart = cartClientFor(app, store.storeId, sessionId);
 
     await cart.addToCart({ productId: shirt, quantity: 2 }).expect(201);
     await cart.addBundleToCart({ bundleId: bundle, quantity: 1 }).expect(201);
 
+    await awaitCartCommitted(store.storeId, sessionId);
     const withBundle = await cart.getCart().expect(200);
     const cartBundleId = withBundle.body.data.cart.bundles[0].id;
     expect(withBundle.body.data.cart.items).toHaveLength(1);
 
     await cart.removeBundleFromCart(cartBundleId).expect(200);
 
+    await awaitCartCommitted(store.storeId, sessionId);
     const after = await cart.getCart().expect(200);
     expect(after.body.data.cart.bundles).toHaveLength(0);
     expect(after.body.data.cart.items).toHaveLength(1);
@@ -317,7 +328,7 @@ describe.skipIf(!hasDb)('bundle cross-tenant isolation (real DB)', () => {
   });
 
   it("adding store B's bundle to store A's cart 404s (route layer)", async () => {
-    const cart = cartClientFor(app, storeA.storeId, `session-${suffix}-xtenant`);
+    const cart = cartClientFor(app, storeA.storeId, cartSessionId('xtenant'));
     const res = await cart.addBundleToCart({ bundleId: storeBBundleId, quantity: 1 });
     // No errorHandler is mounted in this test app (see bundle-fixtures.ts) —
     // Express's default handler still honours AppError's `statusCode`, so
@@ -331,7 +342,7 @@ describe.skipIf(!hasDb)('bundle cross-tenant isolation (real DB)', () => {
   });
 
   it("store B's bundle never appears in store A's public bundle list", async () => {
-    const cart = cartClientFor(app, storeA.storeId, `session-${suffix}-xtenant-public`);
+    const cart = cartClientFor(app, storeA.storeId, cartSessionId('xtenant-public'));
     const res = await cart.publicBundles().expect(200);
     const ids = res.body.data.bundles.map((b: { id: string }) => b.id);
     expect(ids).not.toContain(storeBBundleId);
@@ -381,7 +392,7 @@ describe.skipIf(!hasDb)('mergeGuestCart carries bundles across (real DB)', () =>
       items: [{ productId: p2, quantity: 1 }],
     });
 
-    const guestSessionId = `session-${suffix}-merge-guest`;
+    const guestSessionId = cartSessionId('merge-guest');
 
     // Guest cart: both bundles, qty 1 each.
     const guestCart = await prisma.cart.create({
@@ -399,7 +410,7 @@ describe.skipIf(!hasDb)('mergeGuestCart carries bundles across (real DB)', () =>
     // guest's row instead of incrementing this one, this would 500 on the
     // (cartId, bundleId) unique index.
     const userCart = await prisma.cart.create({
-      data: { storeId: store.storeId, sessionId: `session-${suffix}-merge-user`, customerId },
+      data: { storeId: store.storeId, sessionId: cartSessionId('merge-user'), customerId },
     });
     await prisma.cartBundle.create({
       data: { cartId: userCart.id, bundleId: bundleShared, quantity: 2 },

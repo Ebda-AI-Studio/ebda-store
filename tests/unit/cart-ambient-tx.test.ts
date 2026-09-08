@@ -26,6 +26,11 @@ vi.mock('@force/database', () => ({
     product: { findFirst: vi.fn() },
     productVariant: { findFirst: vi.fn() },
     $transaction: vi.fn(),
+    // The ambient-tx write path brackets its create in a Postgres SAVEPOINT
+    // (see apps/api/src/lib/savepoint.ts) — without this the mock throws
+    // "$executeRawUnsafe is not a function" and every assertion below fails
+    // for the wrong reason.
+    $executeRawUnsafe: vi.fn(),
   },
   Prisma: {
     TransactionIsolationLevel: { Serializable: 'Serializable', ReadCommitted: 'ReadCommitted' },
@@ -77,6 +82,21 @@ describe('CartService.addItem — transaction scoping', () => {
     expect(prisma.cartItem.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ cartId: 'cart-1' }) })
     );
+  });
+
+  it('brackets the ambient-tx write in a SAVEPOINT so a lost unique race can recover', async () => {
+    hasTenantContextMock.mockReturnValue(true);
+
+    await CartService.addItem('store-1', 'sess-1', 'prod-1', 1);
+
+    // Without the savepoint, a P2002 from the create below would abort the
+    // whole request transaction and every later statement — including the
+    // retry's own findFirst — would fail with 25P02 instead of recovering.
+    const statements = (prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>).mock.calls.map(
+      c => c[0] as string
+    );
+    expect(statements.some(s => s.startsWith('SAVEPOINT '))).toBe(true);
+    expect(statements.some(s => s.startsWith('RELEASE SAVEPOINT '))).toBe(true);
   });
 
   it('outside a tenant context it still uses its own transaction', async () => {

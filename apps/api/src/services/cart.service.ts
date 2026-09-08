@@ -19,6 +19,7 @@ import { prisma, Prisma, hasTenantContext } from '@force/database';
 import { AppError } from '../middleware/error-handler';
 import { featureService } from './feature.service';
 import { retryOnWriteConflict } from '../lib/db-retry';
+import { withSavepoint } from '../lib/savepoint';
 import { cartLineUnitPrice } from '../lib/cart-pricing';
 import { STOREFRONT_PRODUCT_SELECT } from './product.service';
 import { resolveBundle, type ResolvedBundle } from './bundle.service';
@@ -114,14 +115,32 @@ export class CartService {
         // Attempt to create — a concurrent request may have already created one,
         // in which case we catch the unique constraint violation and fall back to
         // a findFirst so we never return two carts for the same session.
-        cart = await prisma.cart.create({
-          data: {
-            storeId,
-            sessionId,
-            customerId,
-          },
-          include: cartInclude,
-        });
+        //
+        // `withSavepoint` is what makes that fallback REACHABLE. Store-scoped
+        // requests run inside the one interactive transaction
+        // `middleware/tenant-context.ts` opens, and a failed INSERT aborts a
+        // Postgres transaction outright — so without the savepoint the
+        // `findFirst` below died with 25P02 ("current transaction is aborted")
+        // and the request 500'd on the very race this catch block was written
+        // to absorb.
+        //
+        // The race is routine, not exotic: `tenantContext` commits the ambient
+        // transaction on `res.on('finish')`, i.e. AFTER the response has been
+        // flushed to the client, so a customer's NEXT request can legitimately
+        // begin before the previous request's cart row is visible — the second
+        // request's `findFirst` sees nothing, its `create` then collides with
+        // the winner on `(store_id, session_id)`. Two concurrent requests on
+        // one session hit it head-on. See tests/integration/cart-session-race.test.ts.
+        cart = await withSavepoint(() =>
+          prisma.cart.create({
+            data: {
+              storeId,
+              sessionId,
+              customerId,
+            },
+            include: cartInclude,
+          })
+        );
       } catch (err) {
         // P2002 = Prisma unique constraint violation
         if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -266,9 +285,19 @@ export class CartService {
           throw new AppError(400, 'INSUFFICIENT_INVENTORY', 'Not enough inventory');
         }
 
+        // `increment`, not the absolute `newQuantity` computed above.
+        // `newQuantity` comes from a read that another request can invalidate
+        // before this UPDATE takes the row lock: two concurrent adds of one
+        // more unit both read quantity=1, both wrote 2, and one add vanished
+        // from the customer's cart with a 201 in front of it. `increment`
+        // compiles to `SET quantity = quantity + n`, evaluated against the row
+        // as it stands when the lock is granted, so both adds land.
+        // `newQuantity` stays the basis of the inventory check above, which is
+        // explicitly advisory (the authoritative oversell guard is the atomic
+        // decrement in order.service).
         await tx.cartItem.update({
           where: { id: existingItem.id },
-          data: { quantity: newQuantity },
+          data: { quantity: { increment: quantity } },
         });
       } else {
         if (product.trackInventory && availableInventory < quantity && !effectiveAllowBackorder) {
@@ -302,7 +331,20 @@ export class CartService {
       // below is not applied on this path, which is acceptable for the same
       // reason the comment there gives: this check is advisory and the
       // authoritative oversell guard is the atomic decrement in order.service.
-      await writeLine(prisma as unknown as Prisma.TransactionClient);
+      //
+      // The same P2002 the `else` branch retries can happen here (two requests
+      // adding the SAME line to the SAME cart), and it needs the SAME recovery
+      // — but the tx belongs to the request, so re-running the whole thing is
+      // not an option. `withSavepoint` scopes the failed INSERT's rollback so
+      // the request transaction survives it (without it the retry would run
+      // against an ABORTED transaction and every statement would throw 25P02),
+      // and the re-run's `findFirst` then sees the winner's committed row and
+      // merges the quantity — exactly the recovery the create's comment above
+      // describes.
+      await retryOnWriteConflict(
+        () => withSavepoint(() => writeLine(prisma as unknown as Prisma.TransactionClient)),
+        { label: 'cart.addItem(ambient-tx)', extraRetryCodes: ['P2002'] }
+      );
     } else {
       // No tenant context (crons, scripts, tests) — own transaction as before.
       await retryOnWriteConflict(
@@ -395,9 +437,11 @@ export class CartService {
       }
 
       if (existing) {
+        // Atomic increment, not the absolute `targetQuantity` — same
+        // lost-update reason as addItem's merge above.
         await tx.cartBundle.update({
           where: { id: existing.id },
-          data: { quantity: targetQuantity },
+          data: { quantity: { increment: quantity } },
         });
       } else {
         await tx.cartBundle.create({ data: { cartId: cart.id, bundleId, quantity } });
@@ -405,8 +449,16 @@ export class CartService {
       return { ok: true };
     };
 
+    // Ambient-tx path: same treatment as addItem's. A concurrent add of the
+    // SAME bundle to the SAME cart loses the `(cart_id, bundle_id)` unique
+    // race as P2002, which would abort the request transaction outright —
+    // `withSavepoint` confines that rollback so the retry can re-read the
+    // winner's row and merge the quantity instead of 500ing the customer.
     const result = hasTenantContext()
-      ? await writeBundleLine(prisma as unknown as Prisma.TransactionClient)
+      ? await retryOnWriteConflict(
+          () => withSavepoint(() => writeBundleLine(prisma as unknown as Prisma.TransactionClient)),
+          { label: 'cart.addBundle(ambient-tx)', extraRetryCodes: ['P2002'] }
+        )
       : await retryOnWriteConflict(
           () =>
             prisma.$transaction(writeBundleLine, {
@@ -533,9 +585,12 @@ export class CartService {
               }
 
               if (existing) {
+                // Atomic increment, not the absolute `targetQuantity` — same
+                // lost-update reason as addItem's merge (a bulk sync racing a
+                // manual add is the concrete case here).
                 await tx.cartItem.update({
                   where: { id: existing.id },
-                  data: { quantity: targetQuantity },
+                  data: { quantity: { increment: item.quantity } },
                 });
               } else {
                 // Same-cart unique race → P2002, retried at the tx level (see
@@ -713,9 +768,11 @@ export class CartService {
       );
 
       if (existingItem) {
+        // Atomic increment — `userCart` was read before this loop, and the
+        // customer's other tab can add to that same line while the merge runs.
         await prisma.cartItem.update({
           where: { id: existingItem.id },
-          data: { quantity: existingItem.quantity + guestItem.quantity },
+          data: { quantity: { increment: guestItem.quantity } },
         });
       } else {
         await prisma.cartItem.create({
@@ -739,9 +796,10 @@ export class CartService {
       const existingBundle = userCart?.bundles?.find(b => b.bundleId === guestBundle.bundleId);
 
       if (existingBundle) {
+        // Atomic increment — same reason as the item merge above.
         await prisma.cartBundle.update({
           where: { id: existingBundle.id },
-          data: { quantity: existingBundle.quantity + guestBundle.quantity },
+          data: { quantity: { increment: guestBundle.quantity } },
         });
       } else {
         await prisma.cartBundle.create({

@@ -42,6 +42,7 @@ import {
   addBundleToCart,
   checkoutBundleFor,
   groupsOf,
+  cartSessionId,
   DEFAULT_TEST_SHIPPING_ADDRESS,
   type FixtureStore,
 } from '../helpers/bundle-fixtures';
@@ -176,7 +177,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
 
     // Each bundle is satisfiable ALONE (flour stock=1 covers either one),
     // but the cart holds BOTH — combined demand for flour is 2, stock is 1.
-    const sessionId = `session-${suffix}-t6`;
+    const sessionId = cartSessionId('t6');
     await CartService.getOrCreate(store.storeId, sessionId);
     await addBundleToCart(store.storeId, sessionId, bundleA, 1);
     await addBundleToCart(store.storeId, sessionId, bundleB, 1);
@@ -212,7 +213,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
       ],
     });
 
-    const sessionId = `session-${suffix}-t7`;
+    const sessionId = cartSessionId('t7');
     await CartService.getOrCreate(store.storeId, sessionId);
     await addBundleToCart(store.storeId, sessionId, bundleC, 1); // demands 1 sugar
     await addItemToCart(store.storeId, sessionId, sugar, 1); // demands 1 MORE sugar, loose
@@ -237,7 +238,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
       items: [{ productId: p, quantity: 1 }],
     });
 
-    const sessionId = `session-${suffix}-t8`;
+    const sessionId = cartSessionId('t8');
     await CartService.getOrCreate(store.storeId, sessionId);
     await addBundleToCart(store.storeId, sessionId, bundleD, 1); // purchasable at add-time
 
@@ -344,7 +345,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
       ],
     });
 
-    const sessionId = `session-${suffix}-t11`;
+    const sessionId = cartSessionId('t11');
     const order = await checkoutBundleFor(store.storeId, bundleId, 1, {
       sessionId,
       extraItems: [{ productId: shared, quantity: 2 }], // loose line of the SAME product as the bundle component
@@ -398,7 +399,7 @@ describe.skipIf(!hasDb)('order creation expands bundles into component lines', (
       items: [{ productId: p, quantity: 1 }],
     });
 
-    const sessionId = `session-${suffix}-c1`;
+    const sessionId = cartSessionId('c1');
     await checkoutBundleFor(store.storeId, bundleId, 1, { sessionId });
 
     // Assert directly against the table — NOT via the web success page's

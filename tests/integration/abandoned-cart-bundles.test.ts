@@ -37,6 +37,7 @@ import {
   seedBundle,
   seedCustomer,
   resolveBundleFor,
+  cartSessionId,
   type FixtureStore,
 } from '../helpers/bundle-fixtures';
 import { abandonedCartService } from '@api/services/abandoned-cart.service';
@@ -89,7 +90,7 @@ describe.skipIf(!hasDb)('abandoned-cart detection accounts for cart_bundles', ()
     // read `componentSum` instead of `price` would pass for the wrong reason.
     expect(resolved.price).toBeLessThan(resolved.componentSum);
 
-    const cartId = await createStaleCart(store.storeId, `session-${suffix}-a`, customerId);
+    const cartId = await createStaleCart(store.storeId, cartSessionId('stale-a'), customerId);
     await prisma.cartBundle.create({ data: { cartId, bundleId, quantity: 2 } });
 
     await abandonedCartService.detectNewAbandonments();
@@ -133,7 +134,7 @@ describe.skipIf(!hasDb)('abandoned-cart detection accounts for cart_bundles', ()
     });
     const resolved = await resolveBundleFor(store.storeId, bundleId);
 
-    const cartId = await createStaleCart(store.storeId, `session-${suffix}-b`, customerId);
+    const cartId = await createStaleCart(store.storeId, cartSessionId('stale-b'), customerId);
     await prisma.cartItem.create({ data: { cartId, productId: looseProductId, quantity: 3 } });
     await prisma.cartBundle.create({ data: { cartId, bundleId, quantity: 1 } });
 
@@ -155,7 +156,7 @@ describe.skipIf(!hasDb)('abandoned-cart detection accounts for cart_bundles', ()
       inventory: 20,
     });
 
-    const cartId = await createStaleCart(store.storeId, `session-${suffix}-c`, customerId);
+    const cartId = await createStaleCart(store.storeId, cartSessionId('stale-c'), customerId);
     await prisma.cartItem.create({ data: { cartId, productId, quantity: 2 } });
 
     await abandonedCartService.detectNewAbandonments();

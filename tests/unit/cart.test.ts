@@ -243,9 +243,14 @@ describe('CartService', () => {
 
       await CartService.addItem(mockStoreId, mockSessionId, 'prod-123', 3);
 
+      // The DELTA, not the absolute 5. An absolute quantity computed from the
+      // findFirst above is a lost update: two concurrent adds of 3 both read
+      // 2, both write 5, and one add silently vanishes from the cart behind a
+      // 201. `increment` is evaluated by Postgres against the row as it stands
+      // when the UPDATE takes its lock, so both land (2 + 3 + 3 = 8).
       expect(prisma.cartItem.update).toHaveBeenCalledWith({
         where: { id: 'item-existing' },
-        data: { quantity: 5 }, // 2 + 3
+        data: { quantity: { increment: 3 } },
       });
     });
 
@@ -435,9 +440,11 @@ describe('CartService', () => {
       await CartService.mergeGuestCart(mockStoreId, 'guest-session', mockCustomerId);
 
       // prod-1 exists in both - should update
+      // The guest line's DELTA, not the absolute 5 — see addItem's merge
+      // assertion above for why an absolute quantity here is a lost update.
       expect(prisma.cartItem.update).toHaveBeenCalledWith({
         where: { id: 'user-item-1' },
-        data: { quantity: 5 }, // 3 + 2
+        data: { quantity: { increment: 2 } },
       });
 
       // prod-2 only in guest - should create (with variantId so uniqueness is
