@@ -46,7 +46,11 @@ jobs:
     name: Notify on failure (main only)
     needs: [scan]
     if: always() && failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    # Self-hosted, and deliberately NOT behind a toggle. This is the job that
+    # reports CI failing; with the org billing block a GitHub-hosted job dies in
+    # ~3s with no runner assigned, so failures here have been going unreported —
+    # and silence from an alerting job reads as green. It only uses curl.
+    runs-on: [self-hosted, linux, wsl2]
     timeout-minutes: 2
     steps:
       - name: Telegram alert
