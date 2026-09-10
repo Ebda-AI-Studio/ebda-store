@@ -216,6 +216,30 @@ export async function isPlatformDomain(): Promise<boolean> {
 }
 
 /**
+ * An identifier interpolated into a log line, defanged.
+ *
+ * `domain` comes from the Host header and `slug` from the URL path — both are
+ * visitor-controlled. A control character in either would let a visitor forge
+ * extra log lines (code-quality rule 2, log injection) and an unbounded value
+ * would let them flood the drain, so strip C0/C1 and cap the length.
+ */
+function logSafe(value: string): string {
+  return value.replace(/[\u0000-\u001F\u007F-\u009F]/g, '?').slice(0, 128);
+}
+
+/**
+ * Why a 2xx response carried no store.
+ *
+ * `success: false` (the API refused the request) and `success: true` with no
+ * store object (the API answered about a store that does not exist, or the
+ * response shape drifted) are different operational facts with different
+ * fixes, so the log says which one happened rather than just "no store".
+ */
+function noStoreReason(data: { success?: unknown }): string {
+  return data?.success ? 'response carried no store object' : 'API reported success:false';
+}
+
+/**
  * Fetch store from API by domain
  */
 async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null> {
@@ -232,13 +256,16 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch store for domain ${domain}: ${response.status}`);
+      console.error(`Failed to fetch store for domain ${logSafe(domain)}: ${response.status}`);
       return null;
     }
 
     const data = await response.json();
 
     if (!data.success || !data.data?.store) {
+      console.error(
+        `Failed to resolve store for domain ${logSafe(domain)}: ${noStoreReason(data)}`
+      );
       return null;
     }
 
@@ -336,7 +363,7 @@ async function fetchStoreByDomain(domain: string): Promise<ResolvedStore | null>
           : null,
     };
   } catch (error) {
-    console.error(`Error fetching store for domain ${domain}:`, error);
+    console.error(`Error fetching store for domain ${logSafe(domain)}:`, error);
     return null;
   }
 }
@@ -376,13 +403,14 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch store for slug ${slug}: ${response.status}`);
+      console.error(`Failed to fetch store for slug ${logSafe(slug)}: ${response.status}`);
       return null;
     }
 
     const data = await response.json();
 
     if (!data.success || !data.data?.store) {
+      console.error(`Failed to resolve store for slug ${logSafe(slug)}: ${noStoreReason(data)}`);
       return null;
     }
 
@@ -478,7 +506,7 @@ async function fetchStoreBySlug(slug: string): Promise<ResolvedStore | null> {
           : null,
     };
   } catch (error) {
-    console.error(`Error fetching store for slug ${slug}:`, error);
+    console.error(`Error fetching store for slug ${logSafe(slug)}:`, error);
     return null;
   }
 }
@@ -642,12 +670,14 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
     });
 
     if (!response.ok) {
+      console.error(`Failed to fetch store for id ${logSafe(storeId)}: ${response.status}`);
       return null;
     }
 
     const data = await response.json();
 
     if (!data.success || !data.data?.store) {
+      console.error(`Failed to resolve store for id ${logSafe(storeId)}: ${noStoreReason(data)}`);
       return null;
     }
 
@@ -726,7 +756,7 @@ export async function getStoreById(storeId: string): Promise<ResolvedStore | nul
           : null,
     };
   } catch (error) {
-    console.error(`Error fetching store ${storeId}:`, error);
+    console.error(`Error fetching store ${logSafe(storeId)}:`, error);
     return null;
   }
 }
