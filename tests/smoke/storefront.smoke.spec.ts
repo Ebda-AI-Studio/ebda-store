@@ -36,7 +36,17 @@ test.describe('storefront smoke @prod', () => {
     });
 
     await productLink.click();
-    await page.waitForURL(/\/products\//, { timeout: 15_000 });
+    // `waitUntil` is explicit because the default is 'load' — every resource,
+    // including product imagery and marketing pixels. Every other navigation in
+    // this suite deliberately waits only for 'domcontentloaded'; this line was
+    // the lone exception, and it made the check flaky: it timed out waiting for
+    // assets on a page that had already navigated, so a healthy deploy reported
+    // failure and the notifier proposed a rollback. The assertion is that
+    // navigation happened — the DOM is what carries that, not the images.
+    await page.waitForURL(/\/products\//, {
+      timeout: 15_000,
+      waitUntil: 'domcontentloaded',
+    });
 
     await expect(page.locator('h1').first()).toBeVisible();
     await expect(page.locator('main').first()).toBeVisible();
