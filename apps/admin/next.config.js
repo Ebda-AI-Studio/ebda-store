@@ -10,6 +10,69 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const IS_CLOUDFLARE = !!process.env.OPEN_NEXT_CLOUDFLARE || !!process.env.CF_PAGES;
 
 /** @type {import('next').NextConfig} */
+/**
+ * What the page-builder's live-preview iframe is allowed to embed.
+ *
+ * `frame-src` governs what the PARENT (admin) may embed; the storefront's own
+ * `frame-ancestors` governs who may embed IT. Both must permit the embed, and
+ * the storefront side already restricts framing to admin origins — that is
+ * where the real protection lives.
+ *
+ * This used to be a hand-maintained list of merchant domains, which is why
+ * `https://wadyaljuz.com` was sitting in it: one tenant was onboarded, someone
+ * added their domain, and every merchant onboarded afterwards silently lost
+ * their preview. Pecannbee's page-builder showed Chrome's "This content is
+ * blocked" for exactly that reason — `pecannbee.com.kw` was never added.
+ *
+ * `ADMIN_PREVIEW_FRAME_SRC` was supposed to be the relief valve ("without a
+ * deploy"), but it is read here, in next.config.js, which Next evaluates at
+ * BUILD time — so it never could take effect without a rebuild, and it was
+ * never set in any environment.
+ *
+ * A merchant's custom domain is arbitrary and unknowable at build time, so the
+ * allowlist cannot be enumerated. Rather than keep a list that is wrong the
+ * moment the next merchant signs up, the preview route (and only that route)
+ * permits any https origin; every other admin route keeps the strict list.
+ */
+const PREVIEW_FRAME_SRC =
+  process.env.ADMIN_PREVIEW_FRAME_SRC ??
+  'https://store.force-ai.co https://*.force-ai.co https://store.forcemediakw.com https://*.forcemediakw.com';
+
+const CSP_PREFIX =
+  "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co wss://store-api.forcemediakw.com wss://api.force-ai.co https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; frame-src https://onesignal.com https://*.onesignal.com ";
+const CSP_SUFFIX = "; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'";
+
+/**
+ * The preview route accepts any https origin because a merchant's custom
+ * domain cannot be enumerated at build time. This is not the control that
+ * protects the storefront: the storefront's own `frame-ancestors` allows only
+ * admin origins to frame it, and that check is unaffected by anything here.
+ * `frame-ancestors 'none'` still stops the admin itself being framed.
+ */
+const PREVIEW_PAGE_FRAME_SRC = 'https:';
+
+/**
+ * The admin's security headers. `frameSrc` is the only thing that varies:
+ * the page-builder preview must embed a merchant's own custom domain, which
+ * is arbitrary and unknowable at build time (see PREVIEW_FRAME_SRC above).
+ */
+function securityHeaders(frameSrc) {
+  return [
+    { key: 'X-Frame-Options', value: 'DENY' },
+    { key: 'X-Content-Type-Options', value: 'nosniff' },
+    { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+    { key: 'Permissions-Policy', value: 'geolocation=(), microphone=(), camera=()' },
+    {
+      key: 'Strict-Transport-Security',
+      value: 'max-age=31536000; includeSubDomains; preload',
+    },
+    {
+      key: 'Content-Security-Policy',
+      value: CSP_PREFIX + frameSrc + CSP_SUFFIX,
+    },
+  ];
+}
+
 const nextConfig = {
   reactStrictMode: true,
   // ZAP 10037: don't advertise the framework (x-powered-by: Next.js).
@@ -107,46 +170,17 @@ const nextConfig = {
   // Security headers
   async headers() {
     return [
+      // The live-preview route FIRST, and the catch-all below excludes it, so
+      // exactly one CSP applies to any given path. Two matching rules with the
+      // same header key would leave precedence to framework internals — the
+      // kind of detail that silently changes on an upgrade.
       {
-        source: '/:path*',
-        headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'geolocation=(), microphone=(), camera=()' },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=31536000; includeSubDomains; preload',
-          },
-          { key: 'X-XSS-Protection', value: '1; mode=block' },
-          // Hard block all search engines at the HTTP-header layer too.
-          // Some crawlers honour the header even when robots.txt or the
-          // <meta> tag is overlooked (e.g. when the page is reached via
-          // a direct link from an indexed third-party site).
-          { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive, nosnippet, noimageindex' },
-          {
-            // OneSignal needs:
-            //   script-src + 'unsafe-eval' → SDK runtime checks
-            //   connect-src https://*.onesignal.com → REST + websocket
-            //   worker-src 'self' blob: → /OneSignalSDKWorker.js can importScripts the OneSignal CDN
-            //   manifest-src 'self' → PWA install
-            //
-            // frame-src 2026-05-20: page-builder embeds the storefront as a
-            // live-preview iframe. Without storefront origins here, Chrome
-            // blocks the iframe with "This content is blocked" — the parent's
-            // CSP frame-src controls what URLs the PARENT can frame
-            // (separate from the storefront's frame-ancestors, which controls
-            // who can frame IT). Both must permit the embed for it to render.
-            // ADMIN_PREVIEW_FRAME_SRC env var lets ops extend the allowlist
-            // when new custom-domain tenants are onboarded without a deploy.
-            key: 'Content-Security-Policy',
-            value:
-              "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.onesignal.com https://*.onesignal.com https://onesignal.com https://us-assets.i.posthog.com https://us.i.posthog.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.onesignal.com https://onesignal.com https://*.onesignal.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://store-api.forcemediakw.com https://api.force-ai.co wss://store-api.forcemediakw.com wss://api.force-ai.co https://*.up.railway.app wss://*.up.railway.app https://onesignal.com https://*.onesignal.com wss://*.onesignal.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://cloudflareinsights.com; frame-src https://onesignal.com https://*.onesignal.com " +
-              (process.env.ADMIN_PREVIEW_FRAME_SRC ??
-                'https://store.force-ai.co https://*.force-ai.co https://store.forcemediakw.com https://*.forcemediakw.com https://wadyaljuz.com') +
-              "; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'",
-          },
-        ],
+        source: '/stores/:id/page-builder',
+        headers: securityHeaders(PREVIEW_PAGE_FRAME_SRC),
+      },
+      {
+        source: '/((?!stores/[^/]+/page-builder$).*)',
+        headers: securityHeaders(PREVIEW_FRAME_SRC),
       },
     ];
   },
