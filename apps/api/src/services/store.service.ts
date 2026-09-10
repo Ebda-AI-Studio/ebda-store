@@ -116,6 +116,12 @@ export class StoreService {
         where,
         skip,
         take: limit,
+        // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
+        // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
+        // own explicit select), so it is omitted at the service boundary rather
+        // than left to every caller to remember to strip. Same reasoning as
+        // `maskMarketingPixelSecrets` on `GET /stores/:id`.
+        omit: { agentApiKey: true },
         include: {
           owner: {
             select: { id: true, email: true, firstName: true, lastName: true },
@@ -164,6 +170,12 @@ export class StoreService {
   static async getById(storeId: string) {
     const store = await prisma.store.findUnique({
       where: { id: storeId },
+      // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
+      // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
+      // own explicit select), so it is omitted at the service boundary rather
+      // than left to every caller to remember to strip. Same reasoning as
+      // `maskMarketingPixelSecrets` on `GET /stores/:id`.
+      omit: { agentApiKey: true },
       include: {
         owner: {
           select: { id: true, email: true, firstName: true, lastName: true },
@@ -196,6 +208,12 @@ export class StoreService {
 
     const store = await prisma.store.findUnique({
       where: { slug },
+      // The per-store agent (MCP) WRITE credential is a secret, even encrypted:
+      // it has no consumer outside `mcp/agent-auth.ts` (which reads it with its
+      // own explicit select), so it is omitted at the service boundary rather
+      // than left to every caller to remember to strip. Same reasoning as
+      // `maskMarketingPixelSecrets` on `GET /stores/:id`.
+      omit: { agentApiKey: true },
       include: {
         _count: { select: { products: true, categories: true } },
       },

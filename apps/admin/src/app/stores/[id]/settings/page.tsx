@@ -469,6 +469,31 @@ export default function StoreSettingsPage() {
     // Meta Catalog merged into the WhatsApp Integration tabset (above)
     // as the "Bot Config" tab to remove the page-bouncing overlap.
     {
+      /*
+       * The MCP agent write credential (Ruling M1). Feature-gated on
+       * `agent_checkout` for the same reason the API route is: a merchant
+       * without agentic checkout has nothing to issue a key for. Sits beside
+       * WhatsApp because both are integration credentials, not marketing.
+       */
+      key: 'agentKey',
+      href: `/stores/${storeId}/agent-key`,
+      // Neutral slate, not a brand hue: `indigo` (and every other colour in
+      // the eslint `no-restricted-syntax` list) is a lint warning here, and a
+      // credential card reads better technical than decorative anyway.
+      color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+      featureKey: 'agent_checkout',
+      icon: (
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+          />
+        </svg>
+      ),
+    },
+    {
       key: 'staff',
       href: `/stores/${storeId}/staff`,
       color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300',

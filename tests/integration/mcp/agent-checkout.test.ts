@@ -45,28 +45,56 @@
  *     with Store B's cartId returns a fresh EMPTY cart (storeId-scoped
  *     `getOrCreate` mints a new cart for Store A, never resolving Store B's
  *     real one) — never Store B's data.
+ * 11. **Agent-write authorisation (Ruling M1, 2026-09-09).** The two WRITE
+ *     tools (`add_to_cart`, `place_order`) require the store's `x-agent-key`
+ *     credential; every READ tool and the `initialize` handshake stay
+ *     anonymous. A wrong key, a revoked key and STORE B's key are all refused
+ *     on Store A; the `agent_checkout_open_writes` StoreFeature disables the
+ *     requirement for ONE store and not the other; a refused write leaves an
+ *     `agent.write.denied` audit row carrying ip + user agent.
+ *
+ * RETRY-SAFETY: vitest runs with `retry: 1`, and a retry re-runs `beforeAll`
+ * in the SAME process. Every fixture id below is therefore built from a
+ * per-CALL `randomUUID()` (`uid()`), never from a module-scope `Date.now()` —
+ * the old form collided on `Store.slug`'s unique index on the second attempt
+ * and reported an artefact of attempt 2 while hiding the real failure.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { prisma } from '@force/database';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { encryption } from '../../../apps/api/src/services/encryption.service';
 import { API_BASE } from '../../helpers/api-base';
 
 const API = API_BASE;
 
+/**
+ * Per-CALL unique id. NEVER hoist this into a module-scope constant: vitest
+ * retries the file in the SAME process, so a module-scope value is reused by
+ * attempt 2 and collides on `Store.slug` / `User.email`.
+ */
+const uid = () => randomUUID().slice(0, 12);
+
 let storeId: string;
 let ownerId: string;
-const slug = `mcp-store-${Date.now()}`;
+let slug: string;
+// The per-store agent credential the two WRITE tools require. Seeded encrypted
+// with the SAME `encryption.service` the API decrypts with — CI passes one
+// ENCRYPTION_KEY to both the server process and this test process.
+let agentKeyA: string;
 // Captured across the two 404 tests below and compared in a third test —
 // see "returns a byte-identical 404 body ..." for why.
 let unknownSlugBody: { error: { code: string; message: string } };
 let disabledFeatureBody: { error: { code: string; message: string } };
 
 beforeAll(async () => {
+  slug = `mcp-store-${uid()}`;
+  agentKeyA = `fak_${randomUUID()}`;
   const owner = await prisma.user.create({
     data: {
-      email: `mcp-owner-${Date.now()}@example.test`,
+      email: `mcp-owner-${uid()}@example.test`,
       passwordHash: 'x',
       firstName: 'A',
       lastName: 'B',
@@ -84,6 +112,8 @@ beforeAll(async () => {
       plan: 'starter',
       status: 'active',
       currency: 'KWD',
+      agentApiKey: encryption.encrypt(agentKeyA),
+      agentApiKeyRotatedAt: new Date(),
     },
   });
   storeId = store.id;
@@ -101,8 +131,15 @@ afterAll(async () => {
   await prisma.user.delete({ where: { id: ownerId } }).catch(() => {});
 });
 
-function mcpClient(pathSlug: string) {
-  const transport = new StreamableHTTPClientTransport(new URL(`${API}/mcp/${pathSlug}`));
+/**
+ * `agentKey` is optional ON PURPOSE: omitting it produces exactly the request
+ * an unauthenticated agent makes, which is what the read tools and the
+ * handshake must keep working with.
+ */
+function mcpClient(pathSlug: string, agentKey?: string) {
+  const transport = new StreamableHTTPClientTransport(new URL(`${API}/mcp/${pathSlug}`), {
+    requestInit: agentKey ? { headers: { 'x-agent-key': agentKey } } : undefined,
+  });
   const client = new Client({ name: 'test', version: '1.0.0' });
   return { client, transport };
 }
@@ -223,7 +260,7 @@ describe('MCP endpoint — handshake + gating', () => {
       data: {
         storeId,
         name: 'Blue Widget',
-        slug: `blue-${Date.now()}`,
+        slug: `blue-${uid()}`,
         status: 'active',
         price: 2500,
         inventory: 5,
@@ -279,14 +316,14 @@ describe('MCP endpoint — handshake + gating', () => {
       data: {
         storeId,
         name: 'Cart Item',
-        slug: `ci-${Date.now()}`,
+        slug: `ci-${uid()}`,
         status: 'active',
         price: 1000,
         inventory: 2,
       },
     });
 
-    const { client, transport } = mcpClient(slug);
+    const { client, transport } = mcpClient(slug, agentKeyA);
     await client.connect(transport);
 
     const add = await client.callTool({
@@ -330,7 +367,7 @@ describe('MCP endpoint — handshake + gating', () => {
       data: {
         storeId,
         name: 'Order Item',
-        slug: `oi-${Date.now()}`,
+        slug: `oi-${uid()}`,
         status: 'active',
         price: 3000,
         inventory: 10,
@@ -345,7 +382,7 @@ describe('MCP endpoint — handshake + gating', () => {
       update: { isEnabled: true },
     });
 
-    const { client, transport } = mcpClient(slug);
+    const { client, transport } = mcpClient(slug, agentKeyA);
     await client.connect(transport);
 
     const add = await client.callTool({
@@ -405,13 +442,13 @@ describe('MCP endpoint — handshake + gating', () => {
       data: {
         storeId,
         name: 'Order Item 2',
-        slug: `oi2-${Date.now()}`,
+        slug: `oi2-${uid()}`,
         status: 'active',
         price: 3000,
         inventory: 10,
       },
     });
-    const { client, transport } = mcpClient(slug);
+    const { client, transport } = mcpClient(slug, agentKeyA);
     await client.connect(transport);
 
     const add = await client.callTool({
@@ -439,7 +476,7 @@ describe('MCP endpoint — handshake + gating', () => {
       data: {
         storeId,
         name: 'Order Item 3',
-        slug: `oi3-${Date.now()}`,
+        slug: `oi3-${uid()}`,
         status: 'active',
         price: 3000,
         inventory: 10,
@@ -449,7 +486,7 @@ describe('MCP endpoint — handshake + gating', () => {
     // myfatoorah/hesabe/upayments) and the test harness sets no provider env
     // vars, so PaymentFactory has nothing to fall back to either —
     // PaymentService.getDefaultProvider(store.id) resolves null.
-    const { client, transport } = mcpClient(slug);
+    const { client, transport } = mcpClient(slug, agentKeyA);
     await client.connect(transport);
 
     const add = await client.callTool({
@@ -489,7 +526,10 @@ describe('MCP endpoint — cross-tenant isolation (storeId scoping)', () => {
   // tenant's row.
   let storeBId: string;
   let storeBOwnerId: string;
-  const slugB = `mcp-store-b-${Date.now()}`;
+  let slugB: string;
+  // Store B mints its OWN agent key — the cross-tenant test presents it to
+  // Store A's endpoint and it must not authorise anything there.
+  let agentKeyB: string;
   let productB: { id: string };
   let orderBId: string;
   // A cart that is added-to but never checked out, so it keeps its item —
@@ -498,9 +538,11 @@ describe('MCP endpoint — cross-tenant isolation (storeId scoping)', () => {
   let cartBId: string;
 
   beforeAll(async () => {
+    slugB = `mcp-store-b-${uid()}`;
+    agentKeyB = `fak_${randomUUID()}`;
     const ownerB = await prisma.user.create({
       data: {
-        email: `mcp-owner-b-${Date.now()}@example.test`,
+        email: `mcp-owner-b-${uid()}@example.test`,
         passwordHash: 'x',
         firstName: 'C',
         lastName: 'D',
@@ -518,6 +560,8 @@ describe('MCP endpoint — cross-tenant isolation (storeId scoping)', () => {
         plan: 'starter',
         status: 'active',
         currency: 'KWD',
+        agentApiKey: encryption.encrypt(agentKeyB),
+        agentApiKeyRotatedAt: new Date(),
       },
     });
     storeBId = storeB.id;
@@ -540,14 +584,14 @@ describe('MCP endpoint — cross-tenant isolation (storeId scoping)', () => {
       data: {
         storeId: storeBId,
         name: 'Store B Secret Widget',
-        slug: `store-b-widget-${Date.now()}`,
+        slug: `store-b-widget-${uid()}`,
         status: 'active',
         price: 4500,
         inventory: 10,
       },
     });
 
-    const { client, transport } = mcpClient(slugB);
+    const { client, transport } = mcpClient(slugB, agentKeyB);
     await client.connect(transport);
 
     // Cart 1: left un-checked-out on purpose, so it still holds its item —
@@ -654,5 +698,324 @@ describe('MCP endpoint — cross-tenant isolation (storeId scoping)', () => {
     expect(json.subtotal).toBe(0);
 
     await client.close();
+  });
+});
+
+/**
+ * Agent-write authorisation — Ruling M1 (2026-09-09).
+ *
+ * The property that matters most here is the NEGATIVE one: enforcement must
+ * not reach the reads. All seven tools plus `initialize` and `tools/list` ride
+ * ONE `POST /api/v1/mcp/:storeSlug`, so an auth check in the wrong place
+ * (Express middleware instead of the tool handler) takes the entire surface
+ * dark while `llms.txt` keeps advertising it. That is FM-1, and the first test
+ * below is its guard.
+ */
+describe('MCP endpoint — agent-write authorisation', () => {
+  // A second gated store, used only for the "the escape hatch applies to ONE
+  // store, not the fleet" assertion. Deliberately NOT store B from the
+  // cross-tenant block above, so the two describes stay independent.
+  let storeCId: string;
+  let storeCOwnerId: string;
+  let slugC: string;
+  let productAId: string;
+
+  beforeAll(async () => {
+    slugC = `mcp-store-c-${uid()}`;
+    const ownerC = await prisma.user.create({
+      data: {
+        email: `mcp-owner-c-${uid()}@example.test`,
+        passwordHash: 'x',
+        firstName: 'E',
+        lastName: 'F',
+        role: 'store_admin',
+        emailVerified: true,
+      },
+    });
+    storeCOwnerId = ownerC.id;
+    const storeC = await prisma.store.create({
+      data: {
+        name: 'MCP Store C',
+        slug: slugC,
+        ownerId: storeCOwnerId,
+        plan: 'starter',
+        status: 'active',
+        currency: 'KWD',
+      },
+    });
+    storeCId = storeC.id;
+    await prisma.storeFeature.upsert({
+      where: { storeId_featureKey: { storeId: storeCId, featureKey: 'agent_checkout' } },
+      create: { storeId: storeCId, featureKey: 'agent_checkout', enabled: true },
+      update: { enabled: true },
+    });
+
+    const productA = await prisma.product.create({
+      data: {
+        storeId,
+        name: 'Auth Fixture Widget',
+        slug: `auth-widget-${uid()}`,
+        status: 'active',
+        price: 1500,
+        inventory: 50,
+      },
+    });
+    productAId = productA.id;
+    await prisma.paymentConfig.upsert({
+      where: { storeId_provider: { storeId, provider: 'cod' } },
+      create: { storeId, provider: 'cod', isEnabled: true, isDefault: true },
+      update: { isEnabled: true },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.cart.deleteMany({ where: { storeId } }).catch(() => {});
+    await prisma.product.delete({ where: { id: productAId } }).catch(() => {});
+    await prisma.storeFeature
+      .deleteMany({ where: { storeId, featureKey: 'agent_checkout_open_writes' } })
+      .catch(() => {});
+    await prisma.storeFeature.deleteMany({ where: { storeId: storeCId } }).catch(() => {});
+    await prisma.store.delete({ where: { id: storeCId } }).catch(() => {});
+    await prisma.user.delete({ where: { id: storeCOwnerId } }).catch(() => {});
+  });
+
+  it('FM-1 GUARD — the handshake, tools/list and EVERY read tool still work with NO credential', async () => {
+    const { client, transport } = mcpClient(slug); // no x-agent-key at all
+    await client.connect(transport); // initialize + notifications/initialized
+
+    const tools = await client.listTools();
+    expect(tools.tools.map(t => t.name)).toEqual(
+      expect.arrayContaining([
+        'get_store_info',
+        'search_products',
+        'get_product',
+        'add_to_cart',
+        'view_cart',
+        'place_order',
+        'get_order_status',
+      ])
+    );
+
+    const info = await client.callTool({ name: 'get_store_info', arguments: {} });
+    expect(info.isError).toBeFalsy();
+
+    const search = await client.callTool({
+      name: 'search_products',
+      arguments: { query: 'Auth', limit: 5 },
+    });
+    expect(search.isError).toBeFalsy();
+
+    const detail = await client.callTool({
+      name: 'get_product',
+      arguments: { productId: productAId },
+    });
+    expect(detail.isError).toBeFalsy();
+
+    const view = await client.callTool({
+      name: 'view_cart',
+      arguments: { cartId: `sess_${uid()}` },
+    });
+    expect(view.isError).toBeFalsy();
+
+    await client.close();
+  });
+
+  it('refuses an ANONYMOUS place_order and creates no order, no payment, no inventory movement', async () => {
+    const before = await prisma.order.count({ where: { storeId } });
+    const stockBefore = await prisma.product.findUnique({
+      where: { id: productAId },
+      select: { inventory: true },
+    });
+
+    const { client, transport } = mcpClient(slug);
+    await client.connect(transport);
+
+    const res = await client.callTool({
+      name: 'place_order',
+      arguments: {
+        cartId: `sess_${uid()}`,
+        paymentMethod: 'cod',
+        customer: { name: 'Anon Agent', address: 'Nowhere' },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(JSON.stringify(res.content)).toContain('x-agent-key');
+
+    expect(await prisma.order.count({ where: { storeId } })).toBe(before);
+    const stockAfter = await prisma.product.findUnique({
+      where: { id: productAId },
+      select: { inventory: true },
+    });
+    expect(stockAfter?.inventory).toBe(stockBefore?.inventory);
+
+    await client.close();
+  });
+
+  it('refuses an ANONYMOUS add_to_cart and mints no cart', async () => {
+    const cartId = `sess_${uid()}`;
+    const { client, transport } = mcpClient(slug);
+    await client.connect(transport);
+
+    const res = await client.callTool({
+      name: 'add_to_cart',
+      arguments: { cartId, productId: productAId, quantity: 1 },
+    });
+    expect(res.isError).toBe(true);
+
+    expect(await prisma.cart.count({ where: { storeId, sessionId: cartId } })).toBe(0);
+    await client.close();
+  });
+
+  it('records a REFUSED write in audit_logs with ip and user agent', async () => {
+    const { client, transport } = mcpClient(slug);
+    await client.connect(transport);
+    await client.callTool({
+      name: 'add_to_cart',
+      arguments: { productId: productAId, quantity: 1 },
+    });
+    await client.close();
+
+    const row = await prisma.auditLog.findFirst({
+      where: { storeId, action: 'agent.write.denied' },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(row).not.toBeNull();
+    expect(row?.ipAddress).toBeTruthy();
+    expect(row?.userAgent).toBeTruthy();
+    expect((row?.details as Record<string, unknown> | null)?.tool).toBe('add_to_cart');
+  });
+
+  it('permits both write tools with a VALID credential', async () => {
+    const { client, transport } = mcpClient(slug, agentKeyA);
+    await client.connect(transport);
+
+    const add = await client.callTool({
+      name: 'add_to_cart',
+      arguments: { productId: productAId, quantity: 1 },
+    });
+    expect(add.isError).toBeFalsy();
+    const cartId = JSON.parse((add.content as any)[0].text).cartId;
+
+    const placed = await client.callTool({
+      name: 'place_order',
+      arguments: {
+        cartId,
+        paymentMethod: 'cod',
+        customer: { name: 'Keyed Agent', phone: '+96550000002', address: 'Block 3' },
+      },
+    });
+    expect(placed.isError).toBeFalsy();
+    const orderId = JSON.parse((placed.content as any)[0].text).orderId;
+
+    await client.close();
+    await prisma.payment.deleteMany({ where: { orderId } }).catch(() => {});
+    await prisma.orderItem.deleteMany({ where: { orderId } }).catch(() => {});
+    await prisma.order.delete({ where: { id: orderId } }).catch(() => {});
+  });
+
+  it('refuses a WRONG credential', async () => {
+    const { client, transport } = mcpClient(slug, `fak_${randomUUID()}`);
+    await client.connect(transport);
+    const res = await client.callTool({
+      name: 'add_to_cart',
+      arguments: { productId: productAId, quantity: 1 },
+    });
+    expect(res.isError).toBe(true);
+    await client.close();
+  });
+
+  it("refuses STORE C's credential on STORE A's endpoint (cross-tenant)", async () => {
+    const keyC = `fak_${randomUUID()}`;
+    await prisma.store.update({
+      where: { id: storeCId },
+      data: { agentApiKey: encryption.encrypt(keyC) },
+    });
+
+    const { client, transport } = mcpClient(slug, keyC); // C's key, A's endpoint
+    await client.connect(transport);
+    const res = await client.callTool({
+      name: 'add_to_cart',
+      arguments: { productId: productAId, quantity: 1 },
+    });
+    expect(res.isError).toBe(true);
+    await client.close();
+  });
+
+  it('refuses a REVOKED credential on the very next call', async () => {
+    // Revoke, then present the key that worked a moment ago.
+    await prisma.store.update({ where: { id: storeId }, data: { agentApiKey: null } });
+    const { client, transport } = mcpClient(slug, agentKeyA);
+    await client.connect(transport);
+    const res = await client.callTool({
+      name: 'add_to_cart',
+      arguments: { productId: productAId, quantity: 1 },
+    });
+    expect(res.isError).toBe(true);
+    await client.close();
+
+    // Restore for any later test / retry.
+    await prisma.store.update({
+      where: { id: storeId },
+      data: { agentApiKey: encryption.encrypt(agentKeyA) },
+    });
+  });
+
+  it('the ESCAPE HATCH disables enforcement for ONE store and not for another', async () => {
+    await prisma.storeFeature.upsert({
+      where: {
+        storeId_featureKey: { storeId, featureKey: 'agent_checkout_open_writes' },
+      },
+      create: { storeId, featureKey: 'agent_checkout_open_writes', enabled: true },
+      update: { enabled: true },
+    });
+
+    // Store A: anonymous write now permitted.
+    const a = mcpClient(slug);
+    await a.client.connect(a.transport);
+    const openRes = await a.client.callTool({
+      name: 'add_to_cart',
+      arguments: { productId: productAId, quantity: 1 },
+    });
+    expect(openRes.isError).toBeFalsy();
+    await a.client.close();
+
+    // Store C: same anonymous write, still refused — the hatch is per store.
+    const productC = await prisma.product.create({
+      data: {
+        storeId: storeCId,
+        name: 'C Widget',
+        slug: `c-widget-${uid()}`,
+        status: 'active',
+        price: 1000,
+        inventory: 5,
+      },
+    });
+    const c = mcpClient(slugC);
+    await c.client.connect(c.transport);
+    const stillClosed = await c.client.callTool({
+      name: 'add_to_cart',
+      arguments: { productId: productC.id, quantity: 1 },
+    });
+    expect(stillClosed.isError).toBe(true);
+    await c.client.close();
+
+    // Turn it back off and prove enforcement returns.
+    await prisma.storeFeature.update({
+      where: {
+        storeId_featureKey: { storeId, featureKey: 'agent_checkout_open_writes' },
+      },
+      data: { enabled: false },
+    });
+    const back = mcpClient(slug);
+    await back.client.connect(back.transport);
+    const reClosed = await back.client.callTool({
+      name: 'add_to_cart',
+      arguments: { productId: productAId, quantity: 1 },
+    });
+    expect(reClosed.isError).toBe(true);
+    await back.client.close();
+
+    await prisma.cart.deleteMany({ where: { storeId: storeCId } }).catch(() => {});
+    await prisma.product.delete({ where: { id: productC.id } }).catch(() => {});
   });
 });

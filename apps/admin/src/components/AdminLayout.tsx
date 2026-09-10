@@ -288,6 +288,7 @@ export function AdminLayout({
     language: tcp('pages.language'),
     staff: tcp('pages.staff'),
     announcement: tcp('pages.announcement'),
+    agentKey: tcp('pages.agentKey'),
   };
   const paletteItems: PaletteItem[] =
     mode === 'store_admin' && navStoreId

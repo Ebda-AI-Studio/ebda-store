@@ -22,6 +22,7 @@ import {
 import { alertsFailureWatch } from './alerts-failure-watch';
 import { gmailAlertPoller } from './gmail-alert-poller';
 import { queueDepthWatch } from './queue-depth-watch';
+import { agentWriteDeniedWatch } from './agent-write-denied-watch';
 import { orderWhatsAppNotify } from './order-whatsapp-notify';
 import { accountingPostOrderJournal } from './accounting-post-order-journal';
 import { accountingPostRefundJournal } from './accounting-post-refund-journal';
@@ -100,6 +101,7 @@ export const inngestFunctions: InngestFunction.Any[] = [
   alertsFailureWatch,
   gmailAlertPoller,
   queueDepthWatch,
+  agentWriteDeniedWatch,
   orderWhatsAppNotify,
   accountingPostOrderJournal,
   accountingPostRefundJournal,

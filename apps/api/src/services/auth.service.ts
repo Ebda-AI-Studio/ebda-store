@@ -32,7 +32,37 @@ interface AuthTokens {
  * keeps them isolated; admins (storeId NULL) live in a global namespace
  * enforced by the partial unique index `users_admin_email_key`.
  */
+/**
+ * The no-such-user answer for `resendVerificationEmail`. Exported because
+ * `auth.routes.ts` must return the BYTE-IDENTICAL body when the submitted
+ * email fails validation — if a malformed/filter-object email produced a 400
+ * while an unknown-but-valid email produced this 200, the enumeration oracle
+ * this fix closes would simply reappear from a different angle (FM-5).
+ */
+export const GENERIC_RESEND_VERIFICATION_RESULT = {
+  success: true,
+  message: 'If an account exists with this email, a verification link has been sent.',
+} as const;
+
 function authScope(email: string, storeId: string | null) {
+  // P1-1 — defence in depth at the SINK. `email` lands at the top level of a
+  // Prisma `where`, where Prisma happily accepts a StringFilter OBJECT
+  // (`{ startsWith: 'a' }`, `{ not: 'zzz' }`) instead of a scalar. Two
+  // UNAUTHENTICATED routes reached here with a raw `req.body.email`
+  // (`POST /auth/forgot-password`, `POST /auth/resend-verification` — both
+  // guarded by truthiness only, unlike register/login which are Zod-parsed),
+  // which turned this lookup into an enumeration oracle that defeats the
+  // deliberate enumeration defences 300 lines below (DUMMY_PASSWORD_HASH, the
+  // both-branches bcrypt, the silent no-user return) and could mail a real
+  // reset link to a real customer the attacker never named.
+  //
+  // Those two routes are now Zod-parsed, which is the primary fix. This throw
+  // is the second layer: a FUTURE unvalidated caller cannot reopen the hole,
+  // and `sanitizeObject` will not help — it recurses into nested objects and
+  // PRESERVES their keys, so a filter object survives sanitisation intact.
+  if (typeof email !== 'string') {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');
+  }
   return storeId === null ? { email, storeId: null as null } : { email, storeId };
 }
 
@@ -354,10 +384,7 @@ export class AuthService {
 
     if (!user) {
       // Don't reveal if user exists
-      return {
-        success: true,
-        message: 'If an account exists with this email, a verification link has been sent.',
-      };
+      return { ...GENERIC_RESEND_VERIFICATION_RESULT };
     }
 
     if (user.emailVerified) {

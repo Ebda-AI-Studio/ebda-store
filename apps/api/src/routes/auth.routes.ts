@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@force/database';
 import { config } from '../config';
 import { authenticate, rejectImpersonated } from '../middleware/auth';
-import { AuthService } from '../services/auth.service';
+import { AuthService, GENERIC_RESEND_VERIFICATION_RESULT } from '../services/auth.service';
 import { authLimiter, auditLog, generateCsrfToken } from '../middleware/security';
 import { isPlatformOrigin } from '../lib/cors-cache';
 import { redis } from '../services/redis.service';
@@ -119,6 +119,22 @@ const loginSchema = z.object({
   // Same as registerSchema — storefront passes storeId so login finds
   // the right tenant's account.
   storeId: z.string().uuid().optional(),
+});
+
+/**
+ * P1-1 — the email-only body shape for the two UNAUTHENTICATED lookup routes
+ * (`POST /forgot-password`, `POST /resend-verification`). Matches
+ * `loginSchema`/`registerSchema`'s `z.string().email()` so a Prisma
+ * StringFilter object (`{ startsWith: 'a' }`) can never reach
+ * `authScope(email, ...)` and become an enumeration oracle.
+ *
+ * `storeId` is deliberately NOT in this schema: both routes already coerce it
+ * with `typeof storeId === 'string' ? storeId : null`, and folding it in would
+ * turn a non-string storeId from "ignored" into "whole request rejected",
+ * which changes behaviour for a legitimate caller.
+ */
+const emailLookupSchema = z.object({
+  email: z.string().trim().email(),
 });
 
 /**
@@ -760,7 +776,7 @@ router.post(
   authLimiter,
   async (req: Request, res: Response, _next: NextFunction) => {
     try {
-      const { email, storeId } = req.body;
+      const { email, storeId } = req.body ?? {};
 
       if (!email) {
         res.status(400).json({
@@ -770,8 +786,27 @@ router.post(
         return;
       }
 
-      // Always return success to prevent email enumeration
-      await AuthService.requestPasswordReset(email, typeof storeId === 'string' ? storeId : null);
+      // P1-1 — this route (and /resend-verification below) were the only two
+      // on this router that reached `AuthService` with an UNVALIDATED body;
+      // register/login two hundred lines above are Zod-parsed. `email` lands at
+      // the top level of a Prisma `where`, which accepts a StringFilter object,
+      // so `{"email":{"not":"zzz"}}` matched a REAL user and mailed them a real
+      // reset link — an enumeration/abuse oracle straight through the
+      // enumeration defences this endpoint is built on.
+      //
+      // FM-5: the parse must NOT change the response shape. The always-200 IS
+      // the enumeration defence, so a failed parse falls through to the SAME
+      // generic 200 an unknown-but-valid email gets — never a 400 that would
+      // re-open the oracle from the other side. `{}`/empty still 400s above,
+      // byte-identical to today.
+      const parsed = emailLookupSchema.safeParse({ email });
+      if (parsed.success) {
+        // Always return success to prevent email enumeration
+        await AuthService.requestPasswordReset(
+          parsed.data.email,
+          typeof storeId === 'string' ? storeId : null
+        );
+      }
 
       res.json({
         success: true,
@@ -871,7 +906,7 @@ router.post(
   authLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { email, storeId } = req.body;
+      const { email, storeId } = req.body ?? {};
 
       if (!email) {
         res.status(400).json({
@@ -881,10 +916,17 @@ router.post(
         return;
       }
 
-      const result = await AuthService.resendVerificationEmail(
-        email,
-        typeof storeId === 'string' ? storeId : null
-      );
+      // P1-1 (see POST /forgot-password above for the whole story). FM-5: a
+      // failed parse returns the BYTE-IDENTICAL body an unknown-but-valid email
+      // gets — `GENERIC_RESEND_VERIFICATION_RESULT`, the service's own no-such-user
+      // answer — so a filter object is indistinguishable from a miss.
+      const parsed = emailLookupSchema.safeParse({ email });
+      const result = parsed.success
+        ? await AuthService.resendVerificationEmail(
+            parsed.data.email,
+            typeof storeId === 'string' ? storeId : null
+          )
+        : { ...GENERIC_RESEND_VERIFICATION_RESULT };
 
       res.json({
         success: true,

@@ -1,5 +1,5 @@
 {
-  "$comment": "Spec for scripts/defence-mutation-record.mjs. Each entry removes ONE security defence and names the single test that must then fail. `find` must occur EXACTLY once in `source` — the runner errors out otherwise, so a refactor that moves a defence breaks this loudly instead of silently scoring it green.",
+  "$comment": "Spec for scripts/defence-mutation-record.mjs. Each entry removes ONE security defence and names the single test that must then fail. `find` must occur EXACTLY once in `source` \u2014 the runner errors out otherwise, so a refactor that moves a defence breaks this loudly instead of silently scoring it green.",
   "defences": [
     {
       "id": "tenant-deadstock-clearance-coupon",
@@ -45,7 +45,7 @@
       "id": "authz-permission-gate",
       "domain": "authn / session",
       "tier": "unit",
-      "why": "staff can issue refunds — the orders:refund RBAC gate",
+      "why": "staff can issue refunds \u2014 the orders:refund RBAC gate",
       "source": "apps/api/src/middleware/rbac.ts",
       "find": "    if (!hasPermission(userRole, permission)) {",
       "replace": "    if (false) {",
@@ -170,6 +170,256 @@
       "find": "unpacked.principal === principal",
       "replace": "true",
       "test": "tests/unit/csrf-merchant-origin.test.ts"
+    },
+    {
+      "id": "agent-write-requires-credential",
+      "domain": "agent identity",
+      "tier": "unit",
+      "why": "MCP write tools (add_to_cart / place_order) commit inventory and money for any unauthenticated caller",
+      "source": "apps/api/src/mcp/agent-auth.ts",
+      "find": "  if (!authInfo?.scopes?.includes(AGENT_WRITE_SCOPE)) {",
+      "replace": "  if (false) {",
+      "test": "tests/unit/mcp-agent-write-auth.test.ts"
+    },
+    {
+      "id": "agent-read-stays-anonymous",
+      "domain": "agent identity",
+      "tier": "unit",
+      "why": "credential resolution rejects instead of annotating, so the initialize handshake and every read tool go dark (FM-1)",
+      "source": "apps/api/src/mcp/agent-auth.ts",
+      "find": "  const presented = (req.header(AGENT_KEY_HEADER) ?? '').toString().trim();\n  if (presented) {",
+      "replace": "  const presented = (req.header(AGENT_KEY_HEADER) ?? '').toString().trim();\n  if (!presented) throw new AppError(401, 'AGENT_CREDENTIAL_REQUIRED', 'no key');\n  if (presented) {",
+      "test": "tests/unit/mcp-agent-write-auth.test.ts"
+    },
+    {
+      "id": "agent-credential-actually-compared",
+      "domain": "agent identity",
+      "tier": "unit",
+      "why": "any presented string authorises a write \u2014 a wrong key, and another store's key, both pass",
+      "source": "apps/api/src/mcp/agent-auth.ts",
+      "find": "        } else if (expected && secretsMatch(expected, presented)) {",
+      "replace": "        } else if (expected || presented) {",
+      "test": "tests/unit/mcp-agent-write-auth.test.ts"
+    },
+    {
+      "id": "agent-open-writes-hatch-off-by-default",
+      "domain": "agent identity",
+      "tier": "unit",
+      "why": "the per-store escape hatch grants writes on every store instead of the one it was turned on for",
+      "source": "apps/api/src/mcp/agent-auth.ts",
+      "find": "    if (open) context.grant = 'open_writes';",
+      "replace": "    context.grant = 'open_writes';",
+      "test": "tests/unit/mcp-agent-write-auth.test.ts"
+    },
+    {
+      "id": "mcp-tool-classifier-total",
+      "domain": "availability",
+      "tier": "unit",
+      "why": "the Express-layer tool classifier throws on a batched/null body -> next(err) -> 500 on EVERY MCP request, reads included (FM-3)",
+      "source": "apps/api/src/mcp/agent-auth.ts",
+      "find": "  if (message === null || typeof message !== 'object') return { tool: null, kind: 'unknown' };",
+      "replace": "  if (false) return { tool: null, kind: 'unknown' };",
+      "test": "tests/unit/mcp-agent-write-auth.test.ts"
+    },
+    {
+      "id": "agent-order-attribution",
+      "domain": "audit",
+      "tier": "unit",
+      "why": "a completed agent order records no ip and no user agent, so it is indistinguishable from a row with no origin",
+      "source": "apps/api/src/mcp/tools/order.tools.ts",
+      "find": "              ip: context.ip,\n              userAgent: context.userAgent,",
+      "replace": "",
+      "test": "tests/unit/mcp-agent-write-attribution.test.ts"
+    },
+    {
+      "id": "agent-denied-write-audited",
+      "domain": "audit",
+      "tier": "unit",
+      "why": "a REFUSED agent write leaves no trace anywhere - the signal you most want does not exist",
+      "source": "apps/api/src/mcp/tools/order.tools.ts",
+      "find": "        await auditAgentWrite({\n          store,\n          tool: 'place_order',\n          outcome: 'denied',",
+      "replace": "        await Promise.resolve({\n          store,\n          tool: 'place_order',\n          outcome: 'denied',",
+      "test": "tests/unit/mcp-agent-write-attribution.test.ts"
+    },
+    {
+      "id": "authscope-email-must-be-scalar",
+      "domain": "injection",
+      "tier": "unit",
+      "why": "a Prisma StringFilter object reaches the user lookup's where clause - an enumeration oracle on two unauthenticated routes",
+      "source": "apps/api/src/services/auth.service.ts",
+      "find": "  if (typeof email !== 'string') {\n    throw new AppError(400, 'VALIDATION_ERROR', 'Email is required');\n  }\n",
+      "replace": "",
+      "test": "tests/unit/authscope-email-must-be-scalar.test.ts"
+    },
+    {
+      "id": "forgot-password-email-validated",
+      "domain": "enumeration",
+      "tier": "unit",
+      "why": "POST /auth/forgot-password passes an unvalidated body value into a Prisma where, mailing a real reset link to a user the attacker never named",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "      const parsed = emailLookupSchema.safeParse({ email });\n      if (parsed.success) {",
+      "replace": "      const parsed = { success: true, data: { email } } as const;\n      if (parsed.success) {",
+      "test": "tests/unit/auth-email-enumeration-oracle.test.ts"
+    },
+    {
+      "id": "resend-verification-email-validated",
+      "domain": "enumeration",
+      "tier": "unit",
+      "why": "POST /auth/resend-verification passes an unvalidated body value into a Prisma where, so a filter object reveals that an account exists",
+      "source": "apps/api/src/routes/auth.routes.ts",
+      "find": "      const parsed = emailLookupSchema.safeParse({ email });\n      const result = parsed.success",
+      "replace": "      const parsed = { success: true, data: { email } } as const;\n      const result = parsed.success",
+      "test": "tests/unit/auth-email-enumeration-oracle.test.ts"
+    },
+    {
+      "id": "feed-baseurl-ignores-request-header",
+      "domain": "cache poisoning",
+      "tier": "unit",
+      "why": "an attacker-supplied X-Original-Host lands in every AI product-feed link and is cached 600s in Redis and at the CDN",
+      "source": "apps/api/src/routes/public.routes.ts",
+      "find": "    const baseUrl = store.domain ? `https://${store.domain}` : `${config.webUrl}/${store.slug}`;",
+      "replace": "    const baseUrl = store.domain\n      ? `https://${store.domain}`\n      : `https://${req.get('x-original-host') ?? req.get('host')}`;",
+      "test": "tests/unit/feed-baseurl-ignores-request-header.test.ts"
+    },
+    {
+      "id": "agent-key-status-never-returns-the-key",
+      "domain": "secret exposure",
+      "tier": "unit",
+      "why": "the agent write credential is shown exactly once at mint; a status endpoint that also returned it (plaintext or ciphertext) would make the one-time reveal meaningless and put the secret in every admin page load",
+      "source": "apps/api/src/routes/agent-credential.routes.ts",
+      "find": "          hasKey: Boolean(store.agentApiKey),\n          rotatedAt: store.agentApiKeyRotatedAt,",
+      "replace": "          hasKey: Boolean(store.agentApiKey),\n          apiKey: store.agentApiKey,\n          rotatedAt: store.agentApiKeyRotatedAt,",
+      "test": "tests/unit/agent-credential-route.test.ts"
+    },
+    {
+      "id": "agent-key-revoke-clears-the-column",
+      "domain": "authn/session",
+      "tier": "unit",
+      "why": "a revoke that only re-stamped rotatedAt would answer the same 200 and show \"no key\" in the admin while the old credential kept authorising MCP writes",
+      "source": "apps/api/src/routes/agent-credential.routes.ts",
+      "find": "        data: { agentApiKey: null, agentApiKeyRotatedAt: new Date() },",
+      "replace": "        data: { agentApiKeyRotatedAt: new Date() },",
+      "test": "tests/unit/agent-credential-route.test.ts"
+    },
+    {
+      "id": "agent-key-openwrites-status-fails-closed",
+      "domain": "authn/session",
+      "tier": "unit",
+      "why": "the escape-hatch state shown to the merchant must never read as OPEN because the feature lookup failed \u2014 a fail-open reading of a security control",
+      "source": "apps/api/src/routes/agent-credential.routes.ts",
+      "find": "        .catch(() => false);",
+      "replace": "        .catch(() => true);",
+      "test": "tests/unit/agent-credential-route.test.ts"
+    },
+    {
+      "id": "store-getbyid-omits-agent-credential",
+      "domain": "secret exposure",
+      "tier": "unit",
+      "why": "GET /stores/:id hands a whole Store row to the admin app; without the omit the agent credential ciphertext ships to the browser",
+      "source": "apps/api/src/services/store.service.ts",
+      "find": "      omit: { agentApiKey: true },\n      include: {\n        owner: {\n          select: { id: true, email: true, firstName: true, lastName: true },\n        },\n        _count: { select: { products: true, orders: true, categories: true } },\n      },",
+      "replace": "      include: {\n        owner: {\n          select: { id: true, email: true, firstName: true, lastName: true },\n        },\n        _count: { select: { products: true, orders: true, categories: true } },\n      },",
+      "test": "tests/unit/store-read-omits-agent-credential.test.ts"
+    },
+    {
+      "id": "store-list-omits-agent-credential",
+      "domain": "secret exposure",
+      "tier": "unit",
+      "why": "the admin store list returns whole Store rows; without the omit every listed store ships its agent credential ciphertext",
+      "source": "apps/api/src/services/store.service.ts",
+      "find": "        omit: { agentApiKey: true },\n        include: {\n          owner: {",
+      "replace": "        include: {\n          owner: {",
+      "test": "tests/unit/store-read-omits-agent-credential.test.ts"
+    },
+    {
+      "id": "store-getbyslug-omits-agent-credential",
+      "domain": "secret exposure",
+      "tier": "unit",
+      "why": "getBySlug writes its row into a 120s Redis cache, so without the omit the credential ciphertext is not leaked once but cached and served to every reader for the TTL",
+      "source": "apps/api/src/services/store.service.ts",
+      "find": "      omit: { agentApiKey: true },\n      include: {\n        _count: { select: { products: true, categories: true } },\n      },",
+      "replace": "      include: {\n        _count: { select: { products: true, categories: true } },\n      },",
+      "test": "tests/unit/store-read-omits-agent-credential.test.ts"
+    },
+    {
+      "id": "agent-denial-alert-fires-at-threshold",
+      "domain": "detection",
+      "tier": "unit",
+      "why": "a refused agent write is recorded but nothing read the rows; if the threshold branch never fires, a broken merchant integration and a probe of the write surface both stay invisible",
+      "source": "apps/api/src/mcp/agent-denial-alerts.ts",
+      "find": "      if (presented.length >= threshold) {",
+      "replace": "      if (false) {",
+      "test": "tests/unit/agent-denial-alerts.test.ts"
+    },
+    {
+      "id": "agent-denial-separates-probing-from-broken-integration",
+      "domain": "detection",
+      "tier": "unit",
+      "why": "a merchant integration sending a stale key and someone sweeping the write surface produce the same rows; the distinct-source-IP spread is the only thing that separates them, and collapsing it pages on the wrong one at the wrong threshold",
+      "source": "apps/api/src/mcp/agent-denial-alerts.ts",
+      "find": "    const probing = distinctIps >= PROBE_DISTINCT_IPS;",
+      "replace": "    const probing = false;",
+      "test": "tests/unit/agent-denial-alerts.test.ts"
+    },
+    {
+      "id": "agent-denial-anonymous-traffic-stays-quiet",
+      "domain": "detection",
+      "tier": "unit",
+      "why": "credential-less agent writes are the expected background of a published llms.txt; alerting on them at a low count is how the whole alert gets muted, and a muted alert is worse than none",
+      "source": "apps/api/src/mcp/agent-denial-alerts.ts",
+      "find": "  anonymousFlood: 50,",
+      "replace": "  anonymousFlood: 1,",
+      "test": "tests/unit/agent-denial-alerts.test.ts"
+    },
+    {
+      "id": "agent-denial-prior-agent-store-pages",
+      "domain": "detection",
+      "tier": "unit",
+      "why": "an integration that predates the credential requirement cannot present a key it was never issued, so it lands in the same bucket as a crawler; folding it into anonymousFlood means the one failure this rollout actually causes is the one signature the monitor is built to stay quiet about, and the merchant learns from lost orders",
+      "source": "apps/api/src/mcp/agent-denial-alerts.ts",
+      "find": "      hadPriorAgentActivity &&\n      anonymous.length >= DENIAL_THRESHOLDS.integrationNeverCredentialed",
+      "replace": "      anonymous.length >= DENIAL_THRESHOLDS.anonymousFlood",
+      "test": "tests/unit/agent-denial-alerts.test.ts"
+    },
+    {
+      "id": "agent-denial-watch-reads-the-denied-rows",
+      "domain": "detection",
+      "tier": "unit",
+      "why": "a correct classifier wired to the wrong action or window is an alert that never fires, which is indistinguishable from a quiet system",
+      "source": "apps/api/src/lib/inngest/functions/agent-write-denied-watch.ts",
+      "find": "      where: { action: 'agent.write.denied', createdAt: { gte: since } },",
+      "replace": "      where: { action: 'agent.write.failed', createdAt: { gte: since } },",
+      "test": "tests/unit/agent-write-denied-watch.test.ts"
+    },
+    {
+      "id": "agent-key-escape-hatch-banner-is-conditional",
+      "domain": "detection",
+      "tier": "unit",
+      "why": "the merchant page warns that writes are accepted with no key at all; a banner that renders unconditionally warns about nothing and trains the merchant to ignore it",
+      "source": "apps/admin/src/app/stores/[id]/agent-key/_components/AgentKeyPanel.tsx",
+      "find": "      {status.openWrites && (",
+      "replace": "      {true && (",
+      "test": "tests/unit/agent-key-admin-panel.test.tsx"
+    },
+    {
+      "id": "agent-denial-unknown-ip-is-one-source",
+      "domain": "detection",
+      "tier": "unit",
+      "why": "an absent ip_address is a platform/proxy condition, not many callers; counting each as distinct relabels a merchant's broken integration as a credential sweep AND raises its firing threshold from 3 to 10, so the operator hunts an attacker while the merchant's checkout stays down",
+      "source": "apps/api/src/mcp/agent-denial-alerts.ts",
+      "find": "  return ip && ip.length > 0 ? ip : UNKNOWN_IP;",
+      "replace": "  return ip && ip.length > 0 ? ip : `unknown-${Math.random()}`;",
+      "test": "tests/unit/agent-denial-alerts.test.ts"
+    },
+    {
+      "id": "agent-decrypt-failure-is-not-a-bad-key",
+      "domain": "agent identity",
+      "tier": "unit",
+      "why": "a wrong or rotated ENCRYPTION_KEY refuses every agent write on every store; reporting that as `invalid` blames the caller and makes the denial watcher classify a platform outage as a credential sweep, so the p0 that names ENCRYPTION_KEY never fires",
+      "source": "apps/api/src/mcp/agent-auth.ts",
+      "find": "        if (decryptFailed) {\n          context.credential = 'error';\n        } else if",
+      "replace": "        if (false) {\n          context.credential = 'error';\n        } else if",
+      "test": "tests/unit/mcp-agent-write-auth.test.ts"
     }
   ]
 }

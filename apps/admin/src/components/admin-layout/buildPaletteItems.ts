@@ -70,6 +70,8 @@ const PAGE_KEYWORDS: Record<string, string> = {
   'marketing-pixels': 'facebook tiktok snapchat google ads tracking بكسل تتبع إعلانات',
   affiliates: 'referral partners commission تسويق بالعمولة شركاء إحالة',
   whatsapp: 'wa chat messaging catalog واتساب رسائل دردشة',
+  'agent-key':
+    'ai agent mcp key credential token chatgpt claude agentic checkout api key مفتاح وكيل ذكاء اصطناعي بيانات اعتماد رمز شراء تلقائي',
 };
 
 /** Pull the keyword string for a page from its href's final path segment. */
@@ -91,6 +93,7 @@ export interface SettingsPaletteLabels {
   language: string;
   staff: string;
   announcement: string;
+  agentKey: string;
 }
 
 /**
@@ -148,6 +151,7 @@ export function buildStorePaletteItems(
       [settings.template, `/stores/${storeId}/template`],
       [settings.language, `/stores/${storeId}/language`],
       [settings.staff, `/stores/${storeId}/staff`],
+      [settings.agentKey, `/stores/${storeId}/agent-key`],
     ];
     for (const [name, href] of pages)
       items.push({ name, href, group: settingsGroup, keywords: keywordsForHref(href) });

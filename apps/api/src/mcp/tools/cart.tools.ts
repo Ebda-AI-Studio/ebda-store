@@ -4,6 +4,12 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpStore } from '../resolve-store';
 import { CartService, type CartBundleView } from '../../services/cart.service';
 import { cartLineUnitPrice } from '../../lib/cart-pricing';
+import {
+  agentContextFrom,
+  assertAgentWrite,
+  auditAgentWrite,
+  MCP_ID_MAX_CHARS,
+} from '../agent-auth';
 import { ok } from './tool-result';
 
 /**
@@ -75,29 +81,68 @@ export function registerCartTools(server: McpServer, store: McpStore): void {
     'add_to_cart',
     {
       description:
-        'Add a product (optionally a specific variant) to a cart. Omit cartId to start a new cart — the returned cartId must be reused for later cart/checkout calls.',
+        "Add a product (optionally a specific variant) to a cart. Omit cartId to start a new cart — the returned cartId must be reused for later cart/checkout calls. WRITE TOOL: requires the store's agent credential in the `x-agent-key` header.",
       inputSchema: {
-        cartId: z.string().min(1).optional(),
-        productId: z.string().min(1),
-        variantId: z.string().min(1).optional(),
+        // `.max()` is not cosmetic here: the denied-write audit below persists
+        // `productId` verbatim and runs BEFORE the credential check, so an
+        // unbounded string would let an anonymous caller write the ~10mb body
+        // limit into `audit_logs` 300×/min/IP. See `MCP_ID_MAX_CHARS`.
+        cartId: z.string().min(1).max(MCP_ID_MAX_CHARS).optional(),
+        productId: z.string().min(1).max(MCP_ID_MAX_CHARS),
+        variantId: z.string().min(1).max(MCP_ID_MAX_CHARS).optional(),
         quantity: z.number().int().min(1).max(999),
       },
     },
-    async ({ cartId, productId, variantId, quantity }) => {
+    async ({ cartId, productId, variantId, quantity }, extra) => {
+      // WRITE GATE. `add_to_cart` commits no money and no inventory, but it
+      // creates unbounded Cart/CartItem rows for an unauthenticated caller AND
+      // it is the only way to mint the cartId `place_order` consumes — so it
+      // is gated with `place_order` rather than left as the open on-ramp to
+      // the money path. Reads stay anonymous. Throws inside the handler (not
+      // at the Express layer) so the refusal reaches the agent as an
+      // explained tool error, never as a 401 that would also kill the
+      // handshake and every read tool.
+      let context;
+      try {
+        context = assertAgentWrite('add_to_cart', extra);
+      } catch (err) {
+        await auditAgentWrite({
+          store,
+          tool: 'add_to_cart',
+          outcome: 'denied',
+          context: agentContextFrom(extra),
+          details: { productId },
+        });
+        throw err;
+      }
+
       const sessionId = cartId ?? newCartId();
-      // Throws AppError (404 NOT_FOUND for an unknown product/variant, 400
-      // INSUFFICIENT_INVENTORY on oversell) — left to propagate so the SDK
-      // converts it into `{ isError: true }` rather than a 500 (same pattern
-      // as `get_product` in catalog.tools.ts).
-      const cart = await CartService.addItem(
-        store.id,
-        sessionId,
-        productId,
-        quantity,
-        undefined,
-        variantId
-      );
-      return ok(cartView(sessionId, cart, store.currency));
+      try {
+        // Throws AppError (404 NOT_FOUND for an unknown product/variant, 400
+        // INSUFFICIENT_INVENTORY on oversell) — left to propagate so the SDK
+        // converts it into `{ isError: true }` rather than a 500 (same pattern
+        // as `get_product` in catalog.tools.ts).
+        const cart = await CartService.addItem(
+          store.id,
+          sessionId,
+          productId,
+          quantity,
+          undefined,
+          variantId
+        );
+        return ok(cartView(sessionId, cart, store.currency));
+      } catch (err) {
+        // A rejected write is the signal worth the most and the one nothing
+        // recorded before — this file wrote zero audit rows.
+        await auditAgentWrite({
+          store,
+          tool: 'add_to_cart',
+          outcome: 'failed',
+          context,
+          details: { productId, variantId, quantity, error: (err as Error).message },
+        });
+        throw err;
+      }
     }
   );
 
@@ -106,7 +151,12 @@ export function registerCartTools(server: McpServer, store: McpStore): void {
     {
       description:
         "View a cart's items, bundles, and subtotal by its cartId. `bundles` are boxes the store sells at a fixed price — each is one entry, never split into its component products.",
-      inputSchema: { cartId: z.string().min(1) },
+      // Same bound, same reason on a different table: `getOrCreate` mints a
+      // Cart row on a miss with this exact string as its `sessionId`, so an
+      // unbounded value is a write amplifier on an anonymous read path. Every
+      // cartId in circulation is `sess_` + 32 hex (minted here or by
+      // `apps/web/src/lib/api.ts`), far inside the cap.
+      inputSchema: { cartId: z.string().min(1).max(MCP_ID_MAX_CHARS) },
     },
     async ({ cartId }) => {
       const cart = await CartService.getOrCreate(store.id, cartId);

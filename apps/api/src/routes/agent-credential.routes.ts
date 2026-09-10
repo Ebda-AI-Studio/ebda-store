@@ -1,0 +1,194 @@
+/**
+ * Agent (MCP) write credential — merchant admin API.
+ *
+ * The MCP write tools (`add_to_cart`, `place_order`) require the store's own
+ * agent credential in the `x-agent-key` header (Ruling M1). This is the surface
+ * that issues, rotates and revokes it — without it the credential requirement
+ * would have no way to be satisfied and the feature would be bricked rather
+ * than secured.
+ *
+ * Routes (same auth chain and mount shape as `wbs-integration.routes.ts`):
+ *   GET    /stores/:id/integrations/agent-key  — status only (never the key):
+ *                                                whether one exists, when it was
+ *                                                last rotated, and whether the
+ *                                                `agent_checkout_open_writes`
+ *                                                escape hatch is on for this store
+ *   POST   /stores/:id/integrations/agent-key  — mint or rotate; returns the
+ *                                                plaintext key EXACTLY ONCE
+ *   DELETE /stores/:id/integrations/agent-key  — revoke (writes are refused
+ *                                                again from the next call)
+ *
+ * The key is stored AES-256-GCM-encrypted in `Store.agentApiKey` via the same
+ * `encryption.service` the WBS bridge key uses. It is never logged, never
+ * returned by GET, and never used as a cache or rate-limit key.
+ */
+
+import { Router, Request, Response, NextFunction } from 'express';
+import { randomBytes } from 'node:crypto';
+import { prisma } from '@force/database';
+import { authenticate, authorize } from '../middleware/auth';
+import { requireMfaEnrolled } from '../middleware/require-mfa';
+import { requireStoreAccess } from '../middleware/store-access';
+import { requireFeature } from '../middleware/feature-gate';
+import { encryption } from '../services/encryption.service';
+import { featureService } from '../services/feature.service';
+import { AGENT_OPEN_WRITES_FEATURE } from '../mcp/agent-auth';
+import { auditLog } from '../middleware/security';
+import { getAuthUser } from '../utils/store-helpers';
+
+const router = Router({ mergeParams: true });
+
+const KEY_PREFIX = 'fak_'; // "force agent key" — greppable in a merchant's config
+
+/** 32 random bytes, base64url. ~256 bits; not derived from anything guessable. */
+function mintKey(): string {
+  return `${KEY_PREFIX}${randomBytes(32).toString('base64url')}`;
+}
+
+const chain = [
+  authenticate,
+  requireMfaEnrolled,
+  authorize('store_admin', 'super_admin'),
+  requireStoreAccess,
+  requireFeature('agent_checkout'),
+] as const;
+
+// ─── GET /stores/:id/integrations/agent-key ──────────────────────────────────
+
+router.get(
+  '/:id/integrations/agent-key',
+  ...chain,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id: storeId } = req.params;
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { agentApiKey: true, agentApiKeyRotatedAt: true },
+      });
+      if (!store) {
+        res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
+        return;
+      }
+      // The escape hatch (Ruling M2) is resolved SERVER-SIDE and returned here
+      // rather than read in the browser from `useFeatures()`. That hook returns
+      // `true` for EVERY key while the feature map is still loading (a
+      // deliberate anti-flicker default), so an admin screen that asked it
+      // would state "writes are open without a key" for the first paint of
+      // every store — a fail-OPEN reading of a security control. This value is
+      // never optimistic.
+      const openWrites = await featureService
+        .isFeatureEnabled(storeId, AGENT_OPEN_WRITES_FEATURE)
+        .catch(() => false);
+
+      // Status only. There is no "show me the key again" — a lost key is
+      // rotated, not recovered, so a leaked read of this endpoint is worthless.
+      res.json({
+        success: true,
+        data: {
+          hasKey: Boolean(store.agentApiKey),
+          rotatedAt: store.agentApiKeyRotatedAt,
+          header: 'x-agent-key',
+          openWrites,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── POST /stores/:id/integrations/agent-key ─────────────────────────────────
+
+router.post(
+  '/:id/integrations/agent-key',
+  ...chain,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id: storeId } = req.params;
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { agentApiKey: true },
+      });
+      if (!store) {
+        res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
+        return;
+      }
+
+      const key = mintKey();
+      await prisma.store.update({
+        where: { id: storeId },
+        data: { agentApiKey: encryption.encrypt(key), agentApiKeyRotatedAt: new Date() },
+      });
+
+      await auditLog({
+        action: 'store.agent_key_issued',
+        userId: getAuthUser(req).userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        storeId,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        details: { rotated: Boolean(store.agentApiKey) },
+      });
+
+      // The ONLY time the plaintext leaves the server. Rotating invalidates the
+      // previous key immediately — there is no overlap window, which is the
+      // right default for a credential with one holder.
+      res.status(201).json({
+        success: true,
+        data: {
+          apiKey: key,
+          header: 'x-agent-key',
+          rotated: Boolean(store.agentApiKey),
+          message:
+            'Store this key now — it is shown once and cannot be retrieved again. ' +
+            'Rotating issues a new key and immediately invalidates this one.',
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── DELETE /stores/:id/integrations/agent-key ───────────────────────────────
+
+router.delete(
+  '/:id/integrations/agent-key',
+  ...chain,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id: storeId } = req.params;
+      const store = await prisma.store.findUnique({
+        where: { id: storeId },
+        select: { agentApiKey: true },
+      });
+      if (!store) {
+        res.status(404).json({ success: false, error: { code: 'STORE_NOT_FOUND' } });
+        return;
+      }
+
+      await prisma.store.update({
+        where: { id: storeId },
+        data: { agentApiKey: null, agentApiKeyRotatedAt: new Date() },
+      });
+
+      await auditLog({
+        action: 'store.agent_key_revoked',
+        userId: getAuthUser(req).userId,
+        resourceType: 'store',
+        resourceId: storeId,
+        storeId,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        details: { hadKey: Boolean(store.agentApiKey) },
+      });
+
+      res.json({ success: true, data: { hasKey: false } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+export default router;

@@ -11,6 +11,12 @@ import { AppError } from '../../middleware/error-handler';
 import { config } from '../../config';
 import logger from '../../lib/logger';
 import { buildPaymentLineItems } from '../../lib/payment-line-items';
+import {
+  agentContextFrom,
+  assertAgentWrite,
+  auditAgentWrite,
+  MCP_ID_MAX_CHARS,
+} from '../agent-auth';
 import { ok } from './tool-result';
 
 /**
@@ -50,204 +56,261 @@ export function registerOrderTools(server: McpServer, store: McpStore): void {
     'place_order',
     {
       description:
-        'Place a guest order from a cart. paymentMethod "cod" completes immediately (cash on delivery, requires the store to have COD configured). "online" creates the order and returns a paymentUrl a human must open to pay.',
+        'Place a guest order from a cart. paymentMethod "cod" completes immediately (cash on delivery, requires the store to have COD configured). "online" creates the order and returns a paymentUrl a human must open to pay. WRITE TOOL: requires the store\'s agent credential in the `x-agent-key` header.',
       inputSchema: {
-        cartId: z.string().min(1),
+        // Bounded for the same reason as `add_to_cart`'s ids: the denied-write
+        // audit below persists `cartId` verbatim and runs BEFORE the credential
+        // check. See `MCP_ID_MAX_CHARS`.
+        cartId: z.string().min(1).max(MCP_ID_MAX_CHARS),
         paymentMethod: z.enum(['cod', 'online']),
         customer: customerSchema,
       },
     },
-    async ({ cartId, paymentMethod, customer }) => {
-      const { firstName, lastName } = splitName(customer.name);
-      const shippingAddress = {
-        firstName,
-        lastName,
-        address1: customer.address,
-        city: customer.city ?? '',
-        state: '',
-        postalCode: '',
-        country: customer.country,
-        phone: customer.phone,
-        email: customer.email,
-      };
-
-      if (paymentMethod === 'cod') {
-        // Mirror POST /payments/create's COD-availability gate EXACTLY
-        // (store-specific PaymentConfig row first, then a platform-wide
-        // one) — an agent must not be able to place a COD order in a
-        // store that never enabled COD. Checked BEFORE creating the
-        // order so a store with no COD config never gets an orphan
-        // agent order.
-        const codConfig = await prisma.paymentConfig.findFirst({
-          where: {
-            OR: [
-              { storeId: store.id, provider: 'cod', isEnabled: true },
-              { storeId: null, provider: 'cod', isEnabled: true },
-            ],
-          },
-          orderBy: { storeId: 'desc' },
+    async ({ cartId, paymentMethod, customer }, extra) => {
+      // WRITE GATE — the money-and-inventory path. Enforced HERE, inside the
+      // tool handler, and not as Express middleware: all seven tools ride one
+      // POST, so a rejecting `router.use` would 401 the `initialize` handshake
+      // and every read tool too and take the whole surface dark. Throwing here
+      // is converted by the SDK into `{ isError: true }` carrying an
+      // actionable message.
+      let context;
+      try {
+        context = assertAgentWrite('place_order', extra);
+      } catch (err) {
+        await auditAgentWrite({
+          store,
+          tool: 'place_order',
+          outcome: 'denied',
+          context: agentContextFrom(extra),
+          details: { cartId, paymentMethod },
         });
-        if (!codConfig) {
+        throw err;
+      }
+
+      try {
+        const { firstName, lastName } = splitName(customer.name);
+        const shippingAddress = {
+          firstName,
+          lastName,
+          address1: customer.address,
+          city: customer.city ?? '',
+          state: '',
+          postalCode: '',
+          country: customer.country,
+          phone: customer.phone,
+          email: customer.email,
+        };
+
+        if (paymentMethod === 'cod') {
+          // Mirror POST /payments/create's COD-availability gate EXACTLY
+          // (store-specific PaymentConfig row first, then a platform-wide
+          // one) — an agent must not be able to place a COD order in a
+          // store that never enabled COD. Checked BEFORE creating the
+          // order so a store with no COD config never gets an orphan
+          // agent order.
+          const codConfig = await prisma.paymentConfig.findFirst({
+            where: {
+              OR: [
+                { storeId: store.id, provider: 'cod', isEnabled: true },
+                { storeId: null, provider: 'cod', isEnabled: true },
+              ],
+            },
+            orderBy: { storeId: 'desc' },
+          });
+          if (!codConfig) {
+            throw new AppError(
+              400,
+              'COD_NOT_AVAILABLE',
+              'Cash on Delivery is not available for this store'
+            );
+          }
+
+          // Same required fields as a human guest order — OrderService.create
+          // throws (EMPTY_CART / INSUFFICIENT_INVENTORY / etc.) exactly like
+          // the storefront checkout path; left to propagate as an isError.
+          const order = await OrderService.create(store.id, undefined, cartId, {
+            shippingAddress,
+            paymentMethod: 'cod',
+            source: 'agent',
+          });
+
+          // Same COD-fee + Payment-row bookkeeping as POST /payments/create's
+          // cod branch, so an agent COD order is indistinguishable from a
+          // human COD order to the rest of the platform (admin order detail,
+          // "mark cash collected" flow, payment events).
+          const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
+          const total = codFee > 0 ? order.total + codFee : order.total;
+
+          // Tenant-scoped AND atomic: `withTenantContext` runs both writes
+          // inside ONE Prisma interactive transaction with `app.current_store_id`
+          // SET LOCAL (same RLS discipline the human `payment.routes.ts` cod
+          // branch gets from its request-level `runInTenantContext` wrap). Doing
+          // this in a single transaction is a correctness improvement over even
+          // the human path: if `payment.create` throws, the `order.update` total
+          // bump rolls back with it instead of leaving the order permanently
+          // overcharged with no `cod_pending` Payment row to show for it.
+          const payment = await withTenantContext(store.id, async tx => {
+            if (codFee > 0) {
+              await tx.order.update({ where: { id: order.id }, data: { total } });
+            }
+            return tx.payment.create({
+              data: {
+                orderId: order.id,
+                provider: 'cod',
+                method: 'cod',
+                status: 'cod_pending',
+                amount: total,
+                currency: order.currency,
+                metadata: { codFee, originalTotal: order.total, source: 'agent' },
+              },
+            });
+          });
+
+          // Non-fatal bookkeeping (unchanged semantics — each still swallows
+          // its own error via .catch), now tenant-scoped like the human path.
+          await runInTenantContext(store.id, async () => {
+            await recordPaymentEvent({
+              paymentId: payment.id,
+              storeId: store.id,
+              orderId: order.id,
+              eventType: 'created',
+              toStatus: 'cod_pending',
+              provider: 'cod',
+              details: { amount: total, codFee, originalTotal: order.total, source: 'agent' },
+            }).catch(err =>
+              logger.error(
+                { err, orderId: order.id },
+                '[MCP place_order] recordPaymentEvent failed'
+              )
+            );
+
+            // Attribution: this row used to carry no `ip`, no `userAgent` and no
+            // agent identity at all, so a completed agent order was
+            // indistinguishable in `audit_logs` from a row with no origin. All
+            // three are real columns on `audit_logs` — `auditLog` just was not
+            // being given them.
+            await auditLog({
+              action: 'payment.created',
+              resourceType: 'payment',
+              resourceId: payment.id,
+              storeId: store.id,
+              ip: context.ip,
+              userAgent: context.userAgent,
+              details: {
+                orderId: order.id,
+                amount: total,
+                codFee,
+                provider: 'cod',
+                source: 'agent',
+                agentClientId: context.grant === 'credential' ? 'credentialed' : context.grant,
+                credential: context.credential,
+                requestId: context.requestId,
+              },
+            }).catch(err =>
+              logger.error({ err, orderId: order.id }, '[MCP place_order] auditLog failed')
+            );
+          });
+
+          return ok({
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            paymentMethod: 'cod',
+            total,
+            currency: order.currency,
+          });
+        }
+
+        // Online: resolve the default provider EXPLICITLY first (before
+        // creating an order) so a store with no online provider configured
+        // never gets an orphan unpaid order — the tool errors cleanly
+        // instead. `PaymentService.createPayment` would also throw
+        // PAYMENT_NOT_CONFIGURED at this point, but only AFTER the order
+        // (and its inventory decrement + cart clear) already committed.
+        const provider = await PaymentService.getDefaultProvider(store.id);
+        if (!provider) {
           throw new AppError(
             400,
-            'COD_NOT_AVAILABLE',
-            'Cash on Delivery is not available for this store'
+            'PAYMENT_NOT_CONFIGURED',
+            'No online payment method is configured for this store'
           );
         }
 
-        // Same required fields as a human guest order — OrderService.create
-        // throws (EMPTY_CART / INSUFFICIENT_INVENTORY / etc.) exactly like
-        // the storefront checkout path; left to propagate as an isError.
         const order = await OrderService.create(store.id, undefined, cartId, {
           shippingAddress,
-          paymentMethod: 'cod',
+          paymentMethod: 'online',
           source: 'agent',
         });
 
-        // Same COD-fee + Payment-row bookkeeping as POST /payments/create's
-        // cod branch, so an agent COD order is indistinguishable from a
-        // human COD order to the rest of the platform (admin order detail,
-        // "mark cash collected" flow, payment events).
-        const codFee = codConfig.fixedFee ? Number(codConfig.fixedFee) : 0;
-        const total = codFee > 0 ? order.total + codFee : order.total;
-
-        // Tenant-scoped AND atomic: `withTenantContext` runs both writes
-        // inside ONE Prisma interactive transaction with `app.current_store_id`
-        // SET LOCAL (same RLS discipline the human `payment.routes.ts` cod
-        // branch gets from its request-level `runInTenantContext` wrap). Doing
-        // this in a single transaction is a correctness improvement over even
-        // the human path: if `payment.create` throws, the `order.update` total
-        // bump rolls back with it instead of leaving the order permanently
-        // overcharged with no `cod_pending` Payment row to show for it.
-        const payment = await withTenantContext(store.id, async tx => {
-          if (codFee > 0) {
-            await tx.order.update({ where: { id: order.id }, data: { total } });
-          }
-          return tx.payment.create({
-            data: {
+        const base = storefrontBaseUrl(store);
+        try {
+          // Faithfully replicates POST /payments/create's online-branch
+          // request shape (payment.routes.ts): same customer/items mapping,
+          // same callback/error URL convention, same
+          // `.../webhooks/payment/<provider>` webhook shape — provider is
+          // resolved explicitly above rather than left undefined.
+          const payment = await PaymentService.createPayment(
+            {
               orderId: order.id,
-              provider: 'cod',
-              method: 'cod',
-              status: 'cod_pending',
-              amount: total,
-              currency: order.currency,
-              metadata: { codFee, originalTotal: order.total, source: 'agent' },
+              orderNumber: order.orderNumber,
+              amount: order.total,
+              currency: order.currency as Currency,
+              customer: {
+                id: `guest-${order.id}`,
+                name: customer.name,
+                email: customer.email ?? '',
+                phone: customer.phone,
+              },
+              // Same collapse every other payment-provider call site uses
+              // (`payment.routes.ts` /create, `order.routes.ts` payment-link,
+              // `payment.factory.ts` retry — see `payment-line-items.ts`'s I3
+              // note): a bundle box must reach the gateway's hosted page as
+              // ONE line at the bundle price, never its per-component
+              // allocated shares. This call site mapped `order.items` raw and
+              // was the one instance final review missed.
+              items: buildPaymentLineItems(order.items),
+              callbackUrl: `${base}/checkout/success`,
+              errorUrl: `${base}/checkout/error`,
+              webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,
             },
-          });
-        });
-
-        // Non-fatal bookkeeping (unchanged semantics — each still swallows
-        // its own error via .catch), now tenant-scoped like the human path.
-        await runInTenantContext(store.id, async () => {
-          await recordPaymentEvent({
-            paymentId: payment.id,
-            storeId: store.id,
-            orderId: order.id,
-            eventType: 'created',
-            toStatus: 'cod_pending',
-            provider: 'cod',
-            details: { amount: total, codFee, originalTotal: order.total, source: 'agent' },
-          }).catch(err =>
-            logger.error({ err, orderId: order.id }, '[MCP place_order] recordPaymentEvent failed')
+            provider,
+            store.id
           );
 
-          await auditLog({
-            action: 'payment.created',
-            resourceType: 'payment',
-            resourceId: payment.id,
-            storeId: store.id,
-            details: { orderId: order.id, amount: total, codFee, provider: 'cod', source: 'agent' },
-          }).catch(err =>
-            logger.error({ err, orderId: order.id }, '[MCP place_order] auditLog failed')
-          );
-        });
-
-        return ok({
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          status: order.status,
-          paymentMethod: 'cod',
-          total,
-          currency: order.currency,
-        });
-      }
-
-      // Online: resolve the default provider EXPLICITLY first (before
-      // creating an order) so a store with no online provider configured
-      // never gets an orphan unpaid order — the tool errors cleanly
-      // instead. `PaymentService.createPayment` would also throw
-      // PAYMENT_NOT_CONFIGURED at this point, but only AFTER the order
-      // (and its inventory decrement + cart clear) already committed.
-      const provider = await PaymentService.getDefaultProvider(store.id);
-      if (!provider) {
-        throw new AppError(
-          400,
-          'PAYMENT_NOT_CONFIGURED',
-          'No online payment method is configured for this store'
-        );
-      }
-
-      const order = await OrderService.create(store.id, undefined, cartId, {
-        shippingAddress,
-        paymentMethod: 'online',
-        source: 'agent',
-      });
-
-      const base = storefrontBaseUrl(store);
-      try {
-        // Faithfully replicates POST /payments/create's online-branch
-        // request shape (payment.routes.ts): same customer/items mapping,
-        // same callback/error URL convention, same
-        // `.../webhooks/payment/<provider>` webhook shape — provider is
-        // resolved explicitly above rather than left undefined.
-        const payment = await PaymentService.createPayment(
-          {
+          return ok({
             orderId: order.id,
             orderNumber: order.orderNumber,
-            amount: order.total,
-            currency: order.currency as Currency,
-            customer: {
-              id: `guest-${order.id}`,
-              name: customer.name,
-              email: customer.email ?? '',
-              phone: customer.phone,
-            },
-            // Same collapse every other payment-provider call site uses
-            // (`payment.routes.ts` /create, `order.routes.ts` payment-link,
-            // `payment.factory.ts` retry — see `payment-line-items.ts`'s I3
-            // note): a bundle box must reach the gateway's hosted page as
-            // ONE line at the bundle price, never its per-component
-            // allocated shares. This call site mapped `order.items` raw and
-            // was the one instance final review missed.
-            items: buildPaymentLineItems(order.items),
-            callbackUrl: `${base}/checkout/success`,
-            errorUrl: `${base}/checkout/error`,
-            webhookUrl: `${config.apiUrl}/api/v1/webhooks/payment/${provider}`,
-          },
-          provider,
-          store.id
-        );
-
-        return ok({
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          status: order.status,
-          paymentMethod: 'online',
-          total: order.total,
-          currency: order.currency,
-          paymentUrl: payment.paymentUrl,
-        });
+            status: order.status,
+            paymentMethod: 'online',
+            total: order.total,
+            currency: order.currency,
+            paymentUrl: payment.paymentUrl,
+          });
+        } catch (err) {
+          // Compensating rollback — same pattern as POST /payments/create's
+          // catch block: the order committed (cart cleared, inventory
+          // decremented) but the payment step failed, so undo it rather than
+          // strand an unpaid, cart-less order the agent/customer can't retry.
+          await OrderService.rollbackForPaymentFailure(store.id, order.id, cartId).catch(rbErr =>
+            logger.error(
+              { err: rbErr, orderId: order.id, storeId: store.id },
+              '[MCP place_order] order rollback failed after payment-create failure'
+            )
+          );
+          throw err;
+        }
       } catch (err) {
-        // Compensating rollback — same pattern as POST /payments/create's
-        // catch block: the order committed (cart cleared, inventory
-        // decremented) but the payment step failed, so undo it rather than
-        // strand an unpaid, cart-less order the agent/customer can't retry.
-        await OrderService.rollbackForPaymentFailure(store.id, order.id, cartId).catch(rbErr =>
-          logger.error(
-            { err: rbErr, orderId: order.id, storeId: store.id },
-            '[MCP place_order] order rollback failed after payment-create failure'
-          )
-        );
+        // A REJECTED checkout is the signal we most want and the one nothing
+        // recorded before: an agent order that failed COD availability, ran out
+        // of stock, or blew up at the gateway left no row in any table and no
+        // distinguishable log line.
+        await auditAgentWrite({
+          store,
+          tool: 'place_order',
+          outcome: 'failed',
+          context,
+          details: { cartId, paymentMethod, error: (err as Error).message },
+        });
         throw err;
       }
     }

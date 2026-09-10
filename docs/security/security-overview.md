@@ -36,8 +36,37 @@ deps) — dated reports live in `docs/audits/`.
   read cross-tenant rows outside an explicit, audited bypass helper.
 - MFA is supported on admin accounts (recovery runbook:
   `docs/runbooks/mfa-recovery.md`).
+- **Machine/agent access** (the store-scoped MCP endpoint, `POST
+/api/v1/mcp/:storeSlug`) is split read/write. The 5 read tools and the MCP
+  handshake are anonymous by design — that surface exists so AI shopping agents
+  can find and evaluate a merchant's catalogue. The 2 tools that mutate
+  (`add_to_cart`, `place_order`) require the store's own agent credential,
+  presented as `x-agent-key`, stored AES-256-GCM-encrypted per store and
+  compared ONLY against the store the URL slug resolved to, so a key issued for
+  one merchant cannot write to another. Merchants mint/rotate/revoke it
+  themselves on the **AI agent key** admin page (`/stores/:id/agent-key`; API
+  `/stores/:id/integrations/agent-key`, store_admin + MFA); the plaintext is
+  shown once, at mint time only, and never logged, cached, re-returned by the
+  status endpoint, or used as a rate-limit key. Neither the plaintext nor the
+  stored ciphertext leaves the API on any other read: the three `StoreService`
+  wide reads omit the column, and all four properties are mutation-tested.
+  Enforcement is ON by default; the `agent_checkout_open_writes` StoreFeature is
+  a per-store escape hatch that disables it without a deploy (Rulings M1/M2,
+  2026-09-09).
 - Audit trail: security-relevant actions logged (`audit_logs`), 90 days hot,
-  then archived to R2 for 7 years.
+  then archived to R2 for 7 years. Agent writes are recorded whether they
+  succeed or not — `agent.write.denied` / `agent.write.failed` carry the caller
+  ip and user agent, and a completed agent order's `payment.created` row carries
+  both as well.
+- Detection on refusals: `agent-write-denied-watch` (a 15-minute Inngest cron)
+  reads the `agent.write.denied` rows and alerts through the Telegram channel.
+  It classifies by what the caller PRESENTED — a lookup failure of ours (p0),
+  a merchant integration presenting a stale key from a stable source (p1), a
+  credential sweep from many sources (p1, escalating to one platform p0 across
+  3+ stores), credential-less volume (info) — rather than on the raw denial
+  rate, which is dominated by unauthenticated agents finding the tools through
+  `llms.txt` and would get the alert muted. Thresholds and reasoning:
+  `apps/api/src/mcp/agent-denial-alerts.ts`.
 
 ## Incident response
 
@@ -77,8 +106,10 @@ deps) — dated reports live in `docs/audits/`.
 
 ## Defence verification
 
-Security controls in the five mutation-record-mandatory domains (authn/session,
-tenant/RLS, money/payment/refund, consent, erasure) are not merely covered by a
+Security controls in the mutation-record-mandatory domains (authn/session,
+tenant/RLS, money/payment/refund, consent, erasure, and — added 2026-09-09 —
+agent identity, injection, enumeration, cache poisoning and availability) are
+not merely covered by a
 test — each is proven to FAIL when the control is removed. See
 `docs/security/defence-mutation-record.md` (generated; spec in
 `defence-mutations.json`, runner in `scripts/defence-mutation-record.mjs`). It

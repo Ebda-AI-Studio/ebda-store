@@ -49,6 +49,13 @@ export const FEATURE_KEYS_ARRAY = [
   // baseline (see plan-baselines.ts). A merchant only gets it via an
   // explicit super-admin StoreFeature override.
   'bundles',
+  // MCP agent-write ESCAPE HATCH (2026-09-09, Ruling M2). NOT part of any
+  // plan baseline, so it is OFF for every store and the default posture is
+  // ENFORCEMENT ON: the MCP write tools (add_to_cart, place_order) require
+  // the store's `X-Agent-Key` credential. Turning this key ON for one store
+  // DISABLES that requirement for that store — it is the per-store, no-deploy
+  // rollback lever, never the switch that turns the protection on.
+  'agent_checkout_open_writes',
   // Accounting sub-features (2026-05-27)
   'accounting.basic',
   'accounting.expenses',
@@ -526,6 +533,23 @@ export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
     descriptionAr:
       'تحديد المتسوّقين الذين وصلوا إلى بوابة الدفع لكنهم لم يُكملوا الدفع. ' +
       'تُسجَّل البيانات بشكل تلقائي وتظهر في لوحة إعادة الاستهداف مع بيانات التواصل وقيمة العربة والبوابة المستخدمة.',
+    category: 'marketing',
+    tier: 'addon',
+  },
+  agent_checkout_open_writes: {
+    key: 'agent_checkout_open_writes',
+    name: 'AI Agent Checkout — open writes (no credential)',
+    nameAr: 'الشراء عبر وكلاء الذكاء الاصطناعي — بدون بيانات اعتماد',
+    description:
+      'Escape hatch. By default the MCP write tools (add_to_cart, place_order) require ' +
+      "the store's agent credential sent as the X-Agent-Key header; read tools never do. " +
+      'Turning this on lets any unauthenticated agent write to this store again — enable it ' +
+      'only to unblock a live integration while a credential is issued.',
+    descriptionAr:
+      'مخرج طوارئ. افتراضياً تتطلب أدوات الكتابة في MCP (إضافة إلى السلة، إنشاء الطلب) ' +
+      'بيانات اعتماد المتجر عبر ترويسة X-Agent-Key، أما أدوات القراءة فلا تتطلب ذلك. ' +
+      'تفعيل هذا الخيار يسمح لأي وكيل غير موثّق بالكتابة في هذا المتجر مجدداً — فعّله فقط ' +
+      'لإصلاح تكامل قائم ريثما تُصدر بيانات الاعتماد.',
     category: 'marketing',
     tier: 'addon',
   },

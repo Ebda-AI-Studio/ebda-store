@@ -1533,6 +1533,10 @@
       "checkoutDelivery": {
         "title": "Delivery",
         "description": "Delivery info note and time-window selector shown at checkout"
+      },
+      "agentKey": {
+        "title": "AI agent key",
+        "description": "Issue, rotate or revoke the key an AI agent needs to order from this store"
       }
     },
     "metaCatalogCard": {
@@ -2033,9 +2037,9 @@
       "unlimited": "Unlimited",
       "availableCount": "{count} bundles",
       "mayNotSplitEvenly": "This price may not split evenly across the items — save to see the exact fix, if any.",
-      "discountAboveComponentSum": "A discount of {sum} or more would make the bundle free \u2014 lower it below the components total.",
+      "discountAboveComponentSum": "A discount of {sum} or more would make the bundle free — lower it below the components total.",
       "zeroPriceWillNotSell": "A bundle priced at 0 is not sold while its items cost {sum} — price it above 0, or make the items themselves free.",
-      "priceAboveComponentSum": "A bundle can't cost more than its components ({sum}) \u2014 lower the price or add components.",
+      "priceAboveComponentSum": "A bundle can't cost more than its components ({sum}) — lower the price or add components.",
       "priceNotAllocatable": "{price} can't be split exactly across these items — use {suggested}?",
       "useSuggested": "Use {suggested}",
       "loading": "Loading…",
@@ -4370,7 +4374,8 @@
         "template": "Theme template",
         "language": "Language",
         "staff": "Staff & roles",
-        "announcement": "Announcement bar"
+        "announcement": "Announcement bar",
+        "agentKey": "AI agent key"
       }
     },
     "notificationBell": {
@@ -6133,6 +6138,69 @@
       "loadFailed": "Could not load customer groups.",
       "saveFailed": "Could not save the group.",
       "deleteFailed": "Could not delete the group."
+    }
+  },
+  "agentKey": {
+    "page": {
+      "title": "AI agent key",
+      "subtitle": "The credential an AI agent must present before it can add to a cart or place an order in this store.",
+      "backToSettings": "Back to settings"
+    },
+    "status": {
+      "heading": "Key status",
+      "issued": "Key issued",
+      "notIssued": "No key issued",
+      "issuedBody": "An agent holding this key can add to a cart and place orders in your store. Nobody — including us — can read it back, so if it is lost, rotate it.",
+      "notIssuedBody": "No agent can add to a cart or place an order in your store yet. Browsing tools stay open: agents can already search your products and read your store details without a key.",
+      "headerLabel": "Request header",
+      "lastChangedLabel": "Last issued or changed",
+      "never": "Never"
+    },
+    "hatch": {
+      "title": "Open writes are ON for this store",
+      "body": "A platform administrator has switched off the key requirement here, so any agent can add to a cart and place orders WITHOUT presenting a key. Whether a key is issued below makes no difference while this is on. Ask support to switch it back off once your agent is using its key."
+    },
+    "actions": {
+      "mint": "Issue key",
+      "rotate": "Rotate key",
+      "revoke": "Revoke key"
+    },
+    "howto": {
+      "heading": "Giving the key to your agent",
+      "step1": "Issue the key and copy it — it is shown once and cannot be read back afterwards.",
+      "step2": "Store it wherever your agent keeps its secrets. Never paste it into a public page, a chat, or your store content.",
+      "step3": "Your agent must send it on every write request in the x-agent-key header.",
+      "readsAreOpen": "Reading tools — product search, product details, store details, cart view and order status — need no key and are unaffected by anything on this page."
+    },
+    "reveal": {
+      "title": "Copy your key now",
+      "warning": "This is the only time this key is shown. It is not stored anywhere you can read it back, and support cannot recover it. If you lose it, rotate to issue a new one.",
+      "copy": "Copy key",
+      "copied": "Copied",
+      "done": "I have stored it"
+    },
+    "rotate": {
+      "title": "Rotate the agent key?",
+      "body": "A new key is issued and the current one stops working immediately — there is no overlap period. Any agent still sending the old key will be refused from the next request until you give it the new one.",
+      "confirm": "Rotate key"
+    },
+    "revoke": {
+      "title": "Revoke the agent key?",
+      "body": "This removes the key entirely. Every agent using it is refused from the next request, and the key cannot be restored — a new one has to be issued and handed over again. If your agent is live, its checkout stops working the moment you confirm.",
+      "acknowledge": "I understand this immediately breaks any agent that is using this key.",
+      "confirm": "Revoke key"
+    },
+    "common": {
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "minted": "Agent key issued",
+      "rotated": "Agent key rotated",
+      "revoked": "Agent key revoked",
+      "loadFailedTitle": "Could not load the key status",
+      "issueFailedTitle": "Could not issue the key",
+      "issueFailedBody": "Nothing was changed. Try again.",
+      "revokeFailedTitle": "Could not revoke the key"
     }
   }
 }

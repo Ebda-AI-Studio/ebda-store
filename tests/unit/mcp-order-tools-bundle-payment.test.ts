@@ -52,18 +52,27 @@ vi.mock('@api/config', () => ({
 }));
 
 import { registerOrderTools } from '@api/mcp/tools/order.tools';
+import { authorizedAgentExtra } from '../helpers/mcp-agent-auth';
 import { OrderService } from '@api/services/order.service';
 import { PaymentService } from '@api/services/payment-providers/payment.factory';
 
 function harness() {
-  const tools: Record<string, (input: unknown) => Promise<{ content: unknown[] }>> = {};
+  // `place_order` is a WRITE tool: it now refuses without the `agent:write`
+  // scope the MCP SDK forwards as `extra.authInfo`, so the harness passes the
+  // second handler argument through and every call below supplies an
+  // authorised `extra` (`authorizedAgentExtra()`). Dropping it makes these
+  // tests red with AGENT_CREDENTIAL_REQUIRED, which is the point.
+  const tools: Record<
+    string,
+    (input: unknown, extra?: unknown) => Promise<{ content: unknown[] }>
+  > = {};
   const server = {
     registerTool: (
       name: string,
       _config: unknown,
-      handler: (input: unknown) => Promise<unknown>
+      handler: (input: unknown, extra?: unknown) => Promise<unknown>
     ) => {
-      tools[name] = handler as (input: unknown) => Promise<{ content: unknown[] }>;
+      tools[name] = handler as (input: unknown, extra?: unknown) => Promise<{ content: unknown[] }>;
     },
   } as unknown as McpServer;
   return { server, tools };
@@ -125,7 +134,10 @@ describe('order.tools place_order (online) — payment-provider line items', () 
     const { server, tools } = harness();
     registerOrderTools(server, store as never);
 
-    await tools.place_order({ cartId: 'cart-1', paymentMethod: 'online', customer });
+    await tools.place_order(
+      { cartId: 'cart-1', paymentMethod: 'online', customer },
+      authorizedAgentExtra()
+    );
 
     expect(PaymentService.createPayment).toHaveBeenCalledTimes(1);
     const request = vi.mocked(PaymentService.createPayment).mock.calls[0][0] as {
@@ -166,7 +178,10 @@ describe('order.tools place_order (online) — payment-provider line items', () 
     const { server, tools } = harness();
     registerOrderTools(server, store as never);
 
-    await tools.place_order({ cartId: 'cart-2', paymentMethod: 'online', customer });
+    await tools.place_order(
+      { cartId: 'cart-2', paymentMethod: 'online', customer },
+      authorizedAgentExtra()
+    );
 
     const request = vi.mocked(PaymentService.createPayment).mock.calls[0][0] as {
       items: { name: string; quantity: number; unitPrice: number; sku?: string }[];

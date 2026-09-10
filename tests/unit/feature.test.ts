@@ -46,8 +46,10 @@ describe('Feature Registry', () => {
     // 2026-07-13: 38 keys (added agent_feed add-on feature).
     // 2026-07-24: 40 keys (merge of agent_checkout + answer_engine_insights add-on features).
     // 2026-09-06: 41 keys (added `bundles` — Product Bundles, in NO plan baseline).
-    it('has exactly 41 entries', () => {
-      expect(FEATURE_KEYS_ARRAY).toHaveLength(41);
+    // 2026-09-09: 42 keys (added `agent_checkout_open_writes` — the MCP
+    //   agent-write escape hatch, in NO plan baseline; Ruling M2).
+    it('has exactly 42 entries', () => {
+      expect(FEATURE_KEYS_ARRAY).toHaveLength(42);
     });
   });
 

@@ -21,6 +21,7 @@ import {
 } from '../middleware/security';
 import { recordProductView } from '../services/view-ingest.service';
 import { getStoreIdFromRequest } from '../utils/store-helpers';
+import { config } from '../config';
 import logger from '../lib/logger';
 import { featureService } from '../services/feature.service';
 import { getCached } from '../lib/public-cache';
@@ -331,9 +332,30 @@ router.get('/feed/products.json', async (req: Request, res: Response, next: Next
       where: { id: storeId },
       select: { id: true, name: true, slug: true, currency: true, domain: true },
     });
-    const baseUrl = store.domain
-      ? `https://${store.domain}`
-      : `https://${req.get('x-original-host') ?? req.get('host')}`;
+    // P1-2 — feed poisoning. `baseUrl` used to fall back to
+    // `req.get('x-original-host') ?? req.get('host')`, and NOTHING in the chain
+    // strips inbound headers (`trust proxy` is a hop COUNT, not a filter). An
+    // attacker-supplied `X-Original-Host` therefore landed in every `link` of a
+    // feed built for whichever store `X-Store-ID`/`x-store-domain` named, then
+    // sat in Redis for 600s (the cache key has no host in it) AND at the CDN —
+    // so ONE request poisoned every subsequent agent's product links.
+    //
+    // The fallback is now the same derivation `order.tools.ts`'s
+    // `storefrontBaseUrl` and `payment.routes.ts` already use — custom domain
+    // wins, else the platform web app at /<slug>. This is also a live BUG fix,
+    // not only a hardening: `apps/web` never forwards `x-original-host` to the
+    // API (its feed passthrough sends only `x-store-domain`/`X-Store-ID`, and
+    // `apps/web/middleware.ts` sets that header on the web app's OWN inbound
+    // request headers, which never leave it), so a platform-hosted store's feed
+    // was falling through to `req.get('host')` = the API host and emitting
+    // `https://api.../products/<slug>` links that point at the API, not the
+    // storefront. No request-supplied header can influence the output any more.
+    //
+    // Cache tail after deploy: the old value survives in
+    // `public:products:<storeId>:feed:v1` for up to 600s and at the CDN for
+    // 600s + 86400s stale-while-revalidate. "Fixed" and "visible" are not the
+    // same instant.
+    const baseUrl = store.domain ? `https://${store.domain}` : `${config.webUrl}/${store.slug}`;
     // `bundles` is in NO plan baseline (super-admin override only) — a
     // store without it must see this feed completely unchanged, so the
     // bundle listing query below is skipped entirely rather than run and

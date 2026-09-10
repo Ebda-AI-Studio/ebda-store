@@ -23,6 +23,19 @@ on:
       - 'docs/security/defence-mutations.json'
       - 'apps/api/src/middleware/**'
       - 'apps/api/src/routes/product.routes.ts'
+      # Agent-write auth (Ruling M1) + the two 2026-09-09 P1s. The
+      # `mutation-gate-trigger-coverage` unit test fails if a source named in
+      # defence-mutations.json is not reachable from this list — that is how
+      # this line got added, and it is why the list must grow with the spec.
+      - 'apps/api/src/mcp/**'
+      # Agent-key admin surface + the denial watcher (this PR). Same rule as
+      # the line above: a defended source unreachable from this list means the
+      # gate passes every PR having measured nothing about it.
+      - 'apps/api/src/routes/agent-credential.routes.ts'
+      - 'apps/api/src/services/store.service.ts'
+      - 'apps/api/src/lib/inngest/functions/agent-write-denied-watch.ts'
+      - 'apps/api/src/routes/auth.routes.ts'
+      - 'apps/api/src/routes/public.routes.ts'
       - 'apps/api/src/services/auth.service.ts'
       - 'apps/api/src/services/accounting/**'
       - 'apps/api/src/services/payment-providers/**'

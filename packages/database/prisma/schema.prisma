@@ -308,6 +308,18 @@ model Store {
   /// Supports {storeName}, {customerName}, {items}, {total}, {currency} placeholder vars.
   botCopy                   Json?   @map("bot_copy")
 
+  /// Agent (MCP) WRITE credential — per store, opt-in, NULL for every store
+  /// until a merchant mints one. Encrypted at rest with the SAME AES-256-GCM
+  /// scheme as `wbsApiKey` above (apps/api/src/services/encryption.service.ts,
+  /// keyed off ENCRYPTION_KEY) rather than a second credential scheme.
+  /// Presented by an agent as the `X-Agent-Key` header on
+  /// POST /api/v1/mcp/:storeSlug and compared ONLY against the store the slug
+  /// resolved to, so a key minted for store A can never authorise a write on
+  /// store B. Read tools need no credential. NEVER returned in plaintext
+  /// except once, in the response to the mint/rotate call that generated it.
+  agentApiKey          String?   @map("agent_api_key")
+  agentApiKeyRotatedAt DateTime? @map("agent_api_key_rotated_at")
+
   // GEO (Generative Engine Optimization) — LLM-search visibility fields.
   // Written by bulk-ai-geo Inngest sweep. Merchantscan edit via admin.
   /// LLMs.txt content for this store — served at /<slug>/llms.txt by the storefront.

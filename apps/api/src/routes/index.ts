@@ -46,6 +46,7 @@ import publicStoreLayoutRoutes from './public-store-layout.routes';
 import pagesRoutes from './pages.routes';
 import typographyRoutes from './typography.routes';
 import wbsIntegrationRoutes from './wbs-integration.routes';
+import agentCredentialRoutes from './agent-credential.routes';
 import waTemplatesRoutes from './wa-templates.routes';
 import paymentLinksRoutes from './payment-links.routes';
 import financeRoutes from './finance.routes';
@@ -276,6 +277,14 @@ router.use('/stores', tenantContext, newsletterRoutes);
 // CONTEXT-LESS (Phase 2 candidate, reverted 2026-07-02 PR #499): handlers
 // call the external WBS backend via `fetch` in-request.
 router.use('/stores', tenantContext, wbsIntegrationRoutes);
+
+// Agent (MCP) write-credential admin — mint / rotate / revoke the per-store
+// `x-agent-key`. Mounted next to the WBS integration routes because it is the
+// same shape of per-store credential admin (`/stores/:id/integrations/...`).
+// `tenantContext` here is the same bare-mount no-op it is on every `/stores`
+// line above (Express only fills params declared in the MOUNT path); tenant
+// scoping comes from `requireStoreAccess` inside the router.
+router.use('/stores', tenantContext, agentCredentialRoutes);
 
 // Phase 7: WhatsApp templates admin (generate / sync / status)
 router.use('/stores/:id/wa-templates', tenantContext, waTemplatesRoutes);

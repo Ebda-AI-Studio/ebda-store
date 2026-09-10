@@ -112,6 +112,14 @@ const ENTERPRISE_ADDITIONS: FeatureKey[] = [
   'payment_abandonment',
 ];
 
+// 'agent_checkout_open_writes' (2026-09-09, Ruling M2) is deliberately in NO
+// baseline either, and for the OPPOSITE reason to every other absent key: it
+// is an escape hatch, not a capability. Absent = MCP write tools require the
+// store's agent credential (the protection is ON). A super-admin
+// StoreFeature override turns it on to DISABLE that requirement for one
+// store. Adding it to a baseline would silently reopen the unauthenticated
+// write hole on every store on that plan — do NOT add it below.
+
 // 'bundles' (2026-09-06) is deliberately in NO baseline — not starter, not
 // professional, not enterprise. It is sold per store and enabled via a
 // super-admin StoreFeature override, so every existing merchant (on every

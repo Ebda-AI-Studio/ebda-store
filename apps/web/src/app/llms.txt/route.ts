@@ -285,8 +285,21 @@ export function buildPerStoreBody(
   // ONLY discovery surface for that endpoint (it's not linked from any
   // storefront page). Served by apps/api, not this web app, so the URL is
   // rooted at API_URL (the API's own origin), not `base`.
+  // The advertisement is a CONTRACT: this is the only place an agent can learn
+  // the endpoint exists, so it has to state the read/write split too. Writes
+  // (add_to_cart, place_order) need the store's `x-agent-key` credential
+  // (Ruling M1, 2026-09-09); reads never do. An agent that discovers 7 tools
+  // here and gets an unexplained error on two of them is a broken surface.
+  // `agent_checkout_open_writes` is the per-store escape hatch that turns the
+  // requirement off — when it is on, say so, because then the credential line
+  // would be a lie. Keep this copy in step with
+  // `AGENT_CREDENTIAL_REQUIRED_MESSAGE` in apps/api/src/mcp/agent-auth.ts.
+  const mcpWritesOpen = store.enabledFeatures?.includes('agent_checkout_open_writes');
+  const mcpWriteLine = mcpWritesOpen
+    ? `- Write tools (no credential required on this store): add_to_cart, place_order`
+    : `- Write tools (credential required): add_to_cart, place_order\n- Write authentication: send the store's agent key in the \`x-agent-key\` request header. Ask the store (see Contact above) to issue one. Without it the read tools still work and the write tools return an error explaining this.`;
   const mcpSection = store.enabledFeatures?.includes('agent_checkout')
-    ? `\n\n## Agentic checkout (MCP)\n\nThis store accepts orders from AI agents via the Model Context Protocol (MCP):\n\n- MCP endpoint: ${API_URL}/mcp/${store.slug}\n- Transport: Streamable HTTP (stateless, POST only)\n- Tools: search_products, get_product, get_store_info, add_to_cart, view_cart, place_order, get_order_status`
+    ? `\n\n## Agentic checkout (MCP)\n\nThis store accepts orders from AI agents via the Model Context Protocol (MCP):\n\n- MCP endpoint: ${API_URL}/mcp/${store.slug}\n- Transport: Streamable HTTP (stateless, POST only)\n- Read tools (no credential): search_products, get_product, get_store_info, view_cart, get_order_status\n${mcpWriteLine}`
     : '';
 
   return `# ${storeTitle}
