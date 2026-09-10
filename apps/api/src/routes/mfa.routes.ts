@@ -147,6 +147,11 @@ router.post('/verify', authLimiter, async (req, res, next) => {
       // authenticate middleware rejects any challenge token masquerading as
       // an access token.
       payload = jwt.verify(challengeToken, config.jwtSecret, {
+        // Pinned like every other verify in this codebase. A symmetric secret
+        // already stops `alg: none` in jsonwebtoken, so this closes a
+        // consistency gap rather than a live hole — but "the one call that
+        // didn't pin it" is how algorithm-confusion bugs are always written.
+        algorithms: ['HS256'],
         issuer: 'force-api',
         audience: 'force-mfa-challenge',
       });
