@@ -26,10 +26,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@force/database';
 import bcrypt from 'bcryptjs';
+import { API_BASE } from '../../helpers/api-base';
 
-const API_URL = process.env.TEST_API_BASE
-  ? `${process.env.TEST_API_BASE}/api/v1`
-  : 'http://localhost:4000/api/v1';
+// One knob (TEST_API_URL) configures the whole integration suite; see
+// tests/helpers/api-base.ts for why it is not the server's own API_URL.
+const API_URL = API_BASE;
 
 const PW = 'Test1234!pw';
 const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;

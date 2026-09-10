@@ -16,9 +16,13 @@
 import { describe, it, expect } from 'vitest';
 import { prisma } from '@force/database';
 import bcrypt from 'bcryptjs';
+import { API_BASE } from '../helpers/api-base';
 
-const API_HOST = process.env.API_HOST || 'http://localhost:4000';
-const API_URL = `${API_HOST}/api/v1`;
+// One knob (TEST_API_URL) configures the whole integration suite. Neither the
+// server's API_URL nor its API_HOST is read here: API_HOST is a BARE HOSTNAME
+// ("localhost") that dotenv injects at API-module import time, which would
+// build the invalid "localhost/api/v1". See tests/helpers/api-base.ts.
+const API_URL = API_BASE;
 
 const GDPR_TEST_PASSWORD = 'GdprTest!234';
 

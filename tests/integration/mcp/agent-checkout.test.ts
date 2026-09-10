@@ -51,8 +51,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@force/database';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { API_BASE } from '../../helpers/api-base';
 
-const API = process.env.API_URL || 'http://localhost:4000/api/v1';
+const API = API_BASE;
 
 let storeId: string;
 let ownerId: string;

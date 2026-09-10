@@ -18,8 +18,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@force/database';
 import bcrypt from 'bcryptjs';
+import { API_BASE } from '../helpers/api-base';
 
-const API_URL = 'http://localhost:4000/api/v1';
+// One knob (TEST_API_URL) points the whole suite at one API, so a run cannot
+// silently talk to whatever holds port 4000 — which on this machine was a
+// different project's dev server for five days. See tests/helpers/api-base.ts.
+const API_URL = API_BASE;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@force-ai.co';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 

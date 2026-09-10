@@ -5,7 +5,7 @@
  *   - POST /auth/logout-all bumps the user's tokenVersion so ALL
  *     outstanding access tokens are rejected (401 TOKEN_REVOKED).
  *
- * Requires the API running on API_HOST (default http://localhost:4000)
+ * Requires the API running on TEST_API_URL (default http://localhost:4000)
  * and local Postgres + Redis accessible.
  */
 
@@ -13,13 +13,13 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { prisma } from '@force/database';
 import bcrypt from 'bcryptjs';
 import { redis } from '../../apps/api/src/services/redis.service';
+import { API_BASE } from '../helpers/api-base';
 
-// API_HOST in the root .env is a bare hostname used by the server (e.g.
-// "localhost") — not a URL. Importing redis.service triggers dotenv.config()
-// which injects it before this const runs, producing an invalid URL like
-// "localhost/api/v1". Use a dedicated TEST_API_BASE var with a http:// fallback
-// that matches CI (where neither var is set).
-const API = `${process.env.TEST_API_BASE || 'http://localhost:4000'}/api/v1`;
+// One knob configures the whole suite; see tests/helpers/api-base.ts for why
+// it is TEST_API_URL rather than the server's own API_URL or API_HOST. The
+// redis.service import above is exactly the hazard: it runs dotenv.config()
+// before this line, so root-.env values would win.
+const API = API_BASE;
 const PW = 'Test1234!pw';
 
 /** Track created user IDs for cleanup. */

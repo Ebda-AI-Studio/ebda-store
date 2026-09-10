@@ -6,11 +6,14 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { prisma } from '@force/database';
 import bcrypt from 'bcryptjs';
+import { API_BASE, API_ORIGIN } from '../helpers/api-base';
 
-// API base URL for testing. Health is the public/load-balancer endpoint
-// (no /api/v1 prefix). Everything else lives under /api/v1.
-const API_HOST = 'http://localhost:4000';
-const API_URL = `${API_HOST}/api/v1`;
+// Health is the public/load-balancer endpoint (no /api/v1 prefix); everything
+// else lives under /api/v1. Both forms come from one validated knob — see
+// tests/helpers/api-base.ts for why it is TEST_API_URL and not the server's
+// own API_URL (which points at production in a deployed environment).
+const API_HOST = API_ORIGIN;
+const API_URL = API_BASE;
 
 // Admin credentials must match what the seed script provisioned. CI sets
 // ADMIN_PASSWORD; locally we fall back to the historical value.

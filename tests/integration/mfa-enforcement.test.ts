@@ -11,7 +11,7 @@
  *   6. (C1) store_admin without MFA hits GET /stores (store.routes) → NOT blocked by MFA gate.
  *   7. (C1) enrolled super_admin hits GET /stores → passes (200).
  *
- * Requires the API running on API_HOST (default http://localhost:4000) and
+ * Requires the API running on TEST_API_URL (default http://localhost:4000) and
  * local Postgres + Redis accessible.
  */
 
@@ -21,13 +21,13 @@ import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 import { encryption } from '../../apps/api/src/services/encryption.service';
 import { MfaService } from '../../apps/api/src/services/mfa.service';
+import { API_BASE } from '../helpers/api-base';
 
-// API_HOST in the root .env is a bare hostname used by the server (e.g.
-// "localhost") — not a URL. Importing API modules triggers dotenv.config()
-// which injects it before this const runs, producing an invalid URL like
-// "localhost/api/v1". Use a dedicated TEST_API_BASE var with a http:// fallback
-// that matches CI (where neither var is set).
-const API = `${process.env.TEST_API_BASE || 'http://localhost:4000'}/api/v1`;
+// One knob configures the whole suite; see tests/helpers/api-base.ts for why
+// it is TEST_API_URL rather than the server's own API_URL or API_HOST. The
+// encryption.service import above is exactly the hazard: it runs
+// dotenv.config() before this line, so root-.env values would win.
+const API = API_BASE;
 const PW = 'Test1234!pw';
 const SUPER_EMAIL = `mfa-enf-super-${Date.now()}@example.test`;
 const STORE_EMAIL = `mfa-enf-store-${Date.now()}@example.test`;

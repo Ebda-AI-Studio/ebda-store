@@ -29,10 +29,12 @@ import { prisma } from '@force/database';
 import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 import { encryption } from '../../../apps/api/src/services/encryption.service';
+import { API_BASE } from '../../helpers/api-base';
 
-const API_URL = process.env.TEST_API_BASE
-  ? `${process.env.TEST_API_BASE}/api/v1`
-  : 'http://localhost:4000/api/v1';
+// One knob (TEST_API_URL) configures the whole integration suite; see
+// tests/helpers/api-base.ts for why it is not the server's own API_URL — the
+// encryption.service import above runs dotenv.config() before this line.
+const API_URL = API_BASE;
 
 const PW = 'Test1234!pw';
 const PLAINTEXT_KEY = 'pplx-secret-123';

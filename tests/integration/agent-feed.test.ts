@@ -18,8 +18,9 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@force/database';
+import { API_BASE } from '../helpers/api-base';
 
-const API_URL = process.env.API_URL || 'http://localhost:4000/api/v1';
+const API_URL = API_BASE;
 
 let storeId: string;
 let ownerId: string;

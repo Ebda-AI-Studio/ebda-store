@@ -14,7 +14,7 @@
  *   - SEC-2: /auth/mfa/enroll/begin while already enrolled without current code → 400 MFA_REAUTH_REQUIRED.
  *   - SEC-3: /auth/mfa/enroll/begin while already enrolled WITH valid current code → 200.
  *
- * Requires the API running on API_HOST (default http://localhost:4000) and local
+ * Requires the API running on TEST_API_URL (default http://localhost:4000) and local
  * Postgres + Redis accessible.
  */
 
@@ -22,13 +22,13 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@force/database';
 import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
+import { API_BASE } from '../helpers/api-base';
 
-// API_HOST in the root .env is a bare hostname used by the server (e.g.
-// "localhost") — not a URL. Importing API modules triggers dotenv.config()
-// which injects it before this const runs, producing an invalid URL like
-// "localhost/api/v1". Use a dedicated TEST_API_BASE var with a http:// fallback
-// that matches CI (where neither var is set).
-const API = `${process.env.TEST_API_BASE || 'http://localhost:4000'}/api/v1`;
+// One knob configures the whole suite; see tests/helpers/api-base.ts for why
+// it is TEST_API_URL rather than the server's own API_URL or API_HOST (both
+// are injected by dotenv.config() at API-module import time, i.e. before any
+// const here, and API_URL is an origin that points at production when set).
+const API = API_BASE;
 const PW = 'Test1234!pw';
 const EMAIL = `mfa-${Date.now()}@example.test`;
 
